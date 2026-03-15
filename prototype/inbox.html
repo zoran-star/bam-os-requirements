@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BAM OS — Inbox</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   BAM OS — Design System Tokens
+   ============================================= */
+:root {
+  --font-primary: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8F7F4;
+  --card-bg: #FFFFFF;
+  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --card-shadow-lifted: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --border: #E8E6E1;
+  --border-accent: #D4D1C9;
+  --gold: #C9B97A;
+  --gold-light: #E2DD9F;
+  --gold-dim: rgba(201, 185, 122, 0.15);
+  --gold-hover: rgba(201, 185, 122, 0.25);
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-dim: #9B9B9B;
+  --green: #4caf50;
+  --red: #f44336;
+  --yellow: #f5c842;
+  --blue: #45b7d1;
+}
+
+/* =============================================
+   Reset & Base
+   ============================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* =============================================
+   App Shell
+   ============================================= */
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-secondary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================================
+   Status Bar (mock)
+   ============================================= */
+.status-bar {
+  height: 54px;
+  padding: 0 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  background: var(--bg-primary);
+  padding-bottom: 8px;
+}
+.status-bar-time {
+  font-weight: 700;
+  font-size: 15px;
+}
+.status-bar-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* =============================================
+   Header
+   ============================================= */
+.header {
+  background: var(--bg-primary);
+  padding: 4px 20px 0;
+  border-bottom: 1px solid var(--border);
+}
+.header-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* =============================================
+   Tabs
+   ============================================= */
+.tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-primary);
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  flex: 1;
+  padding: 12px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.tab.active {
+  color: var(--text-primary);
+  font-weight: 700;
+  border-bottom-color: var(--gold);
+}
+.tab:not(.active):hover {
+  color: var(--text-secondary);
+}
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* =============================================
+   Conversation List
+   ============================================= */
+.inbox-content {
+  flex: 1;
+  padding: 0 0 140px;
+  overflow-y: auto;
+}
+
+.conversation-section-label {
+  padding: 14px 20px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.conversation-section-label svg {
+  width: 14px;
+  height: 14px;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.conversation-item:hover {
+  background: var(--bg-secondary);
+}
+.conversation-item:active {
+  background: rgba(0,0,0,0.04);
+}
+
+/* Human intervention required */
+.conversation-item.human-required {
+  border-left: 3px solid var(--red);
+  background: #FFF5F5;
+}
+.conversation-item.human-required:hover {
+  background: #FFEDED;
+}
+
+.conversation-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.conversation-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversation-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.conversation-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-time {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.conversation-preview {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.conversation-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.human-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--red);
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.human-tag svg {
+  width: 10px;
+  height: 10px;
+}
+
+.unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.channel-tag {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Tab content visibility */
+.tab-panel {
+  display: none;
+}
+.tab-panel.active {
+  display: block;
+}
+
+/* =============================================
+   Floating Sage Button
+   ============================================= */
+.sage-float {
+  position: fixed;
+  bottom: 96px;
+  right: 50%;
+  transform: translateX(calc(min(200px, 50vw - 20px)));
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: row-reverse;
+}
+.sage-float-btn {
+  width: 52px;
+  height: 52px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(201, 185, 122, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  border: none;
+}
+.sage-float-btn:active {
+  transform: scale(0.92);
+}
+.sage-float-btn svg {
+  width: 24px;
+  height: 24px;
+  color: #fff;
+}
+
+/* =============================================
+   Bottom Nav
+   ============================================= */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding: 8px 0 28px;
+  z-index: 200;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 0;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease, background 0.15s ease;
+  border-radius: 8px;
+  margin: 0 2px;
+}
+.nav-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+.nav-item:active {
+  transform: scale(0.9);
+  background: rgba(0,0,0,0.06);
+}
+.nav-item:hover svg,
+.nav-item:hover .nav-label {
+  color: var(--text-primary);
+}
+.nav-item:active svg,
+.nav-item:active .nav-label {
+  color: var(--gold);
+}
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.nav-item.active svg {
+  color: var(--gold);
+}
+.nav-item.active .nav-label {
+  color: var(--gold);
+  font-weight: 700;
+}
+.nav-item.active:hover svg,
+.nav-item.active:hover .nav-label {
+  color: var(--gold);
+}
+.nav-item-badge {
+  position: absolute;
+  top: 2px;
+  right: 50%;
+  transform: translateX(calc(50% + 8px));
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-item {
+  position: relative;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app-shell">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-bar-time">9:41</div>
+    <div class="status-bar-icons">
+      <svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="8" width="3" height="4" fill="currentColor" rx="0.5"/><rect x="4.5" y="5" width="3" height="7" fill="currentColor" rx="0.5"/><rect x="9" y="2" width="3" height="10" fill="currentColor" rx="0.5"/><rect x="13.5" y="0" width="3" height="12" fill="currentColor" rx="0.5" opacity="0.3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6c4.5-4 16.5-4 22 0M5 10c3.5-3 10.5-3 14 0M9.5 14c1.5-1.5 5.5-1.5 5 0"/></svg>
+      <svg width="24" height="12" viewBox="0 0 28 13"><rect x="0" y="1" width="24" height="11" rx="2" stroke="currentColor" fill="none" stroke-width="1.2"/><rect x="25" y="4" width="2" height="5" rx="1" fill="currentColor" opacity="0.3"/><rect x="2" y="3" width="16" height="7" rx="1" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">Inbox</div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="leads" onclick="switchTab('leads')">
+      Leads <span class="tab-badge">3</span>
+    </div>
+    <div class="tab" data-tab="members" onclick="switchTab('members')">
+      Members <span class="tab-badge">1</span>
+    </div>
+  </div>
+
+  <!-- Leads Tab -->
+  <div class="inbox-content">
+    <div class="tab-panel active" id="leads-panel">
+
+      <!-- Human Intervention Section -->
+      <div class="conversation-section-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Human Intervention Required
+      </div>
+
+      <div class="conversation-item human-required" onclick="alert('Opening conversation with Marcus Rivera...')">
+        <div class="conversation-avatar" style="background: #E57373;">MR</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Marcus Rivera</div>
+            <div class="conversation-time">2m ago</div>
+          </div>
+          <div class="conversation-preview">I want to cancel my trial. The schedule doesn't work for my kid's...</div>
+          <div class="conversation-meta">
+            <div class="human-tag">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Human Intervention Required
+            </div>
+            <div class="channel-tag">SMS</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item human-required" onclick="alert('Opening conversation with Diana Chen...')">
+        <div class="conversation-avatar" style="background: #9575CD;">DC</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Diana Chen</div>
+            <div class="conversation-time">18m ago</div>
+          </div>
+          <div class="conversation-preview">Can I get a refund for last month? My son was injured and couldn't...</div>
+          <div class="conversation-meta">
+            <div class="human-tag">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Human Intervention Required
+            </div>
+            <div class="channel-tag">Email</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Regular conversations -->
+      <div class="conversation-item" onclick="alert('Opening conversation with Jake Thompson...')">
+        <div class="conversation-avatar" style="background: #64B5F6;">JT</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Jake Thompson</div>
+            <div class="conversation-time">35m ago</div>
+          </div>
+          <div class="conversation-preview">What age groups do you have classes for? My daughter is 7...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">Instagram DM</div>
+            <div class="unread-dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Samantha Lee...')">
+        <div class="conversation-avatar" style="background: #81C784;">SL</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Samantha Lee</div>
+            <div class="conversation-time">1h ago</div>
+          </div>
+          <div class="conversation-preview">Thanks! We'll be there Saturday for the free trial class.</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">SMS</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Roberto Diaz...')">
+        <div class="conversation-avatar" style="background: #FFB74D;">RD</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Roberto Diaz</div>
+            <div class="conversation-time">2h ago</div>
+          </div>
+          <div class="conversation-preview">Do you offer any family discounts? I have 3 kids interested in...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">Facebook</div>
+            <div class="unread-dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Priya Patel...')">
+        <div class="conversation-avatar" style="background: #4DD0E1;">PP</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Priya Patel</div>
+            <div class="conversation-time">3h ago</div>
+          </div>
+          <div class="conversation-preview">Hi! I saw your ad about the kids jiu-jitsu program. What's the...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">Web Chat</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Mike O\'Brien...')">
+        <div class="conversation-avatar" style="background: #A1887F;">MO</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Mike O'Brien</div>
+            <div class="conversation-time">Yesterday</div>
+          </div>
+          <div class="conversation-preview">Sounds good, I'll sign up for the Monday evening class.</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">SMS</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Members Tab -->
+    <div class="tab-panel" id="members-panel">
+
+      <!-- Human Intervention Section -->
+      <div class="conversation-section-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Human Intervention Required
+      </div>
+
+      <div class="conversation-item human-required" onclick="alert('Opening conversation with Lisa Yamamoto...')">
+        <div class="conversation-avatar" style="background: #F06292;">LY</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Lisa Yamamoto</div>
+            <div class="conversation-time">45m ago</div>
+          </div>
+          <div class="conversation-preview">I'm not happy with the instructor change. We signed up because of...</div>
+          <div class="conversation-meta">
+            <div class="human-tag">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Human Intervention Required
+            </div>
+            <div class="channel-tag">Email</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Regular member conversations -->
+      <div class="conversation-item" onclick="alert('Opening conversation with Aaliyah Chen...')">
+        <div class="conversation-avatar" style="background: #7986CB;">AC</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Aaliyah Chen</div>
+            <div class="conversation-time">1h ago</div>
+          </div>
+          <div class="conversation-preview">Can we switch from Tuesday to Thursday class? School schedule...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">App Message</div>
+            <div class="unread-dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Tom Nguyen...')">
+        <div class="conversation-avatar" style="background: #4DB6AC;">TN</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Tom Nguyen</div>
+            <div class="conversation-time">3h ago</div>
+          </div>
+          <div class="conversation-preview">My payment didn't go through, can you check? I updated my card...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">SMS</div>
+            <div class="unread-dot"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Sarah Mitchell...')">
+        <div class="conversation-avatar" style="background: #FF8A65;">SM</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Sarah Mitchell</div>
+            <div class="conversation-time">5h ago</div>
+          </div>
+          <div class="conversation-preview">Just wanted to say Coach Davis has been amazing with my son! He's...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">App Message</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with James Park...')">
+        <div class="conversation-avatar" style="background: #AED581;">JP</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">James Park</div>
+            <div class="conversation-time">Yesterday</div>
+          </div>
+          <div class="conversation-preview">Are there any spots open in the Saturday morning advanced class?</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">SMS</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-item" onclick="alert('Opening conversation with Maria Santos...')">
+        <div class="conversation-avatar" style="background: #BA68C8;">MS</div>
+        <div class="conversation-body">
+          <div class="conversation-top-row">
+            <div class="conversation-name">Maria Santos</div>
+            <div class="conversation-time">Yesterday</div>
+          </div>
+          <div class="conversation-preview">We'll be on vacation next week, just wanted to let you know the...</div>
+          <div class="conversation-meta">
+            <div class="channel-tag">Email</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Floating Sage Button -->
+<div class="sage-float">
+  <button class="sage-float-btn" onclick="alert('Full-screen Sage conversation view would open here.')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+  </button>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <a class="nav-item" href="home.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="nav-label">Home</span>
+  </a>
+  <a class="nav-item active" href="inbox.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/></svg>
+    <span class="nav-label">Inbox</span>
+    <span class="nav-item-badge">4</span>
+  </a>
+  <a class="nav-item" href="marketing.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    <span class="nav-label">Marketing</span>
+  </a>
+  <a class="nav-item" href="sales.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="nav-label">Sales</span>
+  </a>
+  <a class="nav-item" href="management.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <span class="nav-label">Management</span>
+  </a>
+</div>
+
+<script>
+function switchTab(tab) {
+  // Update tab buttons
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${tab}"]`).classList.add('active');
+
+  // Update panels
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(tab + '-panel').classList.add('active');
+}
+</script>
+
+</body>
+</html>
