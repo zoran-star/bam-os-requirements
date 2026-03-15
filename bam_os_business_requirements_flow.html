@@ -726,6 +726,248 @@
                         notes: 'The Marketing tab layout is confirmed in UX Decision 34. Format intentionally mirrors Sales tab (SAL-012): KPI strip → AI advisor insight → deeper link → actionable content. Specific three KPIs for MTD strip are deferred but visual format is locked. More marketing features to be added later.',
                         uxDetail: 'UX Decisions: Section 34 (Marketing tab confirmed layout — MTD KPI strip with 3 KPIs, AI advisor actionable quote, "See full dashboard" link, ads needing refresh with one-tap action, best-performing ads with metrics inline. KPI selection rules deferred).',
                         subJobs: []
+                    },
+                    {
+                        id: 'MKT-005',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Ad campaign creation and launch',
+                        oneLiner: 'Create and launch Meta ad campaigns from within BAM OS — Sage guides the coach through campaign setup, creative upload, and budget allocation without touching Ads Manager.',
+                        release: 'V1',
+                        initiatedBy: 'Human (guided by Sage)',
+                        frequency: 'On demand',
+                        requirement: 'Ad campaign creation and launch — the coach creates a new Meta ad campaign entirely from within BAM OS, without needing to open Meta Ads Manager. Sage guides the process in a conversational flow: (1) Objective selection — Sage recommends an objective based on the academy\'s current pipeline state (e.g., "Your trial pipeline is thin — let\'s run a lead generation campaign"). The coach confirms or adjusts. BAM OS maps to Meta campaign objectives: Lead Generation (form fills), Conversions (trial bookings), or Traffic (landing page visits). (2) Creative upload — coach uploads 3–5 ad creatives (images or short videos) with primary text, headline, and description per creative. Sage suggests copy based on what has performed well for this academy and similar academies in the BAM knowledge base. Preview shows how each ad will look on Facebook Feed, Instagram Feed, and Instagram Stories. (3) Budget and schedule — coach sets a daily budget (Sage suggests a range based on academy size and local market) and a start/end date or ongoing schedule. (4) Targeting — under Advantage+ / Andromeda, BAM OS sets broad targeting (location radius around the academy address from SET-002, age 18–65). No manual interest targeting — Andromeda handles optimization. Coach can optionally exclude existing members by uploading a customer list (or BAM OS auto-generates one from the member database). (5) Review and launch — Sage shows a summary: objective, budget, creatives, targeting, schedule. Coach confirms. BAM OS creates the campaign, ad set, and ads via Meta Marketing API. Campaign goes live immediately or on the scheduled start date. Post-launch: the new campaign appears in MKT-001 reporting and MKT-002 refresh cycle automatically.',
+                        dataInputs: 'Campaign objective, ad creatives (images/video), ad copy (primary text, headline, description), daily budget, schedule, academy location for targeting radius',
+                        dataSources: 'Database (academy profile, member list for exclusion), Meta Marketing API',
+                        outputAction: 'Meta campaign + ad set + ads created via API; campaign live on schedule; campaign visible in MKT-001 reporting and MKT-002 refresh cycle; confirmation shown to coach',
+                        humanTouchpoint: 'Yes — coach provides creatives, confirms budget, and approves launch. Sage guides but does not auto-launch.',
+                        integrations: 'BAM OS Dashboard, Meta Marketing API, Database, BAM Knowledge Base (for copy suggestions)',
+                        dependencies: 'Meta API connected with ads_management permission; SET-002 location configured (for targeting radius); Meta Business account and ad account linked; payment method configured in Meta',
+                        edgeCases: 'Meta API rejects ad creative (policy violation): surface Meta\'s rejection reason clearly — "Meta rejected this image because [reason]. Try a different creative." Do not retry with the same asset. Campaign creation succeeds but ad review is pending: show "Campaign created — ads are being reviewed by Meta (usually takes 1–24 hours)" status. Coach has no existing creatives: link to CNT-001 creative brief flow — "Need ad creatives? Start with a creative brief." Meta ad account not configured: block with setup guidance linking to SET-010. Budget below Meta minimum ($1/day): surface Meta\'s minimum and suggest increasing.',
+                        notes: 'This is the job that eliminates the biggest friction point in academy marketing: the coach having to learn Meta Ads Manager. Most academy owners either pay an agency or run poorly configured campaigns because Ads Manager is overwhelming. BAM OS abstracts it to: pick your creatives, confirm budget, launch. Sage\'s copy suggestions draw from the BAM knowledge base — what ad copy has performed well for similar academies. Andromeda handles the targeting optimization, so BAM OS does not need to expose interest targeting, custom audiences, or detailed demographics. The member exclusion list is important — showing ads to existing members wastes budget.',
+                        subJobs: [
+                            {
+                                id: 'MKT-005a',
+                                title: 'Sage-guided campaign setup flow',
+                                requirement: 'Sage-guided campaign setup — a conversational wizard where Sage walks the coach through campaign creation step by step. Sage opens with a recommendation based on the academy\'s current state: "Based on your pipeline, I\'d suggest a lead generation campaign targeting parents within 15 miles of [location]. Ready to set it up?" Each step (objective, creatives, copy, budget, targeting, review) is presented as a Sage conversation turn with clear inputs. The coach can ask questions at any step ("How much should I spend?" "What kind of images work best?") and Sage answers from the knowledge base before continuing. The flow saves progress — if the coach leaves mid-setup, they can resume where they left off.',
+                                release: 'V1',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Database, BAM Knowledge Base',
+                                dependencies: 'QST-001 Sage conversation system live; MKT-005 parent live',
+                                notes: 'The conversational format is intentional — a form-based wizard would feel like a worse version of Ads Manager. The Sage conversation makes it feel like you have a marketing consultant helping you set up the campaign. Progress saving is critical — coaches get interrupted constantly.'
+                            },
+                            {
+                                id: 'MKT-005b',
+                                title: 'Meta API campaign creation',
+                                requirement: 'Meta API campaign creation — the technical execution layer that translates the coach\'s inputs from MKT-005a into Meta Marketing API calls. Creates: (1) Campaign object with the selected objective and CBO enabled. (2) Ad set with Advantage+ audience (broad targeting, location radius, age range), daily budget, and schedule. (3) Individual ad objects per uploaded creative with the associated copy fields. Uses the Meta Marketing API v21.0+ endpoints. Handles the creation sequence (campaign → ad set → ads) with rollback if any step fails. Returns the campaign ID, ad set ID, and ad IDs to BAM OS for tracking.',
+                                release: 'V1',
+                                initiatedBy: 'Agent',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'SET-010 Meta account connected with ads_management scope; MKT-005a setup complete',
+                                notes: 'CBO (Campaign Budget Optimization) is always enabled — BAM OS does not support ad-set-level budgets. This is intentional: CBO + Andromeda produces better results for small advertisers than manual budget allocation. Rollback on failure: if ad creation fails after campaign + ad set are created, pause the campaign rather than leaving headless objects in the Meta account.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-006',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Budget management and pacing',
+                        oneLiner: 'Set a monthly ad budget, track spend pacing in real time, and get alerts when you\'re running ahead or behind target.',
+                        release: 'MVP',
+                        initiatedBy: 'Human (budget setting) / Agent (pacing monitoring)',
+                        frequency: 'Budget set monthly or on demand; pacing checked daily',
+                        requirement: 'Budget management and pacing — the coach sets a monthly ad budget for each location in BAM OS. The system tracks actual Meta ad spend against the budget in real time (via MKT-001a spend data) and surfaces pacing status. Budget configuration: coach enters a monthly budget amount (e.g., $500/month) per location. The system calculates the ideal daily spend rate (monthly budget ÷ days in month) and compares against actual daily spend pulled from Meta. Pacing status displayed on the Marketing tab (MKT-004) as a visual indicator: (1) On pace (green) — spend is within ±10% of the ideal daily rate. (2) Running hot (yellow) — spend is 10–25% above the ideal daily rate; at this pace, the budget will be exhausted before month-end. (3) Running very hot (red) — spend is 25%+ above the ideal daily rate; budget will be exhausted significantly early. (4) Underspending (blue) — spend is more than 15% below the ideal daily rate; budget is being underutilized. Alerts: when pacing transitions from green to yellow or red, Sage surfaces a home screen card: "Your ad spend is running ahead of budget — at this pace, you\'ll use your $500 budget by the 22nd. Want me to reduce daily spend?" If the coach confirms, BAM OS adjusts the campaign daily budgets via Meta API to bring pacing back on target. Monthly budget reset: on the 1st of each month, pacing resets. Prior month\'s actual spend vs. budget is logged for MKT-001 reporting. Budget can be adjusted mid-month — pacing recalculates from the adjustment date.',
+                        dataInputs: 'Monthly budget amount (coach-set), actual daily spend from Meta, days remaining in month',
+                        dataSources: 'Meta Marketing API (spend data via MKT-001a), Database (budget_settings table)',
+                        outputAction: 'Pacing status displayed on Marketing tab; alerts surfaced on home screen when off-pace; budget adjustment executed via Meta API on coach approval; monthly spend vs. budget logged',
+                        humanTouchpoint: 'Yes — coach sets budget and approves adjustments. Pacing monitoring is automated.',
+                        integrations: 'BAM OS Dashboard, Meta Marketing API, Database',
+                        dependencies: 'Meta API connected; MKT-001a spend data pulling; at least one active campaign',
+                        edgeCases: 'No active campaigns: budget set but no spend to track — show $0 spent with a "No active campaigns" note. Multiple campaigns across one location: budget tracks total spend across all campaigns for that location. Coach sets budget mid-month: prorate — divide remaining budget by remaining days. Meta spend data delayed (up to 24h lag in Meta reporting): note "spend data may be up to 24 hours delayed" on the pacing display. Budget is $0 (coach wants to pause all spending): surface as a deliberate pause, not an error.',
+                        notes: 'Budget pacing is one of the most common anxieties for small business owners running ads — "am I spending too much?" or "why isn\'t my budget being used?" The visual pacing indicator turns an opaque Meta billing experience into something the coach can glance at and understand. The Sage-initiated budget adjustment is the key action: the coach doesn\'t have to go into Meta to reduce daily budgets — BAM OS does it on confirmation. This is a significant quality-of-life improvement over Ads Manager.',
+                        subJobs: [
+                            {
+                                id: 'MKT-006a',
+                                title: 'Budget configuration',
+                                requirement: 'Budget configuration — accessible from Marketing tab settings or during campaign creation (MKT-005). Coach enters a monthly budget per location. Fields: location (dropdown if multi-location), monthly amount (dollars), effective month (current month or next month). Saved to Database. If the coach has never set a budget: Sage suggests a starting point based on academy size and local market ("For an academy your size in [city], I\'d suggest starting with $300–500/month"). Budget history retained for reporting — coach can see what they budgeted vs. what they spent each month.',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SET-002 locations configured'
+                            },
+                            {
+                                id: 'MKT-006b',
+                                title: 'Pacing monitor and alerts',
+                                requirement: 'Pacing monitor — a daily scheduled job that pulls the current month\'s cumulative spend from Meta (via MKT-001a cache) and compares against the ideal pace for this point in the month. Outputs pacing status (on pace / running hot / very hot / underspending) and stores in Database. The Marketing tab (MKT-004) displays: a progress bar showing spend-to-date vs. monthly budget, projected end-of-month spend based on current daily rate, pacing status badge, and days remaining. Alerts: when status transitions to yellow or red, a Sage card appears on the home screen with the projected exhaustion date and a one-tap "Adjust budget" CTA. Underspending alert is lower urgency — shown as a note on the Marketing tab only, not a home screen card.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent (daily scheduled)',
+                                integrations: 'BAM OS Dashboard, Meta Marketing API, Database',
+                                dependencies: 'MKT-006a budget set; MKT-001a spend data live'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-007',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Landing page management',
+                        oneLiner: 'Create, publish, and track conversion rates on the landing pages that ads drive to — without leaving BAM OS.',
+                        release: 'V1',
+                        initiatedBy: 'Human (guided by Sage)',
+                        frequency: 'On demand',
+                        requirement: 'Landing page management — the coach creates and manages the landing pages that Meta ad campaigns drive traffic to. BAM OS provides a simple landing page builder with pre-built templates designed for youth sports academy lead generation. Landing page components: (1) Template selection — 3–5 pre-built templates optimized for trial signup conversion (e.g., "Free Trial Offer," "Summer Camp Registration," "Academy Overview"). Each template has a proven layout: hero image/video, headline, 3 benefit bullets, social proof (testimonials or member count), and a CTA form. (2) Customization — coach fills in: academy name and logo (pulled from SET-001), headline text, benefit bullets, hero image or video, testimonial quotes, and CTA button text. Sage suggests copy based on what converts well for similar academies. (3) Form configuration — the CTA form collects: parent name, email (required), phone (required), child\'s age, and "How did you hear about us?" dropdown. Form submission fires two events: a Meta Conversions API "Lead" event (via SET-010) for ad attribution, and a lead record creation in the sales pipeline (SAL-001). (4) Publishing — landing page is published to a BAM OS-hosted URL (e.g., [academy-slug].bamos.app/trial). Coach can use this URL as the ad destination in MKT-005. (5) Analytics — per landing page: page views, form submissions, conversion rate (submissions ÷ views), and source attribution (which ad campaign drove the traffic, via UTM parameters). Analytics visible in MKT-001 dashboard and on the landing page management screen.',
+                        dataInputs: 'Template selection, custom copy and images, form field configuration, academy branding from SET-001',
+                        dataSources: 'Database (landing_pages table, landing_page_submissions table, page_view_events)',
+                        outputAction: 'Landing page published at BAM OS-hosted URL; form submissions create leads in pipeline and fire Meta CAPI events; analytics tracked per page',
+                        humanTouchpoint: 'Yes — coach builds and publishes page. Form submissions auto-processed.',
+                        integrations: 'BAM OS Dashboard, Database, Meta Conversions API (SET-010), SAL-001 (pipeline lead creation)',
+                        dependencies: 'SET-001 academy profile configured; SET-010 Meta CAPI configured; domain/hosting for BAM OS landing pages',
+                        edgeCases: 'Coach publishes a landing page with no active ad campaign pointing to it: valid — the page is live and accessible via direct URL. Landing page form spam: implement honeypot field and rate limiting (no CAPTCHA — friction kills conversion). Coach deletes a landing page that an active campaign links to: surface warning "This page is linked to [campaign name] — deleting it will break that ad." Require confirmation. Academy has no logo uploaded: use academy name text in place of logo.',
+                        notes: 'The landing page builder is deliberately simple — 3–5 templates, not a drag-and-drop builder. Academy owners do not need (or want) to design pages from scratch. The templates are conversion-optimized layouts proven in youth sports lead generation. The tight integration between the landing page form, Meta CAPI, and the sales pipeline is the key value: a form submission simultaneously attributes the conversion to the ad, creates a pipeline lead, and triggers SAL-004 AI nurture. No manual data transfer, no CSV uploads, no broken attribution.',
+                        subJobs: [
+                            {
+                                id: 'MKT-007a',
+                                title: 'Landing page builder',
+                                requirement: 'Landing page builder — a guided page creation flow in BAM OS. Step 1: Choose a template (visual preview of each). Step 2: Customize content — pre-filled with academy data from SET-001 where possible (name, logo, location address). Sage pre-fills suggested headline and benefit copy. Coach edits inline. Image upload for hero section (or choose from a stock library of youth sports images). Step 3: Configure form fields — required fields locked (name, email, phone), optional fields toggleable (child age, "how did you hear about us"). Step 4: Preview — mobile and desktop preview of the finished page. Step 5: Publish — page goes live at the BAM OS-hosted URL. Post-publish: coach can edit the page at any time — changes go live immediately.',
+                                release: 'V1',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SET-001 academy profile; landing page hosting infrastructure live',
+                                notes: 'Templates are not custom-coded per academy — they are parameterized templates that inject the academy\'s content. This keeps the builder fast and the pages performant. Mobile-first design — most ad traffic from Meta arrives on mobile.'
+                            },
+                            {
+                                id: 'MKT-007b',
+                                title: 'Landing page analytics',
+                                requirement: 'Landing page analytics — per published landing page: total page views (tracked via a lightweight analytics snippet on the page), total form submissions, conversion rate (submissions ÷ views), submissions by source (UTM campaign parameter, mapping back to Meta campaign IDs), and submissions by day (trend chart). Data is also rolled into MKT-001 as "landing page conversion rate" alongside the Meta ad metrics. A/B testing in V2: support two variants of a landing page with traffic splitting and statistical significance calculation.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (continuous tracking)',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'MKT-007a landing page published; page view tracking snippet deployed',
+                                notes: 'A/B testing is deferred to V2 because it requires meaningful traffic volume to reach statistical significance — most individual academies won\'t have enough daily traffic for fast A/B results. In V1, the coach can manually create two pages and compare performance, but there\'s no automated splitting.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-008',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Email and SMS marketing campaigns',
+                        oneLiner: 'Send targeted email and SMS campaigns to prospects and leads — seasonal promotions, re-engagement blasts, event announcements, and drip sequences.',
+                        release: 'V1',
+                        initiatedBy: 'Human / Agent (for automated sequences)',
+                        frequency: 'On demand (one-off campaigns) + event-triggered (automated sequences)',
+                        requirement: 'Email and SMS marketing campaigns — a campaign system for reaching prospects and leads (not existing members — member communication is MEM-002). The coach can create and send email and SMS campaigns to segmented lists of leads from the sales pipeline. Campaign types: (1) One-off broadcast — coach writes a message (email or SMS), selects an audience segment, and sends or schedules it. Example: "Summer camp early bird registration is open — book your spot!" sent to all leads who inquired in the last 90 days. (2) Seasonal promotion — pre-built campaign templates for common academy promotions: back-to-school, summer camp, holiday camp, New Year resolution, spring break, end-of-season showcase. Each template includes suggested copy and a recommended send time. Coach customizes and sends. (3) Re-engagement — automated campaign targeting cold leads (no activity in 60+ days). A 3-touch sequence: email 1 (value reminder — what\'s new at the academy), email 2 (social proof — testimonial or achievement), SMS 3 (direct CTA — "Still interested? Reply YES for a free trial this week"). Sequence stops if the lead responds or books. (4) Event announcement — one-off or series promoting a specific event: camp (MEM-046), open house, showcase, or free trial week. Audience: all leads + optionally existing members. Audience segmentation: leads can be segmented by: pipeline stage (new lead, contacted, trial booked, trial done, lost), lead source (from SAL-002 attribution), days since last contact, geographic proximity (if location data available), and custom tags applied by coach in the pipeline. Analytics per campaign: sends, deliveries, opens (email only), clicks, replies (SMS), unsubscribes, and conversions (trial bookings attributed to the campaign via UTM tracking).',
+                        dataInputs: 'Campaign type, message content (email body / SMS text), audience segment criteria, send schedule, UTM parameters for tracking',
+                        dataSources: 'Database (leads from SAL pipeline, campaign_sends table, campaign_analytics), Email provider, SMS provider',
+                        outputAction: 'Emails/SMS sent to selected audience; delivery and engagement tracked; conversions attributed via UTM; unsubscribes processed; analytics displayed on marketing dashboard',
+                        humanTouchpoint: 'Yes — coach creates campaign and approves send. Automated sequences run without approval after initial setup.',
+                        integrations: 'BAM OS Dashboard, Database, Email provider (SendGrid or Resend), SMS provider (Twilio), Meta Conversions API (for offline conversion events)',
+                        dependencies: 'SAL-001 pipeline live with lead data; email/SMS sending infrastructure configured; unsubscribe handling compliant with CAN-SPAM/TCPA',
+                        edgeCases: 'Lead has no email on file (SMS only lead): exclude from email campaigns, include in SMS only. Lead has opted out of SMS: exclude from SMS campaigns — respect opt-out stored in lead record. Campaign sent to zero recipients (all filtered out by segment): abort with "No leads match this segment" message. Email bounces: mark lead\'s email as invalid, exclude from future email campaigns. SMS to landline: delivery failure handled gracefully — do not retry. Coach schedules a campaign for a past date: block — surface "Scheduled time has passed. Send now instead?"',
+                        notes: 'This campaign system is for prospect marketing — reaching people who are not yet members. Member communication (announcements, session reminders, billing notices) stays in MEM-002 and MEM-016. The line is clear: if they are in the sales pipeline, they are a prospect and this system reaches them. If they have an active account, MEM-002 handles communication. The re-engagement sequence is the highest-ROI automated campaign for most academies — cold leads who showed interest months ago and forgot. The 3-touch cadence (email, email, SMS) escalates from low-friction to high-friction. CAN-SPAM and TCPA compliance are non-negotiable: every email must have an unsubscribe link, every SMS must honor STOP replies.',
+                        subJobs: [
+                            {
+                                id: 'MKT-008a',
+                                title: 'Campaign composer',
+                                requirement: 'Campaign composer — the creation interface for email and SMS campaigns. Email: rich text editor with academy branding (logo, colors from SET-001), merge fields (lead first name, academy name, location), image upload, CTA button with configurable link (landing page URL or trial booking link). SMS: plain text with merge fields and a shortened link. Both: audience segment builder (multi-select filters on pipeline stage, lead source, date range, tags), send options (send now / schedule for date+time), and a preview showing the rendered message with sample lead data. Sage assists with copy: "Write me a summer camp promotion email" generates a draft the coach can edit. Template library: pre-built templates for seasonal promotions that the coach can load and customize.',
+                                release: 'V1',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SAL-001 pipeline data live; email/SMS provider configured',
+                                notes: 'The composer must feel fast — a coach should be able to go from "I want to send a summer camp email" to "sent" in under 5 minutes. The template library reduces that to under 2 minutes for common campaigns. Sage copy generation is the differentiator — no other scheduling tool writes your marketing emails for you.'
+                            },
+                            {
+                                id: 'MKT-008b',
+                                title: 'Automated re-engagement sequence',
+                                requirement: 'Automated re-engagement sequence — a pre-configured 3-touch drip sequence for cold leads. Trigger: lead has been in the pipeline for 60+ days with no activity (no messages sent, no booking, no stage change). Touch 1 (Day 0): email — "What\'s new at [Academy]" with recent program updates or achievements. Touch 2 (Day 4): email — social proof testimonial from a current parent. Touch 3 (Day 8): SMS — "Hi [name], still interested in training at [Academy]? Reply YES and I\'ll set up a free trial for you this week." Exit conditions: lead responds to any touch (routed to SAL-004 AI nurture or SAL-005 inbox), lead books a trial, or lead opts out. The sequence is enabled per location by the coach — not globally active by default. Coach can customize the copy of each touch but the timing and structure are fixed in V1.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (triggered by lead inactivity)',
+                                integrations: 'Database, Email provider, SMS provider, SAL-004 (handoff on response)',
+                                dependencies: 'MKT-008a composer live; SAL-004 AI nurture live; lead activity tracking in pipeline',
+                                notes: 'The re-engagement sequence is the automated counterpart to MKT-008a manual campaigns. It runs continuously in the background for any academy that enables it. The 60-day trigger is the sweet spot — shorter risks annoying leads still in active nurture (SAL-004), longer risks the lead being too cold to recover. The SMS on touch 3 is intentional — it is the highest-response-rate channel and is reserved for the final ask.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-009',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Referral campaign management',
+                        oneLiner: 'Launch and manage referral campaigns that incentivize existing members to bring in new athletes — with configurable rewards, shareable links, and conversion tracking.',
+                        release: 'V1',
+                        initiatedBy: 'Human (campaign setup) / Agent (reward fulfillment)',
+                        frequency: 'On demand — seasonal or ongoing',
+                        requirement: 'Referral campaign management — the marketing-side system for running structured referral campaigns that incentivize existing members to refer new athletes. This extends MEM-032 (referral tracking) and APP-013 (referral link display) with the campaign layer: goal setting, reward configuration, promotion, and tracking. Campaign setup: (1) Campaign name and duration — coach creates a named referral campaign with a start and end date (or ongoing). Example: "Spring Referral Drive — March 1 to April 30." (2) Reward configuration — what the referring member and the new member each receive. Options: account credit (applied to next invoice via MEM-038), free month, percentage discount on next month (via MEM-023 Stripe coupon), or a non-monetary reward (e.g., free merchandise — tracked but fulfilled manually). Coach selects reward type and value for both referrer and referee. (3) Qualifying conditions — what counts as a successful referral: new member completes onboarding (APP-005), new member completes their first paid month (subscription active for 30 days), or new member attends their first class. Coach selects which condition applies. (4) Referral link — each active member gets a unique referral link (extending APP-013) that includes a campaign tracking parameter. When a new member signs up through this link, the referral is automatically attributed to the referring member and the campaign. (5) Campaign promotion — Sage generates a suggested announcement (MEM-016) and a suggested in-app notification (APP-022) to promote the campaign to existing members. Coach reviews and sends. (6) Tracking dashboard — per campaign: total referral links shared (link click count), total signups from referral links, total qualified referrals (meeting the qualifying condition), total rewards issued, and cost of rewards (credit/discount value). Per member: referral count, qualified count, rewards earned. Leaderboard available.',
+                        dataInputs: 'Campaign name, duration, reward config (type + value for referrer and referee), qualifying condition, academy member list',
+                        dataSources: 'Database (referral_campaigns, referral_links, referral_conversions, rewards_issued)',
+                        outputAction: 'Campaign created and active; referral links generated per member; qualifying referrals tracked; rewards auto-applied (credits/discounts) or flagged for manual fulfillment; campaign dashboard populated',
+                        humanTouchpoint: 'Yes — coach creates campaign and configures rewards. Reward fulfillment is automated for credits/discounts, manual for non-monetary.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (APP-013 referral link), Stripe (for credit/discount rewards via MEM-038/MEM-023), MEM-016 (announcements), APP-022 (push notifications)',
+                        dependencies: 'MEM-032 referral tracking live; APP-013 referral link live; MEM-038 account credits live (for credit rewards); MEM-023 discount system live (for discount rewards)',
+                        edgeCases: 'Referring member cancels their membership before the reward is issued: still issue the reward if the qualifying condition was met — the referral was valid. New member signs up without using the referral link but names the referrer in onboarding (APP-005): coach can manually attribute via MEM-032 — the campaign reward is then applied retroactively. Two members both claim they referred the same new member: first attribution wins (by timestamp). Campaign ends while a referred member is still in their qualifying period (e.g., 30-day paid condition): honor the referral — qualifying period extends past campaign end. Coach runs two overlapping campaigns: a referral can only count toward one campaign — the one whose link was used.',
+                        notes: 'Referral campaigns are the lowest-cost acquisition channel for youth sports academies — the cost is a known discount or credit, and the referred member already has social proof (they know someone in the program). The qualifying condition is the critical design decision: "completes onboarding" is the easiest trigger but rewards members for signups that might churn immediately. "Completes first paid month" is more valuable but delays the reward. Most academies should use "attends first class" — it is fast enough to feel rewarding and meaningful enough to filter tire-kickers.',
+                        subJobs: [
+                            {
+                                id: 'MKT-009a',
+                                title: 'Referral campaign setup and reward config',
+                                requirement: 'Referral campaign setup — a creation wizard in BAM OS: (1) Name and duration. (2) Reward for referrer: dropdown (account credit, free month, % discount, other/manual) + value. (3) Reward for new member (referee): same options. (4) Qualifying condition: dropdown (completes onboarding, first paid month, attends first class). (5) Review and launch. On launch: referral links for all active members are generated with the campaign tracking parameter. Existing APP-013 referral links are updated to point to the active campaign. If no campaign is active, APP-013 links still work but no reward is issued (tracks referral only via MEM-032).',
+                                release: 'V1',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Database, APP-013',
+                                dependencies: 'APP-013 referral link system live; MEM-032 referral tracking live'
+                            },
+                            {
+                                id: 'MKT-009b',
+                                title: 'Referral campaign tracking and rewards',
+                                requirement: 'Referral campaign tracking — a dashboard per active campaign showing: referral funnel (links clicked → signups → qualified → rewards issued), cost summary (total reward value issued), top referrers leaderboard, and daily trend chart. Reward fulfillment: when a qualifying condition is met, the system automatically applies the reward — account credit via MEM-038, discount via MEM-023 Stripe coupon, or free month via Stripe subscription update. For non-monetary rewards: a notification is sent to the coach ("Reward fulfillment needed: [member] earned [reward] for referring [new member]"). Both referrer and referee receive a push notification and in-app notification when the reward is issued.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (automated tracking and fulfillment)',
+                                integrations: 'BAM OS Dashboard, Database, Stripe, MEM-038, MEM-023, APP-022',
+                                dependencies: 'MKT-009a campaign live; qualifying condition tracking implemented',
+                                notes: 'The automated reward fulfillment is the key differentiator from MEM-032 (which is tracking only). A coach who has to manually apply credits for every referral will stop running referral campaigns. Automation makes it sustainable.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-010',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Content calendar and scheduling',
+                        oneLiner: 'A visual calendar of all scheduled and published content across platforms — the content agent\'s command center for planning, creating, and tracking the academy\'s content output.',
+                        release: 'V1',
+                        initiatedBy: 'Human / Agent (content agent)',
+                        frequency: 'Continuous — updated on every content action',
+                        requirement: 'Content calendar and scheduling — a visual calendar view in the Marketing section that shows all content across its lifecycle: planned, in-progress, scheduled, published, and past. The calendar is the primary interface for the content agent workflow. Calendar views: (1) Monthly view — each day shows content items as colored cards (color-coded by platform: blue for Facebook, pink for Instagram, black for TikTok, green for email). Cards show: content title or first line, platform icon, status badge (draft / scheduled / published). (2) Weekly view — expanded card details with preview thumbnails and engagement metrics for published items. (3) List view — sortable table of all content with filters. Content lifecycle in the calendar: (a) Planned — coach or content agent adds a content slot to a future date with a topic, platform, and brief (from CNT-001). Shown as an outline card. (b) In progress — content is being created (CNT-002). Card shows progress status. (c) Ready for review — content is complete and awaiting coach approval. Card highlighted with a review badge. (d) Scheduled — approved content scheduled for a specific date and time (CNT-003). Card shows scheduled time. (e) Published — content went live. Card shows published timestamp and, after 24 hours, engagement metrics (likes, comments, shares, reach). The content agent can suggest a posting cadence based on the academy\'s goals and audience: "For your audience, I\'d suggest 4 posts per week: 2 Instagram Reels, 1 Facebook post, 1 TikTok." This suggestion populates the calendar with empty slots the coach can fill or ask the agent to fill. Drag and drop to reschedule content across dates.',
+                        dataInputs: 'Content items with status, platform, schedule date/time, engagement metrics post-publish',
+                        dataSources: 'Database (content_calendar table), Meta Graph API (post-publish engagement), TikTok API (engagement)',
+                        outputAction: 'Visual calendar rendered; content lifecycle tracked; scheduled posts queued for CNT-003 publishing; engagement metrics pulled post-publish; cadence suggestions generated',
+                        humanTouchpoint: 'Yes — coach plans, reviews, and approves. Content agent suggests and creates.',
+                        integrations: 'BAM OS Dashboard, Database, CNT-001 (briefs), CNT-002 (creation), CNT-003 (publishing), Meta Graph API, TikTok API',
+                        dependencies: 'CNT-001, CNT-002, CNT-003 live; social media accounts connected; content agent configured',
+                        edgeCases: 'Coach drags a published item: cannot reschedule published content — show "Already published" tooltip. Content agent suggests cadence but coach has no content ready: empty slots shown as "Needs content" with a one-tap "Generate with content agent" CTA. Platform API unavailable for engagement metrics: show "Metrics unavailable" for affected posts, retry on next sync. Coach deletes a scheduled post: remove from calendar and cancel the scheduled CNT-003 publish job.',
+                        notes: 'The content calendar is the visual hub that ties CNT-001 (briefs), CNT-002 (creation), and CNT-003 (publishing) together into a coherent workflow. Without the calendar, those three jobs are disconnected steps. With it, the coach sees their content pipeline at a glance and can plan weeks ahead. The content agent\'s cadence suggestion is the proactive element — it tells the coach "you should be posting X times per week" and creates the structure for them to fill. This is the content agent\'s command center in the marketing section.',
+                        subJobs: [
+                            {
+                                id: 'MKT-010a',
+                                title: 'Calendar views and content lifecycle',
+                                requirement: 'Calendar views — monthly, weekly, and list views with content cards showing title, platform, status, and schedule. Content items move through the lifecycle: planned → in progress → ready for review → scheduled → published. Each transition updates the card\'s visual state. Published items pull engagement metrics from platform APIs after 24 hours (likes, comments, shares, reach, video views). Engagement data shown inline on the card and aggregated in a weekly content performance summary at the top of the calendar.',
+                                release: 'V1',
+                                initiatedBy: 'Human / Agent',
+                                integrations: 'BAM OS Dashboard, Database, Meta Graph API, TikTok API',
+                                dependencies: 'Content items created via CNT-001/002; social accounts connected for engagement data'
+                            },
+                            {
+                                id: 'MKT-010b',
+                                title: 'Content agent cadence and slot planning',
+                                requirement: 'Content agent cadence — the content agent analyzes the academy\'s audience, platform presence, and content history to suggest a weekly posting cadence. Suggestion format: "I recommend 4 posts per week: Monday Instagram Reel (training tip), Wednesday Facebook post (parent testimonial), Friday Instagram carousel (week recap), Saturday TikTok (behind the scenes)." On coach approval, the calendar is populated with recurring empty content slots at the suggested times. Each slot is a placeholder the coach can fill manually or tap "Generate" to have the content agent create a brief (CNT-001) and draft (CNT-002) for that slot. The agent adapts its suggestions over time based on which content types get the most engagement.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (content agent)',
+                                integrations: 'BAM OS Dashboard, Database, CNT-001, CNT-002',
+                                dependencies: 'Content agent configured; at least 4 weeks of content history for performance-based adaptation',
+                                notes: 'The cadence suggestion is the content agent\'s most valuable output for coaches who know they should be posting but don\'t know what or when. The recurring slots create accountability — an empty slot on Wednesday morning is a visual nudge to create content. The "Generate" one-tap on empty slots is the bridge to the full content creation flow.'
+                            }
+                        ]
                     }
                 ]
             },
@@ -5446,6 +5688,46 @@
                         notes: 'The setup checklist is the new academy\'s first experience with BAM OS — it must be encouraging, not overwhelming. Each step should show a realistic time estimate (e.g., "Set up academy profile — ~2 minutes") and a brief one-line explanation of why it matters. The checklist is also the primary instrument for ensuring BAM OS academies are correctly configured before accepting live members — a misconfigured academy (no timezone, no Stripe, no plans) would produce broken member experiences.',
                         uxDetail: 'UX Decisions: Section 14 Decision 47 (AI advisor daily digest — user-chosen send time set during onboarding, default 8:00 PM, editable in settings after onboarding).',
                         subJobs: []
+                    },
+                    {
+                        id: 'SET-010',
+                        category: 'Integrations Config',
+                        isParent: true,
+                        title: 'Meta Conversions API and event tracking setup',
+                        oneLiner: 'Connect the academy\'s Meta pixel and Conversions API — so ad spend is attributed to real trial bookings, not just link clicks.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner (guided setup)',
+                        frequency: 'One-time setup + ongoing event firing',
+                        requirement: 'Meta Conversions API (CAPI) and event tracking setup — a guided onboarding flow that connects the academy\'s Meta Business account to BAM OS for ad attribution and conversion tracking. Setup steps: (1) Connect Meta Business account — OAuth flow to link the academy\'s Meta Business Manager to BAM OS. Permissions requested: ads_management (for MKT-005 campaign creation), ads_read (for MKT-001 reporting), and business_management. (2) Select or create a Meta Pixel — BAM OS lists existing pixels on the Meta Business account. Coach selects their pixel or BAM OS creates a new one. The pixel ID is stored in BAM OS. (3) Configure Conversions API — BAM OS generates a system user access token (or guides the coach through token generation in Meta Events Manager) and stores it for server-side event firing. (4) Install pixel on BAM OS-hosted pages — the Meta Pixel base code is automatically injected into all BAM OS-hosted pages (landing pages from MKT-007, onboarding flow from APP-005) for browser-side tracking. No manual code installation needed. (5) Define conversion events — BAM OS pre-configures four Meta conversion events: "Lead" (fired on landing page form submission — MKT-007), "TrialBooked" (fired when a lead books a trial via the scheduling app or pipeline), "CompleteRegistration" (fired when a new member completes APP-005 onboarding), and "PageView" (standard, fired on all BAM OS-hosted page loads). Events are fired both client-side (pixel) and server-side (CAPI) for maximum match rate. (6) Test events — BAM OS fires a test event of each type and confirms receipt in Meta Events Manager. Shows green checkmarks for each event type confirmed. Post-setup: all configured events fire automatically as the corresponding actions occur in BAM OS. No manual event management needed. Meta\'s event deduplication (via event_id parameter) ensures pixel + CAPI events are not double-counted.',
+                        dataInputs: 'Meta Business account OAuth credentials, pixel ID, CAPI access token, conversion event definitions',
+                        dataSources: 'Meta Business API, Meta Events Manager, Database (meta_integration_config table)',
+                        outputAction: 'Meta Pixel installed on all BAM OS-hosted pages; CAPI configured for server-side events; four conversion events pre-configured and tested; ongoing automatic event firing on lead, trial booking, and registration actions',
+                        humanTouchpoint: 'Yes — business owner completes the guided setup. Ongoing event firing is fully automated.',
+                        integrations: 'BAM OS Dashboard, Meta Business API, Meta Conversions API, Meta Pixel, Database',
+                        dependencies: 'Academy has a Meta Business Manager account; meta business account has an ad account associated',
+                        edgeCases: 'Business owner does not have a Meta Business Manager account: show setup guidance with a link to Meta Business Suite — BAM OS cannot create a Business Manager on their behalf. OAuth token expires: detect on next API call, surface re-authentication prompt. CAPI event delivery fails (server-side): fall back to pixel-only tracking, log failure, retry on next event. Pixel blocked by ad blocker (client-side): CAPI covers it — this is why dual firing is essential. Coach has multiple pixels: show a picker with pixel names and IDs, allow selection. Test events fail: show specific error per event type and troubleshooting guidance.',
+                        notes: 'Meta Conversions API is the foundation of all marketing attribution in BAM OS. Without it, MKT-001 reporting shows clicks and impressions but not actual conversions (trials booked, members signed up). With it, the coach can see "this ad generated 5 trial bookings at $12 each" instead of just "this ad got 200 clicks." The dual pixel + CAPI setup is Meta\'s current best practice: the pixel catches browser events, CAPI catches server-side events, and Meta deduplicates via event_id. This maximizes match rate and attribution accuracy. The guided setup must abstract away the complexity of Meta Events Manager — most academy owners have never seen it and should never need to.',
+                        subJobs: [
+                            {
+                                id: 'SET-010a',
+                                title: 'Meta account connection and pixel setup',
+                                requirement: 'Meta account connection — an OAuth-based connection flow in BAM OS Settings. Coach taps "Connect Meta" and is redirected to Meta\'s login and permission grant screen. BAM OS requests: ads_management, ads_read, business_management scopes. On success: Meta Business account ID, ad account ID, and access token stored in Database. Pixel setup: BAM OS queries Meta\'s Marketing API for existing pixels on the ad account. If one exists, auto-select it. If multiple, show a picker. If none, create a new pixel via API and name it "[Academy Name] — BAM OS." Pixel base code is automatically injected into all BAM OS-hosted page templates (MKT-007 landing pages, APP-005 onboarding). No manual snippet installation.',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Meta Business API, Database',
+                                dependencies: 'Business owner has Meta Business Manager account with an ad account'
+                            },
+                            {
+                                id: 'SET-010b',
+                                title: 'Conversions API configuration and event testing',
+                                requirement: 'CAPI configuration — BAM OS generates or guides creation of a Meta system user access token with permission to send server events. Token stored securely in Database (encrypted). Four conversion events pre-defined: Lead (event_name: "Lead", triggered on MKT-007 form submission), TrialBooked (custom event, triggered on trial booking confirmation), CompleteRegistration (triggered on APP-005 completion), PageView (standard, all page loads). Each event includes: event_time, event_source_url, user data (hashed email, hashed phone, client IP, user agent, fbc/fbp cookies for matching), event_id (UUID for deduplication with pixel), and custom_data (content_name, value where applicable). Test mode: coach taps "Test events" — BAM OS fires one test event of each type using Meta\'s test_event_code. A results screen shows per-event: sent ✓ / received ✓ / matched ✓ (or specific error). All four must show green before setup is marked complete.',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner / Agent',
+                                integrations: 'Meta Conversions API, Meta Events Manager, Database',
+                                dependencies: 'SET-010a Meta account connected; pixel configured',
+                                notes: 'Hashing user data (email, phone) before sending to Meta is required by Meta\'s CAPI spec and is a privacy requirement. BAM OS uses SHA-256 hashing before transmission. The event_id field is critical — without it, Meta counts both the pixel event and the CAPI event as two separate conversions.'
+                            }
+                        ]
                     }
                 ]
             },
