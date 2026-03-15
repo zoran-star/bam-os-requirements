@@ -2182,19 +2182,23 @@
             updateZoom();
         });
 
+        // Zoom helper — centers zoom on the given screen point
+        function zoomAtPoint(newZoom, screenX, screenY) {
+            const oldZoom = zoom;
+            zoom = Math.max(0.3, Math.min(newZoom, 3));
+            const rect = canvasWrapper.getBoundingClientRect();
+            const mouseX = screenX - rect.left;
+            const mouseY = screenY - rect.top;
+            panX = mouseX - (mouseX - panX) * (zoom / oldZoom);
+            panY = mouseY - (mouseY - panY) * (zoom / oldZoom);
+            updateZoom();
+        }
+
         canvasWrapper.addEventListener('wheel', (e) => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
-                const oldZoom = zoom;
-                const delta = -e.deltaY * 0.01;
-                zoom = Math.max(0.5, Math.min(zoom * (1 + delta), 3));
-                // Adjust pan so the point under the mouse stays fixed
-                const rect = canvasWrapper.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                panX = mouseX - (mouseX - panX) * (zoom / oldZoom);
-                panY = mouseY - (mouseY - panY) * (zoom / oldZoom);
-                updateZoom();
+                const zoomFactor = Math.pow(0.99, e.deltaY);
+                zoomAtPoint(zoom * zoomFactor, e.clientX, e.clientY);
             } else {
                 // Two-finger trackpad scroll → pan the canvas
                 e.preventDefault();
@@ -2203,6 +2207,25 @@
                 updatePan();
             }
         }, { passive: false });
+
+        // Safari / macOS trackpad pinch gesture support
+        let lastGestureScale = 1;
+        let gestureScreenX = 0, gestureScreenY = 0;
+        canvasWrapper.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+            lastGestureScale = 1;
+            gestureScreenX = e.clientX || window.innerWidth / 2;
+            gestureScreenY = e.clientY || window.innerHeight / 2;
+        });
+        canvasWrapper.addEventListener('gesturechange', (e) => {
+            e.preventDefault();
+            const scaleDelta = e.scale / lastGestureScale;
+            lastGestureScale = e.scale;
+            zoomAtPoint(zoom * scaleDelta, gestureScreenX, gestureScreenY);
+        });
+        canvasWrapper.addEventListener('gestureend', (e) => {
+            e.preventDefault();
+        });
 
         function applyTransform() {
             canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
