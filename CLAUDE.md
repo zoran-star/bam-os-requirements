@@ -32,6 +32,7 @@ There are two sources for BAM OS business requirements that must stay in sync:
    - [Scheduling App](https://www.notion.so/31c5aca8ac0f81bebc61e9e76deb6a02)
    - [Strategy](https://www.notion.so/31c5aca8ac0f81da85dcc72bf057e3d6)
    - [Profiles & Identity](https://www.notion.so/3245aca8ac0f819e8166d52f994a5f7a)
+   - [AI Advisor](https://www.notion.so/3245aca8ac0f81978b4ef0972967611c)
 
 **When making changes, update BOTH sources.** The HTML file is the more complete source — it has a unified schema across all domains and full sub-job detail rows. Notion pages have varying column structures per domain (see below).
 
