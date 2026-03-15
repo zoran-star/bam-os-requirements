@@ -2186,8 +2186,8 @@
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 const oldZoom = zoom;
-                zoom += e.deltaY > 0 ? -ZOOM_STEP_SCROLL : ZOOM_STEP_SCROLL;
-                zoom = Math.max(0.5, Math.min(zoom, 3));
+                const delta = -e.deltaY * 0.01;
+                zoom = Math.max(0.5, Math.min(zoom * (1 + delta), 3));
                 // Adjust pan so the point under the mouse stays fixed
                 const rect = canvasWrapper.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
