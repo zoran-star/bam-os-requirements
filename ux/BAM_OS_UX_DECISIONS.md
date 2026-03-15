@@ -469,15 +469,39 @@ Dark mode (toggle):
 
 ---
 
-## 12. DESIGN SYSTEM (confirmed, matches all BAM projects)
+## 12. DESIGN SYSTEM (updated — Satoshi font, white-primary theme with gold accents)
+
+Reference aesthetic: clean, warm, card-based UI with generous whitespace, soft shadows, rounded cards (see wellness/health app reference image — "Good morning, Andreea" style). Premium but approachable.
 
 ```
 Fonts:
-  Headers / KPI values / counters: Bebas Neue
-  Numbers / codes / tags: DM Mono or DM Mono 500
-  Body / labels / descriptions: DM Sans 300–600
+  Primary (all UI text): Satoshi (300–700)
+    - Headers / KPI values / counters: Satoshi 700 (Bold)
+    - Body / labels / descriptions: Satoshi 400–500 (Regular–Medium)
+    - Captions / secondary text: Satoshi 300 (Light)
+  Monospace (numbers / codes / tags): DM Mono or DM Mono 500
 
-Colors:
+Colors (Light theme — primary):
+  Background primary:    #FFFFFF
+  Background secondary:  #F8F7F4  (warm off-white)
+  Card background:       #FFFFFF
+  Card shadow:           0 2px 12px rgba(0, 0, 0, 0.06)
+  Border:                #E8E6E1
+  Border accent:         #D4D1C9
+  Gold (primary accent): #C9B97A
+  Gold (light):          #E2DD9F
+  Gold (dim/fill):       rgba(201, 185, 122, 0.15)
+  Gold (hover):          rgba(201, 185, 122, 0.25)
+  Text primary:          #1A1A1A
+  Text secondary:        #6B6B6B
+  Text dim:              #9B9B9B
+  Green (positive):      #4caf50
+  Red (attention):       #f44336
+  Yellow (watch):        #f5c842
+  Blue (info):           #45b7d1
+  Purple (profiles):     #b388ff
+
+Colors (Dark theme — available via toggle):
   Background primary:    #080808
   Background secondary:  #111111
   Card background:       #1a1a1a
@@ -490,13 +514,8 @@ Colors:
   Text primary:          #f0f0f0
   Text secondary:        #888888
   Text dim:              #555555
-  Green (positive):      #4caf50
-  Red (attention):       #f44336
-  Yellow (watch):        #f5c842
-  Blue (info):           #45b7d1
-  Purple (profiles):     #b388ff
 
-Zone colors (health score, fill rate, risk):
+Zone colors (health score, fill rate, risk — same in both themes):
   Green zone:  #4caf50  (healthy / good)
   Yellow zone: #f5c842  (watch / moderate)
   Red zone:    #f44336  (critical / needs action)
@@ -508,6 +527,7 @@ Motion:
   Task completion: smooth, weighted, premium
   Pipeline card: physical snap + sound + column flash
   Sound: optional, on by default, always subtle
+  Card interactions: soft scale (1.02x) on press, smooth ease-out
 ```
 
 ---
