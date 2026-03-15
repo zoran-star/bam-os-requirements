@@ -23,6 +23,7 @@ There are two sources for BAM OS business requirements that must stay in sync:
    - [Member Management](https://www.notion.so/31b5aca8ac0f816c9b8ee4e4768270da)
    - [Scheduling App](https://www.notion.so/31c5aca8ac0f81bebc61e9e76deb6a02)
    - [Strategy](https://www.notion.so/31c5aca8ac0f81da85dcc72bf057e3d6)
+   - [Profiles & Identity](https://www.notion.so/3245aca8ac0f819e8166d52f994a5f7a)
 
 **When making changes, update BOTH sources.** The HTML file is the more complete source — it has a unified schema across all domains and full sub-job detail rows. Notion pages have varying column structures per domain (see below).
 
@@ -36,6 +37,7 @@ There are two sources for BAM OS business requirements that must stay in sync:
 | Member Management | MEM- | Client retention rate |
 | Scheduling App | APP- | Client retention rate |
 | Strategy | STR- | Business performance visibility |
+| Profiles & Identity | PRF- | Account data integrity |
 
 ## Schema differences across Notion pages
 - **Marketing, Content, Strategy**: Full schema with Parent ID column
@@ -54,8 +56,10 @@ The Scheduling App domain also uses a `category` field per job.
 
 ## How to add or update a requirement
 1. Update the `JOBS_DATA` object in the HTML file with all fields
-2. Update the corresponding Notion page table with the same data (adapting to that page's column structure)
+2. **Immediately** update the corresponding Notion page table with the same data (adapting to that page's column structure) — do NOT defer Notion updates as a separate step
 3. If adding a new parent job with sub-jobs, ensure sub-jobs are listed as separate rows in BOTH sources
+
+**CRITICAL: Every single change to the HTML must be paired with the corresponding Notion update in the same step.** Do not batch Notion updates for later. The workflow is: HTML change → Notion change → commit. Every time, no exceptions.
 
 ## Conventions
 - Job IDs follow the pattern: `{PREFIX}-{NUMBER}` for parent jobs, `{PREFIX}-{NUMBER}{letter}` for sub-jobs
