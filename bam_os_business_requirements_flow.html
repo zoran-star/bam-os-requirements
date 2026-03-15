@@ -433,6 +433,16 @@
             left: 280px;
         }
 
+        .node-staff {
+            top: 1200px;
+            left: 960px;
+        }
+
+        .node-classes {
+            top: 1600px;
+            left: 280px;
+        }
+
         /* Zoom controls */
         .zoom-controls {
             display: flex;
@@ -2344,6 +2354,146 @@
                                 notes: 'The placeholder system keeps messages personal at scale — coach writes one template, every member gets a personalized version. The "My Rewards" section in the member profile ensures gifts have lasting value beyond the 5-second celebration moment. Discount codes should integrate with Stripe coupons in a future version, but V1 is manual code entry.'
                             }
                         ]
+                    },
+                    {
+                        id: 'MEM-038',
+                        category: 'Financial Operations',
+                        isParent: false,
+                        title: 'Manual payment recording',
+                        oneLiner: 'Coach logs a cash or check payment for a member — tracked against their account without going through Stripe.',
+                        release: 'V1',
+                        initiatedBy: 'Coach',
+                        frequency: 'On demand — when a member pays by cash or check',
+                        requirement: 'Manual payment recording — coach can log a payment received outside of Stripe (cash, check, bank transfer, or other) against a member account. The manual payment form: member selection, payment amount, currency, payment method (cash / check / bank transfer / other), date received, description/notes (e.g., "October training fee — check #1042"), and the invoice or billing period it applies to (optional). Manual payments are stored in the Database as a separate payment record type (not a Stripe charge) and are visible in the member\'s payment history (APP-001) and the MEM-024 revenue per member view. Manual payments are included in revenue reporting alongside Stripe payments. A receipt can be generated as a PDF and sent to the parent via email (see MEM-039). Manual payments do not automatically update Stripe subscription status — if a member is in a failed-payment dunning sequence (MEM-021), the coach must separately mark the invoice as resolved in MEM-015 after logging the manual payment.',
+                        dataInputs: 'Member ID, payment amount, currency, payment method, date, description, billing period reference',
+                        dataSources: 'Database (manual_payments table)',
+                        outputAction: 'Manual payment record created in Database; payment visible in member payment history; included in revenue totals; receipt generation available',
+                        humanTouchpoint: 'Yes — coach logs payment.',
+                        integrations: 'BAM OS Dashboard, Database, MEM-015 (failed payment queue — manual resolution)',
+                        dependencies: 'Member account exists in Database',
+                        edgeCases: 'Manual payment logged for a cancelled member: allow — payment may be for a final invoice. Amount entered as zero: block — zero-amount manual payments are not valid. Same amount logged twice for the same member on the same date: surface a duplicate warning — allow override with confirmation.',
+                        notes: 'Cash and check payments are a reality for youth sports academies — many parents prefer to pay at the front desk. The manual payment system bridges the gap between the offline world and the digital record. The key data quality issue is ensuring manual payments are actually logged — a coach who accepts cash and forgets to log it creates financial reconciliation problems. Consider a "log cash payment" shortcut button in the activity feed and on the failed payment queue.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-039',
+                        category: 'Financial Operations',
+                        isParent: false,
+                        title: 'Invoice and receipt generation',
+                        oneLiner: 'Coach generates and sends a custom invoice or receipt for one-time charges, manual payments, or camp/clinic fees.',
+                        release: 'V1',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'On demand',
+                        requirement: 'Invoice and receipt generation — coach can generate invoices and receipts for charges that occur outside of Stripe recurring subscriptions. Use cases: camp or clinic registration fees, evaluation session fees, merchandise, custom one-time charges. Invoice fields: member/parent name, academy name and logo (from SET-001), invoice date, due date, line items (description, quantity, unit price, subtotal), tax (if applicable — see MEM-041), total, payment instructions (bank details or Stripe payment link). Receipt fields: same as invoice with "PAID" stamp and payment date/method. Generation: PDF rendered server-side and optionally emailed to the parent directly from BAM OS. Stripe payment link: for invoice payment via card, coach can generate a Stripe payment link and include it in the invoice. Payment link is single-use, expires in 7 days. On payment, Stripe fires a webhook, BAM OS marks the invoice as paid and generates a receipt automatically.',
+                        dataInputs: 'Member ID, line items (description, qty, unit price), tax rate, due date, payment method preference',
+                        dataSources: 'Database (invoices table), Stripe (payment links API)',
+                        outputAction: 'Invoice PDF generated and stored; email sent to parent if requested; Stripe payment link created and embedded in invoice; on payment receipt, invoice marked paid and receipt PDF generated',
+                        humanTouchpoint: 'Yes — coach creates invoice.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe (payment links), Email provider, PDF generation library',
+                        dependencies: 'SET-001 academy profile (name and logo); SET-006 Stripe connected; member account exists',
+                        edgeCases: 'Stripe payment link expires before member pays: coach must generate a new invoice with a new link. Parent pays by cash after receiving a Stripe-linked invoice: coach manually records the payment (MEM-038) and marks the invoice as paid manually. Invoice sent to parent with wrong amount: coach can void the original invoice and create a new one — voided invoices are retained for audit trail.',
+                        notes: 'Invoice generation is most critical for camp season when academies charge one-time fees for multi-day events. The PDF invoice with a Stripe payment link is the cleanest UX — parent gets a professional invoice in their email, clicks the link, pays by card, and both parties have a receipt automatically. Tax handling is a complex domain — the tax field is free-input in V1 (coach enters a tax rate manually) rather than auto-calculated.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-040',
+                        category: 'Financial Operations',
+                        isParent: false,
+                        title: 'Payout visibility',
+                        oneLiner: 'Business owner sees when Stripe is paying out to their bank account — next payout date, amount, and payout history.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'Continuous — updated daily from Stripe',
+                        requirement: 'Payout visibility — a read-only financial summary in BAM OS settings showing the business owner\'s Stripe payout status. Data displayed: (1) Next payout: expected date and amount (from Stripe balance API). (2) Payout schedule: the frequency configured in their Stripe account (daily, weekly, monthly). (3) Payout history: last 12 payouts listed with date, amount, and Stripe payout ID. Each payout history row is a link that opens the corresponding payout detail in the Stripe dashboard. (4) Current balance breakdown: available balance, pending balance, total. Refreshed daily via Stripe API poll or on-demand by the business owner via a "Refresh" button.',
+                        dataInputs: 'Stripe balance API response, Stripe payouts list API response',
+                        dataSources: 'Stripe API (via SET-006 connected account)',
+                        outputAction: 'Payout data displayed in BAM OS; refreshed daily; deep links to Stripe for detailed payout management',
+                        humanTouchpoint: 'No — automated data pull. Business owner views.',
+                        integrations: 'BAM OS Dashboard, Stripe API',
+                        dependencies: 'SET-006 Stripe account connected',
+                        edgeCases: 'Stripe API unavailable: show last cached payout data with "Last updated: X hours ago" label. Connected account has no payouts yet (new academy): show "No payouts yet" with explanation. Negative balance (refunds exceeded charges): display clearly with explanation.',
+                        notes: 'One of the highest-ROI features in the settings section — business owners check "when do I get paid?" constantly. A single Stripe balance API call serves all of this data. The goal is "I can see my next payout from BAM OS without having to log in to Stripe."',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-041',
+                        category: 'Financial Operations',
+                        isParent: false,
+                        title: 'Tax configuration',
+                        oneLiner: 'Business owner configures whether membership fees and one-time charges are subject to sales tax — stored per academy and applied in invoices.',
+                        release: 'V1',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'One-time setup, editable on demand',
+                        requirement: 'Tax configuration — business owner configures tax settings for the academy. Settings: (1) Tax enabled (yes/no toggle). (2) Tax label (e.g., "Sales Tax", "GST", "VAT"). (3) Default tax rate (percentage). (4) Which charge types are taxable: recurring membership fees (yes/no), one-time invoices (yes/no), camp/clinic fees (yes/no). When tax is enabled, all applicable charges display the tax line item on invoices and receipts (MEM-039). Tax configuration is for informational and invoicing purposes — BAM OS does not file taxes or provide tax advice. A disclaimer is displayed: "BAM OS provides tax rate fields for invoice display purposes only. Consult a tax professional to confirm your obligations."',
+                        dataInputs: 'Tax enabled flag, tax label, default tax rate, taxable charge type flags',
+                        dataSources: 'Database (academy_tax_config table)',
+                        outputAction: 'Tax config stored; tax line items applied to invoices and receipts where applicable; Stripe subscription tax configured via Stripe Tax API if enabled',
+                        humanTouchpoint: 'Yes — business owner configures.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe (Stripe Tax API)',
+                        dependencies: 'SET-001 academy profile; SET-006 Stripe connected',
+                        edgeCases: 'Business owner enables tax after existing subscriptions are running: new subscriptions will include tax, existing require manual Stripe intervention — surface a warning. Tax rate changed: applies to new invoices only — existing open invoices retain their original rate.',
+                        notes: 'Tax is a legally sensitive area — BAM OS must not imply it is providing tax advice. The disclaimer is mandatory. Most US youth sports academies are in states where training services are not subject to sales tax, but international locations often are. Per-location tax rates are a V2 concern.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-042',
+                        category: 'Reporting',
+                        isParent: false,
+                        title: 'Session report (post-session summary)',
+                        oneLiner: 'Auto-generated summary for each completed session — attendance stats, no-show list, capacity utilization, and coach notes.',
+                        release: 'V1',
+                        initiatedBy: 'Agent (auto-generated when coach completes session in CLS-005b)',
+                        frequency: 'Per completed session',
+                        requirement: 'Session report — automatically generated when a coach marks a session as complete in CLS-005b. Stored in the Database and accessible from the BAM OS calendar by clicking a completed session. Report contents: session details (class type, date/time, location, assigned coach), attendance summary (attended count, absent count, attendance rate, vs. previous 4 sessions average), full attendance list (athlete name, status), waitlist conversion data, and coach session notes. The session report is also included as a row in a session history view accessible from the business metrics dashboard (MEM-003) — filterable by date range, class type, location, and coach. Session reports are the raw data behind the attendance KPIs in the KPI dashboard.',
+                        dataInputs: 'Attendance records from CLS-005b, session metadata, waitlist conversion data, coach notes',
+                        dataSources: 'Database (attendance_records, class_sessions, waitlist_events, coach_session_notes)',
+                        outputAction: 'Session report record created in Database; accessible from calendar; aggregated in session history view; feeds attendance KPI calculations',
+                        humanTouchpoint: 'No — auto-generated. Coach views on demand.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'CLS-005b attendance marking live',
+                        edgeCases: 'Coach marks session complete without marking any attendees: generate report with all-unknown status — flag as potentially incomplete. Session cancelled before completion: no session report generated.',
+                        notes: 'The session report is the operational record of what happened in a class. The "vs. previous 4 sessions average" attendance comparison gives the coach immediate context. The session history view in the dashboard is the foundation for the attendance KPI cards.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-043',
+                        category: 'Reporting',
+                        isParent: false,
+                        title: 'Monthly business digest',
+                        oneLiner: 'Auto-generated monthly summary delivered to the business owner — key metrics, notable events, revenue snapshot, and one recommended action.',
+                        release: 'V1',
+                        initiatedBy: 'Agent (auto-generated on the 1st of each month)',
+                        frequency: 'Monthly',
+                        requirement: 'Monthly business digest — an automated report generated on the 1st of each month summarizing the previous month\'s performance. Delivered as: (1) in-app notification that opens a formatted report view, and (2) optional email digest (business owner opts in/out in SET-007). Report sections: (A) Membership snapshot: active members at month end, new, churned, net growth vs. prior month. (B) Revenue snapshot: MRR, total charges processed, failed payments, payout total. (C) Attendance highlights: total sessions held, average fill rate, top 3 most-attended sessions, most active athlete (first name only). (D) Notable events: new records set, at-risk alerts resolved, win-backs succeeded. (E) One recommended action: AI-generated insight based on the month\'s data — actionable CTA deep-links to the relevant BAM OS screen.',
+                        dataInputs: 'All member, attendance, revenue, and event data for the prior month',
+                        dataSources: 'Database (all MEM and CLS tables for the prior month)',
+                        outputAction: 'Monthly digest report generated and stored; in-app notification sent; email sent if opted in; actionable CTA deep-links to relevant BAM OS screen',
+                        humanTouchpoint: 'No — auto-generated. Business owner reads and acts.',
+                        integrations: 'BAM OS Dashboard, Database, Email provider, Anthropic API (for recommended action)',
+                        dependencies: 'All MEM and CLS features live; Anthropic API key configured; SET-007 email preferences configured',
+                        edgeCases: 'First month (insufficient history): generate with current-state data only, skip delta comparisons. AI recommendation fails: show default rule-based recommendation. Business owner takes no action: no automatic follow-up.',
+                        notes: 'The monthly digest is the highest-leverage communication BAM OS sends to business owners. The "one recommended action" is the most important element — an AI-generated, context-specific recommendation that the owner can act on in one click. Keep the recommended action positive and achievable — never alarming.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-044',
+                        category: 'Reporting',
+                        isParent: false,
+                        title: 'Aggregate player development report history',
+                        oneLiner: 'Coach-facing view of all published player reports across all athletes — filterable by date, program, coach, and athlete.',
+                        release: 'V1',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'On demand',
+                        requirement: 'Aggregate player development report history — a reports management view in the BAM OS dashboard showing all player reports (MEM-005) published across all athletes at the location. Columns: athlete name, parent name, report date, authoring coach, program/plan, report title/preview, and read status (has the parent viewed it?). Filterable by: date range, authoring coach, program, and read/unread status. Sortable by any column. Clicking opens the full report. Business owner can identify: coaches who haven\'t published in 30+ days, athletes who have never received a report, and read rate by coach. Summary counts: total reports published this month, total unread, average time from publish to read.',
+                        dataInputs: 'All published report records with read events',
+                        dataSources: 'Database (player_reports table, report_read_events table)',
+                        outputAction: 'Report history table rendered; filters applied; summary counts shown; deep links to individual reports',
+                        humanTouchpoint: 'No — read-only view.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'MEM-005 player reports live; report read tracking implemented',
+                        edgeCases: 'No reports published yet: show empty state with CTA to publish first report. Read status unavailable: show "read status unavailable" for affected reports.',
+                        notes: 'Player reports are one of the highest-retention activities — parents who receive regular reports are far less likely to cancel. The "athletes who have never received a report" filter is the most actionable — that list is a direct retention opportunity.',
+                        subJobs: []
                     }
                 ]
             },
@@ -4004,6 +4154,364 @@
                         subJobs: []
                     }
                 ]
+            },
+            staff: {
+                title: 'STAFF MANAGEMENT',
+                subtitle: '👥 Coach accounts, profiles, and access',
+                color: '#ff8a65',
+                jobs: [
+                    {
+                        id: 'STF-001',
+                        category: 'Staff Accounts',
+                        isParent: true,
+                        title: 'Coach account creation and invitation',
+                        oneLiner: 'Business owner invites coaches by email — they receive a setup link, create credentials, and are assigned to a location and role.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand — when hiring new staff',
+                        requirement: 'Coach account creation and invitation — business owner invites a new coach by entering their email address and selecting their role (Coach or Business Owner) and location assignment(s). System sends an invitation email with a unique setup link (expires in 72 hours). The invited coach clicks the link, creates a password, and completes their staff profile (STF-002). On completion, the coach account is active and the business owner sees them in the staff roster. Business owner can resend an expired invitation. Business owner can cancel a pending invitation before it is accepted. Invitations that have not been accepted after 7 days surface a nudge notification to the business owner.',
+                        dataInputs: 'Invitee email, role selection, location assignment(s)',
+                        dataSources: 'Database (staff_invitations table, staff_accounts table)',
+                        outputAction: 'Invitation record created; email sent to invitee; coach account created on acceptance; staff roster updated; pending invitations visible in staff management view',
+                        humanTouchpoint: 'Yes — business owner initiates; coach accepts and sets up.',
+                        integrations: 'BAM OS Dashboard, Database, Email provider',
+                        dependencies: 'SET-001 academy profile complete; SET-002 locations created; email provider configured',
+                        edgeCases: 'Invitee email already has an active coach account at this academy: block duplicate, show "This email is already a staff member." Invitation link clicked after expiry: show "This invitation has expired" with instructions to contact the business owner. Business owner invites themselves (their own email): block — business owner account already exists. Coach accepts invitation but skips profile completion: account is created and active even with incomplete profile — surface profile completion prompt on first login.',
+                        notes: 'The 72-hour expiry on invitations balances security with usability — coaches hired on Friday should still be able to accept over the weekend. The 7-day nudge to the business owner is important because dropped invitations are a common friction point in multi-staff onboarding. Role options in V1: Coach (standard access per MEM-014) and Business Owner (full access). Additional roles (e.g., Front Desk, Assistant Coach) are V2.',
+                        subJobs: [
+                            {
+                                id: 'STF-001a',
+                                title: 'Staff invitation flow',
+                                requirement: 'Staff invitation flow — business owner enters email, selects role, selects location(s), and sends. System generates a unique invitation token (UUID), creates a pending invitation record, and sends a formatted invitation email. Email includes: academy name and logo, inviting owner\'s name, role they are being invited to, setup link with embedded token, and expiry time. If the invitee clicks the link and already has a BAM OS account at a different academy: flag for review — do not block, but surface to business owner.',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Email provider',
+                                dependencies: 'SET-001 complete; email provider configured',
+                                notes: 'Invitation email design should match the academy\'s branding (name and logo from SET-001). The link should be mobile-friendly — coaches will likely click it on their phone.'
+                            },
+                            {
+                                id: 'STF-001b',
+                                title: 'Coach accepts invitation',
+                                requirement: 'Coach accepts invitation — coach clicks invitation link, is presented with account setup form: first name, last name, password (min 8 characters, 1 uppercase, 1 number), confirm password. On submit: coach account created, invitation marked accepted, coach redirected to BAM OS dashboard with a first-login welcome state and a prompt to complete their staff profile (STF-002).',
+                                release: 'MVP',
+                                initiatedBy: 'Coach (invitee)',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'STF-001a invitation sent and not expired',
+                                notes: 'Password requirements must be clearly communicated during input (real-time validation). The post-acceptance redirect to the dashboard with a profile completion prompt is the staff equivalent of the academy setup checklist — coach should not be dropped into a blank screen.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STF-002',
+                        category: 'Staff Accounts',
+                        isParent: false,
+                        title: 'Coach profile',
+                        oneLiner: 'Coach\'s own identity record — name, photo, bio, specialties, contact info — used on player reports, class rosters, and member-facing communications.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach (self-manages) / Business Owner (can edit)',
+                        frequency: 'On demand — editable at any time',
+                        requirement: 'Coach profile — the coach\'s identity record stored in the Database. Fields: first name, last name, profile photo (used on player reports and in the scheduling app class detail view), bio (coach-facing description shown in scheduling app — max 300 characters), coaching specialties (multi-select from predefined list: Guard Development, Post Play, Shooting, Defense, Athletic Development, Team Systems, Youth Development — or custom text), years of experience (numeric), certifications (free text), contact phone (internal — not shown to members), personal email (internal — for BAM OS account, not shown to members), and notification preferences (which BAM OS alerts they receive — per MEM-007). Profile photo is displayed on: published player reports (MEM-005), class roster detail views, and the scheduling app coach detail view. The coach\'s name appears on all player reports, internal notes they write, and messages they send. Coach can edit all fields from a profile settings page in BAM OS. Business owner can edit all fields from the staff roster.',
+                        dataInputs: 'Coach name, photo, bio, specialties, experience, certifications, contact info, notification preferences',
+                        dataSources: 'Database (staff_profiles table)',
+                        outputAction: 'Staff profile record stored; photo and name used in player reports, class detail, and messaging context throughout system',
+                        humanTouchpoint: 'Yes — coach self-manages; business owner can also edit.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (class detail view)',
+                        dependencies: 'STF-001b account creation complete',
+                        edgeCases: 'Coach has no profile photo: use initials avatar throughout the system. Coach changes their name: update all surfaces immediately including historical report attributions (reports show the coach\'s current name). Coach removes a specialty that is referenced in a class type they are assigned to: allow — the specialty is informational only, not a gating mechanism.',
+                        notes: 'The coach profile is member-facing at the class detail level — parents will see the coach\'s photo and bio when their child is booked into a class. This creates an accountability surface and builds trust. Coaching specialties are the only searchable/filterable field — in V2, business owners will be able to assign classes based on coach specialty matching. Certifications field is free text in V1 — structured certification tracking (with BAM Coaches certification integration) is a V2 concern that aligns with the BAM Coaches vertical.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'STF-003',
+                        category: 'Authentication',
+                        isParent: true,
+                        title: 'Coach authentication',
+                        oneLiner: 'Login, session management, password reset, and optional 2FA for all BAM OS coach and owner accounts.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'Per session',
+                        requirement: 'Coach authentication — the authentication system for all BAM OS dashboard users (coaches and business owners). Components: (1) Login: email + password login form at the BAM OS dashboard URL. On success, a session token is issued and stored securely (httpOnly cookie). Session expires after 8 hours of inactivity or 30 days with "remember me" checked. (2) Password reset: "Forgot password" link on login page. User enters email; if an account exists, a reset link is sent (expires in 1 hour). Reset link presents a new password form. On submit, password updated, all existing sessions invalidated, confirmation email sent. (3) Session management: active sessions visible to coach in account settings — shows device, location (approximate, from IP), last active. Coach can revoke any individual session or all sessions at once. (4) Optional 2FA: coach can enable two-factor authentication (TOTP via authenticator app — Google Authenticator, Authy compatible). On 2FA enable: QR code displayed for authenticator app setup, backup codes generated (shown once, downloadable). On login with 2FA: password step followed by 6-digit TOTP prompt.',
+                        dataInputs: 'Email, password, TOTP code (if 2FA enabled), "remember me" preference',
+                        dataSources: 'Database (staff_accounts, sessions, 2fa_secrets tables)',
+                        outputAction: 'Session token issued on successful login; session stored in Database; password reset token generated and emailed; 2FA TOTP validated against stored secret',
+                        humanTouchpoint: 'Yes — coach logs in; coach initiates password reset; coach enables 2FA.',
+                        integrations: 'BAM OS Dashboard, Database, Email provider',
+                        dependencies: 'STF-001b account creation complete; email provider configured',
+                        edgeCases: 'Failed login attempts: lock account for 15 minutes after 5 consecutive failures; notify account owner by email. Password reset link used twice: invalidate on first use. 2FA device lost: backup codes allow login; if backup codes also lost, business owner can reset 2FA for a coach account. Session token stolen (XSS): httpOnly cookie prevents JS access; short expiry limits damage window.',
+                        notes: '2FA should be strongly encouraged for business owner accounts — surface a persistent prompt until they enable it. Session management visibility (device list) is a trust and security feature — coaches who see an unfamiliar device can revoke it immediately. Password hashing: bcrypt with minimum cost factor 12. Never store plaintext passwords. The "remember me" session (30 days) must still require re-authentication if the browser flags the cookie as potentially compromised.',
+                        subJobs: [
+                            {
+                                id: 'STF-003a',
+                                title: 'Login flow',
+                                requirement: 'Login flow — email + password form at the BAM OS dashboard root URL. On success: session token issued, coach redirected to dashboard home (activity feed MEM-013 or setup checklist SET-009 if onboarding). On failure: generic error message "Incorrect email or password" — never specify which field is wrong. Rate limiting: max 5 attempts per 15-minute window per IP. Account lockout at 5 consecutive failures: 15-minute lockout with email notification to account holder.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'STF-001b account created',
+                                notes: 'Generic error message is intentional — never confirm whether an email address exists in the system. This prevents account enumeration attacks.'
+                            },
+                            {
+                                id: 'STF-003b',
+                                title: 'Password reset',
+                                requirement: 'Password reset — "Forgot password" link on login page. User enters email address. System responds with "If an account exists for this email, a reset link has been sent" — always show this message regardless of whether account exists (prevents email enumeration). Reset email contains a one-time link (expires 1 hour, single-use). Link presents new password + confirm password form. On submit: password updated using bcrypt, all active sessions invalidated, confirmation email sent, user redirected to login.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, Email provider',
+                                dependencies: 'Email provider configured',
+                                notes: 'The "always show the same message" pattern on password reset is a security requirement, not an UX bug. Explain this in the codebase comments.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STF-004',
+                        category: 'Staff Operations',
+                        isParent: false,
+                        title: 'Coach schedule and availability',
+                        oneLiner: 'Business owner assigns coaches to specific class sessions; coach sees their own upcoming schedule in BAM OS.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner / Coach',
+                        frequency: 'On demand — updated when schedule changes',
+                        requirement: 'Coach schedule and availability — coaches are assigned to specific class sessions by the business owner (or by the coach themselves if they have scheduling permissions). Each class session (from the Classes module) has a designated coach. The coach\'s assignment is visible to members in the scheduling app class detail view. In BAM OS, each coach has a personal schedule view showing all sessions they are assigned to, filterable by date range and location. Business owner sees a staff schedule view showing all coaches\' assignments in a calendar grid — useful for identifying coverage gaps. Coaches can mark themselves as unavailable for a specific date or time range (e.g., holiday, illness) — business owner is notified to reassign those sessions. Unavailability blocks are advisory in V1 — they surface a warning but do not automatically reassign classes.',
+                        dataInputs: 'Coach ID, class session ID, assignment; unavailability date ranges',
+                        dataSources: 'Database (class_coach_assignments, coach_unavailability tables)',
+                        outputAction: 'Coach assignment stored per class session; coach schedule view populated; business owner staff calendar populated; unavailability blocks surface reassignment warnings',
+                        humanTouchpoint: 'Yes — business owner assigns coaches; coach marks unavailability.',
+                        integrations: 'BAM OS Dashboard, Database, Classes module (CLS jobs)',
+                        dependencies: 'STF-002 coach profiles exist; Classes module (CLS-001) live',
+                        edgeCases: 'Coach marked unavailable but still assigned to a class in that window: surface warning — do not auto-cancel the class. Coach deactivated while assigned to future classes: immediately flag all their upcoming sessions as unassigned in the business owner\'s dashboard. Two coaches assigned to same session: allowed (multi-coach sessions for large groups) — both see it in their schedule.',
+                        notes: 'The staff calendar view for the business owner is one of the highest-value operational screens — it answers "who is working when and do I have any gaps" at a glance. In V2, this evolves into a full staff scheduling tool with shift management. In V1, it is read-only for planning purposes.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'STF-005',
+                        category: 'Staff Accounts',
+                        isParent: false,
+                        title: 'Coach deactivation and offboarding',
+                        oneLiner: 'Business owner deactivates a departing coach — handles member reassignment, open items handoff, and data archival.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand — when a coach leaves',
+                        requirement: 'Coach deactivation and offboarding — when a coach leaves the academy, the business owner deactivates their account. The deactivation flow is a wizard with pre-deactivation checks and actions: (1) Open support tickets: list of any escalated support tickets currently assigned to this coach — business owner must reassign each to another coach before deactivation can proceed. (2) Upcoming class assignments: list of all future class sessions assigned to this coach — business owner must reassign each or mark as unassigned. (3) Member roster: list of members whose primary coach is this person — business owner is prompted to reassign to another coach (can bulk-reassign). (4) Unpublished player reports: list of any reports drafted but not published by this coach — business owner can publish, delete, or reassign to another coach. (5) Confirm deactivation: coach account set to inactive, all active sessions invalidated immediately, account removed from all future-facing surfaces. Historical data (published reports, sent messages, logged attendance) retains the deactivated coach\'s name. Deactivated coaches cannot be reactivated in V1 — a new invitation must be sent if they return.',
+                        dataInputs: 'Coach ID being deactivated, reassignment selections for each open item category',
+                        dataSources: 'Database (all tables with coach_id foreign keys)',
+                        outputAction: 'All open items resolved or reassigned; coach account set inactive; all sessions invalidated; coach removed from active scheduling and directory surfaces; historical data preserved with name attribution',
+                        humanTouchpoint: 'Yes — business owner works through deactivation wizard.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'STF-001 account system live; at least one other active coach exists for reassignment',
+                        edgeCases: 'Only one coach at the academy (the owner): block deactivation if it would leave the academy with zero active coaches. Coach being deactivated is the business owner: block — ownership transfer (V2 feature) is required first. Deactivation mid-session (coach is currently logged in): invalidate session immediately — coach is logged out on next request.',
+                        notes: 'The deactivation wizard is a critical offboarding tool — a coach leaving with open support tickets and unassigned classes is an operational disaster. Each step in the wizard must be mandatory before proceeding. The session invalidation on deactivation is a security requirement — a departing coach should not retain access for even a minute after deactivation is confirmed. Historical attribution (published reports retain the coach\'s name) is important for member trust — parents should not see their child\'s report history change after a coach leaves.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'STF-006',
+                        category: 'Staff Operations',
+                        isParent: false,
+                        title: 'Staff roster view',
+                        oneLiner: 'Business owner sees all active and pending coaches in a table — with their role, location assignments, member count, and key activity stats.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand',
+                        requirement: 'Staff roster view — a table in BAM OS settings showing all staff accounts: active coaches, pending invitations, and deactivated coaches (toggle to show/hide). Columns for active coaches: name and photo, role, location(s), member count on their roster, last login date, published report count (last 30 days), open support ticket count. Each row has actions: view profile (STF-002), edit role/location, send message, deactivate (STF-005). Pending invitation rows show: invitee email, invited date, expiry date, and a resend action. A single "Invite coach" button at the top right initiates STF-001. The roster is filterable by location.',
+                        dataInputs: 'Staff account records, location assignments, member roster counts, report and ticket stats',
+                        dataSources: 'Database (staff_accounts, staff_profiles, coach_location_assignments, member_coach_assignments)',
+                        outputAction: 'Staff roster table rendered with real-time data; actions available per row',
+                        humanTouchpoint: 'Yes — business owner views and manages.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'STF-001 through STF-005 live',
+                        edgeCases: 'Single coach academy (owner only): show roster with just the owner row and a prominent "Invite your first coach" CTA. Deactivated coaches row: show with "Deactivated" badge and disabled actions except "View history."',
+                        notes: 'The "last login date" column is a subtle but important accountability metric for the business owner — a coach who has not logged in for 14 days may not be using the system. The open support ticket count per coach is the most operationally urgent column — a coach with 5 open escalated tickets needs attention.',
+                        subJobs: []
+                    }
+                ]
+            },
+            classes: {
+                title: 'CLASSES & SESSIONS',
+                subtitle: '🏀 Scheduling, rosters, and session operations',
+                color: '#4db6ac',
+                jobs: [
+                    {
+                        id: 'CLS-001',
+                        category: 'Class Configuration',
+                        isParent: false,
+                        title: 'Class type configuration',
+                        oneLiner: 'Business owner defines the taxonomy of class types available at the academy — each with a name, color, default capacity, credit cost, and eligibility tag.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand — during setup and as program offerings change',
+                        requirement: 'Class type configuration — business owner creates and manages the class types offered at the academy. Each class type is a template that individual class sessions are built from. Class type fields: name (e.g., "Elite Group Training", "Individual Skills Session", "Evaluation"), color code (used for calendar display), default capacity (maximum athletes per session — overridable per individual session), session credit cost (how many session credits from a member\'s plan are consumed per booking — e.g., 1 credit for group, 2 for individual), eligibility tag requirement (which member eligibility tag(s) can book this class type — maps to MEM-009), whether the class type is visible to members in the scheduling app or internal-only (e.g., "Staff Meeting"), and whether the class type allows waitlisting (MEM-027). Class types are the foundation of the scheduling system — every class session is an instance of a class type.',
+                        dataInputs: 'Class type name, color, default capacity, credit cost, eligibility tags, visibility, waitlist enabled',
+                        dataSources: 'Database (class_types table)',
+                        outputAction: 'Class type record created; available as a template when creating class sessions (CLS-002); eligibility enforcement applied in member booking flow',
+                        humanTouchpoint: 'Yes — business owner creates and manages class types.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (eligibility enforcement)',
+                        dependencies: 'SET-001 academy profile complete; MEM-009 eligibility tag system live',
+                        edgeCases: 'Class type with zero credit cost: valid — some academies offer drop-in classes or included sessions. Class type eligibility tag deleted from MEM-009: existing class type retains the reference but surfaces a warning — "Eligibility tag no longer exists." Class type archived while active sessions exist of that type: block archive until all future sessions are cancelled or rescheduled.',
+                        notes: 'Class types are the product catalog for the scheduling side of the business. Getting the taxonomy right at setup saves enormous operational complexity later. Recommended starter types for a basketball academy: Group Training (general), Elite Group Training (advanced), Individual Training (1-on-1), Evaluation Session, Camp Day, Clinic. The color coding should match the BAM OS zone colors for visual consistency in the calendar view.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CLS-002',
+                        category: 'Class Scheduling',
+                        isParent: true,
+                        title: 'Class session creation and scheduling',
+                        oneLiner: 'Coach or business owner creates individual or recurring class sessions — setting class type, time, location, capacity, and assigned coach.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner / Coach',
+                        frequency: 'On demand — when building the schedule',
+                        requirement: 'Class session creation and scheduling — coaches and business owners create individual class sessions in the BAM OS calendar. A class session is a specific instance of a class type at a specific date, time, and location. Session fields: class type (from CLS-001), date, start time, end time, location, assigned coach(es), capacity (defaults to class type default, overridable), any session-specific notes visible to members (e.g., "Bring a ball" or "Evaluation day — dress to play"), and recurrence pattern (none, or recurring — see CLS-003). Sessions are immediately visible in the scheduling app for eligible members to book. The BAM OS calendar shows all sessions across all locations with color coding by class type. Coach view shows only their assigned sessions. Business owner view shows all sessions.',
+                        dataInputs: 'Class type, date, start/end time, location, assigned coach(es), capacity override, member notes, recurrence pattern',
+                        dataSources: 'Database (class_sessions table)',
+                        outputAction: 'Class session record created; session appears in scheduling app for eligible members; session appears in BAM OS calendar; assigned coach notified via MEM-007',
+                        humanTouchpoint: 'Yes — coach or business owner creates sessions.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App',
+                        dependencies: 'CLS-001 class types configured; SET-002 locations configured; STF-002 coach profiles exist',
+                        edgeCases: 'Session created with capacity below current booking count (e.g., editing a session that already has bookings): block capacity reduction below current booking count. Session time overlaps with another session in the same location: surface a warning — do not block (the coach may intend parallel sessions). Session assigned to a coach who has marked that time as unavailable (STF-004): surface warning — do not block.',
+                        notes: 'The BAM OS calendar is the operational heart of the scheduling system. It must be a proper calendar UI (week view default, month view option) with drag-to-create for new sessions and click-to-edit for existing ones. Sessions should show at a glance: class type color, current booking count vs. capacity, and a visual indicator of the assigned coach.',
+                        subJobs: [
+                            {
+                                id: 'CLS-002a',
+                                title: 'Individual session creation',
+                                requirement: 'Individual session creation — coach selects a date and time on the calendar (or uses a "Create Session" button), fills in the session form, and saves. Session immediately appears in the scheduling app for eligible members. Coach assigned to the session receives a MEM-007 notification.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach / Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Scheduling App',
+                                dependencies: 'CLS-001 class types configured',
+                                notes: 'Drag-to-create on the calendar should pre-fill the start time based on where the user clicked. The session form should be completable in under 60 seconds for a standard class.'
+                            },
+                            {
+                                id: 'CLS-002b',
+                                title: 'Session editing',
+                                requirement: 'Session editing — coach can edit any future session\'s time, capacity, notes, and assigned coach. Editing a session that has bookings: if capacity is reduced below current booking count, block. If time is changed: all booked members receive an automated notification of the time change (APP-010 session reminder channel). If the session is part of a recurring series (CLS-003), the coach is prompted: "Edit this session only" or "Edit this and all future sessions in the series." Changes to a single instance do not affect other instances in the series.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach / Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Scheduling App, SMS/notification provider',
+                                dependencies: 'CLS-002a live; APP-010 notifications live',
+                                notes: 'The "edit this one vs. all future" prompt is the most important UX decision in recurring series management. Default should be "this session only" to prevent accidental mass changes.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'CLS-003',
+                        category: 'Class Scheduling',
+                        isParent: false,
+                        title: 'Recurring class series management',
+                        oneLiner: 'Coach creates a repeating class pattern (weekly, biweekly, custom) that generates individual session instances — with the ability to edit one or all future instances.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'On demand — during schedule setup',
+                        requirement: 'Recurring class series management — when creating or editing a class session (CLS-002), the coach can set a recurrence pattern to create a series of sessions automatically. Recurrence options: weekly (same day and time every week), biweekly, custom (specific days of the week — e.g., Monday and Wednesday). Series has a defined end date or a set number of occurrences (max 52 — one year of weekly sessions). The system generates all individual session records from the pattern at series creation time. Each generated session is an independent record — it can be individually cancelled, edited, or have its capacity adjusted without affecting others. The series as a whole can be cancelled (all future sessions cancelled simultaneously — members notified). Editing a single session prompts "this session only" or "this and all future sessions." Sessions that already have bookings in the series show a count in the edit prompt so the coach understands the impact.',
+                        dataInputs: 'Recurrence type (weekly/biweekly/custom), recurrence days, end date or occurrence count, series-level fields (class type, location, coach, capacity, notes)',
+                        dataSources: 'Database (class_series table, class_sessions table with series_id FK)',
+                        outputAction: 'All session instances generated and stored; series record created; sessions visible in scheduling app and BAM OS calendar; series management view available',
+                        humanTouchpoint: 'Yes — coach creates and manages series.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App',
+                        dependencies: 'CLS-002 session creation live',
+                        edgeCases: 'Series creation generates sessions spanning a holiday or academy closure: generate sessions but flag the holiday-adjacent ones for coach review. Series end date changed to be earlier than current date: cancel all future unbooked sessions, notify members booked in the removed sessions. Series with 52 occurrences hits the limit: surface a "This series will end on [date]. Create a new series to continue." prompt 4 weeks before expiry.',
+                        notes: 'Recurring series management is the most complex scheduling feature because of the "edit one vs. all future" branching. The system must maintain a clear data model: each session has a series_id FK but is otherwise independent. The series record stores the original pattern parameters. The BAM OS calendar should visually group series instances (same color, a small link icon) so coaches can tell at a glance which sessions are part of a recurring pattern.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CLS-004',
+                        category: 'Class Operations',
+                        isParent: false,
+                        title: 'Class cancellation by coach',
+                        oneLiner: 'Coach cancels a session — all booked members are notified, attendance records voided, make-up credits issued, and waitlist dissolved.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'On demand — event-triggered when a session cannot run',
+                        requirement: 'Class cancellation by coach — coach cancels a scheduled class session from the BAM OS calendar. The cancellation flow: (1) Coach selects session and initiates cancellation. (2) System shows impact summary: number of booked members, waitlisted members, and whether make-up credits will be issued. (3) Coach confirms cancellation reason (dropdown: weather/facility, coach unavailable, insufficient enrollment, other — with optional notes). (4) On confirmation: all booked members receive an automated notification (in-app + SMS) stating the session is cancelled and the reason. Notification includes the make-up credit details if credits are being issued. (5) BAM OS prompts coach to issue make-up credits to all affected members via MEM-026 flow (pre-populated with all booked athletes). (6) Any session credits consumed by bookings are automatically refunded to the members\' credit balance. (7) Waitlist dissolved — all waitlisted members notified the session is cancelled. (8) Attendance record for the session is voided. (9) Session marked as cancelled in the calendar (greyed out, not deleted — retained for historical reporting).',
+                        dataInputs: 'Session ID, cancellation reason, make-up credit decision (issue or skip)',
+                        dataSources: 'Database (class_sessions, bookings, waitlist, credit_balances)',
+                        outputAction: 'Session status set to cancelled; all booked members notified; session credits refunded; make-up credits issued (MEM-026); waitlist dissolved; attendance record voided; session retained in calendar with cancelled status',
+                        humanTouchpoint: 'Yes — coach initiates; prompted to issue make-up credits.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App, SMS/notification provider, MEM-026 (credits)',
+                        dependencies: 'CLS-002 session creation live; MEM-026 credit management live; APP-010 notifications live',
+                        edgeCases: 'Coach cancels a session less than 1 hour before start time: all real-time notifications sent immediately regardless of quiet hours. Cancellation of a session in a recurring series: apply "this session only" by default — prompt if coach wants to cancel all future sessions in the series. Session has zero bookings: no notifications, no credits — just mark cancelled. Coach cancels a session that is part of a camp or multi-day program: warn that this may disrupt the program sequence.',
+                        notes: 'Class cancellations are a significant trust event — how the academy handles them determines whether members feel valued or exploited. The automated notification must be immediate and include a sincere reason. Make-up credits are the trust-restoration mechanism. The prompt to issue credits is mandatory in the flow — the coach can choose not to issue them but must explicitly skip the step, not accidentally overlook it. The cancellation reason dropdown feeds into operational reporting — tracking which cancellation reasons occur most frequently is valuable for improving reliability.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CLS-005',
+                        category: 'Class Operations',
+                        isParent: true,
+                        title: 'Session roster management',
+                        oneLiner: 'Coach views and manages the live roster for any session — attendance marking, manual adds/removes, and a complete session summary.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'Per session',
+                        requirement: 'Session roster management — the coach-facing view for managing an individual class session. Accessible from the BAM OS calendar by clicking any session. The roster view shows: session details (class type, date/time, location, capacity status), list of all booked athletes with their photo, name, eligibility tag, and attendance status (present / absent / unknown), a waitlist section (if applicable), and session notes. Before the session (more than 30 minutes before start time): coach can add athletes manually (search by name, subject to eligibility and capacity), remove booked athletes (with or without credit refund decision), and view athlete profiles (click-through to PRF-008). During and after the session: coach marks attendance for each athlete (present / absent). Bulk mark all present option. After marking, any absent athletes with 2+ consecutive no-shows are flagged per MEM-001. Coach can add session notes visible only to coaches (different from member-facing session notes in CLS-002).',
+                        dataInputs: 'Session ID, attendance status per athlete (present/absent), manual add/remove actions, coach session notes',
+                        dataSources: 'Database (class_sessions, bookings, athlete_profiles, attendance_records)',
+                        outputAction: 'Attendance records written to Database per athlete per session; manual adds/removes update booking records; coach notes stored; MEM-001 no-show flags triggered on consecutive absences; session status updated',
+                        humanTouchpoint: 'Yes — coach marks attendance and manages roster.',
+                        integrations: 'BAM OS Dashboard, Database, MEM-001 (attendance tracking)',
+                        dependencies: 'CLS-002 session creation live; MEM-001 attendance tracking live; PRF-003 athlete profiles live',
+                        edgeCases: 'Coach marks attendance after 24 hours: allow — late entries are common (paper backup entry). Coach adds athlete who is not eligible for this class type (eligibility tag mismatch): warn but allow — coach override is intentional (e.g., a guest athlete). Session capacity reached and coach tries to add manually: warn "This session is at capacity" but allow override with confirmation. Athlete marked present but has active unpaid invoice: no gate — attendance and billing are separate concerns.',
+                        notes: 'The session roster is the most time-pressured view in BAM OS — coaches often have a 30-second window between sessions to mark attendance. The UI must be mobile-first, large tap targets, one-tap per athlete to toggle present/absent. The bulk "mark all present" button with an "undo" option covers 90% of sessions where everyone shows up. The session summary after marking attendance should show at a glance: X attended of Y booked, Z no-shows.',
+                        subJobs: [
+                            {
+                                id: 'CLS-005a',
+                                title: 'Pre-session roster view',
+                                requirement: 'Pre-session roster view — available from session creation until 30 minutes before start. Shows booked athletes list, waitlist, capacity indicator. Actions: add athlete manually (search, eligibility check, capacity check), remove athlete (with credit refund prompt — "Refund session credit?" yes/no), view athlete profile. Athlete rows show: photo, name, eligibility tag, membership status, last attendance date.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'CLS-002 live; PRF-003 athlete profiles live',
+                                notes: 'The last attendance date on each athlete row is a subtle but high-value field — coach can see at a glance if someone hasn\'t come in a while and make note to check in.'
+                            },
+                            {
+                                id: 'CLS-005b',
+                                title: 'Live attendance marking',
+                                requirement: 'Live attendance marking — available from 30 minutes before session start through 24 hours after end time. Each athlete row has a toggle: tap to mark present (green checkmark), tap again for absent (red X), tap again for unknown (grey dash — default state). "Mark all present" button at top with one-tap confirm. After all athletes are marked, "Complete Session" button saves all attendance records and triggers MEM-001 processing. Session is marked as "completed" status in calendar. Coach can reopen a completed session to correct attendance within 24 hours.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, MEM-001',
+                                dependencies: 'CLS-005a live; MEM-001 live',
+                                notes: 'The "Complete Session" action is the moment attendance data becomes real — it triggers the MEM-001 no-show detection, the health score recalculation (MEM-017), and the attendance history update for each athlete. Make this action prominent but not alarming.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'CLS-006',
+                        category: 'Class Scheduling',
+                        isParent: false,
+                        title: 'BAM OS class calendar',
+                        oneLiner: 'The coach-facing calendar view of all sessions — week and month views, color coded by class type, with drag-to-create and click-to-edit.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'Continuous — primary scheduling navigation surface',
+                        requirement: 'BAM OS class calendar — the primary scheduling view in the BAM OS dashboard. Displays all class sessions for the selected location in a standard calendar UI. Views: week (default) and month. Each session is displayed as a color-coded block (class type color from CLS-001) showing: class name, time, booking count vs. capacity (e.g., "12/15"), and assigned coach initials. Status indicators: upcoming (default), full (no more bookings), cancelled (grey/strikethrough), completed (dimmed). Interactions: click any session to open the session detail/roster (CLS-005); drag an empty time slot to create a new session (CLS-002 form pre-filled with the dragged time); drag an existing session to reschedule it (prompts confirmation if the session has bookings). Filters: location dropdown (business owner only), class type filter, coach filter. Navigation: previous/next week or month arrows, "today" button, date picker.',
+                        dataInputs: 'All class session records for selected location and date range',
+                        dataSources: 'Database (class_sessions table)',
+                        outputAction: 'Calendar rendered with real-time session data; interactions initiate CLS-002, CLS-002b, or CLS-005 flows',
+                        humanTouchpoint: 'Yes — primary scheduling surface for coaches.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'CLS-001 class types configured; CLS-002 sessions created',
+                        edgeCases: 'No sessions in the displayed period: show empty calendar with "Create your first class" CTA. Many sessions in one time slot (parallel sessions): stack session blocks or show "+2 more" with an expand action. Long session names: truncate in calendar block, show full name in tooltip on hover. Session dragged to a time that conflicts with another session at the same location: surface a warning — do not block.',
+                        notes: 'The calendar is a standard product pattern — do not over-engineer it. A solid week view with color coding and click-to-open is sufficient for MVP. Month view is useful for schedule planning but not session management. Drag-to-create is a power user feature that dramatically speeds up schedule building — worth the implementation complexity. The capacity indicator ("12/15") is the single most important piece of information a coach needs at a glance.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CLS-007',
+                        category: 'Class Operations',
+                        isParent: false,
+                        title: 'Manual enrollment by coach',
+                        oneLiner: 'Coach directly enrolls an athlete in a session from the BAM OS dashboard — bypassing the member-facing booking flow.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'On demand',
+                        requirement: 'Manual enrollment by coach — coach can enroll any athlete in any upcoming session directly from the BAM OS dashboard without the athlete going through the scheduling app booking flow. Accessible from: (1) the session pre-roster view (CLS-005a) via a search-to-add flow, (2) the athlete profile detail drawer (PRF-008) via an "Enroll in Session" action that opens a session picker. Enrollment bypasses eligibility tag enforcement with a warning (not a block) — coach override is intentional. Enrollment bypasses capacity limits with a warning (not a block). Credit deduction: coach is prompted whether to deduct a session credit from the athlete\'s balance. If the athlete has no credits remaining: coach can override and enroll without credit deduction (e.g., for a complimentary session). Enrolled athlete receives an automated session confirmation notification.',
+                        dataInputs: 'Athlete ID, session ID, credit deduction decision',
+                        dataSources: 'Database (bookings, credit_balances)',
+                        outputAction: 'Booking record created; credit deducted if applicable; athlete receives confirmation notification; session roster updated',
+                        humanTouchpoint: 'Yes — coach initiates enrollment.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (roster sync)',
+                        dependencies: 'CLS-002 sessions exist; PRF-003 athlete profiles exist; APP-010 notifications live',
+                        edgeCases: 'Coach enrolls athlete who is already booked in that session: block duplicate booking. Coach enrolls athlete who is on the waitlist: promote off waitlist and book directly. Athlete has active unpaid invoice: warn coach but do not block enrollment.',
+                        notes: 'Manual enrollment is one of the most common daily operations at a physical academy — a parent calls in, a coach decides to add a player to a session, or a makeup needs to be arranged informally. The credit deduction prompt is important for financial accuracy — skipping it consistently would corrupt session credit accounting.',
+                        subJobs: []
+                    }
+                ]
             }
         };
 
@@ -4030,7 +4538,9 @@
                     scheduling: 'node-scheduling',
                     strategy: 'node-strategy',
                     profiles: 'node-profiles',
-                    settings: 'node-settings'
+                    settings: 'node-settings',
+                    staff: 'node-staff',
+                    classes: 'node-classes'
                 }[key];
 
                 let jobsHtml;
@@ -4073,7 +4583,15 @@
                         'Member Acquisition Config',
                         'Integrations Config',
                         'Communication Config',
-                        'BAM OS Admin'
+                        'BAM OS Admin',
+                        'Staff Accounts',
+                        'Authentication',
+                        'Staff Operations',
+                        'Class Configuration',
+                        'Class Scheduling',
+                        'Class Operations',
+                        'Financial Operations',
+                        'Reporting'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
