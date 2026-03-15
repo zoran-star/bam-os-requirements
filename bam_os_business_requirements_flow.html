@@ -423,6 +423,11 @@
             left: 280px;
         }
 
+        .node-profiles {
+            top: 800px;
+            left: 960px;
+        }
+
         /* Zoom controls */
         .zoom-controls {
             display: flex;
@@ -1921,7 +1926,7 @@
                         humanTouchpoint: 'No — self-managed',
                         integrations: 'Database',
                         dependencies: 'Account created (APP-005 onboarding complete)',
-                        notes: 'Formerly APP-007. Parent and player share one combined account. Multiple players displayed simultaneously — not a profile switcher. Player name used on reports; player image used in group chat and coach interface. Signed documents also stored in profile.',
+                        notes: 'Formerly APP-007. Parent and player share one combined account. Multiple players displayed simultaneously — not a profile switcher. Player name used on reports; player image used in group chat and coach interface. Signed documents also stored in profile. [PRF UPDATE] This job is now superseded by PRF-001 (account type architecture), PRF-002 (parent profile), and PRF-003 (athlete profile). The PRF module provides the authoritative specification for how parent and athlete identities are structured. APP-004 remains as a reference for the original scheduling-app requirement — all new implementation work should follow the PRF definitions.',
                         subJobs: []
                     },
                     {
@@ -1939,7 +1944,7 @@
                         humanTouchpoint: 'Yes — coach sends the onboarding link manually',
                         integrations: 'Database, Stripe',
                         dependencies: 'Plans/products configured; legal agreement documents configured; Stripe connected',
-                        notes: 'Formerly APP-010. Web app (not native mobile) for onboarding. Coach sends link manually. Steps in order: (1) account creation, (2) product selection, (3) payment, (4) legal agreements, (5) app walkthrough, (6) welcome state.',
+                        notes: 'Formerly APP-010. Web app (not native mobile) for onboarding. Coach sends link manually. Steps in order: (1) account creation, (2) product selection, (3) payment, (4) legal agreements, (5) app walkthrough, (6) welcome state. [PRF UPDATE] Onboarding flow must now collect parent profile fields per PRF-002a (first name, last name, email, phone, relationship to athlete) and create athlete profile(s) per PRF-003a. Account creation step creates a Parent account (account_type = "parent") with linked athlete profile(s). See PRF-001 for the account type architecture that this flow must implement.',
                         subJobs: [
                             {
                                 id: 'APP-005a',
@@ -2160,7 +2165,7 @@
                         humanTouchpoint: 'No — self-managed (adding players)',
                         integrations: 'Database, Stripe',
                         dependencies: 'Parent account created (APP-005); plans configured; Stripe connected',
-                        notes: 'Formerly APP-019. Billing is per player — each player has a separate Stripe subscription and invoice. Parent sees all players simultaneously (not a profile switcher). Credits scoped out of this session. Class eligibility tag assigned per player (MEM-009).',
+                        notes: 'Formerly APP-019. Billing is per player — each player has a separate Stripe subscription and invoice. Parent sees all players simultaneously (not a profile switcher). Credits scoped out of this session. Class eligibility tag assigned per player (MEM-009). [PRF UPDATE] Multi-player account structure is now formally defined in PRF-001 (account type architecture) and PRF-004 (parent-athlete linking). The parent-to-athlete relationship, adding/removing athletes, and the data model are specified in the PRF module. APP-014 remains as the scheduling-app requirement — implementation should follow PRF specifications for the underlying data model.',
                         subJobs: []
                     }
                 ]
@@ -2191,6 +2196,297 @@
                         subJobs: []
                     }
                 ]
+            },
+            profiles: {
+                title: 'PROFILES & IDENTITY',
+                subtitle: '👤 Account structure, roles, and relationships',
+                color: '#b388ff',
+                jobs: [
+                    {
+                        id: 'PRF-001',
+                        category: 'Account Architecture',
+                        isParent: false,
+                        title: 'Account type architecture',
+                        oneLiner: 'Two account types — Parent (billing owner) and Athlete (sub-profile) — with a formal parent-to-athlete relationship stored in the Database.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (system-enforced)',
+                        frequency: 'Continuous — foundational data model',
+                        requirement: 'Account type architecture — BAM OS supports two distinct account types: (1) Parent Account: the primary billing and administrative account. A Parent owns the subscription, signs all legal documents, manages payment methods, and controls account-level settings. A Parent can have one or more linked Athlete profiles. The Parent is the login identity — they authenticate and access all features through a single login. (2) Athlete Profile: a named sub-profile linked to a Parent account. An Athlete is not a separate login in V1 — they are a profile managed under the Parent account. An Athlete has their own name, photo, bio, position, date of birth, height/weight, class eligibility tag, subscription, attendance history, player reports, and online program progress. (3) Parent-Athlete Relationship: a formal many-to-one linkage stored in the Database — one Parent can have many Athletes; each Athlete belongs to exactly one Parent. The relationship is created during onboarding and can be updated by the coach. All billing, legal, and communication flows are anchored to the Parent. All development, scheduling, and performance flows are anchored to the Athlete.',
+                        dataInputs: 'Account creation data (parent), athlete profile creation data (athlete), parent-athlete linkage record',
+                        dataSources: 'Database (accounts table, athlete_profiles table, parent_athlete_relationships table)',
+                        outputAction: 'Parent account created with account_type = "parent"; athlete_profile records created with parent_id foreign key; relationship record stored and enforced throughout all downstream features',
+                        humanTouchpoint: 'Yes — account type is determined at onboarding. Coach can create athlete profiles on behalf of a parent.',
+                        integrations: 'Database',
+                        dependencies: 'Database schema updated to support account_type field on accounts table and athlete_profiles table with parent_id FK',
+                        edgeCases: 'Adult athlete training without a parent (adult member): account_type = "adult_athlete" — they are both the billing owner and the athlete. Adult athlete accounts have all Parent permissions and all Athlete profile features in one account. Coach creates an athlete profile without a linked parent (orphaned profile): flag as incomplete onboarding — require parent account linkage before subscription can be activated.',
+                        notes: 'The parent/athlete split is the foundational data model decision that downstream features depend on. Every feature in the system must be aware of which account type is relevant. Adult athletes (18+) who train for themselves are a special case — they function as parent and athlete in one account. The three-table model (accounts, athlete_profiles, parent_athlete_relationships) gives maximum flexibility for future features like athlete-owned logins (V2) and sibling profiles under one parent.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'PRF-002',
+                        category: 'Parent Profile',
+                        isParent: true,
+                        title: 'Parent account profile',
+                        oneLiner: 'The parent\'s own identity record — contact info, notification preferences, billing details, signed documents, and linked athlete profiles.',
+                        release: 'MVP',
+                        initiatedBy: 'User (parent self-manages) / Coach (can edit from dashboard)',
+                        frequency: 'On demand — editable at any time',
+                        requirement: 'Parent account profile — the parent\'s own profile record stored in the Database. Fields: first name, last name, email address, phone number, profile photo (optional), relationship to athlete(s) (e.g., mother, father, guardian — selected from dropdown or free text), preferred notification channel (SMS, in-app, or both), notification preferences per type (payment reminders, session reminders, report published, coach messages — independently toggleable), timezone, and emergency contact name + phone. The parent profile is distinct from the athlete profiles they manage — the parent\'s name and photo appear on messages sent to them, while athlete names and photos appear in attendance, reports, and class context. Parent profile is editable from the scheduling app (member-facing) and viewable/editable by coach from BAM OS dashboard (MEM-011b detail drawer).',
+                        dataInputs: 'Parent name, email, phone, profile photo, relationship to athlete, notification preferences, timezone, emergency contact',
+                        dataSources: 'Database (accounts table with parent profile fields)',
+                        outputAction: 'Parent profile record stored and updated in Database; notification preferences enforced across all outbound communications (APP-010, MEM-002); coach sees parent profile in MEM-011b detail drawer',
+                        humanTouchpoint: 'Yes — parent edits own profile. Coach can also edit from dashboard.',
+                        integrations: 'BAM OS Dashboard, Database, MEM-002 (messaging), APP-010 (notifications)',
+                        dependencies: 'PRF-001 account type architecture live; APP-005 onboarding flow updated to collect parent profile fields',
+                        edgeCases: 'Parent has no profile photo: show initials avatar throughout the system. Parent changes email: update login credential and all communication channels simultaneously — confirm via verification email. Parent changes phone number: update SMS delivery target immediately. Parent removes all notification preferences: in-app only as fallback — never zero notification channels. Parent and athlete share the same email address (family email): allow but flag as potential confusion risk.',
+                        notes: 'The parent profile is the communication anchor — every message, invoice, reminder, and notification in the system routes to the parent, not to the athlete. The relationship field ("mother", "father", "guardian") helps coaches personalize communication ("Hi Sarah" vs. generic "Hi there"). Notification preferences stored on the parent profile override the global defaults in APP-010 — the parent\'s settings are authoritative.',
+                        subJobs: [
+                            {
+                                id: 'PRF-002a',
+                                title: 'Parent profile creation (onboarding)',
+                                requirement: 'Parent profile creation (onboarding) — during APP-005 account creation step, parent enters: first name, last name, email, phone, and relationship to athlete (required). Profile photo and emergency contact are optional at onboarding — prompted later via MEM-025 activation checklist. Notification preferences default to all-on at onboarding and are configurable from profile settings post-onboarding.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-005 onboarding flow updated to include parent profile fields',
+                                notes: 'Keep onboarding fields minimal — name, email, phone, relationship to athlete. Optional fields prompt post-onboarding via activation checklist. Relationship field is free text with common options pre-populated as suggestions: Mother, Father, Guardian, Self (for adult athletes).'
+                            },
+                            {
+                                id: 'PRF-002b',
+                                title: 'Parent profile editing (post-onboarding)',
+                                requirement: 'Parent profile editing — parent can edit all profile fields from a dedicated profile settings page in the scheduling app. Changes to email trigger a verification email before taking effect. Changes to phone number take effect immediately with a confirmation SMS sent to the new number. Profile photo upload supports JPEG and PNG up to 5MB, auto-resized to 400x400px. All edits are logged in the member event history (MEM-013) with the field changed and timestamp.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'PRF-002a complete; member account active',
+                                notes: 'Email change must be verified before taking effect — prevents accidental lockout. Phone change is immediate because SMS is the primary communication channel and we want it working instantly. Photo upload is server-side resized to avoid performance issues in the messaging UI.'
+                            },
+                            {
+                                id: 'PRF-002c',
+                                title: 'Coach view and edit of parent profile',
+                                requirement: 'Coach view and edit of parent profile — from the member detail drawer (MEM-011b), coach can view all parent profile fields and edit: name, phone, relationship to athlete, notification preferences, and emergency contact. Coach cannot change the parent\'s email or password — authentication changes are parent-initiated only. All coach edits are logged with coach attribution and timestamp.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'MEM-011b detail drawer live; PRF-002a onboarding complete',
+                                notes: 'Coach edit access is necessary for operational reality — parents frequently call in to update their phone number or ask the coach to adjust their notifications. The email/password exclusion is a security boundary — authentication credentials are parent-controlled only.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'PRF-003',
+                        category: 'Athlete Profile',
+                        isParent: true,
+                        title: 'Athlete profile',
+                        oneLiner: 'The athlete\'s individual identity record — name, photo, bio, position, DOB, physical stats, and all development data linked to this athlete.',
+                        release: 'MVP',
+                        initiatedBy: 'User (parent creates) / Coach (can create and edit from dashboard)',
+                        frequency: 'On demand — editable at any time',
+                        requirement: 'Athlete profile — a sub-profile record linked to a parent account. Each athlete has their own independent identity and data record. Fields: first name, last name, profile photo, bio (optional, max 300 characters), primary position (Guard, Forward, Center, or custom), date of birth, height, weight, dominant hand (left/right/ambidextrous), school or team (optional free text), jersey number (optional), and an internal coach notes field (not visible to parent or athlete — equivalent to MEM-011c internal notes but scoped to the athlete profile). All development data is linked to the athlete, not the parent: class attendance history (MEM-001), player reports (MEM-005), online program progress (APP-008), class bookings, eligibility tag (MEM-009), make-up credits (MEM-026), and health score (MEM-017). Billing, legal documents, and communication are linked to the parent, not the athlete.',
+                        dataInputs: 'Athlete name, photo, bio, position, DOB, height, weight, dominant hand, school/team, jersey number; parent account ID for linkage',
+                        dataSources: 'Database (athlete_profiles table with parent_id FK)',
+                        outputAction: 'Athlete profile record created in Database and linked to parent account; athlete visible in coach directory and detail drawer; athlete data (attendance, reports, progress) populated as linked records',
+                        humanTouchpoint: 'Yes — parent creates athlete profile during onboarding or from account settings. Coach can create on behalf of parent.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App',
+                        dependencies: 'PRF-001 account architecture live; PRF-002 parent account created first',
+                        edgeCases: 'Parent with multiple athletes: each athlete has a fully independent profile — no shared data between siblings except the parent account linkage. Athlete DOB not provided: required for age-group eligibility calculations — flag as incomplete profile. Athlete without a first and last name: block — name is required for class rosters, reports, and communications. Coach creates athlete profile without a linked parent: flag as orphaned profile, require parent linkage before activating subscription.',
+                        notes: 'The athlete profile is the subject of everything the academy does — schedules are for athletes, reports are about athletes, attendance is of athletes. The parent is the administrative and billing owner. This separation is critical for multi-athlete households where one parent has two kids in different programs — the system should make it obvious which child\'s data you are looking at. The internal coach notes field on the athlete profile is separate from the internal notes on the parent account (MEM-011c) — coach notes about the athlete\'s development ("needs to work on left hand") are different from notes about the account ("dad is hard to reach by phone").',
+                        subJobs: [
+                            {
+                                id: 'PRF-003a',
+                                title: 'Athlete profile creation (onboarding)',
+                                requirement: 'Athlete profile creation (onboarding) — after parent account creation in APP-005a, parent creates at least one athlete profile before proceeding to product selection. Required fields at onboarding: athlete first name, last name, date of birth, primary position. Optional at onboarding: photo, bio, height, weight, school/team, jersey number. Parent can add additional athletes during onboarding or later from account settings. The plan and subscription selected in APP-005b is linked to the specific athlete, not the parent account.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-005a parent account creation complete',
+                                notes: 'Athlete creation must happen before product selection so the subscription can be correctly linked to the athlete. Onboarding fields are minimal — DOB and position are the only fields needed for eligibility logic. The system must support creating multiple athletes before proceeding — a parent with two kids should not have to finish onboarding one child to start the other.'
+                            },
+                            {
+                                id: 'PRF-003b',
+                                title: 'Athlete profile editing',
+                                requirement: 'Athlete profile editing — parent can edit all athlete profile fields from a dedicated athlete settings page in the scheduling app. Photo upload supports JPEG and PNG up to 5MB, auto-resized to 400x400px. DOB changes require coach confirmation (to prevent accidental eligibility tag manipulation). All edits logged in event history. Coach can edit all athlete fields (including DOB) from the BAM OS dashboard without confirmation — coach changes are logged with coach attribution.',
+                                release: 'MVP',
+                                initiatedBy: 'User / Coach',
+                                integrations: 'Database, BAM OS Dashboard',
+                                dependencies: 'PRF-003a complete',
+                                notes: 'DOB edit confirmation by coach prevents parents from gaming age-group class eligibility (e.g., claiming a child is younger to access beginner classes). Coach override is unrestricted — coach is trusted to have a legitimate reason. Photo is cropped to square at upload time — no post-crop adjustments in V1.'
+                            },
+                            {
+                                id: 'PRF-003c',
+                                title: 'Coach view of athlete profile in dashboard',
+                                requirement: 'Coach view of athlete profile in dashboard — in the MEM-011b member detail drawer, the athlete profile is displayed as a dedicated tab (for multi-athlete accounts, each athlete has a separate tab). Athlete tab shows: photo, name, position, DOB and age, physical stats, class eligibility tag (with edit), internal athlete notes (coach-only), current subscription, attendance summary, player reports list, and online program progress. The parent profile information (billing, contact, signed documents) remains in a separate parent tab in the same drawer.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'MEM-011b detail drawer live; PRF-003a athlete profile created',
+                                notes: 'The tab structure in the detail drawer separates parent context (billing, communication) from athlete context (development, scheduling). Coach should be able to switch between athletes on a multi-athlete account without closing and reopening the drawer. The athlete tab is the primary view for development-related conversations; the parent tab is the primary view for operational and billing conversations.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'PRF-004',
+                        category: 'Account Architecture',
+                        isParent: true,
+                        title: 'Parent-athlete relationship management',
+                        oneLiner: 'Formal linkage between parent accounts and athlete profiles — with the ability to add, remove, and reassign athlete profiles by coaches.',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        frequency: 'On demand — managed during onboarding and as needed',
+                        requirement: 'Parent-athlete relationship management — the formal linkage between a parent account and their athlete profile(s), with management tools for coaches. The parent-athlete relationship is created during onboarding (PRF-003a). After onboarding, coaches can: (1) Add a new athlete profile to an existing parent account — useful when a second child joins. (2) Remove an athlete profile from a parent account — requires confirmation; athlete profile is retained in the Database as an archived record, subscription cancelled per MEM-006 flow. (3) Reassign an athlete profile to a different parent account — edge case for custody changes or family restructuring; requires business owner permission. All relationship changes are logged in the event history with coach/owner attribution.',
+                        dataInputs: 'Parent account ID, athlete profile ID, relationship type, action (add / remove / reassign), new parent account ID (for reassignment)',
+                        dataSources: 'Database (parent_athlete_relationships table)',
+                        outputAction: 'Relationship record created, archived, or updated; subscription status updated on removal; event logged',
+                        humanTouchpoint: 'Yes — coach initiates all relationship changes from BAM OS dashboard.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe (for subscription updates on removal)',
+                        dependencies: 'PRF-001 architecture live; PRF-002 parent profile live; PRF-003 athlete profile live; MEM-006 cancellation flow live',
+                        edgeCases: 'Removing an athlete with an active subscription: must go through MEM-006 cancellation flow before relationship removal — cannot orphan an active subscription. Reassigning an athlete changes which parent sees their reports, messages, and billing: send notification to both old and new parent on reassignment. Parent account has only one athlete and that athlete is removed: parent account remains active but is flagged as having no active athletes — subscription cancelled, account in dormant state. Two athletes share the same name under one parent (twins): distinguished by athlete_profile_id internally; display as "James A" and "James B" or use jersey number as disambiguator.',
+                        notes: 'The reassignment flow is an edge case but a real operational need — divorce, remarriage, custody arrangements. It must be restricted to business owner role (not standard coach) because it has billing and legal implications. The archived athlete profile on removal is important for reporting history — you do not want to lose session attendance data or report history just because a family membership ended.',
+                        subJobs: [
+                            {
+                                id: 'PRF-004a',
+                                title: 'Add athlete to existing parent account',
+                                requirement: 'Add athlete to existing parent account — coach can add a new athlete profile to an existing parent account from the BAM OS dashboard. Coach initiates from the parent\'s MEM-011b detail drawer. A lightweight athlete creation form is presented: required fields (athlete name, DOB, position), optional fields (photo, bio, physical stats). On save, the athlete profile is created and linked to the parent. Coach then proceeds to select a plan for the new athlete and send a payment link to the parent for the additional subscription.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'PRF-003 athlete profile system live; MEM-011b detail drawer live',
+                                notes: 'The payment link for the new athlete subscription uses the same coach-sent onboarding link mechanism as APP-005 — parent receives a link to complete payment and sign documents for the new athlete only (steps 2–4 of onboarding, skipping account creation since they already have one).'
+                            },
+                            {
+                                id: 'PRF-004b',
+                                title: 'Reassign athlete to different parent',
+                                requirement: 'Reassign athlete to different parent — business owner can reassign an athlete profile from one parent account to another. Flow: (1) Business owner selects athlete, (2) selects new parent account (must already exist in system), (3) confirms reassignment with acknowledgment of billing and communication impact, (4) system updates parent_id on athlete profile, updates all active subscriptions, sends notification to both old and new parent. Restricted to business owner role only.',
+                                release: 'V1',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'PRF-004 parent; both parent accounts must exist in Database',
+                                notes: 'The reassignment notification to the old parent must be sensitive — do not expose family situation details. A simple "Your account has been updated" notification is sufficient. The new parent receives a "Welcome — [Athlete Name] has been added to your account" notification.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'PRF-005',
+                        category: 'Account Architecture',
+                        isParent: false,
+                        title: 'Adult athlete account (self-managed)',
+                        oneLiner: 'Adult members (18+) who train for themselves — one account that is both the billing owner and the athlete, with full access to all parent and athlete features.',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        frequency: 'One-time setup at onboarding',
+                        requirement: 'Adult athlete account (self-managed) — when a member signs up as an adult athlete (18+ or no dependent athletes), the account functions as a combined parent + athlete account. There is no separate parent profile and athlete profile — the account holder IS the athlete. The account has all parent features (billing, legal documents, communication) AND all athlete features (attendance, reports, class eligibility, progress) in a single identity. In the scheduling app, the adult athlete sees their own profile as the athlete — no "players" tab or multi-athlete switcher. In the coach dashboard, the adult athlete appears in the member directory with a single identity — the MEM-011b detail drawer shows a unified view (no parent/athlete tab split). The system determines account type at onboarding based on a question: "Are you signing up for yourself or for your child?" Adult athlete accounts can be converted to parent accounts if they later enroll a child (adds a linked athlete profile without disrupting the adult\'s own data).',
+                        dataInputs: 'Onboarding "for yourself or for a child" selection; adult athlete profile fields (same as PRF-003 athlete fields plus parent contact fields)',
+                        dataSources: 'Database (account_type = "adult_athlete" flag)',
+                        outputAction: 'Single unified account created with adult_athlete type; all parent and athlete features available under one identity; coach sees unified detail drawer with no tab split',
+                        humanTouchpoint: 'Yes — member selects account type at onboarding.',
+                        integrations: 'Database, BAM OS Dashboard, Scheduling App',
+                        dependencies: 'PRF-001 account architecture live; APP-005 onboarding updated with account type selection',
+                        edgeCases: 'Adult athlete later enrolls their child: convert account to parent type, create new athlete profile for child, retain adult\'s own athlete profile as their personal profile (now they are both a parent and an athlete). Adult athlete who is also a coach at the academy: account is still adult_athlete type for membership — their coach access is a separate role grant, not an account type change.',
+                        notes: 'The adult athlete case is statistically significant — many basketball training academies serve adult recreational players and adult skill development members, not just youth. The "for yourself or for your child" question at onboarding is the only routing decision needed. The unified account keeps the UX simple for adults who would find a parent/athlete split confusing and unnecessary.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'PRF-006',
+                        category: 'Account Architecture',
+                        isParent: false,
+                        title: 'Profile visibility and permission rules',
+                        oneLiner: 'Explicit rules for what parents, athletes, and coaches can see and edit across all profile types.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (system-enforced)',
+                        frequency: 'Continuous — enforced on every data access',
+                        requirement: 'Profile visibility and permission rules — the system enforces clear rules about which actors can view and edit which data. Rules by role: PARENT: can view and edit their own parent profile (PRF-002), can view and edit all athlete profiles they own (PRF-003), can view all billing and payment data for their athletes, can view all signed documents, can view all player reports published for their athletes, can view attendance history for their athletes, can view online program progress for their athletes. Parents CANNOT see internal coach notes (MEM-011c, PRF-003c athlete notes) — these are strictly coach-only. ATHLETE (future V2 login): in V1, athletes do not have a separate login — all athlete-facing features are accessed through the parent account. V2 athlete login will have a restricted view: can see own attendance, reports, program progress, and class schedule only — cannot see billing, documents, or parent profile. COACH: can view and edit all parent profiles and athlete profiles at their assigned location, can see internal notes, can initiate all relationship management actions. Cannot change parent email or password. BUSINESS OWNER: full access to all profiles at all locations, plus relationship reassignment (PRF-004b).',
+                        dataInputs: 'Actor role (parent / coach / business_owner / athlete), requested resource, resource ownership (parent_id / location_id)',
+                        dataSources: 'Database (role assignments, parent_athlete_relationships, location assignments)',
+                        outputAction: 'Access granted or denied at the API/database query level; UI elements hidden or disabled for unauthorized actions',
+                        humanTouchpoint: 'No — system-enforced.',
+                        integrations: 'Database, BAM OS Dashboard, Scheduling App',
+                        dependencies: 'PRF-001, PRF-002, PRF-003 live; role assignment system in MEM-014 live',
+                        edgeCases: 'Parent tries to access another family\'s athlete profile directly (URL manipulation): return 403 forbidden. Coach at Location A tries to view members at Location B: return 403 forbidden. Business owner demoted to coach mid-session: invalidate session and require re-login. Parent account with no linked athletes (edge case from PRF-004 removal): parent can still log in and see billing history but scheduling app shows empty state.',
+                        notes: 'Internal coach notes are the most sensitive visibility rule — parents must never see them. The note content ("dad is difficult", "athlete seems burned out") is written for coach-to-coach operational context, not for parent consumption. This must be enforced at the database query level, not just the UI level. The V2 athlete login scope is specced here even though it is deferred — this informs the data model decisions made in V1 so that athlete login does not require a database migration.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'PRF-007',
+                        category: 'Athlete Profile',
+                        isParent: true,
+                        title: 'Athlete profile (member-facing view)',
+                        oneLiner: 'The athlete\'s profile as seen in the scheduling app — photo, bio, position, stats, and links to their personal data (attendance, reports, progress).',
+                        release: 'MVP',
+                        initiatedBy: 'User (parent views and edits)',
+                        frequency: 'On demand',
+                        requirement: 'Athlete profile (member-facing view) — the athlete\'s profile page in the scheduling app, accessible to the parent. For multi-athlete accounts, each athlete has a separate profile accessible from a profiles list. The athlete profile page displays: athlete photo, name, position, bio, age (calculated from DOB — never raw DOB displayed to member for privacy), height, weight, dominant hand, school/team, jersey number. Below the identity section: quick-access links to the athlete\'s attendance history (APP-011), player reports (MEM-005b), online program progress (APP-008), and upcoming classes. The referral link (APP-013) is displayed at the bottom of the profile page. Parent can tap any field to edit (PRF-003b). For adult athlete accounts (PRF-005), this page is the member\'s own profile — same layout, no multi-athlete context.',
+                        dataInputs: 'Athlete profile fields from PRF-003, attendance summary from MEM-001, report count from MEM-005, program progress from APP-008, upcoming class bookings from scheduling app',
+                        dataSources: 'Database (athlete_profiles, attendance logs, reports, program progress, bookings)',
+                        outputAction: 'Athlete profile page rendered with all fields and linked data summaries; edit flow available for all editable fields; quick-access links open respective sections',
+                        humanTouchpoint: 'No — read-mostly, self-serve editing.',
+                        integrations: 'Scheduling App, Database',
+                        dependencies: 'PRF-003 athlete profile created; MEM-001 live; MEM-005 live; APP-008 live',
+                        edgeCases: 'Athlete has no photo: show initials avatar with position color coding (e.g., guard = blue, forward = green, center = red). Athlete has no reports yet: show "No reports yet" empty state in the reports section — not an error. Multiple athletes on account: show athlete switcher as a horizontal scroll of athlete avatars at the top of the profile section — tapping one loads that athlete\'s profile.',
+                        notes: 'The athlete profile page is the parent\'s personal view of their child\'s journey at the academy. It should feel like a personal dashboard for that athlete — not a settings page. The design should lead with the photo and name prominently (this is their child). The quick-access links to attendance, reports, and progress make this the natural home page for parent engagement with their child\'s development. For adult athletes, this page is equivalent to a personal dashboard and should feel more performance-focused than the parent version.',
+                        subJobs: [
+                            {
+                                id: 'PRF-007a',
+                                title: 'Multi-athlete profile switcher',
+                                requirement: 'Multi-athlete profile switcher — for parent accounts with two or more athlete profiles, the scheduling app displays an athlete switcher at the top of any athlete-specific section (profile, attendance history, player reports, online programs, class booking). The switcher shows athlete avatars (or initials if no photo) with names. The currently active athlete context is clearly indicated. Switching athlete context updates all athlete-specific data on the current page. The selected athlete context persists within the session — parent does not need to re-select on every page.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Scheduling App, Database',
+                                dependencies: 'PRF-003 multiple athlete profiles created under one parent account',
+                                notes: 'The switcher is not needed for accounts with only one athlete — show without switcher UI in that case. The session context persistence is critical — if a parent is managing class bookings for their younger child, every booking action should default to that child until explicitly switched. The switcher must be persistent and visible without requiring navigation to the profile page.'
+                            },
+                            {
+                                id: 'PRF-007b',
+                                title: 'Athlete context enforcement in scheduling',
+                                requirement: 'Athlete context enforcement in scheduling — all class bookings, cancellations, and waitlist actions in the scheduling app are performed in the context of the currently selected athlete (PRF-007a). The booking flow shows the athlete\'s name and photo prominently to confirm context before booking. The athlete\'s class eligibility tag (MEM-009) is enforced — ineligible classes do not appear. The athlete\'s make-up credits (MEM-026) are applied in booking context for that athlete only — credits are not shared between siblings.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Scheduling App, Database',
+                                dependencies: 'PRF-007a switcher live; MEM-009 eligibility tags live; MEM-026 credits live',
+                                notes: 'Booking for the wrong child is a real operational error — the context confirmation in the booking flow prevents it. Credits are athlete-scoped, not account-scoped — this must be enforced at the data level (credit records have athlete_profile_id FK, not just account_id).'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'PRF-008',
+                        category: 'Athlete Profile',
+                        isParent: false,
+                        title: 'Athlete profile (coach dashboard view)',
+                        oneLiner: 'The complete athlete view in BAM OS — identity, development data, internal notes, and all athlete-linked records in one panel.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'On demand — accessed from member directory and class rosters',
+                        requirement: 'Athlete profile (coach dashboard view) — the athlete\'s full profile as seen by coaches in BAM OS. Accessible from: (1) the member detail drawer (MEM-011b) via an athlete tab, (2) the class roster (clicking an athlete\'s name during session management), (3) the player reports section (MEM-005) — athlete context pre-loaded. The coach view displays all athlete identity fields (PRF-003), plus: internal athlete notes (coach-only, not visible to parent), current health score (MEM-017), attendance streak and rate, all player reports with publish status, online program completion rates, class eligibility tag with edit control, make-up credit balance, and a "development timeline" showing report publication dates and attendance patterns over the last 90 days. Coaches can initiate a direct message to the parent from the athlete profile (pre-fills MEM-002a with parent contact, athlete name in the message context).',
+                        dataInputs: 'Athlete profile fields (PRF-003), health score (MEM-017), attendance data (MEM-001), player reports (MEM-005), program progress (APP-008), eligibility tag (MEM-009), credits (MEM-026)',
+                        dataSources: 'Database (all athlete-linked tables)',
+                        outputAction: 'Complete athlete profile rendered in coach dashboard; all edit and action controls available; message-to-parent action routes to MEM-002a',
+                        humanTouchpoint: 'Yes — coach views, edits athlete notes, edits eligibility tag, publishes reports.',
+                        integrations: 'BAM OS Dashboard, Database, MEM-002 (messaging), MEM-005 (reports), MEM-017 (health score)',
+                        dependencies: 'MEM-011b detail drawer live; all referenced MEM features live',
+                        edgeCases: 'Athlete has no attendance data yet (new member): show empty state per section, not errors. Athlete profile accessed from class roster has limited context (only fields relevant to session management): show full profile on click-through. Coach opens athlete profile for a member at a different location: enforce location-based access per PRF-006.',
+                        notes: 'The class roster click-through is a critical UX pattern — during a training session, the coach needs to quickly pull up a player\'s profile to check eligibility, add a note, or view their last report. The development timeline (90-day attendance + report pattern) is the visual that tells the story of the athlete\'s engagement trajectory. "Message parent" as a primary action on the athlete profile reduces the friction of the most common coach workflow: see something about an athlete → communicate with their parent.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'PRF-009',
+                        category: 'Athlete Profile',
+                        isParent: false,
+                        title: 'Athlete profile completeness score',
+                        oneLiner: 'A completeness indicator per athlete profile showing what data is missing — surfaces gaps to both parent and coach.',
+                        release: 'V1',
+                        initiatedBy: 'Agent',
+                        frequency: 'Recalculated on any profile field update',
+                        requirement: 'Athlete profile completeness score — a computed indicator (percentage or tiered: Basic / Complete / Full) showing how much of an athlete\'s profile has been filled in. Fields weighted by importance: Required (name, DOB, position — 0% if missing), Core (profile photo, height, weight, dominant hand — each worth points), Optional (bio, school/team, jersey number — each worth smaller points). The completeness score is displayed: (1) in the coach MEM-011b detail drawer as a small progress bar on the athlete tab, (2) in the member-facing athlete profile as a gentle prompt ("Complete [Athlete Name]\'s profile — 60% complete"). Clicking the prompt in the member app highlights the missing fields. Members with athletes below 80% completeness are included in the MEM-025b not-yet-activated follow-up (profile completion is one of the three activation milestones).',
+                        dataInputs: 'Athlete profile field completion status from PRF-003',
+                        dataSources: 'Database (athlete_profiles table)',
+                        outputAction: 'Completeness score calculated and stored per athlete; displayed in coach dashboard and member app; incomplete profiles surfaced in MEM-025b activation follow-up',
+                        humanTouchpoint: 'No — computed automatically. Parent and coach see the score and are prompted to fill in missing fields.',
+                        integrations: 'BAM OS Dashboard, Scheduling App, Database, MEM-025 (activation tracking)',
+                        dependencies: 'PRF-003 athlete profile live; MEM-025 activation tracking live',
+                        edgeCases: 'Profile completeness drops after a field is removed (e.g., parent removes photo): recalculate and show new score — do not lock the score at its previous high. Required fields missing: score is capped at 0% regardless of optional fields — required fields are gates. Completeness prompt shown to parent whose athlete was recently created by a coach: context is "the coach started your athlete\'s profile — finish it here."',
+                        notes: 'Profile completeness is a data quality mechanism dressed as a user engagement feature. The richer the athlete profiles, the better the health scoring (MEM-017), the more personalized the player reports (MEM-005), and the more meaningful the class rosters for coaches. The 80% threshold for the activation milestone is intentionally not 100% — optional fields like jersey number should not block activation. The prompt language in the member app must be warm and encouraging, not bureaucratic ("Help us know [Athlete Name] better!" not "Complete required fields").',
+                        subJobs: []
+                    }
+                ]
             }
         };
 
@@ -2215,7 +2511,8 @@
                     sales: 'node-sales',
                     memberManagement: 'node-member-management',
                     scheduling: 'node-scheduling',
-                    strategy: 'node-strategy'
+                    strategy: 'node-strategy',
+                    profiles: 'node-profiles'
                 }[key];
 
                 let jobsHtml;
@@ -2235,7 +2532,16 @@
                         'Business Owner Dashboard',
                         'Player Profiles & Account Structure',
                         'Cancellation Management',
-                        'Player Reports'
+                        'Player Reports',
+                        'Account Architecture',
+                        'Parent Profile',
+                        'Athlete Profile',
+                        'Retention Intelligence',
+                        'Billing & Revenue Recovery',
+                        'Onboarding & Activation',
+                        'Scheduling & Operations',
+                        'Analytics & Reporting',
+                        'Growth & Acquisition'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
