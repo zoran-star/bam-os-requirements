@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BAM OS — Marketing</title>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,700&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   BAM OS — Design System Tokens
+   ============================================= */
+:root {
+  /* Fonts */
+  --font-primary: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  /* Light theme (default) */
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8F7F4;
+  --card-bg: #FFFFFF;
+  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --card-shadow-lifted: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --border: #E8E6E1;
+  --border-accent: #D4D1C9;
+  --gold: #C9B97A;
+  --gold-light: #E2DD9F;
+  --gold-dim: rgba(201, 185, 122, 0.15);
+  --gold-hover: rgba(201, 185, 122, 0.25);
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B6B;
+  --text-dim: #9B9B9B;
+  --green: #4caf50;
+  --red: #f44336;
+  --yellow: #f5c842;
+  --blue: #45b7d1;
+}
+
+/* =============================================
+   Reset & Base
+   ============================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* =============================================
+   App Shell
+   ============================================= */
+.app-shell {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-secondary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================================
+   Status Bar (mock)
+   ============================================= */
+.status-bar {
+  height: 54px;
+  padding: 0 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  background: var(--bg-primary);
+  padding-bottom: 8px;
+}
+.status-bar-time {
+  font-weight: 700;
+  font-size: 15px;
+}
+.status-bar-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* =============================================
+   Header
+   ============================================= */
+.header {
+  background: var(--bg-primary);
+  padding: 4px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.header-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.header-location {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.header-location-select {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.header-location-select svg {
+  width: 12px;
+  height: 12px;
+  color: var(--text-dim);
+}
+
+/* =============================================
+   MTD Stats Strip
+   ============================================= */
+.stats-strip {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  background: var(--bg-primary);
+  margin-top: 1px;
+}
+.stat-card {
+  flex: 1;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 14px 12px;
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-value.positive {
+  color: var(--green);
+}
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* =============================================
+   Sage Quick Tip
+   ============================================= */
+.sage-tip {
+  margin: 12px 20px;
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  border-left: 3px solid var(--gold);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.sage-tip-icon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  background: var(--gold-dim);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--gold);
+  margin-top: 1px;
+  font-weight: 700;
+}
+.sage-tip-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+.sage-tip-text strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* =============================================
+   See Full Dashboard Link
+   ============================================= */
+.full-dashboard-link {
+  padding: 0 20px 8px;
+  text-align: right;
+}
+.full-dashboard-link a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gold);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.full-dashboard-link a:hover {
+  text-decoration: underline;
+}
+
+/* =============================================
+   Section Header
+   ============================================= */
+.section-header {
+  padding: 16px 20px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* =============================================
+   Ad Cards
+   ============================================= */
+.ad-cards {
+  padding: 0 20px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ad-card {
+  background: var(--card-bg);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.ad-card:active {
+  transform: scale(0.99);
+  box-shadow: var(--card-shadow-lifted);
+}
+
+.ad-image {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ad-image svg {
+  width: 24px;
+  height: 24px;
+  color: var(--text-dim);
+}
+
+.ad-content {
+  flex: 1;
+  min-width: 0;
+}
+.ad-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.ad-metrics {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+/* Attention card accent */
+.ad-card.attention {
+  border-left: 3px solid var(--yellow);
+}
+.ad-card.attention .ad-metrics {
+  color: #8a6d00;
+}
+
+/* Performer card accent */
+.ad-card.performer .performance-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+.performance-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* CTA button */
+.ad-cta {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--gold);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ad-cta:active {
+  background: #b8a96e;
+}
+.ad-cta svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* =============================================
+   Floating Sage Button (persistent all tabs)
+   ============================================= */
+.sage-float {
+  position: fixed;
+  bottom: 96px;
+  right: 50%;
+  transform: translateX(calc(min(195px, 50vw - 28px)));
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sage-float-btn {
+  width: 48px;
+  height: 48px;
+  background: var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(201, 185, 122, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  border: none;
+}
+.sage-float-btn:active {
+  transform: scale(0.92);
+}
+.sage-float-btn svg {
+  width: 22px;
+  height: 22px;
+  color: #fff;
+}
+
+/* =============================================
+   Bottom Nav
+   ============================================= */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border);
+  display: flex;
+  padding: 8px 0 28px;
+  z-index: 200;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.nav-item.active svg {
+  color: var(--gold);
+}
+.nav-item.active .nav-label {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* =============================================
+   Content area padding for bottom nav
+   ============================================= */
+.content-scroll {
+  flex: 1;
+  padding-bottom: 120px;
+}
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <div class="status-bar-time">9:41</div>
+    <div class="status-bar-icons">
+      <svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="8" width="3" height="4" fill="currentColor" rx="0.5"/><rect x="4.5" y="5" width="3" height="7" fill="currentColor" rx="0.5"/><rect x="9" y="2" width="3" height="10" fill="currentColor" rx="0.5"/><rect x="13.5" y="0" width="3" height="12" fill="currentColor" rx="0.5" opacity="0.3"/></svg>
+      <svg width="16" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6c4.5-4 16.5-4 22 0M5 10c3.5-3 10.5-3 14 0M9.5 14c1.5-1.5 5.5-1.5 5 0"/></svg>
+      <svg width="24" height="12" viewBox="0 0 28 13"><rect x="0" y="1" width="24" height="11" rx="2" stroke="currentColor" fill="none" stroke-width="1.2"/><rect x="25" y="4" width="2" height="5" rx="1" fill="currentColor" opacity="0.3"/><rect x="2" y="3" width="16" height="7" rx="1" fill="currentColor"/></svg>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-title">Marketing</div>
+      <div class="header-location-select" onclick="alert('Location picker coming soon')">
+        <span class="header-location">Apex Basketball Academy</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- MTD Stats Strip -->
+  <div class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-value">24</div>
+      <div class="stat-label">Leads MTD</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value positive">$18</div>
+      <div class="stat-label">Cost / Lead</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">$432</div>
+      <div class="stat-label">Ad Spend MTD</div>
+    </div>
+  </div>
+
+  <!-- Sage Quick Tip -->
+  <div class="sage-tip">
+    <div class="sage-tip-icon">S</div>
+    <div class="sage-tip-text">
+      <strong>Your Saturday ad is outperforming everything else by 3x</strong> — worth putting more budget there this week.
+    </div>
+  </div>
+
+  <!-- See Full Dashboard -->
+  <div class="full-dashboard-link">
+    <a href="#">See full dashboard <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+  </div>
+
+  <!-- Scrollable content area -->
+  <div class="content-scroll">
+
+    <!-- Needs Attention Section -->
+    <div class="section-header">
+      <div class="section-title">Needs Attention</div>
+    </div>
+    <div class="ad-cards">
+
+      <!-- Ad Card 1: Summer Skills Camp -->
+      <div class="ad-card attention">
+        <div class="ad-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8" cy="8" r="2"/><path d="M22 15l-5-5L2 22"/></svg>
+        </div>
+        <div class="ad-content">
+          <div class="ad-name">Summer Skills Camp</div>
+          <div class="ad-metrics">Running 21 days &middot; CTR dropped 40% &middot; $4.20 CPL</div>
+          <button class="ad-cta" onclick="alert('Opening Sage ad refresh flow...')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Refresh with Sage
+          </button>
+        </div>
+      </div>
+
+      <!-- Ad Card 2: Free Trial Offer -->
+      <div class="ad-card attention">
+        <div class="ad-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8" cy="8" r="2"/><path d="M22 15l-5-5L2 22"/></svg>
+        </div>
+        <div class="ad-content">
+          <div class="ad-name">Free Trial Offer</div>
+          <div class="ad-metrics">Running 34 days &middot; Frequency 3.8 &middot; Audience fatigued</div>
+          <button class="ad-cta" onclick="alert('Opening Sage ad refresh flow...')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+            Refresh with Sage
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Top Performers Section -->
+    <div class="section-header" style="margin-top: 8px;">
+      <div class="section-title">Top Performers</div>
+    </div>
+    <div class="ad-cards">
+
+      <!-- Ad Card 3: Saturday Open Gym -->
+      <div class="ad-card performer">
+        <div class="ad-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8" cy="8" r="2"/><path d="M22 15l-5-5L2 22"/></svg>
+        </div>
+        <div class="ad-content">
+          <div class="performance-indicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Performing well
+          </div>
+          <div class="ad-name">Saturday Open Gym</div>
+          <div class="ad-metrics">12 leads &middot; $12 CPL &middot; 2.4% CTR</div>
+        </div>
+      </div>
+
+      <!-- Ad Card 4: Parent Info Night -->
+      <div class="ad-card performer">
+        <div class="ad-image">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8" cy="8" r="2"/><path d="M22 15l-5-5L2 22"/></svg>
+        </div>
+        <div class="ad-content">
+          <div class="performance-indicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Performing well
+          </div>
+          <div class="ad-name">Parent Info Night</div>
+          <div class="ad-metrics">8 leads &middot; $15 CPL &middot; 1.8% CTR</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Floating Sage Button -->
+<div class="sage-float">
+  <button class="sage-float-btn" onclick="alert('Opening Sage...')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+  </button>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <a class="nav-item" href="home.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="nav-label">Home</span>
+  </a>
+  <a class="nav-item active" href="marketing.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    <span class="nav-label">Marketing</span>
+  </a>
+  <a class="nav-item" href="sales.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="nav-label">Sales</span>
+  </a>
+  <a class="nav-item" href="management.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    <span class="nav-label">Management</span>
+  </a>
+</div>
+
+</body>
+</html>
