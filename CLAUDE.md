@@ -46,6 +46,7 @@ There are two sources for BAM OS business requirements that must stay in sync:
 | Scheduling App | APP- | Client retention rate |
 | Strategy | STR- | Business performance visibility |
 | Profiles & Identity | PRF- | Account data integrity |
+| AI Advisor | AI- | Time to confident action |
 
 ## Schema differences across Notion pages
 - **Marketing, Content, Strategy**: Full schema with Parent ID column
@@ -58,7 +59,7 @@ The HTML file uses a **unified schema** across all domains. When adding new requ
 ## HTML file structure
 All requirement data lives in the `JOBS_DATA` JavaScript object (starts around line 482). Each domain has:
 - `title`, `subtitle` (north star metric), `color`
-- `jobs[]` array where each job has: `id`, `isParent`, `title`, `oneLiner`, `requirement`, `release`, `initiatedBy`, `frequency`, `dataInputs`, `dataSources`, `outputAction`, `humanTouchpoint`, `integrations`, `dependencies`, `edgeCases`, `notes`, `subJobs[]`
+- `jobs[]` array where each job has: `id`, `isParent`, `title`, `oneLiner`, `requirement`, `release`, `initiatedBy`, `frequency`, `dataInputs`, `dataSources`, `outputAction`, `humanTouchpoint`, `integrations`, `dependencies`, `edgeCases`, `notes`, `uxDetail`, `subJobs[]`
 
 The Scheduling App domain also uses a `category` field per job.
 
