@@ -1392,6 +1392,231 @@
                         dependencies: 'Coach account active with online program management permissions',
                         notes: 'Formerly APP-013b. Coach-facing program creation and management lives in BAM OS dashboard. Member-facing viewing and completion tracking lives in scheduling app (APP-008).',
                         subJobs: []
+                    },
+                    {
+                        id: 'MEM-011',
+                        category: 'Member Directory',
+                        isParent: true,
+                        title: 'Member directory and profile view',
+                        oneLiner: 'Searchable member list with toggle between table and card views, plus a 360° detail drawer per member.',
+                        fullTitle: 'Member directory and profile view — central member list in the BAM OS dashboard with toggle between table view (sortable columns: name, status, plan, last attendance, payment status, location) and card view (photo, name, status badge, key stats). Clicking a member opens a slide-out detail drawer showing full 360° member context: billing summary, attendance streak, message history, player reports, internal notes, eligibility tags, signed documents, and pause history. Internal notes are private coach-only notes stored per member — not visible to the member. Search bar supports name, email, and phone lookup. Filters match MEM-002d smart filters (status, program, attendance, payment status). This is the coach\'s home base for managing individual members.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'Continuous — primary navigation surface',
+                        requirement: 'Member directory and profile view — central member list in the BAM OS dashboard with toggle between table view (sortable columns: name, status, plan, last attendance, payment status, location) and card view (photo, name, status badge, key stats). Clicking a member opens a slide-out detail drawer showing full 360° member context: billing summary, attendance streak, message history, player reports, internal notes, eligibility tags, signed documents, and pause history. Internal notes are private coach-only notes stored per member — not visible to the member. Search bar supports name, email, and phone lookup. Filters match MEM-002d smart filters (status, program, attendance, payment status). This is the coach\'s home base for managing individual members.',
+                        dataInputs: 'Member profiles (name, email, phone, photo, membership status, plan, location), attendance records, billing data, message history, player reports, internal notes, eligibility tags, signed documents, pause history',
+                        dataSources: 'Database (all member-related tables), Stripe (billing summary), Scheduling App (attendance, roster)',
+                        outputAction: 'Rendered member list with real-time data; detail drawer populated on member click; internal notes persisted to Database on save',
+                        humanTouchpoint: 'Yes — coach browses, searches, filters, views member details, and writes internal notes',
+                        integrations: 'BAM OS Dashboard, Database, Stripe, Scheduling App',
+                        dependencies: 'Member profiles in Database; Stripe synced; attendance tracking live (MEM-001); messaging live (MEM-002) for message history display',
+                        edgeCases: 'No members in system: show empty state with prompt to send first onboarding link. Member has no photo: show initials avatar. Search returns no results: show "no members found" with filter summary. Detail drawer data partially unavailable (e.g., Stripe not synced): show available sections, grey out unavailable with "data unavailable" note. Internal note exceeds character limit: warn coach, suggest shortening.',
+                        notes: 'This is the most-used screen in the dashboard — every other MEM feature is accessed from or feeds into this view. The detail drawer should never require a full page navigation — coach stays in context. Table view is the default for coaches managing 50+ members; card view is better for smaller academies or visual preference. Internal notes support plain text only in V1 — rich text and attachments deferred to V2. Notes are timestamped and attributed to the coach who wrote them. Filters on the list view reuse the same filter engine as MEM-002d smart audience filters — shared component.',
+                        subJobs: [
+                            {
+                                id: 'MEM-011a',
+                                title: 'Table and card list views',
+                                requirement: 'Table and card list views — default table view with sortable columns (name, status, plan, last attendance date, payment status, location). Card view alternative showing member photo, name, status badge, plan name, and last attendance. Toggle between views persists per coach session. Both views support the same search and filter controls. Pagination or infinite scroll for lists exceeding 50 members.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'Member profiles populated in Database',
+                                notes: 'Table view is denser and better for bulk scanning. Card view is better for visual recognition. Coach preference persists per session (not permanently in V1). Sort order: default by name alphabetical; sortable by any column in table view.'
+                            },
+                            {
+                                id: 'MEM-011b',
+                                title: '360° member detail drawer',
+                                requirement: '360° member detail drawer — slide-out panel triggered by clicking a member from the list view. Sections displayed: (1) header with name, photo, status badge, plan, location; (2) billing summary (current plan, next payment date, payment method, lifetime revenue); (3) attendance summary (total sessions, current streak, last attended); (4) recent messages (last 5 messages with link to full thread in MEM-002); (5) player reports (list of published reports with link to MEM-005); (6) internal notes (scrollable note history with add new note input); (7) eligibility tags (current tag with edit option); (8) signed documents (list with signed dates); (9) pause history (all pauses with dates and durations). Each section is collapsible. Drawer width is approximately 40% of viewport.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'MEM-011a complete; all referenced MEM features live for full data population',
+                                edgeCases: 'Section has no data (e.g., no reports yet): show empty state per section, not a blank drawer. Multiple players on account: show player tabs within the drawer. Coach opens drawer while another drawer is open: replace, don\'t stack.',
+                                notes: 'The drawer is the single pane of glass for a member. Coach should never need to open a new page to get context. Sections load independently — if billing data is slow, show spinner for that section only. Deep links from other MEM features (e.g., clicking a member name in MEM-013 activity feed) should open this drawer directly.'
+                            },
+                            {
+                                id: 'MEM-011c',
+                                title: 'Internal notes',
+                                requirement: 'Internal notes — private coach-only notes stored per member. Coach can add a new note from the detail drawer (MEM-011b). Each note is timestamped and attributed to the authoring coach. Notes are displayed in reverse chronological order (newest first). Notes are plain text with a 2000-character limit per note. No limit on total notes per member. Notes are searchable from the member directory search bar (search matches note content in addition to member name/email/phone). Notes are never visible to the member.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'MEM-011b complete; coach accounts active',
+                                edgeCases: 'Coach deletes a note: soft delete with undo option for 10 seconds. Coach edits a note: allow editing own notes only within 24 hours of creation. Note contains sensitive information: no content filtering in V1 — coach is responsible. Multiple coaches note the same member: all notes visible to all coaches at that location.',
+                                notes: 'Internal notes are a CRM fundamental — "dad is difficult about scheduling," "considering upgrading next month," "referred by Mike." Plain text only in V1. Rich text, attachments, and @mentions deferred to V2. Notes data is also valuable for future AI context — the AI agent could use notes to personalize interactions in V2.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-012',
+                        category: 'Member Directory',
+                        isParent: true,
+                        title: 'Pause management',
+                        oneLiner: 'Coach views all pauses and can extend, shorten, end early, or initiate pauses on behalf of members.',
+                        fullTitle: 'Pause management — dedicated coach-facing view for managing member pauses. Displays all currently paused members with pause start date, scheduled resume date, pause duration, and days remaining. Coach has full control: extend a pause, shorten a pause, end a pause early (immediate resume), or initiate a new pause on behalf of a member. All coach-initiated pause actions update Stripe billing dates accordingly. Pause history per member is accessible from the member detail drawer (MEM-011b).',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'On demand — checked when reviewing member status',
+                        requirement: 'Pause management — dedicated coach-facing view for managing member pauses. Displays all currently paused members with pause start date, scheduled resume date, pause duration, and days remaining. Coach has full control: extend a pause, shorten a pause, end a pause early (immediate resume), or initiate a new pause on behalf of a member. All coach-initiated pause actions update Stripe billing dates accordingly. Pause history per member is accessible from the member detail drawer (MEM-011b).',
+                        dataInputs: 'Member pause records (start date, duration, scheduled resume date), subscription data, admin-configured min/max pause rules',
+                        dataSources: 'Database (pause records, member profiles), Stripe (subscription status, billing dates)',
+                        outputAction: 'Pause list rendered with real-time status; coach actions update Database and Stripe; confirmation shown after each action; MEM-007 notification sent on coach-initiated pause actions',
+                        humanTouchpoint: 'Yes — coach views and manages pauses',
+                        integrations: 'BAM OS Dashboard, Database, Stripe',
+                        dependencies: 'APP-009 pause flow live (member-initiated pauses must exist); Stripe connected; admin pause rules configured',
+                        edgeCases: 'Coach extends pause beyond admin max duration: warn but allow override with confirmation ("This exceeds the max pause duration of X days. Continue?"). Coach ends pause early on a member who paused for medical reasons: allow but surface a reminder note. No members currently paused: show empty state with count of pauses in last 30 days. Coach initiates pause on a member with overdue payment: warn that pausing does not resolve the outstanding balance. Multiple players on one account paused independently: show each player separately in the pause list.',
+                        notes: 'Pauses are a key retention signal — a paused member is at risk of cancelling. This view gives the coach visibility to intervene. The pause list should default to sorted by "days remaining" ascending so the coach sees members about to resume first. Coach-initiated pauses follow the same Stripe billing logic as member-initiated pauses (APP-009). The pause management view can also be accessed from the member detail drawer (MEM-011b) for individual member context.',
+                        subJobs: [
+                            {
+                                id: 'MEM-012a',
+                                title: 'Active pause list view',
+                                requirement: 'Active pause list view — table showing all currently paused members: member name, player name, pause start date, scheduled resume date, total duration, days remaining, pause reason (if provided). Sortable by any column. Default sort: days remaining ascending. Filter by location. Badge showing total pause count.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'Pause records in Database; member profiles populated',
+                                notes: 'This is a focused operational view — not a full member list. Only paused members appear here.'
+                            },
+                            {
+                                id: 'MEM-012b',
+                                title: 'Coach pause actions',
+                                requirement: 'Coach pause actions — from the active pause list or member detail drawer, coach can: (1) extend pause by selecting a new resume date, (2) shorten pause by selecting an earlier resume date, (3) end pause immediately (member resumes today, billing date recalculated), (4) initiate a new pause on behalf of an active member by selecting start date and duration. All actions require confirmation. All actions update Stripe subscription billing dates. All actions logged in pause history with coach attribution.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'MEM-012a complete; Stripe connected; admin pause rules configured',
+                                edgeCases: 'Coach tries to initiate pause on already-paused member: block with message "Member is already paused." Coach extends past billing cycle boundary: Stripe handles proration. Coach ends pause on a member whose subscription has other issues (failed payment): warn coach.',
+                                notes: 'Every coach action on a pause is logged with timestamp and coach ID for audit trail. Initiate-on-behalf is the key differentiator from APP-009 — allows coach to pause a member proactively (e.g., member calls in, coach handles it without making them do it in the app).'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-013',
+                        category: 'Coach & Admin Panel',
+                        isParent: false,
+                        title: 'Activity feed',
+                        oneLiner: 'Real-time chronological feed of all business events — the coach\'s home screen in BAM OS.',
+                        fullTitle: 'Activity feed — real-time chronological feed of business events displayed as the BAM OS dashboard home screen. Events include: new member signup, cancellation request submitted, cancellation confirmed, membership paused, membership resumed, payment received, payment failed, support ticket opened, support ticket escalated, player report published, new message received (reply from member). Each event shows timestamp, event type icon, member name (clickable to open MEM-011b detail drawer), and a one-line summary. Feed updates in real time via WebSocket or polling. Filterable by event type and location. No pagination — infinite scroll with lazy loading.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Continuous — real-time event stream',
+                        requirement: 'Activity feed — real-time chronological feed of business events displayed as the BAM OS dashboard home screen. Events include: new member signup, cancellation request submitted, cancellation confirmed, membership paused, membership resumed, payment received, payment failed, support ticket opened, support ticket escalated, player report published, new message received (reply from member). Each event shows timestamp, event type icon, member name (clickable to open MEM-011b detail drawer), and a one-line summary. Feed updates in real time via WebSocket or polling. Filterable by event type and location. No pagination — infinite scroll with lazy loading.',
+                        dataInputs: 'Event records from all MEM and APP subsystems: signups, cancellations, pauses, payments, support tickets, reports, messages',
+                        dataSources: 'Database (event log table aggregating events from all subsystems)',
+                        outputAction: 'Chronological event feed rendered on dashboard home; new events appear at top in real time; member name links open detail drawer (MEM-011b)',
+                        humanTouchpoint: 'No — feed is automated. Coach reads and clicks through to take action on individual items.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe (payment events), Scheduling App (attendance events)',
+                        dependencies: 'Event logging implemented across all subsystems; Database event log table schema defined; MEM-011b detail drawer live for member click-through',
+                        edgeCases: 'No events yet (new academy): show welcome state with setup checklist. High event volume (100+ events/day): group by time bucket (e.g., "Today", "Yesterday", "This Week"). Event references a deleted member: show event with "[Deleted Member]" label. WebSocket disconnects: fall back to polling, show "reconnecting" indicator. Coach has multiple locations: show all locations by default with location filter available.',
+                        notes: 'This is the first thing the coach sees when they open BAM OS — it sets the tone for the product. The feed replaces a traditional dashboard home in V1. It answers the question "what happened since I last checked?" without the coach having to click into multiple sections. Each event type has its own icon and color for quick scanning. Clicking a member name anywhere in the feed opens the MEM-011b detail drawer — this is the primary navigation pattern. Payment events (received + failed) come from Stripe webhooks. The event log table is append-only and indexed by timestamp and business_id. This table is also valuable for future AI analysis — the activity feed is a training dataset for business pattern recognition.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-014',
+                        category: 'Coach & Admin Panel',
+                        isParent: true,
+                        title: 'Coach and staff management',
+                        oneLiner: 'Business owner and admins create coach accounts, assign locations, and manage role-based permissions.',
+                        fullTitle: 'Coach and staff management — business owner (and designated admins) can create coach accounts, assign coaches to one or more locations, and set role-based permissions. Two roles: Admin (can manage other coaches, access all locations, view business metrics) and Coach (can access assigned locations only, manage members at their locations, no access to business-wide metrics or staff management). Business owner is a permanent Admin that cannot be demoted. Coach accounts require name, email, and assigned location(s). Coaches log into the same BAM OS dashboard with their view scoped to their role and location(s).',
+                        release: 'MVP',
+                        initiatedBy: 'Admin / Business Owner',
+                        frequency: 'Infrequent — when hiring or adjusting staff',
+                        requirement: 'Coach and staff management — business owner (and designated admins) can create coach accounts, assign coaches to one or more locations, and set role-based permissions. Two roles: Admin (can manage other coaches, access all locations, view business metrics) and Coach (can access assigned locations only, manage members at their locations, no access to business-wide metrics or staff management). Business owner is a permanent Admin that cannot be demoted. Coach accounts require name, email, and assigned location(s). Coaches log into the same BAM OS dashboard with their view scoped to their role and location(s).',
+                        dataInputs: 'Coach name, email, assigned location(s), role selection (Admin or Coach)',
+                        dataSources: 'Database (coach accounts, location assignments, role definitions)',
+                        outputAction: 'Coach account created in Database; invitation email sent; coach can log into BAM OS dashboard with scoped access; staff list updated in admin view',
+                        humanTouchpoint: 'Yes — admin creates and manages coach accounts',
+                        integrations: 'BAM OS Dashboard, Database, Email (invitation)',
+                        dependencies: 'Locations defined in system; BAM OS dashboard authentication live; email sending enabled',
+                        edgeCases: 'Admin tries to create coach with email already in use: block with "email already registered" error. Admin demotes the only other admin to Coach: allow but warn. Business owner account deleted or locked: prevent — business owner is permanent. Coach assigned to location that is later deactivated: flag coach as "unassigned," prompt admin to reassign. Coach has active support tickets when deactivated: reassign tickets to another coach at the same location.',
+                        notes: 'This is a critical dependency for multi-location academies — without staff management, there is no way to scope data and actions by location. V1 has two roles only (Admin + Coach). More granular permissions (e.g., "can view billing but not modify," "can message but not cancel") are deferred to V2. The business owner is always role = Admin with an immutable flag. Coach invitation flow: admin enters email → system sends invitation link → coach clicks link → creates password → lands in BAM OS dashboard with scoped view.',
+                        subJobs: [
+                            {
+                                id: 'MEM-014a',
+                                title: 'Staff list and coach creation',
+                                requirement: 'Staff list and coach creation — admin view showing all coach accounts with name, email, role, assigned location(s), and status (active/deactivated). "Add Coach" button opens a form: name, email, role (Admin or Coach), location assignment (multi-select). On submit, invitation email sent to coach. Admin can also deactivate a coach (revokes login access, preserves data) or reactivate a previously deactivated coach.',
+                                release: 'MVP',
+                                initiatedBy: 'Admin / Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Email',
+                                dependencies: 'Locations defined in system; email sending enabled',
+                                notes: 'Deactivation is a soft delete — coach data is preserved for audit trail and message history attribution. Reactivation restores full access with previous role and location assignments.'
+                            },
+                            {
+                                id: 'MEM-014b',
+                                title: 'Role-based access control',
+                                requirement: 'Role-based access control — BAM OS dashboard enforces role-based visibility and actions. Admin role: full access to all locations, all members, business metrics (MEM-003), staff management (MEM-014), and all operational features. Coach role: access scoped to assigned location(s) only — sees only members at their location(s), can message, create reports, manage support tickets, and view attendance for their location(s) only. Cannot access business metrics, staff management, or members at other locations. Role is evaluated on every page load and API call.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'MEM-014a complete; coach accounts created with role and location assignments',
+                                edgeCases: 'Coach tries to access a restricted page via direct URL: redirect to dashboard home with "Access denied" message. Coach assigned to multiple locations: data from all assigned locations is visible. Admin views member at a location they don\'t directly manage: allowed (admin sees everything). Role changed while coach is logged in: enforce on next page load, not mid-session.',
+                                notes: 'This is enforced at the API layer (Database RLS policies scoped by business_id + location_id + role), not just the UI. UI hides restricted nav items for Coach role. V1 is coarse-grained (Admin vs. Coach). Fine-grained permissions (feature-level toggles) are V2.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-015',
+                        category: 'Billing & Payments',
+                        isParent: true,
+                        title: 'Failed payment handling',
+                        oneLiner: 'Surface failed payments to coaches with retry, outreach tools, and Stripe dunning visibility.',
+                        fullTitle: 'Failed payment handling — dedicated coach-facing view for managing failed payments. Displays all members with failed payment attempts: member name, amount, failure reason (card declined, insufficient funds, expired card, etc.), failure date, retry status, and number of Stripe auto-retry attempts remaining. Coach can trigger a manual retry, send a payment reminder message (routes to MEM-002a), or mark as "contacted" to track outreach. Integrates with Stripe\'s built-in dunning (Smart Retries) — surfaces Stripe\'s retry schedule and outcomes. Members with failed payments are visually flagged in the member directory (MEM-011) and activity feed (MEM-013).',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (detection) / Coach (action)',
+                        frequency: 'Event-triggered (payment failure webhook) + coach reviews on demand',
+                        requirement: 'Failed payment handling — dedicated coach-facing view for managing failed payments. Displays all members with failed payment attempts: member name, amount, failure reason (card declined, insufficient funds, expired card, etc.), failure date, retry status, and number of Stripe auto-retry attempts remaining. Coach can trigger a manual retry, send a payment reminder message (routes to MEM-002a), or mark as "contacted" to track outreach. Integrates with Stripe\'s built-in dunning (Smart Retries) — surfaces Stripe\'s retry schedule and outcomes. Members with failed payments are visually flagged in the member directory (MEM-011) and activity feed (MEM-013).',
+                        dataInputs: 'Stripe payment failure webhooks (invoice.payment_failed), failure reason codes, retry schedule, member subscription data',
+                        dataSources: 'Database (payment failure log, outreach tracking), Stripe (invoice status, retry attempts, dunning state)',
+                        outputAction: 'Failed payment list rendered with real-time Stripe status; coach actions logged; payment reminder sent via MEM-002a; failed payment badge shown on member in directory and feed',
+                        humanTouchpoint: 'Yes — coach reviews failures, contacts members, triggers retries',
+                        integrations: 'BAM OS Dashboard, Database, Stripe, MEM-002 (messaging for payment reminders)',
+                        dependencies: 'Stripe connected with webhook for invoice.payment_failed; Stripe Smart Retries enabled; MEM-002 messaging live (for sending payment reminders); MEM-011 member directory live (for failed payment badge)',
+                        edgeCases: 'Stripe auto-retry succeeds before coach acts: update status to "resolved" automatically, remove from active list. All retry attempts exhausted: flag as "requires action" with options (cancel subscription, extend grace period, contact member). Coach triggers retry and it fails again: show updated failure reason immediately. Member updates payment method via APP-002 while coach is viewing failure: status updates in real time. Multiple failed payments for same member (multi-player account): group by member, show each failed invoice separately.',
+                        notes: 'Failed payments are direct revenue leakage — this is one of the highest-ROI features in the dashboard. Stripe Smart Retries handles the automated dunning schedule (typically 3-4 retries over 1-2 weeks). BAM OS adds the human layer on top: coach visibility, personal outreach, and tracking. The "send payment reminder" action should pre-fill a MEM-002a message with a payment failure template (MEM-002c) — one click to contact the member. The failed payment view also feeds into MEM-003 business metrics (failed payment count and recovery rate as future sub-jobs). Financial data from this feature is accessible to other agents (finance bot, general KPIs) per the running notes decision.',
+                        subJobs: [
+                            {
+                                id: 'MEM-015a',
+                                title: 'Failed payment list view',
+                                requirement: 'Failed payment list view — table showing all members with active payment failures: member name, player name, amount due, failure reason, failure date, Stripe retry status (X of Y attempts remaining), last retry date, next scheduled retry, coach outreach status (not contacted / contacted / resolved). Sortable by any column. Default sort: failure date descending (newest first). Filter by location and outreach status. Badge showing total active failure count visible in dashboard navigation.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'Stripe webhooks configured for payment failure events',
+                                notes: 'Badge count in navigation is critical — coach should always know if there are outstanding failures without clicking into this view.'
+                            },
+                            {
+                                id: 'MEM-015b',
+                                title: 'Coach payment actions',
+                                requirement: 'Coach payment actions — from the failed payment list, coach can: (1) trigger manual Stripe retry (one-click), (2) send payment reminder to member (opens MEM-002a compose with payment failure template pre-filled), (3) mark as "contacted" with optional note, (4) view member detail drawer (MEM-011b) for full context. After Stripe dunning exhausts all retries, coach gets additional options: (5) extend grace period (keep subscription active for X additional days), (6) cancel subscription (routes to MEM-006 cancellation flow). All actions logged with timestamp and coach attribution.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, Stripe, MEM-002 (messaging)',
+                                dependencies: 'MEM-015a complete; MEM-002 messaging live; MEM-006 cancellation flow live',
+                                edgeCases: 'Coach extends grace period on a member who also has a pending cancellation request: warn coach of conflicting states. Manual retry succeeds: auto-resolve and remove from list with success toast. Coach sends payment reminder to member who has opted out of SMS: deliver in-app only per MEM-002 rules.',
+                                notes: 'The one-click "send payment reminder" with pre-filled template is the key UX win — reduces coach effort from "look up member → compose message → find the right thing to say" to a single button. Grace period extension creates a custom Stripe subscription schedule — this is a Stripe API capability that needs to be validated during implementation.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-016',
+                        category: 'Coach & Admin Panel',
+                        isParent: false,
+                        title: 'Announcement management',
+                        oneLiner: 'Coach creates, edits, schedules, and manages announcements displayed on the member home page.',
+                        fullTitle: 'Announcement management — coach creates and manages announcements that appear in the home page carousel (APP-006) within the scheduling app. Announcements support text and an optional image. Each announcement is scoped to a specific location. Coach can create, edit, reorder, schedule (publish at a future date), and archive announcements. Active announcements appear in the member-facing carousel in the order set by the coach. Archived announcements are hidden from members but retained in the system. No limit on active announcements but UX recommendation is 3-5 for optimal carousel experience.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'On demand — when announcements need to be created or updated',
+                        requirement: 'Announcement management — coach creates and manages announcements that appear in the home page carousel (APP-006) within the scheduling app. Announcements support text and an optional image. Each announcement is scoped to a specific location. Coach can create, edit, reorder, schedule (publish at a future date), and archive announcements. Active announcements appear in the member-facing carousel in the order set by the coach. Archived announcements are hidden from members but retained in the system. No limit on active announcements but UX recommendation is 3-5 for optimal carousel experience.',
+                        dataInputs: 'Announcement content (text + optional image), location scope, display order, scheduled publish date (optional)',
+                        dataSources: 'Database (announcement records, location data)',
+                        outputAction: 'Announcement created/updated in Database; visible in member-facing home page carousel (APP-006) at the scheduled time or immediately; archived announcements hidden from members',
+                        humanTouchpoint: 'Yes — coach creates and manages all announcements',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (APP-006 renders the carousel)',
+                        dependencies: 'APP-006 home page live; locations defined in system; coach accounts active with location assignment',
+                        edgeCases: 'Coach creates announcement for a location with no active members: allow but surface note "0 active members at this location." Image upload fails: allow text-only announcement, flag upload failure. Coach schedules announcement for a past date: reject, prompt for future date. Coach archives all announcements: home page carousel shows empty state or hides carousel section. Coach at one location tries to create announcement for another location: enforce location-based access per MEM-014b role rules.',
+                        notes: 'Announcements are location-specific — a multi-location academy has separate announcement feeds per location. This is the coach-facing management tool; APP-006 is the member-facing display. In V1, announcements are text + optional image only. Rich media (video, links, CTAs) deferred to V2. Announcement scheduling reuses the same scheduling infrastructure as MEM-002e message scheduling — shared component. The carousel on the member side is persistent (announcements don\'t auto-dismiss). Coach should be able to preview how the announcement will look in the member-facing carousel before publishing.',
+                        subJobs: []
                     }
                 ]
             },
@@ -1744,6 +1969,7 @@
                 let jobsHtml;
                 if (domain.jobs.some(j => j.category)) {
                     const categoryOrder = [
+                        'Member Directory',
                         'Credit-Based Scheduling System',
                         'Onboarding',
                         'Athlete Portal',
@@ -1752,9 +1978,12 @@
                         'Support Chat',
                         'Group Chat',
                         'Alerts & Notifications',
+                        'Billing & Payments',
                         'Coach & Admin Panel',
                         'Business Owner Dashboard',
-                        'Player Profiles & Account Structure'
+                        'Player Profiles & Account Structure',
+                        'Cancellation Management',
+                        'Player Reports'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
