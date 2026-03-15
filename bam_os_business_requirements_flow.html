@@ -922,7 +922,7 @@
             },
             memberManagement: {
                 title: 'MEMBER MANAGEMENT',
-                subtitle: '📂 Client retention rate',
+                subtitle: '📂 Client retention rate (internal)',
                 color: '#45b7d1',
                 jobs: [
                     {
@@ -1055,12 +1055,289 @@
                                 notes: 'SMS delivery tracking relies on the SMS provider\'s webhook/callback infrastructure — this is a vendor selection consideration. In-app read receipts are more reliable than SMS read receipts. The delivery analytics view is a lightweight dashboard: send volume over time, delivery rate %, read rate %, and failure rate %. Not a full analytics product — just enough for the coach to know their messages are landing. Failed message retry should be one-click from the failure view. Opted-out members should never be retried — permanent failure.'
                             }
                         ]
+                    },
+                    {
+                        id: 'MEM-003',
+                        category: 'Business Owner Dashboard',
+                        isParent: true,
+                        title: 'Business metrics dashboard',
+                        oneLiner: 'Real-time operational KPIs for the business owner with charts and trend graphics.',
+                        requirement: 'Business metrics dashboard — real-time operational metrics view for business owners, filterable by date range where applicable, with charts and trend graphics',
+                        release: 'MVP',
+                        initiatedBy: 'User (business owner)',
+                        dataInputs: 'Member records, subscription status, pause/cancellation events, attendance records',
+                        outputAction: 'Dashboard displaying: total active members, new members, churned members, pause rate, cancellation rate, average attendance per class, churn rate, average membership duration — with charts and trend lines',
+                        humanTouchpoint: 'No',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Member data in Database; Stripe synced; attendance records populated via MEM-001',
+                        edgeCases: 'No data for selected range: display empty state. Attendance data missing: exclude from average, flag gap. Partial Stripe sync: display available metrics, flag missing data.',
+                        notes: 'Formerly APP-003. One dashboard per business (multi-tenant scoped by business_id). Separate from agent-generated reports — this is a live view. Date filtering is metric-dependent.',
+                        subJobs: [
+                            {
+                                id: 'MEM-003a',
+                                title: 'Total active members',
+                                requirement: 'Total active members — count of members with an active (non-paused, non-cancelled) subscription at time of viewing.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Single count displayed as KPI card with trend line vs. prior period',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete',
+                                notes: 'Point-in-time metric — shows current state regardless of date filter.'
+                            },
+                            {
+                                id: 'MEM-003b',
+                                title: 'New members',
+                                requirement: 'New members — count of members who started their first active subscription within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Count displayed as KPI card with bar chart by week/month depending on range selected',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete'
+                            },
+                            {
+                                id: 'MEM-003c',
+                                title: 'Churned members',
+                                requirement: 'Churned members — count of members whose subscription was cancelled (not paused) within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Count displayed as KPI card with bar chart',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete; cancellation flow live'
+                            },
+                            {
+                                id: 'MEM-003d',
+                                title: 'Pause rate',
+                                requirement: 'Pause rate — percentage of active members who initiated at least one pause within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card',
+                                integrations: 'Database',
+                                dependencies: 'MEM-003 parent complete; pause flow live'
+                            },
+                            {
+                                id: 'MEM-003e',
+                                title: 'Cancellation rate',
+                                requirement: 'Cancellation rate — percentage of active members who cancelled within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete; cancellation flow live'
+                            },
+                            {
+                                id: 'MEM-003f',
+                                title: 'Average attendance per class',
+                                requirement: 'Average attendance per class — average number of athletes who attended across all sessions within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Average count displayed as KPI card with trend line',
+                                integrations: 'Database',
+                                dependencies: 'MEM-003 parent complete; MEM-001 attendance tracking live'
+                            },
+                            {
+                                id: 'MEM-003g',
+                                title: 'Churn rate',
+                                requirement: 'Churn rate — percentage of members at the start of the selected period who cancelled before the end of the period.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card with trend line vs. prior period',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete; cancellation flow live',
+                                notes: 'Standard churn formula: (cancelled in period) ÷ (members at start of period). Distinct from cancellation rate — churn rate is cohort-based.'
+                            },
+                            {
+                                id: 'MEM-003h',
+                                title: 'Average membership duration',
+                                requirement: 'Average membership duration — average number of days between subscription start and cancellation for all members who cancelled within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Average duration in days/months displayed as KPI card',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-003 parent complete',
+                                notes: 'Paused time included in duration by default.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-004',
+                        category: 'Support Chat',
+                        isParent: true,
+                        title: 'Support chat',
+                        oneLiner: 'AI-first member support with coach escalation for billing, scheduling, and complaints.',
+                        requirement: 'Support chat — AI-first member support chat with coach escalation; handles billing, scheduling, pausing, cancellation, refunds, credits, and complaints',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        dataInputs: 'Member account info (plan, payment history, bookings, player profiles); business info (schedules, policies, pricing); conversation history',
+                        outputAction: 'AI responds from available context; escalates to coach when outside context; full conversation history passed on escalation; escalated chats routed to coaches at member\'s specific location',
+                        humanTouchpoint: 'Yes — coach handles escalated conversations',
+                        integrations: 'Database, Scheduling App (TBD)',
+                        dependencies: 'Member account data in Database; business policies and FAQs defined and loaded as AI context; coach accounts created',
+                        edgeCases: 'AI receives question outside its context: escalate immediately. Coach unavailable: chat sits in queue, no fallback. Scheduling app down: AI flags booking questions as temporarily unavailable.',
+                        notes: 'Formerly APP-004. AI informs and routes only — no actions executed. Coach interface is a separate view within same app. Escalations routed to member\'s specific location only. Member-facing chat is in the scheduling app; coach escalation queue and responses live in BAM OS dashboard.',
+                        subJobs: [
+                            {
+                                id: 'MEM-004a',
+                                title: 'AI first response',
+                                requirement: 'AI first response — AI handles initial member query using business-specific and member-specific context; responds within scope, escalates when outside context.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Scheduling App (TBD)',
+                                dependencies: 'AI context loaded; member account data accessible in Database',
+                                notes: 'AI must know its own boundaries — when in doubt, escalate.'
+                            },
+                            {
+                                id: 'MEM-004b',
+                                title: 'Coach escalation',
+                                requirement: 'Coach escalation — unresolved or out-of-context AI chats routed to available coach at member\'s location; coach sees full conversation history.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent (trigger) / Coach (response)',
+                                integrations: 'Database',
+                                dependencies: 'MEM-004a complete; coach accounts active with location assignment',
+                                notes: 'No SLA on response time — unresolved chats sit in queue indefinitely.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-005',
+                        category: 'Player Reports',
+                        isParent: true,
+                        title: 'Player reports',
+                        oneLiner: 'Coach-authored text reports published on demand, visible to parent and player.',
+                        requirement: 'Player reports — coach-authored text reports published on demand; visible to both parent and player with full history retained',
+                        release: 'MVP',
+                        initiatedBy: 'Coach (creates) / User (views)',
+                        outputAction: 'Formatted report published to player/parent profile; push notification sent on publish; full report history accessible',
+                        humanTouchpoint: 'Yes — coach authors and publishes report',
+                        integrations: 'Database',
+                        dependencies: 'Coach account active; player profile exists in Database',
+                        notes: 'Formerly APP-006. Reports use predefined section structure — coach fills in text only. Standalone — not connected to skill tracking or attendance data. Coach creates/publishes from BAM OS dashboard; member views from scheduling app.',
+                        subJobs: [
+                            {
+                                id: 'MEM-005a',
+                                title: 'Coach creates and publishes report',
+                                requirement: 'Coach creates and publishes report — coach authors report using predefined section structure, previews, and publishes.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database',
+                                dependencies: 'Coach account active; player profile exists',
+                                notes: 'Draft state available before publishing.'
+                            },
+                            {
+                                id: 'MEM-005b',
+                                title: 'Member views player reports',
+                                requirement: 'Member views player reports — parent and player can view all published reports for their player(s) with full history.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'MEM-005a complete; at least one report published',
+                                notes: 'Member-facing view lives in scheduling app.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-006',
+                        category: 'Cancellation Management',
+                        isParent: true,
+                        title: 'Cancellation flow',
+                        oneLiner: 'Member submits cancellation; coach does outreach and confirms before it processes.',
+                        requirement: 'Cancellation flow — member submits cancellation form with required reason; coach is notified and must attempt outreach; coach confirms cancellation in system; access and billing retained until end of billing period',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        dataInputs: 'Cancellation reason (dropdown), member ID, subscription data, billing period end date',
+                        outputAction: 'Cancellation request logged in Database; coach notified; coach confirms after outreach; Stripe subscription set to cancel at period end; member retains access until period end',
+                        humanTouchpoint: 'Yes — coach must attempt outreach and confirm cancellation',
+                        integrations: 'Database, Stripe, GHL',
+                        dependencies: 'Stripe connected; coach accounts active; GHL connected',
+                        notes: 'Formerly APP-009. Cancellation is a request requiring coach confirmation. Access and billing continue until end of current billing period. Default dropdown reasons: high cost, not enough time, wasn\'t having fun, wasn\'t getting better, moved on to better things, other. Member submits from scheduling app; coach reviews and confirms from BAM OS dashboard.',
+                        subJobs: [
+                            {
+                                id: 'MEM-006a',
+                                title: 'Member submits cancellation request',
+                                requirement: 'Member submits cancellation request — member selects reason from dropdown and submits form; confirmation state displayed; coach notified.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'Member has active subscription; cancellation reason options configured by admin',
+                                notes: 'Reason is required. Confirmation message: "Your request has been received. A coach will reach out shortly." Member-facing form lives in scheduling app.'
+                            },
+                            {
+                                id: 'MEM-006b',
+                                title: 'Coach confirms cancellation',
+                                requirement: 'Coach confirms cancellation — coach reviews request, attempts member outreach, and confirms or rejects cancellation in system; confirmed cancellations scheduled in Stripe.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database, Stripe, GHL',
+                                dependencies: 'MEM-006a complete; coach account active'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-007',
+                        category: 'Alerts & Notifications',
+                        isParent: false,
+                        title: 'Coach notifications',
+                        oneLiner: 'In-app notifications for new support tickets, new members, cancellations, pauses, and community activity.',
+                        requirement: 'Coach notifications — in-app notifications for: new support ticket, new member, cancellation request, pause event, community activity.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        outputAction: 'In-app notifications sent to coaches for their event types',
+                        humanTouchpoint: 'No — automated',
+                        integrations: 'Database',
+                        dependencies: 'Coach accounts active with location assignment',
+                        notes: 'Formerly APP-014b. Coach notifications are in-app only (BAM OS dashboard).',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-008',
+                        category: 'Onboarding',
+                        isParent: false,
+                        title: 'Waiver and document management',
+                        oneLiner: 'Three required agreements signed at onboarding, re-signed on plan change, stored in profile.',
+                        requirement: 'Waiver and document management — three required agreements signed during onboarding; terms re-signed on plan change; all signed documents stored and viewable in member profile',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Signed agreement records stored in Database; accessible in member profile; re-sign prompt triggered on plan change (terms only)',
+                        humanTouchpoint: 'No — self-serve signing',
+                        integrations: 'Database',
+                        dependencies: 'Agreement document templates configured in system; member account active',
+                        notes: 'Formerly APP-017. Three documents: liability waiver, terms of service, media release. All three signed at onboarding. Terms re-signed when plan changes only. Templates are hardcoded. Signed documents viewable in member profile. Coach manages templates from BAM OS dashboard.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-009',
+                        category: 'Credit-Based Scheduling System',
+                        isParent: false,
+                        title: 'Class eligibility tagging',
+                        oneLiner: 'Coach assigns tags that control which classes each player can see and book.',
+                        requirement: 'Class eligibility tagging — each player is assigned a tag that determines which class types are visible and bookable; tags are predefined with option for coaches to create custom tags; assigned during onboarding or manually by coach; ineligible classes do not appear for the player',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        outputAction: 'Player\'s class view filtered to show only classes matching their assigned tag; coach can view and update tag per player',
+                        humanTouchpoint: 'Yes — coach assigns and updates tags',
+                        integrations: 'Database, Scheduling App (TBD)',
+                        dependencies: 'Player profiles in Database; class types defined and tagged in scheduling app; scheduling app integrated',
+                        notes: 'Formerly APP-020. Ineligible classes simply do not appear — no error shown. Tag is not visible to parent or player. Predefined tags can be supplemented by coach-created custom tags. Tag assigned during onboarding or manually updated by coach at any time. Coach manages from BAM OS dashboard; filtering applies in scheduling app.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-010',
+                        category: 'Online Programs',
+                        isParent: false,
+                        title: 'Online program management',
+                        oneLiner: 'Coach builds program structure, publishes content, and monitors player completion rates.',
+                        requirement: 'Online program management — coach builds program structure (weeks/modules), uploads content (video links, images, text), publishes, and monitors player completion rates.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        integrations: 'Database',
+                        dependencies: 'Coach account active with online program management permissions',
+                        notes: 'Formerly APP-013b. Coach-facing program creation and management lives in BAM OS dashboard. Member-facing viewing and completion tracking lives in scheduling app (APP-008).',
+                        subJobs: []
                     }
                 ]
             },
             scheduling: {
                 title: 'SCHEDULING APP',
-                subtitle: '📱 Client retention rate',
+                subtitle: '📱 Client retention rate (external)',
                 color: '#96ceb4',
                 jobs: [
                     {
@@ -1099,145 +1376,6 @@
                     },
                     {
                         id: 'APP-003',
-                        category: 'Business Owner Dashboard',
-                        isParent: true,
-                        title: 'Business metrics dashboard',
-                        requirement: 'Business metrics dashboard — real-time operational metrics view for business owners, filterable by date range where applicable, with charts and trend graphics',
-                        release: 'MVP',
-                        initiatedBy: 'User (business owner)',
-                        dataInputs: 'Member records, subscription status, pause/cancellation events, attendance records',
-                        outputAction: 'Dashboard displaying: total active members, new members, churned members, pause rate, cancellation rate, average attendance per class, churn rate, average membership duration — with charts and trend lines',
-                        humanTouchpoint: 'No',
-                        integrations: 'Database, Stripe',
-                        dependencies: 'Member data in Database; Stripe synced; attendance records populated via MEM-001',
-                        edgeCases: 'No data for selected range: display empty state. Attendance data missing: exclude from average, flag gap. Partial Stripe sync: display available metrics, flag missing data.',
-                        notes: 'One dashboard per business (multi-tenant scoped by business_id). Separate from agent-generated reports — this is a live view. Date filtering is metric-dependent.',
-                        subJobs: [
-                            {
-                                id: 'APP-003a',
-                                title: 'Total active members',
-                                requirement: 'Total active members — count of members with an active (non-paused, non-cancelled) subscription at time of viewing.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Single count displayed as KPI card with trend line vs. prior period',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete',
-                                notes: 'Point-in-time metric — shows current state regardless of date filter.'
-                            },
-                            {
-                                id: 'APP-003b',
-                                title: 'New members',
-                                requirement: 'New members — count of members who started their first active subscription within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Count displayed as KPI card with bar chart by week/month depending on range selected',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete'
-                            },
-                            {
-                                id: 'APP-003c',
-                                title: 'Churned members',
-                                requirement: 'Churned members — count of members whose subscription was cancelled (not paused) within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Count displayed as KPI card with bar chart',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live'
-                            },
-                            {
-                                id: 'APP-003d',
-                                title: 'Pause rate',
-                                requirement: 'Pause rate — percentage of active members who initiated at least one pause within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Percentage displayed as KPI card',
-                                integrations: 'Database',
-                                dependencies: 'APP-003 parent complete; APP-009 pause flow live'
-                            },
-                            {
-                                id: 'APP-003e',
-                                title: 'Cancellation rate',
-                                requirement: 'Cancellation rate — percentage of active members who cancelled within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Percentage displayed as KPI card',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live'
-                            },
-                            {
-                                id: 'APP-003f',
-                                title: 'Average attendance per class',
-                                requirement: 'Average attendance per class — average number of athletes who attended across all sessions within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Average count displayed as KPI card with trend line',
-                                integrations: 'Database',
-                                dependencies: 'APP-003 parent complete; MEM-001 attendance tracking live'
-                            },
-                            {
-                                id: 'APP-003g',
-                                title: 'Churn rate',
-                                requirement: 'Churn rate — percentage of members at the start of the selected period who cancelled before the end of the period.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Percentage displayed as KPI card with trend line vs. prior period',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live',
-                                notes: 'Standard churn formula: (cancelled in period) ÷ (members at start of period). Distinct from cancellation rate — churn rate is cohort-based.'
-                            },
-                            {
-                                id: 'APP-003h',
-                                title: 'Average membership duration',
-                                requirement: 'Average membership duration — average number of days between subscription start and cancellation for all members who cancelled within the selected date range.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                outputAction: 'Average duration in days/months displayed as KPI card',
-                                integrations: 'Database, Stripe',
-                                dependencies: 'APP-003 parent complete',
-                                notes: 'Paused time included in duration by default.'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'APP-004',
-                        category: 'Support Chat',
-                        isParent: true,
-                        title: 'Support chat',
-                        requirement: 'Support chat — AI-first member support chat with coach escalation; handles billing, scheduling, pausing, cancellation, refunds, credits, and complaints',
-                        release: 'MVP',
-                        initiatedBy: 'User',
-                        dataInputs: 'Member account info (plan, payment history, bookings, player profiles); business info (schedules, policies, pricing); conversation history',
-                        outputAction: 'AI responds from available context; escalates to coach when outside context; full conversation history passed on escalation; escalated chats routed to coaches at member\'s specific location',
-                        humanTouchpoint: 'Yes — coach handles escalated conversations',
-                        integrations: 'Database, Scheduling App (TBD)',
-                        dependencies: 'Member account data in Database; business policies and FAQs defined and loaded as AI context; coach accounts created',
-                        edgeCases: 'AI receives question outside its context: escalate immediately. Coach unavailable: chat sits in queue, no fallback. Scheduling app down: AI flags booking questions as temporarily unavailable.',
-                        notes: 'AI informs and routes only — no actions executed. Coach interface is a separate view within same app. Escalations routed to member\'s specific location only.',
-                        subJobs: [
-                            {
-                                id: 'APP-004a',
-                                title: 'AI first response',
-                                requirement: 'AI first response — AI handles initial member query using business-specific and member-specific context; responds within scope, escalates when outside context.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                integrations: 'Database, Scheduling App (TBD)',
-                                dependencies: 'AI context loaded; member account data accessible in Database',
-                                notes: 'AI must know its own boundaries — when in doubt, escalate.'
-                            },
-                            {
-                                id: 'APP-004b',
-                                title: 'Coach escalation',
-                                requirement: 'Coach escalation — unresolved or out-of-context AI chats routed to available coach at member\'s location; coach sees full conversation history.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent (trigger) / Coach (response)',
-                                integrations: 'Database',
-                                dependencies: 'APP-004a complete; coach accounts active with location assignment',
-                                notes: 'No SLA on response time — unresolved chats sit in queue indefinitely.'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'APP-005',
                         category: 'Group Chat',
                         isParent: false,
                         title: 'Community group chat',
@@ -1249,46 +1387,11 @@
                         humanTouchpoint: 'Yes — coaches moderate',
                         integrations: 'Database',
                         dependencies: 'Location defined in system; member and coach accounts assigned to location',
-                        notes: 'One chat per location — no sub-channels. Announcements live on home page (APP-011), not in this chat. Notifications toggleable by member.',
+                        notes: 'Formerly APP-005. One chat per location — no sub-channels. Announcements live on home page (APP-006), not in this chat. Notifications toggleable by member.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-006',
-                        category: 'Athlete Portal',
-                        isParent: true,
-                        title: 'Player reports',
-                        requirement: 'Player reports — coach-authored text reports published on demand; visible to both parent and player with full history retained',
-                        release: 'MVP',
-                        initiatedBy: 'Coach (creates) / User (views)',
-                        outputAction: 'Formatted report published to player/parent profile; push notification sent on publish; full report history accessible',
-                        humanTouchpoint: 'Yes — coach authors and publishes report',
-                        integrations: 'Database',
-                        dependencies: 'Coach account active; player profile exists in Database',
-                        notes: 'Reports use predefined section structure — coach fills in text only. Standalone — not connected to skill tracking or attendance data.',
-                        subJobs: [
-                            {
-                                id: 'APP-006a',
-                                title: 'Coach creates and publishes report',
-                                requirement: 'Coach creates and publishes report — coach authors report using predefined section structure, previews, and publishes.',
-                                release: 'MVP',
-                                initiatedBy: 'Coach',
-                                integrations: 'Database',
-                                dependencies: 'Coach account active; player profile exists',
-                                notes: 'Draft state available before publishing.'
-                            },
-                            {
-                                id: 'APP-006b',
-                                title: 'Member views player reports',
-                                requirement: 'Member views player reports — parent and player can view all published reports for their player(s) with full history.',
-                                release: 'MVP',
-                                initiatedBy: 'User',
-                                integrations: 'Database',
-                                dependencies: 'APP-006a complete; at least one report published'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'APP-007',
+                        id: 'APP-004',
                         category: 'Player Profiles & Account Structure',
                         isParent: false,
                         title: 'Parent + player combo profile',
@@ -1298,64 +1401,12 @@
                         outputAction: 'Profile page displaying all players on account with name, bio, and image; editable by parent or player',
                         humanTouchpoint: 'No — self-managed',
                         integrations: 'Database',
-                        dependencies: 'Account created (APP-011 onboarding complete)',
-                        notes: 'Parent and player share one combined account. Multiple players displayed simultaneously — not a profile switcher. Player name used on reports; player image used in group chat and coach interface. Signed documents also stored in profile (APP-018).',
+                        dependencies: 'Account created (APP-005 onboarding complete)',
+                        notes: 'Formerly APP-007. Parent and player share one combined account. Multiple players displayed simultaneously — not a profile switcher. Player name used on reports; player image used in group chat and coach interface. Signed documents also stored in profile.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-008',
-                        category: 'Athlete Portal',
-                        isParent: false,
-                        title: 'Pause membership',
-                        requirement: 'Pause membership — member or coach initiates a pause for a defined duration; billing date pushed by pause length; session booking disabled during pause; auto-resumes at end date with option for member to return early',
-                        release: 'MVP',
-                        initiatedBy: 'User / Coach',
-                        dataInputs: 'Pause start date, pause duration, member subscription data, pause min/max rules set by admin',
-                        outputAction: 'Subscription pause logged in Database; Stripe next payment date updated; session booking access disabled; auto-resume scheduled; confirmation displayed to member',
-                        humanTouchpoint: 'No — takes effect immediately. Coach reviews pause log separately.',
-                        integrations: 'Database, Stripe',
-                        dependencies: 'Stripe connected; member has active subscription; admin has configured min/max pause rules',
-                        notes: 'Pause takes effect immediately — no coach approval required. Admin sets min and max pause duration. Member retains full app access during pause — only session booking is disabled. Member can override auto-resume and return early.',
-                        subJobs: []
-                    },
-                    {
-                        id: 'APP-009',
-                        category: 'Athlete Portal',
-                        isParent: true,
-                        title: 'Cancellation flow',
-                        requirement: 'Cancellation flow — member submits cancellation form with required reason; coach is notified and must attempt outreach; coach confirms cancellation in system; access and billing retained until end of billing period',
-                        release: 'MVP',
-                        initiatedBy: 'User / Coach',
-                        dataInputs: 'Cancellation reason (dropdown), member ID, subscription data, billing period end date',
-                        outputAction: 'Cancellation request logged in Database; coach notified; coach confirms after outreach; Stripe subscription set to cancel at period end; member retains access until period end',
-                        humanTouchpoint: 'Yes — coach must attempt outreach and confirm cancellation',
-                        integrations: 'Database, Stripe, GHL',
-                        dependencies: 'Stripe connected; coach accounts active; GHL connected',
-                        notes: 'Cancellation is a request requiring coach confirmation. Access and billing continue until end of current billing period. Default dropdown reasons: high cost, not enough time, wasn\'t having fun, wasn\'t getting better, moved on to better things, other. Also accessible from APP-017 billing management.',
-                        subJobs: [
-                            {
-                                id: 'APP-009a',
-                                title: 'Member submits cancellation request',
-                                requirement: 'Member submits cancellation request — member selects reason from dropdown and submits form; confirmation state displayed; coach notified.',
-                                release: 'MVP',
-                                initiatedBy: 'User',
-                                integrations: 'Database',
-                                dependencies: 'Member has active subscription; cancellation reason options configured by admin',
-                                notes: 'Reason is required. Confirmation message: "Your request has been received. A coach will reach out shortly."'
-                            },
-                            {
-                                id: 'APP-009b',
-                                title: 'Coach confirms cancellation',
-                                requirement: 'Coach confirms cancellation — coach reviews request, attempts member outreach, and confirms or rejects cancellation in system; confirmed cancellations scheduled in Stripe.',
-                                release: 'MVP',
-                                initiatedBy: 'Coach',
-                                integrations: 'Database, Stripe, GHL',
-                                dependencies: 'APP-009a complete; coach account active'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'APP-010',
+                        id: 'APP-005',
                         category: 'Onboarding',
                         isParent: true,
                         title: 'Member onboarding flow',
@@ -1368,10 +1419,10 @@
                         humanTouchpoint: 'Yes — coach sends the onboarding link manually',
                         integrations: 'Database, Stripe',
                         dependencies: 'Plans/products configured; legal agreement documents configured; Stripe connected',
-                        notes: 'Web app (not native mobile) for onboarding. Coach sends link manually. Steps in order: (1) account creation, (2) product selection, (3) payment, (4) legal agreements, (5) app walkthrough, (6) welcome state.',
+                        notes: 'Formerly APP-010. Web app (not native mobile) for onboarding. Coach sends link manually. Steps in order: (1) account creation, (2) product selection, (3) payment, (4) legal agreements, (5) app walkthrough, (6) welcome state.',
                         subJobs: [
                             {
-                                id: 'APP-010a',
+                                id: 'APP-005a',
                                 title: 'Account creation',
                                 requirement: 'Account creation — member creates account with name, email, and password; account persisted to Database immediately to enable flow resume.',
                                 release: 'MVP',
@@ -1381,46 +1432,46 @@
                                 notes: 'Must be step 1 — no progress can be saved before account exists.'
                             },
                             {
-                                id: 'APP-010b',
+                                id: 'APP-005b',
                                 title: 'Product selection',
                                 requirement: 'Product selection — member browses available plans and selects one to proceed with payment.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
                                 integrations: 'Database',
-                                dependencies: 'APP-010a complete; plans configured in system'
+                                dependencies: 'APP-005a complete; plans configured in system'
                             },
                             {
-                                id: 'APP-010c',
+                                id: 'APP-005c',
                                 title: 'Payment setup',
                                 requirement: 'Payment setup — member enters payment method via Stripe hosted UI; subscription created on successful payment.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
                                 integrations: 'Stripe',
-                                dependencies: 'APP-010b complete; Stripe connected'
+                                dependencies: 'APP-005b complete; Stripe connected'
                             },
                             {
-                                id: 'APP-010d',
+                                id: 'APP-005d',
                                 title: 'Legal agreements',
                                 requirement: 'Legal agreements — member reviews and signs liability waiver, terms of service, and media release; signed documents stored in member profile.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
                                 integrations: 'Database',
-                                dependencies: 'APP-010c complete; agreement documents configured in system',
-                                notes: 'Three documents required: liability waiver, terms of service, media release. Templates are hardcoded into the platform. Terms must be re-signed when plan changes (APP-017).'
+                                dependencies: 'APP-005c complete; agreement documents configured in system',
+                                notes: 'Three documents required: liability waiver, terms of service, media release. Templates are hardcoded into the platform. Terms must be re-signed when plan changes.'
                             },
                             {
-                                id: 'APP-010e',
+                                id: 'APP-005e',
                                 title: 'App walkthrough and welcome',
                                 requirement: 'App walkthrough and welcome — brief guided tour of key app areas followed by welcome state on home page.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
-                                dependencies: 'APP-010d complete',
+                                dependencies: 'APP-005d complete',
                                 notes: 'Walkthrough is a UI tour of key navigation areas. Welcome state is a one-time congratulations message on first home page load.'
                             }
                         ]
                     },
                     {
-                        id: 'APP-011',
+                        id: 'APP-006',
                         category: 'Athlete Portal',
                         isParent: false,
                         title: 'Home page',
@@ -1431,11 +1482,11 @@
                         humanTouchpoint: 'Yes — coaches post announcements',
                         integrations: 'Database',
                         dependencies: 'Member account active; location assigned; at least one shortcut configured',
-                        notes: 'Announcements are location-specific. Carousel is persistent — announcements do not dismiss. Quick-access shortcut destinations to be defined separately. Dashboard-style layout with widgets/cards.',
+                        notes: 'Formerly APP-011. Announcements are location-specific. Carousel is persistent — announcements do not dismiss. Quick-access shortcut destinations to be defined separately. Dashboard-style layout with widgets/cards.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-012',
+                        id: 'APP-007',
                         category: 'Shop',
                         isParent: false,
                         title: 'Products page',
@@ -1446,79 +1497,57 @@
                         humanTouchpoint: 'No — self-serve purchase',
                         integrations: 'Database, Stripe',
                         dependencies: 'Plans configured in Database; Stripe connected; member account active',
-                        notes: 'Online programs have their own separate interface — they may appear here as a purchasable add-on but detailed program content lives elsewhere. Current plan is visually badged.',
+                        notes: 'Formerly APP-012. Online programs have their own separate interface — they may appear here as a purchasable add-on but detailed program content lives elsewhere. Current plan is visually badged.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-013',
+                        id: 'APP-008',
                         category: 'Online Programs',
-                        isParent: true,
+                        isParent: false,
                         title: 'Online programs',
-                        requirement: 'Online programs — structured video/image/text programs organized by weeks and modules; gated by plan; progress tracked per player; accessible via member app and managed via coach admin view',
+                        requirement: 'Online programs — member browses program modules organized by weeks, views video/image/text content, marks sessions complete, and sees progress through program. Congratulations pop-up on program completion.',
                         release: 'MVP',
-                        initiatedBy: 'User (views) / Coach (creates)',
-                        outputAction: 'Member views program content, marks sessions complete, sees progress; coach sees completion percentage per player; congratulations pop-up on program completion',
-                        humanTouchpoint: 'Yes — coach creates and publishes program content',
+                        initiatedBy: 'User',
+                        outputAction: 'Member views program content, marks sessions complete, sees progress; congratulations pop-up on program completion',
+                        humanTouchpoint: 'No — self-serve viewing and completion',
                         integrations: 'Database',
-                        dependencies: 'Plans configured with online program entitlement; coach account active; video content hosted externally',
-                        notes: 'Available as a standalone add-on or included in certain plan tiers. Videos hosted externally (e.g. Vimeo, YouTube) and embedded — not uploaded directly. Mobile-first, desktop supported. Coach admin view is within same app as separate interface.',
-                        subJobs: [
-                            {
-                                id: 'APP-013a',
-                                title: 'Member views and completes program',
-                                requirement: 'Member views and completes program — member browses program modules, views content, marks sessions complete, and sees progress through program.',
-                                release: 'MVP',
-                                initiatedBy: 'User',
-                                integrations: 'Database',
-                                dependencies: 'APP-013 parent complete; program published by coach; member entitled to online programs'
-                            },
-                            {
-                                id: 'APP-013b',
-                                title: 'Coach creates and manages program content',
-                                requirement: 'Coach creates and manages program content — coach builds program structure (weeks/modules), uploads content (video links, images, text), publishes, and monitors player completion rates.',
-                                release: 'MVP',
-                                initiatedBy: 'Coach',
-                                integrations: 'Database',
-                                dependencies: 'Coach account active with online program management permissions'
-                            }
-                        ]
+                        dependencies: 'Program published by coach (MEM-010); member entitled to online programs via plan',
+                        notes: 'Formerly APP-013a. Member-facing program viewing and completion. Coach-facing program creation and management lives in MEM-010. Videos hosted externally (e.g. Vimeo, YouTube) and embedded. Mobile-first, desktop supported. Available as a standalone add-on or included in certain plan tiers.',
+                        subJobs: []
                     },
                     {
-                        id: 'APP-014',
-                        category: 'Alerts & Notifications',
-                        isParent: true,
-                        title: 'Notifications & alerts',
-                        requirement: 'Notifications & alerts — member notifications via text (toggleable per type); coach in-app notifications for key events',
+                        id: 'APP-009',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'Pause membership',
+                        requirement: 'Pause membership — member or coach initiates a pause for a defined duration; billing date pushed by pause length; session booking disabled during pause; auto-resumes at end date with option for member to return early',
                         release: 'MVP',
-                        initiatedBy: 'Agent (triggered)',
-                        outputAction: 'Text notifications sent to members per enabled type; in-app notifications sent to coaches for their event types',
+                        initiatedBy: 'User / Coach',
+                        dataInputs: 'Pause start date, pause duration, member subscription data, pause min/max rules set by admin',
+                        outputAction: 'Subscription pause logged in Database; Stripe next payment date updated; session booking access disabled; auto-resume scheduled; confirmation displayed to member',
+                        humanTouchpoint: 'No — takes effect immediately. Coach reviews pause log separately.',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Stripe connected; member has active subscription; admin has configured min/max pause rules',
+                        notes: 'Formerly APP-008. Pause takes effect immediately — no coach approval required. Admin sets min and max pause duration. Member retains full app access during pause — only session booking is disabled. Member can override auto-resume and return early.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-010',
+                        category: 'Alerts & Notifications',
+                        isParent: false,
+                        title: 'Member notifications',
+                        requirement: 'Member notifications — text notifications for: payment reminders, session reminders, report published, coach messages; each type independently toggleable by member.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        outputAction: 'Text notifications sent to members per enabled type',
                         humanTouchpoint: 'No — automated',
                         integrations: 'Database, Stripe, Scheduling App (TBD)',
-                        dependencies: 'Member phone number on file; coach app accounts active; notification preferences stored in Database',
-                        notes: 'Member notifications via text only. Coach notifications are in-app only. Members can toggle each notification type independently.',
-                        subJobs: [
-                            {
-                                id: 'APP-014a',
-                                title: 'Member notifications',
-                                requirement: 'Member notifications — text notifications for: payment reminders, session reminders, report published, coach messages; each type independently toggleable by member.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                integrations: 'Database, Stripe, Scheduling App (TBD)',
-                                dependencies: 'APP-014 parent complete; member phone number on file; notification preferences initialized'
-                            },
-                            {
-                                id: 'APP-014b',
-                                title: 'Coach notifications',
-                                requirement: 'Coach notifications — in-app notifications for: new support ticket, new member, cancellation request, pause event, community activity.',
-                                release: 'MVP',
-                                initiatedBy: 'Agent',
-                                integrations: 'Database',
-                                dependencies: 'APP-014 parent complete; coach accounts active with location assignment'
-                            }
-                        ]
+                        dependencies: 'Member phone number on file; notification preferences initialized',
+                        notes: 'Formerly APP-014a. Member notifications via text only. Members can toggle each notification type independently.',
+                        subJobs: []
                     },
                     {
-                        id: 'APP-015',
+                        id: 'APP-011',
                         category: 'Athlete Portal',
                         isParent: false,
                         title: 'Attendance history',
@@ -1529,62 +1558,47 @@
                         humanTouchpoint: 'No',
                         integrations: 'Database',
                         dependencies: 'MEM-001 attendance tracking live; attendance records populated in Database',
-                        notes: 'Read-only log — no stats or rates displayed. Lifetime history, no date filter. Per-player view for multi-player accounts. Populated by MEM-001.',
+                        notes: 'Formerly APP-015. Read-only log — no stats or rates displayed. Lifetime history, no date filter. Per-player view for multi-player accounts. Populated by MEM-001.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-016',
+                        id: 'APP-012',
                         category: 'Shop',
                         isParent: true,
                         title: 'Billing and plan management',
-                        requirement: 'Billing and plan management — member can upgrade, downgrade, or cancel their plan and manage payment method; upgrades immediate, downgrades at end of billing cycle; cancellation routes to APP-009 flow',
+                        requirement: 'Billing and plan management — member can upgrade, downgrade, or cancel their plan and manage payment method; upgrades immediate, downgrades at end of billing cycle; cancellation routes to MEM-006 flow',
                         release: 'MVP',
                         initiatedBy: 'User',
-                        outputAction: 'Plan changes executed or scheduled in Stripe; payment method manageable via Stripe hosted UI; cancellation request routed to APP-009 flow',
-                        humanTouchpoint: 'Yes — for cancellations (APP-009 flow)',
+                        outputAction: 'Plan changes executed or scheduled in Stripe; payment method manageable via Stripe hosted UI; cancellation request routed to MEM-006 flow',
+                        humanTouchpoint: 'Yes — for cancellations (MEM-006 flow)',
                         integrations: 'Database, Stripe',
                         dependencies: 'Stripe connected; plans configured in Database; member has active subscription',
-                        notes: 'Payment method management lives here and also accessible from APP-002 upcoming payments view. Cancellation from here routes into APP-009 — not a separate path. Terms of service re-sign triggered on plan change (APP-017).',
+                        notes: 'Formerly APP-016. Payment method management lives here and also accessible from APP-002 upcoming payments view. Cancellation from here routes into MEM-006 — not a separate path. Terms of service re-sign triggered on plan change.',
                         subJobs: [
                             {
-                                id: 'APP-016a',
+                                id: 'APP-012a',
                                 title: 'Upgrade plan',
                                 requirement: 'Upgrade plan — member selects a higher-tier plan; upgrade takes effect immediately; new billing amount prorated and charged via Stripe.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
                                 integrations: 'Stripe, Database',
-                                dependencies: 'APP-016 parent complete; Stripe connected',
+                                dependencies: 'APP-012 parent complete; Stripe connected',
                                 notes: 'Immediate effect. Stripe handles proration automatically.'
                             },
                             {
-                                id: 'APP-016b',
+                                id: 'APP-012b',
                                 title: 'Downgrade plan',
                                 requirement: 'Downgrade plan — member selects a lower-tier plan; downgrade scheduled to take effect at end of current billing cycle.',
                                 release: 'MVP',
                                 initiatedBy: 'User',
                                 integrations: 'Stripe, Database',
-                                dependencies: 'APP-016 parent complete; Stripe connected',
+                                dependencies: 'APP-012 parent complete; Stripe connected',
                                 notes: 'Downgrade takes effect at end of billing cycle — member retains current plan access until then.'
                             }
                         ]
                     },
                     {
-                        id: 'APP-017',
-                        category: 'Onboarding',
-                        isParent: false,
-                        title: 'Waiver and document management',
-                        requirement: 'Waiver and document management — three required agreements signed during onboarding; terms re-signed on plan change; all signed documents stored and viewable in member profile',
-                        release: 'MVP',
-                        initiatedBy: 'User',
-                        outputAction: 'Signed agreement records stored in Database; accessible in member profile; re-sign prompt triggered on plan change (terms only)',
-                        humanTouchpoint: 'No — self-serve signing',
-                        integrations: 'Database',
-                        dependencies: 'Agreement document templates configured in system; member account active',
-                        notes: 'Three documents: liability waiver, terms of service, media release. All three signed at onboarding. Terms re-signed when plan changes only. Templates are hardcoded. Signed documents viewable in member profile (APP-007).',
-                        subJobs: []
-                    },
-                    {
-                        id: 'APP-018',
+                        id: 'APP-013',
                         category: 'Athlete Portal',
                         isParent: false,
                         title: 'Referral',
@@ -1595,11 +1609,11 @@
                         humanTouchpoint: 'No — automated link generation',
                         integrations: 'Database, GHL',
                         dependencies: 'GHL connected; referral workflow configured in GHL',
-                        notes: 'In-app experience limited to displaying the referral link in profile. All reward logic, tracking, and fulfillment handled by GHL — not in BAM OS.',
+                        notes: 'Formerly APP-018. In-app experience limited to displaying the referral link in profile. All reward logic, tracking, and fulfillment handled by GHL — not in BAM OS.',
                         subJobs: []
                     },
                     {
-                        id: 'APP-019',
+                        id: 'APP-014',
                         category: 'Player Profiles & Account Structure',
                         isParent: false,
                         title: 'Multi-player accounts',
@@ -1609,23 +1623,8 @@
                         outputAction: 'Each player stored as a linked profile under the parent account in Database; independent Stripe subscription per player; all players visible simultaneously on account',
                         humanTouchpoint: 'No — self-managed (adding players)',
                         integrations: 'Database, Stripe',
-                        dependencies: 'Parent account created (APP-010); plans configured; Stripe connected',
-                        notes: 'Billing is per player — each player has a separate Stripe subscription and invoice. Parent sees all players simultaneously (not a profile switcher). Credits scoped out of this session. Class eligibility tag assigned per player (APP-020).',
-                        subJobs: []
-                    },
-                    {
-                        id: 'APP-020',
-                        category: 'Credit-Based Scheduling System',
-                        isParent: false,
-                        title: 'Class eligibility tagging',
-                        requirement: 'Class eligibility tagging — each player is assigned a tag that determines which class types are visible and bookable; tags are predefined with option for coaches to create custom tags; assigned during onboarding or manually by coach; ineligible classes do not appear for the player',
-                        release: 'MVP',
-                        initiatedBy: 'Coach',
-                        outputAction: 'Player\'s class view filtered to show only classes matching their assigned tag; coach can view and update tag per player',
-                        humanTouchpoint: 'Yes — coach assigns and updates tags',
-                        integrations: 'Database, Scheduling App (TBD)',
-                        dependencies: 'Player profiles in Database; class types defined and tagged in scheduling app; scheduling app integrated',
-                        notes: 'Ineligible classes simply do not appear — no error shown. Tag is not visible to parent or player. Predefined tags can be supplemented by coach-created custom tags. Tag assigned during onboarding or manually updated by coach at any time.',
+                        dependencies: 'Parent account created (APP-005); plans configured; Stripe connected',
+                        notes: 'Formerly APP-019. Billing is per player — each player has a separate Stripe subscription and invoice. Parent sees all players simultaneously (not a profile switcher). Credits scoped out of this session. Class eligibility tag assigned per player (MEM-009).',
                         subJobs: []
                     }
                 ]
