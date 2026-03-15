@@ -2641,6 +2641,762 @@
                         edgeCases: 'No KPI data available at snapshot time: log empty snapshot with timestamp and flag. Comparison periods have mismatched KPI sets (e.g. new metric added mid-period): show available metrics, note gap. Snapshot storage limit reached: archive or purge oldest snapshots per retention policy.',
                         notes: 'Open design questions: (1) Snapshot scope — per agent or unified business snapshot? (2) Snapshot granularity — full metric set or summary-level only? (3) Retention policy — how long are snapshots kept? (4) Comparison model — two-period only or multi-period stacking? (5) Does snapshot include agent commentary from that period or raw values only? Preliminary V1 scope: scheduled trigger + basic two-period comparison. Custom scopes and multi-period stacking → V2.',
                         subJobs: []
+                    },
+                    {
+                        id: 'STR-002',
+                        accessLevel: 'Admin',
+                        category: 'Dashboard Infrastructure',
+                        isParent: true,
+                        title: 'Member analytics dashboard',
+                        oneLiner: 'Coach/owner-facing analytics screen displaying all member management KPIs with tiered visibility, global comparison, and gamification.',
+                        requirement: 'Member analytics dashboard — a dedicated analytics view within BAM OS for academy owners and coaches. Displays all member management KPIs organized into three visibility tiers: Tier 1 (Basic) — always visible, core operational KPIs; Tier 2 (Advanced) — toggled on by user, deeper metrics for strategic analysis; Tier 3 (Internal) — restricted to BAM OS internal team only, product/UX improvement metrics not shared with academy owners. Each KPI displays: current value, delta badge vs. a comparison period, trend data (last 6 periods), and applicable gamification elements. The dashboard is a single scrollable view with no routing — all tiers stack vertically.',
+                        release: 'MVP',
+                        initiatedBy: 'Human (owner/coach navigates to dashboard)',
+                        frequency: 'On demand — refreshes on page load',
+                        dataInputs: 'All KPI values computed from underlying data tables',
+                        dataSources: 'Database (all member, billing, attendance, scheduling, and communication tables)',
+                        outputAction: 'Rendered dashboard view with all KPIs, deltas, gamification, and tier controls',
+                        humanTouchpoint: 'No — data-driven, auto-computed',
+                        integrations: 'Database, Stripe (revenue KPIs)',
+                        dependencies: 'KPI computation layer defined; STR-001 snapshot system for historical comparisons; member, billing, and attendance data tables populated',
+                        edgeCases: 'No data available for a KPI: show "—" with "No data yet" label. Academy is brand new with <30 days of data: show available data, suppress comparison deltas, display "Collecting data" state for trend-dependent KPIs. Owner has no members: show empty state with onboarding prompt.',
+                        notes: 'The dashboard is the owner\'s primary tool for understanding business health at a glance. It is NOT a planning tool — it is an operational analytics screen. The tier system keeps the default view clean while allowing deep dives. Internal tier is for BAM OS product team only — used to improve onboarding UX, activation flows, and churn analysis.',
+                        subJobs: [
+                            {
+                                id: 'STR-002a',
+                                title: 'Tier visibility system',
+                                requirement: 'Tier visibility system — three tiers control which KPIs are visible. Tier 1 (Basic): always visible, cannot be hidden. Tier 2 (Advanced): hidden by default, toggled on/off by the user via a pill button. Tier 3 (Internal): hidden by default, visible only when an internal toggle is activated — restricted to BAM OS team, not exposed to academy owners. Tier visibility state persists per user across sessions.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database (user preferences)',
+                                dependencies: 'STR-002 dashboard live',
+                                notes: 'Tier 1 should cover 80% of daily operational needs. Tier 2 is for owners who want to go deeper. Tier 3 is never shown to customers — it is BAM OS internal product analytics.'
+                            },
+                            {
+                                id: 'STR-002b',
+                                title: 'Global comparison engine',
+                                requirement: 'Global comparison engine — a single comparison mode selector applies to all KPIs on the dashboard simultaneously. For average-based KPIs: compare vs. rolling 6-month average, vs. last month, or vs. best month ever. For cumulative (MTD) KPIs: compare vs. MTD average at the same day-of-month, vs. last month MTD, or vs. best month MTD. Each KPI renders a delta badge showing the difference: green with upward arrow for improvement, red with downward arrow for decline, gray for no significant change. For inverted metrics (where lower = better, e.g., churn rate, no-show rate): color logic is reversed — a decrease shows green.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'STR-001 snapshot system; STR-002 dashboard live',
+                                notes: 'The comparison engine is what makes this dashboard actionable — raw numbers without context are meaningless. The global selector ensures consistency (owner is always looking at the same comparison frame across all KPIs).'
+                            },
+                            {
+                                id: 'STR-002c',
+                                title: 'Gamification system',
+                                requirement: 'Gamification system — four gamification elements applied to KPI cards where applicable: (1) Streaks: track consecutive months a KPI improved or stayed in green zone. Display badge at 3 months, 6 months, and 12 months. (2) Milestone alerts: auto-detected from historical data — "Best month ever" when value exceeds all-time best, "Lowest in 6 months" when below 6-month rolling average, "Fastest growth month" for largest positive delta. (3) Personal bests: each KPI tracks its all-time best value; when current value equals PB, the card is visually highlighted. (4) Zone indicators: for KPIs with defined thresholds, display green/yellow/red zone status based on current value vs. threshold ranges.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (auto-computed)',
+                                integrations: 'Database',
+                                dependencies: 'STR-001 snapshot system for historical data; STR-002 dashboard live',
+                                notes: 'Gamification is motivational, not prescriptive. Streaks and milestones create positive reinforcement loops. Zone indicators create urgency for at-risk metrics. All thresholds should be configurable per academy in V2.'
+                            },
+                            {
+                                id: 'STR-002d',
+                                title: 'Academy Score (composite metric)',
+                                requirement: 'Academy Score — a single 0–100 composite score displayed prominently on the dashboard, summarizing overall academy health. Calculated from weighted inputs: active member count vs. goal, churn rate vs. threshold, MRR growth rate, at-risk member percentage, and attendance rate. Displayed with a color-coded zone (green/yellow/red) and delta vs. last month. The score is motivational — a single number the owner can track at a glance.',
+                                release: 'V1',
+                                initiatedBy: 'Agent (auto-computed)',
+                                integrations: 'Database',
+                                dependencies: 'STR-003 through STR-008 KPIs defined and computed',
+                                notes: 'Weights should be equal in V1 for simplicity. V2 could allow owners to weight what matters most to them. The score is NOT used for any business logic — it is purely a motivational display element.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-003',
+                        accessLevel: 'Admin',
+                        category: 'Volume KPIs',
+                        isParent: true,
+                        title: 'Member volume KPIs',
+                        oneLiner: 'Track total active members, paused members, churned members, net growth, and breakdowns by program, location, and age group.',
+                        requirement: 'Member volume KPIs — a set of point-in-time and cumulative metrics tracking the size and composition of the member base. All volume KPIs are Tier 1 (Basic) visibility, available to academy owners.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load; underlying data updated in real-time as members join, pause, or churn',
+                        dataInputs: 'Member account records, subscription statuses, program assignments, location assignments, athlete DOB fields',
+                        dataSources: 'Database (accounts, subscriptions, athlete_profiles, locations)',
+                        outputAction: 'KPI values rendered on dashboard with deltas, sparklines, and gamification',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Member accounts and subscriptions tracked in Database; PRF-001 account architecture live',
+                        edgeCases: 'Academy with one location: hide location breakdown KPI. No age data collected: show "Age data unavailable" for age group KPI. Zero members: show empty state.',
+                        notes: 'Volume KPIs are the most-checked metrics — they answer "how big is my business right now?" and "is it growing?" These are always visible (Tier 1).',
+                        subJobs: [
+                            {
+                                id: 'STR-003a',
+                                title: 'Total active members (KPI-001)',
+                                requirement: 'Total active members — point-in-time count of all members with an active subscription. Delta badge vs. comparison period. Progress bar toward a configurable monthly member goal. Milestone alert if count is an all-time high.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'Active subscription tracking',
+                                notes: 'The single most important volume metric. Goal is configurable per academy.'
+                            },
+                            {
+                                id: 'STR-003b',
+                                title: 'Total paused members (KPI-002)',
+                                requirement: 'Total paused members — point-in-time count of members with a paused subscription. Display as count and as percentage of total active base. Zone indicator: green (<10% of base), yellow (10–20%), red (>20%).',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-009 pause system live',
+                                notes: 'High pause rate is an early warning signal for churn. Zone thresholds may need tuning per academy size.'
+                            },
+                            {
+                                id: 'STR-003c',
+                                title: 'Total churned members (KPI-003)',
+                                requirement: 'Total churned members — cumulative MTD count of members who cancelled. Display as count and as percentage of starting base. Zone indicator: green (0–2% of base), yellow (2–5%), red (>5%). Streak badge if below 3 churned for 3+ consecutive months.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-006 cancellation tracking',
+                                notes: 'Inverted metric — lower is better. Cumulative MTD resets on the 1st of each month.'
+                            },
+                            {
+                                id: 'STR-003d',
+                                title: 'Net member growth (KPI-004)',
+                                requirement: 'Net member growth — cumulative MTD calculation: new members minus churned members. Display as signed number (positive = green, negative = red). Sparkline showing last 6 months of net growth. Streak badge if positive for 3+ consecutive months. Milestone alert if best month ever.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'STR-003a and STR-003c computed',
+                                notes: 'The single clearest signal of business trajectory. Negative net growth for 2+ months should trigger strategic review.'
+                            },
+                            {
+                                id: 'STR-003e',
+                                title: 'Members by program/tier (KPI-005)',
+                                requirement: 'Members by program/tier — point-in-time breakdown of active members by their subscription plan/program. Display count and percentage per program. Highlight the fastest-growing program.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'Plans/products configured',
+                                notes: 'Helps owners understand which programs are most popular and where growth is happening.'
+                            },
+                            {
+                                id: 'STR-003f',
+                                title: 'Members by location (KPI-006)',
+                                requirement: 'Members by location — point-in-time breakdown of active members by assigned location. Display count, percentage of total, and trend arrow vs. last month per location.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Locations defined in system',
+                                notes: 'Only relevant for multi-location academies. Single-location academies: hide this KPI.'
+                            },
+                            {
+                                id: 'STR-003g',
+                                title: 'Members by age group (KPI-007)',
+                                requirement: 'Members by age group — point-in-time breakdown of athletes by age bucket: U10, U12, U14, U16, U18, Adult. Calculated from athlete DOB field. Display count per bucket. Highlight largest segment.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'PRF-003 athlete profiles with DOB field',
+                                notes: 'Age groups help owners plan class offerings and marketing. Requires DOB to be collected — if missing, show "Age data unavailable."'
+                            },
+                            {
+                                id: 'STR-003h',
+                                title: 'Members with multiple athletes (KPI-009)',
+                                requirement: 'Members with multiple athletes — point-in-time count of parent accounts that have more than one linked athlete profile. Display count, percentage of total accounts, and mini breakdown (2 athletes vs. 3+). Tier 2 (Advanced) visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'PRF-004 parent-athlete linking',
+                                notes: 'Multi-athlete families represent higher LTV and lower acquisition cost per athlete. Tracking this helps identify upsell opportunities (sibling discounts, family plans).'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-004',
+                        accessLevel: 'Admin',
+                        category: 'Engagement KPIs',
+                        isParent: true,
+                        title: 'Member engagement KPIs',
+                        oneLiner: 'Track session frequency, class fill rates, attendance rates, no-show rates, streaks, leaderboards, and program completion.',
+                        requirement: 'Member engagement KPIs — metrics tracking how actively members participate in the academy. Includes session frequency, class utilization, attendance consistency, and program engagement. Mix of Tier 1 and Tier 2 visibility.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Attendance records, booking records, class schedules, online program progress',
+                        dataSources: 'Database (attendance, bookings, classes, program_progress)',
+                        outputAction: 'KPI values rendered on dashboard',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database',
+                        dependencies: 'MEM-001 attendance tracking live; booking system active; MEM-010 online programs live',
+                        edgeCases: 'No classes scheduled: suppress fill rate KPIs. No bookings (open-door academy): suppress booking-dependent KPIs, show attendance-only metrics.',
+                        notes: 'Engagement is the leading indicator of retention — members who attend consistently almost never churn. These KPIs help owners identify engagement drops before they become cancellations.',
+                        subJobs: [
+                            {
+                                id: 'STR-004a',
+                                title: 'Avg sessions per member per month (KPI-017)',
+                                requirement: 'Average sessions per member per month — average number of attended sessions across all active members in the current month. Zone indicator: green (≥6), yellow (4–6), red (<4). Progress bar toward configurable target. Streak badge if above target for 3+ months. Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking',
+                                notes: 'The core engagement pulse. Switchable to weekly view in the Advanced tier (STR-004b).'
+                            },
+                            {
+                                id: 'STR-004b',
+                                title: 'Avg sessions per member per week (KPI-018)',
+                                requirement: 'Average sessions per member per week — weekly granularity view of session frequency. Tier 2 visibility. Provides more granular tracking than monthly average.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking',
+                                notes: 'Useful for spotting week-over-week trends that monthly averages smooth out.'
+                            },
+                            {
+                                id: 'STR-004c',
+                                title: 'Average class fill rate (KPI-019)',
+                                requirement: 'Average class fill rate — average percentage of available spots filled across all classes in the period. Zone indicator: green (>80%), yellow (60–80%), red (<60%). Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Class capacity defined; booking system active',
+                                notes: 'Fill rate below 60% suggests either too many classes scheduled or insufficient demand. Actionable for schedule optimization.'
+                            },
+                            {
+                                id: 'STR-004d',
+                                title: 'Total sessions logged MTD (KPI-020)',
+                                requirement: 'Total sessions logged MTD — cumulative count of all attended sessions this month across all members. Progress bar toward monthly session target. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking',
+                                notes: 'Raw session volume — useful for understanding total throughput.'
+                            },
+                            {
+                                id: 'STR-004e',
+                                title: 'Attendance rate (KPI-021)',
+                                requirement: 'Attendance rate — percentage of booked sessions that were actually attended. Display booked count vs. attended count as sub-label. Zone indicator: green (>80%), yellow (65–80%), red (<65%). Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Booking and attendance tracking',
+                                notes: 'Low attendance rate with high booking rate = no-show problem. Low attendance with low booking = engagement problem. Different interventions for each.'
+                            },
+                            {
+                                id: 'STR-004f',
+                                title: 'No-show rate per member (KPI-023)',
+                                requirement: 'No-show rate per member — average percentage of booked sessions where the member did not attend. Inverted metric (lower = better). Distribution breakdown: percentage of members with 0 no-shows vs. 1–2 vs. 3+. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Booking and attendance tracking',
+                                notes: 'The distribution matters more than the average — a small number of chronic no-shows can skew the average. The 3+ bucket identifies members who need intervention.'
+                            },
+                            {
+                                id: 'STR-004g',
+                                title: 'Avg attendance streak (KPI-027)',
+                                requirement: 'Average attendance streak — average length of current consecutive-attendance streaks across all active members, measured in weeks. Display academy record as sub-label. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-017 streak tracker',
+                                notes: 'Rising average streaks indicate improving habit formation across the member base.'
+                            },
+                            {
+                                id: 'STR-004h',
+                                title: 'Longest active streak (KPI-028)',
+                                requirement: 'Longest active streak — the single longest current consecutive-attendance streak held by any active member. Display session count and first name of the streak holder. Milestone alert if this is an all-time academy record. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-017 streak tracker',
+                                notes: 'Creates aspirational motivation — members may compete to hold the longest streak.'
+                            },
+                            {
+                                id: 'STR-004i',
+                                title: 'Top 10% most active members (KPI-029)',
+                                requirement: 'Top 10% most active members — leaderboard-style list of the top 5 most active members by sessions attended MTD. Display first name and last initial only. Podium ranking: #1 highlighted. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking',
+                                notes: 'The most explicitly gamified KPI. Helps coaches recognize and reward most engaged members. Privacy: first name + last initial only.'
+                            },
+                            {
+                                id: 'STR-004j',
+                                title: 'Online program completion rate (KPI-090)',
+                                requirement: 'Online program completion rate — percentage of enrolled members who completed at least one program module MTD. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-010 online programs; APP-008 program access',
+                                notes: 'Low completion suggests content isn\'t engaging or members don\'t know about programs.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-005',
+                        accessLevel: 'Admin',
+                        category: 'Retention KPIs',
+                        isParent: true,
+                        title: 'Member retention KPIs',
+                        oneLiner: 'Track churn rate, cancellation rate, cohort retention funnel, at-risk members, re-engagement rate, and win-back rate.',
+                        requirement: 'Member retention KPIs — metrics tracking how well the academy retains members over time. Includes rate-based churn metrics (Tier 1), cohort retention funnel and at-risk analysis (Tier 2), and internal churn analysis (Tier 3).',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Member join dates, cancellation dates, pause records, health score data, re-signup records',
+                        dataSources: 'Database (accounts, subscriptions, cancellations, member_health_scores)',
+                        outputAction: 'KPI values rendered on dashboard with retention funnel visualization',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'MEM-006 cancellation tracking; member health scoring system; APP-009 pause system',
+                        edgeCases: 'Academy less than 12 months old: suppress long-term retention rates (6-month, 12-month) with "Insufficient data" label. Zero cancellations in period: show 0% churn with celebration state.',
+                        notes: 'Retention is the north star for Member Management. These KPIs directly measure whether the academy is keeping the members it acquires. The cohort retention funnel (30d → 12mo) is the most strategically valuable view — it shows exactly where members drop off over their lifecycle.',
+                        subJobs: [
+                            {
+                                id: 'STR-005a',
+                                title: 'Monthly churn rate (KPI-034)',
+                                requirement: 'Monthly churn rate — percentage of active members at period start who cancelled during the period. Inverted metric (lower = better). Zone indicator: green (<3%), yellow (3–7%), red (>7%). Sparkline of last 6 months. Streak badge if below 3% for 3+ months. Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'MEM-006 cancellation tracking',
+                                notes: 'The single most watched retention metric. Industry benchmark for fitness is ~5–7%/month — below 3% is excellent.'
+                            },
+                            {
+                                id: 'STR-005b',
+                                title: 'Monthly cancellation rate (KPI-035)',
+                                requirement: 'Monthly cancellation rate — percentage of members who initiated cancellation (includes those saved by retention flow). Inverted metric. Zone indicator. Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-006 cancellation tracking',
+                                notes: 'Differs from churn rate in that it captures intent to cancel, not just completed cancellations. Higher cancellation rate with lower churn rate means the retention flow (MEM-006) is working.'
+                            },
+                            {
+                                id: 'STR-005c',
+                                title: 'Zero attendance 14 days (KPI-025)',
+                                requirement: 'Zero attendance in last 14 days — point-in-time count of active members who have not attended any session in the last 14 days. Display as count and percentage of active base. Zone indicator: green (<5%), yellow (5–15%), red (>15%). Inverted metric. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking',
+                                notes: 'The most urgent retention risk signal — members who haven\'t shown up in 2 weeks are at high risk of churning. This KPI should drive re-engagement outreach.'
+                            },
+                            {
+                                id: 'STR-005d',
+                                title: 'Cohort retention funnel (KPI-036–040)',
+                                requirement: 'Cohort retention funnel — five retention rates calculated on a cohort basis: 30-day (KPI-036), 60-day (KPI-037), 90-day (KPI-038), 6-month (KPI-039), and 12-month (KPI-040). Displayed as a connected funnel visualization showing each stage\'s rate and the drop-off delta from the previous stage. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Member join date tracking; sufficient historical data per cohort',
+                                notes: 'The funnel view is the most strategically important retention visual — it shows exactly where in the member lifecycle the biggest drop-offs occur. If 30-day retention is low, onboarding needs work. If 6-month retention drops sharply, the product needs more value for long-term members.'
+                            },
+                            {
+                                id: 'STR-005e',
+                                title: 'Members at risk — health score (KPI-045)',
+                                requirement: 'Members at risk — point-in-time count of members flagged by the health scoring system, split by risk level: Yellow (at risk) and Red (critical). Display as total count, percentage of active base, and per-level counts. Celebration state if zero Red members. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Member health scoring system defined and computed',
+                                notes: 'This is the "action queue" metric — it tells the coach exactly how many members need intervention right now.'
+                            },
+                            {
+                                id: 'STR-005f',
+                                title: 'Re-engagement rate (KPI-047)',
+                                requirement: 'Re-engagement rate — percentage of at-risk members who returned to active attendance in the period. Display as percentage and as "X of Y at-risk members recovered." Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'STR-005e health scoring; re-engagement outreach tracking',
+                                notes: 'Measures effectiveness of coach intervention and automated re-engagement flows.'
+                            },
+                            {
+                                id: 'STR-005g',
+                                title: 'Win-back rate (KPI-048)',
+                                requirement: 'Win-back rate — percentage of cancelled members who re-signed within 90 days of cancellation. Display as percentage and as "X of Y cancelled members won back." Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-006 cancellation tracking; re-signup tracking',
+                                notes: 'Measures effectiveness of post-cancellation outreach. 90-day window is industry standard for win-back eligibility.'
+                            },
+                            {
+                                id: 'STR-005h',
+                                title: 'Pause-to-cancel conversion rate (KPI-049)',
+                                requirement: 'Pause-to-cancel conversion rate — percentage of membership pauses that ultimately result in a cancellation within 90 days. Breakdown by time-to-cancel: <30 days, 30–60 days, 60–90 days. Inverted metric. Tier 3 (Internal) visibility only.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'APP-009 pause system; MEM-006 cancellation tracking',
+                                notes: 'Internal metric — tells BAM OS whether the pause feature is genuinely preventing churn or just delaying it. If >40% of pauses lead to cancellation, the pause product may need redesign.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-006',
+                        accessLevel: 'Admin',
+                        category: 'Revenue KPIs',
+                        isParent: true,
+                        title: 'Revenue KPIs',
+                        oneLiner: 'Track MRR, growth rate, ARPM, ARPU, LTV, failed payments, recovery, churn split, NRR, and revenue breakdowns.',
+                        requirement: 'Revenue KPIs — metrics tracking all financial performance indicators for the academy. Includes headline revenue metrics (Tier 1), detailed revenue analysis and payment health (Tier 2).',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Subscription values, payment records, refunds, plan changes, promo codes',
+                        dataSources: 'Database, Stripe (subscriptions, invoices, payments, refunds)',
+                        outputAction: 'KPI values rendered on dashboard',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Stripe connected; subscriptions active; payment history available',
+                        edgeCases: 'No revenue yet: show $0 with "No active subscriptions" label. Currency: display in academy\'s configured currency. Stripe sync delay: show "Last synced: X minutes ago" if data is stale.',
+                        notes: 'Revenue KPIs are the financial health pulse of the business. MRR and growth rate are the headline numbers (Tier 1). Everything else provides diagnostic depth (Tier 2).',
+                        subJobs: [
+                            {
+                                id: 'STR-006a',
+                                title: 'Monthly Recurring Revenue (KPI-055)',
+                                requirement: 'Monthly Recurring Revenue (MRR) — sum of all active subscription values normalized to a monthly amount. Point-in-time. Sparkline of last 6 months. Progress bar toward MRR goal (configurable). Milestone alert if all-time high. Streak badge if MRR grew 3+ consecutive months. Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'Active subscriptions in Stripe',
+                                notes: 'MRR is the single most important financial metric for a subscription business.'
+                            },
+                            {
+                                id: 'STR-006b',
+                                title: 'MRR growth rate (KPI-056)',
+                                requirement: 'MRR growth rate — month-over-month percentage change in MRR. Display as signed percentage with color coding (positive = green, negative = red). Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'STR-006a MRR computed; at least 2 months of data',
+                                notes: 'Growth rate matters more than absolute MRR for understanding trajectory.'
+                            },
+                            {
+                                id: 'STR-006c',
+                                title: 'Average Revenue Per Member (KPI-060)',
+                                requirement: 'Average Revenue Per Member (ARPM) — MRR divided by total active members. Dollar amount. Progress bar toward target. Tier 1 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'STR-006a MRR; STR-003a active member count',
+                                notes: 'ARPM is per athlete, not per account. Rising ARPM with flat member count = good (members upgrading). Falling ARPM = pricing pressure or downgrades.'
+                            },
+                            {
+                                id: 'STR-006d',
+                                title: 'MRR at risk — paused (KPI-057)',
+                                requirement: 'MRR at risk from paused members — dollar value of subscriptions currently on pause. Display dollar amount and count of paused members. Inverted metric. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'APP-009 pause system',
+                                notes: 'Quantifies the revenue impact of paused memberships. Helps owners understand pause as a financial risk, not just a member count issue.'
+                            },
+                            {
+                                id: 'STR-006e',
+                                title: 'ARPU per account (KPI-061)',
+                                requirement: 'Average Revenue Per User (ARPU) — total MRR divided by total parent accounts (not athletes). Dollar amount. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'STR-006a MRR; PRF-001 account architecture',
+                                notes: 'ARPU per account is higher than ARPM because multi-athlete families pay for multiple subscriptions under one account. The delta between ARPU and ARPM shows the multi-athlete revenue uplift.'
+                            },
+                            {
+                                id: 'STR-006f',
+                                title: 'Lifetime Value — average (KPI-062)',
+                                requirement: 'Lifetime Value (LTV) — average total revenue generated per member over their entire tenure. Calculated as average monthly revenue × average member tenure in months. Display sub-label showing calculation inputs. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'STR-006c ARPM; sufficient tenure data',
+                                notes: 'LTV is the strategic metric that connects retention to revenue. Higher retention = higher LTV. Used to calculate acceptable customer acquisition cost.'
+                            },
+                            {
+                                id: 'STR-006g',
+                                title: 'LTV by program (KPI-063)',
+                                requirement: 'LTV by program — average LTV broken down by subscription program/tier. Bar chart ranking programs by LTV. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'STR-006f LTV; plans configured',
+                                notes: 'Shows which programs produce the most valuable long-term members — informs marketing and sales prioritization.'
+                            },
+                            {
+                                id: 'STR-006h',
+                                title: 'Failed payment rate (KPI-064)',
+                                requirement: 'Failed payment rate — percentage of subscription payment attempts that failed in the period. Inverted metric. Zone indicator: green (<2%), yellow (2–5%), red (>5%). Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe',
+                                dependencies: 'Stripe webhook for payment failures',
+                                notes: 'High failure rate may indicate expired cards (solvable with card updater) or insufficient funds (may need dunning strategy).'
+                            },
+                            {
+                                id: 'STR-006i',
+                                title: 'Payment recovery rate (KPI-065)',
+                                requirement: 'Payment recovery rate — percentage of failed payments that were eventually collected (via retry, card update, or manual payment). Display as "X of Y recovered." Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'MEM-016 failed payment tracking',
+                                notes: 'Measures effectiveness of the dunning/recovery process. Target: >70% recovery.'
+                            },
+                            {
+                                id: 'STR-006j',
+                                title: 'Avg days to payment recovery (KPI-066)',
+                                requirement: 'Average days to payment recovery — average number of days between initial payment failure and successful collection. Inverted metric (lower = better). Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'MEM-016 failed payment tracking',
+                                notes: 'Speed of recovery matters — longer recovery times correlate with higher churn risk.'
+                            },
+                            {
+                                id: 'STR-006k',
+                                title: 'Voluntary vs. payment-failure churn split (KPI-067)',
+                                requirement: 'Voluntary vs. payment-failure churn split — breakdown of churned members by reason: voluntary cancellation vs. payment failure (involuntary). Display as percentage split. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'MEM-006 cancellation tracking; MEM-016 failed payment tracking',
+                                notes: 'Critical strategic distinction — voluntary churn requires product/service improvements, payment-failure churn requires better dunning and card management. Different interventions for each type.'
+                            },
+                            {
+                                id: 'STR-006l',
+                                title: 'Upgrade rate (KPI-069)',
+                                requirement: 'Upgrade rate — percentage of active members who upgraded their plan in the period. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'APP-012a upgrade tracking',
+                                notes: 'Indicates product-market fit at higher tiers and effectiveness of upsell efforts.'
+                            },
+                            {
+                                id: 'STR-006m',
+                                title: 'Downgrade rate (KPI-070)',
+                                requirement: 'Downgrade rate — percentage of active members who downgraded their plan in the period. Inverted metric. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'APP-012b downgrade tracking',
+                                notes: 'Rising downgrade rate is an early warning — members may be reducing commitment before cancelling entirely.'
+                            },
+                            {
+                                id: 'STR-006n',
+                                title: 'Net Revenue Retention (KPI-071)',
+                                requirement: 'Net Revenue Retention (NRR) — percentage of revenue retained from existing members after accounting for churn, downgrades, and upgrades. Above 100% = expansion revenue exceeds losses (show in gold). Below 100% = contraction (show in red). Milestone alert if NRR > 110%. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'Upgrade, downgrade, and churn revenue tracking',
+                                notes: 'NRR above 100% means the business grows even without new members. This is the gold standard SaaS metric applied to fitness — rarely tracked in this industry, giving BAM OS academies a strategic edge.'
+                            },
+                            {
+                                id: 'STR-006o',
+                                title: 'Revenue by program (KPI-072)',
+                                requirement: 'Revenue by program — MRR broken down by subscription program/tier. Bar chart ranking programs by revenue contribution. Delta per program. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'Plans configured; active subscriptions',
+                                notes: 'Shows revenue concentration — if one program generates >60% of revenue, the business is exposed to single-product risk.'
+                            },
+                            {
+                                id: 'STR-006p',
+                                title: 'Revenue by location (KPI-073)',
+                                requirement: 'Revenue by location — MRR broken down by location. Bar chart ranking locations by revenue. Delta per location. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'Locations defined; active subscriptions',
+                                notes: 'Multi-location only. Shows which locations are financially strongest.'
+                            },
+                            {
+                                id: 'STR-006q',
+                                title: 'Promo redemption rate (KPI-074)',
+                                requirement: 'Discount/promo redemption rate — percentage of new signups that used a promo code. Display dollar value of discounts issued vs. revenue retained. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'Promo code system configured',
+                                notes: 'Helps measure whether promos are driving incremental signups or just discounting members who would have signed up anyway.'
+                            },
+                            {
+                                id: 'STR-006r',
+                                title: 'Refund rate (KPI-075)',
+                                requirement: 'Refund rate — percentage of transactions refunded in the period. Dollar amount refunded MTD. Inverted metric. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Stripe',
+                                dependencies: 'Stripe refund tracking',
+                                notes: 'High refund rate may indicate billing disputes, unclear pricing, or service quality issues.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-007',
+                        accessLevel: 'Admin',
+                        category: 'Operations KPIs',
+                        isParent: true,
+                        title: 'Operations KPIs',
+                        oneLiner: 'Track day-of-week attendance patterns, time-slot popularity, booking conversion, pause duration, and communication delivery.',
+                        requirement: 'Operations KPIs — metrics tracking operational patterns that help owners optimize scheduling, staffing, and communication. All Tier 2 (Advanced) visibility.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Attendance records with timestamps, booking records, pause records, message delivery logs',
+                        dataSources: 'Database (attendance, bookings, pauses, messages)',
+                        outputAction: 'KPI values and pattern visualizations rendered on dashboard',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database',
+                        dependencies: 'Attendance, booking, and messaging systems active',
+                        edgeCases: 'Academy operates <5 days/week: suppress unused days in day-of-week view. No messaging enabled: suppress communication KPIs.',
+                        notes: 'Operations KPIs are about pattern recognition — when do members come, which slots are hot, how long do pauses last. These drive scheduling and staffing decisions.',
+                        subJobs: [
+                            {
+                                id: 'STR-007a',
+                                title: 'Day-of-week attendance distribution (KPI-031)',
+                                requirement: 'Day-of-week attendance distribution — average session count per day of week (Monday through Sunday). Highlight peak day and trough day. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking with date data',
+                                notes: 'Directly informs class scheduling — add more classes on peak days, reduce on trough days.'
+                            },
+                            {
+                                id: 'STR-007b',
+                                title: 'Time-slot popularity (KPI-032)',
+                                requirement: 'Time-slot popularity — ranked list of time slots by average attendance. Display top 5 hottest slots. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Class schedule with time slots; attendance tracking',
+                                notes: 'Identifies high-demand slots for capacity planning and potential premium pricing.'
+                            },
+                            {
+                                id: 'STR-007c',
+                                title: 'Booking-to-attendance conversion (KPI-033)',
+                                requirement: 'Booking-to-attendance conversion rate — percentage of bookings that result in actual attendance. Zone indicator. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'Booking and attendance tracking',
+                                notes: 'Equivalent to attendance rate but framed as a conversion metric. Same underlying data as KPI-021.'
+                            },
+                            {
+                                id: 'STR-007d',
+                                title: 'Average pause duration (KPI-050)',
+                                requirement: 'Average pause duration — average number of days members remain paused before resuming or cancelling. Inverted metric (shorter = better). Distribution breakdown: <2 weeks, 2–4 weeks, >4 weeks. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'APP-009 pause system',
+                                notes: 'Long average pause durations suggest members are disengaging. Short pauses (vacation, illness) are healthy — long pauses often precede cancellation.'
+                            },
+                            {
+                                id: 'STR-007e',
+                                title: 'Message open rate — in-app (KPI-076)',
+                                requirement: 'Message open rate — percentage of in-app messages opened by recipients. Display as "X of Y messages opened." Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-002 messaging system with read tracking',
+                                notes: 'Low open rates suggest notification fatigue or irrelevant messaging.'
+                            },
+                            {
+                                id: 'STR-007f',
+                                title: 'SMS delivery rate (KPI-077)',
+                                requirement: 'SMS delivery rate — percentage of outbound SMS messages successfully delivered. Zone indicator: green (>95%), yellow (90–95%), red (<90%). Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, SMS provider',
+                                dependencies: 'APP-010 notification system',
+                                notes: 'Low delivery rate may indicate bad phone numbers in member records — trigger data cleanup campaign.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-008',
+                        accessLevel: 'Admin',
+                        category: 'Growth KPIs',
+                        isParent: true,
+                        title: 'Growth KPIs',
+                        oneLiner: 'Track referral rate and referral conversion rate to measure organic member acquisition.',
+                        requirement: 'Growth KPIs — metrics tracking organic member acquisition through referrals. Tier 2 (Advanced) visibility.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Referral link clicks, referred member signups, total new member signups',
+                        dataSources: 'Database, GHL (referral tracking)',
+                        outputAction: 'KPI values rendered on dashboard',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database, GHL',
+                        dependencies: 'APP-013 referral system; GHL connected',
+                        edgeCases: 'No referral system configured: suppress growth KPIs with "Referral system not configured" label. Zero new members in period: show 0% with "No new signups this month."',
+                        notes: 'Referral metrics are the leading indicator of product-market fit and member satisfaction — happy members refer.',
+                        subJobs: [
+                            {
+                                id: 'STR-008a',
+                                title: 'Referral rate (KPI-097)',
+                                requirement: 'Referral rate — percentage of new members in the period who were attributed to a referral. Display as "X of Y new members came from referrals." Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, GHL',
+                                dependencies: 'APP-013 referral system',
+                                notes: 'High referral rate = strong word-of-mouth. Target: >25% of new signups from referrals.'
+                            },
+                            {
+                                id: 'STR-008b',
+                                title: 'Referral conversion rate (KPI-098)',
+                                requirement: 'Referral conversion rate — percentage of referred leads who became paying members. Tier 2 visibility.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, GHL',
+                                dependencies: 'APP-013 referral system; lead tracking',
+                                notes: 'Measures quality of referrals. Low conversion may indicate referral incentive attracts low-intent leads.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'STR-009',
+                        accessLevel: 'Admin',
+                        category: 'Internal KPIs',
+                        isParent: true,
+                        title: 'Internal activation KPIs',
+                        oneLiner: 'BAM OS internal metrics for onboarding completion and new member activation — not shared with academy owners.',
+                        requirement: 'Internal activation KPIs — Tier 3 (Internal) metrics visible only to the BAM OS team. Track onboarding flow performance and new member activation to inform product improvements. These KPIs are never exposed to academy owners.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-computed)',
+                        frequency: 'Computed on dashboard load',
+                        dataInputs: 'Onboarding step completion records, first-class attendance dates, signup dates',
+                        dataSources: 'Database (onboarding_steps, attendance, accounts)',
+                        outputAction: 'KPI values rendered on dashboard (Internal tier only)',
+                        humanTouchpoint: 'No — fully automated',
+                        integrations: 'Database',
+                        dependencies: 'APP-005 onboarding flow with step-level tracking; MEM-001 attendance tracking',
+                        edgeCases: 'No new signups in period: show "No new members to measure" state. Onboarding flow changed mid-period: note in UI that metrics may reflect mixed flow versions.',
+                        notes: 'These metrics exist to improve the BAM OS product itself. Onboarding completion tells us where our UX loses people. Activation rate tells us whether our onboarding-to-first-class pipeline works. Both directly predict long-term retention.',
+                        subJobs: [
+                            {
+                                id: 'STR-009a',
+                                title: 'Onboarding completion rate (KPI-010)',
+                                requirement: 'Onboarding completion rate — percentage of members who complete all 5 onboarding steps (account creation → plan selection → payment → legal docs → app walkthrough). Display step-by-step funnel showing drop-off at each stage with the highest-drop step highlighted. Tier 3 (Internal) visibility only.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'APP-005 onboarding with step-level tracking',
+                                notes: 'The funnel view is critical — it pinpoints exactly which step loses the most people. Historically, payment is the biggest drop-off point. This metric directly informs UX improvements to the onboarding flow.'
+                            },
+                            {
+                                id: 'STR-009b',
+                                title: 'Activation rate — first class in 7 days (KPI-013)',
+                                requirement: 'Activation rate — percentage of new members who attend their first class within 7 days of signup. Display activated count vs. not-activated count and average days to first class. Tier 3 (Internal) visibility only.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'MEM-001 attendance tracking; member signup date',
+                                notes: 'The single highest retention-predictor metric. Members who attend within 7 days retain at significantly higher rates. If below 60%, onboarding and new-member outreach flows need adjustment. This drives product decisions around welcome emails, first-class booking nudges, and coach follow-up prompts.'
+                            }
+                        ]
                     }
                 ]
             },
@@ -3007,7 +3763,15 @@
                         'Onboarding & Activation',
                         'Scheduling & Operations',
                         'Analytics & Reporting',
-                        'Growth & Acquisition'
+                        'Growth & Acquisition',
+                        'Dashboard Infrastructure',
+                        'Volume KPIs',
+                        'Engagement KPIs',
+                        'Retention KPIs',
+                        'Revenue KPIs',
+                        'Operations KPIs',
+                        'Growth KPIs',
+                        'Internal KPIs'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
