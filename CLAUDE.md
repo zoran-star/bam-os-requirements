@@ -1,7 +1,15 @@
 # BAM OS Requirements
 
+## Collaborators
+This repo is a collaborative project between **Zoran** and **Cole**. Both contributors use Claude Code to work on the requirements. Changes made by either collaborator should be committed and pushed promptly so the other person always has the latest state.
+
+- **Zoran** has access to: Git, Notion MCP, GoHighLevel MCP
+- **Cole** has access to: Git, Notion MCP
+
+When working on requirements, be aware that the other collaborator may have made recent changes — always pull before editing.
+
 ## Before you start
-Always run `git pull` before making any edits to files in this repo. This ensures you have the latest changes from other collaborators.
+Always run `git pull` before making any edits to files in this repo. This ensures you have the latest changes from the other collaborator.
 
 ## After you finish
 Always commit and push changes after making edits. Use descriptive commit messages that reference the job IDs affected (e.g. "Add MEM-010 referral tracking requirement"). This ensures the other collaborator gets changes immediately.
@@ -10,7 +18,7 @@ Always commit and push changes after making edits. Use descriptive commit messag
 When committing, include a summary of what changed in the commit message body — which jobs were added, updated, or removed, and why. This serves as the change log for the project.
 
 ## What this repo is
-This repository holds the interactive business requirements flow diagram for BAM OS (`bam_os_business_requirements_flow.html`). It is a single self-contained HTML file with embedded JavaScript data representing all business requirements across 6 domains.
+This repository holds the interactive business requirements flow diagram for BAM OS (`bam_os_business_requirements_flow.html`). It is a single self-contained HTML file with embedded JavaScript data representing all business requirements across 7 domains.
 
 ## Sources of truth
 There are two sources for BAM OS business requirements that must stay in sync:
@@ -60,6 +68,9 @@ The Scheduling App domain also uses a `category` field per job.
 3. If adding a new parent job with sub-jobs, ensure sub-jobs are listed as separate rows in BOTH sources
 
 **CRITICAL: Every single change to the HTML must be paired with the corresponding Notion update in the same step.** Do not batch Notion updates for later. The workflow is: HTML change → Notion change → commit. Every time, no exceptions.
+
+## Presenting requirements
+When showing requirements in a table, always include the one-liner column alongside ID, title, type, and release. This gives a quick summary without needing to drill into the full details.
 
 ## Conventions
 - Job IDs follow the pattern: `{PREFIX}-{NUMBER}` for parent jobs, `{PREFIX}-{NUMBER}{letter}` for sub-jobs
