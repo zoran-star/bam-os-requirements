@@ -1617,6 +1617,119 @@
                         edgeCases: 'Coach creates announcement for a location with no active members: allow but surface note "0 active members at this location." Image upload fails: allow text-only announcement, flag upload failure. Coach schedules announcement for a past date: reject, prompt for future date. Coach archives all announcements: home page carousel shows empty state or hides carousel section. Coach at one location tries to create announcement for another location: enforce location-based access per MEM-014b role rules.',
                         notes: 'Announcements are location-specific — a multi-location academy has separate announcement feeds per location. This is the coach-facing management tool; APP-006 is the member-facing display. In V1, announcements are text + optional image only. Rich media (video, links, CTAs) deferred to V2. Announcement scheduling reuses the same scheduling infrastructure as MEM-002e message scheduling — shared component. The carousel on the member side is persistent (announcements don\'t auto-dismiss). Coach should be able to preview how the announcement will look in the member-facing carousel before publishing.',
                         subJobs: []
+                    },
+                    {
+                        id: 'MEM-017',
+                        isParent: false,
+                        title: 'Streak tracker',
+                        oneLiner: 'Display a consecutive-session attendance streak on the member dashboard, toggleable by coach.',
+                        fullTitle: 'Streak tracker — track and display how many consecutive scheduled sessions a member has attended without a miss. Streak counter is visible on the member-facing dashboard (APP-006) as a dynamic widget. Coach can toggle streak visibility on or off per location from advanced settings. Streak resets to zero on a missed session (no-shows and unexcused absences reset; paused memberships freeze the streak without resetting). Streak milestones (e.g., 10, 25, 50, 100 sessions) trigger a celebration animation on the member dashboard and can optionally trigger a MEM-019 milestone event. Streak data is per player on multi-player accounts.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Per session (event-triggered, updates after each attended or missed session)',
+                        requirement: 'Streak tracker — track and display how many consecutive scheduled sessions a member has attended without a miss. Streak counter is visible on the member-facing dashboard (APP-006) as a dynamic widget. Coach can toggle streak visibility on or off per location from advanced settings. Streak resets to zero on a missed session (no-shows and unexcused absences reset; paused memberships freeze the streak without resetting). Streak milestones (e.g., 10, 25, 50, 100 sessions) trigger a celebration animation on the member dashboard and can optionally trigger a MEM-019 milestone event. Streak data is per player on multi-player accounts.',
+                        dataInputs: 'Attendance record per session (from MEM-001), player ID, session date, attendance status (attended/missed/excused/paused)',
+                        dataSources: 'Database (attendance records, streak counter, player profiles)',
+                        outputAction: 'Streak counter updated in Database after each session; streak widget rendered on member dashboard (APP-006) showing current streak count with flame/fire animation that grows with streak length; streak milestone reached triggers celebration animation and optional MEM-019 milestone event',
+                        humanTouchpoint: 'No — automated tracking. Coach configures visibility toggle in advanced settings.',
+                        integrations: 'BAM OS Dashboard (advanced settings toggle), Database, Scheduling App (APP-006 renders streak widget)',
+                        dependencies: 'MEM-001 attendance tracking live; APP-006 home page live; member profiles in Database',
+                        edgeCases: 'Member pauses membership mid-streak: freeze streak at current count, resume counting on return. Member has two sessions in one day: each counts as one attendance event. Member cancels a session in advance (not a no-show): streak is unaffected (only missed/no-show sessions reset). Coach toggles streak off while members have active streaks: hide widget but preserve streak data in Database. Member rejoins after cancellation: streak resets to zero.',
+                        notes: 'The streak widget should feel rewarding — the visual grows more impressive as the streak climbs (small flame at 3, roaring fire at 50+). Streak milestones are a natural integration point with MEM-019 milestone celebrations. Per-player tracking on multi-player accounts means each sibling has their own streak. The coach toggle is per-location, not per-member — either all members at a location see streaks or none do.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'MEM-018',
+                        isParent: true,
+                        title: 'Visual attendance check-in',
+                        oneLiner: 'Coach-facing tap-to-check-in board with athlete photos and motion graphics.',
+                        fullTitle: 'Visual attendance check-in — coach-facing attendance board displaying athlete profile pictures in a grid. Shows athletes booked for the current session (if using a booking system) or all active members at that location (for open/drop-in systems). Coach taps an athlete\'s photo to mark them present — tap triggers a satisfying motion graphic animation (e.g., checkmark burst, glow pulse, card flip). Checked-in athletes visually shift to a "present" state. Board auto-populates based on session schedule or location roster. Feeds attendance data directly into MEM-001.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        frequency: 'Per session — coach opens check-in board at session start',
+                        requirement: 'Visual attendance check-in — coach-facing attendance board displaying athlete profile pictures in a grid. Shows athletes booked for the current session (if using a booking system) or all active members at that location (for open/drop-in systems). Coach taps an athlete\'s photo to mark them present — tap triggers a satisfying motion graphic animation (e.g., checkmark burst, glow pulse, card flip). Checked-in athletes visually shift to a "present" state. Board auto-populates based on session schedule or location roster. Feeds attendance data directly into MEM-001.',
+                        dataInputs: 'Session roster or full location roster, player profile photos, player names, session date/time, booking status (if applicable)',
+                        dataSources: 'Database (player profiles, session roster), Scheduling App (booked sessions)',
+                        outputAction: 'Attendance record written to Database per checked-in athlete via MEM-001; visual state updated on check-in board; unchecked athletes at session end flagged as absent per MEM-001 no-show logic',
+                        humanTouchpoint: 'Yes — coach manually taps each athlete to check in',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App (session roster), MEM-001 (attendance data)',
+                        dependencies: 'MEM-001 attendance tracking live; player profiles with photos in Database; session schedule or location roster available',
+                        edgeCases: 'Player has no profile photo: display initials avatar with name label. Coach accidentally taps wrong player: tap again to undo (toggle behavior) with reverse animation. Session has 50+ athletes: paginate or add search/filter by name. Player arrives late after coach has closed check-in: coach can reopen and tap to add. Player is booked but coach doesn\'t recognize them (new member): name displayed prominently below photo. Open system with 100+ active members at a location: provide alphabet filter or search bar to reduce grid size.',
+                        notes: 'This is the primary mechanism for capturing the "check-in data" that MEM-001 references as an input. The motion graphics are key to making attendance feel effortless and even enjoyable — this is a task coaches do every session, so the UX must be fast and satisfying. Designed for tablet use (iPad at the front desk or coach\'s tablet on the field). The toggle between "booked for this session" and "all members" accommodates both structured booking and open/drop-in class models. At session end, any un-tapped athletes are automatically marked absent — coach does not need to manually mark no-shows.',
+                        subJobs: [
+                            {
+                                id: 'MEM-018a',
+                                title: 'Session roster board',
+                                requirement: 'Session roster board — display a grid of athlete profile photos for the current session. If the academy uses a booking system, show only booked athletes. If the academy uses an open/drop-in model, show all active members at that location. Grid is sorted alphabetically by default with option to sort by recent check-in. Each card shows photo, first name, and a subtle booking/drop-in badge.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database, Scheduling App',
+                                dependencies: 'Player profiles in Database; session schedule or location roster available',
+                                notes: 'The board should auto-select the current or next upcoming session based on time. Coach can manually switch to a different session if needed. Open/drop-in mode is a location-level setting configured by admin.'
+                            },
+                            {
+                                id: 'MEM-018b',
+                                title: 'Tap-to-check-in with motion graphics',
+                                requirement: 'Tap-to-check-in with motion graphics — coach taps an athlete\'s photo card to mark them present. Tap triggers a motion graphic animation: checkmark burst with particle effects, card background transitions to a "checked in" color state (e.g., green glow), and a subtle haptic feedback on supported devices. Tapping again toggles the athlete back to unchecked with a reverse animation. Checked-in count displayed as a live counter (e.g., "12/18 checked in"). Attendance record written to Database immediately on tap.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database, MEM-001',
+                                dependencies: 'MEM-018a roster board live; MEM-001 attendance tracking live',
+                                notes: 'Animation must be fast (under 300ms) — this is a rapid-fire task when 20 kids walk in at once. Haptic feedback on iOS/tablet devices adds tactile satisfaction. The live counter gives coach an at-a-glance sense of who\'s still missing. Write to Database is optimistic (update UI immediately, sync in background) to keep the experience snappy.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MEM-019',
+                        isParent: true,
+                        title: 'Milestone celebrations',
+                        oneLiner: 'Auto-triggered celebrations with motion graphics, custom messages, and optional gifts for key member moments.',
+                        fullTitle: 'Milestone celebrations — system detects key member moments (birthdays, attendance milestones, membership anniversaries, streak milestones from MEM-017) and triggers a full-screen motion graphic celebration when the member opens the app that day. Each milestone type has a unique animation (e.g., confetti burst for birthdays, trophy animation for attendance milestones, fireworks for anniversaries). Coach can toggle each milestone type on or off per location in advanced settings. Coach can attach a custom message and an optional gift (video, file upload, or discount code) to any milestone type. Gifts are displayed alongside the celebration animation and accessible from the member\'s profile afterward.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Event-triggered — on member app login when a milestone condition is met',
+                        requirement: 'Milestone celebrations — system detects key member moments (birthdays, attendance milestones, membership anniversaries, streak milestones from MEM-017) and triggers a full-screen motion graphic celebration when the member opens the app that day. Each milestone type has a unique animation (e.g., confetti burst for birthdays, trophy animation for attendance milestones, fireworks for anniversaries). Coach can toggle each milestone type on or off per location in advanced settings. Coach can attach a custom message and an optional gift (video, file upload, or discount code) to any milestone type. Gifts are displayed alongside the celebration animation and accessible from the member\'s profile afterward.',
+                        dataInputs: 'Member date of birth, membership start date, cumulative attendance count, current streak (from MEM-017), milestone thresholds (configurable by coach), custom message text, gift attachment (video URL, file, or discount code)',
+                        dataSources: 'Database (member profiles, attendance records, streak data, milestone configuration, gift attachments)',
+                        outputAction: 'Full-screen celebration animation rendered on member app login; custom message displayed with animation; gift (if attached) presented and stored in member profile for later access; milestone event logged in Database and visible in MEM-013 activity feed',
+                        humanTouchpoint: 'No — automated detection and display. Coach configures milestone settings, messages, and gifts in advance.',
+                        integrations: 'BAM OS Dashboard (advanced settings), Database, Scheduling App (member-facing app renders celebrations), MEM-017 (streak data), MEM-013 (activity feed logging)',
+                        dependencies: 'Member profiles with date of birth in Database; MEM-001 attendance tracking live (for attendance milestones); MEM-017 streak tracker live (for streak milestones); APP-006 home page live (celebration renders on app open)',
+                        edgeCases: 'Member has multiple milestones on the same day (birthday + attendance milestone): queue celebrations sequentially, most personal first (birthday → attendance). Member doesn\'t open the app on their milestone day: show celebration on next login with adjusted message ("Belated happy birthday!"). Coach attaches a discount code that has expired: validate code at configuration time, warn coach. Gift file upload exceeds size limit: enforce max file size, surface error. Member on a paused account hits a milestone: still trigger celebration on next login after resume — milestones shouldn\'t be lost to timing. Coach toggles off a milestone type after celebrations have already been queued: cancel pending celebrations for that type.',
+                        notes: 'The celebration animations are the emotional core of this feature — they should feel premium and delightful, not generic. Each milestone type should have a distinct visual identity. Confetti for birthdays is the classic choice. Trophy/medal reveal for attendance milestones. Fireworks or sparkler effect for membership anniversaries. Streak milestones reuse the fire/flame visual language from MEM-017. The gift system is intentionally flexible — a video message from the coach feels personal, a discount code drives revenue, a training PDF adds value. Gifts persist in the member\'s profile so they can be accessed after the celebration dismisses.',
+                        subJobs: [
+                            {
+                                id: 'MEM-019a',
+                                title: 'Milestone detection and configuration',
+                                requirement: 'Milestone detection and configuration — system automatically detects four milestone types: (1) Birthday — based on date of birth in member profile, triggers annually. (2) Attendance milestones — cumulative session count hits a threshold (default: 25, 50, 100, 200, 500; coach can customize thresholds). (3) Membership anniversary — annual anniversary of membership start date. (4) Streak milestones — consecutive session count from MEM-017 hits a threshold (default: 10, 25, 50, 100). Coach configures which milestone types are active per location in advanced settings. Each milestone type can be independently toggled on or off.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent (detection) / Coach (configuration)',
+                                integrations: 'Database, BAM OS Dashboard (settings UI)',
+                                dependencies: 'Member profiles with date of birth; MEM-001 attendance data; MEM-017 streak data; membership start date in Database',
+                                notes: 'Detection runs as a daily job (check birthdays and anniversaries) and event-triggered (attendance and streak milestones checked after each session). Coach should be able to preview what a celebration looks like from the settings screen before enabling it.'
+                            },
+                            {
+                                id: 'MEM-019b',
+                                title: 'Celebration animations',
+                                requirement: 'Celebration animations — full-screen motion graphic overlay triggered on member app login when a milestone is detected. Each milestone type has a unique animation: birthday triggers a confetti burst across the screen with a birthday message; attendance milestones trigger a trophy/medal reveal animation; membership anniversaries trigger a fireworks display; streak milestones trigger an intensified version of the MEM-017 flame animation. Animation plays for 3–5 seconds, then settles into a card displaying the milestone message and any attached gift. Member can tap to dismiss or interact with the gift. Animation respects device performance — graceful degradation on older devices.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Scheduling App (member-facing app)',
+                                dependencies: 'MEM-019a milestone detection live; APP-006 home page live',
+                                notes: 'Animations should be built with a performant framework (Lottie, Rive, or CSS/Canvas animations — TBD based on app stack). The 3–5 second duration is long enough to feel special but short enough to not annoy. The settle-into-card transition is key — the animation isn\'t just eye candy, it leads to actionable content (message + gift).'
+                            },
+                            {
+                                id: 'MEM-019c',
+                                title: 'Custom messages and gifts',
+                                requirement: 'Custom messages and gifts — coach can attach a custom message and an optional gift to each milestone type from the advanced settings. Custom message is free-text with support for dynamic placeholders (e.g., {{firstName}}, {{streakCount}}, {{years}}). Gift options: (1) Video — coach uploads or pastes a URL (YouTube, Vimeo); displayed as an embedded player in the celebration card. (2) File — coach uploads a file (PDF, image; max 25MB); displayed as a download button in the celebration card. (3) Discount code — coach enters a code and description; displayed as a copyable code with description in the celebration card. Gifts are saved to the member\'s profile under a "My Rewards" section for later access. Coach can set different messages and gifts per milestone type. One message and one gift per milestone type (not per individual member).',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database, BAM OS Dashboard (settings UI)',
+                                dependencies: 'MEM-019a milestone detection live; MEM-019b celebration animations live',
+                                edgeCases: 'Coach leaves custom message blank: use default message per milestone type (e.g., "Happy Birthday, {{firstName}}!"). Coach uploads a video file instead of a URL: reject and prompt for URL or suggest uploading to YouTube/Vimeo first. Discount code already used by member: display code anyway — validation is external (Stripe coupon or manual). Coach changes the gift for a milestone type after some members have already received the old gift: new gift applies going forward, previously received gifts remain in member profiles.',
+                                notes: 'The placeholder system keeps messages personal at scale — coach writes one template, every member gets a personalized version. The "My Rewards" section in the member profile ensures gifts have lasting value beyond the 5-second celebration moment. Discount codes should integrate with Stripe coupons in a future version, but V1 is manual code entry.'
+                            }
+                        ]
                     }
                 ]
             },
