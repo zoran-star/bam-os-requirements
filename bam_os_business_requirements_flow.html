@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BAM OS — Business Requirements Flow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #2c2c2c;
+            color: #e5e5ea;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 110px;
+            background: linear-gradient(to bottom, #333338, #2c2c2c);
+            border-bottom: 1px solid #1e1e2e;
+            padding: 16px 20px;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            flex: 1;
+        }
+
+        .header-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: #f5f5f7;
+        }
+
+        .header-subtitle {
+            font-size: 12px;
+            color: #888896;
+        }
+
+        .header-legend {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .canvas-wrapper {
+            position: fixed;
+            top: 110px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            background: #2c2c2c;
+            cursor: grab;
+        }
+
+        .canvas {
+            position: relative;
+            min-width: 3200px;
+            min-height: 2400px;
+            padding: 40px;
+        }
+
+
+        .canvas-wrapper.panning {
+            cursor: grabbing;
+        }
+
+        .node-container {
+            position: absolute;
+            background: #1e1e22;
+            border: 2px solid;
+            border-radius: 12px;
+            padding: 0;
+            min-width: 320px;
+            max-width: 380px;
+            z-index: 20;
+            cursor: grab;
+            user-select: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .node-container.dragging {
+            cursor: grabbing;
+            z-index: 50;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .node-header {
+            padding: 16px;
+            border-bottom: 1px solid #3a3a44;
+        }
+
+        .node-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f5f5f7;
+            margin-bottom: 8px;
+        }
+
+        .node-jobs {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* Parent job card styling */
+        .job-card {
+            background: #28282e;
+            border-top: 1px solid #3a3a44;
+            border-bottom: none;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .job-card:last-child {
+            border-bottom: none;
+        }
+
+        .job-card:hover {
+            background: #30303a;
+        }
+
+        .job-card.parent {
+            background: #262629;
+        }
+
+        .job-card.parent:hover {
+            background: #2e2e32;
+        }
+
+        .job-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            min-height: 50px;
+        }
+
+        .job-card.parent .job-card-header {
+            font-weight: 600;
+            background: #262629;
+            padding: 14px 16px;
+        }
+
+        .job-info {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .job-code-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .job-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
+
+        .job-icon svg {
+            display: block;
+            width: 28px;
+            height: 28px;
+        }
+
+        .job-code {
+            font-size: 12px;
+            font-weight: 700;
+            color: #f5f5f7;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .job-text {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .job-title {
+            font-size: 13px;
+            color: #e5e5ea;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .job-card.parent .job-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .job-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .job-tag {
+            display: inline-block;
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
+
+        .tag-initiated {
+            background: #3a3a44;
+            color: #c5c5cf;
+        }
+
+        .tag-release {
+            background: transparent;
+            color: #c5c5cf;
+            font-weight: 600;
+            border: 2px solid #c5c5cf;
+        }
+        .tag-mvp {
+            color: #f5c842;
+            border-color: #f5c842;
+        }
+        .tag-v1 {
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+        .tag-v2 {
+            color: #ff9800;
+            border-color: #ff9800;
+        }
+        .tag-v3 {
+            color: #f44336;
+            border-color: #f44336;
+        }
+
+
+        .category-divider {
+            padding: 8px 12px;
+            margin: 10px 0 4px 0;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: #96ceb4;
+            border-top: 1px solid #3a3a44;
+            background: rgba(150, 206, 180, 0.06);
+        }
+
+        .category-divider:first-child {
+            margin-top: 0;
+            border-top: none;
+        }
+
+        .expand-icon {
+            color: #666674;
+            font-size: 14px;
+            transition: transform 0.2s ease;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .job-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .job-details {
+            display: none;
+            padding: 16px;
+            border-top: 1px solid #3a3a44;
+            background: #262629;
+            font-size: 12px;
+            color: #a8a8b8;
+            line-height: 1.6;
+        }
+
+        .job-card.expanded .job-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 12px;
+        }
+
+        .detail-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            color: #666674;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            color: #c5c5cf;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+
+        .sub-jobs-container {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #3a3a44;
+        }
+
+        .job-card.expanded .sub-jobs-container {
+            display: block;
+        }
+
+        .sub-job {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #3a3a44;
+        }
+
+        .sub-job:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .sub-job-code {
+            font-size: 11px;
+            font-weight: 700;
+            color: #f5f5f7;
+            margin-bottom: 4px;
+        }
+
+        .sub-job-details {
+            font-size: 11px;
+            color: #a8a8b8;
+            margin-left: 8px;
+        }
+
+        .sub-job-detail-row {
+            margin-bottom: 3px;
+        }
+
+        /* Position overrides for each node */
+        .node-marketing {
+            top: 60px;
+            left: 40px;
+        }
+
+        .node-content {
+            top: 400px;
+            left: 80px;
+        }
+
+        .node-sales {
+            top: 80px;
+            left: 600px;
+        }
+
+        .node-member-management {
+            top: 500px;
+            left: 600px;
+        }
+
+        .node-scheduling {
+            top: 800px;
+            left: 800px;
+        }
+
+        .node-strategy {
+            top: 800px;
+            left: 280px;
+        }
+
+        /* Zoom controls */
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 24px;
+        }
+
+        .zoom-btn {
+            background: #3a3a44;
+            border: none;
+            color: #e5e5ea;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zoom-btn:hover {
+            background: #505060;
+        }
+
+        .zoom-percentage {
+            font-size: 12px;
+            color: #888896;
+            min-width: 45px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="header-title">BAM OS — Business Requirements Flow</div>
+            <div class="header-subtitle">Interactive diagram of all jobs and dependencies across domains</div>
+        </div>
+        <div class="zoom-controls">
+            <button class="zoom-btn" id="zoom-out">−</button>
+            <div class="zoom-percentage" id="zoom-percent">100%</div>
+            <button class="zoom-btn" id="zoom-in">+</button>
+        </div>
+    </div>
+
+    <div class="canvas-wrapper" id="canvas-wrapper">
+        <div class="canvas" id="canvas">
+            <!-- Nodes will be inserted here by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // ========== DATA ==========
+        const JOBS_DATA = {
+            marketing: {
+                title: 'MARKETING',
+                subtitle: '📣 Cost per qualified free trial',
+                color: '#ff6b6b',
+                jobs: [
+                    {
+                        id: 'MKT-001',
+                        isParent: true,
+                        title: 'Ads report',
+                        fullTitle: 'Ads report — generates a full ads performance report with campaign-level KPIs and demographic breakdown, presented in a clear, easy-to-understand format. Invokable for any time frame (monthly, bi-monthly, ad-hoc).',
+                        release: 'MVP',
+                        initiatedBy: 'Human or Agent',
+                        requirement: 'Ads report — generates a full ads performance report with campaign-level KPIs and demographic breakdown, presented in a clear, easy-to-understand format. Invokable for any time frame (monthly, bi-monthly, ad-hoc).',
+                        frequency: 'Any time frame (monthly, bi-monthly, ad-hoc)',
+                        dataInputs: 'Campaign-level KPIs, demographic breakdowns per campaign',
+                        dataSources: 'Meta Marketing API → Database (self-healing cache)',
+                        outputAction: 'Structured report containing campaign KPIs and demographic flags',
+                        humanTouchpoint: 'No — report only, no actions taken',
+                        integrations: 'Meta Marketing API, Database',
+                        dependencies: 'Meta API connected, campaigns live',
+                        edgeCases: 'API unavailable: pull from Database cache, flag as potentially stale. No campaigns live: return empty report with note.',
+                        notes: 'Read-only — no changes made to campaigns or ads. Time frame passed as parameter at invocation.',
+                        subJobs: [
+                            {
+                                id: 'MKT-001a',
+                                title: 'Pull campaign-level KPIs',
+                                requirement: 'Pull campaign-level KPIs — retrieve the following metrics per campaign for the requested time frame: spend, impressions, CPM, reach, frequency, clicks, CTR, CPC, landing page views, click-to-LPV rate, form fills, trial bookings, CPL, conversion rate.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: '—',
+                                dataSources: 'Meta Marketing API → Database (self-healing cache)',
+                                outputAction: 'Structured KPI table per campaign: spend, impressions, CPM, reach, frequency, clicks, CTR, CPC, landing page views, click-to-LPV rate, form fills, trial bookings, CPL (spend ÷ (form fills + trial bookings)), conversion rate ((form fills + trial bookings) ÷ landing page views)',
+                                humanTouchpoint: 'No',
+                                integrations: 'Meta Marketing API, Database, Meta Conversions API (for form fill + trial booking events)',
+                                dependencies: 'Meta API connected, form fill (Lead) and trial booking (TrialBooked) events configured as distinct conversion events in Meta Events Manager and firing correctly via Conversions API',
+                                edgeCases: 'Metric unavailable for time frame: return null for that field, flag in report. Form fill or trial booking event not firing: flag as tracking gap, report combined conversions only. Multiple campaigns: return data per campaign, not aggregated.',
+                                notes: 'CPL = spend ÷ (form fills + trial bookings). Conversion rate = (form fills + trial bookings) ÷ landing page views. Form fills and trial bookings must be set up as separate named events in Meta Events Manager before they can be pulled independently. This is a tracking dependency — agent cannot split them without correct event configuration.'
+                            },
+                            {
+                                id: 'MKT-001b',
+                                title: 'Pull demographic data and flag if off-target',
+                                requirement: 'Pull demographic data and flag if off-target — retrieve age, gender, and geography breakdown for reached and engaged audience per campaign. Flag any campaign where demographics deviate significantly from target profile.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: '—',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'Age, gender, geography breakdown for reached audience and engaged audience per campaign',
+                                humanTouchpoint: 'No — flag only, no action taken',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, target audience profile defined (age range, geography)',
+                                edgeCases: 'Demographic data unavailable: note in report, skip flag. Borderline skew: flag with low confidence note. Multiple campaigns with different target profiles: apply correct profile per campaign.',
+                                notes: 'Target profile for BAM V1: age 25–44, geography within 30-min drive of training location. Do not adjust targeting based on this — Andromeda controls delivery. Flag is for human awareness only.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-002',
+                        isParent: true,
+                        title: 'Bi-monthly ad refresh suggestion',
+                        fullTitle: 'Bi-monthly ad refresh suggestion — run full assessment of active ads and generate a ranked cut/replace candidates list for human review and approval.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Bi-monthly',
+                        requirement: 'Bi-monthly ad refresh suggestion — run full assessment of active ads and generate a ranked cut/replace candidates list for human review and approval.',
+                        dataInputs: 'Ad-level spend, reach, frequency, conversions, runtime, distribution data across all active ads',
+                        dataSources: 'Meta Marketing API → Database',
+                        outputAction: 'Ranked cut/replace candidates list with reasoning per ad, returned to human for approval before any changes made',
+                        humanTouchpoint: 'Yes — human approves all cuts and replacements before execution',
+                        integrations: 'Meta Marketing API, Database',
+                        dependencies: 'Meta API connected, CBO campaign live, MKT-002a through MKT-002e complete',
+                        edgeCases: 'Full API failure: abort, notify human. Partial data: complete available sub-jobs, flag gaps in output.',
+                        notes: 'CBO only. Default cadence is bi-monthly. No ads are cut without human approval. Stop-loss (MKT-002b) can flag ads for early cut at any time outside this cycle. Can also happen on command.',
+                        subJobs: [
+                            {
+                                id: 'MKT-002a',
+                                title: 'Check distribution health',
+                                requirement: 'Check distribution health — assess whether 4–5 ads are contributing meaningfully to the ad set or whether 1–2 ads are carrying everything. Flag fragile distribution as a priority input for the next creative brief.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: 'Spend and reach per ad across full active ad set',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'Distribution health status: healthy / fragile. Fragile flag passed to MKT-002 output as priority creative diversity note.',
+                                humanTouchpoint: 'No — feeds into MKT-002 candidates list',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, at least one active ad set',
+                                edgeCases: 'Only 1–2 ads in set total: flag as structurally fragile regardless of performance. All ads contributing equally: healthy, no flag.',
+                                notes: 'Fragile distribution = prioritize creative diversity in next brief, not just volume. Common under CBO due to Hot Ad Bias — Andromeda concentrates spend early. This is a creative problem, not a campaign structure problem.'
+                            },
+                            {
+                                id: 'MKT-002b',
+                                title: 'Stop-loss check',
+                                requirement: 'Stop-loss check — scan all active ads for the stop-loss condition: any ad that has spent $150 or more with zero conversions (zero trial bookings AND zero form fills). Flag immediately for human review.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                frequency: 'Ongoing (runs independently of bi-monthly cycle)',
+                                dataInputs: 'Spend per ad, trial bookings per ad, form fills per ad',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'Stop-loss flag raised for qualifying ads. Passed into MKT-002 candidates list. Flagged ads paused only after human approval.',
+                                humanTouchpoint: 'Yes — human approves before any ad is paused or cut',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, conversion tracking live for trial bookings and form fills',
+                                edgeCases: 'Ad has $150 spend with one form fill but zero trial bookings: does NOT trigger stop-loss — form fill counts as conversion. Ad approaching $150: flag as approaching threshold, do not cut yet. Human overrides flag: log override and reason.',
+                                notes: 'A conversion is a trial booking OR a form fill. If either is present the ad survives. This is the only mechanism for cutting ads outside the 2-month cycle.'
+                            },
+                            {
+                                id: 'MKT-002c',
+                                title: 'Evaluate individual ads by spend + reach',
+                                requirement: 'Evaluate individual ads by spend + reach — apply 2x2 matrix: low spend + low reach = dead, cut candidate; low spend + decent reach = possibly contributing to mix, leave if aggregate on target; high spend + low reach = fatigue signal, flag; high spend + high reach = working, don\'t touch.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: 'Allocated spend per ad, reach per ad, aggregate ad set performance, conversions per ad',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'Per-ad disposition: cut candidate / leave / flag fatigue / leave winner. Bottom X% identified.',
+                                humanTouchpoint: 'No — feeds into MKT-002 candidates list',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, MKT-002e (runtime data) complete',
+                                edgeCases: 'New ad with low spend: cross-reference MKT-002e runtime — if recently launched, do not flag as cut candidate. Aggregate ad set data unavailable: pause evaluation, flag for human.',
+                                notes: 'In CBO, allocated spend IS a valid signal — Andromeda distributes freely so low spend reflects low algorithmic confidence. Bottom X% threshold is dynamic — relative performance, not fixed cutoff.'
+                            },
+                            {
+                                id: 'MKT-002d',
+                                title: 'Check frequency on top performers',
+                                requirement: 'Check frequency on top performers — identify high-performing ads with climbing frequency as early creative fatigue signals, even if current performance is still on target.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: 'Frequency per ad over time, spend per ad, conversions per ad',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'List of top performers with rising frequency flagged as fatigue-at-risk. Passed into MKT-002 candidates list.',
+                                humanTouchpoint: 'No — feeds into MKT-002 candidates list',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, MKT-002e (runtime data) complete',
+                                edgeCases: 'Frequency data unavailable: skip and note. Frequency stable but performance declining: flag via MKT-002c fatigue signal instead. Ad recently launched: insufficient frequency history, skip.',
+                                notes: 'No fixed frequency threshold — agent assesses trend direction, not absolute number. Rising frequency on a high-spend/high-reach ad is a leading indicator — flag before performance drops.'
+                            },
+                            {
+                                id: 'MKT-002e',
+                                title: 'Pull ad-level age and runtime data',
+                                requirement: 'Pull ad-level age and runtime data — retrieve launch date, days active, and spend over time for each active ad. Provides context for all other MKT-002 sub-jobs to avoid misreading new ads as underperformers.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                dataInputs: 'Ad launch date, days active, daily spend history per ad',
+                                dataSources: 'Meta Marketing API → Database',
+                                outputAction: 'Ad age and runtime profile per ad, passed as context to MKT-002a, MKT-002c, MKT-002d',
+                                humanTouchpoint: 'No',
+                                integrations: 'Meta Marketing API, Database',
+                                dependencies: 'Meta API connected, at least one active ad',
+                                edgeCases: 'Launch date unavailable: estimate from earliest spend data. Ad paused and reactivated: use total active days, not calendar days since launch.',
+                                notes: 'Should run first within MKT-002 — its output is a dependency for MKT-002c and MKT-002d. A new ad (under 14 days) should not be evaluated for cutting regardless of spend/reach signals.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'MKT-003',
+                        isParent: false,
+                        title: 'Ads analysis & education',
+                        fullTitle: 'Ads analysis & education — user-initiated deep analysis of MKT-001 report data. Compares the user\'s ad performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
+                        release: 'MVP',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand (after MKT-001 report)',
+                        requirement: 'Ads analysis & education — user-initiated deep analysis of MKT-001 report data. Compares the user\'s ad performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
+                        dataInputs: 'MKT-001 report output, cross-customer anonymized performance data',
+                        dataSources: 'Database',
+                        outputAction: 'Analysis report with cross-academy benchmarking, educational context per metric, and conversational follow-up capability for deeper exploration',
+                        humanTouchpoint: 'No — user-initiated, fully automated response',
+                        integrations: 'Database',
+                        dependencies: 'MKT-001 complete, cross-customer anonymized data populated (requires multiple customers on platform)',
+                        edgeCases: 'Insufficient cross-customer data (fewer than N academies): provide analysis with confidence disclaimer, skip comparison. User is extreme outlier: flag but don\'t suppress. New customer with no historical data: skip period-over-period, show current snapshot only.',
+                        notes: 'The educational layer is the differentiator — this is how BAM OS teaches users to understand their own business. Cross-customer data must be anonymized and aggregated. Minimum customer threshold (N) to be defined before launch.',
+                        subJobs: []
+                    }
+                ]
+            },
+            content: {
+                title: 'CONTENT',
+                subtitle: '🎨 Content output velocity',
+                color: '#ffd93d',
+                jobs: [
+                    {
+                        id: 'CNT-001',
+                        isParent: false,
+                        title: 'Creative brief generation',
+                        fullTitle: 'Creative brief generation — AI-guided intake collects target audience data (separate from MKT-001 lead gen data) plus past content samples from the user. Analyzes style, tone, and performance patterns. Outputs detailed content briefs specifying exact content to create: scripts, topics, formats, hooks, and creative direction.',
+                        release: 'MVP',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand',
+                        requirement: 'Creative brief generation — AI-guided intake collects target audience data (separate from MKT-001 lead gen data) plus past content samples from the user. Analyzes style, tone, and performance patterns. Outputs detailed content briefs specifying exact content to create: scripts, topics, formats, hooks, and creative direction.',
+                        dataInputs: 'User-provided target audience context (guided Q&A), past content samples (posts, videos, flyers), MKT-002 ad refresh output (creative gaps)',
+                        dataSources: 'Database',
+                        outputAction: 'Structured creative briefs with: content type, topic/hook, script outline, visual direction, target platform, posting cadence recommendation',
+                        humanTouchpoint: 'No — outputs briefs only, no content created yet',
+                        integrations: 'Database',
+                        dependencies: 'None (standalone intake — user provides all inputs)',
+                        edgeCases: 'User provides no past content: generate briefs based on target audience and industry best practices only, flag as "cold start" briefs. Insufficient target audience input: prompt user for minimum required fields before generating. MKT-002 data unavailable: generate briefs without creative gap context, note in output.',
+                        notes: 'This is a separate creative-focused intake — not the same data as MKT-001 lead gen audience profiling. MKT-002 feeds in here: ad refresh identifies creative gaps (e.g., fragile distribution) that should inform what kind of new content is needed. Past content ingestion is for style learning, not performance analysis.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CNT-002',
+                        isParent: false,
+                        title: 'Content creation',
+                        fullTitle: 'Content creation — takes approved briefs from CNT-001 and produces the actual content. Generates both text copy (captions, scripts, post copy) and AI-generated visual assets (images, graphics). Outputs ready-to-review content packages per brief.',
+                        release: 'V2',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand (after CNT-001 brief approved)',
+                        requirement: 'Content creation — takes approved briefs from CNT-001 and produces the actual content. Generates both text copy (captions, scripts, post copy) and AI-generated visual assets (images, graphics). Outputs ready-to-review content packages per brief.',
+                        dataInputs: 'Approved creative briefs from CNT-001, brand style context from past content ingestion',
+                        dataSources: 'Database',
+                        outputAction: 'Content packages per brief: final text copy + AI-generated visual assets, formatted per target platform specs',
+                        humanTouchpoint: 'No — outputs content for review, does not post',
+                        integrations: 'Database, AI image generation service',
+                        dependencies: 'CNT-001 complete (at least one approved brief exists)',
+                        edgeCases: 'Image generation fails: deliver text copy with placeholder notes for visuals, flag for retry. Brief is vague: request clarification from user before generating. Platform specs change: flag outdated format specs, generate to last known spec.',
+                        notes: 'AI generates both copy and visuals. User reviews full content package before anything goes live. Visual quality bar TBD — may need human polish in early V1. Each brief produces one content package.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'CNT-003',
+                        isParent: false,
+                        title: 'Content publishing',
+                        fullTitle: 'Content publishing — upon user approval of CNT-002 content packages, posts content to designated social media platforms. Handles platform-specific formatting, scheduling, and confirmation.',
+                        release: 'V2',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand (after CNT-002 content approved)',
+                        requirement: 'Content publishing — upon user approval of CNT-002 content packages, posts content to designated social media platforms. Handles platform-specific formatting, scheduling, and confirmation.',
+                        dataInputs: 'Approved content packages from CNT-002, user-specified platform targets and posting schedule',
+                        dataSources: 'Database, social media platform APIs',
+                        outputAction: 'Published posts on designated platforms, confirmation log with post URLs and timestamps',
+                        humanTouchpoint: 'Yes — user must explicitly approve each post before publishing',
+                        integrations: 'Database, Meta Graph API (Instagram/Facebook), TikTok API',
+                        dependencies: 'CNT-002 complete (approved content package exists), social media accounts connected',
+                        edgeCases: 'API auth expired: notify user, do not retry without re-auth. Post rejected by platform (content policy): flag specific rejection reason, return to user for edit. Scheduled post time missed: post immediately with notification, do not silently skip. Platform outage: queue post, retry with backoff, notify user after 3 failures.',
+                        notes: 'V1 scope: social media only (Instagram, Facebook, TikTok). No email/SMS in V1. User approval is mandatory for every post — no auto-posting. Scheduling capability included (user can approve now, set post time for later).',
+                        subJobs: []
+                    }
+                ]
+            },
+            sales: {
+                title: 'SALES',
+                subtitle: '📊 Qualified trial conversion rate',
+                color: '#4ecdc4',
+                jobs: [
+                    {
+                        id: 'SAL-001',
+                        isParent: false,
+                        title: 'Sales pipeline pulse check',
+                        fullTitle: 'Sales pipeline pulse check — pull a snapshot of the group training pipeline in GHL every Friday at noon and on demand. For each lead: current stage, days since becoming a lead, days since trial (if applicable), and assigned follow-up staff member. Includes stage volume count. Read-only — no actions taken.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Weekly (Friday 12:00 PM) + on demand',
+                        requirement: 'Sales pipeline pulse check — pull a snapshot of the group training pipeline in GHL every Friday at noon and on demand. For each lead: current stage, days since becoming a lead, days since trial (if applicable), and assigned follow-up staff member. Includes stage volume count. Read-only — no actions taken.',
+                        dataInputs: 'GHL opportunity records: contact.name, stage.name, createdAt, assignedTo, contact.id. GHL appointment records: startTime (filtered to trial calendars)',
+                        dataSources: 'GHL Opportunities API + GHL Calendars API → Database (self-healing cache)',
+                        outputAction: 'Stage volume summary + per-lead detail: name, current stage, days as lead, days since trial, assigned staff member',
+                        humanTouchpoint: 'No — report only',
+                        integrations: 'GoHighLevel (GHL), Database',
+                        dependencies: 'GHL connected, group training pipeline ID confirmed, post-trial staff assignment automation live, trial date field populated via GHL calendar, both trial calendar IDs confirmed and configured before build',
+                        edgeCases: 'GHL unavailable: pull from cache, flag as stale. Trial date missing: flag as unknown. Staff member not yet assigned: flag as unassigned. Empty pipeline: return snapshot with note.',
+                        notes: 'Two API calls per lead: (1) GET /opportunities/search by pipeline ID for stage, creation date, assigned user, and contact ID; (2) GET /calendars/appointments by contact ID to retrieve trial date, filtered to the two trial calendars. Assigned staff member resolved from assignedTo user ID via Users API. Days since trial only surfaces for leads with a confirmed appointment in the trial calendars.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SAL-002',
+                        isParent: false,
+                        title: 'Sales KPI report',
+                        fullTitle: 'Sales KPI report — pull a monthly sales performance summary automatically on the 1st of each month, covering the prior calendar month. Also available on demand with a custom date range. Outputs: total leads, qualified trials, unqualified trials, no-shows (booked trial, did not attend), sales (won), qualified trial close rate, and Conversational AI conversion metrics (AI-engaged leads that booked a trial, AI conversion rate vs. non-AI conversion rate, average time from first AI contact to booking). Read-only — no actions taken.',
+                        release: 'MVP',
+                        initiatedBy: 'Human or Agent',
+                        frequency: 'Monthly (1st of month, prior calendar month) + on demand with date range parameter',
+                        requirement: 'Sales KPI report — pull a monthly sales performance summary automatically on the 1st of each month, covering the prior calendar month. Also available on demand with a custom date range. Outputs: total leads, qualified trials, unqualified trials, no-shows (booked trial, did not attend), sales (won), qualified trial close rate, and Conversational AI conversion metrics (AI-engaged leads that booked a trial, AI conversion rate vs. non-AI conversion rate, average time from first AI contact to booking). Read-only — no actions taken.',
+                        dataInputs: 'GHL opportunity records: createdAt, status (won/lost), contact.id. GHL contact records: qualification tag (contact.tags or custom field — key to be confirmed). GHL appointment records: status (showed/no-show), startTime (filtered to trial calendars and reporting period). SAL-004 conversation logs: contact.id, AI engagement flag, first AI contact timestamp, conversation outcome (booked, drip, opted out)',
+                        dataSources: 'GHL Opportunities API + GHL Calendars API + GHL Contacts API + Database (self-healing cache, SAL-004 conversation logs)',
+                        outputAction: 'Structured KPI summary: total leads, qualified trials, unqualified trials, no-shows, sales, qualified trial close rate. Blended AI metrics: AI-engaged leads that booked a trial, AI conversion rate (AI-engaged bookings ÷ total AI-engaged leads), non-AI conversion rate (direct bookings ÷ leads not engaged by AI), AI vs. non-AI conversion rate comparison, average time from first AI contact to trial booking',
+                        humanTouchpoint: 'No — report only',
+                        integrations: 'GoHighLevel (GHL), Database',
+                        dependencies: 'GHL connected, qualification tag active and consistently applied in GHL, won/lost status marked on all closed opportunities, trial attendance status logged via GHL calendar appointment status, both trial calendar IDs confirmed and configured before build, qualification tag key (contact.tags vs custom field) confirmed before build, SAL-004 conversation logging active with contact ID linkage',
+                        edgeCases: 'Qualification tag missing on a lead: exclude from qualified/unqualified count, flag as untagged. Attendance status not logged: flag as unknown, exclude from no-show count. GHL unavailable: pull from cache, flag as stale. Zero qualified trials in period: return report with close rate as N/A. No AI-engaged leads in period: show AI metrics as N/A. Lead engaged by AI but booked independently (e.g., walked in): attribute to AI-engaged if AI contact occurred before booking. SAL-004 not yet live: omit AI metrics section entirely, no error.',
+                        notes: 'Three API calls per report: (1) GET /opportunities/search filtered by pipeline ID and date range for lead count, sales, and contact IDs; (2) GET /contacts by contact ID to retrieve qualification tag; (3) GET /calendars/appointments by contact ID filtered to trial calendars and reporting period for attendance status. Plus one Database query for SAL-004 conversation logs filtered by contact ID and reporting period. Qualified trial close rate = won ÷ qualified trials. No-show = appointment status is no-show within reporting period. AI conversion rate = AI-engaged bookings ÷ total AI-engaged leads. Non-AI conversion rate = direct bookings ÷ non-AI leads. Average time to booking = mean of (booking timestamp − first AI contact timestamp) for AI-converted leads. Close lag not handled in V1 — sales attributed to the month the opportunity is marked won, not the month the trial occurred. Proper trial-to-sale attribution deferred to future build. AI metrics only appear once SAL-004 is live and generating data.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SAL-003',
+                        isParent: false,
+                        title: 'Sales analysis & education',
+                        fullTitle: 'Sales analysis & education — user-initiated deep analysis of SAL-002 report data. Compares the user\'s sales performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
+                        release: 'MVP',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand (after SAL-002 report)',
+                        requirement: 'Sales analysis & education — user-initiated deep analysis of SAL-002 report data. Compares the user\'s sales performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
+                        dataInputs: 'SAL-002 report output, cross-customer anonymized sales performance data',
+                        dataSources: 'Database',
+                        outputAction: 'Analysis report with cross-academy benchmarking on sales KPIs (close rate, lead volume, no-show rate, etc.), educational context per metric, and conversational follow-up capability',
+                        humanTouchpoint: 'No — user-initiated, fully automated response',
+                        integrations: 'Database',
+                        dependencies: 'SAL-002 complete, cross-customer anonymized data populated (requires multiple customers on platform)',
+                        edgeCases: 'Insufficient cross-customer data (fewer than N academies): provide analysis with confidence disclaimer, skip comparison. User is extreme outlier: flag but don\'t suppress. New customer with no historical data: skip period-over-period, show current snapshot only. Zero qualified trials in period: adjust education to focus on lead generation rather than conversion.',
+                        notes: 'Same education-first pattern as MKT-003. The educational layer is the differentiator — this is how BAM OS teaches users to understand their sales funnel. Cross-customer data must be anonymized and aggregated. Minimum customer threshold (N) to be defined before launch. Sales-specific education topics include: what a healthy close rate looks like, why no-show rate matters more than lead volume, how to read qualified vs. unqualified trial ratios.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SAL-004',
+                        isParent: true,
+                        title: 'Conversational AI lead nurture',
+                        fullTitle: 'Conversational AI lead nurture — automatically engage any lead that does not directly book a trial via SMS and email. Leads enter the pipeline through six channels: text message, Instagram DM, Facebook DM, contact form submission, email, or phone call. The AI initiates contact within 5 minutes of the lead entering the pipeline without a booking, answers questions about the program, and nudges the lead toward booking a trial. Data collection is minimal-friction (email only — enrich later). If the lead does not convert after 2–3 contact attempts, they are moved into an automated drip campaign. The AI\'s tone and messaging should reflect the academy\'s brand and focus on getting the lead the information they need by booking a trial.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Event-triggered (new lead without trial booking) + follow-up cadence (2–3 attempts)',
+                        requirement: 'Conversational AI lead nurture — automatically engage any lead that does not directly book a trial via SMS and email. Leads enter the pipeline through six channels: text message, Instagram DM, Facebook DM, contact form submission, email, or phone call. The AI initiates contact within 5 minutes of the lead entering the pipeline without a booking, answers questions about the program, and nudges the lead toward booking a trial. Data collection is minimal-friction (email only — enrich later). If the lead does not convert after 2–3 contact attempts, they are moved into an automated drip campaign. The AI\'s tone and messaging should reflect the academy\'s brand and focus on getting the lead the information they need by booking a trial.',
+                        dataInputs: 'GHL contact record: name, email, phone, lead source (text, Instagram DM, Facebook DM, contact form, email, phone call), pipeline stage, trial booking status. Academy profile: brand voice, program details, trial booking link',
+                        dataSources: 'GHL Contacts API + GHL Opportunities API + GHL Conversations API → Database',
+                        outputAction: 'Automated SMS and email conversations with lead; booking link delivery; lead status updates in GHL; unconverted leads moved to drip campaign after 2–3 attempts',
+                        humanTouchpoint: 'No — fully automated. Human reviews drip campaign escalations only if needed',
+                        integrations: 'GoHighLevel (GHL), SMS provider (via GHL), Email (via GHL), Database',
+                        dependencies: 'GHL connected, SMS and email sending enabled in GHL, trial booking calendar configured, drip campaign workflow built in GHL, academy brand voice and program details populated in Database',
+                        edgeCases: 'Lead books trial between AI contact attempts: stop nurture sequence immediately, mark as converted. Lead replies "stop" or opts out: respect opt-out, flag in GHL, do not re-engage. SMS delivery failure: fall back to email only. Lead already in pipeline from previous interaction: check for existing booking before initiating. GHL unavailable: queue outreach, retry on next sync. Lead responds with question AI cannot answer: provide general encouragement to book trial for full info, do not fabricate details.',
+                        notes: 'First contact must fire within 5 minutes of lead creation — speed to lead is critical. Six lead entry channels: text message, Instagram DM, Facebook DM, contact form submission, email, and phone call. All funnel into GHL as the single pipeline source of truth. The AI is not a hard-sell bot — it answers questions and nudges toward trial booking as the best way to get full information. Minimal data capture (email only) keeps friction low; enrichment happens post-trial or via drip. After 2–3 attempts with no conversion, the lead is handed to a drip campaign — no further AI outreach. SMS and email are the two outreach channels. Conversation context should persist across attempts so the AI does not repeat itself. Drip campaign design is a separate requirement (not covered here).',
+                        subJobs: [
+                            {
+                                id: 'SAL-004a',
+                                title: 'Conversation review + thumbs up/down',
+                                requirement: 'Conversation review + thumbs up/down — provide a conversation feed within the BAM OS dashboard (under AI Training section) where the academy owner can browse AI-lead conversations and rate them thumbs up or thumbs down. Default view shows AI-flagged low-confidence conversations; toggle to view all conversations. Each conversation displays as a chat thread with lead messages and AI responses. Lead context (name, source channel, pipeline stage, booking status) available in a collapsible sidebar panel. Thumbs up reinforces the AI\'s approach; thumbs down flags the conversation for the AI to de-prioritize that response pattern.',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                dataInputs: 'AI conversation logs, AI confidence scores per message, lead context from GHL',
+                                dataSources: 'Database (conversation logs + confidence scores), GHL Contacts API',
+                                outputAction: 'Binary feedback signal stored per conversation; flagged conversations influence future AI prompt weighting',
+                                humanTouchpoint: 'Yes — owner reviews and rates conversations',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SAL-004 live and generating conversations, AI confidence scoring implemented, conversation logging active',
+                                edgeCases: 'No conversations yet: show empty state with explanation. All conversations rated thumbs up: no adjustment needed. Owner rates everything thumbs down: surface prompt to use correction-in-place (SAL-004b) for more specific feedback. Confidence scoring miscalibrated: allow manual override to flag/unflag.',
+                                notes: 'Lowest friction training method — one tap per conversation. Training strength is low (coarse signal) but valuable for catching obvious failures. The flagged vs. all toggle lets engaged owners dig deeper while keeping the default view manageable. UI lives in BAM OS dashboard under a dedicated AI Training section alongside all other training tools.'
+                            },
+                            {
+                                id: 'SAL-004b',
+                                title: 'Correction-in-place editing',
+                                requirement: 'Correction-in-place editing — within the same conversation review feed (SAL-004a), allow the academy owner to tap into any specific AI message and rewrite what the AI should have said. The original AI message is preserved alongside the correction for training context. Corrections are stored as paired examples (lead message → corrected AI response) and injected into the AI\'s prompt context for future conversations. UI shows the conversation as a chat thread; tapping an AI message opens an inline editor with the original text pre-filled for editing. Collapsible sidebar shows lead context (name, source channel, pipeline stage, booking status).',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                dataInputs: 'AI conversation logs, owner-written corrections, full conversation context',
+                                dataSources: 'Database (conversation logs + correction pairs)',
+                                outputAction: 'Correction pairs stored in Database; corrections retrieved and injected into AI prompt context for future conversations matching similar patterns',
+                                humanTouchpoint: 'Yes — owner rewrites specific AI messages',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SAL-004a live (conversation review feed), conversation logging with message-level IDs',
+                                edgeCases: 'Owner corrects same type of message repeatedly: surface as a pattern and suggest adding to FAQ/brand voice (SAL-004c). Correction contradicts brand voice settings: flag conflict for owner to resolve. Very long correction: allow but warn if over 500 chars. Owner deletes correction: revert to original, remove from training set.',
+                                notes: 'Highest-value training signal per interaction — the owner is literally showing the AI the right answer. Corrections are stored as (context, original, correction) triples. Retrieval pipeline matches incoming lead messages against stored corrections by semantic similarity to inject relevant examples into the AI prompt. This is the primary ongoing refinement loop. UI is an extension of the SAL-004a review feed — not a separate screen.'
+                            },
+                            {
+                                id: 'SAL-004c',
+                                title: 'Brand voice + FAQ knowledge base',
+                                requirement: 'Brand voice + FAQ knowledge base — provide a structured setup flow within the BAM OS dashboard where the academy owner defines the AI\'s personality and knowledge. Quick version presented during onboarding (required fields: academy name, tone selection, top 3 selling points, trial booking link). Full version available anytime from AI Training settings with additional fields: detailed tone of voice description, common objections and how to handle them, FAQ entries (question + approved answer), program descriptions, pricing guidance, things the AI should never say, preferred greeting style, and follow-up message templates. All entries editable at any time. Content is injected into the AI\'s system prompt for every conversation.',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                dataInputs: 'Owner-provided: academy name, tone, selling points, objections, FAQs, program details, restrictions',
+                                dataSources: 'Database (academy profile store)',
+                                outputAction: 'Structured brand profile stored in Database; injected into AI system prompt for all SAL-004 conversations',
+                                humanTouchpoint: 'Yes — owner fills out and maintains profile',
+                                integrations: 'BAM OS Dashboard (onboarding flow + AI Training settings), Database',
+                                dependencies: 'BAM OS dashboard live, academy account created',
+                                edgeCases: 'Owner skips onboarding quick setup: AI uses sensible defaults (neutral professional tone, generic basketball training language). Owner leaves FAQ empty: AI relies on brand voice and selling points only. Conflicting entries (e.g., tone says casual but restriction says never use slang): flag conflict. Owner updates profile mid-conversation: changes apply to next conversation, not in-progress ones.',
+                                notes: 'This is the proactive training method — sets the AI up before it talks to anyone. Quick onboarding version should take under 5 minutes. Full version is a settings page the owner can return to anytime. Tone selection options: Professional, Friendly/Casual, High-Energy/Hype, Motivational Coach. FAQ entries are the most impactful — they give the AI exact approved answers to common questions. This is the foundation layer that all other training methods build on top of.'
+                            },
+                            {
+                                id: 'SAL-004d',
+                                title: 'Shadow mode with approval queue',
+                                requirement: 'Shadow mode with approval queue — optional mode where the AI drafts outbound messages but queues them for owner approval before sending. Owner receives push notification (SMS or email with quick-approve link) when a message is queued, and can also review the full queue in the BAM OS dashboard. For each queued message, owner can: approve as-is (one tap), edit then send, or reject. After the owner approves/edits a configurable threshold of messages (default: 30), the system prompts graduation to autonomous mode. Owner can switch between shadow and autonomous mode at any time from AI Training settings. Approved and edited messages are stored as training data (same format as SAL-004b corrections).',
+                                release: 'MVP',
+                                initiatedBy: 'Human (enable/disable) + Agent (queues messages)',
+                                dataInputs: 'AI-drafted messages, lead conversation context, owner approval/edit/reject actions',
+                                dataSources: 'Database (approval queue + training data)',
+                                outputAction: 'Messages held in queue until approved; approved/edited messages sent to lead and stored as training data; graduation prompt after threshold met',
+                                humanTouchpoint: 'Yes — owner approves every outbound message until graduation',
+                                integrations: 'BAM OS Dashboard, Database, SMS notification provider, Email notification provider, GHL (for sending approved messages)',
+                                dependencies: 'SAL-004 conversation engine live, notification infrastructure (SMS + email), approval queue storage',
+                                edgeCases: 'Owner doesn\'t respond to queued message within 15 minutes: send reminder notification. Owner doesn\'t respond within 1 hour: flag as stale, do not send (speed to lead is lost). Owner rejects everything: surface prompt suggesting they update brand voice (SAL-004c). Owner graduates then wants to go back: allow instant revert to shadow mode. Multiple messages queued simultaneously: show in chronological order with lead context.',
+                                notes: 'This is the trust-building option — lets cautious owners see exactly what the AI would say before it goes live. The tradeoff is speed to lead is significantly reduced during shadow mode (messages are delayed by approval time). Push notifications via SMS and email with a quick-approve link minimize this delay. Graduation threshold of 30 is a default — owner can adjust. All approved/edited messages feed into the same training pipeline as SAL-004b corrections. Shadow mode is OFF by default — owner opts in from AI Training settings.'
+                            },
+                            {
+                                id: 'SAL-004e',
+                                title: 'Conversation simulation / role-play',
+                                requirement: 'Conversation simulation / role-play — sandbox mode within the BAM OS dashboard where the academy owner role-plays as a lead and has a practice conversation with the AI. Owner can test specific scenarios (e.g., pricing questions, competitor comparisons, scheduling concerns) and correct AI responses in real time before the AI engages real leads. UI is a standard chat interface with a banner indicating sandbox mode. Owner can reset the conversation and start a new scenario at any time. Corrections made during simulation are stored as training data (same format as SAL-004b). Simulation conversations are never sent to real leads and are clearly separated from live conversation logs.',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                dataInputs: 'Owner-simulated lead messages, AI responses, owner corrections during simulation',
+                                dataSources: 'Database (simulation logs + correction pairs)',
+                                outputAction: 'Simulated conversation with real-time AI responses; corrections stored as training data; no messages sent to real leads',
+                                humanTouchpoint: 'Yes — owner drives the simulation',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SAL-004 conversation engine live (can be used before going live with real leads), brand voice profile (SAL-004c) populated',
+                                edgeCases: 'Owner tries to simulate without brand voice set up: allow but warn that responses will use defaults. Owner correction during simulation contradicts brand voice: flag conflict. Very long simulation session: no limit, but auto-save every 5 messages. Owner expects simulation to perfectly predict real conversations: add disclaimer that real leads may behave differently.',
+                                notes: 'Great for pre-launch testing and for owners who want to stress-test edge cases. Think of it as a QA tool for the AI. Particularly useful for testing: pricing questions, "what makes you different" questions, objections about time/money, and leads who are shopping around. Simulation mode should be accessible before the AI goes live with real leads so the owner can vet it first. UI is identical to the real conversation view but with a clear sandbox banner and a "Reset Conversation" button.'
+                            },
+                            {
+                                id: 'SAL-004f',
+                                title: 'Outcome-based learning',
+                                requirement: 'Outcome-based learning — passive optimization system that tracks which AI conversation patterns correlate with successful trial bookings and which do not. The system maps each conversation to its outcome (booked trial, moved to drip, opted out) and identifies patterns in message tone, length, timing, and content that correlate with higher conversion rates. Insights are surfaced to the owner in the AI Training dashboard as a performance summary: conversion rate by first-response time, by message count, by lead source channel, and top-performing message patterns. The AI uses these patterns to auto-optimize its approach over time. No owner action required — learning is fully passive.',
+                                release: 'V2',
+                                initiatedBy: 'Agent',
+                                dataInputs: 'Complete conversation logs with timestamps, lead outcomes (booked, drip, opted out), lead source channel, message metadata (length, response time, tone classification)',
+                                dataSources: 'Database (conversation logs + outcome data), GHL Opportunities API (booking confirmation)',
+                                outputAction: 'Performance insights dashboard in AI Training section; AI prompt adjustments based on high-performing patterns; no owner action required',
+                                humanTouchpoint: 'No — fully passive. Owner can view insights but no action needed',
+                                integrations: 'BAM OS Dashboard, Database, GHL',
+                                dependencies: 'SAL-004 live with sufficient conversation volume (minimum 50+ completed conversations for initial patterns), outcome tracking linked to conversation IDs, GHL booking status synced',
+                                edgeCases: 'Insufficient data (fewer than 50 conversations): show "gathering data" state, do not optimize yet. Confounding variables (e.g., seasonality, ad spend changes): add disclaimer to insights. All conversations converting: report success, no optimization needed. No conversations converting: flag for owner review, suggest checking brand voice and FAQ settings. Correlation without causation: label insights as "correlated patterns" not "proven strategies."',
+                                notes: 'This is the most hands-off training method but the hardest to build and the slowest to produce value. Requires meaningful conversation volume before patterns emerge. Marked as V2 because it depends on having a critical mass of conversations from the MVP training methods first. The performance dashboard is valuable even without auto-optimization — owners can see what\'s working. Auto-optimization should be conservative: small adjustments, not wholesale prompt rewrites. Attribution is conversation-to-booking, not multi-touch (keep it simple for V1 of this feature).'
+                            }
+                        ]
+                    }
+                ]
+            },
+            memberManagement: {
+                title: 'MEMBER MANAGEMENT',
+                subtitle: '📂 Client retention rate',
+                color: '#45b7d1',
+                jobs: [
+                    {
+                        id: 'MEM-001',
+                        isParent: false,
+                        title: 'Attendance tracking',
+                        fullTitle: 'Attendance tracking — log athlete attendance per session and flag consistent no-shows for follow-up.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent',
+                        frequency: 'Per session (event-triggered)',
+                        requirement: 'Attendance tracking — log athlete attendance per session and flag consistent no-shows for follow-up.',
+                        dataInputs: 'Session roster, check-in data, athlete ID, session date/time, program type',
+                        dataSources: 'Scheduling App, Database',
+                        outputAction: 'Attendance record written to Database; 2+ consecutive no-shows flagged for CRM follow-up',
+                        humanTouchpoint: 'No — automated logging. Yes — human reviews no-show flag before outreach',
+                        integrations: 'Scheduling App (TBD), Database, GHL',
+                        dependencies: 'Scheduling app selected and integrated, athlete profiles in Database',
+                        edgeCases: 'Check-in data missing: mark unknown. API down: queue for next sync. Advance cancel: do not flag as no-show.',
+                        notes: 'Scheduling app not yet selected — integration spec pending vendor decision.',
+                        subJobs: []
+                    }
+                ]
+            },
+            scheduling: {
+                title: 'SCHEDULING APP',
+                subtitle: '📱 Client retention rate',
+                color: '#96ceb4',
+                jobs: [
+                    {
+                        id: 'APP-001',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'View payment history',
+                        requirement: 'View payment history — display full lifetime transaction log accessible to both parent and player on the account',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        dataInputs: 'Transaction records: date, amount, product name, transaction type (charge/refund)',
+                        outputAction: 'Chronological list of all transactions showing date, amount, product; refunds appear as separate line items; failed payments included in list',
+                        humanTouchpoint: 'No',
+                        integrations: 'Stripe, Database',
+                        dependencies: 'Stripe connected and syncing to Database; member account created',
+                        edgeCases: 'No transaction history: display empty state. Refund without matching charge: display as standalone line item. Multiple players: all transactions in one combined list.',
+                        notes: 'No status labels displayed. No downloadable receipts — invoices sent via email by Stripe. Read-only view.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-002',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'View upcoming payments',
+                        requirement: 'View upcoming payments — display all scheduled future payments with option to update payment method via Stripe hosted UI',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        dataInputs: 'Scheduled payment date, amount, product name per active subscription; current payment method on file',
+                        outputAction: 'List of all upcoming payments showing date, amount, product per player; update payment method CTA routes to Stripe hosted UI',
+                        humanTouchpoint: 'No — unless updating payment method (routed to Stripe hosted UI)',
+                        integrations: 'Stripe, Database',
+                        dependencies: 'Stripe connected; at least one active subscription on account',
+                        edgeCases: 'No upcoming payments: display empty state. Payment method update fails: surface Stripe error. Multiple players on different billing cycles: all shown in one combined list.',
+                        notes: 'Date only — no countdown. Payment method update handled entirely via Stripe hosted UI.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-003',
+                        category: 'Business Owner Dashboard',
+                        isParent: true,
+                        title: 'Business metrics dashboard',
+                        requirement: 'Business metrics dashboard — real-time operational metrics view for business owners, filterable by date range where applicable, with charts and trend graphics',
+                        release: 'MVP',
+                        initiatedBy: 'User (business owner)',
+                        dataInputs: 'Member records, subscription status, pause/cancellation events, attendance records',
+                        outputAction: 'Dashboard displaying: total active members, new members, churned members, pause rate, cancellation rate, average attendance per class, churn rate, average membership duration — with charts and trend lines',
+                        humanTouchpoint: 'No',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Member data in Database; Stripe synced; attendance records populated via MEM-001',
+                        edgeCases: 'No data for selected range: display empty state. Attendance data missing: exclude from average, flag gap. Partial Stripe sync: display available metrics, flag missing data.',
+                        notes: 'One dashboard per business (multi-tenant scoped by business_id). Separate from agent-generated reports — this is a live view. Date filtering is metric-dependent.',
+                        subJobs: [
+                            {
+                                id: 'APP-003a',
+                                title: 'Total active members',
+                                requirement: 'Total active members — count of members with an active (non-paused, non-cancelled) subscription at time of viewing.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Single count displayed as KPI card with trend line vs. prior period',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete',
+                                notes: 'Point-in-time metric — shows current state regardless of date filter.'
+                            },
+                            {
+                                id: 'APP-003b',
+                                title: 'New members',
+                                requirement: 'New members — count of members who started their first active subscription within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Count displayed as KPI card with bar chart by week/month depending on range selected',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete'
+                            },
+                            {
+                                id: 'APP-003c',
+                                title: 'Churned members',
+                                requirement: 'Churned members — count of members whose subscription was cancelled (not paused) within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Count displayed as KPI card with bar chart',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live'
+                            },
+                            {
+                                id: 'APP-003d',
+                                title: 'Pause rate',
+                                requirement: 'Pause rate — percentage of active members who initiated at least one pause within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card',
+                                integrations: 'Database',
+                                dependencies: 'APP-003 parent complete; APP-009 pause flow live'
+                            },
+                            {
+                                id: 'APP-003e',
+                                title: 'Cancellation rate',
+                                requirement: 'Cancellation rate — percentage of active members who cancelled within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live'
+                            },
+                            {
+                                id: 'APP-003f',
+                                title: 'Average attendance per class',
+                                requirement: 'Average attendance per class — average number of athletes who attended across all sessions within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Average count displayed as KPI card with trend line',
+                                integrations: 'Database',
+                                dependencies: 'APP-003 parent complete; MEM-001 attendance tracking live'
+                            },
+                            {
+                                id: 'APP-003g',
+                                title: 'Churn rate',
+                                requirement: 'Churn rate — percentage of members at the start of the selected period who cancelled before the end of the period.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Percentage displayed as KPI card with trend line vs. prior period',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete; APP-010 cancellation flow live',
+                                notes: 'Standard churn formula: (cancelled in period) ÷ (members at start of period). Distinct from cancellation rate — churn rate is cohort-based.'
+                            },
+                            {
+                                id: 'APP-003h',
+                                title: 'Average membership duration',
+                                requirement: 'Average membership duration — average number of days between subscription start and cancellation for all members who cancelled within the selected date range.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                outputAction: 'Average duration in days/months displayed as KPI card',
+                                integrations: 'Database, Stripe',
+                                dependencies: 'APP-003 parent complete',
+                                notes: 'Paused time included in duration by default.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-004',
+                        category: 'Support Chat',
+                        isParent: true,
+                        title: 'Support chat',
+                        requirement: 'Support chat — AI-first member support chat with coach escalation; handles billing, scheduling, pausing, cancellation, refunds, credits, and complaints',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        dataInputs: 'Member account info (plan, payment history, bookings, player profiles); business info (schedules, policies, pricing); conversation history',
+                        outputAction: 'AI responds from available context; escalates to coach when outside context; full conversation history passed on escalation; escalated chats routed to coaches at member\'s specific location',
+                        humanTouchpoint: 'Yes — coach handles escalated conversations',
+                        integrations: 'Database, Scheduling App (TBD)',
+                        dependencies: 'Member account data in Database; business policies and FAQs defined and loaded as AI context; coach accounts created',
+                        edgeCases: 'AI receives question outside its context: escalate immediately. Coach unavailable: chat sits in queue, no fallback. Scheduling app down: AI flags booking questions as temporarily unavailable.',
+                        notes: 'AI informs and routes only — no actions executed. Coach interface is a separate view within same app. Escalations routed to member\'s specific location only.',
+                        subJobs: [
+                            {
+                                id: 'APP-004a',
+                                title: 'AI first response',
+                                requirement: 'AI first response — AI handles initial member query using business-specific and member-specific context; responds within scope, escalates when outside context.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Scheduling App (TBD)',
+                                dependencies: 'AI context loaded; member account data accessible in Database',
+                                notes: 'AI must know its own boundaries — when in doubt, escalate.'
+                            },
+                            {
+                                id: 'APP-004b',
+                                title: 'Coach escalation',
+                                requirement: 'Coach escalation — unresolved or out-of-context AI chats routed to available coach at member\'s location; coach sees full conversation history.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent (trigger) / Coach (response)',
+                                integrations: 'Database',
+                                dependencies: 'APP-004a complete; coach accounts active with location assignment',
+                                notes: 'No SLA on response time — unresolved chats sit in queue indefinitely.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-005',
+                        category: 'Group Chat',
+                        isParent: false,
+                        title: 'Community group chat',
+                        requirement: 'Community group chat — one per location, open to all members and coaches; used for social interaction and general communication; supports text, images, and video',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        dataInputs: 'Message content (text/image/video), sender ID, location ID, timestamp',
+                        outputAction: 'Real-time group chat feed per location; media displayed inline; coach moderation tools available (delete posts, mute members)',
+                        humanTouchpoint: 'Yes — coaches moderate',
+                        integrations: 'Database',
+                        dependencies: 'Location defined in system; member and coach accounts assigned to location',
+                        notes: 'One chat per location — no sub-channels. Announcements live on home page (APP-011), not in this chat. Notifications toggleable by member.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-006',
+                        category: 'Athlete Portal',
+                        isParent: true,
+                        title: 'Player reports',
+                        requirement: 'Player reports — coach-authored text reports published on demand; visible to both parent and player with full history retained',
+                        release: 'MVP',
+                        initiatedBy: 'Coach (creates) / User (views)',
+                        outputAction: 'Formatted report published to player/parent profile; push notification sent on publish; full report history accessible',
+                        humanTouchpoint: 'Yes — coach authors and publishes report',
+                        integrations: 'Database',
+                        dependencies: 'Coach account active; player profile exists in Database',
+                        notes: 'Reports use predefined section structure — coach fills in text only. Standalone — not connected to skill tracking or attendance data.',
+                        subJobs: [
+                            {
+                                id: 'APP-006a',
+                                title: 'Coach creates and publishes report',
+                                requirement: 'Coach creates and publishes report — coach authors report using predefined section structure, previews, and publishes.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database',
+                                dependencies: 'Coach account active; player profile exists',
+                                notes: 'Draft state available before publishing.'
+                            },
+                            {
+                                id: 'APP-006b',
+                                title: 'Member views player reports',
+                                requirement: 'Member views player reports — parent and player can view all published reports for their player(s) with full history.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-006a complete; at least one report published'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-007',
+                        category: 'Player Profiles & Account Structure',
+                        isParent: false,
+                        title: 'Parent + player combo profile',
+                        requirement: 'Parent + player combo profile — shared account with combined parent/player identity; each player has a name, bio, and individual profile image; multiple players visible simultaneously on account',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Profile page displaying all players on account with name, bio, and image; editable by parent or player',
+                        humanTouchpoint: 'No — self-managed',
+                        integrations: 'Database',
+                        dependencies: 'Account created (APP-011 onboarding complete)',
+                        notes: 'Parent and player share one combined account. Multiple players displayed simultaneously — not a profile switcher. Player name used on reports; player image used in group chat and coach interface. Signed documents also stored in profile (APP-018).',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-008',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'Pause membership',
+                        requirement: 'Pause membership — member or coach initiates a pause for a defined duration; billing date pushed by pause length; session booking disabled during pause; auto-resumes at end date with option for member to return early',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        dataInputs: 'Pause start date, pause duration, member subscription data, pause min/max rules set by admin',
+                        outputAction: 'Subscription pause logged in Database; Stripe next payment date updated; session booking access disabled; auto-resume scheduled; confirmation displayed to member',
+                        humanTouchpoint: 'No — takes effect immediately. Coach reviews pause log separately.',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Stripe connected; member has active subscription; admin has configured min/max pause rules',
+                        notes: 'Pause takes effect immediately — no coach approval required. Admin sets min and max pause duration. Member retains full app access during pause — only session booking is disabled. Member can override auto-resume and return early.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-009',
+                        category: 'Athlete Portal',
+                        isParent: true,
+                        title: 'Cancellation flow',
+                        requirement: 'Cancellation flow — member submits cancellation form with required reason; coach is notified and must attempt outreach; coach confirms cancellation in system; access and billing retained until end of billing period',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        dataInputs: 'Cancellation reason (dropdown), member ID, subscription data, billing period end date',
+                        outputAction: 'Cancellation request logged in Database; coach notified; coach confirms after outreach; Stripe subscription set to cancel at period end; member retains access until period end',
+                        humanTouchpoint: 'Yes — coach must attempt outreach and confirm cancellation',
+                        integrations: 'Database, Stripe, GHL',
+                        dependencies: 'Stripe connected; coach accounts active; GHL connected',
+                        notes: 'Cancellation is a request requiring coach confirmation. Access and billing continue until end of current billing period. Default dropdown reasons: high cost, not enough time, wasn\'t having fun, wasn\'t getting better, moved on to better things, other. Also accessible from APP-017 billing management.',
+                        subJobs: [
+                            {
+                                id: 'APP-009a',
+                                title: 'Member submits cancellation request',
+                                requirement: 'Member submits cancellation request — member selects reason from dropdown and submits form; confirmation state displayed; coach notified.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'Member has active subscription; cancellation reason options configured by admin',
+                                notes: 'Reason is required. Confirmation message: "Your request has been received. A coach will reach out shortly."'
+                            },
+                            {
+                                id: 'APP-009b',
+                                title: 'Coach confirms cancellation',
+                                requirement: 'Coach confirms cancellation — coach reviews request, attempts member outreach, and confirms or rejects cancellation in system; confirmed cancellations scheduled in Stripe.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database, Stripe, GHL',
+                                dependencies: 'APP-009a complete; coach account active'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-010',
+                        category: 'Onboarding',
+                        isParent: true,
+                        title: 'Member onboarding flow',
+                        requirement: 'Member onboarding flow — self-serve web app flow initiated by a coach-sent link; covers account creation, product selection, payment, legal agreements, and app walkthrough; resumes from last completed step',
+                        release: 'MVP',
+                        initiatedBy: 'User (self-serve, initiated by coach-sent link)',
+                        frequency: 'One-time per member',
+                        dataInputs: 'Member name, email, password; selected product/plan; payment method; signed agreements',
+                        outputAction: 'Completed member account in Database; active Stripe subscription; signed documents stored; member lands on home page with welcome state after completion',
+                        humanTouchpoint: 'Yes — coach sends the onboarding link manually',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Plans/products configured; legal agreement documents configured; Stripe connected',
+                        notes: 'Web app (not native mobile) for onboarding. Coach sends link manually. Steps in order: (1) account creation, (2) product selection, (3) payment, (4) legal agreements, (5) app walkthrough, (6) welcome state.',
+                        subJobs: [
+                            {
+                                id: 'APP-010a',
+                                title: 'Account creation',
+                                requirement: 'Account creation — member creates account with name, email, and password; account persisted to Database immediately to enable flow resume.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'Onboarding link active and valid',
+                                notes: 'Must be step 1 — no progress can be saved before account exists.'
+                            },
+                            {
+                                id: 'APP-010b',
+                                title: 'Product selection',
+                                requirement: 'Product selection — member browses available plans and selects one to proceed with payment.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-010a complete; plans configured in system'
+                            },
+                            {
+                                id: 'APP-010c',
+                                title: 'Payment setup',
+                                requirement: 'Payment setup — member enters payment method via Stripe hosted UI; subscription created on successful payment.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Stripe',
+                                dependencies: 'APP-010b complete; Stripe connected'
+                            },
+                            {
+                                id: 'APP-010d',
+                                title: 'Legal agreements',
+                                requirement: 'Legal agreements — member reviews and signs liability waiver, terms of service, and media release; signed documents stored in member profile.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-010c complete; agreement documents configured in system',
+                                notes: 'Three documents required: liability waiver, terms of service, media release. Templates are hardcoded into the platform. Terms must be re-signed when plan changes (APP-017).'
+                            },
+                            {
+                                id: 'APP-010e',
+                                title: 'App walkthrough and welcome',
+                                requirement: 'App walkthrough and welcome — brief guided tour of key app areas followed by welcome state on home page.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                dependencies: 'APP-010d complete',
+                                notes: 'Walkthrough is a UI tour of key navigation areas. Welcome state is a one-time congratulations message on first home page load.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-011',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'Home page',
+                        requirement: 'Home page — member-facing dashboard with announcement carousel at top and quick-access shortcut buttons below; shared view for parent and player',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Dashboard displaying active announcements in carousel and quick-access shortcut buttons to key app areas',
+                        humanTouchpoint: 'Yes — coaches post announcements',
+                        integrations: 'Database',
+                        dependencies: 'Member account active; location assigned; at least one shortcut configured',
+                        notes: 'Announcements are location-specific. Carousel is persistent — announcements do not dismiss. Quick-access shortcut destinations to be defined separately. Dashboard-style layout with widgets/cards.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-012',
+                        category: 'Shop',
+                        isParent: false,
+                        title: 'Products page',
+                        requirement: 'Products page — displays all available plans and programs; member can purchase or upgrade directly from this page; current plan is highlighted',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Grid/list of all available products showing name, price, description, features; current plan badged; purchase/upgrade CTA routes to Stripe checkout',
+                        humanTouchpoint: 'No — self-serve purchase',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Plans configured in Database; Stripe connected; member account active',
+                        notes: 'Online programs have their own separate interface — they may appear here as a purchasable add-on but detailed program content lives elsewhere. Current plan is visually badged.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-013',
+                        category: 'Online Programs',
+                        isParent: true,
+                        title: 'Online programs',
+                        requirement: 'Online programs — structured video/image/text programs organized by weeks and modules; gated by plan; progress tracked per player; accessible via member app and managed via coach admin view',
+                        release: 'MVP',
+                        initiatedBy: 'User (views) / Coach (creates)',
+                        outputAction: 'Member views program content, marks sessions complete, sees progress; coach sees completion percentage per player; congratulations pop-up on program completion',
+                        humanTouchpoint: 'Yes — coach creates and publishes program content',
+                        integrations: 'Database',
+                        dependencies: 'Plans configured with online program entitlement; coach account active; video content hosted externally',
+                        notes: 'Available as a standalone add-on or included in certain plan tiers. Videos hosted externally (e.g. Vimeo, YouTube) and embedded — not uploaded directly. Mobile-first, desktop supported. Coach admin view is within same app as separate interface.',
+                        subJobs: [
+                            {
+                                id: 'APP-013a',
+                                title: 'Member views and completes program',
+                                requirement: 'Member views and completes program — member browses program modules, views content, marks sessions complete, and sees progress through program.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Database',
+                                dependencies: 'APP-013 parent complete; program published by coach; member entitled to online programs'
+                            },
+                            {
+                                id: 'APP-013b',
+                                title: 'Coach creates and manages program content',
+                                requirement: 'Coach creates and manages program content — coach builds program structure (weeks/modules), uploads content (video links, images, text), publishes, and monitors player completion rates.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'Database',
+                                dependencies: 'Coach account active with online program management permissions'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-014',
+                        category: 'Alerts & Notifications',
+                        isParent: true,
+                        title: 'Notifications & alerts',
+                        requirement: 'Notifications & alerts — member notifications via text (toggleable per type); coach in-app notifications for key events',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (triggered)',
+                        outputAction: 'Text notifications sent to members per enabled type; in-app notifications sent to coaches for their event types',
+                        humanTouchpoint: 'No — automated',
+                        integrations: 'Database, Stripe, Scheduling App (TBD)',
+                        dependencies: 'Member phone number on file; coach app accounts active; notification preferences stored in Database',
+                        notes: 'Member notifications via text only. Coach notifications are in-app only. Members can toggle each notification type independently.',
+                        subJobs: [
+                            {
+                                id: 'APP-014a',
+                                title: 'Member notifications',
+                                requirement: 'Member notifications — text notifications for: payment reminders, session reminders, report published, coach messages; each type independently toggleable by member.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database, Stripe, Scheduling App (TBD)',
+                                dependencies: 'APP-014 parent complete; member phone number on file; notification preferences initialized'
+                            },
+                            {
+                                id: 'APP-014b',
+                                title: 'Coach notifications',
+                                requirement: 'Coach notifications — in-app notifications for: new support ticket, new member, cancellation request, pause event, community activity.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent',
+                                integrations: 'Database',
+                                dependencies: 'APP-014 parent complete; coach accounts active with location assignment'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-015',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'Attendance history',
+                        requirement: 'Attendance history — member-facing view of full lifetime attendance log per player, showing date, session type, time, and location',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Chronological log of all attended and missed sessions per player; for accounts with multiple players, each player\'s history shown separately',
+                        humanTouchpoint: 'No',
+                        integrations: 'Database',
+                        dependencies: 'MEM-001 attendance tracking live; attendance records populated in Database',
+                        notes: 'Read-only log — no stats or rates displayed. Lifetime history, no date filter. Per-player view for multi-player accounts. Populated by MEM-001.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-016',
+                        category: 'Shop',
+                        isParent: true,
+                        title: 'Billing and plan management',
+                        requirement: 'Billing and plan management — member can upgrade, downgrade, or cancel their plan and manage payment method; upgrades immediate, downgrades at end of billing cycle; cancellation routes to APP-009 flow',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Plan changes executed or scheduled in Stripe; payment method manageable via Stripe hosted UI; cancellation request routed to APP-009 flow',
+                        humanTouchpoint: 'Yes — for cancellations (APP-009 flow)',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Stripe connected; plans configured in Database; member has active subscription',
+                        notes: 'Payment method management lives here and also accessible from APP-002 upcoming payments view. Cancellation from here routes into APP-009 — not a separate path. Terms of service re-sign triggered on plan change (APP-017).',
+                        subJobs: [
+                            {
+                                id: 'APP-016a',
+                                title: 'Upgrade plan',
+                                requirement: 'Upgrade plan — member selects a higher-tier plan; upgrade takes effect immediately; new billing amount prorated and charged via Stripe.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'APP-016 parent complete; Stripe connected',
+                                notes: 'Immediate effect. Stripe handles proration automatically.'
+                            },
+                            {
+                                id: 'APP-016b',
+                                title: 'Downgrade plan',
+                                requirement: 'Downgrade plan — member selects a lower-tier plan; downgrade scheduled to take effect at end of current billing cycle.',
+                                release: 'MVP',
+                                initiatedBy: 'User',
+                                integrations: 'Stripe, Database',
+                                dependencies: 'APP-016 parent complete; Stripe connected',
+                                notes: 'Downgrade takes effect at end of billing cycle — member retains current plan access until then.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'APP-017',
+                        category: 'Onboarding',
+                        isParent: false,
+                        title: 'Waiver and document management',
+                        requirement: 'Waiver and document management — three required agreements signed during onboarding; terms re-signed on plan change; all signed documents stored and viewable in member profile',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Signed agreement records stored in Database; accessible in member profile; re-sign prompt triggered on plan change (terms only)',
+                        humanTouchpoint: 'No — self-serve signing',
+                        integrations: 'Database',
+                        dependencies: 'Agreement document templates configured in system; member account active',
+                        notes: 'Three documents: liability waiver, terms of service, media release. All three signed at onboarding. Terms re-signed when plan changes only. Templates are hardcoded. Signed documents viewable in member profile (APP-007).',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-018',
+                        category: 'Athlete Portal',
+                        isParent: false,
+                        title: 'Referral',
+                        requirement: 'Referral — unique referral link accessible from member profile; link processing and reward management handled by GHL CRM',
+                        release: 'MVP',
+                        initiatedBy: 'User',
+                        outputAction: 'Referral link displayed in member profile; click tracked and passed to GHL for processing',
+                        humanTouchpoint: 'No — automated link generation',
+                        integrations: 'Database, GHL',
+                        dependencies: 'GHL connected; referral workflow configured in GHL',
+                        notes: 'In-app experience limited to displaying the referral link in profile. All reward logic, tracking, and fulfillment handled by GHL — not in BAM OS.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-019',
+                        category: 'Player Profiles & Account Structure',
+                        isParent: false,
+                        title: 'Multi-player accounts',
+                        requirement: 'Multi-player accounts — parent account can have one or more linked player profiles; each player has independent plan, billing, class eligibility tag, and profile; players can be added during onboarding or later from profile',
+                        release: 'MVP',
+                        initiatedBy: 'User / Coach',
+                        outputAction: 'Each player stored as a linked profile under the parent account in Database; independent Stripe subscription per player; all players visible simultaneously on account',
+                        humanTouchpoint: 'No — self-managed (adding players)',
+                        integrations: 'Database, Stripe',
+                        dependencies: 'Parent account created (APP-010); plans configured; Stripe connected',
+                        notes: 'Billing is per player — each player has a separate Stripe subscription and invoice. Parent sees all players simultaneously (not a profile switcher). Credits scoped out of this session. Class eligibility tag assigned per player (APP-020).',
+                        subJobs: []
+                    },
+                    {
+                        id: 'APP-020',
+                        category: 'Credit-Based Scheduling System',
+                        isParent: false,
+                        title: 'Class eligibility tagging',
+                        requirement: 'Class eligibility tagging — each player is assigned a tag that determines which class types are visible and bookable; tags are predefined with option for coaches to create custom tags; assigned during onboarding or manually by coach; ineligible classes do not appear for the player',
+                        release: 'MVP',
+                        initiatedBy: 'Coach',
+                        outputAction: 'Player\'s class view filtered to show only classes matching their assigned tag; coach can view and update tag per player',
+                        humanTouchpoint: 'Yes — coach assigns and updates tags',
+                        integrations: 'Database, Scheduling App (TBD)',
+                        dependencies: 'Player profiles in Database; class types defined and tagged in scheduling app; scheduling app integrated',
+                        notes: 'Ineligible classes simply do not appear — no error shown. Tag is not visible to parent or player. Predefined tags can be supplemented by coach-created custom tags. Tag assigned during onboarding or manually updated by coach at any time.',
+                        subJobs: []
+                    }
+                ]
+            },
+            strategy: {
+                title: 'STRATEGY',
+                subtitle: '📐 Business performance visibility',
+                color: '#dda0dd',
+                jobs: [
+                    {
+                        id: 'STR-001',
+                        isParent: false,
+                        title: 'KPI Dashboard Snapshots',
+                        requirement: 'KPI Dashboard Snapshots — capture the state of a defined KPI set at a point in time and store it as a timestamped snapshot. Allow users to retrieve and compare any two snapshots for period-over-period analysis.',
+                        release: 'MVP',
+                        initiatedBy: 'Human or Agent',
+                        frequency: 'Scheduled (e.g. weekly, end-of-month), manual on-demand, or event-triggered',
+                        dataInputs: 'KPI values from all in-scope agent dashboards at time of snapshot',
+                        dataSources: 'Database (read from live KPI tables, write to snapshot table)',
+                        outputAction: 'Timestamped snapshot record stored in Database. Comparison view showing delta (absolute + % change) per metric across two selected snapshots. Threshold flags where movement exceeds a defined limit.',
+                        humanTouchpoint: 'No — snapshot and comparison are automated. Human selects periods for comparison.',
+                        integrations: 'Database',
+                        dependencies: 'All agent KPI sets must be defined before snapshot schema can be finalized. Chat vs. dashboard UI decision affects how the comparison surface is built.',
+                        edgeCases: 'No KPI data available at snapshot time: log empty snapshot with timestamp and flag. Comparison periods have mismatched KPI sets (e.g. new metric added mid-period): show available metrics, note gap. Snapshot storage limit reached: archive or purge oldest snapshots per retention policy.',
+                        notes: 'Open design questions: (1) Snapshot scope — per agent or unified business snapshot? (2) Snapshot granularity — full metric set or summary-level only? (3) Retention policy — how long are snapshots kept? (4) Comparison model — two-period only or multi-period stacking? (5) Does snapshot include agent commentary from that period or raw values only? Preliminary V1 scope: scheduled trigger + basic two-period comparison. Custom scopes and multi-period stacking → V2.',
+                        subJobs: []
+                    }
+                ]
+            }
+        };
+
+        // ========== ZOOM/PAN ==========
+        let zoom = 1;
+        const ZOOM_STEP = 0.1;
+        const ZOOM_STEP_SCROLL = 0.03;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+
+        const canvas = document.getElementById('canvas');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        // ========== RENDER NODES ==========
+        function renderNodes() {
+            const html = Object.entries(JOBS_DATA).map(([key, domain]) => {
+                const nodeClass = {
+                    marketing: 'node-marketing',
+                    content: 'node-content',
+                    sales: 'node-sales',
+                    memberManagement: 'node-member-management',
+                    scheduling: 'node-scheduling',
+                    strategy: 'node-strategy'
+                }[key];
+
+                let jobsHtml;
+                if (domain.jobs.some(j => j.category)) {
+                    const categoryOrder = [
+                        'Credit-Based Scheduling System',
+                        'Onboarding',
+                        'Athlete Portal',
+                        'Shop',
+                        'Online Programs',
+                        'Support Chat',
+                        'Group Chat',
+                        'Alerts & Notifications',
+                        'Coach & Admin Panel',
+                        'Business Owner Dashboard',
+                        'Player Profiles & Account Structure'
+                    ];
+                    const grouped = {};
+                    domain.jobs.forEach(job => {
+                        const cat = job.category || 'Uncategorized';
+                        if (!grouped[cat]) grouped[cat] = [];
+                        grouped[cat].push(job);
+                    });
+                    jobsHtml = categoryOrder
+                        .filter(cat => grouped[cat])
+                        .map(cat => `
+                            <div class="category-divider">${cat}</div>
+                            ${grouped[cat].map(job => createJobCardHtml(job)).join('')}
+                        `).join('');
+                } else {
+                    jobsHtml = domain.jobs.map(job => createJobCardHtml(job)).join('');
+                }
+
+                return `
+                    <div class="node-container ${nodeClass}" data-domain="${key}">
+                        <div class="node-header" style="border-color: ${domain.color}">
+                            <div class="node-title" style="color: ${domain.color}">${domain.title}</div>
+                        </div>
+                        <div class="node-jobs">
+                            ${jobsHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            canvas.innerHTML = html;
+            attachNodeEventListeners();
+        }
+
+        // ========== ICON REGISTRY ==========
+        const JOB_ICONS = {
+            'MKT-001': `<svg width="20" height="20" viewBox="0 0 32 32" fill="none"><rect x="4" y="2" width="24" height="28" rx="2" stroke="#a0a0b0" stroke-width="1.8" fill="none"/><polyline points="20,2 20,8 28,8" stroke="#a0a0b0" stroke-width="1.5" fill="none" stroke-linejoin="round"/><polyline points="8,12 11,11.5 14,10.5 17,9.5 20,8.5 23,7" stroke="#a0a0b0" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 14 C13 10.5, 19 10.5, 19 14" stroke="#a0a0b0" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M9.5 15 L22.5 15" stroke="#a0a0b0" stroke-width="1.5" stroke-linecap="round"/><path d="M10.5 15 L11.5 23 L20.5 23 L21.5 15" stroke="#a0a0b0" stroke-width="1.5" fill="none" stroke-linejoin="round"/><polyline points="9,27 12,26.5 15,26 18,25 21,24.5 24,23.5" stroke="#a0a0b0" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+            'MKT-002': `<svg width="20" height="20" viewBox="0 0 32 32" fill="none"><path d="M19 5 A11 11 0 0 1 19 16" stroke="#a0a0b0" stroke-width="2" fill="none" stroke-linecap="round"/><polygon points="22,16 16,16 19,20" fill="#a0a0b0"/><path d="M13 27 A11 11 0 0 1 13 16" stroke="#a0a0b0" stroke-width="2" fill="none" stroke-linecap="round"/><polygon points="10,16 16,16 13,12" fill="#a0a0b0"/></svg>`,
+        };
+
+        function getJobIcon(jobId) {
+            if (JOB_ICONS[jobId]) return `<div class="job-icon">${JOB_ICONS[jobId]}</div>`;
+            return '';
+        }
+
+        function createJobCardHtml(job) {
+            const subJobsHtml = job.subJobs && job.subJobs.length > 0
+                ? job.subJobs.map(sub => `
+                    <div class="sub-job">
+                        <div class="sub-job-code">${sub.id} — ${sub.title}</div>
+                        <div class="sub-job-details">
+                            <div class="sub-job-detail-row"><strong>Release:</strong> <span class="job-tag tag-release ${sub.release === 'MVP' ? 'tag-mvp' : sub.release === 'V1' ? 'tag-v1' : sub.release === 'V2' ? 'tag-v2' : sub.release === 'V3' ? 'tag-v3' : ''}" style="display:inline;padding:2px 8px;font-size:11px;">${sub.release || 'N/A'}</span></div>
+                            <div class="sub-job-detail-row"><strong>Initiated By:</strong> ${sub.initiatedBy || 'N/A'}</div>
+                            <div class="sub-job-detail-row"><strong>Output:</strong> ${sub.outputAction || 'N/A'}</div>
+                            ${sub.integrations ? `<div class="sub-job-detail-row"><strong>Integrations:</strong> ${sub.integrations}</div>` : ''}
+                            ${sub.dataInputs ? `<div class="sub-job-detail-row"><strong>Data Inputs:</strong> ${sub.dataInputs}</div>` : ''}
+                            ${sub.dependencies ? `<div class="sub-job-detail-row"><strong>Dependencies:</strong> ${sub.dependencies}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('')
+                : '';
+
+            const detailsHtml = `
+                <div class="detail-section">
+                    <span class="detail-label">Requirement</span>
+                    <div class="detail-value">${job.requirement || job.fullTitle || 'N/A'}</div>
+                </div>
+                ${job.frequency ? `
+                <div class="detail-section">
+                    <span class="detail-label">Frequency</span>
+                    <div class="detail-value">${job.frequency}</div>
+                </div>
+                ` : ''}
+                ${job.humanTouchpoint ? `
+                <div class="detail-section">
+                    <span class="detail-label">Human Touchpoint</span>
+                    <div class="detail-value">${job.humanTouchpoint}</div>
+                </div>
+                ` : ''}
+                ${job.outputAction ? `
+                <div class="detail-section">
+                    <span class="detail-label">Output/Action</span>
+                    <div class="detail-value">${job.outputAction}</div>
+                </div>
+                ` : ''}
+                ${job.integrations ? `
+                <div class="detail-section">
+                    <span class="detail-label">Integrations</span>
+                    <div class="detail-value">${job.integrations}</div>
+                </div>
+                ` : ''}
+                ${job.dataInputs ? `
+                <div class="detail-section">
+                    <span class="detail-label">Data Inputs</span>
+                    <div class="detail-value">${job.dataInputs}</div>
+                </div>
+                ` : ''}
+                ${job.dependencies ? `
+                <div class="detail-section">
+                    <span class="detail-label">Dependencies</span>
+                    <div class="detail-value">${job.dependencies}</div>
+                </div>
+                ` : ''}
+                ${job.notes ? `
+                <div class="detail-section">
+                    <span class="detail-label">Notes</span>
+                    <div class="detail-value">${job.notes}</div>
+                </div>
+                ` : ''}
+                ${subJobsHtml ? `
+                <div class="sub-jobs-container">
+                    ${subJobsHtml}
+                </div>
+                ` : ''}
+            `;
+
+            return `
+                <div class="job-card ${job.isParent ? 'parent' : ''}" data-job-id="${job.id}">
+                    <div class="job-card-header">
+                        <div class="job-info">
+                            <div class="job-code-wrap">
+                                <div class="job-code">${job.id}</div>
+                                ${getJobIcon(job.id)}
+                            </div>
+                            <div class="job-text">
+                                <div class="job-title">${job.title}</div>
+                                <div class="job-tags">
+                                    ${job.release ? `<span class="job-tag tag-release ${job.release === 'MVP' ? 'tag-mvp' : job.release === 'V1' ? 'tag-v1' : job.release === 'V2' ? 'tag-v2' : job.release === 'V3' ? 'tag-v3' : ''}">${job.release}</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="expand-icon">▼</div>
+                    </div>
+                    <div class="job-details">
+                        ${detailsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachNodeEventListeners() {
+            document.querySelectorAll('.job-card-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const card = header.closest('.job-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+
+            document.querySelectorAll('.node-container').forEach(node => {
+                node.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('.job-card-header')) return;
+                    startNodeDrag(e, node);
+                });
+            });
+        }
+
+        // ========== NODE DRAGGING ==========
+        function startNodeDrag(e, node) {
+            if (e.button !== 0) return;
+            e.preventDefault();
+
+            const rect = node.getBoundingClientRect();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const nodeX = node.offsetLeft;
+            const nodeY = node.offsetTop;
+
+            node.classList.add('dragging');
+
+            function onMouseMove(e) {
+                const dx = (e.clientX - startX) / zoom;
+                const dy = (e.clientY - startY) / zoom;
+                node.style.left = (nodeX + dx) + 'px';
+                node.style.top = (nodeY + dy) + 'px';
+                }
+
+            function onMouseUp() {
+                node.classList.remove('dragging');
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        // ========== ZOOM ==========
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            zoom = Math.min(zoom + ZOOM_STEP, 3);
+            updateZoom();
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            zoom = Math.max(zoom - ZOOM_STEP, 0.5);
+            updateZoom();
+        });
+
+        canvasWrapper.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                zoom += e.deltaY > 0 ? -ZOOM_STEP_SCROLL : ZOOM_STEP_SCROLL;
+                zoom = Math.max(0.5, Math.min(zoom, 3));
+                updateZoom();
+            } else {
+                // Two-finger trackpad scroll → pan the canvas
+                e.preventDefault();
+                panX -= e.deltaX;
+                panY -= e.deltaY;
+                updatePan();
+            }
+        }, { passive: false });
+
+        function applyTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+            canvas.style.transformOrigin = '0 0';
+        }
+
+        function updateZoom() {
+            document.getElementById('zoom-percent').textContent = Math.round(zoom * 100) + '%';
+            applyTransform();
+        }
+
+        function updatePan() {
+            applyTransform();
+        }
+
+        // ========== PAN ==========
+        canvasWrapper.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node-container')) return;
+            if (e.button !== 0) return;
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            canvasWrapper.classList.add('panning');
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - panStartX;
+            const dy = e.clientY - panStartY;
+            panX += dx;
+            panY += dy;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            applyTransform();
+        });
+
+        document.addEventListener('mouseup', () => {
+            isPanning = false;
+            canvasWrapper.classList.remove('panning');
+        });
+
+        // ========== INIT ==========
+        renderNodes();
+    </script>
+</body>
+</html>
