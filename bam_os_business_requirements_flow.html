@@ -231,6 +231,13 @@
             font-weight: 600;
         }
 
+        .job-one-liner {
+            font-size: 11px;
+            color: #888896;
+            line-height: 1.4;
+            margin-top: 2px;
+        }
+
         .job-tags {
             display: flex;
             gap: 6px;
@@ -482,6 +489,7 @@
                         id: 'MKT-001',
                         isParent: true,
                         title: 'Ads report',
+                        oneLiner: 'Full campaign performance report with KPIs and demographic breakdown on any time frame.',
                         fullTitle: 'Ads report — generates a full ads performance report with campaign-level KPIs and demographic breakdown, presented in a clear, easy-to-understand format. Invokable for any time frame (monthly, bi-monthly, ad-hoc).',
                         release: 'MVP',
                         initiatedBy: 'Human or Agent',
@@ -532,6 +540,7 @@
                         id: 'MKT-002',
                         isParent: true,
                         title: 'Bi-monthly ad refresh suggestion',
+                        oneLiner: 'Assess active ads and rank which to cut or replace, with human approval before changes.',
                         fullTitle: 'Bi-monthly ad refresh suggestion — run full assessment of active ads and generate a ranked cut/replace candidates list for human review and approval.',
                         release: 'MVP',
                         initiatedBy: 'Agent',
@@ -628,6 +637,7 @@
                         id: 'MKT-003',
                         isParent: false,
                         title: 'Ads analysis & education',
+                        oneLiner: 'Deep-dive analysis with cross-academy benchmarking that teaches you what your ad numbers mean.',
                         fullTitle: 'Ads analysis & education — user-initiated deep analysis of MKT-001 report data. Compares the user\'s ad performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
                         release: 'MVP',
                         initiatedBy: 'Human',
@@ -654,6 +664,7 @@
                         id: 'CNT-001',
                         isParent: false,
                         title: 'Creative brief generation',
+                        oneLiner: 'AI-guided intake that analyzes your style and audience to produce detailed content briefs.',
                         fullTitle: 'Creative brief generation — AI-guided intake collects target audience data (separate from MKT-001 lead gen data) plus past content samples from the user. Analyzes style, tone, and performance patterns. Outputs detailed content briefs specifying exact content to create: scripts, topics, formats, hooks, and creative direction.',
                         release: 'MVP',
                         initiatedBy: 'Human',
@@ -673,6 +684,7 @@
                         id: 'CNT-002',
                         isParent: false,
                         title: 'Content creation',
+                        oneLiner: 'Turn approved briefs into ready-to-review copy and AI-generated visuals.',
                         fullTitle: 'Content creation — takes approved briefs from CNT-001 and produces the actual content. Generates both text copy (captions, scripts, post copy) and AI-generated visual assets (images, graphics). Outputs ready-to-review content packages per brief.',
                         release: 'V2',
                         initiatedBy: 'Human',
@@ -692,6 +704,7 @@
                         id: 'CNT-003',
                         isParent: false,
                         title: 'Content publishing',
+                        oneLiner: 'Post approved content to social platforms with scheduling and platform-specific formatting.',
                         fullTitle: 'Content publishing — upon user approval of CNT-002 content packages, posts content to designated social media platforms. Handles platform-specific formatting, scheduling, and confirmation.',
                         release: 'V2',
                         initiatedBy: 'Human',
@@ -718,6 +731,7 @@
                         id: 'SAL-001',
                         isParent: false,
                         title: 'Sales pipeline pulse check',
+                        oneLiner: 'Weekly snapshot of every lead in the pipeline with stage, age, trial date, and assigned staff.',
                         fullTitle: 'Sales pipeline pulse check — pull a snapshot of the group training pipeline in GHL every Friday at noon and on demand. For each lead: current stage, days since becoming a lead, days since trial (if applicable), and assigned follow-up staff member. Includes stage volume count. Read-only — no actions taken.',
                         release: 'MVP',
                         initiatedBy: 'Agent',
@@ -737,6 +751,7 @@
                         id: 'SAL-002',
                         isParent: false,
                         title: 'Sales KPI report',
+                        oneLiner: 'Monthly sales performance summary with AI conversion metrics blended in.',
                         fullTitle: 'Sales KPI report — pull a monthly sales performance summary automatically on the 1st of each month, covering the prior calendar month. Also available on demand with a custom date range. Outputs: total leads, qualified trials, unqualified trials, no-shows (booked trial, did not attend), sales (won), qualified trial close rate, and Conversational AI conversion metrics (AI-engaged leads that booked a trial, AI conversion rate vs. non-AI conversion rate, average time from first AI contact to booking). Read-only — no actions taken.',
                         release: 'MVP',
                         initiatedBy: 'Human or Agent',
@@ -756,6 +771,7 @@
                         id: 'SAL-003',
                         isParent: false,
                         title: 'Sales analysis & education',
+                        oneLiner: 'Deep-dive analysis with cross-academy benchmarking that teaches you your sales funnel.',
                         fullTitle: 'Sales analysis & education — user-initiated deep analysis of SAL-002 report data. Compares the user\'s sales performance against anonymized cross-customer data from other BAM OS academies. Educates the user on: (1) what the numbers are, (2) why they matter, (3) which are most important, (4) what happens if you improve vs. neglect them. Includes a static educational section by default, with conversational follow-up available for drilling into specific metrics.',
                         release: 'MVP',
                         initiatedBy: 'Human',
@@ -775,6 +791,7 @@
                         id: 'SAL-004',
                         isParent: true,
                         title: 'Conversational AI lead nurture',
+                        oneLiner: 'AI engages unboked leads via SMS and email within 5 min, nudging them to book a trial.',
                         fullTitle: 'Conversational AI lead nurture — automatically engage any lead that does not directly book a trial via SMS and email. Leads enter the pipeline through six channels: text message, Instagram DM, Facebook DM, contact form submission, email, or phone call. The AI initiates contact within 5 minutes of the lead entering the pipeline without a booking, answers questions about the program, and nudges the lead toward booking a trial. Data collection is minimal-friction (email only — enrich later). If the lead does not convert after 2–3 contact attempts, they are moved into an automated drip campaign. The AI\'s tone and messaging should reflect the academy\'s brand and focus on getting the lead the information they need by booking a trial.',
                         release: 'MVP',
                         initiatedBy: 'Agent',
@@ -880,6 +897,26 @@
                                 notes: 'This is the most hands-off training method but the hardest to build and the slowest to produce value. Requires meaningful conversation volume before patterns emerge. Marked as V2 because it depends on having a critical mass of conversations from the MVP training methods first. The performance dashboard is valuable even without auto-optimization — owners can see what\'s working. Auto-optimization should be conservative: small adjustments, not wholesale prompt rewrites. Attribution is conversation-to-booking, not multi-touch (keep it simple for V1 of this feature).'
                             }
                         ]
+                    },
+                    {
+                        id: 'SAL-005',
+                        isParent: false,
+                        title: 'Unified lead inbox',
+                        oneLiner: 'Message leads across all channels from one place, with AI takeover, copilot, or hand-back modes.',
+                        fullTitle: 'Unified lead inbox — a multi-channel messaging center in the BAM OS dashboard where the academy owner or staff can converse directly with leads across text (SMS), email, phone (click-to-call/VoIP), Instagram DM, and Facebook DM. All conversations for a given lead are displayed in a single unified thread with channel labels on each message. Works alongside the Conversational AI (SAL-004) — when the AI is handling a lead, the owner can jump in at any time and choose per conversation to: (1) take over fully (AI pauses), (2) copilot mode (AI suggests responses, owner approves/edits before send), or (3) hand back to AI. Phone calls are initiated directly from BAM OS via click-to-call/VoIP. UI is responsive and works on desktop and mobile web so the owner can message leads from their phone. Conversation history persists across all channels and syncs with GHL.',
+                        release: 'MVP',
+                        initiatedBy: 'Human',
+                        frequency: 'On demand (owner-initiated)',
+                        requirement: 'Unified lead inbox — a multi-channel messaging center in the BAM OS dashboard where the academy owner or staff can converse directly with leads across text (SMS), email, phone (click-to-call/VoIP), Instagram DM, and Facebook DM. All conversations for a given lead are displayed in a single unified thread with channel labels on each message. Works alongside the Conversational AI (SAL-004) — when the AI is handling a lead, the owner can jump in at any time and choose per conversation to: (1) take over fully (AI pauses), (2) copilot mode (AI suggests responses, owner approves/edits before send), or (3) hand back to AI. Phone calls are initiated directly from BAM OS via click-to-call/VoIP. UI is responsive and works on desktop and mobile web so the owner can message leads from their phone. Conversation history persists across all channels and syncs with GHL.',
+                        dataInputs: 'GHL conversation records across all channels (SMS, email, Instagram DM, Facebook DM, phone), lead profile data (name, source channel, pipeline stage, booking status), SAL-004 AI conversation state (active, paused, handed back)',
+                        dataSources: 'GHL Conversations API + GHL Contacts API + Database (conversation logs, AI state)',
+                        outputAction: 'Outbound messages sent to leads via their preferred or most recent channel; conversation state updates in GHL and Database; AI mode toggling (takeover, copilot, hand back) per conversation; call records logged',
+                        humanTouchpoint: 'Yes — owner directly communicates with leads',
+                        integrations: 'BAM OS Dashboard, GoHighLevel (GHL), Instagram Messaging API (via GHL), Facebook Messenger API (via GHL), SMS provider (via GHL), Email (via GHL), VoIP/telephony provider (via GHL or standalone), Database',
+                        dependencies: 'GHL connected with all channels enabled (SMS, email, Instagram, Facebook, phone), Instagram and Facebook business accounts linked to GHL, VoIP/telephony provider selected and integrated, SAL-004 conversation engine live (for AI handoff controls), BAM OS dashboard live with responsive/mobile-friendly design',
+                        edgeCases: 'Owner sends message while AI is mid-response: queue owner message, cancel AI draft, switch to owner mode. Lead responds on different channel than owner messaged: show in same thread with channel label, route reply to owner. VoIP call fails: show error, suggest retry or fallback to phone number display for manual dial. Owner on mobile with poor connection: queue outbound messages, send when connection restores, show pending state. Two staff members try to message same lead simultaneously: show real-time presence indicator, warn of conflict. Instagram/Facebook API rate limited: queue messages, send when available, notify owner of delay. Owner tries to hand back to AI but brand voice (SAL-004c) not configured: warn that AI will use defaults. Lead opts out on one channel: flag across all channels, prevent messaging on opted-out channel but allow others unless full opt-out.',
+                        notes: 'This is the human-side complement to SAL-004. The AI handles the initial outreach and follow-up, but the owner needs the ability to step in on any channel at any time. The unified thread with channel labels is critical — the owner should never have to check five different places to see a conversation. Three AI interaction modes per conversation: (1) Takeover — AI fully pauses, owner handles everything until they explicitly hand back; (2) Copilot — AI drafts suggested responses shown to owner for approval/edit before sending, similar to SAL-004d shadow mode but per-conversation; (3) Hand back — owner steps out, AI resumes autonomous mode. Mode selection should be a simple toggle in the conversation header. VoIP/click-to-call is a V1 requirement but vendor selection (Twilio, GHL built-in, etc.) is TBD. Mobile web must be fully functional, not a stripped-down version — owner needs to be able to do everything from their phone. All messages sent by the owner are logged and visible to the AI so it has full context if handed back.',
+                        subJobs: []
                     }
                 ]
             },
@@ -892,6 +929,7 @@
                         id: 'MEM-001',
                         isParent: false,
                         title: 'Attendance tracking',
+                        oneLiner: 'Auto-log athlete attendance per session and flag consecutive no-shows for follow-up.',
                         fullTitle: 'Attendance tracking — log athlete attendance per session and flag consistent no-shows for follow-up.',
                         release: 'MVP',
                         initiatedBy: 'Agent',
@@ -1490,6 +1528,7 @@
                         id: 'STR-001',
                         isParent: false,
                         title: 'KPI Dashboard Snapshots',
+                        oneLiner: 'Capture KPI snapshots at any point in time and compare them period-over-period.',
                         requirement: 'KPI Dashboard Snapshots — capture the state of a defined KPI set at a point in time and store it as a timestamped snapshot. Allow users to retrieve and compare any two snapshots for period-over-period analysis.',
                         release: 'MVP',
                         initiatedBy: 'Human or Agent',
@@ -1671,6 +1710,7 @@
                             </div>
                             <div class="job-text">
                                 <div class="job-title">${job.title}</div>
+                                ${job.oneLiner ? `<div class="job-one-liner">${job.oneLiner}</div>` : ''}
                                 <div class="job-tags">
                                     ${job.release ? `<span class="job-tag tag-release ${job.release === 'MVP' ? 'tag-mvp' : job.release === 'V1' ? 'tag-v1' : job.release === 'V2' ? 'tag-v2' : job.release === 'V3' ? 'tag-v3' : ''}">${job.release}</span>` : ''}
                                 </div>
