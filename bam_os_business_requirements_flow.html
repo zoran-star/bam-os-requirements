@@ -6132,6 +6132,212 @@
                         subJobs: []
                     }
                 ]
+            },
+            qualitativeStrategy: {
+                title: 'QUALITATIVE STRATEGY',
+                subtitle: '🧠 Sage counsel — problems, patterns, and playbooks',
+                color: '#7eb8a4',
+                jobs: [
+                    {
+                        id: 'QST-001',
+                        category: 'Sage Counsel',
+                        accessLevel: 'Admin',
+                        isParent: true,
+                        title: 'Sage strategic counsel',
+                        oneLiner: 'Coach poses any open-ended business problem to Sage — Sage responds with context-aware guidance drawn from the BAM knowledge base and the academy\'s own history.',
+                        release: 'MVP',
+                        initiatedBy: 'Human (voice or text)',
+                        frequency: 'On demand — any time a coach has a strategic question',
+                        requirement: 'Sage strategic counsel — the qualitative counterpart to the quantitative KPI dashboard. Where the KPI dashboard answers "what is happening," Sage strategic counsel answers "what should I do about it" and "has anyone else faced this." The coach poses a free-form problem, question, or situation to Sage via voice or text from anywhere in BAM OS. Sage constructs a response by combining three sources: (1) The academy\'s own operational history — attendance trends, member behavior, past decisions and their outcomes, coach notes, and KPI patterns specific to this academy. (2) The BAM OS knowledge base — a structured, curated library of problems solved by BAM-coached academies and operators, organized by domain (staff, retention, pricing, scheduling, parent communication, program design, culture, growth). (3) General coaching business principles — distilled from BAM\'s experience working with academies globally. Sage\'s response is always calm, confident, and advisor-toned — not a list of bullet points but a considered perspective that gives the coach a point of view, relevant context from similar situations, and a recommended next step. Sage distinguishes between situations it has strong precedent for ("I\'ve seen this pattern in 12 academies — here\'s what worked") and situations where it is reasoning from principles ("This is less common, but based on what I know about your program, here\'s my thinking"). All strategic conversations are stored in the academy\'s Sage history for later retrieval.',
+                        dataInputs: 'Coach\'s question or problem (voice transcript or text), academy operational context snapshot (current KPIs, recent events, member health, staff context), BAM knowledge base (curated problem-solution library), conversation history',
+                        dataSources: 'Database (academy context snapshot, sage_conversations table), BAM Knowledge Base (vector database of curated problems and playbooks), Anthropic API (Claude — reasoning and synthesis)',
+                        outputAction: 'Sage response rendered in full-screen conversation view — text + optional supporting data visualization. Response stored in sage_conversations. Recommended next step surfaced as an actionable card the coach can tap to execute or dismiss.',
+                        humanTouchpoint: 'Yes — coach initiates. Sage responds. Coach decides what to do.',
+                        integrations: 'BAM OS Dashboard, Anthropic API, BAM Knowledge Base (vector DB — Pinecone or pgvector), Database',
+                        dependencies: 'Anthropic API key configured; BAM Knowledge Base seeded with minimum viable content (QST-004); academy context snapshot system live (QST-002); Sage conversation storage live',
+                        edgeCases: 'Coach asks about something with no knowledge base precedent: Sage responds from principles, clearly flags it is reasoning without direct precedent, and suggests the coach bring the outcome back to BAM for future playbook contribution. Coach asks about a topic outside BAM\'s scope (legal, medical, financial advice): Sage acknowledges the question, provides high-level framing only, and directs the coach to the appropriate professional. Knowledge base retrieval returns conflicting advice from different academies: Sage surfaces both perspectives and contextualizes which applies more to this academy\'s situation.',
+                        notes: 'The qualitative strategy system is BAM\'s deepest competitive moat — no scheduling software or generic gym management tool has this. Every academy that runs on BAM OS contributes (anonymously and with consent) to a growing library of solved problems. The coach who joined BAM OS in year 3 benefits from everything figured out in years 1 and 2. Sage is not a search engine for the knowledge base — it synthesizes across sources and gives a perspective. The distinction between "I have strong precedent for this" and "I\'m reasoning from principles" is critical for trust — Sage must never overstate its confidence. The recommended next step card is the bridge between strategic insight and operational action — it connects QST to MEM, CLS, SAL, and the rest of the system.',
+                        subJobs: [
+                            {
+                                id: 'QST-001a',
+                                title: 'Voice and text problem input',
+                                requirement: 'Voice and text problem input — coach poses a problem from any screen in BAM OS. Voice: tap the persistent Sage mic button, speak freely (no structured format required — Sage handles unstructured input). Text: tap the Sage input bar, type. Both inputs are transcribed/captured and sent to Sage with the current academy context snapshot automatically attached. Sage does not require the coach to categorize their question — it classifies the domain internally (staff, retention, pricing, etc.) and routes to the appropriate knowledge base section. Input can be as short as "I\'m losing members and I don\'t know why" or as long as a full voice memo describing a complex situation. The full-screen Sage conversation view opens when input is submitted.',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Anthropic API, Database',
+                                dependencies: 'QST-001 parent live; Sage input button live across all BAM OS screens',
+                                notes: 'The input must feel completely open — no dropdowns, no topic selection, no required fields. The coach should feel like they are talking to someone who already knows their business and just needs to hear the problem. Pre-input placeholder text (rotating): "What\'s on your mind about the business?", "Ask Sage anything about your academy.", "Pose a problem. Get a perspective."'
+                            },
+                            {
+                                id: 'QST-001b',
+                                title: 'Sage response format',
+                                requirement: 'Sage response format — Sage\'s qualitative strategy responses follow a consistent but non-mechanical structure: (1) Acknowledgment of the situation in 1–2 sentences that show Sage has understood the problem (not just repeated it back). (2) Context — what Sage knows about this specific academy that is relevant to the problem. (3) Pattern — what has been seen in similar situations in the BAM knowledge base, with clear confidence framing ("This is a pattern I\'ve seen consistently" vs. "This is less common but there are precedents"). (4) Perspective — Sage\'s point of view on what is actually happening and what is most likely driving it. Not a list of possibilities — a considered opinion. (5) Recommended next step — one specific action, not a menu of options. Surfaced as a tappable card that deep-links to the relevant BAM OS screen. The response is written in Sage\'s voice: calm, confident, advisor-toned, like a knowledgeable friend who has seen your business before. No bullet points in the main response — prose only. Supporting data (if relevant) appears as a small inline visualization below the text.',
+                                release: 'MVP',
+                                initiatedBy: 'Agent (Sage)',
+                                integrations: 'BAM OS Dashboard, Anthropic API',
+                                dependencies: 'QST-001a live',
+                                notes: 'The single recommended next step is a hard constraint — not two or three options. Sage makes a call. The coach can always ask "what else could I do?" for alternatives. The initial response is always one path forward. This is what makes Sage feel like an advisor rather than a search engine. Response length target: 150–250 words. Never shorter than 100 (too thin) or longer than 350 (too overwhelming). The inline data visualization is optional — Sage only includes it when the data genuinely illuminates the point, not as decoration.'
+                            },
+                            {
+                                id: 'QST-001c',
+                                title: 'Conversation continuation and follow-up',
+                                requirement: 'Conversation continuation — after Sage\'s initial response, the coach can continue the conversation: ask follow-up questions ("what if I try X instead?"), push back ("I don\'t think that\'s the issue"), or go deeper ("tell me more about how other academies handled the pricing conversation"). Sage maintains context across the full conversation thread — it does not reset between messages. The coach can also ask Sage to show them similar past situations from the knowledge base ("have you seen this with a program like mine?"). Conversation threads are saved permanently in the academy\'s Sage history and are searchable. The coach can title a conversation or leave it untitled (Sage auto-generates a descriptive title based on the problem discussed).',
+                                release: 'MVP',
+                                initiatedBy: 'Human',
+                                integrations: 'BAM OS Dashboard, Anthropic API, Database',
+                                dependencies: 'QST-001b live',
+                                notes: 'Conversation history is one of the most valuable long-term assets in the system — an academy owner who has been on BAM OS for 2 years has 2 years of strategic conversations with Sage that document how their thinking evolved and what worked. This history should be prominently accessible, not buried. The auto-generated title uses the format: "[Domain] — [Core problem] — [Date]" e.g., "Retention — Why members stop coming after 3 months — March 2026."'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'QST-002',
+                        category: 'Sage Counsel',
+                        accessLevel: 'Admin',
+                        isParent: false,
+                        title: 'Academy context snapshot',
+                        oneLiner: 'A structured summary of the academy\'s current operational state — automatically compiled every 15 minutes and attached to every Sage query as context.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (scheduled + on-demand)',
+                        frequency: 'Every 15 minutes + on-demand when a Sage query is submitted',
+                        requirement: 'Academy context snapshot — a structured JSON document compiled automatically and attached as context to every Sage query. The snapshot gives Sage a current picture of the academy so the coach does not have to explain their situation from scratch on every query. Snapshot contents: (1) Membership health: total active members, paused count, at-risk count (health score Yellow + Red), members with zero attendance in 14 days, churn rate last 30 days. (2) Financial pulse: current MRR, MRR vs. last month (delta), failed payment count, last payout amount and date. (3) Operations: sessions scheduled this week, average fill rate last 7 days, total attendance events last 7 days, any cancelled sessions. (4) Pipeline: new leads last 7 days, trials booked, trials completed, conversion rate last 30 days. (5) Recent events: last 10 activity feed events (MEM-013) in plain-text summary form. (6) Open items: count of unread messages, open support tickets, pending cancellation requests, pending pause requests. (7) Academy metadata: academy name, location(s), active plans, coach count, days since academy went live on BAM OS. The snapshot is not shown to the coach directly — it is system context for Sage. When Sage references specific numbers in its response ("your churn rate is up this month"), those numbers come from the snapshot.',
+                        dataInputs: 'Live data from all BAM OS operational tables',
+                        dataSources: 'Database (all MEM, CLS, SAL, STR tables), Stripe (MRR + payout data)',
+                        outputAction: 'Snapshot JSON written to Database (academy_sage_context table) every 15 minutes; attached automatically to every Anthropic API call for Sage queries; used by home screen to power the AI feed cards',
+                        humanTouchpoint: 'No — fully automated.',
+                        integrations: 'Database, Stripe, Anthropic API (as context payload)',
+                        dependencies: 'All MEM and STR modules live to populate snapshot fields; Stripe connected',
+                        edgeCases: 'Academy is brand new (no data): snapshot contains zeroes and metadata only — Sage uses this to know it is advising a new academy and adjusts its framing accordingly. Stripe not connected: financial fields show null — Sage does not reference financial data in responses. Snapshot job fails: use last successful snapshot, flag age in the Sage query context ("context data is 2 hours old").',
+                        notes: 'The context snapshot is what makes Sage feel like it knows your business. Without it, every Sage query requires the coach to explain their situation — which kills the advisor relationship. With it, the coach can say "I\'m losing members" and Sage already knows how many, who, and for how long. The 15-minute refresh cycle balances freshness with database query cost. The snapshot is also the data source for the home screen AI feed cards — not a separate query. One snapshot serves both purposes.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'QST-003',
+                        category: 'Sage Counsel',
+                        accessLevel: 'Admin',
+                        isParent: false,
+                        title: 'Sage conversation history',
+                        oneLiner: 'All strategic conversations with Sage are stored, titled, searchable, and retrievable — building a long-term record of how the business has been advised and what the owner has decided.',
+                        release: 'MVP',
+                        initiatedBy: 'User (browsing) / Agent (auto-storage)',
+                        frequency: 'Continuous — every Sage conversation stored automatically',
+                        requirement: 'Sage conversation history — a dedicated section in BAM OS (accessible from the Sage full-screen interface and from the "More" navigation section) showing all past strategic conversations. Each conversation entry shows: auto-generated or coach-edited title, date and time, domain tag (Retention / Pricing / Staff / Scheduling / Growth / Parent Relations / Culture / General), conversation length (number of exchanges), and a one-sentence Sage-generated summary of the problem and outcome. Conversations are searchable by keyword and filterable by domain tag and date range. Tapping a conversation reopens the full thread in the Sage conversation view — the coach can continue it, share a takeaway, or mark it as resolved. Resolved conversations are visually distinct (dimmed, with a checkmark) but remain fully accessible. The history view also shows a "patterns" summary at the top: the domains the owner has asked about most, the most common problem types, and any themes Sage has noticed across multiple conversations ("You\'ve asked about member retention 7 times in the last 90 days — would you like me to synthesize what we\'ve discussed into a retention playbook for your academy?").',
+                        dataInputs: 'All Sage conversation records from sage_conversations table',
+                        dataSources: 'Database (sage_conversations, sage_conversation_messages tables)',
+                        outputAction: 'Conversation list rendered with search and filter; individual conversations reopenable; patterns summary generated weekly by Sage; resolved status trackable',
+                        humanTouchpoint: 'Yes — coach browses, searches, marks resolved.',
+                        integrations: 'BAM OS Dashboard, Database, Anthropic API (for weekly patterns summary generation)',
+                        dependencies: 'QST-001 live and generating conversations',
+                        edgeCases: 'Coach deletes a conversation: soft delete — conversation hidden from list but retained in Database for pattern analysis. No conversations yet: show empty state with an invitation — "You haven\'t asked Sage anything yet. Start with a question about your business." Coach searches for a keyword that matches no conversations: show "No conversations found" with a "Ask Sage about this now" CTA.',
+                        notes: 'The conversation history becomes more valuable over time, not less — it is the institutional memory of how the business has been managed. An owner selling their academy or onboarding a new head coach can share the Sage history as a context document. The weekly patterns summary is a proactive Sage behavior — it does not wait to be asked, it notices recurring themes and offers to synthesize them. This is one of the most powerful expressions of Sage as a long-term advisor rather than a query tool.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'QST-004',
+                        category: 'Knowledge Base',
+                        accessLevel: 'BAM OS Internal (content management) / All users (retrieval via Sage)',
+                        isParent: true,
+                        title: 'BAM knowledge base',
+                        oneLiner: 'The curated, structured library of solved problems, playbooks, and patterns from BAM-coached academies — the foundation of Sage\'s qualitative counsel.',
+                        release: 'MVP',
+                        initiatedBy: 'BAM OS team (content creation) / Agent (retrieval)',
+                        frequency: 'Content: updated by BAM team continuously. Retrieval: on every Sage qualitative query.',
+                        requirement: 'BAM knowledge base — the curated library of real-world problems and solutions that powers Sage\'s qualitative strategy responses. The knowledge base is maintained by the BAM OS team and is not directly visible to academy owners — it is the internal intelligence layer that Sage draws from. Structure: the knowledge base is organized into eight domains: (1) Retention — why members leave, patterns of disengagement, intervention playbooks, win-back strategies. (2) Pricing and billing — structuring plans, handling price objections, family discounts, trial conversion tactics. (3) Staff and culture — hiring, managing, motivating, and releasing coaches; building team culture in a youth sports environment. (4) Scheduling and program design — structuring class schedules for retention and fill rate optimization, age-group program design, balancing group and individual training. (5) Parent relations — communication frameworks, handling difficult parents, setting expectations, building parent loyalty. (6) Sales and growth — lead generation, trial-to-member conversion, referral program activation, local marketing tactics that have worked. (7) Operations — managing facilities, handling class cancellations, dealing with conflicts, multi-location expansion patterns. (8) Mindset and ownership — the psychological and emotional patterns of academy ownership, common decision-making traps, how successful academy owners think about their business. Each knowledge base entry has: a problem statement (what the academy was facing), context (size, location type, program structure), what was tried (including things that did not work), what worked (the solution or approach), outcome (quantified where possible), and a set of applicability conditions (when this advice applies and when it does not). Entries are stored as embeddings in a vector database (pgvector within Supabase or Pinecone) to enable semantic similarity retrieval — Sage retrieves the most contextually relevant entries for each query, not just keyword matches.',
+                        dataInputs: 'Problem statements, context descriptions, solution narratives, outcome data — authored by BAM OS team from real academy experiences',
+                        dataSources: 'Vector database (pgvector / Pinecone), BAM OS internal content management interface',
+                        outputAction: 'Knowledge base entries retrieved via semantic search on each Sage qualitative query; top 3–5 most relevant entries passed to Anthropic API as context alongside the academy snapshot; Sage synthesizes across entries rather than quoting them directly',
+                        humanTouchpoint: 'Yes — BAM OS team creates and curates entries. No — retrieval is fully automated.',
+                        integrations: 'Vector database (pgvector in Supabase or Pinecone), Anthropic API, BAM OS internal CMS (QST-004a)',
+                        dependencies: 'Vector database configured; minimum viable knowledge base seeded (QST-004b defines minimum seed content); Anthropic API connected',
+                        edgeCases: 'Query returns no relevant knowledge base entries (score below threshold): Sage proceeds using academy context and general principles only — explicitly tells the coach it is reasoning without direct precedent. Knowledge base entry is outdated (industry conditions have changed): BAM team responsibility to mark entries as archived and replace with updated versions. Multiple highly relevant entries contradict each other: Sage presents both perspectives and contextualizes which applies more strongly to this academy.',
+                        notes: 'The knowledge base is BAM\'s primary competitive advantage in the software market. Generic gym management tools have no equivalent. The quality of the knowledge base directly determines the quality of Sage\'s qualitative counsel — a thin knowledge base makes Sage feel generic, a rich one makes it feel like the most valuable advisor the academy owner has ever had. Initial seed content (QST-004b) is the minimum viable library that makes Sage useful from day one. The knowledge base grows through two mechanisms: (1) BAM OS team manually adds entries from BAM\'s coaching history and client relationships. (2) Over time, patterns from the academy\'s own Sage conversation history (QST-003) can be contributed back to the global knowledge base (anonymized, with academy consent) — creating a flywheel where more academies on BAM OS = richer knowledge base = better Sage = more valuable BAM OS.',
+                        subJobs: [
+                            {
+                                id: 'QST-004a',
+                                title: 'Knowledge base content management interface',
+                                requirement: 'Knowledge base CMS — an internal BAM OS team interface (not visible to academy owners) for creating, editing, reviewing, and archiving knowledge base entries. Entry creation form: domain selection, problem statement, context fields (academy size range, program type, location type), what was tried (including failures), what worked, quantified outcome (optional), applicability conditions, confidence level (high — multiple academies, medium — one strong case, low — reasoning from principles). Entries are reviewed before publishing — draft → reviewed → published workflow. Published entries are immediately available for Sage retrieval. Archived entries are retained but excluded from retrieval. The CMS also shows retrieval analytics: which entries are being retrieved most frequently, which entries are being retrieved but resulting in low coach satisfaction scores (via QST-005 feedback), and which domains have the fewest entries (content gaps).',
+                                release: 'MVP',
+                                initiatedBy: 'BAM OS team',
+                                integrations: 'BAM OS Internal Dashboard, Vector database, Database',
+                                dependencies: 'Vector database configured; BAM OS internal team accounts created',
+                                notes: 'The CMS is an internal tool — it does not need to be beautiful, it needs to be fast and accurate. The retrieval analytics are the most important feature for long-term knowledge base quality — they tell the BAM team what coaches are asking about most (content demand) and where the answers are weakest (content gaps).'
+                            },
+                            {
+                                id: 'QST-004b',
+                                title: 'Minimum viable knowledge base — seed content',
+                                requirement: 'Minimum viable knowledge base — the minimum set of knowledge base entries that must exist before Sage qualitative counsel is launched to beta clients. Minimum seed: 5 entries per domain × 8 domains = 40 entries minimum. Entry quality standard: each entry must be based on a real situation from BAM\'s coaching history or client relationships — not hypothetical or generic. Domains requiring the most seed content for a youth basketball academy beta: Retention (10 entries minimum — this is the most common problem category), Parent Relations (8 entries — high emotional charge, high coach anxiety), Pricing (6 entries — common source of uncertainty), Staff (6 entries — high stakes). Content for the seed library is authored by the BAM team prior to beta launch using: BAM\'s history of working with academies, Coleman\'s direct experience with ADAPT Academy and other client academies, common patterns observed in the basketball coaching community, and general sports academy operational knowledge. All seed entries are reviewed for accuracy and actionability before publishing.',
+                                release: 'MVP',
+                                initiatedBy: 'BAM OS team (pre-launch content work)',
+                                integrations: 'QST-004a CMS',
+                                dependencies: 'QST-004a CMS live',
+                                notes: 'The seed library is the most important pre-launch deliverable for the qualitative strategy system. A Sage that gives generic answers is worse than no Sage at all — it erodes trust. The 40-entry minimum is the floor, not the target. The BAM team should aim for 80–100 entries at launch across all domains, with the retention and parent relations domains being the richest. Each entry should feel like it was written by someone who has been on the gym floor and knows what it actually feels like to run an academy — not a consulting framework.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'QST-005',
+                        category: 'Knowledge Base',
+                        accessLevel: 'Admin (feedback submission) / BAM OS Internal (analytics)',
+                        isParent: false,
+                        title: 'Sage response quality and feedback',
+                        oneLiner: 'Coaches rate Sage\'s qualitative responses — feeding a quality loop that improves the knowledge base and Sage\'s retrieval over time.',
+                        release: 'V1',
+                        initiatedBy: 'User (feedback) / Agent (quality tracking)',
+                        frequency: 'Per Sage response',
+                        requirement: 'Sage response quality and feedback — after each Sage qualitative strategy response, the coach sees a lightweight feedback prompt at the bottom of the response: two buttons — thumbs up (helpful) and thumbs down (not helpful) — plus an optional free-text "What would have been more helpful?" field that appears on thumbs down. The feedback is stored against the specific response, the knowledge base entries that were retrieved, and the academy context snapshot that was active at the time. BAM OS internal analytics shows: overall Sage helpfulness rate by domain, entries with consistently low satisfaction (candidates for archiving or revision), domains with high query volume but low satisfaction (knowledge gaps requiring new content), and individual response quality over time. The coach-facing feedback is deliberately minimal — 2 taps maximum. The BAM team analytics view is detailed.',
+                        dataInputs: 'Response ID, rating (helpful / not helpful), optional free-text feedback, knowledge base entry IDs retrieved for that response',
+                        dataSources: 'Database (sage_response_feedback table)',
+                        outputAction: 'Feedback stored; BAM team analytics updated; low-rated entries flagged in QST-004a CMS for review',
+                        humanTouchpoint: 'Yes — coach submits feedback. BAM team reviews analytics.',
+                        integrations: 'BAM OS Dashboard, Database, QST-004a CMS (for flagging low-quality entries)',
+                        dependencies: 'QST-001 live; QST-004 knowledge base live',
+                        edgeCases: 'Coach does not submit feedback (most common case): no action — feedback is optional and non-blocking. Same coach consistently rates Sage responses as unhelpful: flag for BAM team review — may indicate a domain gap or a mismatch between this academy\'s context and the knowledge base content.',
+                        notes: 'The feedback loop is what prevents the knowledge base from becoming stale or generic over time. The minimum viable version is thumbs up/down — resist the temptation to add a 5-star rating or a multi-select reason picker, both of which dramatically reduce submission rates. The optional free-text on thumbs down is the highest-value feedback signal — when a coach bothers to explain why Sage missed the mark, that is gold for the BAM team content writers.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'QST-006',
+                        category: 'Sage Counsel',
+                        accessLevel: 'Admin',
+                        isParent: false,
+                        title: 'Sage proactive insights',
+                        oneLiner: 'Sage notices patterns in the academy\'s data without being asked — and surfaces a strategic observation once a week that the coach didn\'t know they needed.',
+                        release: 'V1',
+                        initiatedBy: 'Agent (scheduled weekly)',
+                        frequency: 'Weekly — generated every Monday morning before the coach opens the app',
+                        requirement: 'Sage proactive insights — once per week, Sage analyzes the academy\'s context snapshot history (the last 4 weeks of snapshots) and generates one unprompted strategic observation. This is different from the home screen feed cards (which surface operational items that need attention) — the proactive insight is a pattern Sage noticed that the coach has not asked about and might not have noticed themselves. Examples of the type of insight Sage generates: "Your Thursday 5pm class has had below-average fill rate for 6 consecutive weeks — this is the pattern I usually see before an academy drops that time slot or redesigns the program." / "Three of your last four member cancellations cited the same reason: not enough time. That\'s a pricing structure signal, not a scheduling one." / "Your MRR has grown 4 months in a row but your at-risk member count has also grown — you\'re adding new members faster than you\'re retaining existing ones. That gap usually catches up in month 5–6." The insight is delivered as a card on the home screen on Monday morning with a "Talk to Sage about this" CTA that opens a pre-seeded conversation with the insight as the opening context. The coach can dismiss the insight without engaging, in which case it is logged but not shown again that week.',
+                        dataInputs: '4 weeks of academy context snapshots, conversation history (to avoid repeating an insight already discussed), knowledge base patterns',
+                        dataSources: 'Database (academy_sage_context history, sage_conversations), Anthropic API',
+                        outputAction: 'One insight card generated and stored; surfaced on home screen Monday morning; "Talk to Sage about this" pre-seeds a conversation with the insight as context; dismissal logged',
+                        humanTouchpoint: 'No — generated automatically. Coach chooses whether to engage.',
+                        integrations: 'BAM OS Dashboard, Database, Anthropic API',
+                        dependencies: 'QST-002 context snapshot history (minimum 4 weeks of data); QST-001 conversation system live; home screen feed card system live',
+                        edgeCases: 'Academy has fewer than 4 weeks of data: no proactive insight generated — too early for pattern detection. Sage generates an insight the coach has already discussed (detected via conversation history matching): skip and try a different pattern. Coach dismisses insights consistently for 4+ weeks: surface a note — "Sage has been noticing patterns you haven\'t engaged with. Want to turn off weekly insights?" — do not silently keep generating ignored content.',
+                        notes: 'The proactive insight is the most powerful expression of Sage as a long-term advisor because it demonstrates that Sage is watching even when the coach is not asking. The insight that a coach did not ask for but immediately recognizes as true is the one that builds the deepest trust. Quality standard: the weekly insight must be specific (naming a class, a time slot, a member segment, a specific metric), pattern-based (not a one-week anomaly), and actionable (connected to something the coach can actually change). Generic observations ("your attendance is lower this month") do not meet the standard and should be filtered out during generation.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'QST-007',
+                        category: 'Knowledge Base',
+                        accessLevel: 'BAM OS Internal Only',
+                        isParent: false,
+                        title: 'Cross-academy pattern intelligence (internal)',
+                        oneLiner: 'BAM OS aggregates anonymized patterns across all client academies — identifying what works, what fails, and what predicts success at scale.',
+                        release: 'V2',
+                        initiatedBy: 'Agent (scheduled monthly)',
+                        frequency: 'Monthly',
+                        requirement: 'Cross-academy pattern intelligence — a BAM OS internal system (not visible to individual academy owners) that aggregates anonymized operational data across all academies on the platform to identify patterns, correlations, and predictive signals. Data is anonymized at the academy level (no individual member data is used — only aggregate metrics per academy). Analysis runs monthly and outputs: (1) What predicts 12-month member retention across academies — which early signals (first week attendance, parent message response time, trial-to-booking speed) most strongly predict long-term retention. (2) What pricing structures produce the highest LTV across similar academy types. (3) Which class schedule patterns produce the highest fill rates by academy size and program type. (4) Common failure patterns — the sequence of KPI movements that typically precede an academy losing 20%+ of members in a 90-day window. (5) Success trajectories — the KPI profile of academies that crossed $10K MRR, showing what they did in the 6 months before crossing that threshold. All cross-academy insights feed back into the BAM knowledge base (QST-004) as new entries — the platform learns from every academy that joins. Individual academy data is never exposed to other academy owners.',
+                        dataInputs: 'Anonymized aggregate KPI snapshots from all BAM OS academies (no PII, no individual member data)',
+                        dataSources: 'Database (aggregate academy metrics — anonymized)',
+                        outputAction: 'Monthly cross-academy pattern report generated for BAM team; high-confidence patterns added to QST-004 knowledge base as new entries; predictive models updated',
+                        humanTouchpoint: 'BAM OS team reviews monthly report and decides which patterns to add to knowledge base.',
+                        integrations: 'Database, BAM OS Internal Dashboard, QST-004a CMS',
+                        dependencies: 'Minimum 10 active academies on BAM OS for meaningful cross-academy analysis; QST-004a CMS live',
+                        edgeCases: 'Fewer than 10 academies: defer cross-academy analysis — sample too small for reliable patterns. Pattern detected that contradicts existing knowledge base entry: flag both for BAM team review rather than automatically overwriting.',
+                        notes: 'This is the long-term flywheel that makes BAM OS increasingly valuable as it grows. Academy 100 on the platform gets a Sage that has learned from academies 1–99. The anonymization is absolute — no academy owner can ever see another academy\'s data, only the patterns that emerge from the aggregate. The BAM team\'s monthly review of the pattern report is also a product intelligence function: it tells BAM what problems are most common across the client base, which informs both knowledge base content priorities and product feature roadmap decisions.',
+                        subJobs: []
+                    }
+                ]
             }
 ,
             aiAdvisor: {
@@ -6667,7 +6873,8 @@
                     staff: 'node-staff',
                     classes: 'node-classes',
                     infrastructure: 'node-infrastructure',
-                    aiAdvisor: 'node-ai-advisor'
+                    aiAdvisor: 'node-ai-advisor',
+                    qualitativeStrategy: 'node-qualitative-strategy'
                 }[key];
 
                 let jobsHtml;
@@ -6726,7 +6933,9 @@
                         'Parent Features',
                         'Platform',
                         'Integrations',
-                        'Security & Compliance'
+                        'Security & Compliance',
+                        'Sage Counsel',
+                        'Knowledge Base'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
