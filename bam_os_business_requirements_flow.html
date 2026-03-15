@@ -428,6 +428,11 @@
             left: 960px;
         }
 
+        .node-settings {
+            top: 1200px;
+            left: 280px;
+        }
+
         /* Zoom controls */
         .zoom-controls {
             display: flex;
@@ -3709,6 +3714,256 @@
                         subJobs: []
                     }
                 ]
+            },
+            settings: {
+                title: 'ACADEMY SETTINGS',
+                subtitle: '⚙️ Configuration and administration',
+                color: '#f0a500',
+                jobs: [
+                    {
+                        id: 'SET-001',
+                        category: 'Academy Configuration',
+                        isParent: false,
+                        title: 'Academy profile setup',
+                        oneLiner: 'Business owner configures the academy\'s identity — name, logo, address, timezone, and contact details used across all member-facing surfaces.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'One-time setup, editable on demand',
+                        requirement: 'Academy profile setup — the business owner configures the academy\'s core identity record during initial BAM OS setup. Fields: academy name (displayed on all member-facing communications, reports, and documents), logo (PNG/SVG, used in app header and notification emails), primary address (street, city, state, zip, country), timezone (applied globally to all scheduling, notifications, and reporting — dropdown of IANA timezone strings), business phone, business email (used as reply-to on all outbound emails), website URL (optional), and a short description (max 300 characters, used in member-facing welcome messages). Academy profile is editable at any time by the business owner. Changes to name or logo propagate immediately to all member-facing surfaces. Changes to timezone affect all future scheduled events but do not retroactively change logged timestamps.',
+                        dataInputs: 'Academy name, logo file, address, timezone, phone, email, website, description',
+                        dataSources: 'Database (academies table)',
+                        outputAction: 'Academy profile record created/updated in Database; name and logo rendered in scheduling app header, notification emails, and document footers; timezone applied to all time-aware system functions',
+                        humanTouchpoint: 'Yes — business owner configures during setup and as needed.',
+                        integrations: 'BAM OS Dashboard, Database, Scheduling App, Email provider',
+                        dependencies: 'Business owner account created; BAM OS organization record exists',
+                        edgeCases: 'Logo upload fails: use text-only fallback with academy name. Timezone not set: default to UTC and surface a prominent warning to business owner to configure it before going live. Name change mid-operation: update all surfaces immediately — do not break existing message threads or reports by removing name references.',
+                        notes: 'Academy profile is the identity layer for everything else in the system. It must be the first step in the BAM OS onboarding checklist for new academies. The timezone field is the single most operationally critical config — getting it wrong causes scheduled messages, session reminders, and dunning sequences to fire at the wrong time. Logo dimensions: minimum 200×200px, displayed at 40×40px in app header and 120×120px in email headers.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SET-002',
+                        category: 'Academy Configuration',
+                        isParent: true,
+                        title: 'Location management',
+                        oneLiner: 'Business owner creates and manages physical locations — each with its own address, timezone, coaches, class schedule, and member base.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand — during initial setup and when expanding',
+                        requirement: 'Location management — business owner can create and manage multiple physical locations under a single BAM OS organization. Each location is a distinct operational unit with its own: name, address, timezone (can differ from org-level timezone), assigned coaches, class schedule, member base, announcement feed (MEM-016), and community group chat (APP-003). All member-facing features that are location-specific (class schedules, rosters, announcements, group chat, support escalation) are scoped to the member\'s assigned location. Business owner can view aggregate data across all locations or filter to a single location in all analytics views. Locations can be set to active or archived (archived locations retain all historical data but cannot receive new members or create new classes).',
+                        dataInputs: 'Location name, address, timezone, assigned coaches, active/archived status',
+                        dataSources: 'Database (locations table, coach_location_assignments table)',
+                        outputAction: 'Location record created in Database; coaches assigned; member routing to location enforced throughout system; analytics filterable by location',
+                        humanTouchpoint: 'Yes — business owner creates and manages locations.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'SET-001 academy profile complete; coach accounts exist for assignment',
+                        edgeCases: 'Only one location: system still uses location architecture internally but hides location-filtering UI to reduce complexity. Archiving a location with active members: block archive — require all members to be transferred (MEM-034) or cancelled first. Location timezone differs from org timezone: all location-scoped scheduling uses location timezone; cross-location reporting normalizes to org timezone.',
+                        notes: 'The location is the fundamental operational unit of BAM OS. Every feature that references "the academy" at the member level is actually referencing a specific location. Single-location academies should not feel the complexity of multi-location architecture — the UI should hide location concepts until a second location is added.',
+                        subJobs: [
+                            {
+                                id: 'SET-002a',
+                                title: 'Create and configure location',
+                                requirement: 'Create and configure location — business owner creates a new location with name, address, timezone, and optional photo. On creation, the system provisions: an empty class schedule, a community group chat (APP-003), an announcement feed (MEM-016), and a support escalation queue scoped to the location. Business owner then assigns coaches to the location from the staff roster.',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SET-001 complete',
+                                notes: 'Location creation is a setup wizard — not a single form. Steps: (1) name and address, (2) timezone, (3) assign coaches, (4) confirm. The wizard should not be dismissable until at least step 1 is complete.'
+                            },
+                            {
+                                id: 'SET-002b',
+                                title: 'Archive location',
+                                requirement: 'Archive location — business owner archives a location that is closing or inactive. Pre-archive checks: (1) zero active members (system blocks if any exist), (2) zero upcoming classes (system blocks or prompts to cancel). On archive: location hidden from all member-facing surfaces, class schedule frozen, coaches unassigned, historical data retained. Archive is reversible — business owner can reactivate with one action.',
+                                release: 'V1',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SET-002a complete; no active members or upcoming classes at location',
+                                notes: 'Archiving a location is a significant operation — surface a confirmation modal listing exactly what will happen and what will be blocked. The reactivation path must be clearly documented so owners are not afraid to archive a seasonal location.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'SET-003',
+                        category: 'Plans & Billing Config',
+                        isParent: true,
+                        title: 'Plan and product configuration',
+                        oneLiner: 'Business owner builds the membership plans offered to members — price, billing interval, session credits, and class eligibility mapping.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand — during setup and when pricing changes',
+                        requirement: 'Plan and product configuration — business owner creates and manages the membership plans that members can purchase. Each plan record contains: plan name (displayed to members), internal code/SKU (for reporting), description (member-facing, max 200 characters), price (in academy\'s currency), billing interval (monthly, quarterly, annually, or one-time), trial period (days — 0 if no trial), session credits per billing period (numeric or "unlimited"), classes eligible (maps to one or more eligibility tags from MEM-009 — determines what the member can book), whether the plan is publicly visible in APP-007 or invite-only, and active/archived status. Plans are synced to Stripe as Products and Prices on creation/update. The Stripe product/price IDs are stored and linked in the Database — BAM OS uses these IDs for all subscription operations. Plan changes (price, credits) do not automatically affect existing subscribers — business owner must manually migrate or grandfather them.',
+                        dataInputs: 'Plan name, code, description, price, billing interval, trial period, session credits, eligibility tags, visibility, active status',
+                        dataSources: 'Database (plans table), Stripe (Products and Prices API)',
+                        outputAction: 'Plan record created in Database; Stripe Product and Price created via API; plan available for selection in member onboarding (APP-005b) and member-facing products page (APP-007)',
+                        humanTouchpoint: 'Yes — business owner creates and manages plans.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe',
+                        dependencies: 'SET-001 academy profile complete; Stripe account connected (SET-006); MEM-009 eligibility tags defined',
+                        edgeCases: 'Price change on existing plan: create a new Stripe Price object — never modify an existing Stripe Price. Existing subscribers stay on old price until manually migrated. Archiving a plan with active subscribers: block until all subscribers are migrated to another plan or cancelled. Plan with zero session credits and no eligibility tags: valid (e.g., online-only plan) but surface a warning.',
+                        notes: 'Plan configuration is one of the most consequential setup steps — every subscription, every billing event, and every class eligibility decision in the system traces back to a plan record. The Stripe sync must be bidirectional: if something is updated directly in Stripe (unlikely but possible), BAM OS should detect the discrepancy on next sync. The "invite-only" visibility flag is critical for creating private plans (e.g., a discounted plan for staff family members) that do not appear in the public products page.',
+                        subJobs: [
+                            {
+                                id: 'SET-003a',
+                                title: 'Create plan',
+                                requirement: 'Create plan — business owner fills out the plan creation form. On save: plan record written to Database; Stripe Product created with plan name and description; Stripe Price created with amount, currency, and interval. The Stripe product_id and price_id are written back to the Database plan record. New plan is immediately available for use in onboarding links and the products page (if set to public).',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'SET-006 Stripe connection complete',
+                                notes: 'Currency is inherited from the academy\'s Stripe account default currency. Multi-currency support (for multi-location academies in different countries) is a V2 concern — in V1, all plans in one organization use the same currency.'
+                            },
+                            {
+                                id: 'SET-003b',
+                                title: 'Edit and archive plan',
+                                requirement: 'Edit plan — business owner can edit: plan name, description, session credits, eligibility tags, visibility, and active status. Price and billing interval are NOT editable after creation — changing them requires archiving the current plan and creating a new one (to preserve Stripe price integrity). Archive plan: sets active = false, hides from products page, prevents new subscriptions. Existing subscribers on archived plan are unaffected until their subscription ends or is migrated.',
+                                release: 'MVP',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database, Stripe',
+                                dependencies: 'SET-003a complete',
+                                notes: 'The price-immutability rule is a Stripe constraint, not a BAM OS choice. Communicate this clearly in the UI — a help tooltip on the price field: "Price cannot be changed after plan creation. Archive this plan and create a new one to change pricing."'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'SET-004',
+                        category: 'Plans & Billing Config',
+                        isParent: false,
+                        title: 'Membership policy configuration',
+                        oneLiner: 'Business owner sets the rules governing pauses, cancellations, dunning, and trial behavior across the academy.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'One-time setup, editable on demand',
+                        requirement: 'Membership policy configuration — a settings panel where the business owner configures the behavioral rules for membership lifecycle events. Configurable policies: (1) Pause policy: minimum pause duration (days), maximum pause duration (days), maximum number of pauses per member per year, whether members can self-pause or require coach approval. (2) Cancellation policy: minimum notice period before cancellation takes effect (days), whether cancellation requires coach outreach confirmation (MEM-006 flow) or is self-service, whether members can self-cancel from the app or must contact the coach. (3) Dunning policy: number of days between dunning steps (Day 0, Day X, Day Y, Day Z — configurable from defaults of 0/3/7/14/21), whether access is suspended on payment failure (and on which day), auto-cancel threshold (days). (4) Trial policy: default trial length for new plans (if not set per-plan), whether trial members can book classes during trial. All policies are per-academy (not per-location in V1).',
+                        dataInputs: 'Pause min/max days, pause per-year limit, pause approval requirement, cancellation notice period, cancellation self-service flag, dunning day schedule, access suspension day, auto-cancel day, trial length default',
+                        dataSources: 'Database (academy_policies table)',
+                        outputAction: 'Policy record stored in Database; all dependent features (APP-009, MEM-006, MEM-021, onboarding trial logic) read from this record at runtime',
+                        humanTouchpoint: 'Yes — business owner configures during setup.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'SET-001 academy profile complete',
+                        edgeCases: 'Dunning day schedule has gaps (e.g., Day 0 and Day 21 but nothing in between): valid — system only fires on configured days. Business owner sets cancellation to self-service: MEM-006 coach confirmation flow is bypassed — cancellation proceeds automatically after notice period. Policy change mid-operation: new policy applies to new events only — in-flight dunning sequences or active pauses continue under the policy that was active when they started.',
+                        notes: 'Policy configuration is a leverage point — a 48-hour cancellation notice requirement vs. 30-day notice is the difference between losing revenue suddenly and having time to save the member. Default values should be the recommended best practice for a youth basketball academy: 7-day min pause, 30-day max pause, 2 pauses/year, 7-day cancellation notice, coach-confirmation required, dunning at 0/3/7/14/21 days. Business owners should be able to click "Use Recommended Defaults" to accept all at once.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SET-005',
+                        category: 'Member Acquisition Config',
+                        isParent: true,
+                        title: 'Onboarding link management',
+                        oneLiner: 'Coach generates shareable onboarding links that route new members to the correct plan and academy — with expiry, usage limits, and tracking.',
+                        release: 'MVP',
+                        initiatedBy: 'Coach / Business Owner',
+                        frequency: 'On demand — generated when acquiring new members',
+                        requirement: 'Onboarding link management — coaches and business owners generate onboarding links (unique URLs) that initiate the APP-005 member onboarding flow. Each link is associated with: a specific plan (routes member directly to that plan in APP-005b), a location (assigns new member to that location), an expiry date (optional — link deactivates after this date), a usage limit (optional — single-use for individual invites, or multi-use for general distribution), and a source tag (for tracking where members came from — e.g., "instagram-bio", "front-desk-flyer", "email-campaign"). Links can be copied, shared via SMS/email from within BAM OS, or embedded in QR codes. The link management view shows all generated links with: creation date, plan, location, uses/limit, expiry, and status (active/expired/exhausted). Expired or exhausted links show a friendly error to members who try to use them.',
+                        dataInputs: 'Plan selection, location, expiry date, usage limit, source tag',
+                        dataSources: 'Database (onboarding_links table)',
+                        outputAction: 'Unique link URL generated and stored; link serves APP-005 onboarding flow when visited; usage count incremented on each completion; link status updated on expiry or exhaustion; source tag recorded against new member record for acquisition attribution',
+                        humanTouchpoint: 'Yes — coach generates and distributes links.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'SET-003 plans configured; SET-002 locations configured; APP-005 onboarding flow live',
+                        edgeCases: 'Member visits expired link: show "This invitation link has expired. Please contact your coach for a new one." with academy contact info. Member visits link for a plan that has been archived since the link was created: show expired state — do not show a different plan. Same member uses a multi-use link twice: detect by email at account creation step and redirect to login. Coach deletes a link that has already been used: link is archived, existing members who used it are unaffected.',
+                        notes: 'The onboarding link is the entry point for every new member in the system — it is the equivalent of a store\'s front door. Source tagging is critical for understanding which acquisition channels work (Instagram bio vs. front desk sign vs. email campaign). In V2, links could support discount codes embedded in the URL for campaign-specific offers. QR code generation should be in-app (generate a downloadable PNG of the QR code for printing on flyers or displaying on screens at the gym).',
+                        subJobs: [
+                            {
+                                id: 'SET-005a',
+                                title: 'Generate onboarding link',
+                                requirement: 'Generate onboarding link — coach selects plan and location, optionally sets expiry and usage limit, optionally adds a source tag. System generates a unique URL (format: app.byanymeanscoaches.com/join/[unique-code]). Coach sees options to: copy the URL, send via SMS to a specific phone number, send via email to a specific address, or download a QR code PNG.',
+                                release: 'MVP',
+                                initiatedBy: 'Coach',
+                                integrations: 'BAM OS Dashboard, Database, SMS provider, Email provider',
+                                dependencies: 'SET-003 plan configured; SET-002 location configured',
+                                notes: 'The unique code must be unguessable (UUID or equivalent) — not a sequential ID. Send-via-SMS opens the MEM-002a compose flow pre-filled with the link and a default welcome message template.'
+                            },
+                            {
+                                id: 'SET-005b',
+                                title: 'Onboarding link analytics',
+                                requirement: 'Onboarding link analytics — the link management view shows per-link stats: total visits (link opened), total completions (onboarding completed), conversion rate (completions / visits), and source breakdown if multiple links share a source tag. Aggregate acquisition source report shows which source tags generated the most completed signups over a selected date range.',
+                                release: 'V1',
+                                initiatedBy: 'Business Owner',
+                                integrations: 'BAM OS Dashboard, Database',
+                                dependencies: 'SET-005a live; member onboarding completion events logged with link_id',
+                                notes: 'Link analytics is the first step toward a proper acquisition funnel view. Even basic visit vs. completion data tells the owner whether their onboarding flow is converting people who show up to the link or losing them mid-flow.'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'SET-006',
+                        category: 'Integrations Config',
+                        isParent: false,
+                        title: 'Stripe account connection',
+                        oneLiner: 'Business owner connects their Stripe account to BAM OS via OAuth — enabling all payment, subscription, and billing features.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'One-time setup, reconnectable on demand',
+                        requirement: 'Stripe account connection — business owner connects their existing Stripe account (or creates one) to BAM OS via Stripe Connect OAuth. The connection flow: (1) Business owner clicks "Connect Stripe" in BAM OS settings. (2) Redirected to Stripe OAuth page to authorize BAM OS as a platform. (3) On authorization, Stripe returns an access token and the connected account ID. (4) BAM OS stores the connected account ID and access token securely. (5) All subsequent Stripe API calls (subscription creation, payment processing, dunning, refunds) are made on behalf of the connected account using the stored credentials. Connection status is displayed in settings: connected account name, last sync time, and a "Disconnect" option. Business owner can view their Stripe payout schedule and next payout amount directly in BAM OS settings (read-only — no payout management in BAM OS).',
+                        dataInputs: 'Stripe OAuth authorization code (returned from Stripe redirect)',
+                        dataSources: 'Stripe Connect API, Database (stripe_connections table)',
+                        outputAction: 'Connected account ID and access token stored securely in Database; connection status displayed in settings; payout schedule and next payout displayed from Stripe API; all Stripe features unlocked',
+                        humanTouchpoint: 'Yes — business owner initiates connection.',
+                        integrations: 'BAM OS Dashboard, Database, Stripe Connect API',
+                        dependencies: 'SET-001 academy profile complete; business owner has or creates a Stripe account',
+                        edgeCases: 'Business owner does not have a Stripe account: link to Stripe account creation in the connect flow. OAuth authorization denied or cancelled: return to settings with "Connection failed — please try again" message. Access token expires: detect on next API call, prompt reconnection. Business owner disconnects Stripe with active subscriptions: block disconnection until all active subscriptions are migrated or cancelled — surface warning with count of active subscribers.',
+                        notes: 'Stripe connection is a hard prerequisite for plan creation, member onboarding, and all billing features. It must be step 2 in the BAM OS setup checklist (after academy profile). The payout visibility is a high-value low-effort feature — business owners constantly want to know "when am I getting paid and how much." Displaying next payout date and amount from Stripe\'s balance API is a one-API-call feature that dramatically increases the perceived value of the settings page. Access token storage must follow security best practices — never log, always encrypt at rest.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SET-007',
+                        category: 'Communication Config',
+                        isParent: false,
+                        title: 'Notification and communication settings',
+                        oneLiner: 'Business owner configures outbound communication defaults — SMS sender name, email reply-to, default notification preferences for new members, and opt-out handling.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'One-time setup, editable on demand',
+                        requirement: 'Notification and communication settings — configures all outbound communication defaults for the academy. Settings: (1) SMS sender name or number (the name members see when receiving a text — e.g., "ADAPT Academy" or a dedicated phone number via GHL). (2) Email reply-to address (where members\' email replies go — defaults to business email from SET-001). (3) Email signature (appended to all coach-sent emails — includes academy name, address, and unsubscribe link). (4) Default notification preferences for new members (which notification types are on by default when a new account is created — business owner sets the defaults, members can override per APP-010). (5) SMS opt-out keyword (the word members can text to opt out of SMS — default: STOP, but some academies use a custom word). (6) Re-permission flow toggle — whether the system automatically sends a re-permission request to SMS-opted-out members after 90 days of no contact.',
+                        dataInputs: 'SMS sender name/number, email reply-to, email signature text, default notification preference flags, SMS opt-out keyword, re-permission toggle',
+                        dataSources: 'Database (academy_notification_settings table)',
+                        outputAction: 'Settings stored and applied to all outbound communications; SMS sender and email headers configured with GHL/email provider; new member accounts initialized with default notification preferences on creation',
+                        humanTouchpoint: 'Yes — business owner configures during setup.',
+                        integrations: 'BAM OS Dashboard, Database, GHL, Email provider',
+                        dependencies: 'SET-001 academy profile complete; GHL connected',
+                        edgeCases: 'SMS sender name exceeds carrier character limit (11 characters for alphanumeric sender IDs): warn and truncate. Custom opt-out keyword conflicts with a common word: warn business owner — "STOP" is mandatory to honor regardless of custom keyword (carrier compliance). Default notifications all set to off: allow but warn that members will not receive session reminders or payment alerts.',
+                        notes: 'Default notification preferences are the most impactful setting here — a business owner who turns off payment reminders by default is inadvertently increasing their failed payment rate. Surface the recommended defaults clearly and explain why each one matters.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SET-008',
+                        category: 'BAM OS Admin',
+                        isParent: false,
+                        title: 'BAM OS organization billing',
+                        oneLiner: 'Business owner manages their own BAM OS subscription — plan, billing, invoices, and seat count for their organization.',
+                        release: 'MVP',
+                        initiatedBy: 'Business Owner',
+                        frequency: 'On demand',
+                        requirement: 'BAM OS organization billing — the business owner\'s billing relationship with BAM OS (distinct from their members\' billing with their academy). Settings: current BAM OS plan tier, monthly/annual billing amount, next invoice date, payment method on file, invoice history (downloadable PDFs), and seat/location count vs. plan limits. If the organization is approaching a plan limit (e.g., 90% of member seat cap, or adding a second location that requires a higher tier), the system surfaces an upgrade prompt. Business owner can upgrade, downgrade, or cancel their BAM OS subscription from this view. Cancellation of BAM OS subscription triggers a data export offer — business owner can download all their data before the account is deactivated.',
+                        dataInputs: 'BAM OS subscription data, current usage (member count, location count, coach seat count)',
+                        dataSources: 'BAM OS billing system (Stripe account owned by BAM, not the academy)',
+                        outputAction: 'BAM OS subscription information displayed; usage vs. limits shown; upgrade/downgrade/cancel actions available; data export triggered on cancellation',
+                        humanTouchpoint: 'Yes — business owner manages their BAM OS subscription.',
+                        integrations: 'BAM OS Dashboard, BAM OS Stripe account',
+                        dependencies: 'Business owner account created',
+                        edgeCases: 'Business owner cancels BAM OS subscription with active member subscriptions running: do not immediately deactivate — provide a 30-day wind-down period; surface clear warnings about member impact. Organization exceeds plan limits without upgrading: enforce soft cap with grace period and escalating warnings before hard cutoff.',
+                        notes: 'This is BAM OS\'s own revenue surface — critical for the business. The usage vs. limits display creates natural upgrade pressure. The data export on cancellation is both a trust-building feature (members\' data is yours, not ours) and a legal requirement in many jurisdictions.',
+                        subJobs: []
+                    },
+                    {
+                        id: 'SET-009',
+                        category: 'Academy Configuration',
+                        isParent: false,
+                        title: 'Academy setup checklist',
+                        oneLiner: 'A guided onboarding checklist for new BAM OS academies — walks the business owner through every required configuration step before going live.',
+                        release: 'MVP',
+                        initiatedBy: 'Agent (auto-displayed on first login)',
+                        frequency: 'One-time — dismissed after all steps complete',
+                        requirement: 'Academy setup checklist — displayed prominently on the BAM OS dashboard home screen for new organizations until all required setup steps are completed. Steps in order: (1) Complete academy profile (SET-001), (2) Connect Stripe account (SET-006), (3) Create at least one location (SET-002), (4) Create at least one plan (SET-003), (5) Configure membership policies (SET-004), (6) Create at least one coach account (STF-001), (7) Configure notification settings (SET-007), (8) Generate your first onboarding link (SET-005). Each step shows: a checkmark when complete, an estimated time to complete, and a direct action button ("Set up now →"). Progress is shown as a completion percentage (e.g., "3 of 8 steps complete — 37%"). The checklist is dismissable after step 4 is complete (minimum viable to accept a member) but the remaining steps are surfaced as warnings. After all 8 steps are complete, the checklist is permanently dismissed and replaced with the MEM-013 activity feed as the home screen.',
+                        dataInputs: 'Completion status of each setup step from Database',
+                        dataSources: 'Database (setup_checklist_progress table per organization)',
+                        outputAction: 'Checklist rendered on dashboard home; each step marked complete as it is finished; checklist dismissed on full completion; activity feed becomes home screen',
+                        humanTouchpoint: 'Yes — business owner works through steps.',
+                        integrations: 'BAM OS Dashboard, Database',
+                        dependencies: 'Business owner account created; all referenced SET and STF jobs live',
+                        edgeCases: 'Business owner completes steps out of order (e.g., creates a plan before connecting Stripe): allow, but surface a dependency warning ("You\'ll need to connect Stripe before this plan can be used for payments"). Step completion detection must be real-time — checking the database state of each prerequisite on every page load.',
+                        notes: 'The setup checklist is the new academy\'s first experience with BAM OS — it must be encouraging, not overwhelming. Each step should show a realistic time estimate (e.g., "Set up academy profile — ~2 minutes") and a brief one-line explanation of why it matters. The checklist is also the primary instrument for ensuring BAM OS academies are correctly configured before accepting live members — a misconfigured academy (no timezone, no Stripe, no plans) would produce broken member experiences.',
+                        subJobs: []
+                    }
+                ]
             }
         };
 
@@ -3734,7 +3989,8 @@
                     memberManagement: 'node-member-management',
                     scheduling: 'node-scheduling',
                     strategy: 'node-strategy',
-                    profiles: 'node-profiles'
+                    profiles: 'node-profiles',
+                    settings: 'node-settings'
                 }[key];
 
                 let jobsHtml;
@@ -3771,7 +4027,13 @@
                         'Revenue KPIs',
                         'Operations KPIs',
                         'Growth KPIs',
-                        'Internal KPIs'
+                        'Internal KPIs',
+                        'Academy Configuration',
+                        'Plans & Billing Config',
+                        'Member Acquisition Config',
+                        'Integrations Config',
+                        'Communication Config',
+                        'BAM OS Admin'
                     ];
                     const grouped = {};
                     domain.jobs.forEach(job => {
