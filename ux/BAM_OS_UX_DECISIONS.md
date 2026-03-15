@@ -5,6 +5,37 @@ This document captures every confirmed UX, interaction, and design decision made
 
 ---
 
+## 0. GLOBAL UX PATTERNS (applies across all domains)
+
+### Member 360° Drawer
+Right-side slide-out panel (like Notion's page peek). Sections inside: Overview, Sessions, Billing, Messages, Reports, Notes. Tapping a member anywhere in the app opens this drawer.
+
+### Forms & Data Entry
+All creation/editing flows use **modal overlays** (popup over current screen). Not full-screen forms, not inline editing. Sage-guided flows are conversational but actions still confirm via modal.
+
+### Lists & Directories
+All list views (member directory, class list, at-risk queue, billing list, etc.) use **list/table rows** — compact, data-dense, scannable. Not card grids (except the Management landing blocks which are intentionally large).
+
+### Calendar Views
+Week view is the default for scheduling/calendar screens. Coaches create sessions from the calendar (tap empty slot → modal overlay for creation).
+
+### Confirmation Pattern (Suggest → Confirm → Execute)
+All consequential actions (cancellations, refunds, bulk operations, Sage-suggested actions) confirm via **modal dialog** with confirm/cancel buttons. Non-consequential actions (marking attendance, sending a pre-written message) execute immediately.
+
+### At-Risk Queue & Health Scores
+Visual dashboard layout with zone grouping (green/yellow/red clusters). Members displayed within their zone with key indicators visible.
+
+### KPI Detail Views ("See full dashboard")
+Numbers at top (big KPI cards), charts/graphs below (line charts for trends, bar charts for comparisons). Both data-at-a-glance and visual trends.
+
+### Settings & Configuration
+Separate pages per category (Business Profile, Billing Config, Notifications, Integrations, etc.). No single long scrollable page — keep each settings page focused.
+
+### Bulk Actions
+Filter the list first, then tap a small "Apply to all" button that appears contextually. Not checkbox-selection-based.
+
+---
+
 ## 1. PRODUCT IDENTITY
 
 **Product name:** BAM OS
