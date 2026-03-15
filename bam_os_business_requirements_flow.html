@@ -1927,7 +1927,7 @@
                         requirement: 'KPI Dashboard Snapshots — capture the state of a defined KPI set at a point in time and store it as a timestamped snapshot. Allow users to retrieve and compare any two snapshots for period-over-period analysis.',
                         release: 'MVP',
                         initiatedBy: 'Human or Agent',
-                        frequency: 'Scheduled (e.g. weekly, end-of-month), manual on-demand, or event-triggered',
+                        frequency: 'Scheduled (e.g. weekly, end-of-month), manual on-demand, or event-triggered (e.g. before a major campaign change is executed)',
                         dataInputs: 'KPI values from all in-scope agent dashboards at time of snapshot',
                         dataSources: 'Database (read from live KPI tables, write to snapshot table)',
                         outputAction: 'Timestamped snapshot record stored in Database. Comparison view showing delta (absolute + % change) per metric across two selected snapshots. Threshold flags where movement exceeds a defined limit.',
@@ -2185,8 +2185,15 @@
         canvasWrapper.addEventListener('wheel', (e) => {
             if (e.ctrlKey || e.metaKey) {
                 e.preventDefault();
+                const oldZoom = zoom;
                 zoom += e.deltaY > 0 ? -ZOOM_STEP_SCROLL : ZOOM_STEP_SCROLL;
                 zoom = Math.max(0.5, Math.min(zoom, 3));
+                // Adjust pan so the point under the mouse stays fixed
+                const rect = canvasWrapper.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                panX = mouseX - (mouseX - panX) * (zoom / oldZoom);
+                panY = mouseY - (mouseY - panY) * (zoom / oldZoom);
                 updateZoom();
             } else {
                 // Two-finger trackpad scroll → pan the canvas
