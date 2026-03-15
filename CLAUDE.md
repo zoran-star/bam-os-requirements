@@ -20,6 +20,11 @@ When committing, include a summary of what changed in the commit message body �
 ## What this repo is
 This repository holds the interactive business requirements flow diagram for BAM OS (`bam_os_business_requirements_flow.html`). It is a single self-contained HTML file with embedded JavaScript data representing all business requirements across 7 domains.
 
+### Key files
+- `bam_os_business_requirements_flow.html` — interactive flowchart with all requirements data
+- `ux/BAM_OS_UX_DECISIONS.md` — confirmed UX & interaction design decisions (navigation, Sage AI, design system, micro-interactions, notifications, multi-location, role-based views). This is the source of truth for how BAM OS looks, feels, and behaves.
+- `branding/CONTEXT.md` — brand & naming context
+
 ## Sources of truth
 There are two sources for BAM OS business requirements that must stay in sync:
 
