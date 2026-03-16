@@ -502,7 +502,7 @@ function FullDashboard({ onClose }) {
             system: 'You are a data assistant. Return ONLY valid JSON, no markdown, no explanation.',
             messages: [{
               role: 'user',
-              content: 'Search the user\'s Notion workspace for any databases or pages containing sales metrics, revenue, leads, trials, or membership data. Return a JSON object with these fields (use null if not found): { revenue_mtd: string, revenue_last_month: string, total_members: number, trials_this_month: number, trials_last_month: number, close_rate: string, avg_deal_value: string, leads_total: number, leads_new_this_week: number, top_lead_source: string, monthly_goal: string, notes: string }'
+              content: 'Search the user\'s Notion workspace for any databases or pages containing sales metrics, pipeline data, trial data, or AI conversion data. Return a JSON object with these fields (use null if not found): { total_leads: number, qualified_trials: number, unqualified_trials: number, no_shows: number, sales_won: number, close_rate: string, ai_engaged_bookings: number, ai_conversion_rate: string, non_ai_conversion_rate: string, avg_time_to_booking: string, lead_source_attribution: [{ source: string, leads: number, trials: number, sales: number }], notes: string }'
             }],
             mcp_servers: [{
               type: 'url',
@@ -518,12 +518,19 @@ function FullDashboard({ onClose }) {
       } catch (e) {
         setError('Could not load Notion data. Showing sample metrics.');
         setData({
-          revenue_mtd: '$4,200', revenue_last_month: '$3,800',
-          total_members: 47, trials_this_month: 8, trials_last_month: 5,
-          close_rate: '57%', avg_deal_value: '$155/mo',
-          leads_total: 34, leads_new_this_week: 6,
-          top_lead_source: 'Instagram', monthly_goal: '$5,000',
-          notes: 'Strong month so far. 2 closings pending.'
+          total_leads: 34, qualified_trials: 8, unqualified_trials: 3,
+          no_shows: 2, sales_won: 5, close_rate: '62.5%',
+          ai_engaged_bookings: 6, ai_conversion_rate: '42%',
+          non_ai_conversion_rate: '28%', avg_time_to_booking: '1.8 days',
+          lead_source_attribution: [
+            { source: 'Instagram', leads: 14, trials: 4, sales: 2 },
+            { source: 'Google', leads: 8, trials: 2, sales: 1 },
+            { source: 'Facebook', leads: 5, trials: 1, sales: 1 },
+            { source: 'Referral', leads: 4, trials: 1, sales: 1 },
+            { source: 'Walk-in', leads: 2, trials: 0, sales: 0 },
+            { source: 'Other', leads: 1, trials: 0, sales: 0 },
+          ],
+          notes: 'AI conversion rate is 14pts above non-AI. Instagram is your highest-volume source. 2 closings pending from this week\u2019s trials.'
         });
       } finally {
         setLoading(false);
@@ -532,16 +539,24 @@ function FullDashboard({ onClose }) {
     fetchNotion();
   }, []);
 
-  const metrics = data ? [
-    { label: 'Revenue MTD', value: data.revenue_mtd, sub: `vs ${data.revenue_last_month} last mo` },
-    { label: 'Total Members', value: data.total_members, sub: 'active enrollments' },
-    { label: 'Trials This Month', value: data.trials_this_month, sub: `${data.trials_last_month} last month` },
-    { label: 'Close Rate', value: data.close_rate, sub: 'trial \u2192 member' },
-    { label: 'Avg Deal Value', value: data.avg_deal_value, sub: 'per member' },
-    { label: 'Total Leads', value: data.leads_total, sub: `${data.leads_new_this_week} new this week` },
-    { label: 'Top Lead Source', value: data.top_lead_source, sub: 'highest volume' },
-    { label: 'Monthly Goal', value: data.monthly_goal, sub: 'revenue target' },
+  // SAL-002 KPIs: pipeline metrics
+  const pipelineMetrics = data ? [
+    { label: 'Total Leads', value: data.total_leads, sub: 'All leads this period' },
+    { label: 'Qualified Trials', value: data.qualified_trials, sub: 'Met qualification criteria' },
+    { label: 'Unqualified Trials', value: data.unqualified_trials, sub: 'Did not meet criteria' },
+    { label: 'No-Shows', value: data.no_shows, sub: 'Booked but did not attend' },
+    { label: 'Sales (Won)', value: data.sales_won, sub: 'Closed members this period' },
+    { label: 'Close Rate', value: data.close_rate, sub: 'Won \u00F7 qualified trials' },
   ] : [];
+  // SAL-002 KPIs: AI conversion metrics
+  const aiMetrics = data ? [
+    { label: 'AI-Engaged Bookings', value: data.ai_engaged_bookings, sub: 'AI-engaged leads that booked' },
+    { label: 'AI Conversion Rate', value: data.ai_conversion_rate, sub: 'AI bookings \u00F7 AI-engaged leads' },
+    { label: 'Non-AI Conversion Rate', value: data.non_ai_conversion_rate, sub: 'Direct bookings \u00F7 non-AI leads' },
+    { label: 'Avg Time to Booking', value: data.avg_time_to_booking, sub: 'First AI contact \u2192 trial booked' },
+  ] : [];
+  // SAL-002 KPIs: lead source attribution
+  const sourceData = data?.lead_source_attribution || [];
 
   return (
     <>
@@ -562,8 +577,10 @@ function FullDashboard({ onClose }) {
         ) : (
           <div className={s.dashBody}>
             {error && <div className={s.dashError}>{error}</div>}
+
+            <div className={s.dashSectionLabel}>Pipeline Performance <span className={s.dashRef}>SAL-002</span></div>
             <div className={s.dashGrid}>
-              {metrics.map((m, i) => (
+              {pipelineMetrics.map((m, i) => (
                 <div key={i} className={s.dashMetric}>
                   <div className={s.dashMetricLabel}>{m.label}</div>
                   <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
@@ -571,9 +588,38 @@ function FullDashboard({ onClose }) {
                 </div>
               ))}
             </div>
+
+            <div className={s.dashSectionLabel}>AI Conversion Metrics <span className={s.dashRef}>SAL-004</span></div>
+            <div className={s.dashGrid}>
+              {aiMetrics.map((m, i) => (
+                <div key={i} className={s.dashMetric}>
+                  <div className={s.dashMetricLabel}>{m.label}</div>
+                  <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
+                  <div className={s.dashMetricSub}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className={s.dashSectionLabel}>Lead Source Attribution <span className={s.dashRef}>SAL-002</span></div>
+            {sourceData.length > 0 && (
+              <div className={s.dashSourceTable}>
+                <div className={s.dashSourceHeader}>
+                  <span>Source</span><span>Leads</span><span>Trials</span><span>Sales</span>
+                </div>
+                {sourceData.map((row, i) => (
+                  <div key={i} className={s.dashSourceRow}>
+                    <span className={s.dashSourceName}>{row.source}</span>
+                    <span>{row.leads}</span>
+                    <span>{row.trials}</span>
+                    <span className={s.dashSourceSales}>{row.sales}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {data?.notes && (
               <div className={s.dashNotes}>
-                <span className={s.dashNotesLabel}>Notes</span>
+                <span className={s.dashNotesLabel}>Sage Summary</span>
                 <span>{data.notes}</span>
               </div>
             )}
