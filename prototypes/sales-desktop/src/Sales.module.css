@@ -59,8 +59,10 @@ html,body,#root{height:100%;margin:0}
 .bannerTop{display:flex;align-items:flex-end;justify-content:space-between;padding:20px 36px 0;position:relative;z-index:2}
 .pageTitle{font-weight:800;font-size:clamp(52px, 7vw, 80px);letter-spacing:-0.03em;color:var(--tp);line-height:1;text-transform:uppercase;position:relative;z-index:2}
 .bannerStats{display:flex;gap:8px;position:relative;z-index:2}
-.statPill{background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.25);border-radius:12px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--tp);white-space:nowrap;letter-spacing:0.02em;cursor:default;transition:transform 160ms ease,box-shadow 160ms ease}
-.statPill:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(200,168,78,0.2)}
+.statPill{background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.25);border-radius:12px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--tp);white-space:nowrap;letter-spacing:0.02em;cursor:default;position:relative;overflow:hidden;transition:all 220ms cubic-bezier(0.4,0,0.2,1);min-width:90px;text-align:center}
+.statPillExpanded{min-width:160px;background:rgba(200,168,78,0.18)!important;border-color:rgba(200,168,78,0.45)!important}
+.statPillValue{transition:opacity 150ms ease}
+.statPillExplain{font-size:11px;font-weight:500;color:var(--ts);transition:opacity 150ms ease 80ms;white-space:nowrap}
 .statPill:nth-child(1){font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;background:rgba(200,168,78,0.15);border-color:rgba(200,168,78,0.4);animation:pillSlideIn 0.4s var(--espring) 0.3s backwards,pillGlow 2.5s ease-in-out 1s infinite}
 .statPill:nth-child(2){animation:pillSlideIn 0.4s var(--espring) 0.45s backwards}
 .statPill:nth-child(3){animation:pillSlideIn 0.4s var(--espring) 0.6s backwards}
@@ -86,6 +88,11 @@ html,body,#root{height:100%;margin:0}
 .pipelineArrow:nth-child(4){animation:arrowFlow 1.8s ease-in-out infinite 0.9s}
 .pipelineArrow:nth-child(5){animation:arrowFlow 1.8s ease-in-out infinite 1.2s}
 @keyframes arrowFlow{0%{transform:translateX(-8px);opacity:0}30%{opacity:1}70%{opacity:1}100%{transform:translateX(8px);opacity:0}}
+.pipelineLegend{display:flex;gap:16px;align-items:center;padding:6px 0 2px}
+.legendItem{display:flex;align-items:center;gap:6px}
+.legendDotRed{width:8px;height:8px;border-radius:50%;background:rgba(224,90,66,0.5);box-shadow:0 0 0 3px rgba(224,90,66,0.12)}
+.legendDotGold{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.2)}
+.legendText{font-size:11px;font-weight:500;color:var(--tm)}
 .pipelineDivider{width:100%;height:1px;background:var(--border);margin:10px 0}
 
 /* ─── HERO ─── */
@@ -104,6 +111,7 @@ html,body,#root{height:100%;margin:0}
 .kpiHeroTrend{display:inline-flex;align-items:center;gap:6px;font-family:'Nunito',sans-serif;font-size:20px;font-weight:900;color:var(--green);background:var(--greenl);padding:8px 16px;border-radius:14px;width:fit-content;animation:trendPop 0.5s var(--espring) 1.1s backwards,trendPulse 2s ease-in-out 1.7s infinite}
 @keyframes trendPop{0%{transform:scale(0.6);opacity:0}60%{transform:scale(1.12)}80%{transform:scale(0.96)}100%{transform:scale(1);opacity:1}}
 @keyframes trendPulse{0%,100%{transform:translateY(0);opacity:.85}50%{transform:translateY(-2px);opacity:1}}
+.kpiHeroTrendSub{font-size:11px;font-weight:500;opacity:0.7;font-family:var(--ff);margin-left:2px}
 .kpiHeroTrend svg{animation:arrowBounceUp 1.4s ease-in-out infinite}
 @keyframes arrowBounceUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 .kpiSubRow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -129,9 +137,9 @@ html,body,#root{height:100%;margin:0}
 .kpiProgressLabel{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .kpiProgressText{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--tm);text-transform:uppercase}
 .kpiProgressPct{font-family:var(--fm);font-size:10px;font-weight:500;color:var(--gold)}
-.kpiBar{height:6px;background:var(--surf3);border-radius:4px;overflow:hidden}
-.kpiBarFill{height:100%;background:linear-gradient(90deg,var(--gold),var(--goldl));border-radius:4px;width:0;animation:barFill 1.2s var(--es) .4s forwards;position:relative}
-.kpiBarFill::after{content:'';position:absolute;right:0;top:-1px;bottom:-1px;width:6px;border-radius:3px;background:var(--goldl);box-shadow:0 0 6px rgba(200,168,78,0.4)}
+.kpiBar{height:7px;background:var(--surf3);border-radius:9999px;overflow:hidden;margin-top:6px}
+.kpiBarFill{height:100%;background:linear-gradient(90deg,var(--gold),var(--goldl));border-radius:9999px;width:0;animation:barFill 1.2s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;position:relative}
+.kpiBarFill::after{content:'';position:absolute;right:0;top:-1px;bottom:-1px;width:8px;border-radius:9999px;background:var(--goldl);box-shadow:0 0 8px rgba(200,168,78,0.5)}
 @keyframes barFill{0%{width:0}100%{width:var(--bar-pct)}}
 
 /* ─── SAGE CARD ─── */
@@ -175,10 +183,13 @@ html,body,#root{height:100%;margin:0}
 @keyframes ctFlash{0%{transform:scale(1)}40%{transform:scale(1.35);background:var(--gold);color:#fff}100%{transform:scale(1)}}
 
 /* ─── CARDS ─── */
+.cardsWrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 .cards{flex:1;overflow-y:auto;padding:5px 7px 7px;display:flex;flex-direction:column;gap:7px}
 .cards::-webkit-scrollbar{width:2px}
 .cards::-webkit-scrollbar-thumb{background:var(--borderm);border-radius:2px}
-.card{background:var(--surf);border:1px solid var(--border);border-left:2px solid transparent;border-radius:14px;padding:13px;cursor:grab;transition:all 200ms var(--es),box-shadow 200ms ease,border-left-color 200ms ease;user-select:none;position:relative;overflow:hidden;animation:fadeUp 380ms var(--es) backwards;box-shadow:var(--shadow-sm)}
+.cardsMoreFade{position:absolute;bottom:0;left:0;right:0;height:56px;background:linear-gradient(to bottom,transparent,var(--surf2));display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;pointer-events:none;border-radius:0 0 16px 16px}
+.cardsMoreLabel{font-size:11px;font-weight:700;color:var(--ts);background:var(--surf);border:1px solid var(--border);padding:3px 12px;border-radius:9999px;pointer-events:all;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
+.card{background:var(--surf);border:1px solid var(--border);border-left:2px solid transparent;border-radius:14px;padding:16px 18px;min-height:80px;gap:6px;display:flex;flex-direction:column;cursor:grab;transition:all 200ms var(--es),box-shadow 200ms ease,border-left-color 200ms ease;user-select:none;position:relative;overflow:hidden;animation:fadeUp 380ms var(--es) backwards;box-shadow:var(--shadow-sm)}
 .card:nth-child(1){animation-delay:0ms}
 .card:nth-child(2){animation-delay:45ms}
 .card:nth-child(3){animation-delay:90ms}
@@ -189,13 +200,19 @@ html,body,#root{height:100%;margin:0}
 .cardDropped{animation:snapIn 320ms var(--espring)}
 @keyframes snapIn{0%{transform:scale(1.07);opacity:.65}60%{transform:scale(.97)}100%{transform:scale(1);opacity:1}}
 .cardName{font-size:14px;font-weight:700;color:var(--tp);letter-spacing:-0.01em}
-.cardActivity{font-size:11px;color:var(--tm);font-family:var(--fm);margin-top:4px}
+.cardActivity{font-size:12px;color:var(--ts);font-family:var(--fm);margin-top:4px;display:flex;flex-direction:column}
+.cardActivityLabel{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--tm);display:block;margin-bottom:1px}
 .cardTrialDate{font-size:11px;font-weight:600;color:var(--ts);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .cardTrialToday{color:var(--gold);font-weight:700}
 .cardDaysSince{font-size:11px;color:var(--tm);font-family:var(--fm);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
-/* Today trial — gold glow */
-.cardToday{border-color:rgba(200,168,78,0.5)!important;box-shadow:0 0 0 3px rgba(200,168,78,0.12),0 4px 20px rgba(200,168,78,0.18)!important;animation:todayPulse 2.5s ease-in-out infinite}
-@keyframes todayPulse{0%,100%{box-shadow:0 0 0 3px rgba(200,168,78,0.12),0 4px 20px rgba(200,168,78,0.18)}50%{box-shadow:0 0 0 6px rgba(200,168,78,0.18),0 6px 28px rgba(200,168,78,0.28)}}
+/* Today trial — gold background */
+.cardToday{background:linear-gradient(135deg,#C8A84E 0%,#D4B65C 50%,#B8942E 100%);border:none!important;box-shadow:0 6px 24px rgba(200,168,78,0.35),0 2px 8px rgba(200,168,78,0.2)!important;animation:none!important}
+.cardToday .cardName{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.15)}
+.cardToday .cardActivity{color:rgba(255,255,255,0.7)}
+.cardToday .cardActivityLabel{color:rgba(255,255,255,0.6)}
+.cardToday .cardTrialDate{color:#fff;border-top-color:rgba(255,255,255,0.25);font-size:22px;font-weight:800;letter-spacing:-0.02em;margin-top:10px;padding-top:10px}
+.cardTodayLabel{display:block;font-size:11px;font-weight:700;opacity:0.85;text-transform:uppercase;letter-spacing:0.08em}
+.cardTodayTime{display:block;font-size:28px;font-weight:800;letter-spacing:-0.03em;line-height:1.1;margin-top:2px}
 /* Needs attention — red glow */
 .cardUrgent{border-color:rgba(224,90,66,0.3)!important;box-shadow:0 0 0 3px rgba(224,90,66,0.07),0 4px 16px rgba(224,90,66,0.12)!important;animation:urgentPulse 2s ease-in-out infinite}
 @keyframes urgentPulse{0%,100%{box-shadow:0 0 0 3px rgba(224,90,66,0.07),0 4px 16px rgba(224,90,66,0.10)}50%{box-shadow:0 0 0 5px rgba(224,90,66,0.13),0 6px 22px rgba(224,90,66,0.18)}}
@@ -238,5 +255,20 @@ html,body,#root{height:100%;margin:0}
 .tooltip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:#1C1B18;color:#fff;font-size:11px;font-weight:500;line-height:1.45;padding:7px 12px;border-radius:10px;max-width:220px;white-space:normal;text-align:center;pointer-events:none;z-index:999;box-shadow:0 4px 16px rgba(0,0,0,0.15);animation:tooltipFade 0.15s ease forwards}
 .tooltip::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1C1B18}
 @keyframes tooltipFade{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ─── PANEL CONTROLS ─── */
+.panelControls{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.inboxFilters{display:flex;gap:4px;flex-wrap:wrap}
+.inboxFilterBtn{font-family:var(--ff);font-size:11px;font-weight:600;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--ts);cursor:pointer;transition:all 120ms}
+.inboxFilterActive{background:var(--tp);color:#fff;border-color:var(--tp)}
+.markAllRead{font-family:var(--ff);font-size:11px;font-weight:600;color:var(--gold);background:none;border:none;cursor:pointer;padding:0;text-align:left;width:fit-content}
+.markAllRead:hover{text-decoration:underline}
+.thread:not(.threadUnread){opacity:0.55}
+.thread:not(.threadUnread) .tname{font-weight:500;color:var(--ts)}
+.thread:not(.threadUnread) .tav{border-color:var(--border);color:var(--tm);background:var(--surf2)}
+.threadActions{display:none;gap:6px;margin-top:8px}
+.thread:hover .threadActions{display:flex}
+.threadActionBtn{font-family:var(--ff);font-size:11px;font-weight:600;padding:4px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:var(--surf);color:var(--ts);transition:all 120ms}
+.threadActionBtn:hover{border-color:var(--gold);color:var(--gold);background:var(--gglow)}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}

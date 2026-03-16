@@ -3,16 +3,17 @@ import s from './Sales.module.css';
 
 /* ─── DATA ─── */
 const INITIAL_LEADS = [
-  { id: 'l1', name: 'Marcus Johnson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: '4h ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
-  { id: 'l2', name: 'Sarah Chen', src: 'Web Form', days: '3d', daysClass: '', badge: 'active', lastContact: '1d ago', initials: 'MR', initClass: 'initS', stage: 'interested' },
-  { id: 'l3', name: 'David Ortiz', src: 'Facebook', days: '8d', daysClass: 'daysWarn', badge: 'paused', lastContact: '3d ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
-  { id: 'l4', name: 'Emily Watson', src: 'SMS', days: '2d', daysClass: '', badge: 'human', lastContact: '6h ago', initials: 'JT', initClass: 'initD', stage: 'interested' },
-  { id: 'l5', name: 'Jake Rivera', src: 'Phone', days: '5d', daysClass: '', badge: 'active', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
-  { id: 'l6', name: 'Mia Thompson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: 'Tomorrow 4pm', initials: 'MR', initClass: 'initS', stage: 'bookedTrial' },
-  { id: 'l7', name: 'Liam Park', src: 'Web Form', days: '4d', daysClass: '', badge: 'human', lastContact: 'Fri 5:30pm', initials: 'JT', initClass: 'initD', stage: 'bookedTrial' },
-  { id: 'l8', name: 'Ava Martinez', src: 'Email', days: '2d', daysClass: '', badge: 'human', lastContact: '1d ago', initials: 'ZS', initClass: 'initG', stage: 'doneTrial' },
-  { id: 'l9', name: 'Noah Kim', src: 'Instagram', days: 'Today', daysClass: 'daysGold', badge: 'conv', lastContact: 'Today', initials: 'MR', initClass: 'initS', stage: 'doneTrial' },
-  { id: 'l10', name: 'Chloe Davis', src: 'Facebook', days: '2d ago', daysClass: 'daysGold', badge: 'conv', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'doneTrial' },
+  { id: 'l1', name: 'Marcus Johnson', lastActivity: '4h ago', needsAttention: false, stage: 'interested' },
+  { id: 'l2', name: 'Sarah Chen', lastActivity: '1d ago', needsAttention: false, stage: 'interested' },
+  { id: 'l3', name: 'David Ortiz', lastActivity: '3d ago', needsAttention: true, stage: 'interested' },
+  { id: 'l4', name: 'Emily Watson', lastActivity: '6h ago', needsAttention: false, stage: 'interested' },
+  { id: 'l5', name: 'Jake Rivera', lastActivity: '2d ago', needsAttention: true, stage: 'interested' },
+  { id: 'l6', name: 'Mia Thompson', lastActivity: '1h ago', trialDate: 'today', trialTime: '10:00am', needsAttention: false, stage: 'bookedTrial' },
+  { id: 'l7', name: 'Liam Park', lastActivity: '4h ago', trialDate: 'Fri Mar 21', trialTime: '5:30pm', needsAttention: false, stage: 'bookedTrial' },
+  { id: 'l11', name: 'Sofia Reyes', lastActivity: '30m ago', trialDate: 'today', trialTime: '3:00pm', needsAttention: false, stage: 'bookedTrial' },
+  { id: 'l8', name: 'Ava Martinez', lastActivity: '1d ago', daysSinceTrial: '1d', needsAttention: true, stage: 'doneTrial' },
+  { id: 'l9', name: 'Noah Kim', lastActivity: 'Today', daysSinceTrial: '0d', needsAttention: false, stage: 'doneTrial' },
+  { id: 'l10', name: 'Chloe Davis', lastActivity: '2d ago', daysSinceTrial: '2d', needsAttention: false, stage: 'doneTrial' },
 ];
 
 const STAGES = [
@@ -36,13 +37,6 @@ const TYPEWRITER_PROMPTS = [
   "What\u2019s my biggest revenue risk right now?",
 ];
 
-const BADGE_MAP = {
-  active: { cls: s.badgeActive, label: 'AI Active' },
-  paused: { cls: s.badgePaused, label: 'AI Paused' },
-  human: { cls: s.badgeHuman, label: 'Human' },
-  conv: { cls: s.badgeConv, label: 'Converted' },
-};
-
 /* ─── TOOLTIP ─── */
 function Tooltip({ text, children }) {
   const [visible, setVisible] = useState(false);
@@ -53,6 +47,31 @@ function Tooltip({ text, children }) {
     >
       {children}
       {visible && <div className={s.tooltip}>{text}</div>}
+    </div>
+  );
+}
+
+/* ─── STAT PILL ─── */
+function StatPill({ value, explanation }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      className={`${s.statPill} ${hovered ? s.statPillExpanded : ''}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span className={s.statPillValue}
+        style={{ opacity: hovered ? 0 : 1,
+                 position: hovered ? 'absolute' : 'relative',
+                 pointerEvents: 'none' }}>
+        {value}
+      </span>
+      <span className={s.statPillExplain}
+        style={{ opacity: hovered ? 1 : 0,
+                 position: hovered ? 'relative' : 'absolute',
+                 pointerEvents: 'none' }}>
+        {explanation}
+      </span>
     </div>
   );
 }
@@ -208,32 +227,36 @@ function useTypewriter(prompts) {
 
 /* ─── LEAD CARD ─── */
 function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
+  const isToday = lead.trialDate === 'today';
+  const needsAttention = lead.needsAttention === true;
   let cardCls = s.card;
   if (draggingId === lead.id) cardCls += ` ${s.cardDragging}`;
   if (droppedId === lead.id) cardCls += ` ${s.cardDropped}`;
+  if (isToday) cardCls += ` ${s.cardToday}`;
+  if (needsAttention) cardCls += ` ${s.cardUrgent}`;
 
   return (
-    <div
-      className={cardCls}
-      draggable
+    <div className={cardCls} draggable
       onDragStart={(e) => onDragStart(e, lead.id)}
       onDragEnd={onDragEnd}
     >
-      <div className={s.cardTop}>
-        <div className={s.leadName}>{lead.name}</div>
-        <div className={`${s.badge} ${BADGE_MAP[lead.badge].cls}`}>
-          <span className={s.badgeDot}></span>
-          {BADGE_MAP[lead.badge].label}
+      <div className={s.cardName}>{lead.name}</div>
+      <div className={s.cardActivity}>
+        <span className={s.cardActivityLabel}>Last activity</span>
+        {lead.lastActivity}
+      </div>
+      {lead.stage === 'bookedTrial' && lead.trialDate && (
+        <div className={`${s.cardTrialDate} ${isToday ? s.cardTrialToday : ''}`}>
+          {isToday
+            ? <><span className={s.cardTodayLabel}>⚡ Today</span>
+                <span className={s.cardTodayTime}>{lead.trialTime}</span></>
+            : <>{lead.trialDate}{lead.trialTime && `, ${lead.trialTime}`}</>
+          }
         </div>
-      </div>
-      <div className={s.cardMeta}>
-        <span className={s.src}>{lead.src}</span>
-        <span className={`${s.days} ${lead.daysClass ? s[lead.daysClass] : ''}`}>{lead.days}</span>
-      </div>
-      <div className={s.cardFoot}>
-        <span className={s.last}>{lead.lastContact}</span>
-        <span className={`${s.init} ${s[lead.initClass]}`}>{lead.initials}</span>
-      </div>
+      )}
+      {lead.stage === 'doneTrial' && lead.daysSinceTrial && (
+        <div className={s.cardDaysSince}>{lead.daysSinceTrial} since trial</div>
+      )}
     </div>
   );
 }
@@ -248,6 +271,8 @@ export default function Sales() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [flipped, setFlipped] = useState({ trials: false, closed: false });
+  const [inboxFilter, setInboxFilter] = useState('All');
+  const [threads, setThreads] = useState(THREADS);
 
   // Refs
   const canvasRef = useRef(null);
@@ -395,9 +420,9 @@ export default function Sales() {
           <div className={s.bannerTop}>
             <h1 className={s.pageTitle}>Sales</h1>
             <div className={s.bannerStats}>
-              <Tooltip text="Month-to-date revenue growth vs same period last month"><div className={s.statPill}>+12.4% MTD</div></Tooltip>
-              <Tooltip text="Total active leads currently in your pipeline"><div className={s.statPill}>34 Leads</div></Tooltip>
-              <Tooltip text="Close rate for leads who complete a trial session"><div className={s.statPill}>82% Close</div></Tooltip>
+              <StatPill value="+12.4% MTD" explanation="Revenue growth vs last month" />
+              <StatPill value="34 Leads" explanation="Active in pipeline" />
+              <StatPill value="82% Close" explanation="Trial-to-member rate" />
             </div>
           </div>
           <div className={s.bannerBottom}>
@@ -421,12 +446,11 @@ export default function Sales() {
                   <Tooltip text="Your close rate this month: % of qualified trials that became members"><div className={s.kpiHeroVal}>{heroVal}<span>%</span></div></Tooltip>
                 </div>
                 <div className={s.kpiHeroRight}>
-                  <Tooltip text="Up 8 percentage points vs last month's close rate of 49%">
-                    <div className={s.kpiHeroTrend}>
-                      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-                      +8pts
-                    </div>
-                  </Tooltip>
+                  <div className={s.kpiHeroTrend}>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                    +8%
+                    <span className={s.kpiHeroTrendSub}>from last month</span>
+                  </div>
                 </div>
               </div>
               <div className={s.kpiSubRow}>
@@ -486,7 +510,7 @@ export default function Sales() {
               <div className={s.kpiProgress}>
                 <div className={s.kpiProgressLabel}>
                   <span className={s.kpiProgressText}>Month progress</span>
-                  <span className={s.kpiProgressPct}>Day 15 of 31</span>
+                  <span className={s.kpiProgressPct}>Day 15 of 31 · 48%</span>
                 </div>
                 <Tooltip text="You're on Day 15 of 31 — halfway through the month">
                   <div className={s.kpiBar}>
@@ -500,9 +524,9 @@ export default function Sales() {
             <div className={s.sageCard}>
               <div className={s.sageBody}>
                 <div className={s.sageBodyContent}>
-                  <Tooltip text="AI-generated insight based on pipeline activity and timing signals"><div className={s.sagePriorityBadge}>Priority Insight</div></Tooltip>
+                  <Tooltip text="AI-generated insight based on pipeline activity and timing signals"><div className={s.sagePriorityBadge}>For You To Know</div></Tooltip>
                   <div className={s.sageInsight}>
-                    <div className={s.sageInsightText}>🔥 Ava Martinez completed a trial 1 day ago — highest close probability in pipeline. Follow up now before momentum fades.</div>
+                    <div className={s.sageInsightText}>🔥 <strong>Ava Martinez</strong> completed a trial 1 day ago — highest close probability in your pipeline. Follow up now before momentum fades.</div>
                   </div>
                 </div>
                 <div className={s.sageMicWrap}>
@@ -537,6 +561,16 @@ export default function Sales() {
                 ))}
               </div>
             </div>
+            <div className={s.pipelineLegend}>
+              <div className={s.legendItem}>
+                <span className={s.legendDotRed}></span>
+                <span className={s.legendText}>Needs attention</span>
+              </div>
+              <div className={s.legendItem}>
+                <span className={s.legendDotGold}></span>
+                <span className={s.legendText}>Trial today</span>
+              </div>
+            </div>
             <div className={s.pipelineDivider}></div>
             <div className={s.board}>
               {STAGES.map(stage => {
@@ -553,17 +587,26 @@ export default function Sales() {
                       <span className={s.colName}>{stage.name}</span>
                       <span className={s.colCt}>{stageLeads.length}</span>
                     </div>
-                    <div className={s.cards}>
-                      {stageLeads.map(lead => (
-                        <LeadCard
-                          key={lead.id}
-                          lead={lead}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          draggingId={draggingId}
-                          droppedId={droppedId}
-                        />
-                      ))}
+                    <div className={s.cardsWrap}>
+                      <div className={s.cards}>
+                        {stageLeads.map(lead => (
+                          <LeadCard
+                            key={lead.id}
+                            lead={lead}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                            draggingId={draggingId}
+                            droppedId={droppedId}
+                          />
+                        ))}
+                      </div>
+                      {stageLeads.length > 3 && (
+                        <div className={s.cardsMoreFade}>
+                          <span className={s.cardsMoreLabel}>
+                            +{stageLeads.length - 3} more
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -597,8 +640,22 @@ export default function Sales() {
           <span className={s.panelTitle}>Lead Inbox</span>
           <button className={s.closeBtn} onClick={() => setPanelOpen(false)}>&times;</button>
         </div>
+        <div className={s.panelControls}>
+          <div className={s.inboxFilters}>
+            {['All', 'Instagram DM', 'SMS', 'Email'].map(f => (
+              <button key={f}
+                className={`${s.inboxFilterBtn} ${inboxFilter === f ? s.inboxFilterActive : ''}`}
+                onClick={() => setInboxFilter(f)}
+              >{f}</button>
+            ))}
+          </div>
+          <button className={s.markAllRead}
+            onClick={() => setThreads(prev => prev.map(t => ({ ...t, unread: false })))}>
+            Mark all read
+          </button>
+        </div>
         <div className={s.threads}>
-          {THREADS.map((t, i) => (
+          {(inboxFilter === 'All' ? threads : threads.filter(t => t.channel === inboxFilter)).map((t, i) => (
             <div key={i} className={`${s.thread} ${t.unread ? s.threadUnread : ''}`}>
               <div className={s.tav}>{t.initials}</div>
               <div className={s.tcontent}>
@@ -610,6 +667,10 @@ export default function Sales() {
                 <div className={s.tmeta}>
                   <span className={s.tch}>{t.channel}</span>
                   {t.unread && <div className={s.udot}></div>}
+                </div>
+                <div className={s.threadActions}>
+                  <button className={s.threadActionBtn}>Reply</button>
+                  <button className={s.threadActionBtn}>Move to Booked</button>
                 </div>
               </div>
             </div>
