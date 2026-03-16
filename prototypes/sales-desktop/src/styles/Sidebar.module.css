@@ -1,0 +1,24 @@
+.sidebar{width:240px;min-width:240px;background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;padding:28px 0 20px}
+.logoWrap{padding:0 20px 36px;display:flex;align-items:center;gap:12px}
+.logoMark{width:40px;height:40px;background:var(--gold);border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:var(--ff);font-weight:800;font-size:17px;color:#fff;letter-spacing:-.01em;flex-shrink:0;box-shadow:0 2px 8px rgba(200,168,78,0.3);position:relative;overflow:hidden}
+.logoMark::after{content:'';position:absolute;top:-50%;left:-150%;width:60%;height:200%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent);transform:skewX(-25deg);pointer-events:none;animation:logoShimmer 4s ease-in-out infinite}
+@keyframes logoShimmer{0%,85%,100%{left:-150%}90%{left:150%}}
+.logoText{display:flex;flex-direction:column}
+.logoName{font-weight:800;font-size:17px;letter-spacing:.08em;color:var(--tp);text-transform:uppercase;line-height:1;padding-bottom:2px}
+.logoSub{font-size:10px;font-weight:500;color:var(--tm);letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
+.nav{padding:0 10px;flex:1}
+.navLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--tm);padding:0 14px 10px;display:block}
+.navItem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;cursor:pointer;transition:all 140ms var(--es);margin-bottom:2px;position:relative;color:var(--ts);font-size:13.5px;font-weight:600;border:1px solid transparent;overflow:hidden;text-decoration:none}
+.navItem:hover{background:var(--surf2);color:var(--tp)}
+.navItem.active{background:var(--surf2);color:var(--gold);border-color:var(--border)}
+.navItem::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:0;background:var(--gold);border-radius:0 3px 3px 0;transition:width 140ms var(--es)}
+.navItem.active::before{width:3px}
+.navIcon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.4}
+.navItem.active .navIcon,.navItem:hover .navIcon{opacity:1}
+.navItem.active .navIcon{color:var(--gold)}
+.sidebarFooter{padding:18px 18px 0;margin:0 10px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.av{width:34px;height:34px;border-radius:9999px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0}
+.coachName{font-size:12px;font-weight:700;color:var(--tp)}
+.coachRole{font-size:10px;font-weight:500;color:var(--tm)}
+.settingsBtn{margin-left:auto;color:var(--tm);cursor:pointer;transition:color 120ms;text-decoration:none;display:flex;align-items:center}
+.settingsBtn:hover{color:var(--ts)}

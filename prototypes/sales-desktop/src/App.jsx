@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './components/Layout';
 import Sales from './pages/Sales';
 import Home from './pages/Home';
 import Marketing from './pages/Marketing';
@@ -10,11 +11,11 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/sales" element={<Sales />} />
-        <Route path="/marketing" element={<Marketing />} />
-        <Route path="/members" element={<Members />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/home" element={<Layout><Home /></Layout>} />
+        <Route path="/sales" element={<Layout><Sales /></Layout>} />
+        <Route path="/marketing" element={<Layout><Marketing /></Layout>} />
+        <Route path="/members" element={<Layout><Members /></Layout>} />
+        <Route path="/settings" element={<Layout><Settings /></Layout>} />
       </Routes>
     </BrowserRouter>
   );
