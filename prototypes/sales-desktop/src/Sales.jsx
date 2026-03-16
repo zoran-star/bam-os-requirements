@@ -3,24 +3,22 @@ import s from './Sales.module.css';
 
 /* ─── DATA ─── */
 const INITIAL_LEADS = [
-  { id: 'l1', name: 'Marcus Johnson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: '4h ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
-  { id: 'l2', name: 'Sarah Chen', src: 'Web Form', days: '3d', daysClass: '', badge: 'active', lastContact: '1d ago', initials: 'MR', initClass: 'initS', stage: 'nl' },
-  { id: 'l3', name: 'David Ortiz', src: 'Facebook', days: '8d', daysClass: 'daysWarn', badge: 'paused', lastContact: '3d ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
-  { id: 'l4', name: 'Emily Watson', src: 'SMS', days: '2d', daysClass: '', badge: 'human', lastContact: '6h ago', initials: 'JT', initClass: 'initD', stage: 'ct' },
-  { id: 'l5', name: 'Jake Rivera', src: 'Phone', days: '5d', daysClass: '', badge: 'active', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'ct' },
-  { id: 'l6', name: 'Mia Thompson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: 'Tomorrow 4pm', initials: 'MR', initClass: 'initS', stage: 'tb' },
-  { id: 'l7', name: 'Liam Park', src: 'Web Form', days: '4d', daysClass: '', badge: 'human', lastContact: 'Fri 5:30pm', initials: 'JT', initClass: 'initD', stage: 'tb' },
-  { id: 'l8', name: 'Ava Martinez', src: 'Email', days: '2d', daysClass: '', badge: 'human', lastContact: '1d ago', initials: 'ZS', initClass: 'initG', stage: 'td' },
-  { id: 'l9', name: 'Noah Kim', src: 'Instagram', days: 'Today', daysClass: 'daysGold', badge: 'conv', lastContact: 'Today', initials: 'MR', initClass: 'initS', stage: 'mb' },
-  { id: 'l10', name: 'Chloe Davis', src: 'Facebook', days: '2d ago', daysClass: 'daysGold', badge: 'conv', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'mb' },
+  { id: 'l1', name: 'Marcus Johnson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: '4h ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
+  { id: 'l2', name: 'Sarah Chen', src: 'Web Form', days: '3d', daysClass: '', badge: 'active', lastContact: '1d ago', initials: 'MR', initClass: 'initS', stage: 'interested' },
+  { id: 'l3', name: 'David Ortiz', src: 'Facebook', days: '8d', daysClass: 'daysWarn', badge: 'paused', lastContact: '3d ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
+  { id: 'l4', name: 'Emily Watson', src: 'SMS', days: '2d', daysClass: '', badge: 'human', lastContact: '6h ago', initials: 'JT', initClass: 'initD', stage: 'interested' },
+  { id: 'l5', name: 'Jake Rivera', src: 'Phone', days: '5d', daysClass: '', badge: 'active', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'interested' },
+  { id: 'l6', name: 'Mia Thompson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: 'Tomorrow 4pm', initials: 'MR', initClass: 'initS', stage: 'bookedTrial' },
+  { id: 'l7', name: 'Liam Park', src: 'Web Form', days: '4d', daysClass: '', badge: 'human', lastContact: 'Fri 5:30pm', initials: 'JT', initClass: 'initD', stage: 'bookedTrial' },
+  { id: 'l8', name: 'Ava Martinez', src: 'Email', days: '2d', daysClass: '', badge: 'human', lastContact: '1d ago', initials: 'ZS', initClass: 'initG', stage: 'doneTrial' },
+  { id: 'l9', name: 'Noah Kim', src: 'Instagram', days: 'Today', daysClass: 'daysGold', badge: 'conv', lastContact: 'Today', initials: 'MR', initClass: 'initS', stage: 'doneTrial' },
+  { id: 'l10', name: 'Chloe Davis', src: 'Facebook', days: '2d ago', daysClass: 'daysGold', badge: 'conv', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'doneTrial' },
 ];
 
 const STAGES = [
-  { id: 'nl', name: 'New Lead' },
-  { id: 'ct', name: 'Contacted' },
-  { id: 'tb', name: 'Trial Booked' },
-  { id: 'td', name: 'Trial Done' },
-  { id: 'mb', name: 'Member' },
+  { id: 'interested', name: 'Interested' },
+  { id: 'bookedTrial', name: 'Booked Trial' },
+  { id: 'doneTrial', name: 'Done Trial' },
 ];
 
 const THREADS = [
@@ -44,8 +42,6 @@ const BADGE_MAP = {
   human: { cls: s.badgeHuman, label: 'Human' },
   conv: { cls: s.badgeConv, label: 'Converted' },
 };
-
-const FILTERS = ['All Leads', 'My Leads', 'AI Active'];
 
 /* ─── TOOLTIP ─── */
 function Tooltip({ text, children }) {
@@ -251,7 +247,6 @@ export default function Sales() {
   const [droppedId, setDroppedId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
-  const [activeFilter, setActiveFilter] = useState(0);
   const [flipped, setFlipped] = useState({ trials: false, closed: false });
 
   // Refs
@@ -415,16 +410,6 @@ export default function Sales() {
         </div>
 
         <div className={s.scroll}>
-          {/* FLOW GUIDE */}
-          <div className={s.flowGuide} aria-hidden="true">
-            {Array.from({ length: 5 }, (_, i) => (
-              <div className={s.flowArrow} key={i}>
-                <div className={s.flowDash}></div>
-                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-              </div>
-            ))}
-          </div>
-
           {/* HERO */}
           <div className={s.hero}>
             {/* KPI CARD */}
@@ -540,22 +525,19 @@ export default function Sales() {
             </div>
           </div>
 
-          {/* KANBAN */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div className={s.kanbanHead}>
-              <div className={s.kanbanTitle}>Pipeline</div>
-              <div className={s.filters}>
-                {FILTERS.map((f, i) => (
-                  <button
-                    key={f}
-                    className={`${s.fbtn} ${i === activeFilter ? s.fbtnActive : ''}`}
-                    onClick={() => setActiveFilter(i)}
-                  >
-                    {f}
-                  </button>
+          {/* PIPELINE */}
+          <div className={s.pipelineSection}>
+            <div className={s.pipelineTopbar}>
+              <h2 className={s.pipelineTitle}>Pipeline</h2>
+              <div className={s.pipelineArrows} aria-hidden="true">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div className={s.pipelineArrow} key={i}>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                  </div>
                 ))}
               </div>
             </div>
+            <div className={s.pipelineDivider}></div>
             <div className={s.board}>
               {STAGES.map(stage => {
                 const stageLeads = leadsByStage[stage.id];
