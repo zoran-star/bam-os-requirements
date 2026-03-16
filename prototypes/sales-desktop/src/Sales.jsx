@@ -47,6 +47,20 @@ const BADGE_MAP = {
 
 const FILTERS = ['All Leads', 'My Leads', 'AI Active'];
 
+/* ─── TOOLTIP ─── */
+function Tooltip({ text, children }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className={s.tooltipWrap}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      {children}
+      {visible && <div className={s.tooltip}>{text}</div>}
+    </div>
+  );
+}
+
 /* ─── CUSTOM HOOKS ─── */
 
 function useCountUp(target, duration = 920) {
@@ -76,7 +90,7 @@ function useBannerCanvas(canvasRef) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let w, h, t = 0;
-    const barCount = 18, barW = 10, barGap = 18, barBaseH = 0.55;
+    const barCount = 28, barW = 10, barGap = 14, barBaseH = 0.55;
 
     function resize() {
       const r = window.devicePixelRatio || 1;
@@ -123,7 +137,7 @@ function useBannerCanvas(canvasRef) {
       ctx.clearRect(0, 0, w, h);
       // Dot grid
       const dotSpacing = 24;
-      ctx.fillStyle = 'rgba(200,168,78,0.12)';
+      ctx.fillStyle = 'rgba(200,168,78,0.07)';
       for (let x = dotSpacing / 2; x < w; x += dotSpacing) {
         for (let y = dotSpacing / 2; y < h; y += dotSpacing) {
           ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
@@ -133,24 +147,24 @@ function useBannerCanvas(canvasRef) {
       for (let i = 0; i < barCount; i++) {
         const x = getBarX(i), bh = getBarH(i), y = h - bh;
         const grad = ctx.createLinearGradient(x, y, x, h);
-        grad.addColorStop(0, 'rgba(212,182,92,0.18)');
-        grad.addColorStop(1, 'rgba(200,168,78,0.55)');
+        grad.addColorStop(0, 'rgba(212,182,92,0.11)');
+        grad.addColorStop(1, 'rgba(200,168,78,0.33)');
         ctx.fillStyle = grad;
         ctx.beginPath(); ctx.roundRect(x, y, barW, bh, 3); ctx.fill();
       }
       // Curves
       const mainPts = genCurvePts(0, 6, -8);
       const shadowPts = genCurvePts(1.5, 5, -2);
-      drawCurve(shadowPts, 'rgba(200,168,78,0.2)', 1);
-      drawCurve(mainPts, 'rgba(200,168,78,0.7)', 2);
+      drawCurve(shadowPts, 'rgba(200,168,78,0.12)', 1);
+      drawCurve(mainPts, 'rgba(200,168,78,0.42)', 2);
       // Glowing dots
       const dotIndices = [2, 6, 10, 14, 17];
       ctx.save();
       for (const di of dotIndices) {
         if (di < mainPts.length) {
           const p = mainPts[di];
-          ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(200,168,78,0.7)';
-          ctx.fillStyle = 'rgba(200,168,78,0.9)';
+          ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(200,168,78,0.42)';
+          ctx.fillStyle = 'rgba(200,168,78,0.54)';
           ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
         }
       }
@@ -261,21 +275,6 @@ export default function Sales() {
   /* ─── TYPEWRITER (custom hook) ─── */
   const typewriterText = useTypewriter(TYPEWRITER_PROMPTS);
 
-  /* ─── FLIP CARDS ─── */
-  useEffect(() => {
-    const timers = [];
-    const t1 = setTimeout(() => {
-      const iv1 = setInterval(() => setFlipped(prev => ({ ...prev, trials: !prev.trials })), 4000);
-      timers.push(iv1);
-    }, 3000);
-    const t2 = setTimeout(() => {
-      const iv2 = setInterval(() => setFlipped(prev => ({ ...prev, closed: !prev.closed })), 4000);
-      timers.push(iv2);
-    }, 4000);
-    timers.push(t1, t2);
-    return () => timers.forEach(id => { clearTimeout(id); clearInterval(id); });
-  }, []);
-
   /* ─── DRAG & DROP ─── */
   const handleDragStart = useCallback((e, leadId) => {
     setDraggingId(leadId);
@@ -333,15 +332,11 @@ export default function Sales() {
   }, [draggingId]);
 
   /* ─── FLIP CARD HOVER ─── */
-  const flipHoverTimers = useRef({});
   const handleFlipEnter = useCallback((key) => {
-    clearTimeout(flipHoverTimers.current[key]);
     setFlipped(prev => ({ ...prev, [key]: true }));
   }, []);
   const handleFlipLeave = useCallback((key) => {
-    flipHoverTimers.current[key] = setTimeout(() => {
-      setFlipped(prev => ({ ...prev, [key]: false }));
-    }, 1200);
+    setFlipped(prev => ({ ...prev, [key]: false }));
   }, []);
 
   /* ─── RENDER ─── */
@@ -399,13 +394,15 @@ export default function Sales() {
       <main className={s.main}>
         {/* BANNER */}
         <div className={s.banner}>
-          <canvas className={s.bannerCanvas} ref={canvasRef}></canvas>
+          <div className={s.bannerCanvasWrap}>
+            <canvas className={s.bannerCanvas} ref={canvasRef}></canvas>
+          </div>
           <div className={s.bannerTop}>
             <h1 className={s.pageTitle}>Sales</h1>
             <div className={s.bannerStats}>
-              <div className={s.statPill}>+12.4% MTD</div>
-              <div className={s.statPill}>34 Leads</div>
-              <div className={s.statPill}>82% Close</div>
+              <Tooltip text="Month-to-date revenue growth vs same period last month"><div className={s.statPill}>+12.4% MTD</div></Tooltip>
+              <Tooltip text="Total active leads currently in your pipeline"><div className={s.statPill}>34 Leads</div></Tooltip>
+              <Tooltip text="Close rate for leads who complete a trial session"><div className={s.statPill}>82% Close</div></Tooltip>
             </div>
           </div>
           <div className={s.bannerBottom}>
@@ -436,73 +433,81 @@ export default function Sales() {
               <div className={s.kpiHero}>
                 <div className={s.kpiHeroLeft}>
                   <div className={s.kpiHeroLabel}>Qualified Trial Close Rate</div>
-                  <div className={s.kpiHeroVal}>{heroVal}<span>%</span></div>
+                  <Tooltip text="Your close rate this month: % of qualified trials that became members"><div className={s.kpiHeroVal}>{heroVal}<span>%</span></div></Tooltip>
                 </div>
                 <div className={s.kpiHeroRight}>
-                  <div className={s.kpiHeroTrend}>
-                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-                    +8pts
-                  </div>
+                  <Tooltip text="Up 8 percentage points vs last month's close rate of 49%">
+                    <div className={s.kpiHeroTrend}>
+                      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                      +8pts
+                    </div>
+                  </Tooltip>
                 </div>
               </div>
               <div className={s.kpiSubRow}>
                 {/* Flip card: Trials */}
-                <div
-                  className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.trials ? s.flipped : ''}`}
-                  onMouseEnter={() => handleFlipEnter('trials')}
-                  onMouseLeave={() => handleFlipLeave('trials')}
-                >
-                  <div className={s.kpiSubLabel}>Qualified Trials</div>
-                  <div className={s.kpiFlipInner}>
-                    <div className={s.kpiFlipFront}>
-                      <div className={s.kpiSubVal}>{subVal1}</div>
-                      <div className={s.kpiSubFoot}>
-                        <span className={s.kpiSubTrend}>
-                          <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-                          +3
-                        </span>
-                        <span className={s.kpiSubPeriod}>vs last mo</span>
+                <Tooltip text="Prospects who attended or confirmed a trial session this month">
+                  <div
+                    className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.trials ? s.flipped : ''}`}
+                    onMouseEnter={() => handleFlipEnter('trials')}
+                    onMouseLeave={() => handleFlipLeave('trials')}
+                  >
+                    <div className={s.kpiSubLabel}>Qualified Trials</div>
+                    <div className={s.kpiFlipInner}>
+                      <div className={s.kpiFlipFront}>
+                        <div className={s.kpiSubVal}>{subVal1}</div>
+                        <div className={s.kpiSubFoot}>
+                          <span className={s.kpiSubTrend}>
+                            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                            +3
+                          </span>
+                          <span className={s.kpiSubPeriod}>vs last mo</span>
+                        </div>
+                      </div>
+                      <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
+                        <div className={s.kpiFlipComparison}>+3 from last month</div>
+                        <div className={s.kpiFlipPrev}>5 last month</div>
                       </div>
                     </div>
-                    <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
-                      <div className={s.kpiFlipComparison}>+3 from last month</div>
-                      <div className={s.kpiFlipPrev}>5 last month</div>
-                    </div>
                   </div>
-                </div>
+                </Tooltip>
                 {/* Flip card: Closed */}
-                <div
-                  className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.closed ? s.flipped : ''}`}
-                  onMouseEnter={() => handleFlipEnter('closed')}
-                  onMouseLeave={() => handleFlipLeave('closed')}
-                >
-                  <div className={s.kpiSubLabel}>Sales Closed</div>
-                  <div className={s.kpiFlipInner}>
-                    <div className={s.kpiFlipFront}>
-                      <div className={s.kpiSubVal}>{subVal2}</div>
-                      <div className={s.kpiSubFoot}>
-                        <span className={s.kpiSubTrend}>
-                          <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
-                          +2
-                        </span>
-                        <span className={s.kpiSubPeriod}>vs last mo</span>
+                <Tooltip text="New members who signed up after completing a trial">
+                  <div
+                    className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.closed ? s.flipped : ''}`}
+                    onMouseEnter={() => handleFlipEnter('closed')}
+                    onMouseLeave={() => handleFlipLeave('closed')}
+                  >
+                    <div className={s.kpiSubLabel}>Sales Closed</div>
+                    <div className={s.kpiFlipInner}>
+                      <div className={s.kpiFlipFront}>
+                        <div className={s.kpiSubVal}>{subVal2}</div>
+                        <div className={s.kpiSubFoot}>
+                          <span className={s.kpiSubTrend}>
+                            <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                            +2
+                          </span>
+                          <span className={s.kpiSubPeriod}>vs last mo</span>
+                        </div>
+                      </div>
+                      <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
+                        <div className={s.kpiFlipComparison}>+2 from last month</div>
+                        <div className={s.kpiFlipPrev}>0 last month</div>
                       </div>
                     </div>
-                    <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
-                      <div className={s.kpiFlipComparison}>+2 from last month</div>
-                      <div className={s.kpiFlipPrev}>0 last month</div>
-                    </div>
                   </div>
-                </div>
+                </Tooltip>
               </div>
               <div className={s.kpiProgress}>
                 <div className={s.kpiProgressLabel}>
                   <span className={s.kpiProgressText}>Month progress</span>
                   <span className={s.kpiProgressPct}>Day 15 of 31</span>
                 </div>
-                <div className={s.kpiBar}>
-                  <div className={s.kpiBarFill} style={{ '--bar-pct': '48%' }}></div>
-                </div>
+                <Tooltip text="You're on Day 15 of 31 — halfway through the month">
+                  <div className={s.kpiBar}>
+                    <div className={s.kpiBarFill} style={{ '--bar-pct': '48%' }}></div>
+                  </div>
+                </Tooltip>
               </div>
             </div>
 
@@ -510,7 +515,7 @@ export default function Sales() {
             <div className={s.sageCard}>
               <div className={s.sageBody}>
                 <div className={s.sageBodyContent}>
-                  <div className={s.sagePriorityBadge}>Priority Insight</div>
+                  <Tooltip text="AI-generated insight based on pipeline activity and timing signals"><div className={s.sagePriorityBadge}>Priority Insight</div></Tooltip>
                   <div className={s.sageInsight}>
                     <div className={s.sageInsightText}>🔥 Ava Martinez completed a trial 1 day ago — highest close probability in pipeline. Follow up now before momentum fades.</div>
                   </div>
