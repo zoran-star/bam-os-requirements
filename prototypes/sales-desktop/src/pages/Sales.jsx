@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import s from '../styles/Sales.module.css';
+import PageBanner from '../components/PageBanner';
+import useCountUp from '../hooks/useCountUp';
+import useTypewriter from '../hooks/useTypewriter';
 
 /* ─── DATA ─── */
 const INITIAL_LEADS = [
@@ -130,179 +133,7 @@ function Tooltip({ text, children }) {
   );
 }
 
-/* ─── STAT PILL ─── */
-function StatPill({ value, explanation }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      className={`${s.statPill} ${hovered ? s.statPillExpanded : ''}`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <span className={s.statPillValue}
-        style={{ opacity: hovered ? 0 : 1,
-                 position: hovered ? 'absolute' : 'relative',
-                 pointerEvents: 'none' }}>
-        {value}
-      </span>
-      <span className={s.statPillExplain}
-        style={{ opacity: hovered ? 1 : 0,
-                 position: hovered ? 'relative' : 'absolute',
-                 pointerEvents: 'none' }}>
-        {explanation}
-      </span>
-    </div>
-  );
-}
-
-/* ─── CUSTOM HOOKS ─── */
-
-function useCountUp(target, duration = 920) {
-  const [value, setValue] = useState(0);
-  const animRef = useRef(null);
-
-  useEffect(() => {
-    const start = performance.now();
-    function tick(now) {
-      const p = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setValue(Math.round(eased * target));
-      if (p < 1) animRef.current = requestAnimationFrame(tick);
-    }
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [target, duration]);
-
-  return value;
-}
-
-function useBannerCanvas(canvasRef) {
-  const animRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let w, h, t = 0;
-    const barCount = 28, barW = 10, barGap = 14, barBaseH = 0.55;
-
-    function resize() {
-      const r = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement.getBoundingClientRect();
-      w = rect.width; h = rect.height;
-      canvas.width = w * r; canvas.height = h * r;
-      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
-      ctx.setTransform(r, 0, 0, r, 0, 0);
-    }
-    function getBarX(i) {
-      const totalW = barCount * barW + (barCount - 1) * barGap;
-      return (w - totalW) / 2 + i * (barW + barGap);
-    }
-    function getBarH(i) {
-      const base = h * barBaseH, variance = h * 0.08;
-      return base + Math.sin(i * 0.45 + t * 0.017) * variance + Math.sin(i * 0.8 + t * 0.011) * variance * 0.5;
-    }
-    function genCurvePts(seed, amp, yOff) {
-      const pts = [], n = barCount - 1;
-      for (let i = 0; i <= n; i++) {
-        const x = getBarX(i) + barW / 2;
-        const bh = getBarH(i);
-        const y = (h - bh) + yOff + Math.sin(i * 0.6 + t * 0.014 + seed) * amp;
-        pts.push({ x, y });
-      }
-      return pts;
-    }
-    function drawCurve(pts, color, lw) {
-      if (pts.length < 2) return;
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const cx = (pts[i].x + pts[i + 1].x) / 2;
-        const cy = (pts[i].y + pts[i + 1].y) / 2;
-        ctx.quadraticCurveTo(pts[i].x, pts[i].y, cx, cy);
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lw;
-      ctx.stroke();
-    }
-    function draw() {
-      const r = window.devicePixelRatio || 1;
-      ctx.setTransform(r, 0, 0, r, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      // Dot grid
-      const dotSpacing = 24;
-      ctx.fillStyle = 'rgba(200,168,78,0.07)';
-      for (let x = dotSpacing / 2; x < w; x += dotSpacing) {
-        for (let y = dotSpacing / 2; y < h; y += dotSpacing) {
-          ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      // Bars
-      for (let i = 0; i < barCount; i++) {
-        const x = getBarX(i), bh = getBarH(i), y = h - bh;
-        const grad = ctx.createLinearGradient(x, y, x, h);
-        grad.addColorStop(0, 'rgba(212,182,92,0.11)');
-        grad.addColorStop(1, 'rgba(200,168,78,0.33)');
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.roundRect(x, y, barW, bh, 3); ctx.fill();
-      }
-      // Curves
-      const mainPts = genCurvePts(0, 6, -8);
-      const shadowPts = genCurvePts(1.5, 5, -2);
-      drawCurve(shadowPts, 'rgba(200,168,78,0.12)', 1);
-      drawCurve(mainPts, 'rgba(200,168,78,0.42)', 2);
-      // Glowing dots
-      const dotIndices = [2, 6, 10, 14, 17];
-      ctx.save();
-      for (const di of dotIndices) {
-        if (di < mainPts.length) {
-          const p = mainPts[di];
-          ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(200,168,78,0.42)';
-          ctx.fillStyle = 'rgba(200,168,78,0.54)';
-          ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
-        }
-      }
-      ctx.restore();
-      t++;
-      animRef.current = requestAnimationFrame(draw);
-    }
-
-    resize();
-    window.addEventListener('resize', resize);
-    draw();
-    return () => {
-      window.removeEventListener('resize', resize);
-      cancelAnimationFrame(animRef.current);
-    };
-  }, [canvasRef]);
-}
-
-function useTypewriter(prompts) {
-  const [text, setText] = useState('');
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    let pi = 0, ci = 0, deleting = false;
-    function type() {
-      const txt = prompts[pi];
-      if (!deleting) {
-        setText(txt.slice(0, ci + 1));
-        ci++;
-        if (ci >= txt.length) { timerRef.current = setTimeout(() => { deleting = true; type(); }, 2200); return; }
-        timerRef.current = setTimeout(type, 55 + Math.random() * 40);
-      } else {
-        setText(txt.slice(0, ci));
-        ci--;
-        if (ci <= 0) { deleting = false; pi = (pi + 1) % prompts.length; timerRef.current = setTimeout(type, 400); return; }
-        timerRef.current = setTimeout(type, 25);
-      }
-    }
-    timerRef.current = setTimeout(type, 800);
-    return () => clearTimeout(timerRef.current);
-  }, [prompts]);
-
-  return text;
-}
+/* Hooks and StatPill extracted to src/hooks/ and src/components/ */
 
 /* ─── LEAD CARD ─── */
 function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId, onSelect }) {
@@ -727,7 +558,6 @@ export default function Sales() {
   const [dashOpen, setDashOpen] = useState(false);
 
   // Refs
-  const canvasRef = useRef(null);
   const dragSrcStage = useRef(null);
   const toastTimer = useRef(null);
   const droppedTimer = useRef(null);
@@ -748,9 +578,6 @@ export default function Sales() {
     ];
     leadsByStage[st.id] = stageLeads;
   });
-
-  /* ─── BANNER CANVAS (custom hook) ─── */
-  useBannerCanvas(canvasRef);
 
   /* ─── COUNT-UP (custom hook) ─── */
   const heroVal = useCountUp(57);
@@ -847,27 +674,15 @@ export default function Sales() {
       </svg>
 
       <main className={s.main}>
-        {/* BANNER */}
-        <div className={s.banner}>
-          <div className={s.bannerCanvasWrap}>
-            <canvas className={s.bannerCanvas} ref={canvasRef}></canvas>
-          </div>
-          <div className={s.bannerTop}>
-            <h1 className={s.pageTitle}>Sales</h1>
-            <div className={s.bannerStats}>
-              <StatPill value="+12.4% MTD" explanation="Revenue growth vs last month" />
-              <StatPill value="34 Leads" explanation="Active in pipeline" />
-              <StatPill value="82% Close" explanation="Trial-to-member rate" />
-            </div>
-          </div>
-          <div className={s.bannerBottom}>
-            <div></div>
-            <button className={s.dashLink} onClick={() => setDashOpen(true)}>
-              Full dashboard
-              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </button>
-          </div>
-        </div>
+        <PageBanner
+          title="Sales"
+          stats={[
+            { value: '+12.4% MTD', explanation: 'Revenue growth vs last month' },
+            { value: '34 Leads', explanation: 'Active in pipeline' },
+            { value: '82% Close', explanation: 'Trial-to-member rate' },
+          ]}
+          onDashboardClick={() => setDashOpen(true)}
+        />
 
         <div className={s.scroll}>
           {/* HERO */}

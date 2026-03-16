@@ -1,0 +1,9 @@
+.statPill{background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.25);border-radius:12px;padding:7px 14px;font-size:12px;font-weight:700;color:var(--tp);white-space:nowrap;letter-spacing:0.02em;cursor:default;position:relative;overflow:hidden;transition:all 220ms cubic-bezier(0.4,0,0.2,1);min-width:90px;text-align:center}
+.statPillExpanded{min-width:160px;background:rgba(200,168,78,0.18)!important;border-color:rgba(200,168,78,0.45)!important}
+.statPillValue{transition:opacity 150ms ease}
+.statPillExplain{font-size:11px;font-weight:500;color:var(--ts);transition:opacity 150ms ease 80ms;white-space:nowrap}
+.statPill:nth-child(1){font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;background:rgba(200,168,78,0.15);border-color:rgba(200,168,78,0.4);animation:pillSlideIn 0.4s var(--espring) 0.3s backwards,pillGlow 2.5s ease-in-out 1s infinite}
+.statPill:nth-child(2){animation:pillSlideIn 0.4s var(--espring) 0.45s backwards}
+.statPill:nth-child(3){animation:pillSlideIn 0.4s var(--espring) 0.6s backwards}
+@keyframes pillSlideIn{0%{opacity:0;transform:translateY(-8px) scale(0.9)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes pillGlow{0%,100%{box-shadow:0 0 0 0 rgba(200,168,78,0.15)}50%{box-shadow:0 0 0 6px rgba(200,168,78,0.0)}}
