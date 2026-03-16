@@ -360,17 +360,49 @@ function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId, onSelec
 }
 
 /* ─── LEAD DRAWER ─── */
-function LeadDrawer({ lead, onClose }) {
+function LeadDrawer({ lead, onClose, onUpdateLead }) {
+  const [messages, setMessages] = useState(lead?.messages || []);
+  const [inputVal, setInputVal] = useState('');
+  const [sending, setSending] = useState(false);
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    setMessages(lead?.messages || []);
+    setInputVal('');
+  }, [lead?.id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
   if (!lead) return null;
   const isBooked = lead.stage === 'bookedTrial';
   const isDone = lead.stage === 'doneTrial';
+
+  function handleSend() {
+    const txt = inputVal.trim();
+    if (!txt) return;
+    const newMsg = { from: 'human', text: txt, time: 'just now' };
+    setMessages(prev => [...prev, newMsg]);
+    onUpdateLead(lead.id, { messages: [...messages, newMsg] });
+    setInputVal('');
+    setSending(true);
+    setTimeout(() => {
+      const aiMsg = { from: 'ai', text: '\u2726 AI is drafting a response...', time: 'just now', pending: true };
+      setMessages(prev => [...prev, aiMsg]);
+      setSending(false);
+    }, 1200);
+  }
 
   return (
     <>
       <div className={s.drawerOverlay} onClick={onClose} />
       <div className={s.drawer}>
         <div className={s.drawerHead}>
-          <div className={s.drawerTitle}>{lead.name}</div>
+          <div>
+            <div className={s.drawerTitle}>{lead.name}</div>
+            <div className={s.drawerSubtitle}>{lead.stage === 'interested' ? 'Interested' : lead.stage === 'bookedTrial' ? 'Booked Trial' : 'Done Trial'}</div>
+          </div>
           <button className={s.drawerClose} onClick={onClose}>&times;</button>
         </div>
         <div className={s.drawerBody}>
@@ -385,9 +417,9 @@ function LeadDrawer({ lead, onClose }) {
             </div>
             {isBooked && (
               <div className={s.drawerRow}>
-                <span className={s.drawerLabel}>Days until trial</span>
+                <span className={s.drawerLabel}>Trial date</span>
                 <span className={`${s.drawerVal} ${s.drawerValGold}`}>
-                  {lead.trialDate === 'today' ? 'Today!' : lead.trialDate}
+                  {lead.trialDate === 'today' ? `Today at ${lead.trialTime}` : `${lead.trialDate}${lead.trialTime ? `, ${lead.trialTime}` : ''}`}
                 </span>
               </div>
             )}
@@ -398,15 +430,45 @@ function LeadDrawer({ lead, onClose }) {
               </div>
             )}
           </div>
+
           <div className={s.drawerSectionTitle}>Conversation</div>
-          <div className={s.drawerChat}>
-            {(lead.messages || []).map((m, i) => (
-              <div key={i} className={`${s.chatMsg} ${m.from === 'parent' ? s.chatMsgParent : s.chatMsgAi}`}>
-                <div className={s.chatBubble}>{m.text}</div>
-                <div className={s.chatTime}>{m.time}</div>
-              </div>
-            ))}
+          <div className={s.drawerChatWrap}>
+            <div className={s.drawerChat}>
+              {messages.map((m, i) => (
+                <div key={i} className={`${s.chatMsg} ${
+                  m.from === 'parent' ? s.chatMsgParent
+                  : m.from === 'human' ? s.chatMsgHuman
+                  : s.chatMsgAi
+                }`}>
+                  {m.from === 'human' && (
+                    <div className={s.chatFromLabel}>You (manual)</div>
+                  )}
+                  <div className={`${s.chatBubble} ${m.pending ? s.chatBubblePending : ''}`}>
+                    {m.text}
+                  </div>
+                  <div className={s.chatTime}>{m.time}</div>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+            <div className={s.chatInputRow}>
+              <input
+                className={s.chatInput}
+                placeholder="Type a message or override AI..."
+                value={inputVal}
+                onChange={e => setInputVal(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSend()}
+              />
+              <button
+                className={s.chatSendBtn}
+                onClick={handleSend}
+                disabled={!inputVal.trim() || sending}
+              >
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+              </button>
+            </div>
           </div>
+
           <div className={s.drawerSectionTitle}>Sales Notes</div>
           <div className={s.drawerNotes}>
             {lead.salesNotes && Object.entries(lead.salesNotes).map(([k, v]) => (
@@ -417,6 +479,106 @@ function LeadDrawer({ lead, onClose }) {
             ))}
           </div>
         </div>
+      </div>
+    </>
+  );
+}
+
+/* ─── FULL DASHBOARD ─── */
+function FullDashboard({ onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchNotion() {
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1000,
+            system: 'You are a data assistant. Return ONLY valid JSON, no markdown, no explanation.',
+            messages: [{
+              role: 'user',
+              content: 'Search the user\'s Notion workspace for any databases or pages containing sales metrics, revenue, leads, trials, or membership data. Return a JSON object with these fields (use null if not found): { revenue_mtd: string, revenue_last_month: string, total_members: number, trials_this_month: number, trials_last_month: number, close_rate: string, avg_deal_value: string, leads_total: number, leads_new_this_week: number, top_lead_source: string, monthly_goal: string, notes: string }'
+            }],
+            mcp_servers: [{
+              type: 'url',
+              url: 'https://mcp.notion.com/mcp',
+              name: 'notion-mcp'
+            }]
+          })
+        });
+        const json = await res.json();
+        const text = json.content?.find(b => b.type === 'text')?.text || '{}';
+        const clean = text.replace(/```json|```/g, '').trim();
+        setData(JSON.parse(clean));
+      } catch (e) {
+        setError('Could not load Notion data. Showing sample metrics.');
+        setData({
+          revenue_mtd: '$4,200', revenue_last_month: '$3,800',
+          total_members: 47, trials_this_month: 8, trials_last_month: 5,
+          close_rate: '57%', avg_deal_value: '$155/mo',
+          leads_total: 34, leads_new_this_week: 6,
+          top_lead_source: 'Instagram', monthly_goal: '$5,000',
+          notes: 'Strong month so far. 2 closings pending.'
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchNotion();
+  }, []);
+
+  const metrics = data ? [
+    { label: 'Revenue MTD', value: data.revenue_mtd, sub: `vs ${data.revenue_last_month} last mo` },
+    { label: 'Total Members', value: data.total_members, sub: 'active enrollments' },
+    { label: 'Trials This Month', value: data.trials_this_month, sub: `${data.trials_last_month} last month` },
+    { label: 'Close Rate', value: data.close_rate, sub: 'trial \u2192 member' },
+    { label: 'Avg Deal Value', value: data.avg_deal_value, sub: 'per member' },
+    { label: 'Total Leads', value: data.leads_total, sub: `${data.leads_new_this_week} new this week` },
+    { label: 'Top Lead Source', value: data.top_lead_source, sub: 'highest volume' },
+    { label: 'Monthly Goal', value: data.monthly_goal, sub: 'revenue target' },
+  ] : [];
+
+  return (
+    <>
+      <div className={s.dashOverlay} onClick={onClose} />
+      <div className={s.dashModal}>
+        <div className={s.dashHead}>
+          <div>
+            <div className={s.dashTitle}>Full Dashboard</div>
+            <div className={s.dashSubtitle}>Pulled from your Notion workspace</div>
+          </div>
+          <button className={s.drawerClose} onClick={onClose}>&times;</button>
+        </div>
+        {loading ? (
+          <div className={s.dashLoading}>
+            <div className={s.dashSpinner} />
+            <span>Connecting to Notion...</span>
+          </div>
+        ) : (
+          <div className={s.dashBody}>
+            {error && <div className={s.dashError}>{error}</div>}
+            <div className={s.dashGrid}>
+              {metrics.map((m, i) => (
+                <div key={i} className={s.dashMetric}>
+                  <div className={s.dashMetricLabel}>{m.label}</div>
+                  <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
+                  <div className={s.dashMetricSub}>{m.sub}</div>
+                </div>
+              ))}
+            </div>
+            {data?.notes && (
+              <div className={s.dashNotes}>
+                <span className={s.dashNotesLabel}>Notes</span>
+                <span>{data.notes}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -436,6 +598,7 @@ export default function Sales() {
   const [threads, setThreads] = useState(THREADS);
   const [selectedLead, setSelectedLead] = useState(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
+  const [dashOpen, setDashOpen] = useState(false);
 
   // Refs
   const canvasRef = useRef(null);
@@ -453,6 +616,10 @@ export default function Sales() {
         ...stageLeads.filter(l => l.trialDate !== 'today'),
       ];
     }
+    stageLeads = [
+      ...stageLeads.filter(l => l.needsAttention),
+      ...stageLeads.filter(l => !l.needsAttention),
+    ];
     leadsByStage[st.id] = stageLeads;
   });
 
@@ -522,6 +689,17 @@ export default function Sales() {
       o.start(); o.stop(a.currentTime + 0.11);
     } catch (_) {}
   }, [draggingId]);
+
+  /* ─── UPDATE LEAD ─── */
+  function handleUpdateLead(id, patch) {
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...patch } : l));
+  }
+
+  /* ─── MONTH PROGRESS ─── */
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const dayOfMonth = today.getDate();
+  const monthPct = Math.round((dayOfMonth / daysInMonth) * 100);
 
   /* ─── FLIP CARD HOVER ─── */
   const handleFlipEnter = useCallback((key) => {
@@ -599,10 +777,10 @@ export default function Sales() {
           </div>
           <div className={s.bannerBottom}>
             <div></div>
-            <a className={s.dashLink} href="#">
+            <button className={s.dashLink} onClick={() => setDashOpen(true)}>
               Full dashboard
               <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </a>
+            </button>
           </div>
         </div>
 
@@ -682,13 +860,11 @@ export default function Sales() {
               <div className={s.kpiProgress}>
                 <div className={s.kpiProgressLabel}>
                   <span className={s.kpiProgressText}>Month progress</span>
-                  <span className={s.kpiProgressPct}>Day 15 of 31 · 48%</span>
+                  <span className={s.kpiProgressPct}>Day {dayOfMonth} of {daysInMonth}</span>
                 </div>
-                <Tooltip text="You're on Day 15 of 31 — halfway through the month">
-                  <div className={s.kpiBar}>
-                    <div className={s.kpiBarFill} style={{ '--bar-pct': '48%' }}></div>
-                  </div>
-                </Tooltip>
+                <div className={s.kpiBar}>
+                  <div className={s.kpiBarFill} style={{ '--bar-pct': `${monthPct}%` }} />
+                </div>
               </div>
             </div>
 
@@ -866,7 +1042,10 @@ export default function Sales() {
       </div>
 
       {/* LEAD DRAWER */}
-      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLead(null)} />
+      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLead(null)} onUpdateLead={handleUpdateLead} />
+
+      {/* FULL DASHBOARD */}
+      {dashOpen && <FullDashboard onClose={() => setDashOpen(false)} />}
     </div>
   );
 }

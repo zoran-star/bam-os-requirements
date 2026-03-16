@@ -139,10 +139,9 @@ html,body,#root{height:100%;margin:0}
 .kpiProgressLabel{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .kpiProgressText{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--tm);text-transform:uppercase}
 .kpiProgressPct{font-family:var(--fm);font-size:10px;font-weight:500;color:var(--gold)}
-.kpiBar{height:7px;background:var(--surf3);border-radius:9999px;overflow:hidden;margin-top:6px}
-.kpiBarFill{height:100%;background:linear-gradient(90deg,var(--gold),var(--goldl));border-radius:9999px;width:0;animation:barFill 1.2s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;position:relative}
-.kpiBarFill::after{content:'';position:absolute;right:0;top:-1px;bottom:-1px;width:8px;border-radius:9999px;background:var(--goldl);box-shadow:0 0 8px rgba(200,168,78,0.5)}
-@keyframes barFill{0%{width:0}100%{width:var(--bar-pct)}}
+.kpiBar{height:7px;background:#E8E4DC;border-radius:9999px;overflow:hidden;margin-top:8px;width:100%;display:block}
+.kpiBarFill{height:7px;background:linear-gradient(90deg,#C8A84E,#D4B65C);border-radius:9999px;width:0%;display:block;animation:barFill 1.4s cubic-bezier(0.4,0,0.2,1) 0.5s forwards}
+@keyframes barFill{from{width:0%}to{width:var(--bar-pct,48%)}}
 
 /* ─── SAGE CARD ─── */
 .sageCard{background:var(--surf);border:2px solid var(--gold);border-radius:24px;padding:22px 24px 20px;box-shadow:var(--shadow-gold);display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;cursor:pointer;transition:all 280ms var(--es),box-shadow 200ms ease;animation:sageGlow 2.5s ease-in-out infinite;height:100%;min-height:0}
@@ -311,6 +310,39 @@ html,body,#root{height:100%;margin:0}
 .chatMsgParent .chatBubble{background:var(--surf2);color:var(--tp);border-bottom-left-radius:4px}
 .chatMsgAi .chatBubble{background:var(--gold);color:#fff;border-bottom-right-radius:4px}
 .chatTime{font-size:10px;color:var(--tm);font-family:var(--fm);padding:0 4px}
+.drawerSubtitle{font-size:12px;color:var(--tm);font-weight:500;margin-top:2px}
+.drawerChatWrap{display:flex;flex-direction:column;gap:0;border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.drawerChat{padding:16px;display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;background:var(--surf2)}
+.chatMsgHuman{align-items:flex-end}
+.chatMsgHuman .chatBubble{background:var(--tp);color:#fff;border-bottom-right-radius:4px}
+.chatFromLabel{font-size:10px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px}
+.chatBubblePending{opacity:0.6;font-style:italic}
+.chatInputRow{display:flex;align-items:center;gap:0;border-top:1px solid var(--border);background:var(--surf)}
+.chatInput{flex:1;border:none;background:transparent;padding:12px 16px;font-family:var(--ff);font-size:13px;font-weight:500;color:var(--tp);outline:none}
+.chatInput::placeholder{color:var(--tm)}
+.chatSendBtn{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--gold);border:none;cursor:pointer;color:#fff;transition:background 150ms;flex-shrink:0}
+.chatSendBtn:hover{background:var(--goldl)}
+.chatSendBtn:disabled{background:var(--surf3);color:var(--tm);cursor:default}
 .drawerNotes{display:flex;flex-direction:column;gap:8px;background:var(--surf2);border-radius:14px;padding:14px 16px}
+
+/* ─── FULL DASHBOARD MODAL ─── */
+.dashOverlay{position:fixed;inset:0;background:rgba(28,27,24,0.35);backdrop-filter:blur(4px);z-index:500}
+.dashModal{position:fixed;top:50%;left:50%;z-index:501;transform:translate(-50%,-50%);width:min(860px,calc(100vw - 48px));max-height:calc(100vh - 80px);background:var(--surf);border-radius:24px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,0.12),0 8px 24px rgba(0,0,0,0.06);display:flex;flex-direction:column;overflow:hidden;animation:dashIn 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+@keyframes dashIn{from{opacity:0;transform:translate(-50%,-48%) scale(0.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.dashHead{padding:28px 32px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+.dashTitle{font-size:22px;font-weight:800;color:var(--tp);letter-spacing:-0.02em}
+.dashSubtitle{font-size:12px;color:var(--tm);font-weight:500;margin-top:3px}
+.dashBody{padding:28px 32px 32px;overflow-y:auto}
+.dashGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.dashMetric{background:var(--surf2);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border)}
+.dashMetricLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tm)}
+.dashMetricValue{font-size:28px;font-weight:800;color:var(--tp);letter-spacing:-0.02em;line-height:1.1}
+.dashMetricSub{font-size:11px;color:var(--tm);font-weight:500}
+.dashLoading{padding:60px;display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--tm);font-size:14px;font-weight:500}
+.dashSpinner{width:32px;height:32px;border:3px solid var(--surf3);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dashError{font-size:12px;color:var(--warn);background:var(--warnl);padding:10px 14px;border-radius:10px;margin-bottom:20px;font-weight:500}
+.dashNotes{margin-top:20px;padding:14px 18px;background:var(--gglow);border:1px solid rgba(200,168,78,0.2);border-radius:14px;font-size:13px;color:var(--ts);font-weight:500;display:flex;gap:10px}
+.dashNotesLabel{font-weight:700;color:var(--gold);flex-shrink:0}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
