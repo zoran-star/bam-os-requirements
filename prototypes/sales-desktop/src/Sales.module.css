@@ -138,11 +138,12 @@ html,body,#root{height:100%;margin:0}
 .sageCard{background:var(--surf);border:2px solid var(--gold);border-radius:24px;padding:22px 24px 20px;box-shadow:var(--shadow-gold);display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;cursor:pointer;transition:all 280ms var(--es),box-shadow 200ms ease;animation:sageGlow 2.5s ease-in-out infinite;height:100%;min-height:0}
 @keyframes sageGlow{0%,100%{box-shadow:0 4px 18px rgba(200,168,78,0.12),0 2px 8px rgba(200,168,78,0.06);border-color:var(--gold)}50%{box-shadow:0 4px 28px rgba(200,168,78,0.28),0 2px 12px rgba(200,168,78,0.14),0 0 0 4px rgba(200,168,78,0.08);border-color:var(--goldl)}}
 .sageCard:hover{transform:translateY(-2px);box-shadow:0 6px 32px rgba(200,168,78,0.3),0 0 0 6px rgba(200,168,78,0.1);animation:none;border-color:var(--goldl)}
-.sagePriorityBadge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--gold),var(--goldl));color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:5px 14px;border-radius:9999px;width:fit-content}
-.sageInsight{background:rgba(200,168,78,0.06);border-left:3px solid var(--gold);border-radius:10px;padding:14px 18px;flex:1;display:flex;flex-direction:column;justify-content:center}
-.sageInsightText{font-size:14px;font-weight:600;color:var(--ts);line-height:1.6}
+.sagePriorityBadge{display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,var(--gold),var(--goldl));color:#fff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:6px 16px;border-radius:9999px;width:fit-content}
+.sageInsight{background:rgba(200,168,78,0.07);border-left:4px solid var(--gold);border-radius:14px;padding:16px 20px;flex:1;display:flex;align-items:center;animation:insightSlide 0.5s ease 0.3s backwards}
+@keyframes insightSlide{0%{opacity:0;transform:translateX(-12px)}100%{opacity:1;transform:translateX(0)}}
+.sageInsightText{font-size:16px;font-weight:700;color:var(--tp);line-height:1.55;letter-spacing:-0.01em}
 .sageBody{display:flex;align-items:flex-start;gap:16px;flex:1}
-.sageBodyContent{flex:1;display:flex;flex-direction:column;gap:10px;justify-content:center}
+.sageBodyContent{flex:1;display:flex;flex-direction:column;gap:14px;justify-content:center}
 .sageMicWrap{display:flex;flex-direction:column;align-items:center;gap:6px;flex-shrink:0}
 .sageMic{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--goldl),var(--gold),var(--goldd));display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;transition:all 280ms var(--es);box-shadow:0 0 0 8px rgba(200,168,78,0.08),0 0 0 20px rgba(200,168,78,0.04),0 4px 16px rgba(200,168,78,0.25)}
 .sageCard:hover .sageMic{transform:scale(1.06);box-shadow:0 0 0 10px rgba(200,168,78,0.12),0 0 0 24px rgba(200,168,78,0.06),0 6px 24px rgba(200,168,78,0.35)}
@@ -187,30 +188,17 @@ html,body,#root{height:100%;margin:0}
 .cardDragging{opacity:.35;transform:scale(.95)}
 .cardDropped{animation:snapIn 320ms var(--espring)}
 @keyframes snapIn{0%{transform:scale(1.07);opacity:.65}60%{transform:scale(.97)}100%{transform:scale(1);opacity:1}}
-.cardTop{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:9px}
-.leadName{font-size:13px;font-weight:700;color:var(--tp);line-height:1.3;letter-spacing:-0.02em}
-.badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:9999px;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em}
-.badgeDot{width:6px;height:6px;border-radius:50%}
-.badgeActive{background:var(--greenl);color:var(--green)}
-.badgeActive .badgeDot{background:var(--green);animation:dp 2s ease-in-out infinite}
-@keyframes dp{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.25)}}
-.badgePaused{background:rgba(200,168,78,0.12);color:var(--goldd);border:1px solid rgba(200,168,78,0.3)}
-.badgePaused .badgeDot{background:var(--gold);animation:dp 2s ease-in-out infinite}
-.badgeHuman{background:rgba(0,0,0,0.04);color:var(--ts)}
-.badgeHuman .badgeDot{background:var(--tm)}
-.badgeConv{background:rgba(200,168,78,0.08);color:var(--goldd);border:1px solid rgba(200,168,78,0.2)}
-.badgeConv .badgeDot{background:var(--gold)}
-.cardMeta{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-.src{font-size:10px;font-weight:700;color:var(--ts);background:var(--surf2);padding:3px 9px;border-radius:8px;text-transform:uppercase;letter-spacing:.04em}
-.days{font-family:var(--fm);font-size:10px;color:var(--tm)}
-.daysWarn{color:var(--warn)}
-.daysGold{color:var(--gold)}
-.cardFoot{display:flex;align-items:center;justify-content:space-between;padding-top:9px;border-top:1px solid var(--border)}
-.last{font-family:var(--fm);font-size:10px;color:var(--tm)}
-.init{width:24px;height:24px;border-radius:9999px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff}
-.initG{background:var(--gold)}
-.initS{background:var(--tm)}
-.initD{background:var(--goldd)}
+.cardName{font-size:14px;font-weight:700;color:var(--tp);letter-spacing:-0.01em}
+.cardActivity{font-size:11px;color:var(--tm);font-family:var(--fm);margin-top:4px}
+.cardTrialDate{font-size:11px;font-weight:600;color:var(--ts);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.cardTrialToday{color:var(--gold);font-weight:700}
+.cardDaysSince{font-size:11px;color:var(--tm);font-family:var(--fm);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+/* Today trial — gold glow */
+.cardToday{border-color:rgba(200,168,78,0.5)!important;box-shadow:0 0 0 3px rgba(200,168,78,0.12),0 4px 20px rgba(200,168,78,0.18)!important;animation:todayPulse 2.5s ease-in-out infinite}
+@keyframes todayPulse{0%,100%{box-shadow:0 0 0 3px rgba(200,168,78,0.12),0 4px 20px rgba(200,168,78,0.18)}50%{box-shadow:0 0 0 6px rgba(200,168,78,0.18),0 6px 28px rgba(200,168,78,0.28)}}
+/* Needs attention — red glow */
+.cardUrgent{border-color:rgba(224,90,66,0.3)!important;box-shadow:0 0 0 3px rgba(224,90,66,0.07),0 4px 16px rgba(224,90,66,0.12)!important;animation:urgentPulse 2s ease-in-out infinite}
+@keyframes urgentPulse{0%,100%{box-shadow:0 0 0 3px rgba(224,90,66,0.07),0 4px 16px rgba(224,90,66,0.10)}50%{box-shadow:0 0 0 5px rgba(224,90,66,0.13),0 6px 22px rgba(224,90,66,0.18)}}
 
 /* ─── INBOX ─── */
 .inboxBtn{position:fixed;bottom:28px;right:28px;width:54px;height:54px;background:var(--tp);border-radius:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100;border:none;overflow:hidden;transition:all 200ms var(--es);box-shadow:var(--shadow-lg)}
