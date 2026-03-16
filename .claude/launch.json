@@ -2,9 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "html-server",
+      "name": "prototype",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8080"],
+      "runtimeArgs": ["-m", "http.server", "8090", "--directory", "prototype"],
+      "port": 8090
+    },
+    {
+      "name": "sales-prototype",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "prototypes"],
       "port": 8080
     }
   ]
