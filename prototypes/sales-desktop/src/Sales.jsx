@@ -484,149 +484,258 @@ function LeadDrawer({ lead, onClose, onUpdateLead }) {
   );
 }
 
+/* ─── SPARKLINE CHART ─── */
+function Sparkline({ data, color = '#C8A84E', compData, compColor = '#A5A19A', height = 48, width = '100%' }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const r = window.devicePixelRatio || 1;
+    const rect = c.parentElement.getBoundingClientRect();
+    const w = rect.width, h = height;
+    c.width = w * r; c.height = h * r;
+    c.style.width = w + 'px'; c.style.height = h + 'px';
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const allVals = [...data, ...(compData || [])];
+    const max = Math.max(...allVals, 1), min = Math.min(...allVals, 0);
+    const pad = 4;
+    function drawLine(pts, col, lw, dashed) {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      if (dashed) ctx.setLineDash([4, 4]); else ctx.setLineDash([]);
+      pts.forEach((v, i) => {
+        const x = pad + (i / (pts.length - 1)) * (w - pad * 2);
+        const y = pad + (1 - (v - min) / (max - min || 1)) * (h - pad * 2);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    function drawFill(pts, col) {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      pts.forEach((v, i) => {
+        const x = pad + (i / (pts.length - 1)) * (w - pad * 2);
+        const y = pad + (1 - (v - min) / (max - min || 1)) * (h - pad * 2);
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.lineTo(pad + (w - pad * 2), h); ctx.lineTo(pad, h); ctx.closePath();
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, col + '18'); grad.addColorStop(1, col + '02');
+      ctx.fillStyle = grad; ctx.fill();
+    }
+    if (compData) { drawLine(compData, compColor, 1.5, true); }
+    drawFill(data, color);
+    drawLine(data, color, 2, false);
+    // end dot
+    const lastX = pad + (w - pad * 2), lastY = pad + (1 - (data[data.length - 1] - min) / (max - min || 1)) * (h - pad * 2);
+    ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+  }, [data, compData, color, compColor, height]);
+  return <canvas ref={canvasRef} style={{ width, height, display: 'block' }} />;
+}
+
+/* ─── BAR CHART ─── */
+function BarChart({ items, height = 140 }) {
+  const max = Math.max(...items.map(i => i.value), 1);
+  return (
+    <div className={s.barChart} style={{ height }}>
+      {items.map((item, i) => (
+        <div key={i} className={s.barChartCol}>
+          <div className={s.barChartBar} style={{ height: `${(item.value / max) * 100}%`, background: item.color || 'var(--gold)', animationDelay: `${i * 60}ms` }} />
+          <div className={s.barChartLabel}>{item.label}</div>
+          <div className={s.barChartVal}>{item.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── SAMPLE DATA GENERATOR ─── */
+const PERIODS = [
+  { id: '7d', label: 'Last 7 days', days: 7 },
+  { id: '4w', label: 'Last 4 weeks', days: 28 },
+  { id: 'mtd', label: 'Month to date', days: new Date().getDate() },
+  { id: '3m', label: 'Last 3 months', days: 90 },
+  { id: '12m', label: 'Last 12 months', days: 365 },
+];
+const COMPARES = [
+  { id: 'none', label: 'No comparison' },
+  { id: 'prev', label: 'Previous period' },
+  { id: 'yoy', label: 'Same period last year' },
+];
+function genSampleData(periodDays) {
+  const pts = Math.min(periodDays, 30);
+  const rand = (base, variance) => Array.from({ length: pts }, (_, i) =>
+    Math.round(base + Math.sin(i * 0.5) * variance + (Math.random() - 0.3) * variance * 0.8 + i * (base * 0.01))
+  );
+  const compRand = (base, variance) => Array.from({ length: pts }, (_, i) =>
+    Math.round(base * 0.82 + Math.sin(i * 0.4 + 1) * variance + (Math.random() - 0.3) * variance * 0.8 + i * (base * 0.008))
+  );
+  const scale = periodDays / 30;
+  return {
+    total_leads: Math.round(34 * scale), qualified_trials: Math.round(8 * scale),
+    unqualified_trials: Math.round(3 * scale), no_shows: Math.round(2 * scale),
+    sales_won: Math.round(5 * scale), close_rate: '62.5%',
+    ai_engaged_bookings: Math.round(6 * scale), ai_conversion_rate: '42%',
+    non_ai_conversion_rate: '28%', avg_time_to_booking: '1.8 days',
+    lead_source_attribution: [
+      { source: 'Instagram', leads: Math.round(14 * scale), trials: Math.round(4 * scale), sales: Math.round(2 * scale) },
+      { source: 'Google', leads: Math.round(8 * scale), trials: Math.round(2 * scale), sales: Math.round(1 * scale) },
+      { source: 'Facebook', leads: Math.round(5 * scale), trials: Math.round(1 * scale), sales: Math.round(1 * scale) },
+      { source: 'Referral', leads: Math.round(4 * scale), trials: Math.round(1 * scale), sales: Math.round(1 * scale) },
+      { source: 'Walk-in', leads: Math.round(2 * scale), trials: 0, sales: 0 },
+      { source: 'Other', leads: Math.round(1 * scale), trials: 0, sales: 0 },
+    ],
+    notes: 'AI conversion rate is 14pts above non-AI. Instagram is your highest-volume source. 2 closings pending from this week\u2019s trials.',
+    // Time series
+    leadsOverTime: rand(3, 2), trialsOverTime: rand(1.5, 1), salesOverTime: rand(0.8, 0.6),
+    closeRateOverTime: rand(55, 12), aiRateOverTime: rand(40, 8),
+    // Comparison series
+    leadsComp: compRand(3, 2), trialsComp: compRand(1.5, 1), salesComp: compRand(0.8, 0.6),
+    closeRateComp: compRand(48, 10), aiRateComp: compRand(32, 7),
+  };
+}
+
 /* ─── FULL DASHBOARD ─── */
 function FullDashboard({ onClose }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [period, setPeriod] = useState('mtd');
+  const [compare, setCompare] = useState('none');
+  const showComp = compare !== 'none';
+  const periodObj = PERIODS.find(p => p.id === period);
+  const data = genSampleData(periodObj.days);
+  const sourceData = data.lead_source_attribution;
 
-  useEffect(() => {
-    async function fetchNotion() {
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 1000,
-            system: 'You are a data assistant. Return ONLY valid JSON, no markdown, no explanation.',
-            messages: [{
-              role: 'user',
-              content: 'Search the user\'s Notion workspace for any databases or pages containing sales metrics, pipeline data, trial data, or AI conversion data. Return a JSON object with these fields (use null if not found): { total_leads: number, qualified_trials: number, unqualified_trials: number, no_shows: number, sales_won: number, close_rate: string, ai_engaged_bookings: number, ai_conversion_rate: string, non_ai_conversion_rate: string, avg_time_to_booking: string, lead_source_attribution: [{ source: string, leads: number, trials: number, sales: number }], notes: string }'
-            }],
-            mcp_servers: [{
-              type: 'url',
-              url: 'https://mcp.notion.com/mcp',
-              name: 'notion-mcp'
-            }]
-          })
-        });
-        const json = await res.json();
-        const text = json.content?.find(b => b.type === 'text')?.text || '{}';
-        const clean = text.replace(/```json|```/g, '').trim();
-        setData(JSON.parse(clean));
-      } catch (e) {
-        setError('Could not load Notion data. Showing sample metrics.');
-        setData({
-          total_leads: 34, qualified_trials: 8, unqualified_trials: 3,
-          no_shows: 2, sales_won: 5, close_rate: '62.5%',
-          ai_engaged_bookings: 6, ai_conversion_rate: '42%',
-          non_ai_conversion_rate: '28%', avg_time_to_booking: '1.8 days',
-          lead_source_attribution: [
-            { source: 'Instagram', leads: 14, trials: 4, sales: 2 },
-            { source: 'Google', leads: 8, trials: 2, sales: 1 },
-            { source: 'Facebook', leads: 5, trials: 1, sales: 1 },
-            { source: 'Referral', leads: 4, trials: 1, sales: 1 },
-            { source: 'Walk-in', leads: 2, trials: 0, sales: 0 },
-            { source: 'Other', leads: 1, trials: 0, sales: 0 },
-          ],
-          notes: 'AI conversion rate is 14pts above non-AI. Instagram is your highest-volume source. 2 closings pending from this week\u2019s trials.'
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchNotion();
-  }, []);
-
-  // SAL-002 KPIs: pipeline metrics
-  const pipelineMetrics = data ? [
-    { label: 'Total Leads', value: data.total_leads, sub: 'All leads this period' },
-    { label: 'Qualified Trials', value: data.qualified_trials, sub: 'Met qualification criteria' },
-    { label: 'Unqualified Trials', value: data.unqualified_trials, sub: 'Did not meet criteria' },
+  const pipelineMetrics = [
+    { label: 'Total Leads', value: data.total_leads, sub: 'All leads this period', spark: data.leadsOverTime, comp: data.leadsComp },
+    { label: 'Qualified Trials', value: data.qualified_trials, sub: 'Met qualification criteria', spark: data.trialsOverTime, comp: data.trialsComp },
     { label: 'No-Shows', value: data.no_shows, sub: 'Booked but did not attend' },
-    { label: 'Sales (Won)', value: data.sales_won, sub: 'Closed members this period' },
-    { label: 'Close Rate', value: data.close_rate, sub: 'Won \u00F7 qualified trials' },
-  ] : [];
-  // SAL-002 KPIs: AI conversion metrics
-  const aiMetrics = data ? [
+    { label: 'Sales (Won)', value: data.sales_won, sub: 'Closed members this period', spark: data.salesOverTime, comp: data.salesComp },
+    { label: 'Close Rate', value: data.close_rate, sub: 'Won \u00F7 qualified trials', spark: data.closeRateOverTime, comp: data.closeRateComp },
+    { label: 'Unqualified Trials', value: data.unqualified_trials, sub: 'Did not meet criteria' },
+  ];
+  const aiMetrics = [
     { label: 'AI-Engaged Bookings', value: data.ai_engaged_bookings, sub: 'AI-engaged leads that booked' },
-    { label: 'AI Conversion Rate', value: data.ai_conversion_rate, sub: 'AI bookings \u00F7 AI-engaged leads' },
+    { label: 'AI Conversion Rate', value: data.ai_conversion_rate, sub: 'AI bookings \u00F7 AI-engaged leads', spark: data.aiRateOverTime, comp: data.aiRateComp },
     { label: 'Non-AI Conversion Rate', value: data.non_ai_conversion_rate, sub: 'Direct bookings \u00F7 non-AI leads' },
     { label: 'Avg Time to Booking', value: data.avg_time_to_booking, sub: 'First AI contact \u2192 trial booked' },
-  ] : [];
-  // SAL-002 KPIs: lead source attribution
-  const sourceData = data?.lead_source_attribution || [];
+  ];
+  const sourceBarItems = sourceData.map(r => ({
+    label: r.source.length > 6 ? r.source.slice(0, 6) + '\u2026' : r.source,
+    value: r.leads, color: 'var(--gold)',
+  }));
 
   return (
-    <>
-      <div className={s.dashOverlay} onClick={onClose} />
-      <div className={s.dashModal}>
-        <div className={s.dashHead}>
+    <div className={s.dashFull}>
+      {/* Header */}
+      <div className={s.dashFullHead}>
+        <div className={s.dashFullHeadLeft}>
+          <button className={s.dashBackBtn} onClick={onClose}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          </button>
           <div>
-            <div className={s.dashTitle}>Full Dashboard</div>
-            <div className={s.dashSubtitle}>Pulled from your Notion workspace</div>
+            <div className={s.dashTitle}>Sales Dashboard</div>
+            <div className={s.dashSubtitle}>{periodObj.label}{showComp ? ` vs ${COMPARES.find(c => c.id === compare).label.toLowerCase()}` : ''}</div>
           </div>
-          <button className={s.drawerClose} onClick={onClose}>&times;</button>
         </div>
-        {loading ? (
-          <div className={s.dashLoading}>
-            <div className={s.dashSpinner} />
-            <span>Connecting to Notion...</span>
+        <div className={s.dashControls}>
+          <div className={s.dashPeriodGroup}>
+            {PERIODS.map(p => (
+              <button key={p.id}
+                className={`${s.dashPeriodBtn} ${period === p.id ? s.dashPeriodActive : ''}`}
+                onClick={() => setPeriod(p.id)}
+              >{p.label}</button>
+            ))}
           </div>
-        ) : (
-          <div className={s.dashBody}>
-            {error && <div className={s.dashError}>{error}</div>}
-
-            <div className={s.dashSectionLabel}>Pipeline Performance <span className={s.dashRef}>SAL-002</span></div>
-            <div className={s.dashGrid}>
-              {pipelineMetrics.map((m, i) => (
-                <div key={i} className={s.dashMetric}>
-                  <div className={s.dashMetricLabel}>{m.label}</div>
-                  <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
-                  <div className={s.dashMetricSub}>{m.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className={s.dashSectionLabel}>AI Conversion Metrics <span className={s.dashRef}>SAL-004</span></div>
-            <div className={s.dashGrid}>
-              {aiMetrics.map((m, i) => (
-                <div key={i} className={s.dashMetric}>
-                  <div className={s.dashMetricLabel}>{m.label}</div>
-                  <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
-                  <div className={s.dashMetricSub}>{m.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className={s.dashSectionLabel}>Lead Source Attribution <span className={s.dashRef}>SAL-002</span></div>
-            {sourceData.length > 0 && (
-              <div className={s.dashSourceTable}>
-                <div className={s.dashSourceHeader}>
-                  <span>Source</span><span>Leads</span><span>Trials</span><span>Sales</span>
-                </div>
-                {sourceData.map((row, i) => (
-                  <div key={i} className={s.dashSourceRow}>
-                    <span className={s.dashSourceName}>{row.source}</span>
-                    <span>{row.leads}</span>
-                    <span>{row.trials}</span>
-                    <span className={s.dashSourceSales}>{row.sales}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {data?.notes && (
-              <div className={s.dashNotes}>
-                <span className={s.dashNotesLabel}>Sage Summary</span>
-                <span>{data.notes}</span>
-              </div>
-            )}
-          </div>
-        )}
+          <select className={s.dashCompareSelect} value={compare} onChange={e => setCompare(e.target.value)}>
+            {COMPARES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
+        </div>
       </div>
-    </>
+
+      {/* Body */}
+      <div className={s.dashFullBody}>
+        {/* Sage summary */}
+        <div className={s.dashNotes}>
+          <span className={s.dashNotesLabel}>Sage</span>
+          <span>{data.notes}</span>
+        </div>
+
+        {/* Pipeline */}
+        <div className={s.dashSectionLabel}>Pipeline Performance <span className={s.dashRef}>SAL-002</span></div>
+        <div className={s.dashGrid}>
+          {pipelineMetrics.map((m, i) => (
+            <div key={i} className={s.dashMetric}>
+              <div className={s.dashMetricLabel}>{m.label}</div>
+              <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
+              <div className={s.dashMetricSub}>{m.sub}</div>
+              {m.spark && (
+                <div className={s.dashMetricSpark}>
+                  <Sparkline data={m.spark} compData={showComp ? m.comp : null} height={36} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* AI metrics */}
+        <div className={s.dashSectionLabel}>AI Conversion Metrics <span className={s.dashRef}>SAL-004</span></div>
+        <div className={s.dashGrid}>
+          {aiMetrics.map((m, i) => (
+            <div key={i} className={s.dashMetric}>
+              <div className={s.dashMetricLabel}>{m.label}</div>
+              <div className={s.dashMetricValue}>{m.value ?? '\u2014'}</div>
+              <div className={s.dashMetricSub}>{m.sub}</div>
+              {m.spark && (
+                <div className={s.dashMetricSpark}>
+                  <Sparkline data={m.spark} compData={showComp ? m.comp : null} height={36} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Charts row */}
+        <div className={s.dashChartsRow}>
+          <div className={s.dashChartCard}>
+            <div className={s.dashChartTitle}>Leads over time</div>
+            <Sparkline data={data.leadsOverTime} compData={showComp ? data.leadsComp : null} height={120} />
+            {showComp && <div className={s.dashChartLegend}><span className={s.dashLegendCurrent} />{periodObj.label}<span className={s.dashLegendComp} />Previous</div>}
+          </div>
+          <div className={s.dashChartCard}>
+            <div className={s.dashChartTitle}>Close rate trend</div>
+            <Sparkline data={data.closeRateOverTime} compData={showComp ? data.closeRateComp : null} color="#3EAF5C" compColor="#A5A19A" height={120} />
+            {showComp && <div className={s.dashChartLegend}><span className={s.dashLegendCurrent} style={{ background: '#3EAF5C' }} />{periodObj.label}<span className={s.dashLegendComp} />Previous</div>}
+          </div>
+        </div>
+
+        {/* Lead source */}
+        <div className={s.dashSectionLabel}>Lead Source Attribution <span className={s.dashRef}>SAL-002</span></div>
+        <div className={s.dashChartsRow}>
+          <div className={s.dashChartCard}>
+            <div className={s.dashChartTitle}>Leads by source</div>
+            <BarChart items={sourceBarItems} height={130} />
+          </div>
+          <div className={s.dashChartCard} style={{ flex: 1.2 }}>
+            <div className={s.dashSourceTable}>
+              <div className={s.dashSourceHeader}>
+                <span>Source</span><span>Leads</span><span>Trials</span><span>Sales</span>
+              </div>
+              {sourceData.map((row, i) => (
+                <div key={i} className={s.dashSourceRow}>
+                  <span className={s.dashSourceName}>{row.source}</span>
+                  <span>{row.leads}</span>
+                  <span>{row.trials}</span>
+                  <span className={s.dashSourceSales}>{row.sales}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

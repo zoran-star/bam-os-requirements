@@ -325,14 +325,24 @@ html,body,#root{height:100%;margin:0}
 .chatSendBtn:disabled{background:var(--surf3);color:var(--tm);cursor:default}
 .drawerNotes{display:flex;flex-direction:column;gap:8px;background:var(--surf2);border-radius:14px;padding:14px 16px}
 
-/* ─── FULL DASHBOARD MODAL ─── */
-.dashOverlay{position:fixed;inset:0;background:rgba(28,27,24,0.35);backdrop-filter:blur(4px);z-index:500}
-.dashModal{position:fixed;top:50%;left:50%;z-index:501;transform:translate(-50%,-50%);width:min(860px,calc(100vw - 48px));max-height:calc(100vh - 80px);background:var(--surf);border-radius:24px;border:1px solid var(--border);box-shadow:0 24px 80px rgba(0,0,0,0.12),0 8px 24px rgba(0,0,0,0.06);display:flex;flex-direction:column;overflow:hidden;animation:dashIn 0.3s cubic-bezier(0.34,1.56,0.64,1)}
-@keyframes dashIn{from{opacity:0;transform:translate(-50%,-48%) scale(0.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-.dashHead{padding:28px 32px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0}
+/* ─── FULL DASHBOARD ─── */
+.dashFull{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;flex-direction:column;animation:dashIn 0.28s cubic-bezier(0.4,0,0.2,1)}
+@keyframes dashIn{from{opacity:0;transform:scale(0.98)}to{opacity:1;transform:scale(1)}}
+.dashFullHead{padding:20px 36px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:var(--surf)}
+.dashFullHeadLeft{display:flex;align-items:center;gap:16px}
+.dashBackBtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--surf);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ts);transition:all 150ms;flex-shrink:0}
+.dashBackBtn:hover{border-color:var(--gold);color:var(--gold);background:var(--gglow)}
 .dashTitle{font-size:22px;font-weight:800;color:var(--tp);letter-spacing:-0.02em}
 .dashSubtitle{font-size:12px;color:var(--tm);font-weight:500;margin-top:3px}
-.dashBody{padding:28px 32px 32px;overflow-y:auto}
+.dashControls{display:flex;align-items:center;gap:12px}
+.dashPeriodGroup{display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.dashPeriodBtn{font-family:var(--ff);font-size:12px;font-weight:600;padding:7px 14px;border:none;background:var(--surf);color:var(--ts);cursor:pointer;transition:all 120ms;border-right:1px solid var(--border);white-space:nowrap}
+.dashPeriodBtn:last-child{border-right:none}
+.dashPeriodBtn:hover{background:var(--surf2);color:var(--tp)}
+.dashPeriodActive{background:var(--tp)!important;color:#fff!important}
+.dashCompareSelect{font-family:var(--ff);font-size:12px;font-weight:600;padding:7px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surf);color:var(--ts);cursor:pointer;outline:none;appearance:auto}
+.dashCompareSelect:hover{border-color:var(--borderm)}
+.dashFullBody{flex:1;overflow-y:auto;padding:28px 36px 48px}
 .dashGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .dashMetric{background:var(--surf2);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border)}
 .dashMetricLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tm)}
@@ -351,7 +361,24 @@ html,body,#root{height:100%;margin:0}
 .dashSourceRow:last-child{border-bottom:none}
 .dashSourceName{font-weight:600;color:var(--tp)}
 .dashSourceSales{font-weight:700;color:var(--gold)}
-.dashNotes{margin-top:20px;padding:14px 18px;background:var(--gglow);border:1px solid rgba(200,168,78,0.2);border-radius:14px;font-size:13px;color:var(--ts);font-weight:500;display:flex;gap:10px}
+.dashNotes{margin-top:0;margin-bottom:20px;padding:14px 18px;background:var(--gglow);border:1px solid rgba(200,168,78,0.2);border-radius:14px;font-size:13px;color:var(--ts);font-weight:500;display:flex;gap:10px}
 .dashNotesLabel{font-weight:700;color:var(--gold);flex-shrink:0}
+
+/* Charts row */
+.dashChartsRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.dashChartCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.dashChartTitle{font-size:12px;font-weight:700;color:var(--ts);text-transform:uppercase;letter-spacing:0.08em}
+.dashChartLegend{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;color:var(--tm);margin-top:6px}
+.dashLegendCurrent{width:10px;height:3px;border-radius:2px;background:var(--gold);display:inline-block}
+.dashLegendComp{width:10px;height:3px;border-radius:2px;background:var(--tm);display:inline-block;margin-left:8px}
+.dashMetricSpark{margin-top:6px}
+
+/* Bar chart */
+.barChart{display:flex;align-items:flex-end;gap:8px;padding-bottom:24px;position:relative}
+.barChartCol{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
+.barChartBar{width:100%;max-width:40px;border-radius:6px 6px 0 0;animation:barGrow 0.5s cubic-bezier(0.4,0,0.2,1) backwards;min-height:2px}
+@keyframes barGrow{from{height:0!important}}
+.barChartLabel{font-size:10px;font-weight:600;color:var(--tm);text-align:center;white-space:nowrap}
+.barChartVal{font-size:11px;font-weight:700;color:var(--tp);font-family:var(--fm)}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
