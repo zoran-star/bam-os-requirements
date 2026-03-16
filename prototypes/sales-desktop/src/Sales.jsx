@@ -1,0 +1,628 @@
+import { useState, useEffect, useRef, useCallback } from 'react';
+import s from './Sales.module.css';
+
+/* ─── DATA ─── */
+const LEADS = [
+  { id: 'l1', name: 'Marcus Johnson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: '4h ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
+  { id: 'l2', name: 'Sarah Chen', src: 'Web Form', days: '3d', daysClass: '', badge: 'active', lastContact: '1d ago', initials: 'MR', initClass: 'initS', stage: 'nl' },
+  { id: 'l3', name: 'David Ortiz', src: 'Facebook', days: '8d', daysClass: 'daysWarn', badge: 'paused', lastContact: '3d ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
+  { id: 'l4', name: 'Emily Watson', src: 'SMS', days: '2d', daysClass: '', badge: 'human', lastContact: '6h ago', initials: 'JT', initClass: 'initD', stage: 'ct' },
+  { id: 'l5', name: 'Jake Rivera', src: 'Phone', days: '5d', daysClass: '', badge: 'active', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'ct' },
+  { id: 'l6', name: 'Mia Thompson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: 'Tomorrow 4pm', initials: 'MR', initClass: 'initS', stage: 'tb' },
+  { id: 'l7', name: 'Liam Park', src: 'Web Form', days: '4d', daysClass: '', badge: 'human', lastContact: 'Fri 5:30pm', initials: 'JT', initClass: 'initD', stage: 'tb' },
+  { id: 'l8', name: 'Ava Martinez', src: 'Email', days: '2d', daysClass: '', badge: 'human', lastContact: '1d ago', initials: 'ZS', initClass: 'initG', stage: 'td' },
+  { id: 'l9', name: 'Noah Kim', src: 'Instagram', days: 'Today', daysClass: 'daysGold', badge: 'conv', lastContact: 'Today', initials: 'MR', initClass: 'initS', stage: 'mb' },
+  { id: 'l10', name: 'Chloe Davis', src: 'Facebook', days: '2d ago', daysClass: 'daysGold', badge: 'conv', lastContact: '2d ago', initials: 'ZS', initClass: 'initG', stage: 'mb' },
+];
+
+const STAGES = [
+  { id: 'nl', name: 'New Lead' },
+  { id: 'ct', name: 'Contacted' },
+  { id: 'tb', name: 'Trial Booked' },
+  { id: 'td', name: 'Trial Done' },
+  { id: 'mb', name: 'Member' },
+];
+
+const THREADS = [
+  { initials: 'MJ', name: 'Marcus Johnson', time: '4h ago', preview: 'Hey, I saw your academy on Instagram. What age groups do you have?', channel: 'Instagram DM', unread: true },
+  { initials: 'EW', name: 'Emily Watson', time: '6h ago', preview: 'Can we reschedule the trial to Saturday morning instead?', channel: 'SMS', unread: true },
+  { initials: 'AM', name: 'Ava Martinez', time: '1d ago', preview: 'My son loved the trial class! What are the membership options?', channel: 'Email', unread: true },
+  { initials: 'NK', name: 'Noah Kim', time: '2d ago', preview: 'Just signed up! When is the next beginner class?', channel: 'Instagram DM', unread: false },
+  { initials: 'JR', name: 'Jake Rivera', time: '2d ago', preview: 'AI: Hi Jake! Following up — would you like to book a trial this week?', channel: 'SMS', unread: false },
+];
+
+const TYPEWRITER_PROMPTS = [
+  "How should I follow up with Ava?",
+  "Which lead is most likely to close today?",
+  "Draft a re-engagement message for David Ortiz...",
+  "What\u2019s my biggest revenue risk right now?",
+];
+
+const BADGE_MAP = {
+  active: { cls: s.badgeActive, label: 'AI Active' },
+  paused: { cls: s.badgePaused, label: 'AI Paused' },
+  human: { cls: s.badgeHuman, label: 'Human' },
+  conv: { cls: s.badgeConv, label: 'Converted' },
+};
+
+const FILTERS = ['All Leads', 'My Leads', 'AI Active'];
+
+/* ─── LEAD CARD ─── */
+function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
+  const { badge } = BADGE_MAP[lead.badge];
+  let cardCls = s.card;
+  if (draggingId === lead.id) cardCls += ` ${s.cardDragging}`;
+  if (droppedId === lead.id) cardCls += ` ${s.cardDropped}`;
+
+  return (
+    <div
+      className={cardCls}
+      draggable
+      onDragStart={(e) => onDragStart(e, lead)}
+      onDragEnd={onDragEnd}
+    >
+      <div className={s.cardTop}>
+        <div className={s.leadName}>{lead.name}</div>
+        <div className={`${s.badge} ${BADGE_MAP[lead.badge].cls}`}>
+          <span className={s.badgeDot}></span>
+          {BADGE_MAP[lead.badge].label}
+        </div>
+      </div>
+      <div className={s.cardMeta}>
+        <span className={s.src}>{lead.src}</span>
+        <span className={`${s.days} ${lead.daysClass ? s[lead.daysClass] : ''}`}>{lead.days}</span>
+      </div>
+      <div className={s.cardFoot}>
+        <span className={s.last}>{lead.lastContact}</span>
+        <span className={`${s.init} ${s[lead.initClass]}`}>{lead.initials}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── MAIN COMPONENT ─── */
+export default function Sales() {
+  // State
+  const [columns, setColumns] = useState(() => {
+    const cols = {};
+    STAGES.forEach(st => { cols[st.id] = LEADS.filter(l => l.stage === st.id).map(l => l.id); });
+    return cols;
+  });
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
+  const [droppedId, setDroppedId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(0);
+  const [flipped, setFlipped] = useState({ trials: false, closed: false });
+  const [typewriterText, setTypewriterText] = useState('');
+
+  // Refs
+  const canvasRef = useRef(null);
+  const heroValRef = useRef(null);
+  const subVal1Ref = useRef(null);
+  const subVal2Ref = useRef(null);
+  const dragSrcCol = useRef(null);
+  const toastTimer = useRef(null);
+  const droppedTimer = useRef(null);
+
+  // Leads lookup
+  const leadsById = useRef(Object.fromEntries(LEADS.map(l => [l.id, l]))).current;
+
+  /* ─── BANNER CANVAS ─── */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let w, h, t = 0, animId;
+    const barCount = 18, barW = 10, barGap = 18, barBaseH = 0.55;
+
+    function resize() {
+      const r = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      w = rect.width; h = rect.height;
+      canvas.width = w * r; canvas.height = h * r;
+      canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+    }
+    function getBarX(i) {
+      const totalW = barCount * barW + (barCount - 1) * barGap;
+      return (w - totalW) / 2 + i * (barW + barGap);
+    }
+    function getBarH(i) {
+      const base = h * barBaseH, variance = h * 0.08;
+      return base + Math.sin(i * 0.45 + t * 0.017) * variance + Math.sin(i * 0.8 + t * 0.011) * variance * 0.5;
+    }
+    function genCurvePts(seed, amp, yOff) {
+      const pts = [], n = barCount - 1;
+      for (let i = 0; i <= n; i++) {
+        const x = getBarX(i) + barW / 2;
+        const bh = getBarH(i);
+        const y = (h - bh) + yOff + Math.sin(i * 0.6 + t * 0.014 + seed) * amp;
+        pts.push({ x, y });
+      }
+      return pts;
+    }
+    function drawCurve(pts, color, lw) {
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const cx = (pts[i].x + pts[i + 1].x) / 2;
+        const cy = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, cx, cy);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lw;
+      ctx.stroke();
+    }
+    function draw() {
+      const r = window.devicePixelRatio || 1;
+      ctx.setTransform(r, 0, 0, r, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      // Dot grid
+      const dotSpacing = 24;
+      ctx.fillStyle = 'rgba(200,168,78,0.12)';
+      for (let x = dotSpacing / 2; x < w; x += dotSpacing) {
+        for (let y = dotSpacing / 2; y < h; y += dotSpacing) {
+          ctx.beginPath(); ctx.arc(x, y, 1, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      // Bars
+      for (let i = 0; i < barCount; i++) {
+        const x = getBarX(i), bh = getBarH(i), y = h - bh;
+        const grad = ctx.createLinearGradient(x, y, x, h);
+        grad.addColorStop(0, 'rgba(212,182,92,0.18)');
+        grad.addColorStop(1, 'rgba(200,168,78,0.55)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.roundRect(x, y, barW, bh, 3); ctx.fill();
+      }
+      // Curves
+      const mainPts = genCurvePts(0, 6, -8);
+      const shadowPts = genCurvePts(1.5, 5, -2);
+      drawCurve(shadowPts, 'rgba(200,168,78,0.2)', 1);
+      drawCurve(mainPts, 'rgba(200,168,78,0.7)', 2);
+      // Glowing dots
+      const dotIndices = [2, 6, 10, 14, 17];
+      ctx.save();
+      for (const di of dotIndices) {
+        if (di < mainPts.length) {
+          const p = mainPts[di];
+          ctx.shadowBlur = 12; ctx.shadowColor = 'rgba(200,168,78,0.7)';
+          ctx.fillStyle = 'rgba(200,168,78,0.9)';
+          ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+      t++;
+      animId = requestAnimationFrame(draw);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    draw();
+    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(animId); };
+  }, []);
+
+  /* ─── COUNT-UP ─── */
+  useEffect(() => {
+    const entries = [
+      { ref: heroValRef, target: 57, suffix: '%', isBig: true },
+      { ref: subVal1Ref, target: 8, suffix: '', isBig: false },
+      { ref: subVal2Ref, target: 2, suffix: '', isBig: false },
+    ];
+    const duration = 920;
+    const start = performance.now();
+    let animId;
+    function tick(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      entries.forEach(({ ref, target, suffix, isBig }) => {
+        const el = ref.current;
+        if (!el) return;
+        const v = Math.round(e * target);
+        if (isBig) { el.innerHTML = v + '<span>' + suffix + '</span>'; }
+        else { el.textContent = v; }
+      });
+      if (p < 1) animId = requestAnimationFrame(tick);
+    }
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  /* ─── FLIP CARDS ─── */
+  useEffect(() => {
+    const timers = [];
+    // Auto-flip trials after 3s, closed after 4s
+    const t1 = setTimeout(() => {
+      const iv1 = setInterval(() => setFlipped(prev => ({ ...prev, trials: !prev.trials })), 4000);
+      timers.push(iv1);
+    }, 3000);
+    const t2 = setTimeout(() => {
+      const iv2 = setInterval(() => setFlipped(prev => ({ ...prev, closed: !prev.closed })), 4000);
+      timers.push(iv2);
+    }, 4000);
+    timers.push(t1, t2);
+    return () => timers.forEach(id => { clearTimeout(id); clearInterval(id); });
+  }, []);
+
+  /* ─── TYPEWRITER ─── */
+  useEffect(() => {
+    let pi = 0, ci = 0, deleting = false, timer;
+    function type() {
+      const txt = TYPEWRITER_PROMPTS[pi];
+      if (!deleting) {
+        setTypewriterText(txt.slice(0, ci + 1));
+        ci++;
+        if (ci >= txt.length) { timer = setTimeout(() => { deleting = true; type(); }, 2200); return; }
+        timer = setTimeout(type, 55 + Math.random() * 40);
+      } else {
+        setTypewriterText(txt.slice(0, ci));
+        ci--;
+        if (ci <= 0) { deleting = false; pi = (pi + 1) % TYPEWRITER_PROMPTS.length; timer = setTimeout(type, 400); return; }
+        timer = setTimeout(type, 25);
+      }
+    }
+    timer = setTimeout(type, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  /* ─── DRAG & DROP ─── */
+  const handleDragStart = useCallback((e, lead) => {
+    setDraggingId(lead.id);
+    // Find which column this lead is in
+    for (const [colId, ids] of Object.entries(columns)) {
+      if (ids.includes(lead.id)) { dragSrcCol.current = colId; break; }
+    }
+    e.dataTransfer.effectAllowed = 'move';
+  }, [columns]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingId(null);
+    setDragOverCol(null);
+    dragSrcCol.current = null;
+  }, []);
+
+  const handleDragOver = useCallback((e, colId) => {
+    e.preventDefault();
+    setDragOverCol(colId);
+  }, []);
+
+  const handleDragLeave = useCallback((e, colId) => {
+    const col = e.currentTarget;
+    if (!col.contains(e.relatedTarget)) setDragOverCol(null);
+  }, []);
+
+  const handleDrop = useCallback((e, targetColId) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    if (!draggingId || targetColId === dragSrcCol.current) return;
+
+    setColumns(prev => {
+      const next = { ...prev };
+      // Remove from source
+      const srcId = dragSrcCol.current;
+      next[srcId] = prev[srcId].filter(id => id !== draggingId);
+      // Add to target
+      next[targetColId] = [...prev[targetColId], draggingId];
+      return next;
+    });
+
+    // Dropped animation
+    setDroppedId(draggingId);
+    clearTimeout(droppedTimer.current);
+    droppedTimer.current = setTimeout(() => setDroppedId(null), 380);
+
+    // Toast
+    setToastVisible(true);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToastVisible(false), 1600);
+
+    // Sound
+    try {
+      const a = new (window.AudioContext || window.webkitAudioContext)();
+      const o = a.createOscillator(), g = a.createGain();
+      o.connect(g); g.connect(a.destination);
+      o.frequency.value = 300; o.type = 'sine';
+      g.gain.setValueAtTime(0.055, a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + 0.11);
+      o.start(); o.stop(a.currentTime + 0.11);
+    } catch (_) {}
+  }, [draggingId]);
+
+  /* ─── FLIP CARD HOVER ─── */
+  const flipHoverTimers = useRef({});
+  const handleFlipEnter = useCallback((key) => {
+    clearTimeout(flipHoverTimers.current[key]);
+    setFlipped(prev => ({ ...prev, [key]: true }));
+  }, []);
+  const handleFlipLeave = useCallback((key) => {
+    flipHoverTimers.current[key] = setTimeout(() => {
+      setFlipped(prev => ({ ...prev, [key]: false }));
+    }, 1200);
+  }, []);
+
+  /* ─── RENDER ─── */
+  return (
+    <div className={s.body}>
+      {/* SVG noise filter */}
+      <svg className={s.noiseFilter} xmlns="http://www.w3.org/2000/svg">
+        <filter id="noiseFilter">
+          <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" result="noise" />
+          <feColorMatrix type="saturate" values="0" in="noise" />
+        </filter>
+      </svg>
+
+      {/* SIDEBAR */}
+      <aside className={s.sidebar}>
+        <div className={s.logoWrap}>
+          <div className={s.logoMark}>B</div>
+          <div className={s.logoText}>
+            <div className={s.logoName}>BAM OS</div>
+            <div className={s.logoSub}>Command Center</div>
+          </div>
+        </div>
+        <nav className={s.nav}>
+          <span className={s.navLabel}>Main</span>
+          <div className={s.navItem}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
+            <span>Home</span>
+          </div>
+          <div className={s.navItem}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+            <span>Marketing</span>
+          </div>
+          <div className={`${s.navItem} ${s.active}`}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+            <span>Sales</span>
+          </div>
+          <div className={s.navItem}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <span>Management</span>
+          </div>
+        </nav>
+        <div className={s.sidebarFooter}>
+          <div className={s.av}>ZS</div>
+          <div>
+            <div className={s.coachName}>Zoran Savic</div>
+            <div className={s.coachRole}>Owner</div>
+          </div>
+          <div className={s.settingsBtn}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main className={s.main}>
+        {/* BANNER */}
+        <div className={s.banner}>
+          <canvas className={s.bannerCanvas} ref={canvasRef}></canvas>
+          <div className={s.bannerTop}>
+            <h1 className={s.pageTitle}>Sales</h1>
+            <div className={s.bannerStats}>
+              <div className={s.statPill}>+12.4% MTD</div>
+              <div className={s.statPill}>34 Leads</div>
+              <div className={s.statPill}>82% Close</div>
+            </div>
+          </div>
+          <div className={s.bannerBottom}>
+            <div></div>
+            <a className={s.dashLink} href="#">
+              Full dashboard
+              <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+          </div>
+        </div>
+
+        <div className={s.scroll}>
+          {/* FLOW GUIDE */}
+          <div className={s.flowGuide} aria-hidden="true">
+            {Array.from({ length: 5 }, (_, i) => (
+              <div className={s.flowArrow} key={i}>
+                <div className={s.flowDash}></div>
+                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+              </div>
+            ))}
+          </div>
+
+          {/* HERO */}
+          <div className={s.hero}>
+            {/* KPI CARD */}
+            <div className={s.kpiCard}>
+              <div className={s.kpiCardTitle}>Your sales this month...</div>
+              <div className={s.kpiHero}>
+                <div className={s.kpiHeroLeft}>
+                  <div className={s.kpiHeroLabel}>Qualified Trial Close Rate</div>
+                  <div className={s.kpiHeroVal} ref={heroValRef}>0<span>%</span></div>
+                </div>
+                <div className={s.kpiHeroRight}>
+                  <div className={s.kpiHeroTrend}>
+                    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                    +8pts
+                  </div>
+                </div>
+              </div>
+              <div className={s.kpiSubRow}>
+                {/* Flip card: Trials */}
+                <div
+                  className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.trials ? s.flipped : ''}`}
+                  onMouseEnter={() => handleFlipEnter('trials')}
+                  onMouseLeave={() => handleFlipLeave('trials')}
+                >
+                  <div className={s.kpiSubLabel}>Qualified Trials</div>
+                  <div className={s.kpiFlipInner}>
+                    <div className={s.kpiFlipFront}>
+                      <div className={s.kpiSubVal} ref={subVal1Ref}>0</div>
+                      <div className={s.kpiSubFoot}>
+                        <span className={s.kpiSubTrend}>
+                          <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                          +3
+                        </span>
+                        <span className={s.kpiSubPeriod}>vs last mo</span>
+                      </div>
+                    </div>
+                    <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
+                      <div className={s.kpiFlipComparison}>+3 from last month</div>
+                      <div className={s.kpiFlipPrev}>5 last month</div>
+                    </div>
+                  </div>
+                </div>
+                {/* Flip card: Closed */}
+                <div
+                  className={`${s.kpiSub} ${s.kpiFlipCard} ${flipped.closed ? s.flipped : ''}`}
+                  onMouseEnter={() => handleFlipEnter('closed')}
+                  onMouseLeave={() => handleFlipLeave('closed')}
+                >
+                  <div className={s.kpiSubLabel}>Sales Closed</div>
+                  <div className={s.kpiFlipInner}>
+                    <div className={s.kpiFlipFront}>
+                      <div className={s.kpiSubVal} ref={subVal2Ref}>0</div>
+                      <div className={s.kpiSubFoot}>
+                        <span className={s.kpiSubTrend}>
+                          <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
+                          +2
+                        </span>
+                        <span className={s.kpiSubPeriod}>vs last mo</span>
+                      </div>
+                    </div>
+                    <div className={`${s.kpiFlipBack} ${s.kpiFlipUp}`}>
+                      <div className={s.kpiFlipComparison}>+2 from last month</div>
+                      <div className={s.kpiFlipPrev}>0 last month</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className={s.kpiProgress}>
+                <div className={s.kpiProgressLabel}>
+                  <span className={s.kpiProgressText}>Month progress</span>
+                  <span className={s.kpiProgressPct}>Day 15 of 31</span>
+                </div>
+                <div className={s.kpiBar}>
+                  <div className={s.kpiBarFill} style={{ '--bar-pct': '48%' }}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* SAGE CARD */}
+            <div className={s.sageCard}>
+              <div className={s.sageBody}>
+                <div className={s.sageBodyContent}>
+                  <div className={s.sagePriorityBadge}>Priority Insight</div>
+                  <div className={s.sageInsight}>
+                    <div className={s.sageInsightText}>🔥 Ava Martinez completed a trial 1 day ago — highest close probability in pipeline. Follow up now before momentum fades.</div>
+                  </div>
+                </div>
+                <div className={s.sageMicWrap}>
+                  <div className={s.sageMic}>
+                    <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                  </div>
+                  <div className={s.sageMicLabel}>Tap to speak</div>
+                </div>
+              </div>
+              <div className={s.sageDivider}></div>
+              <div className={s.sageInput}>
+                <div className={s.sageInputText}>
+                  <span>{typewriterText}</span>
+                  <span className={s.sageInputCursor}></span>
+                </div>
+                <div className={s.sageInputSend}>
+                  <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* KANBAN */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div className={s.kanbanHead}>
+              <div className={s.kanbanTitle}>Pipeline</div>
+              <div className={s.filters}>
+                {FILTERS.map((f, i) => (
+                  <button
+                    key={f}
+                    className={`${s.fbtn} ${i === activeFilter ? s.fbtnActive : ''}`}
+                    onClick={() => setActiveFilter(i)}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className={s.board}>
+              {STAGES.map(stage => (
+                <div
+                  key={stage.id}
+                  className={`${s.col} ${dragOverCol === stage.id ? s.colDragOver : ''}`}
+                  onDragOver={(e) => handleDragOver(e, stage.id)}
+                  onDragLeave={(e) => handleDragLeave(e, stage.id)}
+                  onDrop={(e) => handleDrop(e, stage.id)}
+                >
+                  <div className={s.colHead}>
+                    <span className={s.colName}>{stage.name}</span>
+                    <span className={s.colCt}>{columns[stage.id].length}</span>
+                  </div>
+                  <div className={s.cards}>
+                    {columns[stage.id].map(id => (
+                      <LeadCard
+                        key={id}
+                        lead={leadsById[id]}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        draggingId={draggingId}
+                        droppedId={droppedId}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* INBOX BUTTON */}
+      <button className={s.inboxBtn} onClick={() => setPanelOpen(p => !p)}>
+        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <div className={s.inboxCt}>3</div>
+      </button>
+
+      {/* TOAST */}
+      <div className={`${s.toast} ${toastVisible ? s.toastShow : ''}`}>
+        <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        Card moved
+      </div>
+
+      {/* OVERLAY */}
+      <div
+        className={`${s.overlay} ${panelOpen ? s.overlayOpen : ''}`}
+        onClick={() => setPanelOpen(false)}
+      ></div>
+
+      {/* PANEL */}
+      <div className={`${s.panel} ${panelOpen ? s.panelOpen : ''}`}>
+        <div className={s.panelHead}>
+          <span className={s.panelTitle}>Lead Inbox</span>
+          <button className={s.closeBtn} onClick={() => setPanelOpen(false)}>&times;</button>
+        </div>
+        <div className={s.threads}>
+          {THREADS.map((t, i) => (
+            <div key={i} className={`${s.thread} ${t.unread ? s.threadUnread : ''}`}>
+              <div className={s.tav}>{t.initials}</div>
+              <div className={s.tcontent}>
+                <div className={s.ttop}>
+                  <span className={s.tname}>{t.name}</span>
+                  <span className={s.ttime}>{t.time}</span>
+                </div>
+                <div className={s.tprev}>{t.preview}</div>
+                <div className={s.tmeta}>
+                  <span className={s.tch}>{t.channel}</span>
+                  {t.unread && <div className={s.udot}></div>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
