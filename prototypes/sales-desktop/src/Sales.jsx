@@ -580,7 +580,7 @@ function genSampleData(periodDays) {
     unqualified_trials: Math.round(3 * scale), no_shows: Math.round(2 * scale),
     sales_won: Math.round(5 * scale), close_rate: '62.5%',
     ai_engaged_bookings: Math.round(6 * scale), ai_conversion_rate: '42%',
-    non_ai_conversion_rate: '28%', avg_time_to_booking: '1.8 days',
+    post_trial_time_to_close: '3.2 days', avg_time_to_booking: '1.8 days',
     lead_source_attribution: [
       { source: 'Instagram', leads: Math.round(14 * scale), trials: Math.round(4 * scale), sales: Math.round(2 * scale) },
       { source: 'Google', leads: Math.round(8 * scale), trials: Math.round(2 * scale), sales: Math.round(1 * scale) },
@@ -589,7 +589,7 @@ function genSampleData(periodDays) {
       { source: 'Walk-in', leads: Math.round(2 * scale), trials: 0, sales: 0 },
       { source: 'Other', leads: Math.round(1 * scale), trials: 0, sales: 0 },
     ],
-    notes: 'AI conversion rate is 14pts above non-AI. Instagram is your highest-volume source. 2 closings pending from this week\u2019s trials.',
+    notes: 'AI conversion rate outperforming direct bookings by 14pts. Post-trial close time trending down — 2 closings pending from this week\u2019s trials.',
     // Time series
     leadsOverTime: rand(3, 2), trialsOverTime: rand(1.5, 1), salesOverTime: rand(0.8, 0.6),
     closeRateOverTime: rand(55, 12), aiRateOverTime: rand(40, 8),
@@ -606,7 +606,6 @@ function FullDashboard({ onClose }) {
   const showComp = compare !== 'none';
   const periodObj = PERIODS.find(p => p.id === period);
   const data = genSampleData(periodObj.days);
-  const sourceData = data.lead_source_attribution;
 
   const pipelineMetrics = [
     { label: 'Total Leads', value: data.total_leads, sub: 'All leads this period', spark: data.leadsOverTime, comp: data.leadsComp },
@@ -619,13 +618,9 @@ function FullDashboard({ onClose }) {
   const aiMetrics = [
     { label: 'AI-Engaged Bookings', value: data.ai_engaged_bookings, sub: 'AI-engaged leads that booked' },
     { label: 'AI Conversion Rate', value: data.ai_conversion_rate, sub: 'AI bookings \u00F7 AI-engaged leads', spark: data.aiRateOverTime, comp: data.aiRateComp },
-    { label: 'Non-AI Conversion Rate', value: data.non_ai_conversion_rate, sub: 'Direct bookings \u00F7 non-AI leads' },
+    { label: 'Post-Trial Time to Close', value: data.post_trial_time_to_close, sub: 'Trial attended → membership signed' },
     { label: 'Avg Time to Booking', value: data.avg_time_to_booking, sub: 'First AI contact \u2192 trial booked' },
   ];
-  const sourceBarItems = sourceData.map(r => ({
-    label: r.source.length > 6 ? r.source.slice(0, 6) + '\u2026' : r.source,
-    value: r.leads, color: 'var(--gold)',
-  }));
 
   return (
     <div className={s.dashFull}>
@@ -700,38 +695,14 @@ function FullDashboard({ onClose }) {
         {/* Charts row */}
         <div className={s.dashChartsRow}>
           <div className={s.dashChartCard}>
-            <div className={s.dashChartTitle}>Leads over time</div>
-            <Sparkline data={data.leadsOverTime} compData={showComp ? data.leadsComp : null} height={120} />
-            {showComp && <div className={s.dashChartLegend}><span className={s.dashLegendCurrent} />{periodObj.label}<span className={s.dashLegendComp} />Previous</div>}
-          </div>
-          <div className={s.dashChartCard}>
             <div className={s.dashChartTitle}>Close rate trend</div>
             <Sparkline data={data.closeRateOverTime} compData={showComp ? data.closeRateComp : null} color="#3EAF5C" compColor="#A5A19A" height={120} />
             {showComp && <div className={s.dashChartLegend}><span className={s.dashLegendCurrent} style={{ background: '#3EAF5C' }} />{periodObj.label}<span className={s.dashLegendComp} />Previous</div>}
           </div>
-        </div>
-
-        {/* Lead source */}
-        <div className={s.dashSectionLabel}>Lead Source Attribution <span className={s.dashRef}>SAL-002</span></div>
-        <div className={s.dashChartsRow}>
           <div className={s.dashChartCard}>
-            <div className={s.dashChartTitle}>Leads by source</div>
-            <BarChart items={sourceBarItems} height={130} />
-          </div>
-          <div className={s.dashChartCard} style={{ flex: 1.2 }}>
-            <div className={s.dashSourceTable}>
-              <div className={s.dashSourceHeader}>
-                <span>Source</span><span>Leads</span><span>Trials</span><span>Sales</span>
-              </div>
-              {sourceData.map((row, i) => (
-                <div key={i} className={s.dashSourceRow}>
-                  <span className={s.dashSourceName}>{row.source}</span>
-                  <span>{row.leads}</span>
-                  <span>{row.trials}</span>
-                  <span className={s.dashSourceSales}>{row.sales}</span>
-                </div>
-              ))}
-            </div>
+            <div className={s.dashChartTitle}>Sales won over time</div>
+            <Sparkline data={data.salesOverTime} compData={showComp ? data.salesComp : null} height={120} />
+            {showComp && <div className={s.dashChartLegend}><span className={s.dashLegendCurrent} />{periodObj.label}<span className={s.dashLegendComp} />Previous</div>}
           </div>
         </div>
       </div>
