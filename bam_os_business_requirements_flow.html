@@ -1783,7 +1783,7 @@
                 jobs: [
                     {
                         id: 'MEM-001',
-                        version: '—',
+                        version: 'p2',
                         accessLevel: 'Admin, Coach',
                         isParent: false,
                         title: 'Attendance tracking',
@@ -1828,7 +1828,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-002a',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin, Coach',
                                 title: '1:1 direct messaging',
                                 requirement: '1:1 direct messaging — coach sends a message to an individual member from the BAM OS dashboard. Compose flow shows member context (name, membership status, program, last attendance date, payment status) in a sidebar panel. Coach can type text, attach media (images, videos, files), or select a template. Message is delivered via in-app and SMS simultaneously. Member can reply; replies appear in the BAM OS dashboard unified inbox as a conversation thread. Conversation history persists — coach sees full message history with each member.',
@@ -1846,7 +1846,7 @@
                             },
                             {
                                 id: 'MEM-002b',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Group broadcast messaging',
                                 requirement: 'Group broadcast messaging — coach composes a single message and sends it to a filtered group of members. Each member receives the message as an individual message (no group thread visible to the member). Coach can type text, attach media, or select a template. Recipient list is built using smart filters (MEM-002d) or manual selection. Before sending, coach sees a recipient preview showing count and list of names. Coach can remove individual members from the list before sending. Delivery is staggered to avoid rate limits. Coach sees aggregate delivery stats (sent, delivered, read, failed counts) in a broadcast summary view.',
@@ -1864,7 +1864,7 @@
                             },
                             {
                                 id: 'MEM-002c',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Message templates',
                                 requirement: 'Message templates — pre-built and custom message templates accessible from the compose flow for both 1:1 and group messages. System ships with default templates across three categories: operational (class cancelled, schedule change, holiday hours, facility update), retention (missed you at class, membership expiring soon, welcome back from pause, payment failed), and engagement (happy birthday, milestone celebration, referral ask, new program announcement). Coach can edit defaults, create custom templates, and save any sent message as a new template. Templates support dynamic placeholders (member first name, program name, next class date, coach name) that auto-fill on send. Templates are stored per academy.',
@@ -1882,7 +1882,7 @@
                             },
                             {
                                 id: 'MEM-002d',
-                                version: '—',
+                                version: 'p1',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Smart audience filters',
                                 requirement: 'Smart audience filters — within the group broadcast compose flow (MEM-002b), coach can build a recipient list using combinable filters. Available filters: membership status (active, paused, cancelled), program/class (specific program or class enrollment), attendance (attended last X days, missed last X classes, attendance rate above/below threshold), age group, membership duration (member for X+ months), payment status (current, overdue, failed). Filters are combinable with AND logic. Coach can save frequently used filter combinations as named segments (e.g., "Active members in Elite Program," "Members who missed 2+ classes this month"). Saved segments update dynamically — membership changes are reflected in real time when the segment is used.',
@@ -1900,7 +1900,7 @@
                             },
                             {
                                 id: 'MEM-002e',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Message scheduling',
                                 requirement: 'Message scheduling — coach can compose a message (1:1 or broadcast) and schedule it for a future date and time instead of sending immediately. Scheduled messages appear in a "Scheduled" tab within the messaging section of the BAM OS dashboard. Coach can view, edit, or cancel any scheduled message before it sends. Scheduled time is displayed in the academy\'s local timezone. When the scheduled time arrives, the message is sent automatically using the same delivery flow as immediate sends (MEM-002a or MEM-002b). Coach receives a confirmation notification after the scheduled message is sent.',
@@ -1918,7 +1918,7 @@
                             },
                             {
                                 id: 'MEM-002f',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Delivery tracking and read receipts',
                                 requirement: 'Delivery tracking and read receipts — full visibility into message delivery status for every message sent through the system. Per-message status tracking: sent (message dispatched), delivered (confirmed receipt by carrier or app), read (member opened the message), failed (delivery error with reason). For group broadcasts, aggregate stats shown in broadcast summary (total sent, delivered, read, failed) with ability to drill into individual recipient status. Failed messages surface the failure reason (invalid number, carrier rejection, opted out) and offer retry for transient failures. Read receipt data available for in-app messages; SMS read receipts depend on carrier support (best effort). Dashboard shows a delivery analytics view with historical send volume, delivery rate, and read rate trends.',
@@ -1958,7 +1958,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-003a',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Total active members',
                                 requirement: 'Total active members — count of members with an active (non-paused, non-cancelled) subscription at time of viewing.',
@@ -1972,7 +1972,7 @@
                             },
                             {
                                 id: 'MEM-003b',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'New members',
                                 requirement: 'New members — count of members who started their first active subscription within the selected date range.',
@@ -1985,7 +1985,7 @@
                             },
                             {
                                 id: 'MEM-003c',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Churned members',
                                 requirement: 'Churned members — count of members whose subscription was cancelled (not paused) within the selected date range.',
@@ -1998,7 +1998,7 @@
                             },
                             {
                                 id: 'MEM-003d',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Pause rate',
                                 requirement: 'Pause rate — percentage of active members who initiated at least one pause within the selected date range.',
@@ -2024,7 +2024,7 @@
                             },
                             {
                                 id: 'MEM-003f',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Average attendance per class',
                                 requirement: 'Average attendance per class — average number of athletes who attended across all sessions within the selected date range.',
@@ -2037,7 +2037,7 @@
                             },
                             {
                                 id: 'MEM-003g',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Churn rate',
                                 requirement: 'Churn rate — percentage of members at the start of the selected period who cancelled before the end of the period.',
@@ -2051,7 +2051,7 @@
                             },
                             {
                                 id: 'MEM-003h',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin',
                                 title: 'Average membership duration',
                                 requirement: 'Average membership duration — average number of days between subscription start and cancellation for all members who cancelled within the selected date range.',
@@ -2087,7 +2087,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-004a',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'AI first response',
                                 requirement: 'AI first response — AI handles initial member query using business-specific and member-specific context; responds within scope, escalates when outside context.',
@@ -2100,7 +2100,7 @@
                             },
                             {
                                 id: 'MEM-004b',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Coach escalation',
                                 requirement: 'Coach escalation — unresolved or out-of-context AI chats routed to available coach at member\'s location; coach sees full conversation history.',
@@ -2133,7 +2133,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-005a',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Coach creates and publishes report',
                                 requirement: 'Coach creates and publishes report — coach authors report using predefined section structure, previews, and publishes.',
@@ -2146,7 +2146,7 @@
                             },
                             {
                                 id: 'MEM-005b',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Member views player reports',
                                 requirement: 'Member views player reports — parent and player can view all published reports for their player(s) with full history.',
@@ -2180,7 +2180,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-006a',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Member submits cancellation request',
                                 requirement: 'Member submits cancellation request — member selects reason from dropdown and submits form; confirmation state displayed; coach notified.',
@@ -2193,7 +2193,7 @@
                             },
                             {
                                 id: 'MEM-006b',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Coach confirms cancellation',
                                 requirement: 'Coach confirms cancellation — coach reviews request, attempts member outreach, and confirms or rejects cancellation in system; confirmed cancellations scheduled in Stripe.',
@@ -2207,7 +2207,7 @@
                     },
                     {
                         id: 'MEM-007',
-                        version: '—',
+                        version: 'p2',
                         accessLevel: 'Admin, Coach',
                         category: 'Alerts & Notifications',
                         isParent: false,
@@ -2226,7 +2226,7 @@
                     },
                     {
                         id: 'MEM-008',
-                        version: '—',
+                        version: 'p3',
                         accessLevel: 'Admin, Coach',
                         category: 'Onboarding',
                         isParent: false,
@@ -2245,7 +2245,7 @@
                     },
                     {
                         id: 'MEM-009',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Credit-Based Scheduling System',
                         isParent: false,
@@ -2264,7 +2264,7 @@
                     },
                     {
                         id: 'MEM-010',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Online Programs',
                         isParent: false,
@@ -2304,7 +2304,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-011a',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Table and card list views',
                                 requirement: 'Table and card list views — default table view with sortable columns (name, status, plan, last attendance date, payment status, location). Card view alternative showing member photo, name, status badge, plan name, and last attendance. Toggle between views persists per coach session. Both views support the same search and filter controls. Pagination or infinite scroll for lists exceeding 50 members.',
@@ -2317,7 +2317,7 @@
                             },
                             {
                                 id: 'MEM-011b',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin, Coach',
                                 title: '360° member detail drawer',
                                 requirement: '360° member detail drawer — slide-out panel triggered by clicking a member from the list view. Sections displayed: (1) header with name, photo, status badge, plan, location; (2) billing summary (current plan, next payment date, payment method, lifetime revenue); (3) attendance summary (total sessions, current streak, last attended); (4) recent messages (last 5 messages with link to full thread in MEM-002); (5) player reports (list of published reports with link to MEM-005); (6) internal notes (scrollable note history with add new note input); (7) eligibility tags (current tag with edit option); (8) signed documents (list with signed dates); (9) pause history (all pauses with dates and durations). Each section is collapsible. Drawer width is approximately 40% of viewport.',
@@ -2331,7 +2331,7 @@
                             },
                             {
                                 id: 'MEM-011c',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Internal notes',
                                 requirement: 'Internal notes — private coach-only notes stored per member. Coach can add a new note from the detail drawer (MEM-011b). Each note is timestamped and attributed to the authoring coach. Notes are displayed in reverse chronological order (newest first). Notes are plain text with a 2000-character limit per note. No limit on total notes per member. Notes are searchable from the member directory search bar (search matches note content in addition to member name/email/phone). Notes are never visible to the member.',
@@ -2370,7 +2370,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-012a',
-                                version: '—',
+                                version: 'p0',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Active pause list view',
                                 requirement: 'Active pause list view — table showing all currently paused members: member name, player name, pause start date, scheduled resume date, total duration, days remaining, pause reason (if provided). Sortable by any column. Default sort: days remaining ascending. Filter by location. Badge showing total pause count.',
@@ -2383,7 +2383,7 @@
                             },
                             {
                                 id: 'MEM-012b',
-                                version: '—',
+                                version: 'p1',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Coach pause actions',
                                 requirement: 'Coach pause actions — from the active pause list or member detail drawer, coach can: (1) extend pause by selecting a new resume date, (2) shorten pause by selecting an earlier resume date, (3) end pause immediately (member resumes today, billing date recalculated), (4) initiate a new pause on behalf of an active member by selecting start date and duration. All actions require confirmation. All actions update Stripe subscription billing dates. All actions logged in pause history with coach attribution.',
@@ -2399,7 +2399,7 @@
                     },
                     {
                         id: 'MEM-013',
-                        version: '—',
+                        version: 'p1',
                         accessLevel: 'Admin, Coach',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -2446,7 +2446,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-014a',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin',
                                 title: 'Staff list and coach creation',
                                 requirement: 'Staff list and coach creation — admin view showing all coach accounts with name, email, role, assigned location(s), and status (active/deactivated). "Add Coach" button opens a form: name, email, role (Admin or Coach), location assignment (multi-select). On submit, invitation email sent to coach. Admin can also deactivate a coach (revokes login access, preserves data) or reactivate a previously deactivated coach.',
@@ -2459,7 +2459,7 @@
                             },
                             {
                                 id: 'MEM-014b',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin',
                                 title: 'Role-based access control',
                                 requirement: 'Role-based access control — BAM OS dashboard enforces role-based visibility and actions. Admin role: full access to all locations, all members, business metrics (MEM-003), staff management (MEM-014), and all operational features. Coach role: access scoped to assigned location(s) only — sees only members at their location(s), can message, create reports, manage support tickets, and view attendance for their location(s) only. Cannot access business metrics, staff management, or members at other locations. Role is evaluated on every page load and API call.',
@@ -2498,7 +2498,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-015a',
-                                version: '—',
+                                version: 'p2',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Failed payment list view',
                                 requirement: 'Failed payment list view — table showing all members with active payment failures: member name, player name, amount due, failure reason, failure date, Stripe retry status (X of Y attempts remaining), last retry date, next scheduled retry, coach outreach status (not contacted / contacted / resolved). Sortable by any column. Default sort: failure date descending (newest first). Filter by location and outreach status. Badge showing total active failure count visible in dashboard navigation.',
@@ -2511,7 +2511,7 @@
                             },
                             {
                                 id: 'MEM-015b',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Coach payment actions',
                                 requirement: 'Coach payment actions — from the failed payment list, coach can: (1) trigger manual Stripe retry (one-click), (2) send payment reminder to member (opens MEM-002a compose with payment failure template pre-filled), (3) mark as "contacted" with optional note, (4) view member detail drawer (MEM-011b) for full context. After Stripe dunning exhausts all retries, coach gets additional options: (5) extend grace period (keep subscription active for X additional days), (6) cancel subscription (routes to MEM-006 cancellation flow). All actions logged with timestamp and coach attribution.',
@@ -2527,7 +2527,7 @@
                     },
                     {
                         id: 'MEM-016',
-                        version: '—',
+                        version: 'p0',
                         accessLevel: 'Admin, Coach',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -2551,7 +2551,7 @@
                     },
                     {
                         id: 'MEM-017',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Retention Intelligence',
                         isParent: false,
@@ -2596,7 +2596,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-018a',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'At-risk queue view',
                                 requirement: 'At-risk queue view — a dedicated list view in BAM OS showing all members currently at Yellow or Red health score status. Columns: member name, health score badge (Yellow/Red), top risk factor (e.g., "no attendance in 21 days"), last contact date, days in queue, outreach status (not contacted / contacted / follow-up needed). Sortable by severity, days in queue, and last contact date. Default sort: Red first, then by days in queue descending. Filter by location. Badge count in navigation shows total at-risk members.',
@@ -2609,7 +2609,7 @@
                             },
                             {
                                 id: 'MEM-018b',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'One-click outreach action',
                                 requirement: 'One-click outreach action — from the at-risk queue, coach clicks "Reach Out" next to a member. This opens MEM-002a compose flow pre-filled with a retention message template that includes the member\'s first name, days since last attendance, and program name. Coach can edit the message before sending. After sending, the member\'s outreach status in the queue updates to "contacted" with timestamp. If the member attends a class within 14 days of outreach, the queue item auto-resolves with "re-engaged" status.',
@@ -2624,7 +2624,7 @@
                     },
                     {
                         id: 'MEM-019',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Retention Intelligence',
                         isParent: false,
@@ -2647,7 +2647,7 @@
                     },
                     {
                         id: 'MEM-020',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Retention Intelligence',
                         isParent: false,
@@ -2692,7 +2692,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-021a',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Dunning notification sequence',
                                 requirement: 'Dunning notification sequence — automated in-app and SMS notifications sent at Days 0, 3, and 7 of a failed payment. Each notification includes the member name, failed amount, failure reason (if available from Stripe), and a direct link to the Stripe hosted payment update UI. Notification content uses the academy\'s brand voice profile. All notifications logged in member message history.',
@@ -2705,7 +2705,7 @@
                             },
                             {
                                 id: 'MEM-021b',
-                                version: '—',
+                                version: 'p3',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Access suspension and auto-cancel',
                                 requirement: 'Access suspension and auto-cancel — at Day 14 of unresolved failed payment, member\'s ability to book new classes is suspended in the scheduling app. Member receives notification informing them of the suspension and the Day 21 auto-cancel deadline. At Day 21, subscription is cancelled in Stripe, member record is updated to cancelled status, and member enters MEM-020 win-back queue.',
@@ -2720,7 +2720,7 @@
                     },
                     {
                         id: 'MEM-022',
-                        version: '—',
+                        version: 'p3',
                         accessLevel: 'Admin, Coach',
                         category: 'Billing & Revenue Recovery',
                         isParent: false,
@@ -2743,7 +2743,7 @@
                     },
                     {
                         id: 'MEM-023',
-                        version: '—',
+                        version: 'p0',
                         accessLevel: 'Admin, Coach',
                         category: 'Billing & Revenue Recovery',
                         isParent: false,
@@ -2766,7 +2766,7 @@
                     },
                     {
                         id: 'MEM-024',
-                        version: '—',
+                        version: 'p1',
                         accessLevel: 'Admin, Coach',
                         category: 'Billing & Revenue Recovery',
                         isParent: false,
@@ -2811,7 +2811,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-025a',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin',
                                 title: 'Activation milestone tracking',
                                 requirement: 'Activation milestone tracking — three binary milestones tracked per member: (1) profile complete (photo + bio + all player profiles populated), (2) first booking (any class booking event from scheduling app), (3) first attendance (any check-in event from MEM-001). Each milestone is timestamped on first completion. Milestones are not reversible (deleting a photo does not un-complete milestone 1). All three milestones displayed as a mini-checklist in MEM-011b detail drawer.',
@@ -2824,7 +2824,7 @@
                             },
                             {
                                 id: 'MEM-025b',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin',
                                 title: 'Not-yet-activated follow-up flag',
                                 requirement: 'Not-yet-activated follow-up flag — a nightly agent job checks all members who signed up more than 7 days ago and have not yet achieved all three activation milestones. These members are added to MEM-018a at-risk queue under a dedicated "Activation Needed" category (separate from Yellow/Red health score members). Coach sees which specific milestone is missing and a one-click message action using an activation encouragement template.',
@@ -2839,7 +2839,7 @@
                     },
                     {
                         id: 'MEM-026',
-                        version: '—',
+                        version: 'p0',
                         accessLevel: 'Admin, Coach',
                         category: 'Scheduling & Operations',
                         isParent: false,
@@ -2862,7 +2862,7 @@
                     },
                     {
                         id: 'MEM-027',
-                        version: '—',
+                        version: 'p3',
                         accessLevel: 'Admin, Coach',
                         category: 'Scheduling & Operations',
                         isParent: false,
@@ -2885,7 +2885,7 @@
                     },
                     {
                         id: 'MEM-028',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Analytics & Reporting',
                         isParent: false,
@@ -2908,7 +2908,7 @@
                     },
                     {
                         id: 'MEM-029',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Analytics & Reporting',
                         isParent: false,
@@ -2931,7 +2931,7 @@
                     },
                     {
                         id: 'MEM-030',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -2954,7 +2954,7 @@
                     },
                     {
                         id: 'MEM-031',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -2977,7 +2977,7 @@
                     },
                     {
                         id: 'MEM-032',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin',
                         category: 'Growth & Acquisition',
                         isParent: false,
@@ -3000,7 +3000,7 @@
                     },
                     {
                         id: 'MEM-033',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -3023,7 +3023,7 @@
                     },
                     {
                         id: 'MEM-034',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin',
                         category: 'Coach & Admin Panel',
                         isParent: false,
@@ -3046,7 +3046,7 @@
                     },
                     {
                         id: 'MEM-035',
-                        version: '—',
+                        version: 'p4',
                         accessLevel: 'Admin, Coach',
                         isParent: false,
                         title: 'Streak tracker',
@@ -3091,7 +3091,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-036a',
-                                version: '—',
+                                version: 'p1',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Session roster board',
                                 requirement: 'Session roster board — display a grid of athlete profile photos for the current session. If the academy uses a booking system, show only booked athletes. If the academy uses an open/drop-in model, show all active members at that location. Grid is sorted alphabetically by default with option to sort by recent check-in. Each card shows photo, first name, and a subtle booking/drop-in badge.',
@@ -3104,7 +3104,7 @@
                             },
                             {
                                 id: 'MEM-036b',
-                                version: '—',
+                                version: 'p1',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Tap-to-check-in with motion graphics',
                                 requirement: 'Tap-to-check-in with motion graphics — coach taps an athlete\'s photo card to mark them present. Tap triggers a motion graphic animation: checkmark burst with particle effects, card background transitions to a "checked in" color state (e.g., green glow), and a subtle haptic feedback on supported devices. Tapping again toggles the athlete back to unchecked with a reverse animation. Checked-in count displayed as a live counter (e.g., "12/18 checked in"). Attendance record written to Database immediately on tap.',
@@ -3141,7 +3141,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-037a',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Milestone detection and configuration',
                                 requirement: 'Milestone detection and configuration — system automatically detects four milestone types: (1) Birthday — based on date of birth in member profile, triggers annually. (2) Attendance milestones — cumulative session count hits a threshold (default: 25, 50, 100, 200, 500; coach can customize thresholds). (3) Membership anniversary — annual anniversary of membership start date. (4) Streak milestones — consecutive session count from MEM-035 hits a threshold (default: 10, 25, 50, 100). Coach configures which milestone types are active per location in advanced settings. Each milestone type can be independently toggled on or off.',
@@ -3154,7 +3154,7 @@
                             },
                             {
                                 id: 'MEM-037b',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Celebration animations',
                                 requirement: 'Celebration animations — full-screen motion graphic overlay triggered on member app login when a milestone is detected. Each milestone type has a unique animation: birthday triggers a confetti burst across the screen with a birthday message; attendance milestones trigger a trophy/medal reveal animation; membership anniversaries trigger a fireworks display; streak milestones trigger an intensified version of the MEM-035 flame animation. Animation plays for 3–5 seconds, then settles into a card displaying the milestone message and any attached gift. Member can tap to dismiss or interact with the gift. Animation respects device performance — graceful degradation on older devices.',
@@ -3167,7 +3167,7 @@
                             },
                             {
                                 id: 'MEM-037c',
-                                version: '—',
+                                version: 'p4',
                                 accessLevel: 'Admin, Coach',
                                 title: 'Custom messages and gifts',
                                 requirement: 'Custom messages and gifts — coach can attach a custom message and an optional gift to each milestone type from the advanced settings. Custom message is free-text with support for dynamic placeholders (e.g., {{firstName}}, {{streakCount}}, {{years}}). Gift options: (1) Video — coach uploads or pastes a URL (YouTube, Vimeo); displayed as an embedded player in the celebration card. (2) File — coach uploads a file (PDF, image; max 25MB); displayed as a download button in the celebration card. (3) Discount code — coach enters a code and description; displayed as a copyable code with description in the celebration card. Gifts are saved to the member\'s profile under a "My Rewards" section for later access. Coach can set different messages and gifts per milestone type. One message and one gift per milestone type (not per individual member).',
@@ -3183,7 +3183,7 @@
                     },
                     {
                         id: 'MEM-038',
-                        version: '—',
+                        version: 'p4',
                         category: 'Financial Operations',
                         isParent: false,
                         title: 'Manual payment recording',
@@ -3205,7 +3205,7 @@
                     },
                     {
                         id: 'MEM-039',
-                        version: '—',
+                        version: 'p4',
                         category: 'Financial Operations',
                         isParent: false,
                         title: 'Invoice and receipt generation',
@@ -3227,7 +3227,7 @@
                     },
                     {
                         id: 'MEM-040',
-                        version: '—',
+                        version: 'p1',
                         category: 'Financial Operations',
                         isParent: false,
                         title: 'Payout visibility',
@@ -3249,7 +3249,7 @@
                     },
                     {
                         id: 'MEM-041',
-                        version: '—',
+                        version: 'p1',
                         category: 'Financial Operations',
                         isParent: false,
                         title: 'Tax configuration',
@@ -3271,7 +3271,7 @@
                     },
                     {
                         id: 'MEM-042',
-                        version: '—',
+                        version: 'p3',
                         category: 'Reporting',
                         isParent: false,
                         title: 'Session report (post-session summary)',
@@ -3293,7 +3293,7 @@
                     },
                     {
                         id: 'MEM-043',
-                        version: '—',
+                        version: 'p1',
                         category: 'Reporting',
                         isParent: false,
                         title: 'Monthly business digest',
@@ -3315,7 +3315,7 @@
                     },
                     {
                         id: 'MEM-044',
-                        version: '—',
+                        version: 'p4',
                         category: 'Reporting',
                         isParent: false,
                         title: 'Aggregate player development report history',
@@ -3337,7 +3337,7 @@
                     },
                     {
                         id: 'MEM-045',
-                        version: '—',
+                        version: 'p4',
                         category: 'Plans & Billing Config',
                         isParent: false,
                         title: 'Family / sibling discount',
@@ -3359,7 +3359,7 @@
                     },
                     {
                         id: 'MEM-046',
-                        version: '—',
+                        version: 'p4',
                         category: 'Class Scheduling',
                         isParent: true,
                         title: 'Camp and multi-day event management',
@@ -3380,7 +3380,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-046a',
-                                version: '—',
+                                version: 'p3',
                                 title: 'Camp creation and publishing',
                                 requirement: 'Camp creation — business owner creates a camp from the BAM OS Classes calendar or a dedicated "Camps" section. A camp creation wizard: (1) Basic info: name, description, eligibility tag, registration deadline, total price, capacity. (2) Session schedule: add individual sessions by date/time/coach/location — or use a template (e.g., "Mon–Fri 9am–12pm for 5 days"). Each session is linked to a class type from CLS-001. (3) Policy: camp-specific cancellation/refund terms (free text, displayed to parents during registration). (4) Review and publish. On publish: camp visible to eligible members in scheduling app under a dedicated "Camps & Events" section. Draft camps are only visible to coaches in BAM OS.',
                                 release: 'V1',
@@ -3391,7 +3391,7 @@
                             },
                             {
                                 id: 'MEM-046b',
-                                version: '—',
+                                version: 'p3',
                                 title: 'Camp registration (member-facing)',
                                 requirement: 'Camp registration — in the scheduling app, a "Camps & Events" section (accessible from the home page shortcut or navigation) lists all published, upcoming camps available to the member\'s eligible athlete. Each camp card shows: camp name, dates, description, price, spots remaining, and a "Register" CTA. Registration flow: (1) Camp detail screen — full description, session schedule list, policy. (2) Athlete selection (for multi-athlete accounts). (3) Payment — uses MEM-039 invoice with Stripe payment link. (4) On payment: confirmation screen, sessions added to athlete\'s schedule, confirmation push/SMS sent. Camp appears in APP-018 My Schedule with sessions clearly labelled as part of the camp.',
                                 release: 'V1',
@@ -3405,7 +3405,7 @@
                     },
                     {
                         id: 'MEM-047',
-                        version: '—',
+                        version: 'p0',
                         category: 'Financial Operations',
                         isParent: true,
                         title: 'Refund management',
@@ -3426,7 +3426,7 @@
                         subJobs: [
                             {
                                 id: 'MEM-047a',
-                                version: '—',
+                                version: 'p0',
                                 title: 'Issue refund',
                                 requirement: 'Issue refund — the refund initiation flow from any charge in the member\'s billing history. Full refund pre-fills the amount as the original charge total. Partial refund shows an editable amount field with the original charge amount as the max. Reason is a required dropdown. Free-text note required if reason is "Other." Preview step shows: member name, refund amount, card being refunded (last 4 digits), and estimated credit timeline (5–10 business days for card refunds, immediate for Stripe balance credit). Confirm button clearly labeled "Issue Refund — this cannot be undone."',
                                 release: 'MVP',
@@ -3438,7 +3438,7 @@
                             },
                             {
                                 id: 'MEM-047b',
-                                version: '—',
+                                version: 'p2',
                                 title: 'Refund report',
                                 requirement: 'Refund report — accessible from the business metrics dashboard (MEM-003) or financial settings. Shows all refunds issued across the academy in a table: date, member name, original charge amount, refund amount, refund type (full/partial), reason, issuing coach, and Stripe refund ID. Filterable by: date range, issuing coach, and reason. Totals row at the bottom: total refunded in period. Exportable to CSV. Useful for reconciliation and for identifying whether a specific coach is issuing an unusual number of refunds.',
                                 release: 'V1',
@@ -3452,7 +3452,7 @@
                     },
                     {
                         id: 'MEM-048',
-                        version: '—',
+                        version: 'p4',
                         category: 'Member Acquisition Config',
                         isParent: false,
                         title: 'Onboarding link expiry and error handling',
@@ -3474,7 +3474,7 @@
                     },
                     {
                         id: 'MEM-049',
-                        version: '—',
+                        version: 'p4',
                         category: 'Coach & Admin Panel',
                         isParent: false,
                         title: 'Coach mobile view (BAM OS)',
@@ -3496,7 +3496,7 @@
                     },
                     {
                         id: 'MEM-050',
-                        version: '—',
+                        version: 'p4',
                         category: 'Communication Config',
                         isParent: false,
                         title: 'Custom home page shortcuts configuration',
@@ -3518,7 +3518,7 @@
                     },
                     {
                         id: 'MEM-051',
-                        version: '—',
+                        version: 'p4',
                         category: 'Group Chat',
                         isParent: false,
                         title: 'Community chat — extended moderation',
@@ -3540,7 +3540,7 @@
                     },
                     {
                         id: 'MEM-052',
-                        version: '—',
+                        version: 'p4',
                         category: 'Business Owner Dashboard',
                         isParent: false,
                         title: 'MEM-003 dashboard — additional metrics',
