@@ -3,17 +3,96 @@ import s from './Sales.module.css';
 
 /* ─── DATA ─── */
 const INITIAL_LEADS = [
-  { id: 'l1', name: 'Marcus Johnson', lastActivity: '4h ago', needsAttention: false, stage: 'interested' },
-  { id: 'l2', name: 'Sarah Chen', lastActivity: '1d ago', needsAttention: false, stage: 'interested' },
-  { id: 'l3', name: 'David Ortiz', lastActivity: '3d ago', needsAttention: true, stage: 'interested' },
-  { id: 'l4', name: 'Emily Watson', lastActivity: '6h ago', needsAttention: false, stage: 'interested' },
-  { id: 'l5', name: 'Jake Rivera', lastActivity: '2d ago', needsAttention: true, stage: 'interested' },
-  { id: 'l6', name: 'Mia Thompson', lastActivity: '1h ago', trialDate: 'today', trialTime: '10:00am', needsAttention: false, stage: 'bookedTrial' },
-  { id: 'l7', name: 'Liam Park', lastActivity: '4h ago', trialDate: 'Fri Mar 21', trialTime: '5:30pm', needsAttention: false, stage: 'bookedTrial' },
-  { id: 'l11', name: 'Sofia Reyes', lastActivity: '30m ago', trialDate: 'today', trialTime: '3:00pm', needsAttention: false, stage: 'bookedTrial' },
-  { id: 'l8', name: 'Ava Martinez', lastActivity: '1d ago', daysSinceTrial: '1d', needsAttention: true, stage: 'doneTrial' },
-  { id: 'l9', name: 'Noah Kim', lastActivity: 'Today', daysSinceTrial: '0d', needsAttention: false, stage: 'doneTrial' },
-  { id: 'l10', name: 'Chloe Davis', lastActivity: '2d ago', daysSinceTrial: '2d', needsAttention: false, stage: 'doneTrial' },
+  { id: 'l1', name: 'Marcus Johnson', lastActivity: '4h ago', needsAttention: false, stage: 'interested',
+    parentName: 'Marcus Johnson Sr.', athleteName: 'Marcus Johnson Jr.',
+    salesNotes: { childAge: '9', goal: 'Build confidence and discipline', source: 'Instagram', budget: '$150/mo', availability: 'Weekends', notes: 'Dad coaches little league, very motivated' },
+    messages: [
+      { from: 'parent', text: 'Hi! I saw your ad on Instagram.', time: '2d ago' },
+      { from: 'ai', text: "Hi Marcus! We'd love to have your son try a class. We have spots this Saturday at 10am — would that work?", time: '2d ago' },
+      { from: 'parent', text: 'That works! What age groups do you have?', time: '1d ago' },
+      { from: 'ai', text: 'We have groups for ages 6-8, 9-12, and 13+. Your son would be in our 9-12 group with Coach Rivera.', time: '4h ago' },
+    ] },
+  { id: 'l2', name: 'Sarah Chen', lastActivity: '1d ago', needsAttention: false, stage: 'interested',
+    parentName: 'Wei Chen', athleteName: 'Sarah Chen',
+    salesNotes: { childAge: '7', goal: 'Social skills and teamwork', source: 'Referral', budget: '$130/mo', availability: 'Sat & Sun mornings', notes: 'Friend of Emily Watson family' },
+    messages: [
+      { from: 'parent', text: 'Emily Watson recommended your program. Do you have openings for 7-year-olds?', time: '2d ago' },
+      { from: 'ai', text: 'Absolutely! Our 6-8 group has a few spots. Would you like to schedule a free trial?', time: '2d ago' },
+      { from: 'parent', text: 'Yes please! Weekends work best for us.', time: '1d ago' },
+    ] },
+  { id: 'l3', name: 'David Ortiz', lastActivity: '3d ago', needsAttention: true, stage: 'interested',
+    parentName: 'Carmen Ortiz', athleteName: 'David Ortiz Jr.',
+    salesNotes: { childAge: '11', goal: 'Compete at regional level', source: 'Facebook', budget: '$200/mo', availability: 'Weekdays after 4pm', notes: 'Has prior soccer experience' },
+    messages: [
+      { from: 'parent', text: 'My son wants to get serious about basketball. Do you do competitive training?', time: '5d ago' },
+      { from: 'ai', text: 'Yes! Our 9-12 competitive track focuses on skill development and game strategy. Coach Rivera leads that group.', time: '5d ago' },
+      { from: 'parent', text: 'Sounds great, what are the rates?', time: '4d ago' },
+      { from: 'ai', text: "Our competitive program is $200/mo for 3x/week sessions. Want to book a trial this week?", time: '3d ago' },
+    ] },
+  { id: 'l4', name: 'Emily Watson', lastActivity: '6h ago', needsAttention: false, stage: 'interested',
+    parentName: 'Emily Watson', athleteName: 'Lily Watson',
+    salesNotes: { childAge: '8', goal: 'After-school activity', source: 'Google', budget: '$140/mo', availability: 'Weekdays 3:30-5pm', notes: 'Looking for something close to school' },
+    messages: [
+      { from: 'parent', text: 'Can we reschedule the trial to Saturday morning instead?', time: '6h ago' },
+      { from: 'ai', text: 'Of course! I have 9am or 10:30am available this Saturday. Which works better?', time: '6h ago' },
+      { from: 'parent', text: "10:30 would be perfect, thank you!", time: '6h ago' },
+    ] },
+  { id: 'l5', name: 'Jake Rivera', lastActivity: '2d ago', needsAttention: true, stage: 'interested',
+    parentName: 'Mike Rivera', athleteName: 'Jake Rivera',
+    salesNotes: { childAge: '13', goal: 'Make the school team', source: 'SMS outbound', budget: '$180/mo', availability: 'Flexible', notes: 'Tryouts in 6 weeks, needs intensive prep' },
+    messages: [
+      { from: 'ai', text: 'Hi Jake! Following up — would you like to book a trial this week?', time: '4d ago' },
+      { from: 'parent', text: "Yeah maybe. When do you have openings?", time: '3d ago' },
+      { from: 'ai', text: 'We have Tuesday at 4pm or Thursday at 5pm. Both are with our teen competitive group.', time: '2d ago' },
+    ] },
+  { id: 'l6', name: 'Mia Thompson', lastActivity: '1h ago', trialDate: 'today', trialTime: '10:00am', needsAttention: false, stage: 'bookedTrial',
+    parentName: 'Rachel Thompson', athleteName: 'Mia Thompson',
+    salesNotes: { childAge: '8', goal: 'Fun and fitness', source: 'Instagram', budget: '$120/mo', availability: 'Saturday mornings', notes: 'Trial booked for today 10am' },
+    messages: [
+      { from: 'parent', text: "We're so excited for today! What should Mia bring?", time: '3h ago' },
+      { from: 'ai', text: 'Just comfortable athletic clothes and sneakers! Water bottles provided. See you at 10am! 🏀', time: '2h ago' },
+      { from: 'parent', text: 'Perfect, see you soon!', time: '1h ago' },
+    ] },
+  { id: 'l7', name: 'Liam Park', lastActivity: '4h ago', trialDate: 'Fri Mar 21', trialTime: '5:30pm', needsAttention: false, stage: 'bookedTrial',
+    parentName: 'James Park', athleteName: 'Liam Park',
+    salesNotes: { childAge: '10', goal: 'Build skills and have fun', source: 'Website', budget: '$160/mo', availability: 'Weekday evenings', notes: 'Plays rec league, wants more structured training' },
+    messages: [
+      { from: 'parent', text: 'Confirming Liam for Friday at 5:30. Is parking available?', time: '1d ago' },
+      { from: 'ai', text: 'Confirmed! Yes, free parking in the lot behind the building. Enter through the side entrance.', time: '1d ago' },
+      { from: 'parent', text: 'Great, thanks!', time: '4h ago' },
+    ] },
+  { id: 'l11', name: 'Sofia Reyes', lastActivity: '30m ago', trialDate: 'today', trialTime: '3:00pm', needsAttention: false, stage: 'bookedTrial',
+    parentName: 'Maria Reyes', athleteName: 'Sofia Reyes',
+    salesNotes: { childAge: '9', goal: 'Confidence and coordination', source: 'Referral', budget: '$150/mo', availability: 'Weekends & Wed afternoons', notes: 'Referred by Mia Thompson family' },
+    messages: [
+      { from: 'parent', text: "Our friend Mia's mom told us about the academy. Sofia would love to try!", time: '2d ago' },
+      { from: 'ai', text: "We'd love to have Sofia! How about a trial this Saturday at 3pm?", time: '2d ago' },
+      { from: 'parent', text: "Today works! We'll be there at 3.", time: '30m ago' },
+    ] },
+  { id: 'l8', name: 'Ava Martinez', lastActivity: '1d ago', daysSinceTrial: '1d', needsAttention: true, stage: 'doneTrial',
+    parentName: 'Carlos Martinez', athleteName: 'Ava Martinez',
+    salesNotes: { childAge: '10', goal: 'Competitive development', source: 'Instagram', budget: '$175/mo', availability: 'Tue/Thu/Sat', notes: 'Loved the trial, asking about membership options' },
+    messages: [
+      { from: 'parent', text: 'My son loved the trial class! What are the membership options?', time: '1d ago' },
+      { from: 'ai', text: "So glad to hear that! We have 2x/week at $150/mo or 3x/week at $175/mo. Both include access to open gym on Saturdays.", time: '1d ago' },
+      { from: 'parent', text: "The 3x sounds good. Can we start next week?", time: '1d ago' },
+    ] },
+  { id: 'l9', name: 'Noah Kim', lastActivity: 'Today', daysSinceTrial: '0d', needsAttention: false, stage: 'doneTrial',
+    parentName: 'Susan Kim', athleteName: 'Noah Kim',
+    salesNotes: { childAge: '12', goal: 'Pre-season conditioning', source: 'Google', budget: '$200/mo', availability: 'Mon/Wed/Fri after school', notes: 'Just finished trial today, very enthusiastic' },
+    messages: [
+      { from: 'parent', text: 'Just signed up! When is the next beginner class?', time: '2h ago' },
+      { from: 'ai', text: "Welcome Noah! Next beginner session is Monday at 4pm. We'll send a welcome packet tonight.", time: '1h ago' },
+      { from: 'parent', text: "Can't wait!", time: '30m ago' },
+    ] },
+  { id: 'l10', name: 'Chloe Davis', lastActivity: '2d ago', daysSinceTrial: '2d', needsAttention: false, stage: 'doneTrial',
+    parentName: 'Tom Davis', athleteName: 'Chloe Davis',
+    salesNotes: { childAge: '11', goal: 'Stay active year-round', source: 'Facebook', budget: '$140/mo', availability: 'Weekends only', notes: 'Also does swimming, looking for weekend-only option' },
+    messages: [
+      { from: 'parent', text: 'Chloe had a great time at the trial. Do you have a weekend-only plan?', time: '2d ago' },
+      { from: 'ai', text: 'Yes! Our weekend plan is $140/mo for Saturday and Sunday sessions. Perfect for multi-sport athletes.', time: '2d ago' },
+      { from: 'parent', text: "That's exactly what we need. Let me talk to my wife and get back to you.", time: '2d ago' },
+    ] },
 ];
 
 const STAGES = [
@@ -226,7 +305,7 @@ function useTypewriter(prompts) {
 }
 
 /* ─── LEAD CARD ─── */
-function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
+function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId, onSelect }) {
   const isToday = lead.trialDate === 'today';
   const needsAttention = lead.needsAttention === true;
   let cardCls = s.card;
@@ -239,25 +318,107 @@ function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
     <div className={cardCls} draggable
       onDragStart={(e) => onDragStart(e, lead.id)}
       onDragEnd={onDragEnd}
+      onClick={() => onSelect(lead)}
     >
-      <div className={s.cardName}>{lead.name}</div>
-      <div className={s.cardActivity}>
-        <span className={s.cardActivityLabel}>Last activity</span>
-        {lead.lastActivity}
-      </div>
-      {lead.stage === 'bookedTrial' && lead.trialDate && (
-        <div className={`${s.cardTrialDate} ${isToday ? s.cardTrialToday : ''}`}>
-          {isToday
-            ? <><span className={s.cardTodayLabel}>⚡ Today</span>
-                <span className={s.cardTodayTime}>{lead.trialTime}</span></>
-            : <>{lead.trialDate}{lead.trialTime && `, ${lead.trialTime}`}</>
-          }
+      <div className={s.cardInner}>
+        <div className={s.cardMain}>
+          <div className={s.cardName}>{lead.name}</div>
+          <div className={s.cardActivity}>
+            <span className={s.cardActivityLabel}>Last activity</span>
+            {lead.lastActivity}
+          </div>
+          {lead.stage === 'bookedTrial' && lead.trialDate && !isToday && (
+            <div className={s.cardTrialDate}>
+              {lead.trialDate}{lead.trialTime && `, ${lead.trialTime}`}
+            </div>
+          )}
+          {lead.stage === 'doneTrial' && lead.daysSinceTrial && (
+            <div className={s.cardDaysSince}>{lead.daysSinceTrial} since trial</div>
+          )}
         </div>
-      )}
-      {lead.stage === 'doneTrial' && lead.daysSinceTrial && (
-        <div className={s.cardDaysSince}>{lead.daysSinceTrial} since trial</div>
+        <div className={s.cardRight}>
+          {needsAttention && (
+            <div className={s.cardAttentionIcon} title="Needs attention">
+              <svg width="16" height="16" fill="none" stroke="currentColor"
+                strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+          )}
+          {isToday && lead.trialTime && (
+            <div className={s.cardTodayClockTime}>{lead.trialTime}</div>
+          )}
+        </div>
+      </div>
+      {isToday && (
+        <div className={s.cardTodayBadge}>⚡ Today</div>
       )}
     </div>
+  );
+}
+
+/* ─── LEAD DRAWER ─── */
+function LeadDrawer({ lead, onClose }) {
+  if (!lead) return null;
+  const isBooked = lead.stage === 'bookedTrial';
+  const isDone = lead.stage === 'doneTrial';
+
+  return (
+    <>
+      <div className={s.drawerOverlay} onClick={onClose} />
+      <div className={s.drawer}>
+        <div className={s.drawerHead}>
+          <div className={s.drawerTitle}>{lead.name}</div>
+          <button className={s.drawerClose} onClick={onClose}>&times;</button>
+        </div>
+        <div className={s.drawerBody}>
+          <div className={s.drawerSection}>
+            <div className={s.drawerRow}>
+              <span className={s.drawerLabel}>Parent</span>
+              <span className={s.drawerVal}>{lead.parentName}</span>
+            </div>
+            <div className={s.drawerRow}>
+              <span className={s.drawerLabel}>Athlete</span>
+              <span className={s.drawerVal}>{lead.athleteName}</span>
+            </div>
+            {isBooked && (
+              <div className={s.drawerRow}>
+                <span className={s.drawerLabel}>Days until trial</span>
+                <span className={`${s.drawerVal} ${s.drawerValGold}`}>
+                  {lead.trialDate === 'today' ? 'Today!' : lead.trialDate}
+                </span>
+              </div>
+            )}
+            {isDone && (
+              <div className={s.drawerRow}>
+                <span className={s.drawerLabel}>Days since trial</span>
+                <span className={s.drawerVal}>{lead.daysSinceTrial}</span>
+              </div>
+            )}
+          </div>
+          <div className={s.drawerSectionTitle}>Conversation</div>
+          <div className={s.drawerChat}>
+            {(lead.messages || []).map((m, i) => (
+              <div key={i} className={`${s.chatMsg} ${m.from === 'parent' ? s.chatMsgParent : s.chatMsgAi}`}>
+                <div className={s.chatBubble}>{m.text}</div>
+                <div className={s.chatTime}>{m.time}</div>
+              </div>
+            ))}
+          </div>
+          <div className={s.drawerSectionTitle}>Sales Notes</div>
+          <div className={s.drawerNotes}>
+            {lead.salesNotes && Object.entries(lead.salesNotes).map(([k, v]) => (
+              <div key={k} className={s.drawerRow}>
+                <span className={s.drawerLabel}>{k.replace(/([A-Z])/g, ' $1').toLowerCase()}</span>
+                <span className={s.drawerVal}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -273,6 +434,8 @@ export default function Sales() {
   const [flipped, setFlipped] = useState({ trials: false, closed: false });
   const [inboxFilter, setInboxFilter] = useState('All');
   const [threads, setThreads] = useState(THREADS);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [pipelineExpanded, setPipelineExpanded] = useState(false);
 
   // Refs
   const canvasRef = useRef(null);
@@ -280,9 +443,18 @@ export default function Sales() {
   const toastTimer = useRef(null);
   const droppedTimer = useRef(null);
 
-  // Derived: group leads by stage
+  // Derived: group leads by stage (today trials sorted first)
   const leadsByStage = {};
-  STAGES.forEach(st => { leadsByStage[st.id] = leads.filter(l => l.stage === st.id); });
+  STAGES.forEach(st => {
+    let stageLeads = leads.filter(l => l.stage === st.id);
+    if (st.id === 'bookedTrial') {
+      stageLeads = [
+        ...stageLeads.filter(l => l.trialDate === 'today'),
+        ...stageLeads.filter(l => l.trialDate !== 'today'),
+      ];
+    }
+    leadsByStage[st.id] = stageLeads;
+  });
 
   /* ─── BANNER CANVAS (custom hook) ─── */
   useBannerCanvas(canvasRef);
@@ -439,7 +611,7 @@ export default function Sales() {
           <div className={s.hero}>
             {/* KPI CARD */}
             <div className={s.kpiCard}>
-              <div className={s.kpiCardTitle}>Your sales this month...</div>
+              <div className={s.kpiCardTitle}>This month at a glance</div>
               <div className={s.kpiHero}>
                 <div className={s.kpiHeroLeft}>
                   <div className={s.kpiHeroLabel}>Qualified Trial Close Rate</div>
@@ -550,15 +722,29 @@ export default function Sales() {
           </div>
 
           {/* PIPELINE */}
-          <div className={s.pipelineSection}>
+          <div className={`${s.pipelineSection} ${pipelineExpanded ? s.pipelineSectionExpanded : ''}`}>
             <div className={s.pipelineTopbar}>
               <h2 className={s.pipelineTitle}>Pipeline</h2>
-              <div className={s.pipelineArrows} aria-hidden="true">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <div className={s.pipelineArrow} key={i}>
-                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-                  </div>
-                ))}
+              <div className={s.pipelineTopbarRight}>
+                <div className={`${s.pipelineArrows} ${pipelineExpanded ? s.pipelineArrowsHidden : ''}`} aria-hidden="true">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <div className={s.pipelineArrow} key={i}>
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  className={`${s.pipelineExpandBtn} ${pipelineExpanded ? s.pipelineExpandBtnActive : ''}`}
+                  onClick={() => setPipelineExpanded(p => !p)}
+                  title={pipelineExpanded ? 'Collapse pipeline' : 'Expand pipeline'}
+                >
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    {pipelineExpanded
+                      ? <><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></>
+                      : <><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></>
+                    }
+                  </svg>
+                </button>
               </div>
             </div>
             <div className={s.pipelineLegend}>
@@ -597,6 +783,7 @@ export default function Sales() {
                             onDragEnd={handleDragEnd}
                             draggingId={draggingId}
                             droppedId={droppedId}
+                            onSelect={setSelectedLead}
                           />
                         ))}
                       </div>
@@ -677,6 +864,9 @@ export default function Sales() {
           ))}
         </div>
       </div>
+
+      {/* LEAD DRAWER */}
+      <LeadDrawer lead={selectedLead} onClose={() => setSelectedLead(null)} />
     </div>
   );
 }
