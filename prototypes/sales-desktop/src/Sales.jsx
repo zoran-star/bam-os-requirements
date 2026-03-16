@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import s from './Sales.module.css';
 
 /* ─── DATA ─── */
-const LEADS = [
+const INITIAL_LEADS = [
   { id: 'l1', name: 'Marcus Johnson', src: 'Instagram', days: '1d', daysClass: '', badge: 'active', lastContact: '4h ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
   { id: 'l2', name: 'Sarah Chen', src: 'Web Form', days: '3d', daysClass: '', badge: 'active', lastContact: '1d ago', initials: 'MR', initClass: 'initS', stage: 'nl' },
   { id: 'l3', name: 'David Ortiz', src: 'Facebook', days: '8d', daysClass: 'daysWarn', badge: 'paused', lastContact: '3d ago', initials: 'ZS', initClass: 'initG', stage: 'nl' },
@@ -47,74 +47,35 @@ const BADGE_MAP = {
 
 const FILTERS = ['All Leads', 'My Leads', 'AI Active'];
 
-/* ─── LEAD CARD ─── */
-function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
-  const { badge } = BADGE_MAP[lead.badge];
-  let cardCls = s.card;
-  if (draggingId === lead.id) cardCls += ` ${s.cardDragging}`;
-  if (droppedId === lead.id) cardCls += ` ${s.cardDropped}`;
+/* ─── CUSTOM HOOKS ─── */
 
-  return (
-    <div
-      className={cardCls}
-      draggable
-      onDragStart={(e) => onDragStart(e, lead)}
-      onDragEnd={onDragEnd}
-    >
-      <div className={s.cardTop}>
-        <div className={s.leadName}>{lead.name}</div>
-        <div className={`${s.badge} ${BADGE_MAP[lead.badge].cls}`}>
-          <span className={s.badgeDot}></span>
-          {BADGE_MAP[lead.badge].label}
-        </div>
-      </div>
-      <div className={s.cardMeta}>
-        <span className={s.src}>{lead.src}</span>
-        <span className={`${s.days} ${lead.daysClass ? s[lead.daysClass] : ''}`}>{lead.days}</span>
-      </div>
-      <div className={s.cardFoot}>
-        <span className={s.last}>{lead.lastContact}</span>
-        <span className={`${s.init} ${s[lead.initClass]}`}>{lead.initials}</span>
-      </div>
-    </div>
-  );
+function useCountUp(target, duration = 920) {
+  const [value, setValue] = useState(0);
+  const animRef = useRef(null);
+
+  useEffect(() => {
+    const start = performance.now();
+    function tick(now) {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(Math.round(eased * target));
+      if (p < 1) animRef.current = requestAnimationFrame(tick);
+    }
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [target, duration]);
+
+  return value;
 }
 
-/* ─── MAIN COMPONENT ─── */
-export default function Sales() {
-  // State
-  const [columns, setColumns] = useState(() => {
-    const cols = {};
-    STAGES.forEach(st => { cols[st.id] = LEADS.filter(l => l.stage === st.id).map(l => l.id); });
-    return cols;
-  });
-  const [draggingId, setDraggingId] = useState(null);
-  const [dragOverCol, setDragOverCol] = useState(null);
-  const [droppedId, setDroppedId] = useState(null);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [activeFilter, setActiveFilter] = useState(0);
-  const [flipped, setFlipped] = useState({ trials: false, closed: false });
-  const [typewriterText, setTypewriterText] = useState('');
+function useBannerCanvas(canvasRef) {
+  const animRef = useRef(null);
 
-  // Refs
-  const canvasRef = useRef(null);
-  const heroValRef = useRef(null);
-  const subVal1Ref = useRef(null);
-  const subVal2Ref = useRef(null);
-  const dragSrcCol = useRef(null);
-  const toastTimer = useRef(null);
-  const droppedTimer = useRef(null);
-
-  // Leads lookup
-  const leadsById = useRef(Object.fromEntries(LEADS.map(l => [l.id, l]))).current;
-
-  /* ─── BANNER CANVAS ─── */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    let w, h, t = 0, animId;
+    let w, h, t = 0;
     const barCount = 18, barW = 10, barGap = 18, barBaseH = 0.55;
 
     function resize() {
@@ -195,44 +156,114 @@ export default function Sales() {
       }
       ctx.restore();
       t++;
-      animId = requestAnimationFrame(draw);
+      animRef.current = requestAnimationFrame(draw);
     }
+
     resize();
     window.addEventListener('resize', resize);
     draw();
-    return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(animId); };
-  }, []);
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animRef.current);
+    };
+  }, [canvasRef]);
+}
 
-  /* ─── COUNT-UP ─── */
+function useTypewriter(prompts) {
+  const [text, setText] = useState('');
+  const timerRef = useRef(null);
+
   useEffect(() => {
-    const entries = [
-      { ref: heroValRef, target: 57, suffix: '%', isBig: true },
-      { ref: subVal1Ref, target: 8, suffix: '', isBig: false },
-      { ref: subVal2Ref, target: 2, suffix: '', isBig: false },
-    ];
-    const duration = 920;
-    const start = performance.now();
-    let animId;
-    function tick(now) {
-      const p = Math.min((now - start) / duration, 1);
-      const e = 1 - Math.pow(1 - p, 3);
-      entries.forEach(({ ref, target, suffix, isBig }) => {
-        const el = ref.current;
-        if (!el) return;
-        const v = Math.round(e * target);
-        if (isBig) { el.innerHTML = v + '<span>' + suffix + '</span>'; }
-        else { el.textContent = v; }
-      });
-      if (p < 1) animId = requestAnimationFrame(tick);
+    let pi = 0, ci = 0, deleting = false;
+    function type() {
+      const txt = prompts[pi];
+      if (!deleting) {
+        setText(txt.slice(0, ci + 1));
+        ci++;
+        if (ci >= txt.length) { timerRef.current = setTimeout(() => { deleting = true; type(); }, 2200); return; }
+        timerRef.current = setTimeout(type, 55 + Math.random() * 40);
+      } else {
+        setText(txt.slice(0, ci));
+        ci--;
+        if (ci <= 0) { deleting = false; pi = (pi + 1) % prompts.length; timerRef.current = setTimeout(type, 400); return; }
+        timerRef.current = setTimeout(type, 25);
+      }
     }
-    animId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animId);
-  }, []);
+    timerRef.current = setTimeout(type, 800);
+    return () => clearTimeout(timerRef.current);
+  }, [prompts]);
+
+  return text;
+}
+
+/* ─── LEAD CARD ─── */
+function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId }) {
+  let cardCls = s.card;
+  if (draggingId === lead.id) cardCls += ` ${s.cardDragging}`;
+  if (droppedId === lead.id) cardCls += ` ${s.cardDropped}`;
+
+  return (
+    <div
+      className={cardCls}
+      draggable
+      onDragStart={(e) => onDragStart(e, lead.id)}
+      onDragEnd={onDragEnd}
+    >
+      <div className={s.cardTop}>
+        <div className={s.leadName}>{lead.name}</div>
+        <div className={`${s.badge} ${BADGE_MAP[lead.badge].cls}`}>
+          <span className={s.badgeDot}></span>
+          {BADGE_MAP[lead.badge].label}
+        </div>
+      </div>
+      <div className={s.cardMeta}>
+        <span className={s.src}>{lead.src}</span>
+        <span className={`${s.days} ${lead.daysClass ? s[lead.daysClass] : ''}`}>{lead.days}</span>
+      </div>
+      <div className={s.cardFoot}>
+        <span className={s.last}>{lead.lastContact}</span>
+        <span className={`${s.init} ${s[lead.initClass]}`}>{lead.initials}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── MAIN COMPONENT ─── */
+export default function Sales() {
+  // Leads state — stage property is mutable via drag-and-drop
+  const [leads, setLeads] = useState(INITIAL_LEADS);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
+  const [droppedId, setDroppedId] = useState(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(0);
+  const [flipped, setFlipped] = useState({ trials: false, closed: false });
+
+  // Refs
+  const canvasRef = useRef(null);
+  const dragSrcStage = useRef(null);
+  const toastTimer = useRef(null);
+  const droppedTimer = useRef(null);
+
+  // Derived: group leads by stage
+  const leadsByStage = {};
+  STAGES.forEach(st => { leadsByStage[st.id] = leads.filter(l => l.stage === st.id); });
+
+  /* ─── BANNER CANVAS (custom hook) ─── */
+  useBannerCanvas(canvasRef);
+
+  /* ─── COUNT-UP (custom hook) ─── */
+  const heroVal = useCountUp(57);
+  const subVal1 = useCountUp(8);
+  const subVal2 = useCountUp(2);
+
+  /* ─── TYPEWRITER (custom hook) ─── */
+  const typewriterText = useTypewriter(TYPEWRITER_PROMPTS);
 
   /* ─── FLIP CARDS ─── */
   useEffect(() => {
     const timers = [];
-    // Auto-flip trials after 3s, closed after 4s
     const t1 = setTimeout(() => {
       const iv1 = setInterval(() => setFlipped(prev => ({ ...prev, trials: !prev.trials })), 4000);
       timers.push(iv1);
@@ -245,41 +276,18 @@ export default function Sales() {
     return () => timers.forEach(id => { clearTimeout(id); clearInterval(id); });
   }, []);
 
-  /* ─── TYPEWRITER ─── */
-  useEffect(() => {
-    let pi = 0, ci = 0, deleting = false, timer;
-    function type() {
-      const txt = TYPEWRITER_PROMPTS[pi];
-      if (!deleting) {
-        setTypewriterText(txt.slice(0, ci + 1));
-        ci++;
-        if (ci >= txt.length) { timer = setTimeout(() => { deleting = true; type(); }, 2200); return; }
-        timer = setTimeout(type, 55 + Math.random() * 40);
-      } else {
-        setTypewriterText(txt.slice(0, ci));
-        ci--;
-        if (ci <= 0) { deleting = false; pi = (pi + 1) % TYPEWRITER_PROMPTS.length; timer = setTimeout(type, 400); return; }
-        timer = setTimeout(type, 25);
-      }
-    }
-    timer = setTimeout(type, 800);
-    return () => clearTimeout(timer);
-  }, []);
-
   /* ─── DRAG & DROP ─── */
-  const handleDragStart = useCallback((e, lead) => {
-    setDraggingId(lead.id);
-    // Find which column this lead is in
-    for (const [colId, ids] of Object.entries(columns)) {
-      if (ids.includes(lead.id)) { dragSrcCol.current = colId; break; }
-    }
+  const handleDragStart = useCallback((e, leadId) => {
+    setDraggingId(leadId);
+    const lead = leads.find(l => l.id === leadId);
+    if (lead) dragSrcStage.current = lead.stage;
     e.dataTransfer.effectAllowed = 'move';
-  }, [columns]);
+  }, [leads]);
 
   const handleDragEnd = useCallback(() => {
     setDraggingId(null);
     setDragOverCol(null);
-    dragSrcCol.current = null;
+    dragSrcStage.current = null;
   }, []);
 
   const handleDragOver = useCallback((e, colId) => {
@@ -287,25 +295,20 @@ export default function Sales() {
     setDragOverCol(colId);
   }, []);
 
-  const handleDragLeave = useCallback((e, colId) => {
+  const handleDragLeave = useCallback((e) => {
     const col = e.currentTarget;
     if (!col.contains(e.relatedTarget)) setDragOverCol(null);
   }, []);
 
-  const handleDrop = useCallback((e, targetColId) => {
+  const handleDrop = useCallback((e, targetStage) => {
     e.preventDefault();
     setDragOverCol(null);
-    if (!draggingId || targetColId === dragSrcCol.current) return;
+    if (!draggingId || targetStage === dragSrcStage.current) return;
 
-    setColumns(prev => {
-      const next = { ...prev };
-      // Remove from source
-      const srcId = dragSrcCol.current;
-      next[srcId] = prev[srcId].filter(id => id !== draggingId);
-      // Add to target
-      next[targetColId] = [...prev[targetColId], draggingId];
-      return next;
-    });
+    // Update the lead's stage property
+    setLeads(prev => prev.map(l =>
+      l.id === draggingId ? { ...l, stage: targetStage } : l
+    ));
 
     // Dropped animation
     setDroppedId(draggingId);
@@ -433,7 +436,7 @@ export default function Sales() {
               <div className={s.kpiHero}>
                 <div className={s.kpiHeroLeft}>
                   <div className={s.kpiHeroLabel}>Qualified Trial Close Rate</div>
-                  <div className={s.kpiHeroVal} ref={heroValRef}>0<span>%</span></div>
+                  <div className={s.kpiHeroVal}>{heroVal}<span>%</span></div>
                 </div>
                 <div className={s.kpiHeroRight}>
                   <div className={s.kpiHeroTrend}>
@@ -452,7 +455,7 @@ export default function Sales() {
                   <div className={s.kpiSubLabel}>Qualified Trials</div>
                   <div className={s.kpiFlipInner}>
                     <div className={s.kpiFlipFront}>
-                      <div className={s.kpiSubVal} ref={subVal1Ref}>0</div>
+                      <div className={s.kpiSubVal}>{subVal1}</div>
                       <div className={s.kpiSubFoot}>
                         <span className={s.kpiSubTrend}>
                           <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
@@ -476,7 +479,7 @@ export default function Sales() {
                   <div className={s.kpiSubLabel}>Sales Closed</div>
                   <div className={s.kpiFlipInner}>
                     <div className={s.kpiFlipFront}>
-                      <div className={s.kpiSubVal} ref={subVal2Ref}>0</div>
+                      <div className={s.kpiSubVal}>{subVal2}</div>
                       <div className={s.kpiSubFoot}>
                         <span className={s.kpiSubTrend}>
                           <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>
@@ -549,32 +552,35 @@ export default function Sales() {
               </div>
             </div>
             <div className={s.board}>
-              {STAGES.map(stage => (
-                <div
-                  key={stage.id}
-                  className={`${s.col} ${dragOverCol === stage.id ? s.colDragOver : ''}`}
-                  onDragOver={(e) => handleDragOver(e, stage.id)}
-                  onDragLeave={(e) => handleDragLeave(e, stage.id)}
-                  onDrop={(e) => handleDrop(e, stage.id)}
-                >
-                  <div className={s.colHead}>
-                    <span className={s.colName}>{stage.name}</span>
-                    <span className={s.colCt}>{columns[stage.id].length}</span>
+              {STAGES.map(stage => {
+                const stageLeads = leadsByStage[stage.id];
+                return (
+                  <div
+                    key={stage.id}
+                    className={`${s.col} ${dragOverCol === stage.id ? s.colDragOver : ''}`}
+                    onDragOver={(e) => handleDragOver(e, stage.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, stage.id)}
+                  >
+                    <div className={s.colHead}>
+                      <span className={s.colName}>{stage.name}</span>
+                      <span className={s.colCt}>{stageLeads.length}</span>
+                    </div>
+                    <div className={s.cards}>
+                      {stageLeads.map(lead => (
+                        <LeadCard
+                          key={lead.id}
+                          lead={lead}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          draggingId={draggingId}
+                          droppedId={droppedId}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className={s.cards}>
-                    {columns[stage.id].map(id => (
-                      <LeadCard
-                        key={id}
-                        lead={leadsById[id]}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        draggingId={draggingId}
-                        droppedId={droppedId}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
