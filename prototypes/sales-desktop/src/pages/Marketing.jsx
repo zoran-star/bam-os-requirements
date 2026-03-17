@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import PageBanner from '../components/PageBanner';
+import { useState, useRef, useEffect } from 'react';
+import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
 import s from '../styles/Marketing.module.css';
 import sh from '../styles/shared.module.css';
@@ -24,27 +24,27 @@ const QUICK_ACTIONS = [
 
 const CHANNELS = [
   {
-    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, icon: '📸',
+    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, icon: '📸', accent: '#E1306C',
     campaigns: [
       { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
       { name: 'Summer Skills Camp Promo', spend: '$134', impressions: '6,820', cpm: '$19.65', reach: '5,100', frequency: '1.3', clicks: 245, ctr: '3.6%', cpc: '$0.55', lpv: 189, lpvRate: '77.1%', formFills: 5, trialBookings: 3, cpl: '$16.75', convRate: '4.2%', demo: { age: '25-38', gender: '71% F', geo: 'Within 10mi', onTarget: true } },
     ],
   },
   {
-    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, icon: '📘',
+    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, icon: '📘', accent: '#1877F2',
     campaigns: [
       { name: 'Parent Testimonial — Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
       { name: 'Back-to-School Registration', spend: '$67', impressions: '3,150', cpm: '$21.27', reach: '2,800', frequency: '1.1', clicks: 98, ctr: '3.1%', cpc: '$0.68', lpv: 74, lpvRate: '75.5%', formFills: 2, trialBookings: 1, cpl: '$22.33', convRate: '4.1%', demo: { age: '22-35', gender: '65% F', geo: 'Within 25mi', onTarget: false, flag: 'Geo reaching beyond 20mi target radius' } },
     ],
   },
   {
-    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, icon: '🔍',
+    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, icon: '🔍', accent: '#4285F4',
     campaigns: [
       { name: 'Search — Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
     ],
   },
   {
-    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, icon: '🤝',
+    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, icon: '🤝', accent: '#3EAF5C',
     campaigns: [
       { name: 'Member Referral Links', spend: '$0', impressions: '—', cpm: '—', reach: '—', frequency: '—', clicks: 28, ctr: '—', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
     ],
@@ -73,8 +73,10 @@ const CAMPAIGN_BUDGETS = [
 
 const MORE_TOOLS = [
   { name: 'Meta Ads', icon: '📘', enabled: true, ref: 'MKT-001' },
+  { name: 'Landing Pages', icon: '🌐', enabled: false, ref: 'MKT-007' },
   { name: 'Email & SMS Campaigns', icon: '📧', enabled: false, ref: 'MKT-008' },
   { name: 'Referral Campaigns', icon: '🤝', enabled: false, ref: 'MKT-009' },
+  { name: 'Content Calendar', icon: '📅', enabled: false, ref: 'MKT-010' },
   { name: 'Google Business Profile', icon: '📍', enabled: false, ref: 'MKT-011' },
   { name: 'Testimonial Collection', icon: '⭐', enabled: false, ref: 'MKT-012' },
 ];
@@ -85,6 +87,16 @@ const PERIODS = [
   { id: 'mtd', label: 'Month to date', days: 16 },
   { id: '3m', label: 'Last 3 months', days: 90 },
 ];
+
+/* Metric education — MKT-003 */
+const METRIC_EDUCATION = {
+  cpl: { label: 'Cost Per Lead', explain: 'Total ad spend divided by number of leads (form fills + trial bookings). Lower is better — under $15 is strong for youth sports.' },
+  ctr: { label: 'Click-Through Rate', explain: 'Percentage of people who saw your ad and clicked. Above 3% is solid for Meta ads in the youth sports space.' },
+  cpm: { label: 'Cost Per 1,000 Impressions', explain: 'How much it costs to show your ad 1,000 times. Under $25 is healthy — higher CPM usually means more competitive audience targeting.' },
+  convRate: { label: 'Conversion Rate', explain: 'Percentage of landing page visitors who took an action (form fill or trial booking). Above 5% is excellent.' },
+  lpvRate: { label: 'Landing Page View Rate', explain: 'Percentage of clickers who actually loaded your landing page. Below 70% may indicate slow page load or mismatched ad-to-page experience.' },
+  frequency: { label: 'Frequency', explain: 'Average number of times each person saw your ad. Above 2.0 means audience fatigue may be setting in — time to refresh creative.' },
+};
 
 /* ─── FULL DASHBOARD ─── */
 function FullDashboard({ onClose }) {
@@ -229,31 +241,45 @@ function FullDashboard({ onClose }) {
 
 /* ─── CHANNEL DETAIL MODAL ─── */
 function ChannelDetail({ channel, onClose }) {
+  const [eduTip, setEduTip] = useState(null);
+
   return (
     <div className={s.modalOverlay} onClick={onClose}>
       <div className={s.modalPanel} onClick={e => e.stopPropagation()}>
         <button className={s.modalClose} onClick={onClose}>✕</button>
         <div className={s.modalTitle}>{channel.icon} {channel.name} — Campaign Detail</div>
-        <div className={s.modalRef}>MKT-001a</div>
+        <div className={s.modalRef}>MKT-001a · MKT-003</div>
 
         {channel.campaigns.map((c, i) => (
           <div key={i} className={s.campaignDetailCard}>
             <div className={s.campaignDetailName}>{c.name}</div>
             <div className={s.campaignDetailGrid}>
-              <div className={s.campaignDetailStat}><span>Spend</span><span>{c.spend}</span></div>
-              <div className={s.campaignDetailStat}><span>Impressions</span><span>{c.impressions}</span></div>
-              <div className={s.campaignDetailStat}><span>CPM</span><span>{c.cpm}</span></div>
-              <div className={s.campaignDetailStat}><span>Reach</span><span>{c.reach}</span></div>
-              <div className={s.campaignDetailStat}><span>Frequency</span><span>{c.frequency}</span></div>
-              <div className={s.campaignDetailStat}><span>Clicks</span><span>{c.clicks}</span></div>
-              <div className={s.campaignDetailStat}><span>CTR</span><span>{c.ctr}</span></div>
-              <div className={s.campaignDetailStat}><span>CPC</span><span>{c.cpc}</span></div>
-              <div className={s.campaignDetailStat}><span>LPV</span><span>{c.lpv}</span></div>
-              <div className={s.campaignDetailStat}><span>LPV Rate</span><span>{c.lpvRate}</span></div>
-              <div className={s.campaignDetailStat}><span>Form Fills</span><span>{c.formFills}</span></div>
-              <div className={s.campaignDetailStat}><span>Bookings</span><span>{c.trialBookings}</span></div>
-              <div className={s.campaignDetailStat}><span>CPL</span><span>{c.cpl}</span></div>
-              <div className={s.campaignDetailStat}><span>Conv. Rate</span><span>{c.convRate}</span></div>
+              {[
+                { k: 'Spend', v: c.spend },
+                { k: 'Impressions', v: c.impressions },
+                { k: 'CPM', v: c.cpm, edu: 'cpm' },
+                { k: 'Reach', v: c.reach },
+                { k: 'Frequency', v: c.frequency, edu: 'frequency' },
+                { k: 'Clicks', v: c.clicks },
+                { k: 'CTR', v: c.ctr, edu: 'ctr' },
+                { k: 'CPC', v: c.cpc },
+                { k: 'LPV', v: c.lpv },
+                { k: 'LPV Rate', v: c.lpvRate, edu: 'lpvRate' },
+                { k: 'Form Fills', v: c.formFills },
+                { k: 'Bookings', v: c.trialBookings },
+                { k: 'CPL', v: c.cpl, edu: 'cpl' },
+                { k: 'Conv. Rate', v: c.convRate, edu: 'convRate' },
+              ].map(stat => (
+                <div
+                  key={stat.k}
+                  className={`${s.campaignDetailStat} ${stat.edu ? s.campaignDetailStatEdu : ''}`}
+                  onMouseEnter={() => stat.edu && setEduTip(stat.edu)}
+                  onMouseLeave={() => setEduTip(null)}
+                >
+                  <span>{stat.k} {stat.edu && <span className={s.eduIcon}>?</span>}</span>
+                  <span>{stat.v}</span>
+                </div>
+              ))}
             </div>
             <div className={`${s.campaignDemoBanner} ${!c.demo.onTarget ? s.campaignDemoWarn : ''}`}>
               <span>Demo: {c.demo.age} · {c.demo.gender} · {c.demo.geo}</span>
@@ -264,6 +290,14 @@ function ChannelDetail({ channel, onClose }) {
             </div>
           </div>
         ))}
+
+        {/* Education tooltip — MKT-003 */}
+        {eduTip && METRIC_EDUCATION[eduTip] && (
+          <div className={s.eduTooltip}>
+            <div className={s.eduTooltipLabel}>{METRIC_EDUCATION[eduTip].label}</div>
+            <div className={s.eduTooltipText}>{METRIC_EDUCATION[eduTip].explain}</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -427,7 +461,11 @@ export default function Marketing() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [createAdOpen, setCreateAdOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [sageFocused, setSageFocused] = useState(false);
   const typewriterText = useTypewriter(SAGE_PROMPTS);
+  const cmdInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  useBannerCanvas(canvasRef);
 
   const totalLeads = CHANNELS.reduce((sum, c) => sum + c.leads, 0);
   const avgCpl = '$14.80';
@@ -479,79 +517,137 @@ export default function Marketing() {
   return (
     <>
       <main className={sh.main}>
-        <PageBanner
-          title="Marketing"
-          stats={[
-            { value: `${totalLeads} Leads MTD`, explanation: 'Total leads this month' },
-            { value: avgCpl, explanation: 'Avg cost per lead' },
-            { value: topChannel, explanation: 'Top lead source' },
-          ]}
-          onDashboardClick={() => setDashOpen(true)}
-        />
-
-        <div className={sh.scroll}>
-          {/* Sage Command Bar */}
-          <div className={s.cmdBar}>
-            <div className={s.cmdHeader}>
-              <div className={s.cmdSageIcon}>S</div>
-              <div className={s.cmdHeaderText}>
-                <div className={s.cmdTitle}>Manage your marketing</div>
-                <div className={s.cmdSubtitle}>Tell Sage what you need — create ads, adjust budgets, pull reports</div>
-              </div>
-            </div>
-
-            <div className={s.cmdInputWrap}>
-              <div className={`${s.cmdMic} ${isListening ? s.cmdMicActive : ''}`} onClick={toggleListening}>
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                {isListening && <div className={s.cmdMicPulse} />}
-              </div>
-              <div className={s.cmdInputInner}>
-                <input
-                  className={s.cmdInput}
-                  value={cmdInput}
-                  onChange={e => setCmdInput(e.target.value)}
-                  placeholder={typewriterText}
-                  onKeyDown={e => e.key === 'Enter' && handleCommand()}
-                />
-                {isListening && <span className={s.cmdListeningBadge}>Listening...</span>}
-              </div>
-              <button className={s.cmdSend} onClick={() => handleCommand()} disabled={!cmdInput.trim()}>
-                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-              </button>
-            </div>
-
-            <div className={s.cmdChips}>
-              {QUICK_ACTIONS.map(a => (
-                <button key={a.label} className={s.cmdChip} onClick={() => {
-                  if (a.label === 'Create new ad') setCreateAdOpen(true);
-                  else if (a.label === 'Adjust budget') setBudgetOpen(true);
-                  else handleCommand(a.label);
-                }}>
-                  <span>{a.icon}</span> {a.label}
-                </button>
-              ))}
-            </div>
-
-            {cmdResponse && (
-              <div className={s.cmdResponse}>
-                <div className={s.cmdResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
-                <div className={s.cmdResponseA}>{cmdResponse.reply}</div>
-                <div className={s.cmdResponseActions}>
-                  {cmdResponse.actions.map(a => (
-                    <button key={a} className={a === 'Cancel' ? s.cmdActionCancel : s.cmdActionConfirm} onClick={() => setCmdResponse(null)}>{a}</button>
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* ═══ COMMAND BAR — Sage-powered top bar ═══ */}
+        <div className={s.topBar}>
+          <div className={s.topBarCanvas}>
+            <canvas ref={canvasRef} />
+          </div>
+          <div className={s.topLeft}>
+            <div className={s.topGreeting}>Marketing</div>
+            <div className={s.topSub}>Manage ads, budgets, and content</div>
           </div>
 
-          {/* Sage tip */}
+          <div className={`${s.topSage} ${sageFocused ? s.topSageFocused : ''}`}>
+            <div className={s.topSageGlow} />
+            <div className={s.topSageOrb}>
+              <span className={s.topSageOrbLetter}>S</span>
+              <div className={s.topSageOrbPulse} />
+            </div>
+            <div className={s.topSageInputWrap}>
+              <input
+                ref={cmdInputRef}
+                className={s.topSageInput}
+                value={cmdInput}
+                onChange={e => setCmdInput(e.target.value)}
+                placeholder={typewriterText}
+                onFocus={() => setSageFocused(true)}
+                onBlur={() => !cmdInput && setSageFocused(false)}
+                onKeyDown={e => e.key === 'Enter' && handleCommand()}
+              />
+              {isListening && <span className={s.topSageListening}>Listening...</span>}
+            </div>
+            <div className={`${s.topSageMic} ${isListening ? s.topSageMicActive : ''}`} onClick={toggleListening}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              {isListening && <div className={s.topSageMicPulse} />}
+            </div>
+            <button className={s.topSageSend} onClick={() => handleCommand()} disabled={!cmdInput.trim()}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+            <div className={s.topSageWave}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className={s.topSageWaveBar} style={{ animationDelay: `${i * 0.12}s` }} />
+              ))}
+            </div>
+          </div>
+
+          <div className={s.topRight}>
+            <div className={s.topChip}>
+              <span className={s.topChipDot} style={{ background: 'var(--green)' }} />
+              <span className={s.topChipValue}>{totalLeads}</span>
+              <span className={s.topChipLabel}>leads MTD</span>
+            </div>
+            <div className={s.topChip}>
+              <span className={s.topChipDot} style={{ background: 'var(--gold)' }} />
+              <span className={s.topChipValue}>{avgCpl}</span>
+              <span className={s.topChipLabel}>avg CPL</span>
+            </div>
+            <div className={s.topChip} onClick={() => setDashOpen(true)} style={{ cursor: 'pointer' }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              <span className={s.topChipLabel}>Dashboard</span>
+            </div>
+            <button className={s.topBell}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span className={s.topBellBadge}>3</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Quick action chips + Sage response — slide down from bar */}
+        <div className={s.topActions}>
+          <div className={s.topChips}>
+            {QUICK_ACTIONS.map(a => (
+              <button key={a.label} className={s.topActionChip} onClick={() => {
+                if (a.label === 'Create new ad') setCreateAdOpen(true);
+                else if (a.label === 'Adjust budget') setBudgetOpen(true);
+                else handleCommand(a.label);
+              }}>
+                <span>{a.icon}</span> {a.label}
+              </button>
+            ))}
+          </div>
+          {cmdResponse && (
+            <div className={s.topResponse}>
+              <div className={s.topResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
+              <div className={s.topResponseA}>{cmdResponse.reply}</div>
+              <div className={s.topResponseActions}>
+                {cmdResponse.actions.map(a => (
+                  <button key={a} className={a === 'Cancel' ? s.topResponseCancel : s.topResponseConfirm} onClick={() => setCmdResponse(null)}>{a}</button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={sh.scroll}>
+          {/* ═══ PRIORITIES — what needs attention now ═══ */}
+          <div className={s.sectionBanner} style={{ '--accent': 'var(--red)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Needs attention</span>
+          </div>
+
+          {/* Sage insight */}
           <div className={s.sageTip}>
             <span className={s.sageTipLabel}>Sage</span>
             <span>Your Saturday ad is outperforming everything else by 3x — worth putting more budget there this week.</span>
           </div>
 
-          {/* Lead Sources + More Tools dropdown */}
+          {/* Ads needing refresh */}
+          {ADS_NEEDING_REFRESH.map(ad => (
+            <div key={ad.name} className={s.alertCard}>
+              <div className={s.alertLeft}>
+                <div className={s.alertName}>{ad.name}</div>
+                <div className={s.alertMeta}>
+                  <span>{ad.days} days running</span>
+                  <span>·</span>
+                  <span>{ad.spend} spent</span>
+                  <span>·</span>
+                  <span>{ad.conversions} conversions</span>
+                </div>
+              </div>
+              <div className={s.alertRight}>
+                <span className={ad.status === 'Stop-loss' ? s.alertBadgeRed : s.alertBadgeYellow}>{ad.status}</span>
+                <button className={s.alertCta}>See Sage suggestion</button>
+              </div>
+            </div>
+          ))}
+
+          {/* ═══ PERFORMANCE — channels + budget ═══ */}
+          <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Performance</span>
+          </div>
+
+          {/* Lead Sources + More Tools */}
           <div className={s.sectionHead}>
             <h3 className={s.sectionTitle}>Lead Sources</h3>
             <div className={s.toolsWrap}>
@@ -577,7 +673,8 @@ export default function Marketing() {
           </div>
           <div className={s.channelGrid}>
             {CHANNELS.map(ch => (
-              <div key={ch.name} className={s.channelCard} onClick={() => setChannelDetail(ch)}>
+              <div key={ch.name} className={s.channelCard} onClick={() => setChannelDetail(ch)} style={{ '--ch-accent': ch.accent }}>
+                <div className={s.channelAccent} />
                 <div className={s.channelTop}>
                   <span className={s.channelIcon}>{ch.icon}</span>
                   <span className={s.channelName}>{ch.name}</span>
@@ -626,29 +723,11 @@ export default function Marketing() {
             </div>
           </div>
 
-          {/* Ad Health */}
-          <div className={s.sectionHead}>
-            <h3 className={s.sectionTitle}>Ads Needing Refresh</h3>
-            <span className={s.sectionRef}>MKT-002</span>
+          {/* ═══ TOOLS — ads, creation, briefs ═══ */}
+          <div className={s.sectionBanner} style={{ '--accent': 'var(--green)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span>Tools</span>
           </div>
-          {ADS_NEEDING_REFRESH.map(ad => (
-            <div key={ad.name} className={s.alertCard}>
-              <div className={s.alertLeft}>
-                <div className={s.alertName}>{ad.name}</div>
-                <div className={s.alertMeta}>
-                  <span>{ad.days} days running</span>
-                  <span>•</span>
-                  <span>{ad.spend} spent</span>
-                  <span>•</span>
-                  <span>{ad.conversions} conversions</span>
-                </div>
-              </div>
-              <div className={s.alertRight}>
-                <span className={ad.status === 'Stop-loss' ? s.alertBadgeRed : s.alertBadgeYellow}>{ad.status}</span>
-                <button className={s.alertCta}>See Sage suggestion</button>
-              </div>
-            </div>
-          ))}
 
           {/* Best Performing */}
           <div className={s.sectionHead}>
@@ -672,9 +751,9 @@ export default function Marketing() {
             ))}
           </div>
 
-          {/* Create Ad CTA */}
           <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)}>
-            + Create New Ad Campaign
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Create New Ad Campaign
           </button>
 
           {/* Content Briefs */}

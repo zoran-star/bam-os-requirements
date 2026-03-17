@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import PageBanner from '../components/PageBanner';
+import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
 import useCountUp from '../hooks/useCountUp';
 import s from '../styles/Home.module.css';
@@ -244,6 +244,47 @@ export default function Home() {
   const typewriterText = useTypewriter(ADVISOR_PROMPTS);
   const actionCount = useCountUp(7);
   const sageInputRef = useRef(null);
+  const canvasRef = useRef(null);
+  useBannerCanvas(canvasRef);
+
+  /* Sage pill typing animation */
+  const PILL_PROMPTS = [
+    "what do you need? I'll figure it out",
+    "what should I work on next?",
+    "got a question? just ask",
+    "give me a task — I'm on it",
+  ];
+  const [pillText, setPillText] = useState('');
+  const pillRef = useRef({ idx: 0, charIdx: 0, deleting: false, timeout: null });
+
+  useEffect(() => {
+    if (sageExpanded || !loaded) return;
+    const r = pillRef.current;
+    const tick = () => {
+      const full = PILL_PROMPTS[r.idx];
+      if (!r.deleting) {
+        r.charIdx++;
+        setPillText(full.slice(0, r.charIdx));
+        if (r.charIdx >= full.length) {
+          r.timeout = setTimeout(() => { r.deleting = true; tick(); }, 2200);
+          return;
+        }
+        r.timeout = setTimeout(tick, 45 + Math.random() * 35);
+      } else {
+        r.charIdx--;
+        setPillText(full.slice(0, r.charIdx));
+        if (r.charIdx <= 0) {
+          r.deleting = false;
+          r.idx = (r.idx + 1) % PILL_PROMPTS.length;
+          r.timeout = setTimeout(tick, 400);
+          return;
+        }
+        r.timeout = setTimeout(tick, 25);
+      }
+    };
+    r.timeout = setTimeout(tick, 800);
+    return () => clearTimeout(r.timeout);
+  }, [loaded, sageExpanded]);
 
   useEffect(() => {
     const t = setTimeout(() => setLoaded(true), 1500);
@@ -292,25 +333,69 @@ export default function Home() {
 
   return (
     <main className={sh.main}>
-      <PageBanner
-        title="Home"
-        stats={[
-          { value: TODAY, explanation: 'Current date' },
-          { value: '7 Actions', explanation: 'Completed today' },
-          { value: '$8.2k MRR', explanation: 'Monthly recurring revenue' },
-        ]}
-      />
+      {/* ═══ COMMAND BAR — replaces old PageBanner ═══ */}
+      <div className={s.cmdBar}>
+        <div className={s.cmdBarCanvas}>
+          <canvas ref={canvasRef} />
+        </div>
+        <div className={s.cmdLeft}>
+          <div className={s.cmdGreeting}>{GREETING}, Zoran</div>
+          <div className={s.cmdDate}>{TODAY}</div>
+        </div>
+        <div className={s.cmdCenter}>
+          <div className={s.cmdSearch}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input className={s.cmdInput} placeholder="Search members, classes, or ask Sage..." />
+            <kbd className={s.cmdKbd}>⌘K</kbd>
+          </div>
+        </div>
+        <div className={s.cmdRight}>
+          <div className={s.cmdChip} onClick={() => setSageExpanded(true)}>
+            <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
+            <span className={s.cmdChipValue}>{actionCount}</span>
+            <span className={s.cmdChipLabel}>actions today</span>
+          </div>
+          <div className={s.cmdChip}>
+            <span className={s.cmdChipDot} style={{ background: 'var(--gold)' }} />
+            <span className={s.cmdChipValue}>$8.2k</span>
+            <span className={s.cmdChipLabel}>MRR</span>
+          </div>
+          <div className={s.cmdChip}>
+            <span className={s.cmdChipDot} style={{ background: '#6366f1' }} />
+            <span className={s.cmdChipValue}>42</span>
+            <span className={s.cmdChipLabel}>members</span>
+          </div>
+          <button className={s.cmdBell}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span className={s.cmdBellBadge}>3</span>
+          </button>
+        </div>
+      </div>
 
       <div className={sh.scroll}>
-        {/* Best thing highlight */}
-        <div className={s.highlight}>
-          <div className={s.highlightIcon}>
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        {/* ═══ HERO ROW: highlight + Sage side by side ═══ */}
+        <div className={s.heroRow}>
+          {/* Best thing highlight */}
+          <div className={s.highlight}>
+            <div className={s.highlightIcon}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div className={s.highlightBody}>
+              <div className={s.highlightLabel}>Best thing since your last open</div>
+              <div className={s.highlightValue}>+2 trials booked today</div>
+              <div className={s.highlightContext}>Mia Thompson and Sofia Reyes both confirmed — your Saturday pipeline is strongest it's been in 3 weeks.</div>
+            </div>
           </div>
-          <div className={s.highlightBody}>
-            <div className={s.highlightLabel}>Best thing since your last open</div>
-            <div className={s.highlightValue}>+2 trials booked today</div>
-            <div className={s.highlightContext}>Mia Thompson and Sofia Reyes both confirmed — your Saturday pipeline is strongest it's been in 3 weeks.</div>
+
+          {/* Priority task — dominant CTA */}
+          <div className={s.taskCard}>
+            <div className={s.taskHeader}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span className={s.taskLabel}>Your #1 priority</span>
+            </div>
+            <div className={s.taskTitle}>Follow up with Ava Martinez</div>
+            <div className={s.taskDesc}>She finished her trial yesterday and asked about membership options. Highest close probability in your pipeline.</div>
+            <button className={s.taskCta}>Open conversation →</button>
           </div>
         </div>
 
@@ -326,7 +411,7 @@ export default function Home() {
               </div>
               <div className={s.sagePillText}>
                 <span className={s.sagePillGreeting}>Hey Zoran</span>
-                <span className={s.sagePillPrompt}> — ask me anything</span>
+                <span className={s.sagePillPrompt}> — {pillText}<span className={s.sagePillCursor} /></span>
               </div>
               <div className={s.sagePillWaveform}>
                 {[1, 2, 3, 4, 5].map(i => (
@@ -366,7 +451,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Quick suggestions */}
               <div className={s.sageSuggestions}>
                 {['What should I focus on today?', 'Follow up with cold leads', 'Show revenue breakdown', 'Which KPIs need attention?'].map(q => (
                   <button key={q} className={s.sageSugChip} onClick={() => { setSageInput(q); handleSageSubmit(); }}>
@@ -375,7 +459,6 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Sage response */}
               {sageResponse && (
                 <div className={s.sageResponseCard}>
                   <div className={s.sageResponseQ}>You asked: &ldquo;{sageResponse.q}&rdquo;</div>
@@ -421,7 +504,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ═══ SAGE CHALLENGE ═══ */}
+        {/* ═══ SAGE CHALLENGE + ACTIVITY ═══ */}
+        <div className={s.sectionLabel}>Activity</div>
+
         {!challengeDismissed && (
           <div className={s.challenge}>
             <div className={s.challengeLeft}>
@@ -441,53 +526,26 @@ export default function Home() {
           </div>
         )}
 
-        {/* Two column row */}
-        <div className={s.twoCol}>
-          <div className={s.taskCard}>
-            <div className={s.taskHeader}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <span className={s.taskLabel}>Get started</span>
+        {/* Notifications */}
+        <div className={s.notifList}>
+          <div className={s.notifCard}>
+            <div className={s.notifDot} />
+            <div className={s.notifBody}>
+              <div className={s.notifText}><strong>New lead:</strong> James Park inquired via Instagram DM about the teen competitive program.</div>
+              <div className={s.notifTime}>2h ago</div>
             </div>
-            <div className={s.taskTitle}>Follow up with Ava Martinez</div>
-            <div className={s.taskDesc}>She finished her trial yesterday and asked about membership options. Highest close probability in your pipeline right now.</div>
-            <button className={s.taskCta}>Open conversation →</button>
           </div>
-          <div className={s.actionCard}>
-            <div className={s.actionLabel}>Actions completed today</div>
-            <div className={s.actionValue}>{actionCount}</div>
-            <div className={s.actionCompare}>
-              <span className={s.actionUp}>
-                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
-                +3 vs yesterday
-              </span>
+          <div className={s.notifCard}>
+            <div className={s.notifDot} />
+            <div className={s.notifBody}>
+              <div className={s.notifText}><strong>Payment received:</strong> Carlos Martinez — $175/mo membership started.</div>
+              <div className={s.notifTime}>5h ago</div>
             </div>
-            <div className={s.actionAvg}>Your daily average: 5.2</div>
           </div>
-        </div>
-
-        {/* Notification cards */}
-        <div className={s.notifSection}>
-          <div className={s.sectionTitle}>Notifications</div>
-          <div className={s.notifList}>
-            <div className={s.notifCard}>
-              <div className={s.notifDot} />
-              <div className={s.notifBody}>
-                <div className={s.notifText}><strong>New lead:</strong> James Park inquired via Instagram DM about the teen competitive program.</div>
-                <div className={s.notifTime}>2h ago</div>
-              </div>
-            </div>
-            <div className={s.notifCard}>
-              <div className={s.notifDot} />
-              <div className={s.notifBody}>
-                <div className={s.notifText}><strong>Payment received:</strong> Carlos Martinez — $175/mo membership started.</div>
-                <div className={s.notifTime}>5h ago</div>
-              </div>
-            </div>
-            <div className={`${s.notifCard} ${s.notifRead}`}>
-              <div className={s.notifBody}>
-                <div className={s.notifText}><strong>Session reminder:</strong> 3 athletes expected for the 4pm Intermediate group.</div>
-                <div className={s.notifTime}>Today, 3:30pm</div>
-              </div>
+          <div className={`${s.notifCard} ${s.notifRead}`}>
+            <div className={s.notifBody}>
+              <div className={s.notifText}><strong>Session reminder:</strong> 3 athletes expected for the 4pm Intermediate group.</div>
+              <div className={s.notifTime}>Today, 3:30pm</div>
             </div>
           </div>
         </div>

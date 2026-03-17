@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import s from '../styles/Sales.module.css';
-import PageBanner from '../components/PageBanner';
+import sh from '../styles/shared.module.css';
+import useBannerCanvas from '../hooks/useBannerCanvas';
 import useCountUp from '../hooks/useCountUp';
 import useTypewriter from '../hooks/useTypewriter';
 
@@ -119,6 +120,15 @@ const TYPEWRITER_PROMPTS = [
   "What\u2019s my biggest revenue risk right now?",
 ];
 
+const COMPILED_INBOX = [
+  { id: 'i1', domain: 'Sales', icon: '💬', title: 'Marcus Johnson replied', preview: 'That works! What age groups do you have?', channel: 'Instagram DM', time: '4h ago', unread: true },
+  { id: 'i2', domain: 'Sales', icon: '🔥', title: 'Ava Martinez — follow up recommended', preview: 'Trial 1d ago, highest close probability. Momentum fading.', channel: 'AI Insight', time: '1h ago', unread: true },
+  { id: 'i3', domain: 'Marketing', icon: '⚠️', title: 'Free Trial Story — 0 conversions', preview: '62 days active, $158 spent. Consider pausing.', channel: 'Ad Alert', time: '3h ago', unread: true },
+  { id: 'i4', domain: 'Sales', icon: '📞', title: 'Jake Rivera went cold', preview: 'No response in 3 days. AI re-engagement queued.', channel: 'AI Insight', time: '5h ago', unread: false },
+  { id: 'i5', domain: 'Members', icon: '🔄', title: 'Sarah Chen — renewal in 3 days', preview: 'Monthly membership auto-renews Friday. No issues flagged.', channel: 'System', time: '6h ago', unread: false },
+  { id: 'i6', domain: 'Sales', icon: '📊', title: 'Weekly sales report ready', preview: '8 trials, 5 closes, 62.5% rate. +8% vs last month.', channel: 'Report', time: '1d ago', unread: false },
+];
+
 /* ─── TOOLTIP ─── */
 function Tooltip({ text, children }) {
   const [visible, setVisible] = useState(false);
@@ -161,6 +171,10 @@ function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId, onSelec
           {lead.stage === 'bookedTrial' && lead.trialDate && !isToday && (
             <div className={s.cardTrialDate}>
               {lead.trialDate}{lead.trialTime && `, ${lead.trialTime}`}
+              <span className={s.cardReminderSent}>
+                <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                Reminder sent
+              </span>
             </div>
           )}
           {lead.stage === 'doneTrial' && lead.daysSinceTrial && (
@@ -195,6 +209,7 @@ function LeadDrawer({ lead, onClose, onUpdateLead }) {
   const [messages, setMessages] = useState(lead?.messages || []);
   const [inputVal, setInputVal] = useState('');
   const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState({});
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -277,7 +292,27 @@ function LeadDrawer({ lead, onClose, onUpdateLead }) {
                   <div className={`${s.chatBubble} ${m.pending ? s.chatBubblePending : ''}`}>
                     {m.text}
                   </div>
-                  <div className={s.chatTime}>{m.time}</div>
+                  <div className={s.chatMeta}>
+                    <div className={s.chatTime}>{m.time}</div>
+                    {m.from === 'ai' && !m.pending && (
+                      <div className={s.chatFeedback}>
+                        <button
+                          className={`${s.chatFeedbackBtn} ${feedback[i] === 'up' ? s.chatFeedbackActive : ''}`}
+                          onClick={() => setFeedback(prev => ({ ...prev, [i]: prev[i] === 'up' ? null : 'up' }))}
+                          title="Good response"
+                        >
+                          <svg width="12" height="12" fill={feedback[i] === 'up' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+                        </button>
+                        <button
+                          className={`${s.chatFeedbackBtn} ${feedback[i] === 'down' ? s.chatFeedbackDown : ''}`}
+                          onClick={() => setFeedback(prev => ({ ...prev, [i]: prev[i] === 'down' ? null : 'down' }))}
+                          title="Needs improvement"
+                        >
+                          <svg width="12" height="12" fill={feedback[i] === 'down' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
               <div ref={chatEndRef} />
@@ -556,11 +591,21 @@ export default function Sales() {
   const [selectedLead, setSelectedLead] = useState(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
+  const [sageFocused, setSageFocused] = useState(false);
+  const [cmdInput, setCmdInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [inboxItems, setInboxItems] = useState(COMPILED_INBOX);
 
   // Refs
   const dragSrcStage = useRef(null);
   const toastTimer = useRef(null);
   const droppedTimer = useRef(null);
+  const canvasRef = useRef(null);
+  const cmdInputRef = useRef(null);
+
+  // Banner canvas
+  useBannerCanvas(canvasRef);
 
   // Derived: group leads by stage (today trials sorted first)
   const leadsByStage = {};
@@ -586,6 +631,14 @@ export default function Sales() {
 
   /* ─── TYPEWRITER (custom hook) ─── */
   const typewriterText = useTypewriter(TYPEWRITER_PROMPTS);
+
+  /* ─── COMMAND BAR HANDLERS ─── */
+  const toggleListening = () => setIsListening(p => !p);
+  const handleCommand = () => {
+    if (!cmdInput.trim()) return;
+    setCmdInput('');
+  };
+  const unreadCount = inboxItems.filter(it => it.unread).length;
 
   /* ─── DRAG & DROP ─── */
   const handleDragStart = useCallback((e, leadId) => {
@@ -673,18 +726,84 @@ export default function Sales() {
         </filter>
       </svg>
 
-      <main className={s.main}>
-        <PageBanner
-          title="Sales"
-          stats={[
-            { value: '+12.4% MTD', explanation: 'Revenue growth vs last month' },
-            { value: '34 Leads', explanation: 'Active in pipeline' },
-            { value: '82% Close', explanation: 'Trial-to-member rate' },
-          ]}
-          onDashboardClick={() => setDashOpen(true)}
-        />
+      <main className={sh.main}>
+        {/* ═══ COMMAND BAR ═══ */}
+        <div className={s.cmdBar}>
+          <div className={s.cmdBarCanvas}>
+            <canvas ref={canvasRef} />
+          </div>
+          <div className={s.cmdLeft}>
+            <div className={s.cmdTitle}>Sales</div>
+            <div className={s.cmdSub}>Pipeline, leads, and conversions</div>
+          </div>
+
+          <div className={`${s.cmdSage} ${sageFocused ? s.cmdSageFocused : ''}`}>
+            <div className={s.cmdSageGlow} />
+            <div className={s.cmdSageOrb}>
+              <span className={s.cmdSageOrbLetter}>S</span>
+              <div className={s.cmdSageOrbPulse} />
+            </div>
+            <div className={s.cmdSageInputWrap}>
+              <input
+                ref={cmdInputRef}
+                className={s.cmdSageInput}
+                value={cmdInput}
+                onChange={e => setCmdInput(e.target.value)}
+                placeholder={typewriterText}
+                onFocus={() => setSageFocused(true)}
+                onBlur={() => !cmdInput && setSageFocused(false)}
+                onKeyDown={e => e.key === 'Enter' && handleCommand()}
+              />
+              {isListening && <span className={s.cmdSageListening}>Listening...</span>}
+            </div>
+            <div className={`${s.cmdSageMic} ${isListening ? s.cmdSageMicActive : ''}`} onClick={toggleListening}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              {isListening && <div className={s.cmdSageMicPulse} />}
+            </div>
+            <button className={s.cmdSageSend} onClick={handleCommand} disabled={!cmdInput.trim()}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+            <div className={s.cmdSageWave}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className={s.cmdSageWaveBar} style={{ animationDelay: `${i * 0.12}s` }} />
+              ))}
+            </div>
+          </div>
+
+          <div className={s.cmdRight}>
+            <div className={s.cmdChip}>
+              <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
+              <span className={s.cmdChipValue}>34</span>
+              <span className={s.cmdChipLabel}>leads</span>
+            </div>
+            <div className={s.cmdChip}>
+              <span className={s.cmdChipDot} style={{ background: 'var(--gold)' }} />
+              <span className={s.cmdChipValue}>62%</span>
+              <span className={s.cmdChipLabel}>close</span>
+            </div>
+            <div className={s.cmdChip} onClick={() => setDashOpen(true)} style={{ cursor: 'pointer' }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              <span className={s.cmdChipLabel}>Dashboard</span>
+            </div>
+            <button className={s.cmdBell} onClick={() => setBellOpen(p => !p)}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unreadCount > 0 && <span className={s.cmdBellBadge}>{unreadCount}</span>}
+            </button>
+          </div>
+        </div>
 
         <div className={s.scroll}>
+          {/* SAGE INSIGHT STRIP */}
+          <div className={s.insightStrip}>
+            <div className={s.insightStripIcon}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </div>
+            <div className={s.insightStripText}>
+              <strong>Ava Martinez</strong> completed a trial 1 day ago — highest close probability. Follow up now before momentum fades.
+            </div>
+            <button className={s.insightStripAction}>Follow up</button>
+          </div>
+
           {/* HERO */}
           <div className={s.hero}>
             {/* KPI CARD */}
@@ -768,33 +887,6 @@ export default function Sales() {
               </div>
             </div>
 
-            {/* SAGE CARD */}
-            <div className={s.sageCard}>
-              <div className={s.sageBody}>
-                <div className={s.sageBodyContent}>
-                  <Tooltip text="AI-generated insight based on pipeline activity and timing signals"><div className={s.sagePriorityBadge}>For You To Know</div></Tooltip>
-                  <div className={s.sageInsight}>
-                    <div className={s.sageInsightText}>🔥 <strong>Ava Martinez</strong> completed a trial 1 day ago — highest close probability in your pipeline. Follow up now before momentum fades.</div>
-                  </div>
-                </div>
-                <div className={s.sageMicWrap}>
-                  <div className={s.sageMic}>
-                    <svg fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-                  </div>
-                  <div className={s.sageMicLabel}>Tap to speak</div>
-                </div>
-              </div>
-              <div className={s.sageDivider}></div>
-              <div className={s.sageInput}>
-                <div className={s.sageInputText}>
-                  <span>{typewriterText}</span>
-                  <span className={s.sageInputCursor}></span>
-                </div>
-                <div className={s.sageInputSend}>
-                  <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* PIPELINE */}
@@ -879,7 +971,7 @@ export default function Sales() {
         </div>
       </main>
 
-      {/* INBOX BUTTON */}
+      {/* LEAD INBOX BUTTON */}
       <button className={s.inboxBtn} onClick={() => setPanelOpen(p => !p)}>
         <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <div className={s.inboxCt}>3</div>
@@ -891,13 +983,13 @@ export default function Sales() {
         Card moved
       </div>
 
-      {/* OVERLAY */}
+      {/* LEAD INBOX OVERLAY */}
       <div
         className={`${s.overlay} ${panelOpen ? s.overlayOpen : ''}`}
         onClick={() => setPanelOpen(false)}
       ></div>
 
-      {/* PANEL */}
+      {/* LEAD INBOX PANEL */}
       <div className={`${s.panel} ${panelOpen ? s.panelOpen : ''}`}>
         <div className={s.panelHead}>
           <span className={s.panelTitle}>Lead Inbox</span>
@@ -934,6 +1026,46 @@ export default function Sales() {
                 <div className={s.threadActions}>
                   <button className={s.threadActionBtn}>Reply</button>
                   <button className={s.threadActionBtn}>Move to Booked</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* COMPILED INBOX OVERLAY */}
+      {bellOpen && <div className={s.bellOverlay} onClick={() => setBellOpen(false)} />}
+
+      {/* COMPILED INBOX DRAWER */}
+      <div className={`${s.bellPanel} ${bellOpen ? s.bellPanelOpen : ''}`}>
+        <div className={s.bellPanelHead}>
+          <span className={s.bellPanelTitle}>Inbox</span>
+          <button className={s.closeBtn} onClick={() => setBellOpen(false)}>&times;</button>
+        </div>
+        <div className={s.bellPanelFilters}>
+          {['All', 'Sales', 'Marketing', 'Members'].map(f => (
+            <button key={f}
+              className={`${s.inboxFilterBtn} ${inboxFilter === f ? s.inboxFilterActive : ''}`}
+              onClick={() => setInboxFilter(f)}
+            >{f}</button>
+          ))}
+        </div>
+        <div className={s.bellPanelItems}>
+          {inboxItems
+            .filter(it => inboxFilter === 'All' || it.domain === inboxFilter)
+            .map(it => (
+            <div key={it.id} className={`${s.bellItem} ${it.unread ? s.bellItemUnread : ''}`}>
+              <div className={s.bellItemIcon}>{it.icon}</div>
+              <div className={s.bellItemContent}>
+                <div className={s.bellItemTop}>
+                  <span className={s.bellItemTitle}>{it.title}</span>
+                  <span className={s.bellItemTime}>{it.time}</span>
+                </div>
+                <div className={s.bellItemPreview}>{it.preview}</div>
+                <div className={s.bellItemMeta}>
+                  <span className={s.bellItemDomain}>{it.domain}</span>
+                  <span className={s.bellItemChannel}>{it.channel}</span>
+                  {it.unread && <div className={s.udot} />}
                 </div>
               </div>
             </div>

@@ -8,9 +8,44 @@
 .welcomeGreeting{font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.02em}
 .welcomeData{font-size:14px;font-weight:500;color:rgba(255,255,255,0.5)}
 
+/* ═══ COMMAND BAR ═══ */
+.cmdBar{display:flex;align-items:center;gap:16px;padding:14px 36px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);animation:cmdBarIn 0.4s var(--es);position:relative;overflow:hidden}
+.cmdBarCanvas{position:absolute;inset:0;opacity:0.14;pointer-events:none;z-index:0}
+.cmdBarCanvas canvas{position:absolute;inset:0}
+.cmdLeft,.cmdCenter,.cmdRight{position:relative;z-index:1}
+@keyframes cmdBarIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.cmdLeft{display:flex;flex-direction:column;gap:1px;flex-shrink:0}
+.cmdGreeting{font-size:15px;font-weight:800;color:var(--tp);letter-spacing:-0.01em}
+.cmdDate{font-size:11px;font-weight:500;color:var(--tm)}
+
+.cmdCenter{flex:1;display:flex;justify-content:center;max-width:420px;margin:0 auto}
+.cmdSearch{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:9px 16px;width:100%;transition:all 200ms var(--es);color:var(--tm)}
+.cmdSearch:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08);background:var(--surf2)}
+.cmdInput{flex:1;font-family:var(--ff);font-size:13px;font-weight:500;color:var(--tp);background:none;border:none;outline:none}
+.cmdInput::placeholder{color:var(--tm);font-weight:500}
+.cmdKbd{font-family:var(--fm);font-size:10px;font-weight:600;color:var(--tm);background:var(--surf2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;line-height:1;flex-shrink:0}
+
+.cmdRight{display:flex;gap:8px;flex-shrink:0}
+.cmdChip{display:flex;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:6px 12px;cursor:pointer;transition:all 180ms var(--es)}
+.cmdChip:hover{border-color:var(--borderm);background:var(--surf2);transform:translateY(-1px)}
+.cmdChipDot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.cmdChipValue{font-family:var(--fm);font-size:13px;font-weight:700;color:var(--tp)}
+.cmdChipLabel{font-size:11px;font-weight:500;color:var(--tm)}
+
+/* ─── BELL ICON ─── */
+.cmdBell{position:relative;width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surf);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ts);transition:all 160ms;flex-shrink:0}
+.cmdBell:hover{border-color:var(--gold);color:var(--gold);background:var(--gglow)}
+.cmdBellBadge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-family:var(--fm);font-size:9px;font-weight:700;width:16px;height:16px;border-radius:9999px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+
+/* ═══ HERO ROW ═══ */
+.heroRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;animation:fadeIn 0.5s ease 0.05s backwards}
+
 /* ─── HIGHLIGHT CARD ─── */
-.highlight{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.2);border-radius:24px;padding:24px 28px;display:flex;gap:16px;align-items:flex-start;animation:fadeIn 0.5s ease 0.1s backwards}
+.highlight{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.2);border-radius:24px;padding:24px 28px;display:flex;gap:16px;align-items:flex-start}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── SECTION LABELS ─── */
+.sectionLabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tm);margin-top:4px}
 .highlightIcon{width:44px;height:44px;border-radius:14px;background:rgba(62,175,92,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .highlightBody{display:flex;flex-direction:column;gap:4px}
 .highlightLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
@@ -18,14 +53,17 @@
 .highlightContext{font-size:13px;font-weight:500;color:var(--ts);line-height:1.5}
 
 /* ═══ SAGE — EXPANDING PILL ═══ */
-.sageWrap{position:relative;border-radius:24px;overflow:hidden;animation:fadeIn 0.5s ease 0.15s backwards}
-.sageBorderGlow{position:absolute;inset:-2px;border-radius:26px;background:conic-gradient(from 0deg,var(--gold),rgba(200,168,78,0.1),var(--goldl),rgba(200,168,78,0.05),var(--gold));animation:glowSpin 4s linear infinite;z-index:0}
+.sageWrap{position:relative;border-radius:24px;animation:fadeIn 0.5s ease 0.15s backwards;isolation:isolate;box-shadow:0 0 12px rgba(200,168,78,0.12);transition:box-shadow 400ms var(--es)}
+.sageWrap:hover{box-shadow:0 0 32px rgba(200,168,78,0.28),0 0 60px rgba(200,168,78,0.1)}
+.sageBorderGlow{position:absolute;inset:-2px;border-radius:26px;overflow:hidden;z-index:0}
+.sageBorderGlow::before{content:'';position:absolute;inset:-40%;width:180%;height:180%;background:conic-gradient(from 0deg,rgba(200,168,78,0.35),rgba(200,168,78,0.03),rgba(200,168,78,0.2),rgba(200,168,78,0.02),rgba(200,168,78,0.35));animation:glowSpin 4s linear infinite;transition:opacity 400ms var(--es);opacity:0.5}
+.sageWrap:hover .sageBorderGlow::before{opacity:1;background:conic-gradient(from 0deg,var(--gold),rgba(200,168,78,0.08),var(--goldl),rgba(200,168,78,0.05),var(--gold))}
 @keyframes glowSpin{to{transform:rotate(360deg)}}
-.sageWrapExpanded .sageBorderGlow{animation:glowSpin 2s linear infinite}
+.sageWrapExpanded .sageBorderGlow::before{animation:glowSpin 2s linear infinite}
 
 /* Collapsed pill */
-.sagePill{position:relative;z-index:1;background:var(--surf);margin:2px;border-radius:22px;padding:16px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all 300ms var(--es)}
-.sagePill:hover{background:var(--surf2)}
+.sagePill{position:relative;z-index:1;background:var(--surf);margin:2px;border-radius:22px;padding:16px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all 400ms var(--es)}
+.sagePill:hover{background:var(--surf2);padding:16px 28px}
 
 .sagePillOrb{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--gold),var(--goldl));display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;box-shadow:var(--shadow-gold)}
 .sagePillOrbLetter{font-size:16px;font-weight:900;color:#fff;z-index:1;position:relative}
@@ -34,16 +72,21 @@
 
 .sagePillText{flex:1;display:flex;align-items:baseline;gap:4px}
 .sagePillGreeting{font-size:16px;font-weight:800;color:var(--tp)}
-.sagePillPrompt{font-size:14px;font-weight:500;color:var(--tm)}
+.sagePillPrompt{font-size:14px;font-weight:500;color:var(--tm);transition:color 400ms var(--es);white-space:nowrap}
+.sagePillCursor{display:inline-block;width:2px;height:14px;background:var(--gold);margin-left:2px;vertical-align:middle;animation:cursorBlink 0.8s step-end infinite;border-radius:1px}
+@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+.sagePill:hover .sagePillPrompt{color:var(--tp)}
 
 .sagePillWaveform{display:flex;align-items:center;gap:3px;height:20px;margin-left:auto}
-.sagePillBar{width:3px;border-radius:2px;background:var(--gold);animation:waveIdle 1.4s ease-in-out infinite;height:8px}
+.sagePillBar{width:3px;border-radius:2px;background:var(--gold);animation:waveIdle 1.4s ease-in-out infinite;height:8px;transition:transform 400ms var(--es)}
 .sagePillBar:nth-child(1){height:6px}
 .sagePillBar:nth-child(2){height:12px}
 .sagePillBar:nth-child(3){height:8px}
 .sagePillBar:nth-child(4){height:14px}
 .sagePillBar:nth-child(5){height:6px}
 @keyframes waveIdle{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.8)}}
+.sagePill:hover .sagePillBar{animation:waveActive 0.6s ease-in-out infinite}
+@keyframes waveActive{0%,100%{transform:scaleY(1)}50%{transform:scaleY(2.5)}}
 
 /* Expanded state */
 .sageExpanded{position:relative;z-index:1;background:var(--surf);margin:2px;border-radius:22px;padding:24px 28px;display:flex;flex-direction:column;gap:16px;animation:sageExpand 0.35s var(--es)}
@@ -178,11 +221,9 @@
 .challengeDismiss{font-family:var(--ff);font-size:11px;font-weight:600;color:var(--tm);background:none;border:none;cursor:pointer;transition:color 140ms;text-align:center}
 .challengeDismiss:hover{color:var(--ts)}
 
-/* ─── TWO COLUMN ─── */
-.twoCol{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-
 /* ─── TASK CARD ─── */
-.taskCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm);animation:fadeIn 0.5s ease 0.3s backwards}
+.taskCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm);transition:all 200ms var(--es)}
+.taskCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
 .taskHeader{display:flex;align-items:center;gap:8px;color:var(--gold)}
 .taskLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
 .taskTitle{font-size:16px;font-weight:700;color:var(--tp);letter-spacing:-0.01em}
@@ -190,17 +231,7 @@
 .taskCta{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:10px 20px;cursor:pointer;width:fit-content;transition:all 180ms;margin-top:4px}
 .taskCta:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
 
-/* ─── ACTION COUNTER ─── */
-.actionCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm);animation:fadeIn 0.5s ease 0.35s backwards;align-items:center;justify-content:center;text-align:center}
-.actionLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tm)}
-.actionValue{font-family:'Nunito',sans-serif;font-size:64px;font-weight:900;color:var(--tp);line-height:1;letter-spacing:-0.03em}
-.actionCompare{display:flex;align-items:center;gap:6px}
-.actionUp{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--green);background:var(--greenl);padding:4px 12px;border-radius:8px}
-.actionAvg{font-size:11px;font-weight:500;color:var(--tm);margin-top:2px}
-
 /* ─── NOTIFICATIONS ─── */
-.sectionTitle{font-size:13px;font-weight:700;color:var(--tp);margin-bottom:2px}
-.notifSection{animation:fadeIn 0.5s ease 0.5s backwards}
 .notifList{display:flex;flex-direction:column;gap:8px}
 .notifCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:14px 18px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--shadow-sm);transition:all 180ms}
 .notifCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
