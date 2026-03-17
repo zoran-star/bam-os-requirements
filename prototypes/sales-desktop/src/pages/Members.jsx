@@ -52,13 +52,13 @@ const ACTIVITY = [
 ];
 
 const KPIS = [
-  { label: 'Active Members', value: '42', trend: '+3', trendUp: true, ref: 'MEM-003a' },
-  { label: 'New This Month', value: '6', trend: '+2 vs last', trendUp: true, ref: 'MEM-003b' },
-  { label: 'Churned', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c' },
-  { label: 'Pause Rate', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d' },
-  { label: 'Churn Rate', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g' },
-  { label: 'Avg Attendance', value: '8.2', trend: 'per class', trendUp: true, ref: 'MEM-003f' },
-  { label: 'Avg Duration', value: '7.4mo', trend: '+0.6 vs last', trendUp: true, ref: 'MEM-003h' },
+  { label: 'Active Members', value: '42', trend: '+3', trendUp: true, ref: 'MEM-003a', explain: 'Members with an active, non-paused subscription right now. This is your core headcount.' },
+  { label: 'New This Month', value: '6', trend: '+2 vs last', trendUp: true, ref: 'MEM-003b', explain: 'Members who started their first subscription this month. Shows how fast you\'re growing.' },
+  { label: 'Churned', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c', explain: 'Members who cancelled this month. Fewer is better — every lost member is lost revenue.' },
+  { label: 'Pause Rate', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d', explain: 'Percentage of active members who paused this month. High pause rates can signal dissatisfaction.' },
+  { label: 'Churn Rate', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g', explain: 'Percentage of members at the start of the month who cancelled before the end. Under 5% is strong.' },
+  { label: 'Avg Attendance', value: '8.2', trend: 'per class', trendUp: true, ref: 'MEM-003f', explain: 'Average number of athletes per session. Higher attendance means better class utilization and energy.' },
+  { label: 'Avg Duration', value: '7.4mo', trend: '+0.6 vs last', trendUp: true, ref: 'MEM-003h', explain: 'How long members stay on average before cancelling. Longer duration = more lifetime revenue per member.' },
 ];
 
 const ANNOUNCEMENTS = [
@@ -777,7 +777,7 @@ export default function Members() {
               className={`${s.tabBtn} ${tab === t ? s.tabActive : ''}`}
               onClick={() => setTab(t)}
             >
-              {t === 'directory' ? 'Directory' : t === 'metrics' ? 'Business Metrics' : t === 'pauses' ? 'Pauses' : t === 'activity' ? 'Activity Feed' : 'Announcements'}
+              {t === 'directory' ? 'Directory' : t === 'metrics' ? 'Stats' : t === 'pauses' ? 'Pauses' : t === 'activity' ? 'Activity Feed' : 'Announcements'}
             </button>
           ))}
         </div>
@@ -884,16 +884,23 @@ export default function Members() {
         {tab === 'metrics' && (
           <>
             <div className={s.sectionHead}>
-              <h3 className={s.sectionTitle}>Business Metrics</h3>
+              <h3 className={s.sectionTitle}>Stats</h3>
               <span className={s.sectionRef}>MEM-003</span>
             </div>
             <div className={s.kpiGrid}>
               {KPIS.map(k => (
                 <div key={k.label} className={s.kpiCard}>
-                  <div className={s.kpiLabel}>{k.label}</div>
-                  <div className={s.kpiValue}>{k.value}</div>
-                  <div className={s.kpiTrend}>
-                    <span className={k.trendUp ? s.trendUp : s.trendDown}>{k.trend}</span>
+                  <div className={s.kpiFront}>
+                    <div className={s.kpiLabel}>{k.label}</div>
+                    <div className={s.kpiValue}>{k.value}</div>
+                    <div className={s.kpiTrend}>
+                      <span className={k.trendUp ? s.trendUp : s.trendDown}>{k.trend}</span>
+                      <span className={s.kpiRef}>{k.ref}</span>
+                    </div>
+                  </div>
+                  <div className={s.kpiBack}>
+                    <div className={s.kpiBackLabel}>{k.label}</div>
+                    <div className={s.kpiExplain}>{k.explain}</div>
                     <span className={s.kpiRef}>{k.ref}</span>
                   </div>
                 </div>

@@ -130,8 +130,14 @@
 
 /* ─── KPI GRID ─── */
 .kpiGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.kpiCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.kpiCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm);transition:all 180ms;min-height:120px}
 .kpiCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.kpiFront{display:flex;flex-direction:column;gap:6px;transition:opacity 200ms ease,transform 200ms ease}
+.kpiCard:hover .kpiFront{opacity:0;transform:translateY(-6px)}
+.kpiBack{position:absolute;inset:0;padding:18px 20px;display:flex;flex-direction:column;gap:8px;justify-content:center;opacity:0;transform:translateY(6px);transition:opacity 200ms ease,transform 200ms ease;background:linear-gradient(135deg,rgba(200,168,78,0.06),rgba(200,168,78,0.02))}
+.kpiCard:hover .kpiBack{opacity:1;transform:translateY(0)}
+.kpiBackLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold)}
+.kpiExplain{font-size:12px;font-weight:500;color:var(--ts);line-height:1.55}
 .kpiLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--tm)}
 .kpiValue{font-size:32px;font-weight:900;color:var(--tp);font-family:'Nunito',sans-serif;letter-spacing:-0.03em;line-height:1}
 .kpiTrend{display:flex;align-items:center;justify-content:space-between}
