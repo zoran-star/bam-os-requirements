@@ -23,17 +23,31 @@ const GREETING = (() => {
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
 /* ─── All available KPIs for the picker ─── */
+/* SVG icon helpers for KPIs */
+const KPI_ICONS = {
+  new_members: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  mrr_growth: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  classes_filled: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  trials_booked: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>,
+  churn_rate: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  avg_attendance: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  trial_conversion: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  revenue_per_member: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  referral_rate: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
+  session_fill_rate: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+};
+
 const ALL_KPIS = [
-  { id: 'new_members', label: 'New Members', current: 6, target: 10, unit: '', color: '#3EAF5C', icon: '👥', desc: 'New subscriptions this month' },
-  { id: 'mrr_growth', label: 'MRR Growth', current: 8.2, target: 10, unit: '%', color: '#C8A84E', icon: '💰', desc: 'Monthly recurring revenue growth' },
-  { id: 'classes_filled', label: 'Classes Filled', current: 18, target: 24, unit: '', color: '#6366f1', icon: '📅', desc: 'Sessions at 80%+ capacity' },
-  { id: 'trials_booked', label: 'Trials Booked', current: 4, target: 6, unit: '', color: '#E09D24', icon: '🎯', desc: 'Free trial signups this month' },
-  { id: 'churn_rate', label: 'Churn Rate', current: 2.4, target: 5, unit: '%', color: '#E05A42', icon: '📉', desc: 'Member cancellation rate (lower is better)' },
-  { id: 'avg_attendance', label: 'Avg Attendance', current: 8.2, target: 12, unit: '', color: '#3EAF5C', icon: '🏀', desc: 'Average athletes per session' },
-  { id: 'trial_conversion', label: 'Trial Conversion', current: 67, target: 80, unit: '%', color: '#C8A84E', icon: '🔄', desc: 'Trials converting to paid members' },
-  { id: 'revenue_per_member', label: 'Revenue / Member', current: 126, target: 150, unit: '$', color: '#6366f1', icon: '💵', desc: 'Average monthly revenue per member' },
-  { id: 'referral_rate', label: 'Referral Rate', current: 12, target: 20, unit: '%', color: '#E09D24', icon: '🤝', desc: 'Members who referred someone' },
-  { id: 'session_fill_rate', label: 'Fill Rate', current: 75, target: 90, unit: '%', color: '#3EAF5C', icon: '📊', desc: 'Average class capacity utilization' },
+  { id: 'new_members', label: 'New Members', current: 6, target: 10, unit: '', color: '#3EAF5C', desc: 'New subscriptions this month' },
+  { id: 'mrr_growth', label: 'MRR Growth', current: 8.2, target: 10, unit: '%', color: '#C8A84E', desc: 'Monthly recurring revenue growth' },
+  { id: 'classes_filled', label: 'Classes Filled', current: 18, target: 24, unit: '', color: '#6366f1', desc: 'Sessions at 80%+ capacity' },
+  { id: 'trials_booked', label: 'Trials Booked', current: 4, target: 6, unit: '', color: '#E09D24', desc: 'Free trial signups this month' },
+  { id: 'churn_rate', label: 'Churn Rate', current: 2.4, target: 5, unit: '%', color: '#E05A42', desc: 'Member cancellation rate (lower is better)' },
+  { id: 'avg_attendance', label: 'Avg Attendance', current: 8.2, target: 12, unit: '', color: '#3EAF5C', desc: 'Average athletes per session' },
+  { id: 'trial_conversion', label: 'Trial Conversion', current: 67, target: 80, unit: '%', color: '#C8A84E', desc: 'Trials converting to paid members' },
+  { id: 'revenue_per_member', label: 'Revenue / Member', current: 126, target: 150, unit: '$', color: '#6366f1', desc: 'Average monthly revenue per member' },
+  { id: 'referral_rate', label: 'Referral Rate', current: 12, target: 20, unit: '%', color: '#E09D24', desc: 'Members who referred someone' },
+  { id: 'session_fill_rate', label: 'Fill Rate', current: 75, target: 90, unit: '%', color: '#3EAF5C', desc: 'Average class capacity utilization' },
 ];
 
 const DEFAULT_SELECTED = ['new_members', 'mrr_growth', 'classes_filled', 'trials_booked'];
@@ -48,7 +62,6 @@ const SAGE_CHALLENGE = {
 const MILESTONE = {
   label: 'MRR crossed $8k',
   detail: 'First time hitting this level — up 18% from 3 months ago',
-  icon: '🏆',
 };
 
 /* ─── Sage KPI advice (simulated responses) ─── */
@@ -143,8 +156,10 @@ function KpiPicker({ selected, onSave, onClose }) {
                     onDragOver={e => handleDragOver(e, idx)}
                     onDragEnd={handleDragEnd}
                   >
-                    <span className={s.pickerDragHandle}>⠿</span>
-                    <span className={s.pickerDragIcon}>{kpi.icon}</span>
+                    <span className={s.pickerDragHandle}>
+                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+                    </span>
+                    <span className={s.pickerDragIcon}>{KPI_ICONS[kpi.id]}</span>
                     <span className={s.pickerDragLabel}>{kpi.label}</span>
                     <button className={s.pickerRemove} onClick={() => toggle(id)}>✕</button>
                   </div>
@@ -166,7 +181,7 @@ function KpiPicker({ selected, onSave, onClose }) {
                 onClick={() => toggle(kpi.id)}
               >
                 <div className={s.pickerKpiTop}>
-                  <span className={s.pickerKpiIcon}>{kpi.icon}</span>
+                  <span className={s.pickerKpiIcon}>{KPI_ICONS[kpi.id]}</span>
                   {isSelected && <span className={s.pickerKpiCheck}>✓</span>}
                 </div>
                 <div className={s.pickerKpiLabel}>{kpi.label}</div>
@@ -181,7 +196,9 @@ function KpiPicker({ selected, onSave, onClose }) {
           <button className={s.pickerSageToggle} onClick={() => setShowSage(!showSage)}>
             <span className={s.pickerSageIcon}>S</span>
             <span>Not sure which to pick? Ask Sage</span>
-            <span className={s.pickerSageChevron}>{showSage ? '▲' : '▼'}</span>
+            <span className={s.pickerSageChevron}>
+              <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">{showSage ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}</svg>
+            </span>
           </button>
 
           {showSage && (
@@ -232,7 +249,10 @@ function KpiPicker({ selected, onSave, onClose }) {
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
 export default function Home() {
-  const [loaded, setLoaded] = useState(false);
+  const isFirstVisit = useRef(!sessionStorage.getItem('bam_home_visited'));
+  const [loaded, setLoaded] = useState(!isFirstVisit.current);
+  const [introText, setIntroText] = useState('');
+  const [introFading, setIntroFading] = useState(false);
   const [milestoneVisible, setMilestoneVisible] = useState(false);
   const [milestonePhase, setMilestonePhase] = useState('ring');
   const [challengeDismissed, setChallengeDismissed] = useState(false);
@@ -287,8 +307,20 @@ export default function Home() {
   }, [loaded, sageExpanded]);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoaded(true), 1500);
-    return () => clearTimeout(t);
+    if (!isFirstVisit.current) return;
+    sessionStorage.setItem('bam_home_visited', '1');
+    const greeting = `${GREETING}, Zoran`;
+    let i = 0;
+    const typeTimer = setInterval(() => {
+      i++;
+      setIntroText(greeting.slice(0, i));
+      if (i >= greeting.length) {
+        clearInterval(typeTimer);
+        setTimeout(() => setIntroFading(true), 900);
+        setTimeout(() => setLoaded(true), 1600);
+      }
+    }, 55);
+    return () => clearInterval(typeTimer);
   }, []);
 
   useEffect(() => {
@@ -319,12 +351,24 @@ export default function Home() {
   if (!loaded) {
     return (
       <main className={sh.main}>
-        <div className={s.welcome}>
+        <div className={`${s.welcome} ${introFading ? s.welcomeFading : ''}`}>
           <div className={s.welcomeGlow} />
+          <div className={s.welcomeGlow2} />
           <div className={s.welcomeContent}>
-            <div className={s.welcomeLogo}>B</div>
-            <div className={s.welcomeGreeting}>{GREETING}, Zoran</div>
-            <div className={s.welcomeData}>Your MRR is up 8% this month</div>
+            <div className={s.welcomeOrb}>
+              <span className={s.welcomeOrbLetter}>S</span>
+              <div className={s.welcomeOrbRing} />
+              <div className={s.welcomeOrbRing2} />
+            </div>
+            <div className={s.welcomeGreeting}>
+              {introText}
+              <span className={s.welcomeCursor} />
+            </div>
+          </div>
+          <div className={s.welcomeParticles}>
+            {Array.from({ length: 12 }, (_, i) => (
+              <div key={i} className={s.welcomeParticle} style={{ '--i': i }} />
+            ))}
           </div>
         </div>
       </main>
@@ -501,6 +545,15 @@ export default function Home() {
                 </div>
               );
             })}
+            {rings.length < 3 && (
+              <div className={s.ringCardEmpty} onClick={() => setPickerOpen(true)}>
+                <div className={s.ringCardEmptyIcon}>
+                  <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </div>
+                <div className={s.ringCardEmptyText}>Add a KPI</div>
+                <div className={s.ringCardEmptySub}>Track what matters most to your academy</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -574,7 +627,9 @@ export default function Home() {
               <div className={s.milestoneRipple3} />
             </div>
             <div className={`${s.milestoneTrophy} ${milestonePhase === 'trophy' ? s.milestoneTrophyVisible : ''}`}>
-              <span className={s.milestoneTrophyIcon}>{MILESTONE.icon}</span>
+              <span className={s.milestoneTrophyIcon}>
+                <svg width="48" height="48" fill="none" stroke="var(--gold)" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l-1 8a4 4 0 0 1-8 0L7 4z"/><path d="M7 4H4a1 1 0 0 0-1 1v1a3 3 0 0 0 3 3"/><path d="M17 4h3a1 1 0 0 1 1 1v1a3 3 0 0 1-3 3"/></svg>
+              </span>
             </div>
             <div className={s.milestoneText}>
               <div className={s.milestoneLabel}>Milestone Reached</div>
@@ -588,7 +643,7 @@ export default function Home() {
 
       {milestonePhase === 'badge' && (
         <div className={s.milestoneBadge}>
-          <span>{MILESTONE.icon}</span>
+          <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10l-1 8a4 4 0 0 1-8 0L7 4z"/><path d="M7 4H4a1 1 0 0 0-1 1v1a3 3 0 0 0 3 3"/><path d="M17 4h3a1 1 0 0 1 1 1v1a3 3 0 0 1-3 3"/></svg>
           <span className={s.milestoneBadgeText}>{MILESTONE.label}</span>
         </div>
       )}

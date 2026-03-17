@@ -1,12 +1,24 @@
-/* ─── WELCOME / LOADING SCREEN ─── */
-.welcome{flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1C1B18,#2A2820);position:relative;overflow:hidden}
-.welcomeGlow{position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(200,168,78,0.15),transparent 70%);animation:welcomePulse 2s ease-in-out infinite}
-@keyframes welcomePulse{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.15);opacity:1}}
-.welcomeContent{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:16px;animation:welcomeFade 0.8s ease}
-@keyframes welcomeFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.welcomeLogo{width:56px;height:56px;background:var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:var(--ff);font-weight:800;font-size:22px;color:#fff;box-shadow:0 4px 24px rgba(200,168,78,0.4)}
-.welcomeGreeting{font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.02em}
-.welcomeData{font-size:14px;font-weight:500;color:rgba(255,255,255,0.5)}
+/* ─── WELCOME / LOADING SCREEN (first visit only) ─── */
+.welcome{flex:1;display:flex;align-items:center;justify-content:center;background:#1C1B18;position:relative;overflow:hidden;transition:opacity 0.6s ease,transform 0.6s ease}
+.welcomeFading{opacity:0;transform:translateY(-30px) scale(1.02)}
+.welcomeGlow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(200,168,78,0.12),transparent 70%);animation:welcomePulse 3s ease-in-out infinite}
+.welcomeGlow2{position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(200,168,78,0.04),transparent 60%);animation:welcomePulse 4s ease-in-out infinite 1s}
+@keyframes welcomePulse{0%,100%{transform:scale(1);opacity:0.5}50%{transform:scale(1.1);opacity:1}}
+.welcomeContent{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:24px}
+.welcomeOrb{width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,var(--gold),#D4B65C);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 8px 40px rgba(200,168,78,0.4),0 0 0 1px rgba(200,168,78,0.2);animation:orbAppear 0.8s var(--espring) 0.2s backwards}
+@keyframes orbAppear{from{opacity:0;transform:scale(0.5) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.welcomeOrbLetter{font-size:24px;font-weight:900;color:#fff;z-index:1;position:relative}
+.welcomeOrbRing{position:absolute;inset:-8px;border-radius:24px;border:1.5px solid rgba(200,168,78,0.3);animation:orbRingPulse 2.5s ease-out infinite 0.8s}
+.welcomeOrbRing2{position:absolute;inset:-18px;border-radius:30px;border:1px solid rgba(200,168,78,0.15);animation:orbRingPulse 2.5s ease-out infinite 1.2s}
+@keyframes orbRingPulse{0%{transform:scale(0.9);opacity:0.6}50%{opacity:0.2}100%{transform:scale(1.2);opacity:0}}
+.welcomeGreeting{font-size:32px;font-weight:800;color:#fff;letter-spacing:-0.02em;min-height:42px;text-align:center}
+.welcomeCursor{display:inline-block;width:2px;height:28px;background:var(--gold);margin-left:3px;vertical-align:middle;animation:cursorBlink 0.7s step-end infinite;border-radius:1px}
+@keyframes cursorBlink{0%,100%{opacity:1}50%{opacity:0}}
+/* floating particles */
+.welcomeParticles{position:absolute;inset:0;z-index:1;pointer-events:none}
+.welcomeParticle{position:absolute;width:3px;height:3px;border-radius:50%;background:rgba(200,168,78,0.35);top:50%;left:50%;animation:particleDrift 3s ease-out infinite;animation-delay:calc(var(--i) * 0.18s)}
+.welcomeParticle:nth-child(odd){width:2px;height:2px;background:rgba(200,168,78,0.2)}
+@keyframes particleDrift{0%{transform:translate(0,0) scale(0);opacity:0}20%{opacity:1;transform:translate(calc((var(--i) - 6) * 30px),calc((var(--i) - 6) * -20px)) scale(1)}100%{opacity:0;transform:translate(calc((var(--i) - 6) * 80px),calc((var(--i) - 6) * -60px)) scale(0)}}
 
 /* ═══ COMMAND BAR ═══ */
 .cmdBar{display:flex;align-items:center;gap:16px;padding:14px 36px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg);animation:cmdBarIn 0.4s var(--es);position:relative;overflow:hidden}
@@ -18,9 +30,11 @@
 .cmdGreeting{font-size:15px;font-weight:800;color:var(--tp);letter-spacing:-0.01em}
 .cmdDate{font-size:11px;font-weight:500;color:var(--tm)}
 
-.cmdCenter{flex:1;display:flex;justify-content:center;max-width:420px;margin:0 auto}
-.cmdSearch{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:9px 16px;width:100%;transition:all 200ms var(--es);color:var(--tm)}
-.cmdSearch:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08);background:var(--surf2)}
+.cmdCenter{flex:1;display:flex;justify-content:center;max-width:420px;margin:0 auto;transition:max-width 350ms var(--es)}
+.cmdCenter:hover,.cmdCenter:focus-within{max-width:520px}
+.cmdSearch{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:9px 16px;width:100%;transition:all 280ms var(--es);color:var(--tm)}
+.cmdSearch:hover{border-color:var(--borderm);padding:11px 18px;box-shadow:0 2px 12px rgba(200,168,78,0.06)}
+.cmdSearch:focus-within{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08);background:var(--surf2);padding:11px 18px}
 .cmdInput{flex:1;font-family:var(--ff);font-size:13px;font-weight:500;color:var(--tp);background:none;border:none;outline:none}
 .cmdInput::placeholder{color:var(--tm);font-weight:500}
 .cmdKbd{font-family:var(--fm);font-size:10px;font-weight:600;color:var(--tm);background:var(--surf2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;line-height:1;flex-shrink:0}
@@ -136,6 +150,14 @@
 .ringPct{font-size:16px;font-weight:900;color:var(--tp);font-family:'Nunito',sans-serif;letter-spacing:-0.02em}
 .ringInfo{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
 .ringLabel{font-size:11px;font-weight:700;color:var(--tp)}
+
+/* Empty state KPI card */
+.ringCardEmpty{background:var(--surf);border:2px dashed var(--borderm);border-radius:20px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all 200ms var(--es);min-height:140px}
+.ringCardEmpty:hover{border-color:var(--gold);background:rgba(200,168,78,0.03);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.ringCardEmptyIcon{color:var(--tm);transition:color 200ms}
+.ringCardEmpty:hover .ringCardEmptyIcon{color:var(--gold)}
+.ringCardEmptyText{font-size:13px;font-weight:700;color:var(--tp)}
+.ringCardEmptySub{font-size:11px;font-weight:500;color:var(--tm);text-align:center;line-height:1.4}
 .ringFraction{display:flex;align-items:baseline;gap:2px;font-family:var(--fm)}
 .ringCurrent{font-size:14px;font-weight:700;color:var(--tp)}
 .ringDivider{font-size:12px;color:var(--tm)}
@@ -159,8 +181,8 @@
 .pickerDragItem{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;cursor:grab;transition:all 140ms}
 .pickerDragItem:hover{border-color:var(--borderm)}
 .pickerDragActive{opacity:0.5;border-color:var(--gold);background:rgba(200,168,78,0.06)}
-.pickerDragHandle{font-size:14px;color:var(--tm);cursor:grab;user-select:none}
-.pickerDragIcon{font-size:16px}
+.pickerDragHandle{color:var(--tm);cursor:grab;user-select:none;display:flex;align-items:center}
+.pickerDragIcon{display:flex;align-items:center;color:var(--tm)}
 .pickerDragLabel{font-size:13px;font-weight:700;color:var(--tp);flex:1}
 .pickerRemove{background:none;border:none;font-size:14px;color:var(--tm);cursor:pointer;padding:2px 6px;border-radius:4px;transition:all 140ms}
 .pickerRemove:hover{color:var(--red);background:var(--redl)}
@@ -171,7 +193,7 @@
 .pickerKpiCard:hover{border-color:var(--borderm);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
 .pickerKpiSelected{border-color:var(--gold);background:rgba(200,168,78,0.06)}
 .pickerKpiTop{display:flex;align-items:center;justify-content:space-between}
-.pickerKpiIcon{font-size:20px}
+.pickerKpiIcon{display:flex;align-items:center;color:var(--tm)}
 .pickerKpiCheck{font-size:12px;font-weight:800;color:var(--gold);background:rgba(200,168,78,0.15);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .pickerKpiLabel{font-size:12px;font-weight:700;color:var(--tp)}
 .pickerKpiDesc{font-size:10px;font-weight:500;color:var(--ts);line-height:1.4}
@@ -261,7 +283,7 @@
 .milestoneTrophy{position:absolute;top:40px;display:flex;align-items:center;justify-content:center;opacity:0;transform:translateY(20px) scale(0.5)}
 .milestoneTrophyVisible{animation:trophyRise 0.6s var(--espring) forwards}
 @keyframes trophyRise{0%{opacity:0;transform:translateY(20px) scale(0.5)}60%{opacity:1;transform:translateY(-8px) scale(1.15)}100%{opacity:1;transform:translateY(0) scale(1)}}
-.milestoneTrophyIcon{font-size:48px;filter:drop-shadow(0 4px 12px rgba(200,168,78,0.3))}
+.milestoneTrophyIcon{display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 4px 12px rgba(200,168,78,0.3))}
 .milestoneText{display:flex;flex-direction:column;gap:4px}
 .milestoneLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--gold)}
 .milestoneTitle{font-size:22px;font-weight:800;color:var(--tp);letter-spacing:-0.02em}
