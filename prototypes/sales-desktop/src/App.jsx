@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Marketing from './pages/Marketing';
 import Members from './pages/Members';
 import Settings from './pages/Settings';
+import MemberApp from './pages/member-app/MemberApp';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/marketing" element={<Layout><Marketing /></Layout>} />
         <Route path="/members" element={<Layout><Members /></Layout>} />
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
+        <Route path="/member-app" element={<MemberApp />} />
       </Routes>
     </BrowserRouter>
   );
