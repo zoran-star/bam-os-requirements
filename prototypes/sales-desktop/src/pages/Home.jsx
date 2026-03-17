@@ -21,8 +21,61 @@ const GREETING = (() => {
 
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+/* ─── Progress ring data ─── */
+const RINGS = [
+  { label: 'New Members', current: 6, target: 10, unit: '', color: '#3EAF5C', icon: '👥' },
+  { label: 'MRR Growth', current: 8.2, target: 10, unit: '%', color: '#C8A84E', icon: '💰' },
+  { label: 'Classes Filled', current: 18, target: 24, unit: '', color: '#6366f1', icon: '📅' },
+  { label: 'Trials Booked', current: 4, target: 6, unit: '', color: '#E09D24', icon: '🎯' },
+];
+
+/* ─── Sage challenge ─── */
+const SAGE_CHALLENGE = {
+  text: "You're 2 members away from your best month ever.",
+  action: 'Draft a follow-up to your 3 unconverted trials?',
+  metric: 'New Members',
+  currentStreak: 12,
+};
+
+/* ─── Milestone (simulated — one fires on load for demo) ─── */
+const MILESTONE = {
+  label: 'MRR crossed $8k',
+  detail: 'First time hitting this level — up 18% from 3 months ago',
+  icon: '🏆',
+};
+
+/* ─── ProgressRing SVG ─── */
+function ProgressRing({ current, target, color, size = 72, stroke = 6 }) {
+  const radius = (size - stroke) / 2;
+  const circ = 2 * Math.PI * radius;
+  const pct = Math.min(current / target, 1);
+  const [animPct, setAnimPct] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(() => setAnimPct(pct), 100);
+    return () => clearTimeout(t);
+  }, [pct]);
+
+  return (
+    <svg width={size} height={size} className={s.ringSvg}>
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--surf3)" strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none"
+        stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={circ}
+        strokeDashoffset={circ * (1 - animPct)}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        className={s.ringProgress}
+      />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [loaded, setLoaded] = useState(false);
+  const [milestoneVisible, setMilestoneVisible] = useState(false);
+  const [milestonePhase, setMilestonePhase] = useState('ring'); // ring → trophy → badge
+  const [challengeDismissed, setChallengeDismissed] = useState(false);
   const typewriterText = useTypewriter(ADVISOR_PROMPTS);
   const actionCount = useCountUp(7);
 
@@ -30,6 +83,15 @@ export default function Home() {
     const t = setTimeout(() => setLoaded(true), 1500);
     return () => clearTimeout(t);
   }, []);
+
+  /* Fire milestone celebration 2s after load */
+  useEffect(() => {
+    if (!loaded) return;
+    const t1 = setTimeout(() => setMilestoneVisible(true), 2000);
+    const t2 = setTimeout(() => setMilestonePhase('trophy'), 3200);
+    const t3 = setTimeout(() => setMilestonePhase('badge'), 4400);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [loaded]);
 
   if (!loaded) {
     return (
@@ -69,6 +131,57 @@ export default function Home() {
             <div className={s.highlightContext}>Mia Thompson and Sofia Reyes both confirmed — your Saturday pipeline is strongest it's been in 3 weeks.</div>
           </div>
         </div>
+
+        {/* ═══ PROGRESS RINGS ═══ */}
+        <div className={s.ringsSection}>
+          <div className={s.ringsSectionHead}>
+            <div className={s.ringsSectionTitle}>Monthly Progress</div>
+            <div className={s.ringsSectionSub}>vs. last month as baseline</div>
+          </div>
+          <div className={s.ringsGrid}>
+            {RINGS.map(r => {
+              const pct = Math.round((r.current / r.target) * 100);
+              return (
+                <div key={r.label} className={s.ringCard}>
+                  <div className={s.ringVisual}>
+                    <ProgressRing current={r.current} target={r.target} color={r.color} />
+                    <div className={s.ringCenter}>
+                      <span className={s.ringPct}>{pct}%</span>
+                    </div>
+                  </div>
+                  <div className={s.ringInfo}>
+                    <div className={s.ringLabel}>{r.label}</div>
+                    <div className={s.ringFraction}>
+                      <span className={s.ringCurrent}>{r.current}{r.unit}</span>
+                      <span className={s.ringDivider}>/</span>
+                      <span className={s.ringTarget}>{r.target}{r.unit}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ═══ SAGE CHALLENGE ═══ */}
+        {!challengeDismissed && (
+          <div className={s.challenge}>
+            <div className={s.challengeLeft}>
+              <div className={s.challengeIcon}>
+                <div className={s.challengeSageIcon}>S</div>
+              </div>
+              <div className={s.challengeBody}>
+                <div className={s.challengeLabel}>Weekly Challenge</div>
+                <div className={s.challengeText}>{SAGE_CHALLENGE.text}</div>
+                <div className={s.challengeAction}>{SAGE_CHALLENGE.action}</div>
+              </div>
+            </div>
+            <div className={s.challengeRight}>
+              <button className={s.challengeBtn}>Let's do it</button>
+              <button className={s.challengeDismiss} onClick={() => setChallengeDismissed(true)}>Dismiss</button>
+            </div>
+          </div>
+        )}
 
         {/* Two column row */}
         <div className={s.twoCol}>
@@ -140,6 +253,53 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* ═══ MILESTONE CELEBRATION ═══ */}
+      {milestoneVisible && milestonePhase !== 'badge' && (
+        <div className={s.milestoneOverlay}>
+          <div className={s.milestoneCard}>
+            {/* Ring pulse phase */}
+            <div className={`${s.milestoneRing} ${milestonePhase === 'ring' ? s.milestoneRingActive : s.milestoneRingDone}`}>
+              <svg width="120" height="120" className={s.milestoneRingSvg}>
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--surf3)" strokeWidth="6" />
+                <circle
+                  cx="60" cy="60" r="52" fill="none"
+                  stroke="var(--gold)" strokeWidth="6" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 52}
+                  strokeDashoffset={milestonePhase === 'ring' ? 0 : 0}
+                  transform="rotate(-90 60 60)"
+                  className={s.milestoneRingStroke}
+                />
+              </svg>
+              {/* Ripples */}
+              <div className={s.milestoneRipple1} />
+              <div className={s.milestoneRipple2} />
+              <div className={s.milestoneRipple3} />
+            </div>
+
+            {/* Trophy rises */}
+            <div className={`${s.milestoneTrophy} ${milestonePhase === 'trophy' ? s.milestoneTrophyVisible : ''}`}>
+              <span className={s.milestoneTrophyIcon}>{MILESTONE.icon}</span>
+            </div>
+
+            <div className={s.milestoneText}>
+              <div className={s.milestoneLabel}>Milestone Reached</div>
+              <div className={s.milestoneTitle}>{MILESTONE.label}</div>
+              <div className={s.milestoneDetail}>{MILESTONE.detail}</div>
+            </div>
+
+            <button className={s.milestoneDismiss} onClick={() => setMilestonePhase('badge')}>Nice!</button>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone badge (persists after dismissal) */}
+      {milestonePhase === 'badge' && (
+        <div className={s.milestoneBadge}>
+          <span>{MILESTONE.icon}</span>
+          <span className={s.milestoneBadgeText}>{MILESTONE.label}</span>
+        </div>
+      )}
     </main>
   );
 }
