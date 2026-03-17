@@ -1,4 +1,5 @@
 import Sidebar from './Sidebar';
+import GlobalInbox from './GlobalInbox';
 import s from '../styles/Layout.module.css';
 
 export default function Layout({ children }) {
@@ -8,6 +9,7 @@ export default function Layout({ children }) {
       <div className={s.pageContent}>
         {children}
       </div>
+      <GlobalInbox />
     </div>
   );
 }

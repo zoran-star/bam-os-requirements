@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import PageBanner from '../components/PageBanner';
+import { useState, useMemo, useRef } from 'react';
+import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
 import s from '../styles/Members.module.css';
 import sh from '../styles/shared.module.css';
@@ -14,13 +14,22 @@ const SAGE_PROMPTS = [
   'Create an announcement for Saturday clinic...',
 ];
 
+const QA_ICONS = {
+  compose: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  announcement: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  refund: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  credit: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  discount: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+  cmd: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
+};
+
 const QUICK_ACTIONS = [
-  { label: 'Send message', icon: '💬', action: 'compose' },
-  { label: 'Create announcement', icon: '📢', action: 'announcement' },
-  { label: 'Issue refund', icon: '💸', action: 'refund' },
-  { label: 'Issue credit', icon: '🎟️', action: 'credit' },
-  { label: 'Apply discount', icon: '🏷️', action: 'discount' },
-  { label: 'Pause a member', icon: '⏸️', action: 'cmd' },
+  { label: 'Send message', icon: 'compose', action: 'compose' },
+  { label: 'Create announcement', icon: 'announcement', action: 'announcement' },
+  { label: 'Issue refund', icon: 'refund', action: 'refund' },
+  { label: 'Issue credit', icon: 'credit', action: 'credit' },
+  { label: 'Apply discount', icon: 'discount', action: 'discount' },
+  { label: 'Pause a member', icon: 'cmd', action: 'cmd' },
 ];
 
 const MEMBERS = [
@@ -39,16 +48,28 @@ const PAUSES = [
   { name: 'Zara Okafor', player: 'Zara', start: 'Mar 1', resume: 'Apr 1', reason: 'Injury recovery', daysLeft: 16 },
 ];
 
+const ACTIVITY_ICONS = {
+  payment: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  signup: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
+  alert: <svg width="16" height="16" fill="none" stroke="var(--red)" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  pause: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>,
+  message: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  cancel: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  refund: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  credit: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  announcement: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+};
+
 const ACTIVITY = [
-  { type: 'payment', icon: '💳', text: 'Payment received — Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez' },
-  { type: 'signup', icon: '🎉', text: 'New trial booked — Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes' },
-  { type: 'alert', icon: '⚠️', text: 'Payment failed — Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis' },
-  { type: 'pause', icon: '⏸️', text: 'Membership paused — Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen' },
-  { type: 'message', icon: '💬', text: 'New reply — Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson' },
-  { type: 'cancel', icon: '🚪', text: 'Cancellation confirmed — Lily Park', time: '3d ago', member: 'Lily Park' },
-  { type: 'refund', icon: '💸', text: 'Refund issued — Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park' },
-  { type: 'credit', icon: '🎟️', text: 'Make-up credit issued — Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks' },
-  { type: 'announcement', icon: '📢', text: 'Announcement published — "Spring Break Schedule Changes"', time: '5d ago', member: null },
+  { type: 'payment', text: 'Payment received — Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez' },
+  { type: 'signup', text: 'New trial booked — Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes' },
+  { type: 'alert', text: 'Payment failed — Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis' },
+  { type: 'pause', text: 'Membership paused — Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen' },
+  { type: 'message', text: 'New reply — Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson' },
+  { type: 'cancel', text: 'Cancellation confirmed — Lily Park', time: '3d ago', member: 'Lily Park' },
+  { type: 'refund', text: 'Refund issued — Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park' },
+  { type: 'credit', text: 'Make-up credit issued — Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks' },
+  { type: 'announcement', text: 'Announcement published — "Spring Break Schedule Changes"', time: '5d ago', member: null },
 ];
 
 const KPIS = [
@@ -70,8 +91,35 @@ const ANNOUNCEMENTS = [
 const REFUND_REASONS = ['Billing error', 'Service not delivered', 'Cancellation refund', 'Duplicate charge', 'Customer request', 'Other'];
 
 const MORE_TOOLS = [
-  { name: 'Attendance Tracking', icon: '📋', enabled: false, ref: 'MEM-001' },
-  { name: 'Waivers & Documents', icon: '📄', enabled: false, ref: 'MEM-008' },
+  { name: 'Waivers & Documents', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>, enabled: false, ref: 'MEM-008' },
+];
+
+/* ─── NOTIFICATIONS (MEM-007) ─── */
+const NOTIFICATIONS = [
+  { id: 'n1', domain: 'Members', title: 'Payment failed — Marcus Davis', preview: '$125 charge declined. Retry or contact member.', time: '6h ago', unread: true, action: 'Retry payment' },
+  { id: 'n2', domain: 'Members', title: 'Pause ending soon — Ethan Nguyen', preview: 'Membership resumes in 7 days. Send a welcome-back message?', time: '1d ago', unread: true, action: 'Send message' },
+  { id: 'n3', domain: 'Members', title: 'New trial completed — Sofia Reyes', preview: 'Trial session finished. Follow up to convert.', time: '4h ago', unread: true, action: 'Follow up' },
+  { id: 'n4', domain: 'System', title: 'Monthly report ready', preview: 'March member metrics are available for review.', time: '1d ago', unread: false, action: 'View report' },
+  { id: 'n5', domain: 'Members', title: 'Attendance streak — Mia Thompson', preview: '3-week streak! Consider sending encouragement.', time: '2d ago', unread: false, action: 'Send kudos' },
+];
+
+/* ─── ATTENDANCE CHECK-IN (MEM-036) ─── */
+const TODAYS_SESSIONS = [
+  { id: 'sess1', time: '10:00 AM', name: 'Saturday Elite', coach: 'Coach Rivera', roster: [
+    { id: 1, name: 'Carlos Martinez', initials: 'CM', checked: false },
+    { id: 2, name: 'Mia Thompson', initials: 'MT', checked: false },
+    { id: 3, name: 'Jaylen Brooks', initials: 'JB', checked: false },
+    { id: 6, name: 'Ava Chen', initials: 'AC', checked: false },
+  ]},
+  { id: 'sess2', time: '2:00 PM', name: 'Saturday Intermediate', coach: 'Coach Z', roster: [
+    { id: 7, name: 'Marcus Davis', initials: 'MD', checked: false },
+    { id: 4, name: 'Sofia Reyes', initials: 'SR', checked: false },
+  ]},
+];
+
+/* ─── FAILED PAYMENTS (MEM-015a) ─── */
+const FAILED_PAYMENTS = [
+  { id: 'fp1', name: 'Marcus Davis', initials: 'MD', plan: 'Intermediate', amount: 125, failedDate: 'Mar 14', retryDate: 'Mar 17', attempts: 2, lastFour: '4242', reason: 'Insufficient funds' },
 ];
 
 /* ─── SUB-COMPONENTS ─── */
@@ -598,9 +646,17 @@ export default function Members() {
   const [dashOpen, setDashOpen] = useState(false);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState('all');
+  const [bellOpen, setBellOpen] = useState(false);
+  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [bellFilter, setBellFilter] = useState('All');
+  const [sessions, setSessions] = useState(TODAYS_SESSIONS);
+
+  const canvasRef = useRef(null);
+  useBannerCanvas(canvasRef);
 
   const activeCount = MEMBERS.filter(m => m.status === 'Active').length;
   const pausedCount = MEMBERS.filter(m => m.status === 'Paused').length;
+  const unreadNotifs = notifications.filter(n => n.unread).length;
 
   /* Quick action handler */
   const handleQuickAction = (action, text) => {
@@ -678,106 +734,112 @@ export default function Members() {
     if (m) setDrawerMember(m);
   };
 
+  const toggleAttendance = (sessionId, memberId) => {
+    setSessions(prev => prev.map(sess =>
+      sess.id === sessionId
+        ? { ...sess, roster: sess.roster.map(r => r.id === memberId ? { ...r, checked: !r.checked } : r) }
+        : sess
+    ));
+  };
+
   if (dashOpen) return <FullDashboard onClose={() => setDashOpen(false)} />;
 
   return (
     <main className={sh.main}>
-      <PageBanner
-        title="Members"
-        stats={[
-          { value: `${activeCount} Active`, explanation: 'Active members' },
-          { value: `${pausedCount} Paused`, explanation: 'Paused members' },
-          { value: '2.4% Churn', explanation: 'Monthly churn rate' },
-        ]}
-        onDashboardClick={() => setDashOpen(true)}
-      />
-
-      <div className={sh.scroll}>
-        {/* Sage Command Bar */}
-        <div className={s.cmdBar}>
-          <div className={s.cmdHeader}>
-            <div className={s.cmdSageIcon}>S</div>
-            <div className={s.cmdHeaderText}>
-              <div className={s.cmdTitle}>Manage your members</div>
-              <div className={s.cmdSubtitle}>Tell Sage what you need — type or use your voice</div>
-            </div>
+      {/* ═══ COMMAND BAR HEADER ═══ */}
+      <div className={s.cmdBarHeader}>
+        <canvas ref={canvasRef} className={s.cmdBarCanvas} />
+        <div className={s.cmdBarInner}>
+          <div className={s.cmdLeft}>
+            <h1 className={s.cmdGreeting}>Members</h1>
+            <span className={s.cmdSubGreeting}>{activeCount} active &middot; {pausedCount} paused</span>
           </div>
-
-          <div className={s.cmdInputWrap}>
-            <div className={`${s.cmdMic} ${isListening ? s.cmdMicActive : ''}`} onClick={toggleListening}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              {isListening && <div className={s.cmdMicPulse} />}
-            </div>
-            <div className={s.cmdInputInner}>
-              <input
-                className={s.cmdInput}
-                value={cmdInput}
-                onChange={e => setCmdInput(e.target.value)}
-                placeholder={typewriterText}
-                onKeyDown={e => e.key === 'Enter' && handleCommand()}
-              />
-              {isListening && <span className={s.cmdListeningBadge}>Listening...</span>}
-            </div>
-            <button className={s.cmdSend} onClick={() => handleCommand()} disabled={!cmdInput.trim()}>
+          <div className={s.cmdCenter}>
+            <div className={s.cmdSageOrb}>S</div>
+            <input
+              className={s.cmdSageInput}
+              value={cmdInput}
+              onChange={e => setCmdInput(e.target.value)}
+              placeholder={typewriterText}
+              onKeyDown={e => e.key === 'Enter' && handleCommand()}
+            />
+            {isListening && <span className={s.cmdListenBadge}>Listening...</span>}
+            <button className={`${s.cmdMicBtn} ${isListening ? s.cmdMicBtnActive : ''}`} onClick={toggleListening}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+            <button className={s.cmdSendBtn} onClick={() => handleCommand()} disabled={!cmdInput.trim()}>
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
             </button>
           </div>
+          <div className={s.cmdRight}>
+            <button className={s.cmdChipH} onClick={() => setDashOpen(true)}>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              Dashboard
+            </button>
+            <button className={s.cmdBell} onClick={() => setBellOpen(true)}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {unreadNotifs > 0 && <span className={s.cmdBellBadge}>{unreadNotifs}</span>}
+            </button>
+          </div>
+        </div>
+      </div>
 
-          <div className={s.cmdChips}>
-            {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className={s.cmdChip} onClick={() => handleQuickAction(a.action, a.label)}>
-                <span>{a.icon}</span> {a.label}
-              </button>
-            ))}
-
-            {/* More tools dropdown */}
-            <div className={s.moreToolsWrap}>
-              <button className={s.cmdChipMore} onClick={() => setMoreToolsOpen(!moreToolsOpen)}>
-                ⚙️ More tools <span className={s.moreChevron}>{moreToolsOpen ? '▲' : '▼'}</span>
-              </button>
-              {moreToolsOpen && (
-                <div className={s.moreToolsDrop}>
-                  {MORE_TOOLS.map(t => (
-                    <div key={t.name} className={`${s.moreToolItem} ${!t.enabled ? s.moreToolDisabled : ''}`}>
-                      <span className={s.moreToolIcon}>{t.icon}</span>
-                      <span className={s.moreToolName}>{t.name}</span>
-                      <span className={s.moreToolRef}>{t.ref}</span>
-                      {!t.enabled && <span className={s.moreToolBadge}>Coming soon</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
+      <div className={sh.scroll}>
+        {/* Sage response */}
+        {cmdResponse && (
+          <div className={s.cmdResponse}>
+            <div className={s.cmdResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
+            <div className={s.cmdResponseA}>{cmdResponse.reply}</div>
+            <div className={s.cmdResponseActions}>
+              {cmdResponse.actions.map(a => (
+                <button
+                  key={a}
+                  className={a === 'Cancel' ? s.cmdActionCancel : s.cmdActionConfirm}
+                  onClick={() => setCmdResponse(null)}
+                >
+                  {a}
+                </button>
+              ))}
             </div>
           </div>
+        )}
 
-          {cmdResponse && (
-            <div className={s.cmdResponse}>
-              <div className={s.cmdResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
-              <div className={s.cmdResponseA}>{cmdResponse.reply}</div>
-              <div className={s.cmdResponseActions}>
-                {cmdResponse.actions.map(a => (
-                  <button
-                    key={a}
-                    className={a === 'Cancel' ? s.cmdActionCancel : s.cmdActionConfirm}
-                    onClick={() => setCmdResponse(null)}
-                  >
-                    {a}
-                  </button>
+        {/* Quick action chips */}
+        <div className={s.cmdChips}>
+          {QUICK_ACTIONS.map(a => (
+            <button key={a.label} className={s.cmdChip} onClick={() => handleQuickAction(a.action, a.label)}>
+              <span className={s.cmdChipIcon}>{QA_ICONS[a.icon]}</span> {a.label}
+            </button>
+          ))}
+          <div className={s.moreToolsWrap}>
+            <button className={s.cmdChipMore} onClick={() => setMoreToolsOpen(!moreToolsOpen)}>
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              More tools
+            </button>
+            {moreToolsOpen && (
+              <div className={s.moreToolsDrop}>
+                {MORE_TOOLS.map(t => (
+                  <div key={t.name} className={`${s.moreToolItem} ${!t.enabled ? s.moreToolDisabled : ''}`}>
+                    <span className={s.moreToolIcon}>{t.icon}</span>
+                    <span className={s.moreToolName}>{t.name}</span>
+                    <span className={s.moreToolRef}>{t.ref}</span>
+                    {!t.enabled && <span className={s.moreToolBadge}>Coming soon</span>}
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Tab nav */}
         <div className={s.tabBar}>
-          {['directory', 'metrics', 'pauses', 'activity', 'announcements'].map(t => (
+          {['directory', 'metrics', 'attendance', 'pauses', 'failedPayments', 'activity', 'announcements'].map(t => (
             <button
               key={t}
               className={`${s.tabBtn} ${tab === t ? s.tabActive : ''}`}
               onClick={() => setTab(t)}
             >
-              {t === 'directory' ? 'Directory' : t === 'metrics' ? 'Stats' : t === 'pauses' ? 'Pauses' : t === 'activity' ? 'Activity Feed' : 'Announcements'}
+              {t === 'directory' ? 'Directory' : t === 'metrics' ? 'Stats' : t === 'attendance' ? 'Check-In' : t === 'pauses' ? 'Pauses' : t === 'failedPayments' ? 'Failed Payments' : t === 'activity' ? 'Activity Feed' : 'Announcements'}
             </button>
           ))}
         </div>
@@ -818,7 +880,10 @@ export default function Members() {
                 <option>Trial</option>
                 <option>Cancelled</option>
               </select>
-              <button className={s.btnAction} onClick={() => setComposeOpen(true)}>💬 Send message</button>
+              <button className={s.btnAction} onClick={() => setComposeOpen(true)}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Send message
+              </button>
             </div>
 
             {viewMode === 'table' ? (
@@ -915,6 +980,51 @@ export default function Members() {
           </>
         )}
 
+        {/* ═══ ATTENDANCE CHECK-IN TAB ═══ */}
+        {tab === 'attendance' && (
+          <>
+            <div className={s.sectionHead}>
+              <h3 className={s.sectionTitle}>Attendance Check-In</h3>
+              <span className={s.sectionRef}>MEM-036</span>
+            </div>
+            {sessions.map(sess => {
+              const checkedCount = sess.roster.filter(r => r.checked).length;
+              return (
+                <div key={sess.id} className={s.attendSession}>
+                  <div className={s.attendSessionHead}>
+                    <div className={s.attendSessionInfo}>
+                      <span className={s.attendSessionTime}>{sess.time}</span>
+                      <span className={s.attendSessionName}>{sess.name}</span>
+                      <span className={s.attendSessionCoach}>{sess.coach}</span>
+                    </div>
+                    <span className={s.attendSessionCount}>{checkedCount}/{sess.roster.length} checked in</span>
+                  </div>
+                  <div className={s.attendGrid}>
+                    {sess.roster.map(r => (
+                      <button
+                        key={r.id}
+                        className={`${s.attendCard} ${r.checked ? s.attendCardChecked : ''}`}
+                        onClick={() => toggleAttendance(sess.id, r.id)}
+                      >
+                        <div className={`${s.attendAvatar} ${r.checked ? s.attendAvatarChecked : ''}`}>
+                          {r.checked ? (
+                            <svg width="16" height="16" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                          ) : r.initials}
+                        </div>
+                        <span className={s.attendName}>{r.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <div className={s.sageTip}>
+              <span className={s.sageTipLabel}>Sage</span>
+              <span>Tap a member to mark them present. Attendance data feeds into streak tracking and the member health score.</span>
+            </div>
+          </>
+        )}
+
         {/* ═══ PAUSES TAB ═══ */}
         {tab === 'pauses' && (
           <>
@@ -942,6 +1052,56 @@ export default function Members() {
           </>
         )}
 
+        {/* ═══ FAILED PAYMENTS TAB ═══ */}
+        {tab === 'failedPayments' && (
+          <>
+            <div className={s.sectionHead}>
+              <h3 className={s.sectionTitle}>Failed Payments</h3>
+              <span className={s.sectionRef}>MEM-015a</span>
+            </div>
+            {FAILED_PAYMENTS.length > 0 ? (
+              <div className={s.fpList}>
+                {FAILED_PAYMENTS.map(fp => (
+                  <div key={fp.id} className={s.fpCard}>
+                    <div className={s.fpLeft}>
+                      <div className={s.fpAvatar}>{fp.initials}</div>
+                      <div className={s.fpInfo}>
+                        <div className={s.fpName}>{fp.name}</div>
+                        <div className={s.fpMeta}>{fp.plan} &middot; ${fp.amount}/mo &middot; Card ending {fp.lastFour}</div>
+                      </div>
+                    </div>
+                    <div className={s.fpRight}>
+                      <div className={s.fpDetail}>
+                        <span className={s.fpDetailLabel}>Failed</span>
+                        <span className={s.fpDetailValue}>{fp.failedDate}</span>
+                      </div>
+                      <div className={s.fpDetail}>
+                        <span className={s.fpDetailLabel}>Retry</span>
+                        <span className={s.fpDetailValue}>{fp.retryDate}</span>
+                      </div>
+                      <div className={s.fpDetail}>
+                        <span className={s.fpDetailLabel}>Attempts</span>
+                        <span className={s.fpDetailValue}>{fp.attempts}</span>
+                      </div>
+                      <span className={s.fpReason}>{fp.reason}</span>
+                      <div className={s.fpActions}>
+                        <button className={s.pauseAction}>Retry now</button>
+                        <button className={s.pauseAction}>Contact</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={s.emptyState}>No failed payments right now.</div>
+            )}
+            <div className={s.sageTip}>
+              <span className={s.sageTipLabel}>Sage</span>
+              <span>Stripe automatically retries failed payments. You can also retry manually or reach out to the member to update their card.</span>
+            </div>
+          </>
+        )}
+
         {/* ═══ ACTIVITY TAB ═══ */}
         {tab === 'activity' && (
           <>
@@ -963,7 +1123,7 @@ export default function Members() {
             <div className={s.feedList}>
               {filteredActivity.map((a, i) => (
                 <div key={i} className={s.feedCard}>
-                  <div className={s.feedIcon}>{a.icon}</div>
+                  <div className={s.feedIcon}>{ACTIVITY_ICONS[a.type]}</div>
                   <div className={s.feedBody}>
                     <div className={s.feedText}>
                       {a.member ? (
@@ -1035,10 +1195,18 @@ export default function Members() {
 
             {/* Drawer quick actions */}
             <div className={s.drawerActions}>
-              <button className={s.drawerActionBtn} onClick={() => setComposeOpen(true)}>💬 Message</button>
-              <button className={s.drawerActionBtn} onClick={() => { setRefundMember(drawerMember); setRefundOpen(true); }}>💸 Refund</button>
-              <button className={s.drawerActionBtn} onClick={() => { setCreditMember(drawerMember); setCreditOpen(true); }}>🎟️ Credit</button>
-              <button className={s.drawerActionBtn} onClick={() => setDiscountOpen(true)}>🏷️ Discount</button>
+              <button className={s.drawerActionBtn} onClick={() => setComposeOpen(true)}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Message
+              </button>
+              <button className={s.drawerActionBtn} onClick={() => { setRefundMember(drawerMember); setRefundOpen(true); }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Refund
+              </button>
+              <button className={s.drawerActionBtn} onClick={() => { setCreditMember(drawerMember); setCreditOpen(true); }}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Credit
+              </button>
+              <button className={s.drawerActionBtn} onClick={() => setDiscountOpen(true)}>
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> Discount
+              </button>
             </div>
 
             <div className={s.drawerSection}>
@@ -1070,6 +1238,44 @@ export default function Members() {
           </div>
         </div>
       )}
+
+      {/* ═══ BELL NOTIFICATION PANEL (MEM-007) ═══ */}
+      {bellOpen && <div className={s.bellOverlay} onClick={() => setBellOpen(false)} />}
+      <div className={`${s.bellPanel} ${bellOpen ? s.bellPanelOpen : ''}`}>
+        <div className={s.bellPanelHead}>
+          <span className={s.bellPanelTitle}>Notifications</span>
+          <button className={s.bellCloseBtn} onClick={() => setBellOpen(false)}>&times;</button>
+        </div>
+        <div className={s.bellFilters}>
+          {['All', 'Members', 'System'].map(f => (
+            <button key={f} className={`${s.bellFilterBtn} ${bellFilter === f ? s.bellFilterActive : ''}`} onClick={() => setBellFilter(f)}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className={s.bellList}>
+          {notifications
+            .filter(n => bellFilter === 'All' || n.domain === bellFilter)
+            .map(n => (
+              <div key={n.id} className={`${s.bellItem} ${n.unread ? s.bellItemUnread : ''}`}>
+                <div className={s.bellItemTop}>
+                  <span className={s.bellItemTitle}>{n.title}</span>
+                  <span className={s.bellItemTime}>{n.time}</span>
+                </div>
+                <div className={s.bellItemPreview}>{n.preview}</div>
+                <div className={s.bellItemBottom}>
+                  <span className={s.bellItemDomain}>{n.domain}</span>
+                  <button
+                    className={s.bellItemAction}
+                    onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: false } : x))}
+                  >
+                    {n.action}
+                  </button>
+                </div>
+              </div>
+            ))}
+        </div>
+      </div>
 
       {/* ═══ MODALS ═══ */}
       {composeOpen && <ComposeMessage onClose={() => setComposeOpen(false)} />}

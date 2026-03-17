@@ -105,14 +105,6 @@ const STAGES = [
   { id: 'doneTrial', name: 'Done Trial' },
 ];
 
-const THREADS = [
-  { initials: 'MJ', name: 'Marcus Johnson', time: '4h ago', preview: 'Hey, I saw your academy on Instagram. What age groups do you have?', channel: 'Instagram DM', unread: true },
-  { initials: 'EW', name: 'Emily Watson', time: '6h ago', preview: 'Can we reschedule the trial to Saturday morning instead?', channel: 'SMS', unread: true },
-  { initials: 'AM', name: 'Ava Martinez', time: '1d ago', preview: 'My son loved the trial class! What are the membership options?', channel: 'Email', unread: true },
-  { initials: 'NK', name: 'Noah Kim', time: '2d ago', preview: 'Just signed up! When is the next beginner class?', channel: 'Instagram DM', unread: false },
-  { initials: 'JR', name: 'Jake Rivera', time: '2d ago', preview: 'AI: Hi Jake! Following up — would you like to book a trial this week?', channel: 'SMS', unread: false },
-];
-
 const TYPEWRITER_PROMPTS = [
   "How should I follow up with Ava?",
   "Which lead is most likely to close today?",
@@ -583,11 +575,9 @@ export default function Sales() {
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
   const [droppedId, setDroppedId] = useState(null);
-  const [panelOpen, setPanelOpen] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [flipped, setFlipped] = useState({ trials: false, closed: false });
   const [inboxFilter, setInboxFilter] = useState('All');
-  const [threads, setThreads] = useState(THREADS);
   const [selectedLead, setSelectedLead] = useState(null);
   const [pipelineExpanded, setPipelineExpanded] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
@@ -977,66 +967,10 @@ export default function Sales() {
         </div>
       </main>
 
-      {/* LEAD INBOX BUTTON */}
-      <button className={s.inboxBtn} onClick={() => setPanelOpen(p => !p)}>
-        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <div className={s.inboxCt}>3</div>
-      </button>
-
       {/* TOAST */}
       <div className={`${s.toast} ${toastVisible ? s.toastShow : ''}`}>
         <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         Card moved
-      </div>
-
-      {/* LEAD INBOX OVERLAY */}
-      <div
-        className={`${s.overlay} ${panelOpen ? s.overlayOpen : ''}`}
-        onClick={() => setPanelOpen(false)}
-      ></div>
-
-      {/* LEAD INBOX PANEL */}
-      <div className={`${s.panel} ${panelOpen ? s.panelOpen : ''}`}>
-        <div className={s.panelHead}>
-          <span className={s.panelTitle}>Lead Inbox</span>
-          <button className={s.closeBtn} onClick={() => setPanelOpen(false)}>&times;</button>
-        </div>
-        <div className={s.panelControls}>
-          <div className={s.inboxFilters}>
-            {['All', 'Instagram DM', 'SMS', 'Email'].map(f => (
-              <button key={f}
-                className={`${s.inboxFilterBtn} ${inboxFilter === f ? s.inboxFilterActive : ''}`}
-                onClick={() => setInboxFilter(f)}
-              >{f}</button>
-            ))}
-          </div>
-          <button className={s.markAllRead}
-            onClick={() => setThreads(prev => prev.map(t => ({ ...t, unread: false })))}>
-            Mark all read
-          </button>
-        </div>
-        <div className={s.threads}>
-          {(inboxFilter === 'All' ? threads : threads.filter(t => t.channel === inboxFilter)).map((t, i) => (
-            <div key={i} className={`${s.thread} ${t.unread ? s.threadUnread : ''}`}>
-              <div className={s.tav}>{t.initials}</div>
-              <div className={s.tcontent}>
-                <div className={s.ttop}>
-                  <span className={s.tname}>{t.name}</span>
-                  <span className={s.ttime}>{t.time}</span>
-                </div>
-                <div className={s.tprev}>{t.preview}</div>
-                <div className={s.tmeta}>
-                  <span className={s.tch}>{t.channel}</span>
-                  {t.unread && <div className={s.udot}></div>}
-                </div>
-                <div className={s.threadActions}>
-                  <button className={s.threadActionBtn}>Reply</button>
-                  <button className={s.threadActionBtn}>Move to Booked</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* COMPILED INBOX OVERLAY */}
