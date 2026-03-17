@@ -771,20 +771,26 @@ export default function Sales() {
           </div>
 
           <div className={s.cmdRight}>
-            <div className={s.cmdChip}>
-              <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
-              <span className={s.cmdChipValue}>34</span>
-              <span className={s.cmdChipLabel}>leads</span>
-            </div>
-            <div className={s.cmdChip}>
-              <span className={s.cmdChipDot} style={{ background: 'var(--gold)' }} />
-              <span className={s.cmdChipValue}>62%</span>
-              <span className={s.cmdChipLabel}>close</span>
-            </div>
-            <div className={s.cmdChip} onClick={() => setDashOpen(true)} style={{ cursor: 'pointer' }}>
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-              <span className={s.cmdChipLabel}>Dashboard</span>
-            </div>
+            <Tooltip text="Active leads in pipeline">
+              <div className={s.cmdChip}>
+                <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
+                <span className={s.cmdChipValue}>34</span>
+                <span className={s.cmdChipLabel}>leads</span>
+              </div>
+            </Tooltip>
+            <Tooltip text="Trial-to-member close rate">
+              <div className={s.cmdChip}>
+                <span className={s.cmdChipDot} style={{ background: 'var(--gold)' }} />
+                <span className={s.cmdChipValue}>62%</span>
+                <span className={s.cmdChipLabel}>close</span>
+              </div>
+            </Tooltip>
+            <Tooltip text="Open full sales dashboard">
+              <div className={s.cmdChip} onClick={() => setDashOpen(true)} style={{ cursor: 'pointer' }}>
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                <span className={s.cmdChipLabel}>Dashboard</span>
+              </div>
+            </Tooltip>
             <button className={s.cmdBell} onClick={() => setBellOpen(p => !p)}>
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               {unreadCount > 0 && <span className={s.cmdBellBadge}>{unreadCount}</span>}
