@@ -1,7 +1,26 @@
 import { useState } from 'react';
 import PageBanner from '../components/PageBanner';
+import useTypewriter from '../hooks/useTypewriter';
 import s from '../styles/Members.module.css';
 import sh from '../styles/shared.module.css';
+
+const SAGE_PROMPTS = [
+  'Pause Ethan Nguyen for 2 weeks...',
+  'Cancel Marcus Davis and process final invoice...',
+  'Send a reminder to members who missed last week...',
+  'Show me everyone with failed payments...',
+  'Apply a 20% discount to Ava Chen next month...',
+  'Issue a make-up credit to Jaylen Brooks...',
+];
+
+const QUICK_ACTIONS = [
+  { label: 'Pause a member', icon: '⏸️' },
+  { label: 'Cancel subscription', icon: '🚪' },
+  { label: 'Issue refund', icon: '💸' },
+  { label: 'Send announcement', icon: '📢' },
+  { label: 'Apply discount', icon: '🏷️' },
+  { label: 'Failed payments', icon: '⚠️' },
+];
 
 const MEMBERS = [
   { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite ($175/mo)', lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current' },
@@ -42,9 +61,37 @@ export default function Members() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [drawerMember, setDrawerMember] = useState(null);
   const [tab, setTab] = useState('directory');
+  const [cmdInput, setCmdInput] = useState('');
+  const [cmdResponse, setCmdResponse] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const typewriterText = useTypewriter(SAGE_PROMPTS);
 
   const activeCount = MEMBERS.filter(m => m.status === 'Active').length;
   const pausedCount = MEMBERS.filter(m => m.status === 'Paused').length;
+
+  const handleCommand = (text) => {
+    const cmd = text || cmdInput;
+    if (!cmd.trim()) return;
+    setCmdResponse({
+      input: cmd,
+      reply: `Got it — I'll ${cmd.toLowerCase().startsWith('show') || cmd.toLowerCase().startsWith('find') ? 'pull that up' : 'take care of that'} for you. Processing "${cmd}"...`,
+      actions: cmd.toLowerCase().includes('pause') ? ['Confirm pause', 'Edit dates', 'Cancel']
+        : cmd.toLowerCase().includes('cancel') ? ['Confirm cancellation', 'Process final invoice', 'Cancel']
+        : cmd.toLowerCase().includes('refund') ? ['Issue full refund', 'Partial refund', 'Cancel']
+        : ['Confirm', 'Edit', 'Cancel'],
+    });
+    setCmdInput('');
+  };
+
+  const toggleListening = () => {
+    setIsListening(!isListening);
+    if (!isListening) {
+      setTimeout(() => {
+        setIsListening(false);
+        setCmdInput('Pause Ethan Nguyen for 2 weeks — family vacation');
+      }, 2500);
+    }
+  };
 
   const filtered = MEMBERS.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase());
@@ -70,6 +117,63 @@ export default function Members() {
       />
 
       <div className={sh.scroll}>
+        {/* Sage Command Bar */}
+        <div className={s.cmdBar}>
+          <div className={s.cmdHeader}>
+            <div className={s.cmdSageIcon}>S</div>
+            <div className={s.cmdHeaderText}>
+              <div className={s.cmdTitle}>Manage your members</div>
+              <div className={s.cmdSubtitle}>Tell Sage what you need — type or use your voice</div>
+            </div>
+          </div>
+
+          <div className={s.cmdInputWrap}>
+            <div className={`${s.cmdMic} ${isListening ? s.cmdMicActive : ''}`} onClick={toggleListening}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              {isListening && <div className={s.cmdMicPulse} />}
+            </div>
+            <div className={s.cmdInputInner}>
+              <input
+                className={s.cmdInput}
+                value={cmdInput}
+                onChange={e => setCmdInput(e.target.value)}
+                placeholder={typewriterText}
+                onKeyDown={e => e.key === 'Enter' && handleCommand()}
+              />
+              {isListening && <span className={s.cmdListeningBadge}>Listening...</span>}
+            </div>
+            <button className={s.cmdSend} onClick={() => handleCommand()} disabled={!cmdInput.trim()}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+
+          <div className={s.cmdChips}>
+            {QUICK_ACTIONS.map(a => (
+              <button key={a.label} className={s.cmdChip} onClick={() => handleCommand(a.label)}>
+                <span>{a.icon}</span> {a.label}
+              </button>
+            ))}
+          </div>
+
+          {cmdResponse && (
+            <div className={s.cmdResponse}>
+              <div className={s.cmdResponseQ}>You said: "{cmdResponse.input}"</div>
+              <div className={s.cmdResponseA}>{cmdResponse.reply}</div>
+              <div className={s.cmdResponseActions}>
+                {cmdResponse.actions.map(a => (
+                  <button
+                    key={a}
+                    className={a === 'Cancel' ? s.cmdActionCancel : s.cmdActionConfirm}
+                    onClick={() => setCmdResponse(null)}
+                  >
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Tab nav */}
         <div className={s.tabBar}>
           {['directory', 'metrics', 'pauses', 'activity'].map(t => (

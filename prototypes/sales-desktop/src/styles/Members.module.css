@@ -1,3 +1,45 @@
+/* ─── SAGE COMMAND BAR ─── */
+.cmdBar{background:linear-gradient(135deg,rgba(200,168,78,0.06),rgba(200,168,78,0.02));border:1px solid rgba(200,168,78,0.18);border-radius:24px;padding:24px 28px;display:flex;flex-direction:column;gap:16px;animation:cmdFadeIn 0.5s ease}
+@keyframes cmdFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.cmdHeader{display:flex;align-items:center;gap:14px}
+.cmdSageIcon{width:40px;height:40px;border-radius:14px;background:linear-gradient(135deg,var(--gold),var(--goldl));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:var(--shadow-gold)}
+.cmdHeaderText{display:flex;flex-direction:column;gap:2px}
+.cmdTitle{font-size:17px;font-weight:800;color:var(--tp);letter-spacing:-0.01em}
+.cmdSubtitle{font-size:12px;font-weight:500;color:var(--tm)}
+
+.cmdInputWrap{display:flex;align-items:center;gap:10px}
+.cmdMic{width:42px;height:42px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--goldl),var(--gold));display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;cursor:pointer;transition:all 200ms;box-shadow:0 0 0 4px rgba(200,168,78,0.1);position:relative}
+.cmdMic:hover{transform:scale(1.08);box-shadow:0 0 0 6px rgba(200,168,78,0.18)}
+.cmdMicActive{animation:micPulse 1.2s ease-in-out infinite;box-shadow:0 0 0 8px rgba(200,168,78,0.25)}
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 4px rgba(200,168,78,0.25)}50%{box-shadow:0 0 0 12px rgba(200,168,78,0.08)}}
+.cmdMicPulse{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--gold);animation:micRing 1.2s ease-in-out infinite;opacity:0.5}
+@keyframes micRing{0%{transform:scale(0.8);opacity:0.6}50%{transform:scale(1.15);opacity:0}100%{transform:scale(0.8);opacity:0}}
+
+.cmdInputInner{flex:1;position:relative;display:flex;align-items:center}
+.cmdInput{width:100%;font-family:var(--ff);font-size:15px;font-weight:600;color:var(--tp);background:var(--surf);border:2px solid var(--borderm);border-radius:16px;padding:14px 20px;outline:none;transition:all 200ms var(--es)}
+.cmdInput::placeholder{color:var(--tm);font-weight:500}
+.cmdInput:hover{border-color:rgba(200,168,78,0.3);background:var(--surf)}
+.cmdInput:focus{border-color:var(--gold);background:var(--surf);box-shadow:0 0 0 4px rgba(200,168,78,0.08)}
+.cmdListeningBadge{position:absolute;right:14px;font-size:11px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.12);padding:3px 10px;border-radius:6px;animation:listeningPulse 1s ease-in-out infinite}
+@keyframes listeningPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+
+.cmdSend{width:42px;height:42px;border-radius:14px;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;cursor:pointer;border:none;transition:all 180ms}
+.cmdSend:hover:not(:disabled){background:var(--goldl);transform:scale(1.05);box-shadow:var(--shadow-md)}
+.cmdSend:disabled{opacity:0.35;cursor:not-allowed}
+
+.cmdChips{display:flex;flex-wrap:wrap;gap:6px}
+.cmdChip{font-family:var(--ff);font-size:12px;font-weight:600;color:var(--ts);background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:7px 14px;cursor:pointer;transition:all 180ms;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.cmdChip:hover{border-color:var(--gold);color:var(--tp);background:rgba(200,168,78,0.05);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+
+.cmdResponse{background:var(--surf);border:1px solid rgba(200,168,78,0.2);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:10px;animation:cmdFadeIn 0.3s ease}
+.cmdResponseQ{font-size:12px;font-weight:600;color:var(--tm);font-style:italic}
+.cmdResponseA{font-size:14px;font-weight:600;color:var(--tp);line-height:1.5}
+.cmdResponseActions{display:flex;gap:8px;margin-top:2px}
+.cmdActionConfirm{font-family:var(--ff);font-size:12px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
+.cmdActionConfirm:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.cmdActionCancel{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--ts);background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
+.cmdActionCancel:hover{background:var(--surf3);color:var(--tp)}
+
 /* ─── TAB BAR ─── */
 .tabBar{display:flex;gap:4px;background:var(--surf2);border-radius:14px;padding:4px}
 .tabBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tm);background:none;border:none;border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
