@@ -6,8 +6,8 @@ import s from '../../styles/member-app/MemberApp.module.css';
    ═══════════════════════════════════════════ */
 
 const ANNOUNCEMENTS = [
-  { title: 'Spring Break Schedule Changes', body: 'All Saturday sessions moved to 11am during March 22–29. Normal schedule resumes March 31.' },
-  { title: 'Summer Camp Registration Open', body: 'Early bird pricing through April 15. Limited spots — register now!' },
+  { id: 1, title: 'Spring Break Schedule Changes', body: 'All Saturday sessions moved to 11am during March 22–29. Normal schedule resumes March 31.', full: 'All Saturday sessions have been moved to 11:00 AM during the week of March 22–29 to accommodate spring break scheduling. This affects Elite Skills Training, Youth Development, and Open Gym sessions. Normal schedule resumes on Monday, March 31. Please update your bookings accordingly. Contact the front desk if you have questions.' },
+  { id: 2, title: 'Summer Camp Registration Open', body: 'Early bird pricing through April 15. Limited spots — register now!', full: 'Summer Camp 2026 registration is now open! We\'re offering three age-group camps this year: Mini Ballers (6–8), Rising Stars (9–12), and Elite Prep (13–16). Each camp runs Monday–Friday, 9 AM – 3 PM. Early bird pricing is available through April 15: $299/week (regular $375). Space is limited to 20 campers per group. Register through the app or contact Coach Zoran.' },
 ];
 
 const SHORTCUTS = [
@@ -51,6 +51,66 @@ const NOTIF_TYPES = [
 
 const CAL_DAYS_WITH_CLASSES = [16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31];
 
+/* ─── P0: Inbox messages — APP-026, APP-031 ─── */
+const INBOX_MESSAGES = [
+  { id: 1, from: 'Coach Zoran', avatar: 'CZ', time: '2h ago', preview: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', unread: true, messages: [
+    { sender: 'Coach Zoran', text: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', time: '2:15 PM' },
+    { sender: 'You', text: 'Thanks coach! I felt way more comfortable shooting off movement today.', time: '2:20 PM' },
+    { sender: 'Coach Zoran', text: 'That\'s the goal. Keep putting in the work 💪', time: '2:22 PM' },
+  ]},
+  { id: 2, from: 'BAM Academy', avatar: 'BA', time: '1d ago', preview: 'Your March progress report is ready. Tap to view.', unread: true, messages: [
+    { sender: 'BAM Academy', text: 'Your March progress report is ready. Tap to view your shooting splits, attendance, and coach notes.', time: 'Yesterday' },
+  ]},
+  { id: 3, from: 'Coach Marcus', avatar: 'CM', time: '3d ago', preview: 'Hey Carlos, just a reminder to ice that ankle after practice.', unread: false, messages: [
+    { sender: 'Coach Marcus', text: 'Hey Carlos, just a reminder to ice that ankle after practice. Don\'t push it if it still feels sore tomorrow.', time: 'Mar 14' },
+    { sender: 'You', text: 'Will do, thanks for checking in!', time: 'Mar 14' },
+  ]},
+];
+
+/* ─── P0: Notification center — APP-031 ─── */
+const NOTIF_CENTER = [
+  { id: 1, type: 'reminder', title: 'Youth Development starts in 1 hour', sub: 'Today at 10:30 AM · Court B', time: '30m ago', unread: true },
+  { id: 2, type: 'message', title: 'New message from Coach Zoran', sub: 'Great work on the pull-up jumper…', time: '2h ago', unread: true },
+  { id: 3, type: 'billing', title: 'Payment processed — $175.00', sub: 'Elite Plan · Mar 15, 2026', time: '2d ago', unread: false },
+  { id: 4, type: 'announcement', title: 'Spring Break Schedule Changes', sub: 'Saturday sessions moved to 11am', time: '3d ago', unread: false },
+  { id: 5, type: 'report', title: 'Progress report available', sub: 'March 2026 performance summary', time: '4d ago', unread: false },
+  { id: 6, type: 'waitlist', title: 'Spot opened! Beginner Fundamentals', sub: 'Tomorrow at 11:00 AM — book now', time: '5d ago', unread: false },
+];
+
+/* ─── P0: Billing data — APP-001, APP-002, APP-033 ─── */
+const BILLING_INFO = {
+  plan: 'Elite Plan',
+  price: '$175/mo',
+  nextBilling: 'Apr 15, 2026',
+  cardLast4: '4242',
+  cardBrand: 'Visa',
+  cardExp: '08/27',
+};
+
+const PAYMENT_HISTORY = [
+  { date: 'Mar 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
+  { date: 'Feb 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
+  { date: 'Jan 15, 2026', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
+  { date: 'Dec 15, 2025', amount: '$50.00', desc: 'Credit Pack — 5 sessions', status: 'Paid' },
+  { date: 'Dec 15, 2025', amount: '$175.00', desc: 'Elite Plan — Monthly', status: 'Paid' },
+];
+
+const PLANS = [
+  { id: 'starter', name: 'Starter', price: '$99/mo', credits: '4 sessions', current: false },
+  { id: 'growth', name: 'Growth', price: '$139/mo', credits: '8 sessions', current: false },
+  { id: 'elite', name: 'Elite', price: '$175/mo', credits: '12 sessions', current: true },
+  { id: 'unlimited', name: 'Unlimited', price: '$249/mo', credits: 'Unlimited', current: false },
+];
+
+/* ─── P1: Credit history — APP-021 ─── */
+const CREDIT_HISTORY = [
+  { date: 'Mar 16', action: 'Used', amount: -2, desc: 'Elite Skills Training', balance: 6 },
+  { date: 'Mar 14', action: 'Used', amount: -1, desc: 'Shooting Lab', balance: 8 },
+  { date: 'Mar 11', action: 'No-show', amount: -1, desc: 'Open Gym', balance: 9 },
+  { date: 'Mar 1', action: 'Renewed', amount: 12, desc: 'Monthly reset — Elite Plan', balance: 10 },
+  { date: 'Feb 28', action: 'Used', amount: -2, desc: 'Elite Skills Training', balance: -2 },
+];
+
 /* ═══════════════════════════════════════════
    MEMBER APP (all screens in one component)
    ═══════════════════════════════════════════ */
@@ -66,6 +126,32 @@ export default function MemberApp({ onClose }) {
   const [calSelected, setCalSelected] = useState(16);
   const [notifs, setNotifs] = useState({ session: true, payment: true, messages: true, reports: true, announce: false });
 
+  /* P0: Inbox + Notification center */
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxThread, setInboxThread] = useState(null);
+  const [notifCenterOpen, setNotifCenterOpen] = useState(false);
+
+  /* P0: Cancel class confirmation */
+  const [cancelConfirm, setCancelConfirm] = useState(null);
+
+  /* P0: Announcement detail */
+  const [announceDetail, setAnnounceDetail] = useState(null);
+
+  /* P0: Billing */
+  const [billingTab, setBillingTab] = useState('history');
+
+  /* P0: Delete account / Cancel membership */
+  const [deleteStep, setDeleteStep] = useState(0);
+  const [cancelMemberStep, setCancelMemberStep] = useState(0);
+  const [cancelReason, setCancelReason] = useState('');
+
+  /* P1: QR check-in */
+  const [qrOpen, setQrOpen] = useState(false);
+
+  /* P1: Trial banner dismissed */
+  const [trialDismissed, setTrialDismissed] = useState(false);
+  const IS_TRIAL = false; // toggle to true to preview trial experience
+
   const toggleNotif = (key, locked) => {
     if (locked) return;
     setNotifs(n => ({ ...n, [key]: !n[key] }));
@@ -76,7 +162,21 @@ export default function MemberApp({ onClose }) {
     setSelectedClass(null);
   };
 
-  const navTo = (t) => { setTab(t); setSelectedClass(null); setBookingConfirm(null); setAccountView('main'); };
+  const navTo = (t) => {
+    setTab(t);
+    setSelectedClass(null);
+    setBookingConfirm(null);
+    setAccountView('main');
+    setInboxOpen(false);
+    setNotifCenterOpen(false);
+    setAnnounceDetail(null);
+    setCancelConfirm(null);
+    setQrOpen(false);
+  };
+
+  /* ─── ICONS (shared) ─── */
+  const BellIcon = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
+  const ChevronRight = () => <span className={s.accountRowChevron}>›</span>;
 
   /* ─── Bottom Nav ─── */
   const BottomNav = () => (
@@ -103,11 +203,24 @@ export default function MemberApp({ onClose }) {
         <div className={s.greetingName}>Carlos 👋</div>
       </div>
 
-      {/* Announcement Carousel — APP-006 / MEM-016 */}
+      {/* P1: Trial banner — APP-034a/b */}
+      {IS_TRIAL && !trialDismissed && (
+        <div className={s.trialBanner}>
+          <div className={s.trialBannerLeft}>
+            <div className={s.trialBannerTitle}>Free Trial — 3 days left</div>
+            <div className={s.trialBannerSub}>You have 2 trial sessions remaining. Book now!</div>
+          </div>
+          <button className={s.trialBannerBtn} onClick={() => { setTab('account'); setAccountView('billing'); }}>Upgrade</button>
+          <button className={s.trialDismiss} onClick={() => setTrialDismissed(true)}>✕</button>
+        </div>
+      )}
+
+      {/* Announcement Carousel — APP-006 / MEM-016 / APP-029 (tap for detail) */}
       <div className={s.announceCarousel}>
-        <div className={s.announceSlide}>
+        <div className={s.announceSlide} onClick={() => setAnnounceDetail(ANNOUNCEMENTS[announceIdx])}>
           <div className={s.announceSlideTitle}>{ANNOUNCEMENTS[announceIdx].title}</div>
           <div className={s.announceSlideBody}>{ANNOUNCEMENTS[announceIdx].body}</div>
+          <div className={s.announceTapHint}>Tap to read more</div>
         </div>
         <div className={s.announceDots}>
           {ANNOUNCEMENTS.map((_, i) => (
@@ -122,8 +235,10 @@ export default function MemberApp({ onClose }) {
           <div key={sc.label} className={s.shortcutBtn} onClick={() => {
             if (sc.label === 'Book a Class') navTo('browse');
             else if (sc.label === 'My Schedule') navTo('schedule');
-            else if (sc.label === 'My Credits') navTo('schedule');
-            else if (sc.label === 'Profile' || sc.label === 'Settings') navTo('account');
+            else if (sc.label === 'My Credits') { setTab('account'); setAccountView('credits'); }
+            else if (sc.label === 'Messages') setInboxOpen(true);
+            else if (sc.label === 'Profile') { setTab('account'); setAccountView('profile'); }
+            else if (sc.label === 'Settings') navTo('account');
           }}>
             <div className={s.shortcutIcon}>{sc.icon}</div>
             <div className={s.shortcutLabel}>{sc.label}</div>
@@ -157,7 +272,7 @@ export default function MemberApp({ onClose }) {
       </div>
 
       {/* Credit Balance — APP-021 */}
-      <div className={s.creditWidget}>
+      <div className={s.creditWidget} onClick={() => { setTab('account'); setAccountView('credits'); }} style={{ cursor: 'pointer' }}>
         <div className={s.creditLeft}>
           <div className={s.creditLabel}>Session Credits</div>
           <div className={s.creditValue}>6</div>
@@ -220,7 +335,6 @@ export default function MemberApp({ onClose }) {
               ))}
             </div>
             <div className={s.calDays}>
-              {/* March 2026 starts on Sunday */}
               {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
                 const hasClasses = CAL_DAYS_WITH_CLASSES.includes(day);
                 return (
@@ -241,7 +355,6 @@ export default function MemberApp({ onClose }) {
                 );
               })}
             </div>
-            {/* Sessions for selected day */}
             <div className={s.dayGroup}>
               <div className={s.dayLabel}>{calSelected === 16 ? 'Today' : `Mar ${calSelected}`}</div>
               {CLASSES.filter(c => c.day === 'Today').slice(0, 3).map(cls => (
@@ -270,8 +383,16 @@ export default function MemberApp({ onClose }) {
   /* ─── MY SCHEDULE ─── */
   const SchedulePage = () => (
     <div className={s.pageScroll}>
+      {/* P1: QR Check-In button — APP-030a */}
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.qrCheckinBtn} onClick={() => setQrOpen(true)}>
+          <svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
+          Check In with QR Code
+        </button>
+      </div>
+
       {/* Credit balance widget — APP-021 */}
-      <div className={s.creditWidget}>
+      <div className={s.creditWidget} onClick={() => { setTab('account'); setAccountView('credits'); }} style={{ cursor: 'pointer' }}>
         <div className={s.creditLeft}>
           <div className={s.creditLabel}>Session Credits</div>
           <div className={s.creditValue}>6</div>
@@ -289,7 +410,7 @@ export default function MemberApp({ onClose }) {
               <div className={s.className}>{u.name}</div>
               <div className={s.classMeta}>{u.day} · {u.time} · {u.coach}</div>
             </div>
-            <button className={s.scheduleCancelBtn}>Cancel</button>
+            <button className={s.scheduleCancelBtn} onClick={() => setCancelConfirm(u)}>Cancel</button>
           </div>
         ))}
       </div>
@@ -320,6 +441,12 @@ export default function MemberApp({ onClose }) {
     if (accountView === 'pause') return <PauseFlow />;
     if (accountView === 'notifications') return <NotificationsView />;
     if (accountView === 'password') return <PasswordChange />;
+    if (accountView === 'billing') return <BillingView />;
+    if (accountView === 'deleteAccount') return <DeleteAccountFlow />;
+    if (accountView === 'cancelMembership') return <CancelMembershipFlow />;
+    if (accountView === 'profile') return <ProfileEdit />;
+    if (accountView === 'credits') return <CreditDetailView />;
+    if (accountView === 'changePlan') return <ChangePlanView />;
 
     return (
       <div className={s.pageScroll}>
@@ -332,25 +459,37 @@ export default function MemberApp({ onClose }) {
 
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Membership</div>
+          <div className={s.accountRow} onClick={() => setAccountView('billing')}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>💳</span><span className={s.accountRowLabel}>Billing & Payments</span></div>
+            <ChevronRight />
+          </div>
+          <div className={s.accountRow} onClick={() => setAccountView('changePlan')}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>⬆️</span><span className={s.accountRowLabel}>Change Plan</span></div>
+            <ChevronRight />
+          </div>
           <div className={s.accountRow} onClick={() => setAccountView('pause')}>
             <div className={s.accountRowLeft}><span className={s.accountRowIcon}>⏸️</span><span className={s.accountRowLabel}>Pause Membership</span></div>
-            <span className={s.accountRowChevron}>›</span>
+            <ChevronRight />
           </div>
-          <div className={s.accountRow}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>⬆️</span><span className={s.accountRowLabel}>Change Plan</span></div>
-            <span className={s.accountRowChevron}>›</span>
+          <div className={s.accountRow} onClick={() => setAccountView('credits')}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🎟️</span><span className={s.accountRowLabel}>Session Credits</span></div>
+            <ChevronRight />
           </div>
         </div>
 
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Settings</div>
+          <div className={s.accountRow} onClick={() => setAccountView('profile')}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>👤</span><span className={s.accountRowLabel}>Edit Profile</span></div>
+            <ChevronRight />
+          </div>
           <div className={s.accountRow} onClick={() => setAccountView('notifications')}>
             <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🔔</span><span className={s.accountRowLabel}>Notifications</span></div>
-            <span className={s.accountRowChevron}>›</span>
+            <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('password')}>
             <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🔒</span><span className={s.accountRowLabel}>Change Password</span></div>
-            <span className={s.accountRowChevron}>›</span>
+            <ChevronRight />
           </div>
         </div>
 
@@ -358,7 +497,19 @@ export default function MemberApp({ onClose }) {
           <div className={s.accountSectionTitle}>Support</div>
           <div className={s.accountRow}>
             <div className={s.accountRowLeft}><span className={s.accountRowIcon}>💬</span><span className={s.accountRowLabel}>Contact Academy</span></div>
-            <span className={s.accountRowChevron}>›</span>
+            <ChevronRight />
+          </div>
+        </div>
+
+        <div className={s.accountSection}>
+          <div className={s.accountSectionTitle}>Danger Zone</div>
+          <div className={s.accountRow} onClick={() => { setCancelMemberStep(0); setAccountView('cancelMembership'); }}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🚫</span><span className={s.accountRowLabel} style={{ color: 'var(--warn)' }}>Cancel Membership</span></div>
+            <ChevronRight />
+          </div>
+          <div className={s.accountRow} onClick={() => { setDeleteStep(0); setAccountView('deleteAccount'); }}>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🗑️</span><span className={s.accountRowLabel} style={{ color: 'var(--red)' }}>Delete Account</span></div>
+            <ChevronRight />
           </div>
         </div>
       </div>
@@ -458,6 +609,444 @@ export default function MemberApp({ onClose }) {
     </div>
   );
 
+  /* ─── P0: BILLING — APP-001, APP-002, APP-033, APP-012a/b ─── */
+  const BillingView = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('main')}>← Back to Account</button>
+      </div>
+      <div className={s.pauseFlow}>
+        <div className={s.pauseFlowTitle}>Billing & Payments</div>
+
+        {/* Current plan summary */}
+        <div className={s.billingSummary}>
+          <div className={s.billingPlanRow}>
+            <div>
+              <div className={s.billingPlanName}>{BILLING_INFO.plan}</div>
+              <div className={s.billingPlanPrice}>{BILLING_INFO.price}</div>
+            </div>
+            <button className={s.billingChangeBtn} onClick={() => setAccountView('changePlan')}>Change</button>
+          </div>
+          <div className={s.billingNext}>Next billing: {BILLING_INFO.nextBilling}</div>
+        </div>
+
+        {/* Payment method — APP-033 */}
+        <div className={s.billingMethodCard}>
+          <div className={s.billingMethodLeft}>
+            <div className={s.billingMethodIcon}>
+              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+            </div>
+            <div>
+              <div className={s.billingMethodBrand}>{BILLING_INFO.cardBrand} •••• {BILLING_INFO.cardLast4}</div>
+              <div className={s.billingMethodExp}>Expires {BILLING_INFO.cardExp}</div>
+            </div>
+          </div>
+          <button className={s.billingMethodBtn}>Update</button>
+        </div>
+
+        {/* Tabs: History / Upcoming */}
+        <div className={s.browseToggle}>
+          <button className={`${s.browseToggleBtn} ${billingTab === 'history' ? s.browseToggleActive : ''}`} onClick={() => setBillingTab('history')}>History</button>
+          <button className={`${s.browseToggleBtn} ${billingTab === 'upcoming' ? s.browseToggleActive : ''}`} onClick={() => setBillingTab('upcoming')}>Upcoming</button>
+        </div>
+
+        {billingTab === 'history' ? (
+          <div className={s.paymentList}>
+            {PAYMENT_HISTORY.map((p, i) => (
+              <div key={i} className={s.paymentRow}>
+                <div className={s.paymentRowLeft}>
+                  <div className={s.paymentDesc}>{p.desc}</div>
+                  <div className={s.paymentDate}>{p.date}</div>
+                </div>
+                <div className={s.paymentRowRight}>
+                  <div className={s.paymentAmount}>{p.amount}</div>
+                  <span className={s.paymentBadge}>{p.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={s.paymentList}>
+            <div className={s.paymentRow}>
+              <div className={s.paymentRowLeft}>
+                <div className={s.paymentDesc}>{BILLING_INFO.plan} — Monthly</div>
+                <div className={s.paymentDate}>{BILLING_INFO.nextBilling}</div>
+              </div>
+              <div className={s.paymentRowRight}>
+                <div className={s.paymentAmount}>$175.00</div>
+                <span className={s.paymentBadgePending}>Scheduled</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  /* ─── P0: CHANGE PLAN — APP-012a/b ─── */
+  const ChangePlanView = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('billing')}>← Back to Billing</button>
+      </div>
+      <div className={s.pauseFlow}>
+        <div className={s.pauseFlowTitle}>Change Plan</div>
+        <div className={s.pauseFlowSub}>Select a plan. Changes take effect at your next billing cycle.</div>
+        <div className={s.planGrid}>
+          {PLANS.map(p => (
+            <div key={p.id} className={`${s.planCard} ${p.current ? s.planCardCurrent : ''}`}>
+              <div className={s.planCardName}>{p.name}</div>
+              <div className={s.planCardPrice}>{p.price}</div>
+              <div className={s.planCardCredits}>{p.credits}</div>
+              {p.current ? (
+                <span className={s.planCardBadge}>Current</span>
+              ) : (
+                <button className={s.planCardBtn}>Select</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─── P0: CANCEL CLASS CONFIRMATION — APP-019a/b ─── */
+  const CancelClassDialog = () => (
+    <div className={s.dialogOverlay} onClick={() => setCancelConfirm(null)}>
+      <div className={s.dialogBox} onClick={e => e.stopPropagation()}>
+        <div className={s.dialogIcon}>
+          <svg width="28" height="28" fill="none" stroke="var(--warn)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        </div>
+        <div className={s.dialogTitle}>Cancel this class?</div>
+        <div className={s.dialogSub}>
+          <strong>{cancelConfirm.name}</strong><br />
+          {cancelConfirm.day} at {cancelConfirm.time}
+        </div>
+        <div className={s.dialogPolicy}>
+          Cancellations within 2 hours of start time will not receive a credit refund. This session is more than 2 hours away — your credit will be returned.
+        </div>
+        <div className={s.dialogActions}>
+          <button className={s.dialogDanger} onClick={() => setCancelConfirm(null)}>Yes, Cancel Class</button>
+          <button className={s.dialogCancel} onClick={() => setCancelConfirm(null)}>Keep Booking</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─── P0: ANNOUNCEMENT DETAIL — APP-029 ─── */
+  const AnnouncementDetail = () => (
+    <div className={s.detailOverlay}>
+      <button className={s.detailBack} onClick={() => setAnnounceDetail(null)}>← Back</button>
+      <div className={s.detailContent}>
+        <div className={s.detailHero} style={{ borderLeft: '4px solid var(--gold)' }}>
+          <div className={s.detailClassName}>{announceDetail.title}</div>
+          <div className={s.detailMeta}>BAM Academy · Announcement</div>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--ts)', lineHeight: 1.65, padding: '0 4px' }}>
+          {announceDetail.full || announceDetail.body}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─── P0: DELETE ACCOUNT — APP-023c ─── */
+  const DeleteAccountFlow = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('main')}>← Back to Account</button>
+      </div>
+      <div className={s.pauseFlow}>
+        {deleteStep === 0 ? (
+          <>
+            <div className={s.pauseFlowTitle} style={{ color: 'var(--red)' }}>Delete Account</div>
+            <div className={s.pauseFlowSub}>
+              This will permanently delete your account and all associated data. This action cannot be undone.
+            </div>
+            <div className={s.dangerList}>
+              <div className={s.dangerItem}>Your membership will be cancelled immediately</div>
+              <div className={s.dangerItem}>All session history and credits will be lost</div>
+              <div className={s.dangerItem}>Your profile and progress data will be erased</div>
+              <div className={s.dangerItem}>Any remaining billing cycle will not be refunded</div>
+            </div>
+            <button className={s.dangerBtn} onClick={() => setDeleteStep(1)}>I Understand, Continue</button>
+            <button className={s.confirmSecondary} onClick={() => setAccountView('main')}>Cancel</button>
+          </>
+        ) : (
+          <>
+            <div className={s.pauseFlowTitle} style={{ color: 'var(--red)' }}>Confirm Deletion</div>
+            <div className={s.pauseFlowSub}>Type <strong>DELETE</strong> to confirm account deletion.</div>
+            <div className={s.pauseFormGroup}>
+              <div className={s.pauseFormLabel}>Confirmation</div>
+              <input className={s.pauseFormInput} type="text" placeholder='Type "DELETE"' />
+            </div>
+            <button className={s.dangerBtn}>Permanently Delete Account</button>
+            <button className={s.confirmSecondary} onClick={() => setDeleteStep(0)}>Go Back</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  /* ─── P0: CANCEL MEMBERSHIP — MEM-006a ─── */
+  const CancelMembershipFlow = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('main')}>← Back to Account</button>
+      </div>
+      <div className={s.pauseFlow}>
+        {cancelMemberStep === 0 ? (
+          <>
+            <div className={s.pauseFlowTitle} style={{ color: 'var(--warn)' }}>Cancel Membership</div>
+            <div className={s.pauseFlowSub}>
+              We're sorry to see you go. Your membership will remain active until the end of your current billing period (Apr 15, 2026).
+            </div>
+            <div className={s.pauseFormGroup}>
+              <div className={s.pauseFormLabel}>Why are you leaving?</div>
+              <select className={s.pauseFormInput} value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
+                <option value="">Select a reason...</option>
+                <option value="cost">Too expensive</option>
+                <option value="time">Not enough time</option>
+                <option value="moving">Moving away</option>
+                <option value="injury">Injury or health</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className={s.pausePreview}>
+              <div className={s.pausePreviewRow}><span>Access until</span><span>Apr 15, 2026</span></div>
+              <div className={s.pausePreviewRow}><span>Remaining credits</span><span>6 (use them!)</span></div>
+              <div className={s.pausePreviewRow}><span>Rejoin anytime</span><span>Yes</span></div>
+            </div>
+            <div className={s.altSuggestion}>
+              <div className={s.altSuggestionTitle}>Consider pausing instead?</div>
+              <div className={s.altSuggestionSub}>Pause for up to 4 weeks and keep your spot.</div>
+              <button className={s.altSuggestionBtn} onClick={() => setAccountView('pause')}>Pause Membership</button>
+            </div>
+            <button className={s.dangerBtnWarn} onClick={() => setCancelMemberStep(1)}>Continue with Cancellation</button>
+          </>
+        ) : (
+          <>
+            <div className={s.pauseFlowTitle} style={{ color: 'var(--warn)' }}>Confirm Cancellation</div>
+            <div className={s.pauseFlowSub}>
+              Your Elite Plan will end on April 15, 2026. You can still use your remaining 6 credits until then.
+            </div>
+            <button className={s.dangerBtnWarn}>Confirm Cancellation</button>
+            <button className={s.confirmSecondary} onClick={() => setCancelMemberStep(0)}>Go Back</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  /* ─── P1: PROFILE EDIT — PRF-002b, PRF-003b ─── */
+  const ProfileEdit = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('main')}>← Back to Account</button>
+      </div>
+      <div className={s.pauseFlow}>
+        <div className={s.pauseFlowTitle}>Edit Profile</div>
+        <div className={s.profileAvatarEdit}>
+          <div className={s.accountAvatar} style={{ width: 80, height: 80, fontSize: 28 }}>CM</div>
+          <button className={s.profileAvatarBtn}>Change Photo</button>
+        </div>
+        <div className={s.pauseFormGroup}>
+          <div className={s.pauseFormLabel}>First name</div>
+          <input className={s.pauseFormInput} type="text" defaultValue="Carlos" />
+        </div>
+        <div className={s.pauseFormGroup}>
+          <div className={s.pauseFormLabel}>Last name</div>
+          <input className={s.pauseFormInput} type="text" defaultValue="Martinez" />
+        </div>
+        <div className={s.pauseFormGroup}>
+          <div className={s.pauseFormLabel}>Email</div>
+          <input className={s.pauseFormInput} type="email" defaultValue="carlos.m@email.com" />
+        </div>
+        <div className={s.pauseFormGroup}>
+          <div className={s.pauseFormLabel}>Phone</div>
+          <input className={s.pauseFormInput} type="tel" defaultValue="(555) 123-4567" />
+        </div>
+        <div className={s.pauseFormGroup}>
+          <div className={s.pauseFormLabel}>Date of birth</div>
+          <input className={s.pauseFormInput} type="date" defaultValue="2008-06-15" />
+        </div>
+        <button className={s.pauseSubmitBtn}>Save Changes</button>
+      </div>
+    </div>
+  );
+
+  /* ─── P1: CREDIT DETAIL / HISTORY — APP-021 ─── */
+  const CreditDetailView = () => (
+    <div className={s.pageScroll}>
+      <div style={{ padding: '0 20px' }}>
+        <button className={s.detailBack} style={{ padding: '0 0 12px' }} onClick={() => setAccountView('main')}>← Back to Account</button>
+      </div>
+      <div className={s.pauseFlow}>
+        <div className={s.pauseFlowTitle}>Session Credits</div>
+
+        <div className={s.creditSummaryCard}>
+          <div className={s.creditSummaryMain}>
+            <div className={s.creditSummaryNum}>6</div>
+            <div className={s.creditSummaryLabel}>credits remaining</div>
+          </div>
+          <div className={s.creditSummaryMeta}>
+            <div className={s.pausePreviewRow}><span>Plan allowance</span><span>12/month</span></div>
+            <div className={s.pausePreviewRow}><span>Used this cycle</span><span>4</span></div>
+            <div className={s.pausePreviewRow}><span>Make-up credits</span><span>1</span></div>
+            <div className={s.pausePreviewRow}><span>No-show deductions</span><span>1</span></div>
+            <div className={s.pausePreviewRow}><span>Resets</span><span>Apr 1, 2026</span></div>
+          </div>
+        </div>
+
+        <div className={s.creditHistoryLabel}>Activity Log</div>
+        <div className={s.paymentList}>
+          {CREDIT_HISTORY.map((c, i) => (
+            <div key={i} className={s.paymentRow}>
+              <div className={s.paymentRowLeft}>
+                <div className={s.paymentDesc}>{c.desc}</div>
+                <div className={s.paymentDate}>{c.date} · {c.action}</div>
+              </div>
+              <div className={s.paymentRowRight}>
+                <div className={s.paymentAmount} style={{ color: c.amount > 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {c.amount > 0 ? '+' : ''}{c.amount}
+                </div>
+                <span className={s.creditBalBadge}>Bal: {c.balance}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ─── P0: INBOX — APP-026 ─── */
+  const InboxOverlay = () => (
+    <div className={s.detailOverlay}>
+      {inboxThread ? (
+        <>
+          <button className={s.detailBack} onClick={() => setInboxThread(null)}>← Back to Messages</button>
+          <div className={s.inboxThreadHead}>
+            <div className={s.inboxAvatar}>{inboxThread.avatar}</div>
+            <div className={s.inboxThreadName}>{inboxThread.from}</div>
+          </div>
+          <div className={s.inboxMessages}>
+            {inboxThread.messages.map((m, i) => (
+              <div key={i} className={`${s.inboxBubble} ${m.sender === 'You' ? s.inboxBubbleMine : ''}`}>
+                <div className={s.inboxBubbleText}>{m.text}</div>
+                <div className={s.inboxBubbleTime}>{m.time}</div>
+              </div>
+            ))}
+          </div>
+          <div className={s.inboxCompose}>
+            <input className={s.inboxInput} placeholder="Type a message…" />
+            <button className={s.inboxSendBtn}>
+              <svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <button className={s.detailBack} onClick={() => setInboxOpen(false)}>← Back</button>
+          <div style={{ padding: '0 20px 12px' }}>
+            <div className={s.pauseFlowTitle}>Messages</div>
+          </div>
+          <div className={s.inboxList}>
+            {INBOX_MESSAGES.map(msg => (
+              <div key={msg.id} className={`${s.inboxRow} ${msg.unread ? s.inboxRowUnread : ''}`} onClick={() => setInboxThread(msg)}>
+                <div className={s.inboxAvatar}>{msg.avatar}</div>
+                <div className={s.inboxRowContent}>
+                  <div className={s.inboxRowTop}>
+                    <div className={s.inboxRowName}>{msg.from}</div>
+                    <div className={s.inboxRowTime}>{msg.time}</div>
+                  </div>
+                  <div className={s.inboxRowPreview}>{msg.preview}</div>
+                </div>
+                {msg.unread && <div className={s.inboxUnreadDot} />}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  /* ─── P0: NOTIFICATION CENTER — APP-031 ─── */
+  const NotifCenterOverlay = () => (
+    <div className={s.detailOverlay}>
+      <button className={s.detailBack} onClick={() => setNotifCenterOpen(false)}>← Back</button>
+      <div style={{ padding: '0 20px 12px' }}>
+        <div className={s.pauseFlowTitle}>Notifications</div>
+      </div>
+      <div className={s.notifCenterList}>
+        {NOTIF_CENTER.map(n => (
+          <div key={n.id} className={`${s.notifCenterRow} ${n.unread ? s.notifCenterUnread : ''}`}>
+            <div className={s.notifCenterIcon}>
+              {n.type === 'reminder' && <svg width="18" height="18" fill="none" stroke="var(--gold)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>}
+              {n.type === 'message' && <svg width="18" height="18" fill="none" stroke="var(--blue)" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}
+              {n.type === 'billing' && <svg width="18" height="18" fill="none" stroke="var(--green)" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>}
+              {n.type === 'announcement' && <svg width="18" height="18" fill="none" stroke="var(--warn)" strokeWidth="2" viewBox="0 0 24 24"><path d="M19.4 14.9A9 9 0 0 0 22 9c0-5-4.5-7-10-7S2 4 2 9c0 3.5 1.5 6.5 5 8v5l4.5-3.5"/></svg>}
+              {n.type === 'report' && <svg width="18" height="18" fill="none" stroke="var(--purple)" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
+              {n.type === 'waitlist' && <svg width="18" height="18" fill="none" stroke="var(--green)" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}
+            </div>
+            <div className={s.notifCenterContent}>
+              <div className={s.notifCenterTitle}>{n.title}</div>
+              <div className={s.notifCenterSub}>{n.sub}</div>
+            </div>
+            <div className={s.notifCenterTime}>{n.time}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  /* ─── P1: QR CHECK-IN — APP-030a ─── */
+  const QrCheckinOverlay = () => (
+    <div className={s.detailOverlay}>
+      <button className={s.detailBack} onClick={() => setQrOpen(false)}>← Back</button>
+      <div className={s.qrScreen}>
+        <div className={s.qrTitle}>Self Check-In</div>
+        <div className={s.qrSub}>Show this QR code at the front desk or scan the court QR.</div>
+        <div className={s.qrCodeBox}>
+          {/* Fake QR pattern */}
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <rect width="160" height="160" rx="12" fill="var(--surf)"/>
+            <rect x="20" y="20" width="36" height="36" rx="4" fill="var(--tp)"/>
+            <rect x="24" y="24" width="28" height="28" rx="2" fill="var(--surf)"/>
+            <rect x="30" y="30" width="16" height="16" rx="1" fill="var(--tp)"/>
+            <rect x="104" y="20" width="36" height="36" rx="4" fill="var(--tp)"/>
+            <rect x="108" y="24" width="28" height="28" rx="2" fill="var(--surf)"/>
+            <rect x="114" y="30" width="16" height="16" rx="1" fill="var(--tp)"/>
+            <rect x="20" y="104" width="36" height="36" rx="4" fill="var(--tp)"/>
+            <rect x="24" y="108" width="28" height="28" rx="2" fill="var(--surf)"/>
+            <rect x="30" y="114" width="16" height="16" rx="1" fill="var(--tp)"/>
+            {/* Center dots pattern */}
+            {[64,72,80,88,96].map(x => [64,72,80,88,96].map(y => (
+              <rect key={`${x}-${y}`} x={x} y={y} width="6" height="6" rx="1" fill={(x+y) % 16 === 0 ? 'var(--tp)' : 'var(--borderm)'} />
+            )))}
+            {/* Random fill dots */}
+            {[20,28,36,44,52].map(x => [64,72,80,88,96].map(y => (
+              <rect key={`l${x}-${y}`} x={x} y={y} width="6" height="6" rx="1" fill={(x*y) % 5 < 3 ? 'var(--tp)' : 'transparent'} />
+            )))}
+            {[64,72,80,88,96].map(x => [20,28,36,44,52].map(y => (
+              <rect key={`t${x}-${y}`} x={x} y={y} width="6" height="6" rx="1" fill={(x+y*2) % 7 < 4 ? 'var(--tp)' : 'transparent'} />
+            )))}
+            {[104,112,120,128,136].map(x => [64,72,80,88,96].map(y => (
+              <rect key={`r${x}-${y}`} x={x} y={y} width="6" height="6" rx="1" fill={(x*y) % 4 < 2 ? 'var(--tp)' : 'transparent'} />
+            )))}
+            {[64,72,80,88,96].map(x => [104,112,120,128,136].map(y => (
+              <rect key={`b${x}-${y}`} x={x} y={y} width="6" height="6" rx="1" fill={(x+y) % 3 === 0 ? 'var(--tp)' : 'transparent'} />
+            )))}
+          </svg>
+        </div>
+        <div className={s.qrMemberId}>Member ID: BAM-2026-CM0417</div>
+        <div className={s.qrSessionInfo}>
+          <div className={s.qrSessionLabel}>Next session</div>
+          <div className={s.qrSessionName}>Youth Development</div>
+          <div className={s.qrSessionMeta}>Today · 10:30 AM · Court B</div>
+        </div>
+      </div>
+    </div>
+  );
+
   /* ─── CLASS DETAIL — APP-017 ─── */
   const ClassDetail = () => (
     <div className={s.detailOverlay}>
@@ -474,6 +1063,19 @@ export default function MemberApp({ onClose }) {
           <div className={s.detailRow}><span>Capacity</span><span>{selectedClass.capacity}</span></div>
           <div className={s.detailRow}><span>Credits</span><span>{selectedClass.credits} credit{selectedClass.credits > 1 ? 's' : ''}</span></div>
         </div>
+
+        {/* P1: Waitlist position — APP-027 */}
+        {selectedClass.full && (
+          <div className={s.waitlistInfo}>
+            <div className={s.waitlistIcon}>
+              <svg width="16" height="16" fill="none" stroke="var(--warn)" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div>
+              <div className={s.waitlistLabel}>Waitlist Position: #3</div>
+              <div className={s.waitlistSub}>You'll be notified if a spot opens up</div>
+            </div>
+          </div>
+        )}
 
         <div className={s.detailSection}>
           <div className={s.detailSectionTitle}>Coach</div>
@@ -529,10 +1131,11 @@ export default function MemberApp({ onClose }) {
           {tab === 'home' ? 'BAM' : tab === 'browse' ? 'Classes' : tab === 'schedule' ? 'My Schedule' : 'Account'}
         </div>
         <div className={s.topBarRight}>
-          <button className={s.topBarBtn}>
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <button className={s.topBarBtn} style={{ position: 'relative' }} onClick={() => setNotifCenterOpen(true)}>
+            <BellIcon />
+            <div className={s.topBarBellDot} />
           </button>
-          <div className={s.topBarAvatar}>CM</div>
+          <div className={s.topBarAvatar} onClick={() => navTo('account')}>CM</div>
         </div>
       </div>
 
@@ -546,7 +1149,14 @@ export default function MemberApp({ onClose }) {
         {/* Overlays */}
         {selectedClass && <ClassDetail />}
         {bookingConfirm && <BookingConfirm />}
+        {inboxOpen && <InboxOverlay />}
+        {notifCenterOpen && <NotifCenterOverlay />}
+        {announceDetail && <AnnouncementDetail />}
+        {qrOpen && <QrCheckinOverlay />}
       </div>
+
+      {/* P0: Cancel class dialog — APP-019a/b */}
+      {cancelConfirm && <CancelClassDialog />}
 
       <BottomNav />
     </div>
