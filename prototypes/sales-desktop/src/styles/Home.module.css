@@ -1,0 +1,63 @@
+/* ─── WELCOME / LOADING SCREEN ─── */
+.welcome{flex:1;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1C1B18,#2A2820);position:relative;overflow:hidden}
+.welcomeGlow{position:absolute;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(200,168,78,0.15),transparent 70%);animation:welcomePulse 2s ease-in-out infinite}
+@keyframes welcomePulse{0%,100%{transform:scale(1);opacity:0.6}50%{transform:scale(1.15);opacity:1}}
+.welcomeContent{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:16px;animation:welcomeFade 0.8s ease}
+@keyframes welcomeFade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.welcomeLogo{width:56px;height:56px;background:var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:var(--ff);font-weight:800;font-size:22px;color:#fff;box-shadow:0 4px 24px rgba(200,168,78,0.4)}
+.welcomeGreeting{font-size:28px;font-weight:800;color:#fff;letter-spacing:-0.02em}
+.welcomeData{font-size:14px;font-weight:500;color:rgba(255,255,255,0.5)}
+
+/* ─── HIGHLIGHT CARD ─── */
+.highlight{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.2);border-radius:24px;padding:24px 28px;display:flex;gap:16px;align-items:flex-start;animation:fadeIn 0.5s ease 0.1s backwards}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.highlightIcon{width:44px;height:44px;border-radius:14px;background:rgba(62,175,92,0.12);color:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.highlightBody{display:flex;flex-direction:column;gap:4px}
+.highlightLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
+.highlightValue{font-size:24px;font-weight:800;color:var(--tp);letter-spacing:-0.02em}
+.highlightContext{font-size:13px;font-weight:500;color:var(--ts);line-height:1.5}
+
+/* ─── TWO COLUMN ─── */
+.twoCol{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* ─── TASK CARD ─── */
+.taskCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm);animation:fadeIn 0.5s ease 0.2s backwards}
+.taskHeader{display:flex;align-items:center;gap:8px;color:var(--gold)}
+.taskLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
+.taskTitle{font-size:16px;font-weight:700;color:var(--tp);letter-spacing:-0.01em}
+.taskDesc{font-size:13px;font-weight:500;color:var(--ts);line-height:1.5}
+.taskCta{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:10px 20px;cursor:pointer;width:fit-content;transition:all 180ms;margin-top:4px}
+.taskCta:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* ─── ACTION COUNTER ─── */
+.actionCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:22px 24px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm);animation:fadeIn 0.5s ease 0.3s backwards;align-items:center;justify-content:center;text-align:center}
+.actionLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--tm)}
+.actionValue{font-family:'Nunito',sans-serif;font-size:64px;font-weight:900;color:var(--tp);line-height:1;letter-spacing:-0.03em}
+.actionCompare{display:flex;align-items:center;gap:6px}
+.actionUp{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--green);background:var(--greenl);padding:4px 12px;border-radius:8px}
+.actionAvg{font-size:11px;font-weight:500;color:var(--tm);margin-top:2px}
+
+/* ─── AI ADVISOR INPUT ─── */
+.advisorBar{animation:fadeIn 0.5s ease 0.4s backwards}
+.advisorInput{background:var(--surf2);border:2px solid var(--borderm);border-radius:16px;padding:16px 20px;display:flex;align-items:center;gap:12px;cursor:text;transition:all 200ms var(--es)}
+.advisorInput:hover{border-color:var(--gold);background:var(--surf);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.advisorText{flex:1;font-size:15px;font-weight:600;color:var(--tm);overflow:hidden;white-space:nowrap}
+.advisorCursor{display:inline-block;width:2px;height:18px;background:var(--gold);border-radius:1px;animation:blink 1s step-end infinite;margin-left:1px;vertical-align:middle}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.advisorMic{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--goldl),var(--gold));display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;cursor:pointer;transition:all 200ms;box-shadow:0 0 0 4px rgba(200,168,78,0.1)}
+.advisorMic:hover{transform:scale(1.08);box-shadow:0 0 0 6px rgba(200,168,78,0.18)}
+.advisorSend{width:32px;height:32px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0;cursor:pointer;transition:all 180ms}
+.advisorSend:hover{background:var(--goldl);transform:scale(1.05)}
+
+/* ─── NOTIFICATIONS ─── */
+.sectionTitle{font-size:13px;font-weight:700;color:var(--tp);margin-bottom:2px}
+.notifSection{animation:fadeIn 0.5s ease 0.5s backwards}
+.notifList{display:flex;flex-direction:column;gap:8px}
+.notifCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:14px 18px;display:flex;gap:12px;align-items:flex-start;box-shadow:var(--shadow-sm);transition:all 180ms}
+.notifCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.notifDot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:5px}
+.notifBody{flex:1;display:flex;flex-direction:column;gap:3px}
+.notifText{font-size:13px;font-weight:500;color:var(--tp);line-height:1.45}
+.notifTime{font-size:11px;font-weight:500;color:var(--tm);font-family:var(--fm)}
+.notifRead{opacity:0.5}
+.notifRead .notifText{color:var(--ts)}

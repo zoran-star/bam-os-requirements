@@ -1,0 +1,102 @@
+/* ─── TAB BAR ─── */
+.tabBar{display:flex;gap:4px;background:var(--surf2);border-radius:14px;padding:4px}
+.tabBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tm);background:none;border:none;border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
+.tabBtn:hover{color:var(--tp)}
+.tabActive{background:var(--surf);color:var(--tp);box-shadow:var(--shadow-sm)}
+
+/* ─── SECTION HEADS ─── */
+.sectionHead{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.sectionTitle{font-size:14px;font-weight:700;color:var(--tp)}
+.sectionRef{font-size:10px;font-weight:600;color:var(--tm);font-family:var(--fm);background:var(--surf2);padding:2px 8px;border-radius:6px}
+
+/* ─── SAGE TIP ─── */
+.sageTip{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.18);border-radius:16px;padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:500;color:var(--ts);line-height:1.5}
+.sageTipLabel{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);background:rgba(200,168,78,0.12);padding:3px 10px;border-radius:6px;flex-shrink:0}
+
+/* ─── FORM CARD ─── */
+.formCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow-sm)}
+.formGroup{display:flex;flex-direction:column;gap:6px}
+.formLabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--tm)}
+.formInput{font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;outline:none;transition:all 200ms}
+.formInput::placeholder{color:var(--tm)}
+.formInput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.formTextarea{font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;outline:none;resize:vertical;transition:all 200ms;line-height:1.5}
+.formTextarea::placeholder{color:var(--tm)}
+.formTextarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.formSelect{font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A5A19A' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;transition:all 200ms}
+.formSelect:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+
+/* ─── TONE GRID ─── */
+.toneGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.toneBtn{font-family:var(--ff);font-size:13px;font-weight:600;color:var(--ts);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;cursor:pointer;transition:all 180ms;text-align:center}
+.toneBtn:hover{border-color:var(--gold);color:var(--tp)}
+.toneActive{border-color:var(--gold);background:rgba(200,168,78,0.08);color:var(--tp);box-shadow:0 0 0 2px rgba(200,168,78,0.15)}
+
+/* ─── FAQ LIST ─── */
+.faqList{display:flex;flex-direction:column;gap:10px}
+.faqCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:16px 20px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm)}
+.faqRow{display:flex;align-items:center;gap:10px}
+.faqLabel{font-size:11px;font-weight:800;color:var(--gold);flex-shrink:0;width:20px}
+.faqInput{flex:1;font-family:var(--ff);font-size:13px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:8px 14px;outline:none;transition:all 200ms}
+.faqInput::placeholder{color:var(--tm)}
+.faqInput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+
+.addBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:6px 14px;cursor:pointer;transition:all 180ms}
+.addBtn:hover{background:rgba(200,168,78,0.18);border-color:var(--gold)}
+
+.saveBtn{font-family:var(--ff);font-size:14px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:14px;padding:14px 28px;cursor:pointer;transition:all 180ms;width:fit-content;margin-top:4px}
+.saveBtn:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* ─── OFFER GRID ─── */
+.offerGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.offerCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.offerCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.offerHeader{display:flex;align-items:center;justify-content:space-between}
+.offerName{font-size:15px;font-weight:800;color:var(--tp)}
+.offerStatus{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
+.offerDetails{display:flex;flex-direction:column;gap:8px}
+.offerRow{display:flex;justify-content:space-between;font-size:13px}
+.offerRow span:last-child{font-weight:600;color:var(--tp)}
+.offerLabel{font-weight:500;color:var(--tm)}
+.offerPrice{font-weight:800;color:var(--gold) !important;font-size:15px}
+.offerEdit{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.08);border:1px solid rgba(200,168,78,0.15);border-radius:10px;padding:8px 16px;cursor:pointer;transition:all 180ms;margin-top:auto}
+.offerEdit:hover{background:rgba(200,168,78,0.16);border-color:var(--gold)}
+
+.addOfferBtn{font-family:var(--ff);font-size:14px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:14px;padding:14px 28px;cursor:pointer;transition:all 180ms;width:fit-content}
+.addOfferBtn:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+
+/* ─── OFFER WIZARD MODAL ─── */
+.wizardOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:flex;align-items:center;justify-content:center;animation:overlayIn 200ms ease}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.wizardModal{width:640px;max-width:90vw;max-height:85vh;background:var(--surf);border-radius:28px;padding:32px;display:flex;flex-direction:column;gap:24px;box-shadow:var(--shadow-lg);animation:wizardIn 250ms var(--es);overflow-y:auto;position:relative}
+@keyframes wizardIn{from{transform:scale(0.95);opacity:0}to{transform:scale(1);opacity:1}}
+.wizardClose{position:absolute;top:20px;right:20px;background:none;border:none;font-size:18px;color:var(--tm);cursor:pointer;padding:4px 8px;border-radius:6px;transition:all 140ms}
+.wizardClose:hover{color:var(--tp);background:var(--surf2)}
+.wizardTitle{font-size:22px;font-weight:800;color:var(--tp)}
+
+/* ─── STEPPER ─── */
+.wizardStepper{display:flex;gap:4px}
+.wizardStep{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;background:var(--surf2);transition:all 180ms}
+.wizardStepActive{background:rgba(200,168,78,0.12)}
+.wizardStepDone{opacity:0.6}
+.wizardStepNum{width:22px;height:22px;border-radius:50%;background:var(--borderm);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--tp)}
+.wizardStepActive .wizardStepNum{background:var(--gold);color:#fff}
+.wizardStepDone .wizardStepNum{background:var(--green);color:#fff}
+.wizardStepLabel{font-size:11px;font-weight:600;color:var(--tm)}
+.wizardStepActive .wizardStepLabel{color:var(--tp)}
+
+/* ─── WIZARD BODY ─── */
+.wizardBody{flex:1}
+.wizardContent{display:flex;flex-direction:column;gap:14px}
+.wizardReview{display:flex;flex-direction:column;gap:14px}
+.wizardReviewLabel{font-size:14px;font-weight:600;color:var(--ts)}
+
+/* ─── WIZARD FOOTER ─── */
+.wizardFooter{display:flex;align-items:center;gap:10px;border-top:1px solid var(--border);padding-top:18px}
+.wizardSpacer{flex:1}
+.wizardBack{font-family:var(--ff);font-size:13px;font-weight:700;color:var(--ts);background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:10px 20px;cursor:pointer;transition:all 180ms}
+.wizardBack:hover{background:var(--surf3);color:var(--tp)}
+.wizardNext{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:10px 24px;cursor:pointer;transition:all 180ms}
+.wizardNext:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.wizardSave{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--green);border:none;border-radius:12px;padding:10px 24px;cursor:pointer;transition:all 180ms}
+.wizardSave:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}

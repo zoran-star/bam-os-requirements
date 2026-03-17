@@ -1,0 +1,73 @@
+/* ─── SAGE TIP ─── */
+.sageTip{background:linear-gradient(135deg,rgba(200,168,78,0.08),rgba(200,168,78,0.04));border:1px solid rgba(200,168,78,0.18);border-radius:16px;padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:500;color:var(--ts);line-height:1.5}
+.sageTipLabel{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold);background:rgba(200,168,78,0.12);padding:3px 10px;border-radius:6px;flex-shrink:0}
+
+/* ─── SECTION HEADS ─── */
+.sectionHead{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.sectionTitle{font-size:14px;font-weight:700;color:var(--tp)}
+.sectionRef{font-size:10px;font-weight:600;color:var(--tm);font-family:var(--fm);background:var(--surf2);padding:2px 8px;border-radius:6px}
+
+/* ─── CHANNEL / LEAD SOURCE GRID ─── */
+.channelGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.channelCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.channelCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.channelTop{display:flex;align-items:center;gap:8px}
+.channelIcon{font-size:18px}
+.channelName{font-size:13px;font-weight:700;color:var(--tp)}
+.channelLeads{font-size:36px;font-weight:900;color:var(--tp);letter-spacing:-0.03em;font-family:'Nunito',sans-serif;line-height:1}
+.channelMeta{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600}
+.channelCpl{color:var(--tm)}
+.channelTrendUp{color:var(--green);background:var(--greenl);padding:2px 8px;border-radius:6px}
+.channelTrendDown{color:var(--red);background:var(--redl);padding:2px 8px;border-radius:6px}
+
+/* ─── BUDGET PACING ─── */
+.budgetCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm)}
+.budgetRow{display:flex;align-items:center;justify-content:space-between}
+.budgetLabel{font-size:13px;font-weight:500;color:var(--ts)}
+.budgetValue{font-size:15px;font-weight:700;color:var(--tp);font-family:var(--fm)}
+.budgetBar{height:8px;background:var(--surf2);border-radius:4px;overflow:hidden}
+.budgetBarFill{height:100%;background:linear-gradient(90deg,var(--gold),var(--goldl));border-radius:4px;transition:width 600ms var(--es)}
+.budgetPacing{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green)}
+.pacingDot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.budgetDays{font-size:12px;font-weight:500;color:var(--tm)}
+
+/* ─── AD ALERT CARDS ─── */
+.alertCard{background:var(--surf);border:1px solid var(--border);border-radius:18px;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:var(--shadow-sm);margin-bottom:8px;transition:all 180ms}
+.alertCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.alertCard:last-child{margin-bottom:0}
+.alertLeft{display:flex;flex-direction:column;gap:4px}
+.alertName{font-size:14px;font-weight:700;color:var(--tp)}
+.alertMeta{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--tm)}
+.alertRight{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.alertBadgeRed{font-size:11px;font-weight:700;color:var(--red);background:var(--redl);padding:4px 12px;border-radius:8px}
+.alertBadgeYellow{font-size:11px;font-weight:700;color:#d4a017;background:rgba(212,160,23,0.12);padding:4px 12px;border-radius:8px}
+.alertCta{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:6px 14px;cursor:pointer;transition:all 180ms;white-space:nowrap}
+.alertCta:hover{background:rgba(200,168,78,0.18);border-color:var(--gold)}
+
+/* ─── BEST PERFORMING ADS GRID ─── */
+.adsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.adCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.adCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.adName{font-size:13px;font-weight:700;color:var(--tp);line-height:1.4}
+.adStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.adStat{display:flex;flex-direction:column;gap:2px}
+.adStatLabel{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--tm)}
+.adStatVal{font-size:15px;font-weight:800;color:var(--tp);font-family:var(--fm)}
+.adFooter{display:flex;align-items:center;justify-content:space-between;margin-top:auto}
+.adDays{font-size:11px;font-weight:500;color:var(--tm)}
+.adBadgeNew{font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,0.1);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
+.adBadgeHealthy{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
+
+/* ─── CONTENT BRIEF ─── */
+.briefCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:22px 24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm)}
+.briefLabel{font-size:13px;font-weight:600;color:var(--ts)}
+.briefInputRow{display:flex;gap:10px}
+.briefInput{flex:1;font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;outline:none;transition:all 200ms}
+.briefInput::placeholder{color:var(--tm)}
+.briefInput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.briefBtn{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;transition:all 180ms;white-space:nowrap}
+.briefBtn:hover:not(:disabled){background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.briefBtn:disabled{opacity:0.4;cursor:not-allowed}
+.briefResult{background:rgba(200,168,78,0.05);border:1px solid rgba(200,168,78,0.15);border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;gap:6px}
+.briefResultLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
+.briefResultText{font-size:13px;font-weight:500;color:var(--tp);line-height:1.6}
