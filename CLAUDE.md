@@ -8,8 +8,17 @@ This repo is a collaborative project between **Zoran** and **Cole**. Both contri
 
 When working on requirements, be aware that the other collaborator may have made recent changes — always pull before editing.
 
-## Before you start
-Always run `git pull` before making any edits to files in this repo. This ensures you have the latest changes from the other collaborator.
+## Session startup checklist
+At the very start of every conversation, before doing any work:
+
+1. **Confirm connections** — verify you have access to GitHub (this repo), Notion MCP, and GoHighLevel MCP (Zoran) or Notion MCP (Cole). Tell the user which connections are live and flag any that are missing or broken.
+2. **Pull latest** — run `git pull` to get the latest changes from the other collaborator.
+3. **Read Working Memory** — fetch the [Working Memory page](https://www.notion.so/31b5aca8ac0f81b59fd9e8b84aecffc9) in Notion. Read it fully. Then tell the user you've read it and briefly summarize the current state: what the CRLF is, what's on the horizon, and any recent decisions that may be relevant to the session.
+
+**Example startup message:**
+> Connected: GitHub, Notion, GHL. Pulled latest. Read Working Memory — current CRLF is [X], on the horizon: [Y]. Ready to go.
+
+If any connection fails or the Working Memory page can't be fetched, flag it immediately so the user knows context may be incomplete.
 
 ## After you finish
 Always commit and push changes after making edits. Use descriptive commit messages that reference the job IDs affected (e.g. "Add MEM-010 referral tracking requirement"). This ensures the other collaborator gets changes immediately.
@@ -24,6 +33,23 @@ This repository holds the interactive business requirements flow diagram for BAM
 - `bam_os_business_requirements_flow.html` — interactive flowchart with all requirements data
 - `ux/BAM_OS_UX_DECISIONS.md` — confirmed UX & interaction design decisions (navigation, Sage AI, design system, micro-interactions, notifications, multi-location, role-based views). This is the source of truth for how BAM OS looks, feels, and behaves.
 - `branding/CONTEXT.md` — brand & naming context
+
+## Desktop prototype app
+The interactive desktop prototype is a Vite/React app located at:
+
+```
+prototypes/sales-desktop/src/
+```
+
+**This is where all UI/prototype edits should be made.** The app structure:
+- `src/pages/` — page-level components (Home, Sales, Members, Marketing, Settings, member-app/)
+- `src/components/` — shared components (Layout, Sidebar, GlobalInbox, PageBanner, StatPill)
+- `src/styles/` — CSS modules per component/page
+- `src/hooks/` — custom React hooks
+
+When editing the prototype, always work in the `src/` directory above. Do NOT edit standalone HTML files in `prototype/` — those are legacy.
+
+**If the prototype app location ever changes**, update this section immediately to reflect the new path so all collaborators always know where to find it.
 
 ## Sources of truth
 There are two sources for BAM OS business requirements that must stay in sync:
@@ -78,6 +104,22 @@ The Scheduling App domain also uses a `category` field per job.
 
 ## Presenting requirements
 When showing requirements in a table, always include the one-liner column alongside ID, title, type, and release. This gives a quick summary without needing to drill into the full details.
+
+## Keeping Working Memory up to date
+The [Working Memory page](https://www.notion.so/31b5aca8ac0f81b59fd9e8b84aecffc9) in Notion has a Detail Pages table linking to all key Notion pages. **If a detail page is added, removed, or renamed, update the Detail Pages table in Working Memory immediately.**
+
+## Open Loops
+The [Open Loops database](https://www.notion.so/1eb460ed0646424d8ca7a4c33ceca9fc) in Notion tracks unresolved decisions, blockers, and action items across the project. It has statuses: CRLF (the single critical blocker), Open, and Closed.
+
+**Proactively add to Open Loops when you notice:**
+- An unresolved decision that needs human input
+- A missing requirement or gap in coverage (like we did with admin-side scheduling)
+- A blocker or dependency that can't be resolved in the current session
+- A sync issue between HTML and Notion
+- Anything the user says they need to do manually later
+- Technical debt or known limitations flagged during work
+
+When adding a loop, set Status to "Open" and choose an appropriate Priority (High/Medium/Low). Only Zoran designates CRLF — never assign it yourself.
 
 ## Conventions
 - Job IDs follow the pattern: `{PREFIX}-{NUMBER}` for parent jobs, `{PREFIX}-{NUMBER}{letter}` for sub-jobs
