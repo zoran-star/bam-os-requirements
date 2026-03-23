@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — Business Plan 2026</title>
+<meta name="description" content="FullControl Business Plan — The AI-Powered Command Center for Sports & Fitness Businesses">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.75;overflow-x:hidden;transition:background .4s ease,color .4s ease}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none}
+
+/* ═══════════════════════════════════════════
+   DARK THEME
+   ═══════════════════════════════════════════ */
+[data-theme="dark"]{
+  --bg:#08080a;
+  --bg-alt:#09090b;
+  --white:#fafafa;
+  --g50:#f4f4f5;--g100:#e4e4e7;--g200:#d4d4d8;--g300:#a1a1aa;
+  --g400:#71717a;--g500:#52525b;--g600:#3f3f46;--g700:#27272a;
+  --g800:#18181b;--g900:#09090b;
+  --text:#e4e4e7;
+  --accent:#c8a84e;--accent-l:#d4b65c;
+  --glow:rgba(200,168,78,0.12);
+  --card-bg:rgba(255,255,255,0.02);
+  --card-border:rgba(255,255,255,0.05);
+  --card-hover-border:rgba(200,168,78,0.12);
+  --card-hover-bg:rgba(200,168,78,0.02);
+  --divider:rgba(255,255,255,0.06);
+  --divider-strong:rgba(255,255,255,0.08);
+  --nav-scrolled:rgba(8,8,10,0.88);
+  --nav-border:rgba(255,255,255,0.04);
+  --max:1080px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+  --spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ═══════════════════════════════════════════
+   LIGHT THEME
+   ═══════════════════════════════════════════ */
+[data-theme="light"]{
+  --bg:#fafaf9;
+  --bg-alt:#f5f5f4;
+  --white:#18181b;
+  --g50:#27272a;--g100:#3f3f46;--g200:#52525b;--g300:#71717a;
+  --g400:#a1a1aa;--g500:#d4d4d8;--g600:#e4e4e7;--g700:#f4f4f5;
+  --g800:#fafaf9;--g900:#fafaf9;
+  --text:#3f3f46;
+  --accent:#a8882e;--accent-l:#b8982e;
+  --glow:rgba(168,136,46,0.08);
+  --card-bg:rgba(0,0,0,0.02);
+  --card-border:rgba(0,0,0,0.07);
+  --card-hover-border:rgba(168,136,46,0.2);
+  --card-hover-bg:rgba(168,136,46,0.04);
+  --divider:rgba(0,0,0,0.06);
+  --divider-strong:rgba(0,0,0,0.1);
+  --nav-scrolled:rgba(250,250,249,0.92);
+  --nav-border:rgba(0,0,0,0.06);
+  --max:1080px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+  --spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+[data-theme="light"] .nav-mark{color:#fff!important}
+
+/* ═══════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════ */
+.page-wrap{display:flex;min-height:100vh}
+
+/* TOC Sidebar */
+.toc{position:fixed;top:0;left:0;width:220px;height:100vh;padding:80px 0 32px 0;overflow-y:auto;z-index:50;border-right:1px solid var(--card-border);background:var(--bg);transition:background .4s ease}
+.toc-inner{padding:24px 20px}
+.toc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:16px}
+.toc-list{list-style:none;display:flex;flex-direction:column;gap:2px}
+.toc-list a{display:block;font-size:12.5px;font-weight:500;color:var(--g300);padding:7px 12px;border-radius:8px;transition:all .2s var(--ease);line-height:1.35}
+.toc-list a:hover{color:var(--white);background:var(--card-bg)}
+.toc-list a.active{color:var(--accent);background:rgba(200,168,78,0.06);font-weight:600}
+
+/* Main content area */
+.main{margin-left:220px;flex:1;min-width:0}
+.doc{max-width:760px;margin:0 auto;padding:0 32px}
+
+/* Mobile TOC */
+.toc-mobile-bar{display:none;position:fixed;top:56px;left:0;right:0;z-index:49;background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--nav-border);padding:0 20px}
+.toc-mobile-toggle{display:flex;align-items:center;gap:8px;width:100%;padding:12px 0;font-size:12px;font-weight:600;color:var(--g300);background:none;border:none;cursor:pointer;transition:color .2s}
+.toc-mobile-toggle:hover{color:var(--white)}
+.toc-mobile-toggle svg{transition:transform .3s var(--ease)}
+.toc-mobile-toggle.open svg{transform:rotate(180deg)}
+.toc-mobile-dropdown{display:none;padding:0 0 12px;max-height:60vh;overflow-y:auto}
+.toc-mobile-dropdown.open{display:block}
+.toc-mobile-dropdown a{display:block;font-size:13px;font-weight:500;color:var(--g300);padding:8px 0;transition:color .2s}
+.toc-mobile-dropdown a:hover{color:var(--white)}
+.toc-mobile-dropdown a.active{color:var(--accent);font-weight:600}
+
+@media(max-width:768px){
+  .toc{display:none}
+  .toc-mobile-bar{display:block}
+  .main{margin-left:0}
+  .doc{padding:0 20px}
+}
+
+/* ═══════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:14px 0;transition:all .3s var(--ease);background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--nav-border)}
+.nav-in{max-width:var(--max);margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:16px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:9px;color:var(--white)}
+.nav-mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#111;letter-spacing:0}
+.nav-sep{width:1px;height:16px;background:var(--card-border);margin:0 4px}
+.nav-page-label{font-size:12px;font-weight:500;color:var(--g400)}
+.nav-right{display:flex;align-items:center;gap:8px}
+
+/* ═══════════════════════════════════════════
+   THEME TOGGLE
+   ═══════════════════════════════════════════ */
+.theme-toggle{width:34px;height:34px;border-radius:9px;background:var(--card-bg);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s var(--ease);color:var(--g300)}
+.theme-toggle:hover{border-color:var(--card-hover-border);color:var(--accent)}
+[data-theme="dark"] .theme-toggle .icon-sun{display:none}
+[data-theme="dark"] .theme-toggle .icon-moon{display:block}
+[data-theme="light"] .theme-toggle .icon-sun{display:block}
+[data-theme="light"] .theme-toggle .icon-moon{display:none}
+
+/* ═══════════════════════════════════════════
+   REVEAL
+   ═══════════════════════════════════════════ */
+.rv{opacity:0;transform:translateY(24px);transition:opacity 0.7s var(--ease),transform 0.7s var(--ease)}
+.rv.vis{opacity:1;transform:translateY(0)}
+
+/* ═══════════════════════════════════════════
+   COVER / TITLE AREA
+   ═══════════════════════════════════════════ */
+.cover{padding:120px 0 80px;position:relative;text-align:center}
+.cover::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:900px;height:900px;background:radial-gradient(ellipse,var(--glow) 0%,transparent 65%);pointer-events:none;opacity:0.6}
+.cover-mark{width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111;letter-spacing:0;margin-bottom:24px}
+.cover h1{font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-0.045em;line-height:1.05;color:var(--white);margin-bottom:12px}
+.cover .subtitle{font-size:clamp(15px,2vw,18px);font-weight:500;color:var(--g300);line-height:1.6;max-width:520px;margin:0 auto}
+.cover .year-badge{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:20px}
+
+/* ═══════════════════════════════════════════
+   SECTION TYPOGRAPHY
+   ═══════════════════════════════════════════ */
+.sec-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:14px}
+.sec-title{font-size:clamp(24px,3.5vw,36px);font-weight:900;letter-spacing:-0.04em;line-height:1.1;color:var(--white);margin-bottom:16px}
+
+/* ═══════════════════════════════════════════
+   DOCUMENT SECTIONS
+   ═══════════════════════════════════════════ */
+.doc-section{padding:72px 0;position:relative}
+.doc-section+.doc-section{border-top:1px solid var(--divider)}
+
+/* Body text */
+.doc-body{font-size:16px;font-weight:400;color:var(--g200);line-height:1.78}
+.doc-body p{margin-bottom:20px}
+.doc-body p:last-child{margin-bottom:0}
+.doc-body strong{color:var(--white);font-weight:700}
+.doc-body ul,.doc-body ol{margin:16px 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.doc-body li{font-size:15px;font-weight:500;color:var(--g200);display:flex;align-items:flex-start;gap:10px;line-height:1.55}
+.doc-body li::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:8px}
+
+/* ═══════════════════════════════════════════
+   BLOCKQUOTE
+   ═══════════════════════════════════════════ */
+.bq{position:relative;max-width:100%;margin:32px 0;padding:28px 0 28px 28px;border-left:4px solid var(--accent)}
+.bq::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:8px;background:linear-gradient(180deg,rgba(200,168,78,0.15),rgba(200,168,78,0));pointer-events:none}
+.bq p{font-size:18px;font-weight:500;color:var(--g100);line-height:1.6;letter-spacing:-0.01em;font-style:italic;margin:0}
+@media(max-width:768px){.bq p{font-size:16px}.bq{padding:20px 0 20px 20px}}
+
+/* ═══════════════════════════════════════════
+   CARDS
+   ═══════════════════════════════════════════ */
+.card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:24px;transition:all .3s var(--ease)}
+.card:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.card h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
+.card p{font-size:13px;color:var(--g400);line-height:1.55}
+.card-icon{width:36px;height:36px;border-radius:10px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+
+/* Card grid layouts */
+.card-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:28px}
+.card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:28px}
+@media(max-width:600px){.card-grid-2,.card-grid-3{grid-template-columns:1fr}}
+
+/* ═══════════════════════════════════════════
+   NUMBERED CARDS (for Why Now, Roadmap, etc.)
+   ═══════════════════════════════════════════ */
+.num-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:24px;transition:all .3s var(--ease);position:relative}
+.num-card:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.num-card-num{font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;color:rgba(200,168,78,0.15);line-height:1;margin-bottom:8px;letter-spacing:-0.04em}
+.num-card h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:6px}
+.num-card p{font-size:13px;color:var(--g400);line-height:1.55}
+
+/* ═══════════════════════════════════════════
+   TAGS / PILLS
+   ═══════════════════════════════════════════ */
+.tag-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.tag{font-size:13px;font-weight:600;color:var(--g200);background:var(--card-bg);border:1px solid var(--card-border);border-radius:10px;padding:9px 16px;transition:all .25s var(--ease)}
+.tag:hover{border-color:var(--card-hover-border);color:var(--accent)}
+
+/* ═══════════════════════════════════════════
+   TIMELINE (vertical)
+   ═══════════════════════════════════════════ */
+.v-timeline{position:relative;margin-top:28px;padding-left:36px}
+.v-timeline::before{content:'';position:absolute;left:13px;top:0;bottom:0;width:2px;background:var(--card-border)}
+.v-tl-step{position:relative;padding:0 0 40px 28px}
+.v-tl-step:last-child{padding-bottom:0}
+.v-tl-dot{position:absolute;left:-30px;top:5px;width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);background:var(--bg);z-index:2}
+.v-tl-step h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:2px}
+.v-tl-step .tl-time{font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;display:block}
+.v-tl-step p{font-size:13px;color:var(--g400);line-height:1.55}
+
+/* ═══════════════════════════════════════════
+   MOAT ITEMS
+   ═══════════════════════════════════════════ */
+.moat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:28px}
+@media(max-width:600px){.moat-grid{grid-template-columns:1fr}}
+.moat-item{display:flex;align-items:flex-start;gap:14px;padding:20px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;transition:all .3s var(--ease)}
+.moat-item:hover{border-color:var(--card-hover-border)}
+.moat-icon{width:34px;height:34px;border-radius:9px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.moat-item h3{font-size:14px;font-weight:700;color:var(--white);margin-bottom:3px}
+.moat-item p{font-size:12.5px;color:var(--g400);line-height:1.5}
+
+/* ═══════════════════════════════════════════
+   TEAM
+   ═══════════════════════════════════════════ */
+.team-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:28px}
+@media(max-width:600px){.team-grid{grid-template-columns:1fr}}
+.team-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:24px;transition:all .3s var(--ease)}
+.team-card:hover{border-color:var(--card-hover-border);transform:translateY(-2px)}
+.team-card-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.team-avatar{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#111;flex-shrink:0}
+.team-card-header h3{font-size:15px;font-weight:700;color:var(--white);line-height:1.2}
+.team-card-header span{font-size:12px;font-weight:500;color:var(--accent);display:block;margin-top:2px}
+.team-card p{font-size:13px;color:var(--g400);line-height:1.55}
+
+/* ═══════════════════════════════════════════
+   PRODUCT AREAS
+   ═══════════════════════════════════════════ */
+.prod-area{background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;padding:20px 24px;margin-bottom:10px;transition:all .3s var(--ease)}
+.prod-area:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.prod-area h3{font-size:14px;font-weight:700;color:var(--white);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.prod-area h3 svg{color:var(--accent);flex-shrink:0}
+.prod-area ul{list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.prod-area li{font-size:12px;font-weight:500;color:var(--g300);background:var(--bg);padding:5px 12px;border-radius:8px;border:1px solid var(--card-border)}
+.prod-area li::before{display:none}
+
+/* ═══════════════════════════════════════════
+   PROGRESSION ARROW
+   ═══════════════════════════════════════════ */
+.progression{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:24px 0}
+.progression-step{font-size:14px;font-weight:700;color:var(--g200);letter-spacing:-0.01em}
+.progression-step:last-child{color:var(--accent)}
+.progression-arrow{color:var(--g500);flex-shrink:0}
+
+/* ═══════════════════════════════════════════
+   COMMAND EXAMPLES
+   ═══════════════════════════════════════════ */
+.cmd-list{display:flex;flex-direction:column;gap:10px;margin:24px 0}
+.cmd{background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:14px 18px;font-family:'DM Mono',monospace;font-size:13px;color:var(--g200);line-height:1.5;transition:all .3s var(--ease)}
+.cmd:hover{border-color:var(--card-hover-border)}
+.cmd .cmd-prompt{color:var(--accent);font-weight:500;margin-right:6px}
+.cmd .cmd-desc{display:block;font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:12px;color:var(--g400);margin-top:4px;font-weight:400}
+
+/* ═══════════════════════════════════════════
+   COMPETITIVE CALLOUT
+   ═══════════════════════════════════════════ */
+.comp-callout{background:rgba(200,168,78,0.03);border:1px solid rgba(200,168,78,0.1);border-radius:16px;padding:28px;margin-top:24px;text-align:center}
+.comp-callout p{font-size:16px;font-weight:600;color:var(--g200);line-height:1.6}
+.comp-callout strong{color:var(--accent);font-weight:800}
+
+/* ═══════════════════════════════════════════
+   THESIS
+   ═══════════════════════════════════════════ */
+.thesis-block{text-align:center;padding:20px 0}
+.thesis-block p{font-size:clamp(18px,2.5vw,24px);font-weight:600;color:var(--g200);line-height:1.5;letter-spacing:-0.01em;max-width:580px;margin:0 auto}
+.thesis-block strong{color:var(--white);font-weight:800}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════ */
+footer{border-top:1px solid var(--card-border);padding:32px 0;margin-top:40px}
+.footer-text{text-align:center;font-size:12px;font-weight:500;color:var(--g500)}
+
+/* ═══════════════════════════════════════════
+   TRANSITION STATEMENT
+   ═══════════════════════════════════════════ */
+.transition-stmt{text-align:center;padding:24px 0 0;margin-bottom:-20px}
+.transition-stmt p{font-size:clamp(18px,2.5vw,26px);font-weight:700;letter-spacing:-0.025em;color:var(--g200);line-height:1.35}
+.transition-stmt em{font-style:normal;color:var(--accent);font-weight:800}
+
+/* ═══════════════════════════════════════════
+   MARKET STAT
+   ═══════════════════════════════════════════ */
+.market-stat-inline{font-size:15px;font-weight:500;color:var(--g300);background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:16px 20px;margin:20px 0;line-height:1.6}
+.market-stat-inline strong{color:var(--accent);font-weight:800}
+
+@media(max-width:768px){
+  .cover{padding:100px 0 60px}
+  .doc-section{padding:52px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-in">
+    <div style="display:flex;align-items:center;gap:9px">
+      <a href="index.html" class="nav-logo"><span class="nav-mark">FC</span>FullControl</a>
+      <div class="nav-sep"></div>
+      <span class="nav-page-label">Business Plan</span>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-moon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- TOC SIDEBAR (desktop) -->
+<aside class="toc" id="toc">
+  <div class="toc-inner">
+    <div class="toc-label">Contents</div>
+    <ul class="toc-list" id="tocList">
+      <li><a href="#executive-summary">Executive Summary</a></li>
+      <li><a href="#vision">Vision</a></li>
+      <li><a href="#mission">Mission</a></li>
+      <li><a href="#problem">Problem</a></li>
+      <li><a href="#solution">Solution</a></li>
+      <li><a href="#core-concept">Core Product Concept</a></li>
+      <li><a href="#product-overview">Product Overview</a></li>
+      <li><a href="#category">Category</a></li>
+      <li><a href="#why-now">Why Now</a></li>
+      <li><a href="#market">Market</a></li>
+      <li><a href="#go-to-market">Go-To-Market</a></li>
+      <li><a href="#competitive">Competitive Landscape</a></li>
+      <li><a href="#roadmap">Product Roadmap</a></li>
+      <li><a href="#moat">Moat</a></li>
+      <li><a href="#team">Team</a></li>
+      <li><a href="#thesis">Long-Term Thesis</a></li>
+    </ul>
+  </div>
+</aside>
+
+<!-- TOC MOBILE -->
+<div class="toc-mobile-bar" id="tocMobileBar">
+  <button class="toc-mobile-toggle" id="tocMobileToggle">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    <span id="tocMobileLabel">Executive Summary</span>
+  </button>
+  <div class="toc-mobile-dropdown" id="tocMobileDropdown">
+    <a href="#executive-summary">Executive Summary</a>
+    <a href="#vision">Vision</a>
+    <a href="#mission">Mission</a>
+    <a href="#problem">Problem</a>
+    <a href="#solution">Solution</a>
+    <a href="#core-concept">Core Product Concept</a>
+    <a href="#product-overview">Product Overview</a>
+    <a href="#category">Category</a>
+    <a href="#why-now">Why Now</a>
+    <a href="#market">Market</a>
+    <a href="#go-to-market">Go-To-Market</a>
+    <a href="#competitive">Competitive Landscape</a>
+    <a href="#roadmap">Product Roadmap</a>
+    <a href="#moat">Moat</a>
+    <a href="#team">Team</a>
+    <a href="#thesis">Long-Term Thesis</a>
+  </div>
+</div>
+
+<!-- PAGE WRAP -->
+<div class="page-wrap">
+<div class="main">
+
+<!-- ═══════════════════════════════════════════
+     COVER
+     ═══════════════════════════════════════════ -->
+<div class="doc">
+<section class="cover rv">
+  <div class="cover-mark">FC</div>
+  <div class="year-badge">Business Plan &mdash; 2026</div>
+  <h1>FullControl</h1>
+  <p class="subtitle">The AI-Powered Command Center for Sports &amp; Fitness Businesses</p>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     1. EXECUTIVE SUMMARY
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="executive-summary">
+  <div class="sec-label rv">01</div>
+  <h2 class="sec-title rv">Executive Summary</h2>
+  <div class="doc-body rv">
+    <p>FullControl is an AI-powered command center for sports and fitness businesses. It replaces the fragmented systems operators rely on today &mdash; CRM, scheduling, payments, marketing, analytics, and operations &mdash; with one unified platform that helps them run their business with clarity, confidence, and control.</p>
+    <p>But FullControl is not just about consolidating tools. It is built on a core belief:</p>
+  </div>
+  <div class="bq rv">
+    <p>The people who are best at relationships, communication, culture, and impact will be the most successful in the AI era &mdash; once they have the right systems behind them.</p>
+  </div>
+  <div class="doc-body rv">
+    <p>Today, many of the most talented coaches and operators are limited not by their craft, but by the complexity of running a business. They entered this space to develop people, build communities, and create impact &mdash; not to manage software stacks or learn technical systems.</p>
+    <p>As a result, they are forced to operate within fragmented tools that are difficult to use, disconnected from one another, and require constant manual effort.</p>
+    <p>FullControl solves this by turning a collection of tools into a single intelligent system. It allows operators to:</p>
+    <ul>
+      <li>Understand what is happening across their business</li>
+      <li>Identify what matters most</li>
+      <li>Receive clear guidance on what to do next</li>
+      <li>Take action quickly</li>
+    </ul>
+    <p>And over time: interact with their business through simple conversation.</p>
+  </div>
+  <div class="bq rv">
+    <p>You should be able to talk to your business &mdash; and it runs.</p>
+  </div>
+  <div class="doc-body rv">
+    <p>FullControl begins with sports training facilities and fitness studios &mdash; a category with high operational complexity, strong recurring revenue, and clear demand for better systems &mdash; and expands deeply within this ecosystem.</p>
+    <p><strong>The opportunity is not to build another software tool. It is to build the operating system for how this entire industry runs.</strong></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     2. VISION
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="vision">
+  <div class="sec-label rv">02</div>
+  <h2 class="sec-title rv">Vision</h2>
+  <div class="doc-body rv">
+    <p>A world where sports and fitness businesses run on intelligent systems that take action for them, instead of fragmented tools and low-performing employees. Operators spend less time managing software and more time doing what they got into this for: building great programs, developing athletes or healthier, happier people, and living their dream lives through their passion.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     3. MISSION
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="mission">
+  <div class="sec-label rv">03</div>
+  <h2 class="sec-title rv">Mission</h2>
+  <div class="bq rv">
+    <p>Build the AI command center that allows operators to run their business through one unified system and simple conversation with the ultimate employee.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     4. PROBLEM
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="problem">
+  <div class="sec-label rv">04</div>
+  <h2 class="sec-title rv">Problem</h2>
+  <div class="doc-body rv">
+    <p>Running a sports or fitness business today is unnecessarily complex. Operators manage:</p>
+    <ul>
+      <li>CRM systems</li>
+      <li>Scheduling platforms</li>
+      <li>Payment systems</li>
+      <li>Marketing tools</li>
+      <li>Analytics dashboards</li>
+      <li>Member workflows</li>
+    </ul>
+  </div>
+  <div class="doc-body rv" style="margin-top:24px">
+    <p>These tools are:</p>
+    <ul>
+      <li>Disconnected</li>
+      <li>Difficult to learn</li>
+      <li>Time-consuming to operate</li>
+      <li>Not intelligent</li>
+    </ul>
+  </div>
+  <div class="doc-body rv" style="margin-top:24px">
+    <p>This leads to:</p>
+    <ul>
+      <li>Operational chaos</li>
+      <li>Decision fatigue</li>
+      <li>Poor visibility</li>
+      <li>Lost revenue opportunities</li>
+      <li>Reduced quality of life</li>
+    </ul>
+    <p style="margin-top:20px"><strong>Most operators are spending too much time managing systems and not enough time running their business.</strong></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     5. SOLUTION
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="solution">
+  <div class="sec-label rv">05</div>
+  <h2 class="sec-title rv">Solution</h2>
+  <div class="doc-body rv">
+    <p>FullControl is a unified, AI-powered operating system for sports and fitness businesses. It brings everything into one place and adds an intelligence layer that:</p>
+    <ul>
+      <li>Reads the state of the business</li>
+      <li>Identifies key signals</li>
+      <li>Surfaces opportunities and problems</li>
+      <li>Recommends actions</li>
+      <li>Enables fast execution</li>
+    </ul>
+  </div>
+  <div class="transition-stmt rv" style="margin-top:32px">
+    <p>From tools &rarr; to <em>intelligence</em> &rarr; to <em>autonomy</em></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     6. CORE PRODUCT CONCEPT
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="core-concept">
+  <div class="sec-label rv">06</div>
+  <h2 class="sec-title rv">Core Product Concept</h2>
+  <div class="doc-body rv">
+    <p>FullControl is not just software. It is a command center, a decision engine with ever-improving intelligence, a system of record and system of action, and an operator co-pilot.</p>
+    <p>The defining interaction model is:</p>
+  </div>
+  <div class="bq rv">
+    <p>You can talk to your business, and it acts for you.</p>
+  </div>
+  <div class="cmd-list rv">
+    <div class="cmd">
+      <span class="cmd-prompt">&gt;</span> &ldquo;Why are conversions down?&rdquo;
+      <span class="cmd-desc">Concise analysis of what changed and why</span>
+    </div>
+    <div class="cmd">
+      <span class="cmd-prompt">&gt;</span> &ldquo;Follow up with all unconverted trials&rdquo;
+      <span class="cmd-desc">Conversational AI handles outreach and recapture</span>
+    </div>
+    <div class="cmd">
+      <span class="cmd-prompt">&gt;</span> &ldquo;Fix my low-performing ad content&rdquo;
+      <span class="cmd-desc">Analyzes ads, benchmarks against industry, produces new creative</span>
+    </div>
+    <div class="cmd">
+      <span class="cmd-prompt">&gt;</span> &ldquo;Cancel Johnny&rsquo;s membership and send an exit interview&rdquo;
+      <span class="cmd-desc">Executes both actions with no manual work</span>
+    </div>
+    <div class="cmd">
+      <span class="cmd-prompt">&gt;</span> &ldquo;What should I focus on today?&rdquo;
+      <span class="cmd-desc">Scans the entire business for highest-leverage tasks</span>
+    </div>
+  </div>
+  <div class="rv" style="margin-top:28px">
+    <div class="progression">
+      <span class="progression-step">Insight</span>
+      <svg class="progression-arrow" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <span class="progression-step">Recommendation</span>
+      <svg class="progression-arrow" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <span class="progression-step">Execution</span>
+      <svg class="progression-arrow" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <span class="progression-step">Autonomy</span>
+      <svg class="progression-arrow" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      <span class="progression-step">Freedom</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     7. PRODUCT OVERVIEW
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="product-overview">
+  <div class="sec-label rv">07</div>
+  <h2 class="sec-title rv">Product Overview</h2>
+  <div class="doc-body rv">
+    <p>FullControl integrates the core operational layers of a sports or fitness business:</p>
+  </div>
+  <div class="rv" style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+    <div class="prod-area">
+      <h3>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Sales
+      </h3>
+      <ul>
+        <li>Lead tracking</li>
+        <li>Pipeline visibility</li>
+        <li>Follow-up workflows</li>
+        <li>Conversion insights</li>
+      </ul>
+    </div>
+    <div class="prod-area">
+      <h3>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Marketing
+      </h3>
+      <ul>
+        <li>Campaign performance</li>
+        <li>Ad tracking</li>
+        <li>Optimization insights</li>
+        <li>Budget allocation guidance</li>
+      </ul>
+    </div>
+    <div class="prod-area">
+      <h3>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Operations / Management
+      </h3>
+      <ul>
+        <li>Business overview</li>
+        <li>Staff coordination</li>
+        <li>Key metrics</li>
+        <li>Alerts &amp; priorities</li>
+      </ul>
+    </div>
+    <div class="prod-area">
+      <h3>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Scheduling &amp; Workflows
+      </h3>
+      <ul>
+        <li>Training sessions</li>
+        <li>Member flows</li>
+        <li>Operational processes</li>
+      </ul>
+    </div>
+    <div class="prod-area" style="border-color:rgba(200,168,78,0.12);background:rgba(200,168,78,0.02)">
+      <h3>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+        AI Layer <span style="font-size:11px;font-weight:500;color:var(--accent);margin-left:4px">(Core Differentiator)</span>
+      </h3>
+      <ul>
+        <li>Unified intelligence</li>
+        <li>Conversational interface</li>
+        <li>Recommendations + execution</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     8. CATEGORY
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="category">
+  <div class="sec-label rv">08</div>
+  <h2 class="sec-title rv">Category</h2>
+  <div class="comp-callout rv">
+    <p><strong>The AI Operating System for Sports &amp; Fitness Businesses</strong></p>
+    <p style="margin-top:8px;font-size:14px;color:var(--g300);font-weight:400">Existing tools solve individual problems. FullControl unifies the system and adds intelligence on top.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     9. WHY NOW
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="why-now">
+  <div class="sec-label rv">09</div>
+  <h2 class="sec-title rv">Why Now</h2>
+  <div class="card-grid-2 rv">
+    <div class="num-card">
+      <div class="num-card-num">01</div>
+      <h3>AI changes what software can do</h3>
+      <p>Software can now interpret, guide, and act &mdash; not just store data.</p>
+    </div>
+    <div class="num-card">
+      <div class="num-card-num">02</div>
+      <h3>Existing tools are fragmented</h3>
+      <p>Operators still rely on multiple disconnected platforms with no unified intelligence.</p>
+    </div>
+    <div class="num-card">
+      <div class="num-card-num">03</div>
+      <h3>Simplicity is demanded</h3>
+      <p>Business owners want clarity and speed, not more complexity.</p>
+    </div>
+    <div class="num-card">
+      <div class="num-card-num">04</div>
+      <h3>The integration window is open &mdash; and closing</h3>
+      <p>AI can now be layered directly onto existing tools. Every incumbent knows it and is building toward it.</p>
+    </div>
+  </div>
+  <div class="market-stat-inline rv" style="margin-top:24px">
+    The sports and fitness software market is projected to grow from <strong>$311M to over $1.25B by 2032</strong> (Fortune Business Insights). Incumbents are already consolidating &mdash; ABC Fitness acquired Glofox, ClubReady acquired Gym Insight, WellnessLiving raised $66M. The category is in transition, not maturity. The window to establish a defining position is open now.
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     10. MARKET
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="market">
+  <div class="sec-label rv">10</div>
+  <h2 class="sec-title rv">Market</h2>
+  <div class="doc-body rv">
+    <p><strong>Core market:</strong> Sports and fitness businesses</p>
+  </div>
+  <div class="tag-list rv">
+    <span class="tag">Basketball Academies</span>
+    <span class="tag">Training Facilities</span>
+    <span class="tag">Gyms</span>
+    <span class="tag">Performance Centers</span>
+    <span class="tag">Boutique Studios</span>
+    <span class="tag">Coaching Businesses</span>
+  </div>
+  <div class="doc-body rv" style="margin-top:28px">
+    <p><strong>Key characteristics:</strong></p>
+    <ul>
+      <li>Recurring revenue models</li>
+      <li>Session-based scheduling</li>
+      <li>Multiple overlapping workflows</li>
+      <li>Heavy reliance on software</li>
+      <li>Underserved by current tools</li>
+    </ul>
+    <p style="margin-top:20px">Every one of these businesses runs on software. Today that software is fragmented, manual, and unintelligent. FullControl replaces that layer with a unified system.</p>
+    <p><strong>This is not a niche opportunity &mdash; it is a category-defining vertical platform.</strong></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     11. GO-TO-MARKET
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="go-to-market">
+  <div class="sec-label rv">11</div>
+  <h2 class="sec-title rv">Go-To-Market</h2>
+  <div class="v-timeline rv">
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 0 &mdash; Beta Testing</span>
+      <h3>Internal &amp; Consulting Validation</h3>
+      <p>Test with internal By Any Means academies for high-volume feedback, then expand to consulting clients across team sports (soccer, volleyball, baseball), individual sports (martial arts, track and field), and fitness (yoga, pilates, boutique gym). Ensures adaptability before market launch.</p>
+    </div>
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 1 &mdash; Months 0&ndash;6</span>
+      <h3>Early Basketball Adoption</h3>
+      <p>Leverage existing network and a shotgun launch to reach 100&ndash;200 basketball academies in the first 90 days. After 3 months, begin testing traction in other team sports.</p>
+    </div>
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 2 &mdash; Months 6&ndash;18</span>
+      <h3>All Sports Academies</h3>
+      <p>Choose 2&ndash;3 team sports to create more content around, find partners, sponsor events. Goal: 300 non-basketball academies by Month 12.</p>
+    </div>
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 3 &mdash; Months 18+</span>
+      <h3>Fitness Adoption</h3>
+      <p>A more catered approach to fitness studios, leveraging the proven product and expanded operator network.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     12. COMPETITIVE LANDSCAPE
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="competitive">
+  <div class="sec-label rv">12</div>
+  <h2 class="sec-title rv">Competitive Landscape</h2>
+  <div class="doc-body rv">
+    <p>Current options include fragmented point solutions, &ldquo;all-in-one&rdquo; platforms that still require constant manual work, and CRM-heavy systems that don&rsquo;t understand the operational reality of running a sports or fitness business.</p>
+  </div>
+  <div class="comp-callout rv" style="margin-top:24px">
+    <p>Most platforms give tools.<br><strong>FullControl provides intelligence and execution.</strong></p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     13. PRODUCT ROADMAP
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="roadmap">
+  <div class="sec-label rv">13</div>
+  <h2 class="sec-title rv">Product Roadmap</h2>
+  <div class="v-timeline rv">
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 1 &mdash; MVP</span>
+      <h3>Foundation</h3>
+      <p>Sales intelligence, marketing insights, and the command center &mdash; the core system of record with initial AI-powered analysis.</p>
+    </div>
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 2</span>
+      <h3>Depth</h3>
+      <p>Deeper operations, workflow automation, and stronger AI guidance across all business areas.</p>
+    </div>
+    <div class="v-tl-step">
+      <div class="v-tl-dot"></div>
+      <span class="tl-time">Phase 3</span>
+      <h3>Autonomy</h3>
+      <p>Full system replacement, conversational business control, and increasing autonomy. The system runs the business alongside the operator.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     14. MOAT
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="moat">
+  <div class="sec-label rv">14</div>
+  <h2 class="sec-title rv">Moat</h2>
+  <div class="moat-grid rv">
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div>
+        <h3>Cross-domain data flywheel</h3>
+        <p>Every module feeds the AI. Sales data improves marketing, member data sharpens retention predictions. Compounds over time.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div>
+        <h3>Industry-specific workflows</h3>
+        <p>Built for how academies and studios actually operate, not generic business logic.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>
+      </div>
+      <div>
+        <h3>Embedded system of record</h3>
+        <p>Once FC runs operations, switching costs are high. Becomes the source of truth.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div>
+        <h3>AI that executes, not just advises</h3>
+        <p>Operators say &ldquo;follow up with everyone who missed class&rdquo; and it happens. Fundamentally different from chatbots on old tools.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <h3>AI-native architecture</h3>
+        <p>Built AI-first from day one. Incumbents are retrofitting 10&ndash;15 year old codebases, giving FC a multi-year speed advantage.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-icon">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div>
+        <h3>Operator distribution network</h3>
+        <p>Direct relationships with academy owners and coaches. Built-in feedback, iteration, and word-of-mouth channel.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     15. TEAM
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="team">
+  <div class="sec-label rv">15</div>
+  <h2 class="sec-title rv">Team</h2>
+  <div class="team-grid rv">
+    <div class="team-card">
+      <div class="team-card-header">
+        <div class="team-avatar">ZS</div>
+        <div>
+          <h3>Zoran Savic</h3>
+          <span>Co-Founder &middot; Product &amp; Technology</span>
+        </div>
+      </div>
+      <p>University of Waterloo grad with Big 5 corporate experience turned builder. Built the majority of BAM&rsquo;s business systems and designed the full FullControl product vision and technical stack. Built a fully autonomous training business in Toronto in under 2 years.</p>
+    </div>
+    <div class="team-card">
+      <div class="team-card-header">
+        <div class="team-avatar">CA</div>
+        <div>
+          <h3>Coleman Ayers</h3>
+          <span>Co-Founder &middot; Brand, Operations &amp; Strategy</span>
+        </div>
+      </div>
+      <p>CEO of By Any Means Basketball &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running basketball academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     16. LONG-TERM THESIS
+     ═══════════════════════════════════════════ -->
+<section class="doc-section" id="thesis">
+  <div class="sec-label rv">16</div>
+  <h2 class="sec-title rv">Long-Term Thesis</h2>
+  <div class="thesis-block rv">
+    <p>Software will evolve from:<br><strong>tools &rarr; systems &rarr; intelligent operators</strong></p>
+    <p style="margin-top:16px;font-size:16px;color:var(--g300)">FullControl is building that layer for sports and fitness businesses.</p>
+  </div>
+</section>
+
+</div><!-- .doc -->
+
+<!-- FOOTER -->
+<footer>
+  <div class="doc" style="max-width:760px;margin:0 auto;padding:0 32px">
+    <p class="footer-text">FullControl &copy; 2026 &middot; Confidential</p>
+  </div>
+</footer>
+
+</div><!-- .main -->
+</div><!-- .page-wrap -->
+
+<script>
+(function(){
+  /* ═══════════════════════════════════════════
+     THEME TOGGLE — shared localStorage key
+     ═══════════════════════════════════════════ */
+  const html = document.documentElement;
+  const saved = localStorage.getItem('fc-theme');
+  if(saved) html.setAttribute('data-theme', saved);
+
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('fc-theme', next);
+  });
+
+  /* ═══════════════════════════════════════════
+     REVEAL ON SCROLL
+     ═══════════════════════════════════════════ */
+  const rvEls = document.querySelectorAll('.rv');
+  const rvObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        e.target.classList.add('vis');
+        rvObs.unobserve(e.target);
+      }
+    });
+  }, {threshold:0.05, rootMargin:'0px 0px -20px 0px'});
+  rvEls.forEach(function(el){ rvObs.observe(el); });
+
+  // Fallback: reveal elements already in viewport on load
+  requestAnimationFrame(function(){
+    rvEls.forEach(function(el){
+      var rect = el.getBoundingClientRect();
+      if(rect.top < window.innerHeight && rect.bottom > 0){
+        el.classList.add('vis');
+      }
+    });
+  });
+
+  /* ═══════════════════════════════════════════
+     TOC ACTIVE STATE TRACKING
+     ═══════════════════════════════════════════ */
+  var sections = document.querySelectorAll('.doc-section');
+  var tocLinks = document.querySelectorAll('#tocList a');
+  var mobileTocLinks = document.querySelectorAll('#tocMobileDropdown a');
+  var mobileLabel = document.getElementById('tocMobileLabel');
+  var currentActive = null;
+
+  var tocObs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        var id = e.target.getAttribute('id');
+        if(currentActive === id) return;
+        currentActive = id;
+
+        // Desktop TOC
+        tocLinks.forEach(function(link){
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+
+        // Mobile TOC
+        mobileTocLinks.forEach(function(link){
+          var isActive = link.getAttribute('href') === '#' + id;
+          link.classList.toggle('active', isActive);
+          if(isActive && mobileLabel){
+            mobileLabel.textContent = link.textContent;
+          }
+        });
+      }
+    });
+  }, {threshold:0, rootMargin:'-80px 0px -60% 0px'});
+
+  sections.forEach(function(sec){ tocObs.observe(sec); });
+
+  /* ═══════════════════════════════════════════
+     SMOOTH SCROLL FOR TOC LINKS
+     ═══════════════════════════════════════════ */
+  function handleTocClick(e){
+    e.preventDefault();
+    var target = document.querySelector(this.getAttribute('href'));
+    if(target){
+      var offset = 80;
+      var top = target.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({top: top, behavior: 'smooth'});
+    }
+    // Close mobile dropdown
+    var dropdown = document.getElementById('tocMobileDropdown');
+    var toggle = document.getElementById('tocMobileToggle');
+    if(dropdown) dropdown.classList.remove('open');
+    if(toggle) toggle.classList.remove('open');
+  }
+
+  tocLinks.forEach(function(link){ link.addEventListener('click', handleTocClick); });
+  mobileTocLinks.forEach(function(link){ link.addEventListener('click', handleTocClick); });
+
+  /* ═══════════════════════════════════════════
+     MOBILE TOC DROPDOWN
+     ═══════════════════════════════════════════ */
+  var mobileToggle = document.getElementById('tocMobileToggle');
+  var mobileDropdown = document.getElementById('tocMobileDropdown');
+  if(mobileToggle && mobileDropdown){
+    mobileToggle.addEventListener('click', function(){
+      this.classList.toggle('open');
+      mobileDropdown.classList.toggle('open');
+    });
+  }
+})();
+</script>
+</body>
+</html>
