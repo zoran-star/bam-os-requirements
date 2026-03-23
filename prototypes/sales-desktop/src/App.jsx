@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LocationProvider } from './context/LocationContext';
 import Layout from './components/Layout';
 import Sales from './pages/Sales';
@@ -13,7 +13,7 @@ import MemberApp from './pages/member-app/MemberApp';
 export default function App() {
   return (
     <LocationProvider>
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Layout><Home /></Layout>} />
@@ -25,7 +25,7 @@ export default function App() {
         <Route path="/settings" element={<Layout><Settings /></Layout>} />
         <Route path="/member-app" element={<MemberApp />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
     </LocationProvider>
   );
 }
