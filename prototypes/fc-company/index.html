@@ -419,16 +419,21 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 @media(max-width:768px){.dot-nav{display:none}}
 
 /* ═══════════════════════════════════════════
-   GLASS SHATTER ANIMATION
+   GLASS ASSEMBLE ANIMATION
    ═══════════════════════════════════════════ */
-.glass-wrap{position:relative;width:280px;height:200px;margin:0 auto 40px;perspective:600px}
-.glass-pane{position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.08);border-radius:16px;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;transition:all 1s var(--ease)}
-.glass-pane::after{content:'Your Business';font-size:13px;font-weight:600;color:var(--g300);letter-spacing:0.04em}
-.glass-wrap.shattered .glass-pane{opacity:0;transform:scale(0.95)}
-.shard{position:absolute;background:linear-gradient(135deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.06);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--g400);letter-spacing:0.02em;opacity:0;transition:opacity 1.2s var(--ease),transform 1.2s var(--ease);pointer-events:none;backdrop-filter:blur(2px)}
-.glass-wrap.shattered .shard{opacity:1}
-[data-theme="light"] .glass-pane{background:linear-gradient(135deg,rgba(0,0,0,0.03),rgba(0,0,0,0.01));border-color:rgba(0,0,0,0.08)}
-[data-theme="light"] .shard{background:linear-gradient(135deg,rgba(0,0,0,0.04),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.06)}
+.glass-wrap{position:relative;width:420px;height:280px;margin:0 auto 40px;perspective:800px}
+@media(max-width:600px){.glass-wrap{width:300px;height:200px}}
+#problem{overflow:hidden}
+.glass-glow{position:absolute;inset:-40px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.18) 0%,rgba(200,168,78,0.04) 40%,transparent 70%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
+.glass-wrap.assembled .glass-glow{opacity:1}
+.glass-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
+.glass-wrap.assembled .glass-label{opacity:1}
+.shard{position:absolute;background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease);pointer-events:none;z-index:1;clip-path:polygon(var(--clip))}
+.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.12)}
+.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.02);opacity:1}
+[data-theme="light"] .shard{background:linear-gradient(135deg,rgba(0,0,0,0.05),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.08)}
+[data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.12) 0%,rgba(168,136,46,0.03) 40%,transparent 70%)}
+[data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.15)}
 </style>
 </head>
 <body>
@@ -467,16 +472,16 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     <p class="hero-desc rv rv-d2">A single intelligent system that helps you understand your business, decide what matters, and take action.</p>
     <div class="hero-stats rv rv-d3">
       <div class="hero-stat">
-        <div class="hero-stat-num count-up" data-target="121" data-prefix="$" data-suffix="B">$0</div>
-        <div class="hero-stat-label">Global market</div>
+        <div class="hero-stat-num count-up" data-target="27.8" data-prefix="$" data-suffix="B" data-decimals="1">$0</div>
+        <div class="hero-stat-label">Sports training market</div>
       </div>
       <div class="hero-stat">
-        <div class="hero-stat-num count-up" data-target="200" data-suffix="K+">0</div>
-        <div class="hero-stat-label">Facilities worldwide</div>
+        <div class="hero-stat-num count-up" data-target="19.1" data-suffix="%" data-decimals="1">0</div>
+        <div class="hero-stat-label">Software CAGR</div>
       </div>
       <div class="hero-stat">
-        <div class="hero-stat-num count-up" data-target="40" data-suffix="%">0</div>
-        <div class="hero-stat-label">Time lost to admin</div>
+        <div class="hero-stat-num count-up" data-prefix="$" data-target="200" data-suffix="M+">0</div>
+        <div class="hero-stat-label">SAM opportunity</div>
       </div>
     </div>
   </div>
@@ -533,15 +538,21 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-label rv">The problem</div>
     <h2 class="sec-title rv rv-d1">Today's business software<br>is like shattered glass</h2>
-    <!-- GLASS SHATTER ANIMATION -->
-    <div class="glass-wrap rv rv-d1" id="glassShatter">
-      <div class="glass-pane"></div>
-      <div class="shard" style="width:80px;height:56px;top:8px;left:10px;--dx:-40px;--dy:-30px;--dr:-12deg">CRM</div>
-      <div class="shard" style="width:90px;height:52px;top:4px;right:20px;--dx:35px;--dy:-35px;--dr:8deg">Scheduling</div>
-      <div class="shard" style="width:75px;height:50px;bottom:50px;left:5px;--dx:-45px;--dy:15px;--dr:15deg">Payments</div>
-      <div class="shard" style="width:85px;height:48px;bottom:8px;right:10px;--dx:40px;--dy:30px;--dr:-10deg">Marketing</div>
-      <div class="shard" style="width:72px;height:44px;top:50%;left:50%;margin:-22px 0 0 -36px;--dx:0px;--dy:45px;--dr:20deg">Analytics</div>
-      <div class="shard" style="width:80px;height:46px;top:70px;left:90px;--dx:-20px;--dy:40px;--dr:-18deg">Members</div>
+    <!-- GLASS ASSEMBLE ANIMATION — shards come together on scroll -->
+    <div class="glass-wrap rv rv-d1" id="glassAssemble">
+      <div class="glass-glow"></div>
+      <div class="glass-label">FullControl</div>
+      <!-- Row 1: top shards (3 across) -->
+      <div class="shard" style="width:140px;height:94px;top:0;left:0;--clip:0% 0%,100% 0%,94% 100%,0% 90%;--sx:-160px;--sy:-100px;--sr:-22deg">CRM</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--clip:6% 0%,94% 0%,100% 100%,0% 100%;--sx:30px;--sy:-120px;--sr:15deg">Schedule</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--clip:0% 0%,100% 0%,100% 90%,6% 100%;--sx:170px;--sy:-90px;--sr:-18deg">Payments</div>
+      <!-- Row 2: middle shards (3 across) -->
+      <div class="shard" style="width:140px;height:94px;top:93px;left:0;--clip:0% 10%,94% 0%,100% 100%,0% 90%;--sx:-180px;--sy:40px;--sr:25deg">Marketing</div>
+      <div class="shard" style="width:140px;height:94px;top:93px;left:140px;--clip:0% 0%,100% 0%,94% 100%,6% 100%;--sx:0px;--sy:130px;--sr:-10deg">Analytics</div>
+      <div class="shard" style="width:140px;height:94px;top:93px;left:280px;--clip:6% 0%,100% 10%,100% 90%,0% 100%;--sx:190px;--sy:30px;--sr:-24deg">Members</div>
+      <!-- Row 3: bottom shards (2 across) -->
+      <div class="shard" style="width:210px;height:94px;top:186px;left:0;--clip:0% 0%,100% 10%,96% 100%,0% 100%;--sx:-130px;--sy:140px;--sr:18deg">Leads</div>
+      <div class="shard" style="width:210px;height:94px;top:186px;left:210px;--clip:4% 0%,100% 0%,100% 100%,0% 90%;--sx:140px;--sy:130px;--sr:-16deg">Content</div>
     </div>
 
     <div class="problem-grid">
@@ -746,36 +757,36 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     <!-- MARKET STATS -->
     <div class="market-stats rv rv-d3">
       <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-prefix="$" data-target="121" data-suffix="B">$0</div>
-        <div class="market-stat-desc">Global health & fitness club market (2024)</div>
+        <div class="market-stat-val count-up" data-prefix="$" data-target="311" data-suffix="M">$0</div>
+        <div class="market-stat-desc">Sports management software market (2024) &mdash; projected to reach $1.25B by 2032</div>
         <div class="market-stat-src">Fortune Business Insights</div>
       </div>
       <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-target="8.8" data-suffix="%" data-decimals="1">0</div>
-        <div class="market-stat-desc">Projected CAGR through 2034 &mdash; reaching $235B</div>
-        <div class="market-stat-src">Allied Market Research</div>
+        <div class="market-stat-val count-up" data-target="19.1" data-suffix="%" data-decimals="1">0</div>
+        <div class="market-stat-desc">Sports management software CAGR &mdash; fastest-growing segment in the category</div>
+        <div class="market-stat-src">Fortune Business Insights</div>
       </div>
       <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-target="77" data-suffix="M">0</div>
-        <div class="market-stat-desc">Americans with gym memberships &mdash; a record high, 20% above 2019</div>
-        <div class="market-stat-src">Health & Fitness Association</div>
+        <div class="market-stat-val count-up" data-prefix="$" data-target="27.8" data-suffix="B" data-decimals="1">$0</div>
+        <div class="market-stat-desc">Global sports training market (2023) &mdash; projected $50.7B by 2035</div>
+        <div class="market-stat-src">Allied Market Research</div>
       </div>
     </div>
     <div class="market-stats rv rv-d4" style="margin-top:14px">
       <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-target="40" data-suffix="%">0</div>
-        <div class="market-stat-desc">Of an operator's week lost to admin tasks</div>
-        <div class="market-stat-src">Glofox Industry Survey</div>
+        <div class="market-stat-val count-up" data-target="13.1" data-suffix="%" data-decimals="1">0</div>
+        <div class="market-stat-desc">AI-enabled scheduling CAGR &mdash; fastest subsegment in sports software</div>
+        <div class="market-stat-src">Mordor Intelligence</div>
       </div>
       <div class="market-stat-card">
-        <div class="market-stat-val">30-50%</div>
-        <div class="market-stat-desc">Annual member churn rate &mdash; 5% improvement = 25-95% profit boost</div>
-        <div class="market-stat-src">IHRSA / Exercise.com</div>
+        <div class="market-stat-val">4&ndash;6</div>
+        <div class="market-stat-desc">Disconnected tools the average sports operator runs &mdash; none talk to each other</div>
+        <div class="market-stat-src">BAM OS Operator Research</div>
       </div>
       <div class="market-stat-card">
-        <div class="market-stat-val">45%</div>
-        <div class="market-stat-desc">Of gym software market is fragmented across 100+ regional vendors</div>
-        <div class="market-stat-src">360iResearch</div>
+        <div class="market-stat-val count-up" data-prefix="$" data-target="200" data-suffix="M+">$0</div>
+        <div class="market-stat-desc">SAM across basketball, all sports training, and fitness (3 phases)</div>
+        <div class="market-stat-src">BAM OS Market Analysis</div>
       </div>
     </div>
 
@@ -1153,32 +1164,50 @@ window.addEventListener('scroll', updateTimeline, { passive: true });
 updateTimeline();
 
 // ═══════════════════════════════════════════
-// GLASS SHATTER ANIMATION
+// GLASS ASSEMBLE ANIMATION — shards converge on scroll
 // ═══════════════════════════════════════════
-const glassWrap = document.getElementById('glassShatter');
+const glassWrap = document.getElementById('glassAssemble');
 if (glassWrap) {
   const shards = glassWrap.querySelectorAll('.shard');
-  // Set initial shard transforms from CSS custom properties
+
+  // Set initial scattered positions from CSS custom properties
   shards.forEach(s => {
-    s.style.transform = 'translate(0,0) rotate(0deg)';
+    const sx = getComputedStyle(s).getPropertyValue('--sx') || '0px';
+    const sy = getComputedStyle(s).getPropertyValue('--sy') || '0px';
+    const sr = getComputedStyle(s).getPropertyValue('--sr') || '0deg';
+    s.style.transform = `translate(${sx},${sy}) rotate(${sr})`;
+    s.style.opacity = '0.5';
   });
-  const glassObs = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        setTimeout(() => {
-          glassWrap.classList.add('shattered');
-          shards.forEach(s => {
-            const dx = s.style.getPropertyValue('--dx') || '0px';
-            const dy = s.style.getPropertyValue('--dy') || '0px';
-            const dr = s.style.getPropertyValue('--dr') || '0deg';
-            s.style.transform = `translate(${dx},${dy}) rotate(${dr})`;
-          });
-        }, 400);
-        glassObs.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.3 });
-  glassObs.observe(glassWrap);
+
+  function updateGlassAssemble() {
+    const rect = glassWrap.getBoundingClientRect();
+    const viewH = window.innerHeight;
+    // Progress: 0 when glass-wrap's top enters bottom of viewport, 1 when its center reaches 30% from top
+    const start = viewH;          // element top at bottom edge = progress 0
+    const end = viewH * 0.25;     // element top at 25% from top = progress 1
+    const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
+
+    if (progress >= 0.95) {
+      glassWrap.classList.add('assembled');
+    } else {
+      glassWrap.classList.remove('assembled');
+      // Interpolate shard positions
+      shards.forEach(s => {
+        const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
+        const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
+        const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
+        const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const cx = sx * (1 - ease);
+        const cy = sy * (1 - ease);
+        const cr = sr * (1 - ease);
+        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg)`;
+        s.style.opacity = 0.5 + ease * 0.5;
+      });
+    }
+  }
+
+  window.addEventListener('scroll', updateGlassAssemble, { passive: true });
+  updateGlassAssemble();
 }
 
 // ═══════════════════════════════════════════
