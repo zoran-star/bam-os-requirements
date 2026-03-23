@@ -727,12 +727,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
         <div class="demo-dot"></div>
         <div class="demo-url">app.fullcontrol.io</div>
       </div>
-      <div class="demo-iframe" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
-        <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#111">FC</div>
-        <div style="font-size:18px;font-weight:700;color:var(--white);letter-spacing:-0.02em">Interactive Prototype</div>
-        <div style="font-size:14px;color:var(--g400);max-width:360px;text-align:center;line-height:1.5">A live, clickable prototype of the FullControl command center is available upon request.</div>
-        <a href="mailto:hello@fullcontrol.io" style="font-size:13px;font-weight:700;color:#fff;background:var(--accent);padding:10px 24px;border-radius:10px;margin-top:8px;text-shadow:0 1px 2px rgba(0,0,0,0.2)">Request Access</a>
-      </div>
+      <iframe class="demo-iframe" src="/prototype/index.html" loading="lazy" title="FullControl Prototype"></iframe>
     </div>
   </div>
 </section>
@@ -1279,41 +1274,49 @@ if (glassWrap) {
     s.style.opacity = '0.7';
   });
 
+  let glassLocked = false;
+
   function updateGlassAssemble() {
+    if (glassLocked) return;
     const rect = glassWrap.getBoundingClientRect();
     const viewH = window.innerHeight;
-    // Progress: 0 when glass-wrap's top enters bottom of viewport, 1 when its center reaches 30% from top
-    const start = viewH;          // element top at bottom edge = progress 0
-    const end = viewH * 0.25;     // element top at 25% from top = progress 1
+    const start = viewH;
+    const end = viewH * 0.25;
     const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
 
-    if (progress >= 0.95) {
+    if (progress >= 0.92) {
+      // Lock it — stays assembled forever
+      glassLocked = true;
       glassWrap.classList.add('assembled');
-    } else {
-      glassWrap.classList.remove('assembled');
-      // Interpolate shard positions including 3D rotation
       shards.forEach(s => {
-        const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
-        const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
-        const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
-        const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
-        const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
-        const ease = 1 - Math.pow(1 - progress, 3);
-        const cx = sx * (1 - ease);
-        const cy = sy * (1 - ease);
-        const cr = sr * (1 - ease);
-        const cRx = rxVal * (1 - ease);
-        const cRy = ryVal * (1 - ease);
-        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
-        s.style.opacity = 0.7 + ease * 0.3;
-        // Fade out shard text and borders as assembly nears completion
-        const textFade = Math.max(0, 1 - ease * 2.5); // text fades out by 40% progress
-        s.style.color = `rgba(113,113,122,${textFade})`;
-        if (ease > 0.7) {
-          s.style.borderColor = `rgba(255,255,255,${0.1 * (1 - (ease - 0.7) / 0.3)})`;
-        }
+        s.style.color = 'transparent';
+        s.style.borderColor = 'transparent';
       });
+      window.removeEventListener('scroll', updateGlassAssemble);
+      return;
     }
+
+    // Interpolate shard positions including 3D rotation
+    shards.forEach(s => {
+      const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
+      const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
+      const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
+      const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
+      const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const cx = sx * (1 - ease);
+      const cy = sy * (1 - ease);
+      const cr = sr * (1 - ease);
+      const cRx = rxVal * (1 - ease);
+      const cRy = ryVal * (1 - ease);
+      s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
+      s.style.opacity = 0.7 + ease * 0.3;
+      const textFade = Math.max(0, 1 - ease * 2.5);
+      s.style.color = `rgba(113,113,122,${textFade})`;
+      if (ease > 0.7) {
+        s.style.borderColor = `rgba(255,255,255,${0.1 * (1 - (ease - 0.7) / 0.3)})`;
+      }
+    });
   }
 
   window.addEventListener('scroll', updateGlassAssemble, { passive: true });
