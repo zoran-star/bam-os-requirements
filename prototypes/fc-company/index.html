@@ -124,8 +124,8 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .nav-links{display:flex;gap:28px;align-items:center}
 .nav-links a{font-size:13px;font-weight:500;color:var(--g300);transition:color .2s}
 .nav-links a:hover{color:var(--white)}
-.nav-contact{font-size:12px;font-weight:700;color:#111;background:var(--accent);padding:8px 20px;border-radius:10px;transition:all .2s;letter-spacing:0.01em}
-.nav-contact:hover{background:var(--accent-l);transform:translateY(-1px);box-shadow:0 6px 24px rgba(200,168,78,0.25)}
+.nav-contact{font-size:12px;font-weight:700;color:#111;background:var(--accent);padding:10px 22px;border-radius:10px;transition:all .2s;letter-spacing:0.01em;box-shadow:0 2px 12px rgba(200,168,78,0.3)}
+.nav-contact:hover{background:var(--accent-l);transform:translateY(-1px);box-shadow:0 6px 24px rgba(200,168,78,0.4)}
 @media(max-width:640px){.nav-links a:not(.nav-contact):not(.theme-toggle){display:none}}
 
 /* ═══════════════════════════════════════════
@@ -160,6 +160,10 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
    MISSION
    ═══════════════════════════════════════════ */
 .mission{background:var(--bg-alt)}
+@keyframes accentGlow{0%,100%{text-shadow:0 0 0 transparent}50%{text-shadow:0 0 20px rgba(200,168,78,0.2)}}
+.mission .bq.vis em{animation:accentGlow 3s var(--ease) infinite;animation-delay:1s}
+.mission .bq{transition:transform 0.8s var(--ease)}
+.mission .bq.vis{transform:translateY(0)}
 .mission-body{max-width:680px;margin:0 auto;text-align:center}
 .mission-body p{font-size:18px;font-weight:400;color:var(--g200);line-height:1.7;margin-bottom:20px}
 .mission-body p:last-child{margin-bottom:0}
@@ -328,6 +332,16 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
    ═══════════════════════════════════════════ */
 .why-us-note{font-size:16px;font-weight:500;color:var(--g200);line-height:1.6;max-width:540px;margin-top:16px}
 .why-us-note strong{color:var(--white);font-weight:700}
+.testimonial-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:40px}
+@media(max-width:600px){.testimonial-grid{grid-template-columns:1fr}}
+.testimonial-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease);position:relative}
+.testimonial-card:hover{border-color:var(--card-hover-border)}
+.testimonial-card::before{content:'\201C';position:absolute;top:16px;left:20px;font-size:48px;font-family:Georgia,serif;color:rgba(200,168,78,0.15);line-height:1}
+.testimonial-quote{font-size:14px;font-weight:400;color:var(--g200);line-height:1.6;font-style:italic;margin-bottom:16px;padding-top:8px}
+.testimonial-author{font-size:12px;font-weight:700;color:var(--white)}
+.testimonial-role{font-size:11px;font-weight:500;color:var(--g400);margin-top:2px}
+.result-pills{display:flex;gap:8px;margin-top:32px;flex-wrap:wrap}
+.result-pill{font-size:13px;font-weight:700;color:var(--accent);background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.12);border-radius:10px;padding:10px 18px}
 
 /* ═══════════════════════════════════════════
    SCALE
@@ -450,14 +464,14 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 #problem{overflow:hidden}
 .glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
 .glass-wrap.assembled .glass-glow{opacity:1}
-.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px}
+.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))}
 .glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
 .glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
 .glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
 .glass-wrap.assembled .glass-label{opacity:1}
 .shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
-.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
-.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.015)}
+.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:transparent;border-width:0;box-shadow:none;border-radius:0;font-size:0;color:transparent;background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))}
+.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.025)}
 [data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.05),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.1);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.1)}
 [data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.15) 0%,rgba(168,136,46,0.04) 35%,transparent 65%)}
 [data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.08);box-shadow:none}
@@ -568,7 +582,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       <div class="glass-glow"></div>
       <div class="glass-label">
         <span class="glass-label-name">FullControl</span>
-        <span class="glass-label-tag">One system. Full control.</span>
+        <span class="glass-label-tag">Hundreds of tools. One place. Full control.</span>
       </div>
       <!-- Row 1 -->
       <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-160px;--sy:-100px;--sr:-22deg;--rx:15deg;--ry:-20deg">CRM</div>
@@ -734,7 +748,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-center">
       <div class="sec-label rv">How it works</div>
-      <h2 class="sec-title rv rv-d1">Simple by design</h2>
+      <h2 class="sec-title rv rv-d1">Low friction, high potential</h2>
     </div>
     <div class="timeline rv rv-d2" id="timeline">
       <div class="timeline-progress" id="timelineProgress"></div>
@@ -938,13 +952,29 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-label rv">Why us</div>
     <h2 class="sec-title rv rv-d1">Built from the field,<br>not from a whiteboard</h2>
-    <ul class="why-list rv rv-d2" style="max-width:640px">
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We operate in this space directly, running academies ourselves and consulting for 20+ others in all stages and types of markets</li>
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We've already built systems that help these businesses grow</li>
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We have direct access to early users</li>
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We understand both the craft and the business</li>
+    <p class="sec-sub rv rv-d2">We don't just build software for this industry &mdash; we operate in it. We've helped businesses scale from 2x to 10x in ARR and systemize their operations to cut 30&ndash;40 hours a week of manual work.</p>
+    <ul class="why-list rv rv-d2" style="max-width:640px;margin-top:24px">
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Running academies ourselves and consulting for 20+ others across all stages</li>
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Proven systems that have already helped these businesses grow</li>
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Direct access to early users and real operator feedback</li>
     </ul>
-    <p class="why-us-note rv rv-d3">This is built from real experience, <strong>not just theory and guesses.</strong></p>
+    <div class="result-pills rv rv-d3">
+      <div class="result-pill">2x&ndash;10x ARR growth</div>
+      <div class="result-pill">30&ndash;40 hrs/week saved</div>
+      <div class="result-pill">20+ academies consulted</div>
+    </div>
+    <div class="testimonial-grid rv rv-d4">
+      <div class="testimonial-card">
+        <p class="testimonial-quote">In just 18 months of being with By Any Means, business has been awesome&hellip; They've become the backbone of what I do&hellip; it frees me up to do what I do: coach basketball, and I've taken a $2,000/month side hustle to $20k a month.</p>
+        <div class="testimonial-author">Brantley Osborne</div>
+        <div class="testimonial-role">By Any Means West Virginia Academy</div>
+      </div>
+      <div class="testimonial-card">
+        <p class="testimonial-quote">I'm only working on my business 10 hours a week, yet the systems and strategy has helped me double my business in the first 6 months.</p>
+        <div class="testimonial-author">Josh Mercado</div>
+        <div class="testimonial-role">Prime By Design Basketball</div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -963,14 +993,14 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
           <div class="team-avatar">ZS</div>
           <div><h3>Zoran Savic</h3><span>Co-Founder &middot; Product & Technology</span></div>
         </div>
-        <p>Software engineer and system architect. Built the automation and AI infrastructure that powers BAM Academy operations today. Designed the full FullControl product vision and technical stack.</p>
+        <p>University of Waterloo grad with Big 5 corporate experience turned builder. Built the majority of BAM's business systems and designed the full FullControl product vision and technical stack. Built a fully autonomous training business in Toronto in under 2 years.</p>
       </div>
       <div class="team-card rv rv-d2">
         <div class="team-card-header">
-          <div class="team-avatar">CP</div>
-          <div><h3>Cole Prowse</h3><span>Co-Founder &middot; Operations & Strategy</span></div>
+          <div class="team-avatar">CA</div>
+          <div><h3>Coleman Ayers</h3><span>Co-Founder &middot; Brand, Operations & Strategy</span></div>
         </div>
-        <p>Runs BAM Academy and consults for 20+ sports training businesses across the country. Deep operator experience across all stages &mdash; from startup to multi-location. Understands the pain firsthand.</p>
+        <p>CEO of By Any Means Basketball &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running basketball academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
       </div>
     </div>
   </div>
@@ -1306,6 +1336,12 @@ if (glassWrap) {
         const cRy = ryVal * (1 - ease);
         s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
         s.style.opacity = 0.45 + ease * 0.55;
+        // Fade out shard text and borders as assembly nears completion
+        const textFade = Math.max(0, 1 - ease * 2.5); // text fades out by 40% progress
+        s.style.color = `rgba(113,113,122,${textFade})`;
+        if (ease > 0.7) {
+          s.style.borderColor = `rgba(255,255,255,${0.1 * (1 - (ease - 0.7) / 0.3)})`;
+        }
       });
     }
   }
