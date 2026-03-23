@@ -579,7 +579,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     <div class="sec-label rv">The problem</div>
     <h2 class="sec-title rv rv-d1">Today's business software<br>is like shattered glass</h2>
     <!-- GLASS ASSEMBLE ANIMATION — rigid shards converge into control center -->
-    <div class="glass-wrap rv rv-d1" id="glassAssemble">
+    <div class="glass-wrap" id="glassAssemble">
       <div class="glass-glow"></div>
       <div class="glass-label">
         <span class="glass-label-name">FullControl</span>
@@ -1257,73 +1257,47 @@ window.addEventListener('scroll', updateTimeline, { passive: true });
 updateTimeline();
 
 // ═══════════════════════════════════════════
-// GLASS ASSEMBLE ANIMATION — shards converge on scroll
+// GLASS ASSEMBLE ANIMATION — triggers when visible
 // ═══════════════════════════════════════════
-const glassWrap = document.getElementById('glassAssemble');
-if (glassWrap) {
-  const shards = glassWrap.querySelectorAll('.shard');
+(function() {
+  var gw = document.getElementById('glassAssemble');
+  if (!gw) return;
+  var shards = gw.querySelectorAll('.shard');
+  var done = false;
 
-  // Set initial scattered positions from CSS custom properties (including 3D)
-  shards.forEach(s => {
-    const sx = getComputedStyle(s).getPropertyValue('--sx') || '0px';
-    const sy = getComputedStyle(s).getPropertyValue('--sy') || '0px';
-    const sr = getComputedStyle(s).getPropertyValue('--sr') || '0deg';
-    const rx = getComputedStyle(s).getPropertyValue('--rx') || '0deg';
-    const ry = getComputedStyle(s).getPropertyValue('--ry') || '0deg';
-    s.style.transform = `translate(${sx},${sy}) rotate(${sr}) rotateX(${rx}) rotateY(${ry})`;
-    s.style.opacity = '0.45';
-  });
-
-  let assembled = false;
-  function assemble() {
-    if (assembled) return;
-    assembled = true;
-    glassWrap.classList.add('assembled');
-    shards.forEach(s => {
-      s.style.transform = 'translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)';
-      s.style.opacity = '1';
-    });
-    window.removeEventListener('scroll', updateGlassAssemble);
+  // Set initial scattered positions
+  for (var i = 0; i < shards.length; i++) {
+    var s = shards[i];
+    var sx = s.style.getPropertyValue('--sx') || '0px';
+    var sy = s.style.getPropertyValue('--sy') || '0px';
+    var sr = s.style.getPropertyValue('--sr') || '0deg';
+    var rx = s.style.getPropertyValue('--rx') || '0deg';
+    var ry = s.style.getPropertyValue('--ry') || '0deg';
+    s.style.transform = 'translate(' + sx + ',' + sy + ') rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
   }
 
-  function updateGlassAssemble() {
-    if (assembled) return;
-    const rect = glassWrap.getBoundingClientRect();
-    const viewH = window.innerHeight;
-    const start = viewH;
-    const end = viewH * 0.25;
-    const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
-
-    if (progress >= 0.95) {
-      assemble();
-    } else {
-      shards.forEach(s => {
-        const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
-        const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
-        const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
-        const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
-        const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
-        const ease = 1 - Math.pow(1 - progress, 3);
-        s.style.transform = `translate(${sx*(1-ease)}px,${sy*(1-ease)}px) rotate(${sr*(1-ease)}deg) rotateX(${rxVal*(1-ease)}deg) rotateY(${ryVal*(1-ease)}deg)`;
-        s.style.opacity = 0.45 + ease * 0.55;
-      });
+  function doAssemble() {
+    if (done) return;
+    var r = gw.getBoundingClientRect();
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      done = true;
+      window.removeEventListener('scroll', doAssemble);
+      setTimeout(function() {
+        gw.classList.add('assembled');
+        for (var j = 0; j < shards.length; j++) {
+          shards[j].style.transform = '';
+          shards[j].style.opacity = '';
+        }
+      }, 800);
     }
   }
 
-  window.addEventListener('scroll', updateGlassAssemble, { passive: true });
-  updateGlassAssemble();
-
-  // Fallback: if scroll-driven doesn't trigger, assemble when visible for 1.5s
-  const glassFallback = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting && !assembled) {
-        setTimeout(() => { if (!assembled) assemble(); }, 1500);
-        glassFallback.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.1 });
-  glassFallback.observe(glassWrap);
-}
+  window.addEventListener('scroll', doAssemble, false);
+  doAssemble();
+  setTimeout(doAssemble, 200);
+  setTimeout(doAssemble, 1000);
+  setTimeout(doAssemble, 3000);
+})();
 
 // ═══════════════════════════════════════════
 // STAGGER LIST ITEM DELAYS
