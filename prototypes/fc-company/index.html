@@ -182,6 +182,13 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .problem-list{list-style:none;display:flex;flex-direction:column;gap:10px}
 .problem-list li{font-size:15px;font-weight:500;color:var(--g300);display:flex;align-items:center;gap:10px;line-height:1.4}
 .problem-list li svg{flex-shrink:0;color:var(--g500)}
+.problem-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0}
+@media(max-width:600px){.problem-tools{grid-template-columns:repeat(2,1fr)}}
+.problem-tool{background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:16px 14px;transition:all .3s var(--ease)}
+.problem-tool:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.problem-tool-icon{width:28px;height:28px;border-radius:8px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.problem-tool h4{font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px}
+.problem-tool p{font-size:11px;color:var(--g400);line-height:1.4}
 .problem-stat{background:var(--stat-bg);border:1px solid var(--stat-border);border-radius:20px;padding:28px;margin-top:24px}
 .problem-stat-num{font-size:40px;font-weight:900;font-family:'Nunito',sans-serif;color:#e05a42;letter-spacing:-0.03em;line-height:1}
 .problem-stat-label{font-size:14px;font-weight:500;color:var(--g400);margin-top:6px}
@@ -286,6 +293,22 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .market-stat-val{font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;color:var(--accent);letter-spacing:-0.03em;line-height:1}
 .market-stat-desc{font-size:13px;font-weight:500;color:var(--g300);margin-top:6px;line-height:1.4}
 .market-stat-src{font-size:10px;font-weight:500;color:var(--g500);margin-top:8px;font-style:italic}
+.market-phase-tabs{display:flex;gap:8px;margin-top:40px;margin-bottom:24px}
+@media(max-width:600px){.market-phase-tabs{flex-direction:column}}
+.market-phase-tab{flex:1;padding:16px 18px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;cursor:pointer;transition:all .3s var(--ease);text-align:center}
+.market-phase-tab:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.market-phase-tab.active{border-color:var(--accent);background:rgba(200,168,78,0.04);box-shadow:0 0 20px rgba(200,168,78,0.08)}
+.market-phase-tab h4{font-size:14px;font-weight:700;color:var(--white);margin-bottom:3px;transition:color .3s}
+.market-phase-tab.active h4{color:var(--accent)}
+.market-phase-tab .phase-timeline{font-size:11px;font-weight:600;color:var(--g400);display:block;margin-top:2px}
+.market-phase-tab .phase-desc{font-size:11px;font-weight:500;color:var(--g500)}
+.market-phase-panel{display:none}
+.market-phase-panel.active{display:block;animation:phaseIn .4s var(--ease)}
+@keyframes phaseIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.market-sam-total{margin-top:16px;padding:22px 28px;background:rgba(200,168,78,0.03);border:1px solid rgba(200,168,78,0.1);border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+@media(max-width:600px){.market-sam-total{flex-direction:column;text-align:center}}
+.market-sam-total .market-stat-val{font-size:28px}
+.market-sam-total .market-stat-desc{font-size:13px;color:var(--g300);margin:0}
 .market-traits{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:32px}
 @media(max-width:600px){.market-traits{grid-template-columns:1fr}}
 .market-trait{font-size:14px;font-weight:500;color:var(--g300);display:flex;align-items:flex-start;gap:10px;padding:14px 18px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;line-height:1.4}
@@ -421,19 +444,23 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 /* ═══════════════════════════════════════════
    GLASS ASSEMBLE ANIMATION
    ═══════════════════════════════════════════ */
-.glass-wrap{position:relative;width:420px;height:280px;margin:0 auto 40px;perspective:800px}
-@media(max-width:600px){.glass-wrap{width:300px;height:200px}}
+.glass-wrap{position:relative;width:420px;height:282px;margin:0 auto 40px;perspective:1000px;transform-style:preserve-3d}
+@media(max-width:600px){.glass-wrap{width:300px;height:201px}}
+@media(max-width:600px){.glass-wrap .shard{font-size:8px}}
 #problem{overflow:hidden}
-.glass-glow{position:absolute;inset:-40px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.18) 0%,rgba(200,168,78,0.04) 40%,transparent 70%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
+.glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
 .glass-wrap.assembled .glass-glow{opacity:1}
-.glass-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
+.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px}
+.glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
+.glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
+.glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
 .glass-wrap.assembled .glass-label{opacity:1}
-.shard{position:absolute;background:linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease);pointer-events:none;z-index:1;clip-path:polygon(var(--clip))}
-.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.12)}
-.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.02);opacity:1}
-[data-theme="light"] .shard{background:linear-gradient(135deg,rgba(0,0,0,0.05),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.08)}
-[data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.12) 0%,rgba(168,136,46,0.03) 40%,transparent 70%)}
-[data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.15)}
+.shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
+.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
+.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.015)}
+[data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.05),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.1);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.1)}
+[data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.15) 0%,rgba(168,136,46,0.04) 35%,transparent 65%)}
+[data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.08);box-shadow:none}
 </style>
 </head>
 <body>
@@ -496,17 +523,15 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-center">
       <div class="sec-label rv">Mission</div>
-      <h2 class="sec-title rv rv-d1">Built for the people who<br>build communities</h2>
     </div>
-    <div class="mission-body rv rv-d2">
-      <p>The best operators <strong>understand people, build cultures, and develop athletes</strong> &mdash; but struggle with the technical side of running a business.</p>
-      <p>That struggle cripples their potential.</p>
+    <div class="sec-center rv rv-d1" style="margin-bottom:8px">
+      <h2 class="sec-title" style="font-size:clamp(20px,2.5vw,26px);font-weight:600;color:var(--g200)">Our belief is simple</h2>
     </div>
-    <div class="bq rv rv-d3">
-      <p>The people who master relationships, communication, and culture will be the most successful &mdash; once they have the right systems behind them.</p>
+    <div class="bq rv rv-d2" style="max-width:740px">
+      <p style="font-size:clamp(20px,3vw,26px);font-weight:600;line-height:1.5">The people who master <em style="font-style:normal;color:var(--accent);font-weight:800">relationships, communication, and culture</em> will be the most successful, once they learn to use AI the right way. Soon, <em style="font-style:normal;color:var(--accent);font-weight:800">quality humans and connectors</em> will trump tech savvy.</p>
     </div>
-    <div class="mission-body rv rv-d4" style="margin-top:0">
-      <p>FullControl gives them that ability.</p>
+    <div class="sec-center rv rv-d3" style="margin-top:32px">
+      <p style="font-size:clamp(16px,2.2vw,20px);font-weight:500;color:var(--g200);max-width:680px;margin:0 auto;line-height:1.65"><strong style="color:var(--white)">FullControl</strong> exists to be the first to facilitate this shift and empower the coaches and operators who got into this industry to make an impact &mdash; not to manage software.</p>
     </div>
   </div>
 </section>
@@ -538,37 +563,41 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-label rv">The problem</div>
     <h2 class="sec-title rv rv-d1">Today's business software<br>is like shattered glass</h2>
-    <!-- GLASS ASSEMBLE ANIMATION — shards come together on scroll -->
+    <!-- GLASS ASSEMBLE ANIMATION — rigid shards converge into control center -->
     <div class="glass-wrap rv rv-d1" id="glassAssemble">
       <div class="glass-glow"></div>
-      <div class="glass-label">FullControl</div>
-      <!-- Row 1: top shards (3 across) -->
-      <div class="shard" style="width:140px;height:94px;top:0;left:0;--clip:0% 0%,100% 0%,94% 100%,0% 90%;--sx:-160px;--sy:-100px;--sr:-22deg">CRM</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--clip:6% 0%,94% 0%,100% 100%,0% 100%;--sx:30px;--sy:-120px;--sr:15deg">Schedule</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--clip:0% 0%,100% 0%,100% 90%,6% 100%;--sx:170px;--sy:-90px;--sr:-18deg">Payments</div>
-      <!-- Row 2: middle shards (3 across) -->
-      <div class="shard" style="width:140px;height:94px;top:93px;left:0;--clip:0% 10%,94% 0%,100% 100%,0% 90%;--sx:-180px;--sy:40px;--sr:25deg">Marketing</div>
-      <div class="shard" style="width:140px;height:94px;top:93px;left:140px;--clip:0% 0%,100% 0%,94% 100%,6% 100%;--sx:0px;--sy:130px;--sr:-10deg">Analytics</div>
-      <div class="shard" style="width:140px;height:94px;top:93px;left:280px;--clip:6% 0%,100% 10%,100% 90%,0% 100%;--sx:190px;--sy:30px;--sr:-24deg">Members</div>
-      <!-- Row 3: bottom shards (2 across) -->
-      <div class="shard" style="width:210px;height:94px;top:186px;left:0;--clip:0% 0%,100% 10%,96% 100%,0% 100%;--sx:-130px;--sy:140px;--sr:18deg">Leads</div>
-      <div class="shard" style="width:210px;height:94px;top:186px;left:210px;--clip:4% 0%,100% 0%,100% 100%,0% 90%;--sx:140px;--sy:130px;--sr:-16deg">Content</div>
+      <div class="glass-label">
+        <span class="glass-label-name">FullControl</span>
+        <span class="glass-label-tag">One system. Full control.</span>
+      </div>
+      <!-- Row 1 -->
+      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-160px;--sy:-100px;--sr:-22deg;--rx:15deg;--ry:-20deg">CRM</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:30px;--sy:-120px;--sr:15deg;--rx:-12deg;--ry:18deg">Schedule</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:170px;--sy:-90px;--sr:-18deg;--rx:10deg;--ry:22deg">Payments</div>
+      <!-- Row 2 -->
+      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-180px;--sy:40px;--sr:25deg;--rx:-18deg;--ry:-15deg">Marketing</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:130px;--sr:-10deg;--rx:8deg;--ry:-8deg">Analytics</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:190px;--sy:30px;--sr:-24deg;--rx:-14deg;--ry:20deg">Members</div>
+      <!-- Row 3 -->
+      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-130px;--sy:140px;--sr:18deg;--rx:12deg;--ry:-18deg">Leads</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:140px;--sy:130px;--sr:-16deg;--rx:-10deg;--ry:15deg">Content</div>
     </div>
 
     <div class="problem-grid">
-      <div class="rv rv-d2 accent-block">
+      <div class="rv rv-d2">
         <div class="problem-text">
-          <p>Operators are forced to piece together:</p>
-          <ul class="stagger-list" style="list-style:none;display:flex;flex-direction:column;gap:2px;margin-bottom:16px">
-            <li style="color:var(--g300);font-size:16px">&bull; CRM</li>
-            <li style="color:var(--g300);font-size:16px">&bull; scheduling</li>
-            <li style="color:var(--g300);font-size:16px">&bull; payments</li>
-            <li style="color:var(--g300);font-size:16px">&bull; marketing tools</li>
-            <li style="color:var(--g300);font-size:16px">&bull; analytics</li>
-            <li style="color:var(--g300);font-size:16px">&bull; member systems</li>
-          </ul>
+          <p style="margin-bottom:4px">Operators are forced to piece together:</p>
+        </div>
+        <div class="problem-tools">
+          <div class="problem-tool rv rv-d1"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><h4>CRM</h4><p>Track leads &amp; contacts</p></div>
+          <div class="problem-tool rv rv-d2"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h4>Scheduling</h4><p>Manage sessions &amp; classes</p></div>
+          <div class="problem-tool rv rv-d3"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h4>Payments</h4><p>Collect &amp; reconcile revenue</p></div>
+          <div class="problem-tool rv rv-d4"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><h4>Marketing</h4><p>Run campaigns &amp; outreach</p></div>
+          <div class="problem-tool rv rv-d5"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h4>Analytics</h4><p>Measure what matters</p></div>
+          <div class="problem-tool rv" style="transition-delay:0.48s"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h4>Members</h4><p>Manage rosters &amp; retention</p></div>
+        </div>
+        <div class="problem-text">
           <p>Each one solves part of the problem. <strong>None of them truly work together.</strong> Moreover, all of them require hours weekly of manual labor.</p>
-          <p>It feels like trying to run your business while stepping over broken pieces, and constantly trying to fit them back together.</p>
         </div>
       </div>
       <div class="rv rv-d3">
@@ -754,40 +783,109 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       <div class="market-tag">Coaching Businesses</div>
     </div>
 
-    <!-- MARKET STATS -->
-    <div class="market-stats rv rv-d3">
-      <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-prefix="$" data-target="311" data-suffix="M">$0</div>
-        <div class="market-stat-desc">Sports management software market (2024) &mdash; projected to reach $1.25B by 2032</div>
-        <div class="market-stat-src">Fortune Business Insights</div>
+    <!-- PHASE TABS -->
+    <div class="market-phase-tabs rv rv-d3">
+      <div class="market-phase-tab active" data-phase="1">
+        <h4>Phase 1</h4>
+        <span class="phase-desc">Basketball Training</span>
+        <span class="phase-timeline">6 months to adoption</span>
       </div>
-      <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-target="19.1" data-suffix="%" data-decimals="1">0</div>
-        <div class="market-stat-desc">Sports management software CAGR &mdash; fastest-growing segment in the category</div>
-        <div class="market-stat-src">Fortune Business Insights</div>
+      <div class="market-phase-tab" data-phase="2">
+        <h4>Phase 2</h4>
+        <span class="phase-desc">All Sports Training</span>
+        <span class="phase-timeline">12&ndash;18 months</span>
       </div>
-      <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-prefix="$" data-target="27.8" data-suffix="B" data-decimals="1">$0</div>
-        <div class="market-stat-desc">Global sports training market (2023) &mdash; projected $50.7B by 2035</div>
-        <div class="market-stat-src">Allied Market Research</div>
+      <div class="market-phase-tab" data-phase="3">
+        <h4>Phase 3</h4>
+        <span class="phase-desc">Fitness &amp; Gyms</span>
+        <span class="phase-timeline">2&ndash;3 years</span>
       </div>
     </div>
-    <div class="market-stats rv rv-d4" style="margin-top:14px">
-      <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-target="13.1" data-suffix="%" data-decimals="1">0</div>
-        <div class="market-stat-desc">AI-enabled scheduling CAGR &mdash; fastest subsegment in sports software</div>
-        <div class="market-stat-src">Mordor Intelligence</div>
+
+    <!-- PHASE 1: BASKETBALL -->
+    <div class="market-phase-panel active" data-phase="1">
+      <div class="market-stats" style="grid-template-columns:repeat(2,1fr)">
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-prefix="$" data-target="8.5" data-suffix="B" data-decimals="1">$0</div>
+          <div class="market-stat-desc">Basketball training services market (2023) &mdash; projected $14.5B by 2031</div>
+          <div class="market-stat-src">Verified Market Research</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-target="8.6" data-suffix="%" data-decimals="1">0</div>
+          <div class="market-stat-desc">CAGR &mdash; North America holds ~40% market share</div>
+          <div class="market-stat-src">Verified Market Research</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">3.5&ndash;4.5K</div>
+          <div class="market-stat-desc">SAM operators (US + Canada + Australia, 20+ clients)</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">$13&ndash;16M</div>
+          <div class="market-stat-desc">SAM ARR at $300/mo blended ARPU</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
       </div>
-      <div class="market-stat-card">
-        <div class="market-stat-val">4&ndash;6</div>
-        <div class="market-stat-desc">Disconnected tools the average sports operator runs &mdash; none talk to each other</div>
-        <div class="market-stat-src">BAM OS Operator Research</div>
+    </div>
+
+    <!-- PHASE 2: ALL SPORTS -->
+    <div class="market-phase-panel" data-phase="2">
+      <div class="market-stats" style="grid-template-columns:repeat(2,1fr)">
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-prefix="$" data-target="27.8" data-suffix="B" data-decimals="1">$0</div>
+          <div class="market-stat-desc">Global sports training market (2023) &mdash; projected $50.7B by 2035</div>
+          <div class="market-stat-src">Allied Market Research</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-target="19.1" data-suffix="%" data-decimals="1">0</div>
+          <div class="market-stat-desc">Sports mgmt software CAGR &mdash; $311M to $1.25B by 2032</div>
+          <div class="market-stat-src">Fortune Business Insights</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">16&ndash;20K</div>
+          <div class="market-stat-desc">SAM operators across all sports (US + Canada + Australia)</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">$58&ndash;72M</div>
+          <div class="market-stat-desc">SAM ARR at $300/mo blended ARPU</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
       </div>
-      <div class="market-stat-card">
-        <div class="market-stat-val count-up" data-prefix="$" data-target="200" data-suffix="M+">$0</div>
-        <div class="market-stat-desc">SAM across basketball, all sports training, and fitness (3 phases)</div>
-        <div class="market-stat-src">BAM OS Market Analysis</div>
+    </div>
+
+    <!-- PHASE 3: FITNESS & GYMS -->
+    <div class="market-phase-panel" data-phase="3">
+      <div class="market-stats" style="grid-template-columns:repeat(2,1fr)">
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-prefix="$" data-target="9.75" data-suffix="B" data-decimals="2">$0</div>
+          <div class="market-stat-desc">Gym management software market (2024) &mdash; projected $63.9B by 2035</div>
+          <div class="market-stat-src">Market Research Future</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val count-up" data-target="18.6" data-suffix="%" data-decimals="1">0</div>
+          <div class="market-stat-desc">CAGR &mdash; sports clubs fastest-growing subsegment in North America</div>
+          <div class="market-stat-src">Data Bridge Market Research</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">37&ndash;45K</div>
+          <div class="market-stat-desc">SAM operators &mdash; independent gyms &amp; fitness businesses (US + Canada)</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
+        <div class="market-stat-card">
+          <div class="market-stat-val">$133&ndash;162M</div>
+          <div class="market-stat-desc">SAM ARR at $300/mo blended ARPU</div>
+          <div class="market-stat-src">BAM OS Market Analysis</div>
+        </div>
       </div>
+    </div>
+
+    <!-- TOTAL SAM -->
+    <div class="market-sam-total rv rv-d4">
+      <div>
+        <div class="market-stat-val count-up" data-prefix="$" data-target="200" data-suffix="M+" style="font-size:28px">$0</div>
+      </div>
+      <div class="market-stat-desc">Total SAM ARR across all three phases &mdash; same product, broader positioning</div>
     </div>
 
     <div class="market-traits">
@@ -1170,13 +1268,15 @@ const glassWrap = document.getElementById('glassAssemble');
 if (glassWrap) {
   const shards = glassWrap.querySelectorAll('.shard');
 
-  // Set initial scattered positions from CSS custom properties
+  // Set initial scattered positions from CSS custom properties (including 3D)
   shards.forEach(s => {
     const sx = getComputedStyle(s).getPropertyValue('--sx') || '0px';
     const sy = getComputedStyle(s).getPropertyValue('--sy') || '0px';
     const sr = getComputedStyle(s).getPropertyValue('--sr') || '0deg';
-    s.style.transform = `translate(${sx},${sy}) rotate(${sr})`;
-    s.style.opacity = '0.5';
+    const rx = getComputedStyle(s).getPropertyValue('--rx') || '0deg';
+    const ry = getComputedStyle(s).getPropertyValue('--ry') || '0deg';
+    s.style.transform = `translate(${sx},${sy}) rotate(${sr}) rotateX(${rx}) rotateY(${ry})`;
+    s.style.opacity = '0.45';
   });
 
   function updateGlassAssemble() {
@@ -1191,17 +1291,21 @@ if (glassWrap) {
       glassWrap.classList.add('assembled');
     } else {
       glassWrap.classList.remove('assembled');
-      // Interpolate shard positions
+      // Interpolate shard positions including 3D rotation
       shards.forEach(s => {
         const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
         const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
         const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
-        const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+        const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
+        const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
+        const ease = 1 - Math.pow(1 - progress, 3);
         const cx = sx * (1 - ease);
         const cy = sy * (1 - ease);
         const cr = sr * (1 - ease);
-        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg)`;
-        s.style.opacity = 0.5 + ease * 0.5;
+        const cRx = rxVal * (1 - ease);
+        const cRy = ryVal * (1 - ease);
+        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
+        s.style.opacity = 0.45 + ease * 0.55;
       });
     }
   }
@@ -1274,6 +1378,28 @@ if (dotNav) {
   window.addEventListener('scroll', updateDotNav, { passive: true });
   updateDotNav();
 }
+
+// ═══════════════════════════════════════════
+// MARKET PHASE TABS
+// ═══════════════════════════════════════════
+const phaseTabs = document.querySelectorAll('.market-phase-tab');
+const phasePanels = document.querySelectorAll('.market-phase-panel');
+phaseTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const phase = tab.dataset.phase;
+    phaseTabs.forEach(t => t.classList.remove('active'));
+    phasePanels.forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.querySelector(`.market-phase-panel[data-phase="${phase}"]`);
+    if (panel) {
+      panel.classList.add('active');
+      // Trigger count-up for newly visible panel
+      panel.querySelectorAll('.count-up').forEach(el => {
+        if (!el.dataset.counted) countObs.observe(el);
+      });
+    }
+  });
+});
 </script>
 </body>
 </html>
