@@ -319,6 +319,39 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .scale-note{font-size:14px;color:var(--g400);margin-top:24px;line-height:1.6;max-width:540px}
 
 /* ═══════════════════════════════════════════
+   TEAM
+   ═══════════════════════════════════════════ */
+.team-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:48px}
+@media(max-width:600px){.team-grid{grid-template-columns:1fr}}
+.team-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease)}
+.team-card:hover{border-color:var(--card-hover-border);transform:translateY(-2px)}
+.team-card-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.team-avatar{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#111;flex-shrink:0}
+.team-card-header h3{font-size:16px;font-weight:700;color:var(--white);line-height:1.2}
+.team-card-header span{font-size:12px;font-weight:500;color:var(--accent);display:block;margin-top:2px}
+.team-card p{font-size:13px;color:var(--g400);line-height:1.55}
+
+/* ═══════════════════════════════════════════
+   TRACTION
+   ═══════════════════════════════════════════ */
+.traction-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:48px}
+@media(max-width:600px){.traction-grid{grid-template-columns:1fr}}
+.traction-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;text-align:center;transition:all .3s var(--ease)}
+.traction-card:hover{border-color:var(--card-hover-border)}
+.traction-val{font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;color:var(--accent);letter-spacing:-0.03em;line-height:1}
+.traction-desc{font-size:13px;font-weight:500;color:var(--g300);margin-top:8px;line-height:1.4}
+
+/* ═══════════════════════════════════════════
+   MOAT
+   ═══════════════════════════════════════════ */
+.moat-list{display:flex;flex-direction:column;gap:14px;margin-top:48px;max-width:640px}
+.moat-item{display:flex;align-items:flex-start;gap:14px;padding:20px 24px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:16px;transition:all .3s var(--ease)}
+.moat-item:hover{border-color:var(--card-hover-border)}
+.moat-icon{width:36px;height:36px;border-radius:10px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.moat-item h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:3px}
+.moat-item p{font-size:13px;color:var(--g400);line-height:1.5}
+
+/* ═══════════════════════════════════════════
    VISION
    ═══════════════════════════════════════════ */
 .vision{text-align:center;padding:160px 0;position:relative}
@@ -460,19 +493,12 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       <div class="sec-label rv">Mission</div>
       <h2 class="sec-title rv rv-d1">Built for the people who<br>build communities</h2>
     </div>
-    <div class="mission-body rv rv-d2 accent-block">
-      <p>FullControl exists to empower coaches and operators who got into this industry to make an impact, not to manage software.</p>
-      <p>Many of the best operators:</p>
-      <ul class="stagger-list" style="list-style:none;display:flex;flex-direction:column;gap:4px;margin-bottom:20px">
-        <li style="color:var(--g200);font-size:18px">&bull; understand people</li>
-        <li style="color:var(--g200);font-size:18px">&bull; build strong cultures</li>
-        <li style="color:var(--g200);font-size:18px">&bull; develop athletes and communities</li>
-      </ul>
-      <p>But struggle with the technical side of running a business, and it cripples their potential.</p>
-      <p>Our belief is simple:</p>
+    <div class="mission-body rv rv-d2">
+      <p>The best operators <strong>understand people, build cultures, and develop athletes</strong> &mdash; but struggle with the technical side of running a business.</p>
+      <p>That struggle cripples their potential.</p>
     </div>
     <div class="bq rv rv-d3">
-      <p>The people who master relationships, communication, and culture will be the most successful, once they learn to use AI the right way.</p>
+      <p>The people who master relationships, communication, and culture will be the most successful &mdash; once they have the right systems behind them.</p>
     </div>
     <div class="mission-body rv rv-d4" style="margin-top:0">
       <p>FullControl gives them that ability.</p>
@@ -843,6 +869,104 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
+     TEAM
+     ═══════════════════════════════════════════ -->
+<section id="teamSection">
+  <div class="w">
+    <div class="sec-label rv">Team</div>
+    <h2 class="sec-title rv rv-d1">Operators who build</h2>
+    <div class="team-grid">
+      <div class="team-card rv rv-d1">
+        <div class="team-card-header">
+          <div class="team-avatar">ZS</div>
+          <div><h3>Zoran Savic</h3><span>Co-Founder &middot; Product & Technology</span></div>
+        </div>
+        <p>Software engineer and system architect. Built the automation and AI infrastructure that powers BAM Academy operations today. Designed the full FullControl product vision and technical stack.</p>
+      </div>
+      <div class="team-card rv rv-d2">
+        <div class="team-card-header">
+          <div class="team-avatar">CP</div>
+          <div><h3>Cole Prowse</h3><span>Co-Founder &middot; Operations & Strategy</span></div>
+        </div>
+        <p>Runs BAM Academy and consults for 20+ sports training businesses across the country. Deep operator experience across all stages &mdash; from startup to multi-location. Understands the pain firsthand.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     TRACTION
+     ═══════════════════════════════════════════ -->
+<section id="tractionSection">
+  <div class="w">
+    <div class="sec-center">
+      <div class="sec-label rv">Traction</div>
+      <h2 class="sec-title rv rv-d1">Already in the field</h2>
+    </div>
+    <div class="traction-grid">
+      <div class="traction-card rv rv-d1">
+        <div class="traction-val">20+</div>
+        <div class="traction-desc">Academies consulted &mdash; direct access to early adopters across all stages</div>
+      </div>
+      <div class="traction-card rv rv-d2">
+        <div class="traction-val">15+ hrs</div>
+        <div class="traction-desc">Saved weekly per operator with early automations &mdash; a fraction of what FC delivers</div>
+      </div>
+      <div class="traction-card rv rv-d3">
+        <div class="traction-val">Live</div>
+        <div class="traction-desc">Interactive product prototype built and tested with real operators</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     MOAT
+     ═══════════════════════════════════════════ -->
+<section id="moatSection">
+  <div class="w">
+    <div class="sec-label rv">Defensibility</div>
+    <h2 class="sec-title rv rv-d1">Moats that compound</h2>
+    <div class="moat-list">
+      <div class="moat-item rv rv-d1">
+        <div class="moat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+        <div>
+          <h3>Cross-domain data flywheel</h3>
+          <p>Every module feeds the AI. Sales data improves marketing recommendations. Member data sharpens retention predictions. The more you use, the smarter it gets.</p>
+        </div>
+      </div>
+      <div class="moat-item rv rv-d2">
+        <div class="moat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
+        <div>
+          <h3>Industry-specific workflows</h3>
+          <p>Built for how academies and studios actually operate &mdash; not generic business logic. Deep vertical knowledge that horizontal tools can't replicate.</p>
+        </div>
+      </div>
+      <div class="moat-item rv rv-d3">
+        <div class="moat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg></div>
+        <div>
+          <h3>Embedded system of record</h3>
+          <p>Once FullControl runs your operations, switching costs are high. It becomes the source of truth for your entire business.</p>
+        </div>
+      </div>
+      <div class="moat-item rv rv-d4">
+        <div class="moat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div>
+          <h3>Operator distribution network</h3>
+          <p>Direct relationships with academy owners and coaches. Built-in channel for feedback, iteration, and word-of-mouth growth.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
      SCALE
      ═══════════════════════════════════════════ -->
 <section id="scaleSection">
@@ -914,6 +1038,9 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="dot-nav-item" data-section="solution"><span class="dot-nav-label">Solution</span></div>
   <div class="dot-nav-item" data-section="howSection"><span class="dot-nav-label">How</span></div>
   <div class="dot-nav-item" data-section="market"><span class="dot-nav-label">Market</span></div>
+  <div class="dot-nav-item" data-section="teamSection"><span class="dot-nav-label">Team</span></div>
+  <div class="dot-nav-item" data-section="tractionSection"><span class="dot-nav-label">Traction</span></div>
+  <div class="dot-nav-item" data-section="moatSection"><span class="dot-nav-label">Moat</span></div>
   <div class="dot-nav-item" data-section="scaleSection"><span class="dot-nav-label">Scale</span></div>
   <div class="dot-nav-item" data-section="vision"><span class="dot-nav-label">Vision</span></div>
 </div>
