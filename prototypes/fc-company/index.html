@@ -465,13 +465,13 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 #problem{overflow:hidden}
 .glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
 .glass-wrap.assembled .glass-glow{opacity:1}
-.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px;overflow:hidden;background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.01))}
+.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px}
 .glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
 .glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
 .glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
 .glass-wrap.assembled .glass-label{opacity:1}
 .shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
-.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:transparent;border-width:0;box-shadow:none;border-radius:0;font-size:0;color:transparent;background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))}
+.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
 .glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.025)}
 [data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.07),rgba(0,0,0,0.035));border:2px solid rgba(0,0,0,0.1);box-shadow:0 8px 28px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,255,255,0.7);color:rgba(0,0,0,0.35)}
 [data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.15) 0%,rgba(168,136,46,0.04) 35%,transparent 65%)}
@@ -586,16 +586,16 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
         <span class="glass-label-tag">Hundreds of tools. One place. Full control.</span>
       </div>
       <!-- Row 1 -->
-      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-260px;--sy:-160px;--sr:-35deg;--rx:25deg;--ry:-30deg">CRM</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:40px;--sy:-200px;--sr:22deg;--rx:-20deg;--ry:28deg">Schedule</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:280px;--sy:-140px;--sr:-28deg;--rx:18deg;--ry:35deg">Payments</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-160px;--sy:-100px;--sr:-22deg;--rx:15deg;--ry:-20deg">CRM</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:30px;--sy:-120px;--sr:15deg;--rx:-12deg;--ry:18deg">Schedule</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:170px;--sy:-90px;--sr:-18deg;--rx:10deg;--ry:22deg">Payments</div>
       <!-- Row 2 -->
-      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-300px;--sy:60px;--sr:38deg;--rx:-28deg;--ry:-22deg">Marketing</div>
-      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:210px;--sr:-15deg;--rx:12deg;--ry:-12deg">Analytics</div>
-      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:310px;--sy:50px;--sr:-36deg;--rx:-22deg;--ry:30deg">Members</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-180px;--sy:40px;--sr:25deg;--rx:-18deg;--ry:-15deg">Marketing</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:130px;--sr:-10deg;--rx:8deg;--ry:-8deg">Analytics</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:190px;--sy:30px;--sr:-24deg;--rx:-14deg;--ry:20deg">Members</div>
       <!-- Row 3 -->
-      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-220px;--sy:220px;--sr:28deg;--rx:20deg;--ry:-25deg">Leads</div>
-      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:230px;--sy:200px;--sr:-25deg;--rx:-18deg;--ry:22deg">Content</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-130px;--sy:140px;--sr:18deg;--rx:12deg;--ry:-18deg">Leads</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:140px;--sy:130px;--sr:-16deg;--rx:-10deg;--ry:15deg">Content</div>
     </div>
 
     <div class="problem-grid">
@@ -1257,41 +1257,54 @@ window.addEventListener('scroll', updateTimeline, { passive: true });
 updateTimeline();
 
 // ═══════════════════════════════════════════
-// GLASS ASSEMBLE ANIMATION — one-time trigger
+// GLASS ASSEMBLE ANIMATION — shards converge on scroll
 // ═══════════════════════════════════════════
 const glassWrap = document.getElementById('glassAssemble');
 if (glassWrap) {
   const shards = glassWrap.querySelectorAll('.shard');
 
-  // Set initial scattered positions from CSS custom properties
+  // Set initial scattered positions from CSS custom properties (including 3D)
   shards.forEach(s => {
-    const sx = s.style.getPropertyValue('--sx') || '0px';
-    const sy = s.style.getPropertyValue('--sy') || '0px';
-    const sr = s.style.getPropertyValue('--sr') || '0deg';
-    const rx = s.style.getPropertyValue('--rx') || '0deg';
-    const ry = s.style.getPropertyValue('--ry') || '0deg';
+    const sx = getComputedStyle(s).getPropertyValue('--sx') || '0px';
+    const sy = getComputedStyle(s).getPropertyValue('--sy') || '0px';
+    const sr = getComputedStyle(s).getPropertyValue('--sr') || '0deg';
+    const rx = getComputedStyle(s).getPropertyValue('--rx') || '0deg';
+    const ry = getComputedStyle(s).getPropertyValue('--ry') || '0deg';
     s.style.transform = `translate(${sx},${sy}) rotate(${sr}) rotateX(${rx}) rotateY(${ry})`;
-    s.style.opacity = '0.7';
+    s.style.opacity = '0.45';
   });
 
-  // When glass-wrap enters viewport, trigger assembly after a short delay
-  const glassObs = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (e.isIntersecting) {
-        setTimeout(() => {
-          glassWrap.classList.add('assembled');
-          shards.forEach(s => {
-            s.style.transform = 'translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)';
-            s.style.opacity = '1';
-            s.style.color = 'transparent';
-            s.style.borderColor = 'transparent';
-          });
-        }, 600);
-        glassObs.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.15 });
-  glassObs.observe(glassWrap);
+  function updateGlassAssemble() {
+    const rect = glassWrap.getBoundingClientRect();
+    const viewH = window.innerHeight;
+    const start = viewH;
+    const end = viewH * 0.25;
+    const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
+
+    if (progress >= 0.95) {
+      glassWrap.classList.add('assembled');
+    } else {
+      glassWrap.classList.remove('assembled');
+      shards.forEach(s => {
+        const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
+        const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
+        const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
+        const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
+        const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const cx = sx * (1 - ease);
+        const cy = sy * (1 - ease);
+        const cr = sr * (1 - ease);
+        const cRx = rxVal * (1 - ease);
+        const cRy = ryVal * (1 - ease);
+        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
+        s.style.opacity = 0.45 + ease * 0.55;
+      });
+    }
+  }
+
+  window.addEventListener('scroll', updateGlassAssemble, { passive: true });
+  updateGlassAssemble();
 }
 
 // ═══════════════════════════════════════════
