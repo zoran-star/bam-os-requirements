@@ -1257,70 +1257,41 @@ window.addEventListener('scroll', updateTimeline, { passive: true });
 updateTimeline();
 
 // ═══════════════════════════════════════════
-// GLASS ASSEMBLE ANIMATION — shards converge on scroll
+// GLASS ASSEMBLE ANIMATION — one-time trigger
 // ═══════════════════════════════════════════
 const glassWrap = document.getElementById('glassAssemble');
 if (glassWrap) {
   const shards = glassWrap.querySelectorAll('.shard');
 
-  // Set initial scattered positions from CSS custom properties (including 3D)
+  // Set initial scattered positions from CSS custom properties
   shards.forEach(s => {
-    const sx = getComputedStyle(s).getPropertyValue('--sx') || '0px';
-    const sy = getComputedStyle(s).getPropertyValue('--sy') || '0px';
-    const sr = getComputedStyle(s).getPropertyValue('--sr') || '0deg';
-    const rx = getComputedStyle(s).getPropertyValue('--rx') || '0deg';
-    const ry = getComputedStyle(s).getPropertyValue('--ry') || '0deg';
+    const sx = s.style.getPropertyValue('--sx') || '0px';
+    const sy = s.style.getPropertyValue('--sy') || '0px';
+    const sr = s.style.getPropertyValue('--sr') || '0deg';
+    const rx = s.style.getPropertyValue('--rx') || '0deg';
+    const ry = s.style.getPropertyValue('--ry') || '0deg';
     s.style.transform = `translate(${sx},${sy}) rotate(${sr}) rotateX(${rx}) rotateY(${ry})`;
     s.style.opacity = '0.7';
   });
 
-  let glassLocked = false;
-
-  function updateGlassAssemble() {
-    if (glassLocked) return;
-    const rect = glassWrap.getBoundingClientRect();
-    const viewH = window.innerHeight;
-    const start = viewH;
-    const end = viewH * 0.25;
-    const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
-
-    if (progress >= 0.92) {
-      // Lock it — stays assembled forever
-      glassLocked = true;
-      glassWrap.classList.add('assembled');
-      shards.forEach(s => {
-        s.style.color = 'transparent';
-        s.style.borderColor = 'transparent';
-      });
-      window.removeEventListener('scroll', updateGlassAssemble);
-      return;
-    }
-
-    // Interpolate shard positions including 3D rotation
-    shards.forEach(s => {
-      const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
-      const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
-      const sr = parseFloat(getComputedStyle(s).getPropertyValue('--sr')) || 0;
-      const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
-      const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const cx = sx * (1 - ease);
-      const cy = sy * (1 - ease);
-      const cr = sr * (1 - ease);
-      const cRx = rxVal * (1 - ease);
-      const cRy = ryVal * (1 - ease);
-      s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
-      s.style.opacity = 0.7 + ease * 0.3;
-      const textFade = Math.max(0, 1 - ease * 2.5);
-      s.style.color = `rgba(113,113,122,${textFade})`;
-      if (ease > 0.7) {
-        s.style.borderColor = `rgba(255,255,255,${0.1 * (1 - (ease - 0.7) / 0.3)})`;
+  // When glass-wrap enters viewport, trigger assembly after a short delay
+  const glassObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        setTimeout(() => {
+          glassWrap.classList.add('assembled');
+          shards.forEach(s => {
+            s.style.transform = 'translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)';
+            s.style.opacity = '1';
+            s.style.color = 'transparent';
+            s.style.borderColor = 'transparent';
+          });
+        }, 600);
+        glassObs.unobserve(e.target);
       }
     });
-  }
-
-  window.addEventListener('scroll', updateGlassAssemble, { passive: true });
-  updateGlassAssemble();
+  }, { threshold: 0.15 });
+  glassObs.observe(glassWrap);
 }
 
 // ═══════════════════════════════════════════
