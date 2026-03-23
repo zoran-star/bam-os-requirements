@@ -473,7 +473,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 .shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
 .glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:transparent;border-width:0;box-shadow:none;border-radius:0;font-size:0;color:transparent;background:linear-gradient(145deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))}
 .glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.025)}
-[data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.05),rgba(0,0,0,0.02));border-color:rgba(0,0,0,0.1);box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),0 4px 12px rgba(0,0,0,0.1)}
+[data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.07),rgba(0,0,0,0.035));border:2px solid rgba(0,0,0,0.1);box-shadow:0 8px 28px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,255,255,0.7);color:rgba(0,0,0,0.35)}
 [data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.15) 0%,rgba(168,136,46,0.04) 35%,transparent 65%)}
 [data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.08);box-shadow:none}
 </style>
@@ -622,14 +622,6 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
           <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Unclear priorities</li>
           <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Lost opportunities</li>
         </ul>
-        <div class="problem-stat rv rv-d4">
-          <div class="problem-stat-num count-up" data-target="15" data-suffix="+">0</div>
-          <div class="problem-stat-label">hours saved weekly per operator</div>
-          <button class="stat-toggle" id="statToggle">More detail <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="stat-expand" id="statExpand">
-            <p style="font-size:13px;color:var(--g400);line-height:1.6;margin-top:8px">We've surveyed all of our academy owners, who report savings with simple communication automations, automated scheduling, and better organization. Just a fraction of what FullControl looks to do.</p>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -735,7 +727,12 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
         <div class="demo-dot"></div>
         <div class="demo-url">app.fullcontrol.io</div>
       </div>
-      <iframe class="demo-iframe" id="protoFrame" src="../sales-desktop/dist/index.html" loading="lazy" title="FullControl Prototype"></iframe>
+      <div class="demo-iframe" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+        <div style="width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#111">FC</div>
+        <div style="font-size:18px;font-weight:700;color:var(--white);letter-spacing:-0.02em">Interactive Prototype</div>
+        <div style="font-size:14px;color:var(--g400);max-width:360px;text-align:center;line-height:1.5">A live, clickable prototype of the FullControl command center is available upon request.</div>
+        <a href="mailto:hello@fullcontrol.io" style="font-size:13px;font-weight:700;color:#fff;background:var(--accent);padding:10px 24px;border-radius:10px;margin-top:8px;text-shadow:0 1px 2px rgba(0,0,0,0.2)">Request Access</a>
+      </div>
     </div>
   </div>
 </section>
@@ -1279,7 +1276,7 @@ if (glassWrap) {
     const rx = getComputedStyle(s).getPropertyValue('--rx') || '0deg';
     const ry = getComputedStyle(s).getPropertyValue('--ry') || '0deg';
     s.style.transform = `translate(${sx},${sy}) rotate(${sr}) rotateX(${rx}) rotateY(${ry})`;
-    s.style.opacity = '0.45';
+    s.style.opacity = '0.7';
   });
 
   function updateGlassAssemble() {
@@ -1308,7 +1305,7 @@ if (glassWrap) {
         const cRx = rxVal * (1 - ease);
         const cRy = ryVal * (1 - ease);
         s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
-        s.style.opacity = 0.45 + ease * 0.55;
+        s.style.opacity = 0.7 + ease * 0.3;
         // Fade out shard text and borders as assembly nears completion
         const textFade = Math.max(0, 1 - ease * 2.5); // text fades out by 40% progress
         s.style.color = `rgba(113,113,122,${textFade})`;
