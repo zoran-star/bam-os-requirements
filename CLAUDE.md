@@ -34,6 +34,14 @@ This repository holds the interactive business requirements flow diagram for BAM
 - `ux/BAM_OS_UX_DECISIONS.md` — confirmed UX & interaction design decisions (navigation, Sage AI, design system, micro-interactions, notifications, multi-location, role-based views). This is the source of truth for how BAM OS looks, feels, and behaves.
 - `branding/CONTEXT.md` — brand & naming context
 
+## Landing pages
+
+### Investor page (`prototypes/fc-company/index.html`)
+This is the page we send to investors. It covers mission, market sizing, ARR projections, "why us / why now", and product wedge. **This is the active investor-facing page — edits go here.**
+
+### Product landing page (`prototypes/fc-landing/index.html`)
+Initial prototype of the customer-facing landing page. General service-business positioning, feature grid, Sage AI demo, revenue calculator, early access signup. Not currently active — kept as a reference/starting point.
+
 ## Desktop prototype app
 The interactive desktop prototype is a Vite/React app located at:
 
