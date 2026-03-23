@@ -1274,7 +1274,20 @@ if (glassWrap) {
     s.style.opacity = '0.45';
   });
 
+  let assembled = false;
+  function assemble() {
+    if (assembled) return;
+    assembled = true;
+    glassWrap.classList.add('assembled');
+    shards.forEach(s => {
+      s.style.transform = 'translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)';
+      s.style.opacity = '1';
+    });
+    window.removeEventListener('scroll', updateGlassAssemble);
+  }
+
   function updateGlassAssemble() {
+    if (assembled) return;
     const rect = glassWrap.getBoundingClientRect();
     const viewH = window.innerHeight;
     const start = viewH;
@@ -1282,9 +1295,8 @@ if (glassWrap) {
     const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
 
     if (progress >= 0.95) {
-      glassWrap.classList.add('assembled');
+      assemble();
     } else {
-      glassWrap.classList.remove('assembled');
       shards.forEach(s => {
         const sx = parseFloat(getComputedStyle(s).getPropertyValue('--sx')) || 0;
         const sy = parseFloat(getComputedStyle(s).getPropertyValue('--sy')) || 0;
@@ -1292,12 +1304,7 @@ if (glassWrap) {
         const rxVal = parseFloat(getComputedStyle(s).getPropertyValue('--rx')) || 0;
         const ryVal = parseFloat(getComputedStyle(s).getPropertyValue('--ry')) || 0;
         const ease = 1 - Math.pow(1 - progress, 3);
-        const cx = sx * (1 - ease);
-        const cy = sy * (1 - ease);
-        const cr = sr * (1 - ease);
-        const cRx = rxVal * (1 - ease);
-        const cRy = ryVal * (1 - ease);
-        s.style.transform = `translate(${cx}px,${cy}px) rotate(${cr}deg) rotateX(${cRx}deg) rotateY(${cRy}deg)`;
+        s.style.transform = `translate(${sx*(1-ease)}px,${sy*(1-ease)}px) rotate(${sr*(1-ease)}deg) rotateX(${rxVal*(1-ease)}deg) rotateY(${ryVal*(1-ease)}deg)`;
         s.style.opacity = 0.45 + ease * 0.55;
       });
     }
@@ -1305,6 +1312,17 @@ if (glassWrap) {
 
   window.addEventListener('scroll', updateGlassAssemble, { passive: true });
   updateGlassAssemble();
+
+  // Fallback: if scroll-driven doesn't trigger, assemble when visible for 1.5s
+  const glassFallback = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting && !assembled) {
+        setTimeout(() => { if (!assembled) assemble(); }, 1500);
+        glassFallback.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  glassFallback.observe(glassWrap);
 }
 
 // ═══════════════════════════════════════════
