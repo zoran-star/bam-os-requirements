@@ -127,7 +127,7 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .nav-links a:hover{color:var(--white)}
 .nav-contact{font-size:12px;font-weight:700;color:#fff;background:var(--accent);padding:10px 22px;border-radius:10px;transition:all .2s;letter-spacing:0.01em;box-shadow:0 2px 12px rgba(200,168,78,0.3);text-shadow:0 1px 2px rgba(0,0,0,0.2)}
 .nav-contact:hover{background:var(--accent-l);transform:translateY(-1px);box-shadow:0 6px 24px rgba(200,168,78,0.4)}
-@media(max-width:640px){.nav-links a:not(.nav-contact):not(.theme-toggle){display:none}}
+@media(max-width:640px){.nav-links a:not(.nav-contact):not(.theme-toggle){display:none}.nav-contact{font-size:11px;padding:8px 16px}}
 
 /* ═══════════════════════════════════════════
    HERO — ONE-PAGER TITLE CARD
@@ -460,8 +460,8 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
    GLASS ASSEMBLE ANIMATION
    ═══════════════════════════════════════════ */
 .glass-wrap{position:relative;width:420px;height:282px;margin:0 auto 40px;perspective:1000px;transform-style:preserve-3d}
-@media(max-width:600px){.glass-wrap{width:300px;height:201px}}
-@media(max-width:600px){.glass-wrap .shard{font-size:8px}}
+@media(max-width:600px){.glass-wrap{width:280px;height:188px;margin:0 auto 24px}}
+@media(max-width:600px){.glass-wrap .shard{font-size:7px}}
 #problem{overflow:hidden}
 .glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
 .glass-wrap.assembled .glass-glow{opacity:1}
@@ -469,6 +469,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 .glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
 .glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
 .glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
+@media(max-width:600px){.glass-label-name{font-size:12px}.glass-label-tag{font-size:8px}}
 .glass-wrap.assembled .glass-label{opacity:1}
 .shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
 .glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
@@ -1264,16 +1265,30 @@ updateTimeline();
   if (!gw) return;
   var shards = gw.querySelectorAll('.shard');
   var done = false;
+  var mobile = window.innerWidth <= 600;
+  var scale = mobile ? 0.667 : 1; // 280/420 ratio for mobile
 
-  // Set initial scattered positions
+  // Scale shard positions on mobile
+  if (mobile) {
+    for (var m = 0; m < shards.length; m++) {
+      var ms = shards[m];
+      ms.style.width = (parseFloat(ms.style.width) * scale) + 'px';
+      ms.style.height = (parseFloat(ms.style.height) * scale) + 'px';
+      ms.style.top = (parseFloat(ms.style.top) * scale) + 'px';
+      ms.style.left = (parseFloat(ms.style.left) * scale) + 'px';
+    }
+  }
+
+  // Set initial scattered positions (reduce scatter on mobile)
+  var scatterScale = mobile ? 0.5 : 1;
   for (var i = 0; i < shards.length; i++) {
     var s = shards[i];
-    var sx = s.style.getPropertyValue('--sx') || '0px';
-    var sy = s.style.getPropertyValue('--sy') || '0px';
+    var sx = parseFloat(s.style.getPropertyValue('--sx')) || 0;
+    var sy = parseFloat(s.style.getPropertyValue('--sy')) || 0;
     var sr = s.style.getPropertyValue('--sr') || '0deg';
     var rx = s.style.getPropertyValue('--rx') || '0deg';
     var ry = s.style.getPropertyValue('--ry') || '0deg';
-    s.style.transform = 'translate(' + sx + ',' + sy + ') rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
+    s.style.transform = 'translate(' + (sx * scatterScale) + 'px,' + (sy * scatterScale) + 'px) rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
   }
 
   function doAssemble() {
