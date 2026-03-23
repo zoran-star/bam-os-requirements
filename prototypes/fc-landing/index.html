@@ -1,285 +1,337 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FullControl — The Command Center for Your Business</title>
-<meta name="description" content="Stop juggling tools. FullControl is the AI-powered command center that runs your entire service business from one place.">
+<title>FullControl — Talk to Your Business</title>
+<meta name="description" content="FullControl is the AI-powered command center that lets you talk to your business. It listens, decides, and executes.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════════
+/* ===================================================
    RESET & BASE
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:#09090b;color:#fafafa;line-height:1.6;overflow-x:hidden}
+body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden;transition:background .4s ease,color .4s ease}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none}
 img{max-width:100%;display:block}
 
-/* ═══════════════════════════════════════════════════
-   TOKENS
-   ═══════════════════════════════════════════════════ */
-:root{
+/* ===================================================
+   DARK THEME
+   =================================================== */
+[data-theme="dark"]{
+  --bg:#09090b;
+  --bg-alt:#18181b;
   --white:#fafafa;
-  --gray-50:#f4f4f5;
-  --gray-100:#e4e4e7;
-  --gray-200:#d4d4d8;
-  --gray-300:#a1a1aa;
-  --gray-400:#71717a;
-  --gray-500:#52525b;
-  --gray-600:#3f3f46;
-  --gray-700:#27272a;
-  --gray-800:#18181b;
-  --gray-900:#09090b;
-  --accent:#c8a84e;
-  --accent-light:#d4b65c;
+  --g50:#f4f4f5;--g100:#e4e4e7;--g200:#d4d4d8;--g300:#a1a1aa;
+  --g400:#71717a;--g500:#52525b;--g600:#3f3f46;--g700:#27272a;
+  --g800:#18181b;--g900:#09090b;
+  --text:#e4e4e7;
+  --accent:#c8a84e;--accent-l:#d4b65c;
   --accent-glow:rgba(200,168,78,0.15);
   --accent-subtle:rgba(200,168,78,0.06);
+  --glow:rgba(200,168,78,0.12);
+  --card-bg:rgba(255,255,255,0.02);
+  --card-border:rgba(255,255,255,0.05);
+  --card-hover-border:rgba(200,168,78,0.15);
+  --card-hover-bg:rgba(200,168,78,0.02);
+  --divider:rgba(255,255,255,0.06);
+  --nav-scrolled:rgba(9,9,11,0.92);
+  --nav-border:rgba(255,255,255,0.04);
   --max-w:1120px;
   --ease:cubic-bezier(0.4,0,0.2,1);
 }
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
+   LIGHT THEME
+   =================================================== */
+[data-theme="light"]{
+  --bg:#fafaf9;
+  --bg-alt:#f5f5f0;
+  --white:#18181b;
+  --g50:#27272a;--g100:#3f3f46;--g200:#52525b;--g300:#71717a;
+  --g400:#a1a1aa;--g500:#d4d4d8;--g600:#e4e4e7;--g700:#f4f4f5;
+  --g800:#fafaf9;--g900:#fafaf9;
+  --text:#3f3f46;
+  --accent:#a8882e;--accent-l:#b8982e;
+  --accent-glow:rgba(168,136,46,0.08);
+  --accent-subtle:rgba(168,136,46,0.06);
+  --glow:rgba(168,136,46,0.08);
+  --card-bg:rgba(0,0,0,0.02);
+  --card-border:rgba(0,0,0,0.07);
+  --card-hover-border:rgba(168,136,46,0.2);
+  --card-hover-bg:rgba(168,136,46,0.04);
+  --divider:rgba(0,0,0,0.06);
+  --nav-scrolled:rgba(250,250,249,0.92);
+  --nav-border:rgba(0,0,0,0.06);
+  --max-w:1120px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+}
+[data-theme="light"] .nav-logo-mark{color:#fff!important}
+[data-theme="light"] .btn-primary{color:#fff!important}
+[data-theme="light"] .nav-cta{color:#fff!important}
+[data-theme="light"] .hero h1 span{-webkit-text-fill-color:var(--accent)}
+[data-theme="light"] .sage-msg-ai .sage-msg-orb{color:#fff}
+[data-theme="light"] .hero-mockup-orb{color:#fff}
+[data-theme="light"] .shard{background:linear-gradient(145deg,rgba(0,0,0,0.07),rgba(0,0,0,0.035));border:2px solid rgba(0,0,0,0.1);box-shadow:0 8px 28px rgba(0,0,0,0.12),0 2px 8px rgba(0,0,0,0.08),inset 0 1px 0 rgba(255,255,255,0.7);color:rgba(0,0,0,0.35)}
+[data-theme="light"] .glass-glow{background:radial-gradient(ellipse at center,rgba(168,136,46,0.15) 0%,rgba(168,136,46,0.04) 35%,transparent 65%)}
+[data-theme="light"] .glass-wrap.assembled .shard{border-color:rgba(168,136,46,0.08);box-shadow:none}
+
+/* ===================================================
    LAYOUT
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 .container{max-width:var(--max-w);margin:0 auto;padding:0 24px}
 section{padding:120px 0}
-@media(max-width:768px){section{padding:80px 0}}
+@media(max-width:768px){section{padding:80px 0}.container{padding:0 20px}}
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
+   DIVIDER
+   =================================================== */
+.div-line{height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent);margin:0}
+
+/* ===================================================
    SCROLL ANIMATIONS
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 .reveal{opacity:0;transform:translateY(32px);transition:opacity 0.7s var(--ease),transform 0.7s var(--ease)}
 .reveal.visible{opacity:1;transform:translateY(0)}
 .reveal-delay-1{transition-delay:0.1s}
 .reveal-delay-2{transition-delay:0.2s}
 .reveal-delay-3{transition-delay:0.3s}
 .reveal-delay-4{transition-delay:0.4s}
+.reveal-delay-5{transition-delay:0.5s}
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
+   THEME TOGGLE
+   =================================================== */
+.theme-toggle{width:36px;height:36px;border-radius:10px;background:var(--card-bg);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s var(--ease);color:var(--g300)}
+.theme-toggle:hover{border-color:var(--card-hover-border);color:var(--accent)}
+[data-theme="dark"] .theme-toggle .icon-sun{display:none}
+[data-theme="dark"] .theme-toggle .icon-moon{display:block}
+[data-theme="light"] .theme-toggle .icon-sun{display:block}
+[data-theme="light"] .theme-toggle .icon-moon{display:none}
+
+/* ===================================================
    NAV
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;transition:all 0.3s var(--ease)}
-nav.scrolled{background:rgba(9,9,11,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.04)}
+nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--nav-border)}
 .nav-inner{max-width:var(--max-w);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between}
-.nav-logo{font-size:18px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:8px}
-.nav-logo-mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-light));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#111}
-.nav-links{display:flex;align-items:center;gap:32px}
-.nav-links a{font-size:14px;font-weight:500;color:var(--gray-300);transition:color 0.2s}
+.nav-logo{font-size:18px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:8px;color:var(--white)}
+.nav-logo-mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#111}
+.nav-links{display:flex;align-items:center;gap:28px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--g300);transition:color 0.2s}
 .nav-links a:hover{color:var(--white)}
-.nav-cta{font-size:13px;font-weight:700;color:#111;background:var(--accent);padding:9px 22px;border-radius:10px;transition:all 0.2s}
-.nav-cta:hover{background:var(--accent-light);transform:translateY(-1px);box-shadow:0 4px 20px rgba(200,168,78,0.25)}
+.nav-cta{font-size:13px;font-weight:700;color:#111;background:var(--accent);padding:9px 22px;border-radius:12px;transition:all 0.2s;box-shadow:0 2px 12px rgba(200,168,78,0.3);text-shadow:0 1px 2px rgba(0,0,0,0.2)}
+.nav-cta:hover{background:var(--accent-l);transform:translateY(-1px);box-shadow:0 6px 24px rgba(200,168,78,0.4)}
 @media(max-width:768px){
-  .nav-links a:not(.nav-cta){display:none}
+  .nav-links a:not(.nav-cta):not(.theme-toggle){display:none}
+  .nav-cta{font-size:11px;padding:8px 16px}
 }
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
    HERO
-   ═══════════════════════════════════════════════════ */
-.hero{padding:180px 0 140px;text-align:center;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.6}
-.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.12);border-radius:100px;padding:6px 16px;margin-bottom:28px;letter-spacing:0.02em}
+   =================================================== */
+.hero{padding:200px 0 160px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:1000px;height:1000px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.8}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.12);border-radius:100px;padding:6px 16px;margin-bottom:28px;letter-spacing:0.02em;overflow:hidden}
 .hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-.hero h1{font-size:clamp(42px,6vw,72px);font-weight:900;letter-spacing:-0.04em;line-height:1.05;color:var(--white);margin-bottom:20px}
-.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero-sub{font-size:clamp(16px,2vw,20px);font-weight:400;color:var(--gray-300);max-width:540px;margin:0 auto 40px;line-height:1.6}
+.hero-badge-text{display:inline-block;transition:opacity 250ms var(--ease),transform 250ms var(--ease);white-space:nowrap}
+.hero-badge-text.out{opacity:0;transform:translateY(-8px)}
+.hero h1{font-size:clamp(48px,7vw,80px);font-weight:900;letter-spacing:-0.05em;line-height:1.05;color:var(--white);margin-bottom:20px}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(17px,2.2vw,21px);font-weight:400;color:var(--g300);max-width:560px;margin:0 auto 40px;line-height:1.6}
 .hero-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
-.btn-primary{font-size:15px;font-weight:700;color:#111;background:var(--accent);padding:14px 32px;border-radius:14px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px}
-.btn-primary:hover{background:var(--accent-light);transform:translateY(-2px);box-shadow:0 8px 30px rgba(200,168,78,0.3)}
-.btn-secondary{font-size:15px;font-weight:600;color:var(--gray-300);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:14px 32px;border-radius:14px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px}
-.btn-secondary:hover{color:var(--white);border-color:rgba(255,255,255,0.16);background:rgba(255,255,255,0.08)}
-.hero-visual{margin-top:80px;position:relative}
-.hero-visual-inner{max-width:900px;margin:0 auto;border-radius:20px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg,rgba(255,255,255,0.02) 0%,rgba(255,255,255,0.005) 100%);padding:3px;overflow:hidden;box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}
-.hero-mockup{width:100%;border-radius:17px;background:var(--gray-800);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.btn-primary{font-size:15px;font-weight:700;color:#111;background:var(--accent);padding:16px 36px;border-radius:16px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px;letter-spacing:0.01em}
+.btn-primary:hover{background:var(--accent-l);transform:translateY(-2px);box-shadow:0 12px 40px rgba(200,168,78,0.35)}
+.btn-secondary{font-size:15px;font-weight:600;color:var(--g300);background:var(--card-bg);border:1px solid var(--card-border);padding:14px 32px;border-radius:14px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px}
+.btn-secondary:hover{color:var(--white);border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.hero-visual{margin-top:96px;position:relative}
+.hero-visual-inner{max-width:900px;margin:0 auto;border-radius:20px;border:1px solid var(--card-border);border-top:1px solid rgba(200,168,78,0.08);background:linear-gradient(180deg,var(--card-bg) 0%,rgba(255,255,255,0.005) 100%);padding:3px;overflow:hidden;box-shadow:0 32px 100px rgba(0,0,0,0.6),0 0 0 1px var(--card-border)}
+.hero-mockup{width:100%;border-radius:17px;background:var(--g800);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .hero-mockup-grid{position:absolute;inset:0;opacity:0.04;background-image:linear-gradient(rgba(255,255,255,0.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.3) 1px,transparent 1px);background-size:40px 40px}
 .hero-mockup-content{position:relative;z-index:1;text-align:center;padding:40px}
-.hero-mockup-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray-400);margin-bottom:8px}
-.hero-mockup-title{font-size:28px;font-weight:800;letter-spacing:-0.03em;color:var(--gray-200)}
-.hero-mockup-orb{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-light));margin:20px auto 0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111;box-shadow:0 0 40px rgba(200,168,78,0.3)}
-.hero-trust{margin-top:48px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;color:var(--gray-400)}
+.hero-mockup-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--g400);margin-bottom:8px}
+.hero-mockup-title{font-size:28px;font-weight:800;letter-spacing:-0.03em;color:var(--g200)}
+.hero-mockup-orb{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-l));margin:20px auto 0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111;box-shadow:0 0 40px rgba(200,168,78,0.3)}
+.hero-trust{margin-top:48px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;color:var(--g400)}
 .hero-trust svg{flex-shrink:0}
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
    SECTION HEADERS
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 .section-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent);margin-bottom:14px}
-.section-title{font-size:clamp(30px,4vw,44px);font-weight:900;letter-spacing:-0.035em;line-height:1.1;color:var(--white);margin-bottom:16px}
-.section-sub{font-size:17px;font-weight:400;color:var(--gray-300);max-width:520px;line-height:1.6}
+.section-title{font-size:clamp(34px,4.5vw,52px);font-weight:900;letter-spacing:-0.04em;line-height:1.1;color:var(--white);margin-bottom:16px}
+.section-sub{font-size:17px;font-weight:400;color:var(--g300);max-width:520px;line-height:1.6}
 .section-center{text-align:center}
 .section-center .section-sub{margin:0 auto}
 
-/* ═══════════════════════════════════════════════════
-   PROBLEM SECTION
-   ═══════════════════════════════════════════════════ */
-.problem{background:var(--gray-900);position:relative}
-.problem::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
-.problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
-@media(max-width:768px){.problem-grid{grid-template-columns:1fr;gap:12px}}
-.problem-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:18px;padding:28px 24px;transition:all 0.3s var(--ease)}
-.problem-card:hover{border-color:rgba(224,90,66,0.15);background:rgba(224,90,66,0.02)}
-.problem-icon{width:40px;height:40px;border-radius:12px;background:rgba(224,90,66,0.08);color:#e05a42;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
-.problem-card h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
-.problem-card p{font-size:14px;color:var(--gray-400);line-height:1.5}
+/* ===================================================
+   BELIEF STATEMENT
+   =================================================== */
+.belief{background:var(--bg-alt);position:relative}
+.belief::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.belief-body{max-width:680px;margin:0 auto;text-align:center}
+.belief-body p{font-size:18px;font-weight:400;color:var(--g200);line-height:1.7;margin-bottom:20px}
+.belief-body p:last-child{margin-bottom:0}
+.belief-body strong{color:var(--white);font-weight:700}
+@keyframes accentGlow{0%,100%{text-shadow:0 0 0 transparent}50%{text-shadow:0 0 20px rgba(200,168,78,0.2)}}
+.bq{position:relative;max-width:640px;margin:48px auto;padding:32px 0 32px 28px;border-left:3px solid var(--accent)}
+.bq::before{content:'';position:absolute;left:-1px;top:0;bottom:0;width:8px;background:linear-gradient(180deg,rgba(200,168,78,0.15),rgba(200,168,78,0));pointer-events:none}
+.bq p{font-size:20px;font-weight:500;color:var(--g100);line-height:1.55;letter-spacing:-0.01em;font-style:italic}
+.bq em{font-style:normal;color:var(--accent);font-weight:700}
+.bq.visible em{animation:accentGlow 3s var(--ease) infinite;animation-delay:1s}
+@media(max-width:768px){.bq p{font-size:17px}.bq{padding:28px 0 28px 24px;margin:40px auto}}
 
-/* ═══════════════════════════════════════════════════
-   SOLUTION / TRANSFORMATION
-   ═══════════════════════════════════════════════════ */
-.solution{position:relative}
-.solution::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.3}
-.transformation{display:flex;gap:48px;margin-top:56px;align-items:center}
-@media(max-width:768px){.transformation{flex-direction:column;gap:32px}}
-.transform-side{flex:1}
-.transform-before,.transform-after{border-radius:20px;padding:32px;position:relative}
-.transform-before{background:rgba(224,90,66,0.03);border:1px solid rgba(224,90,66,0.1)}
-.transform-after{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.12)}
-.transform-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
-.transform-label-before{color:#e05a42}
-.transform-label-after{color:var(--accent)}
-.transform-list{list-style:none;display:flex;flex-direction:column;gap:12px}
-.transform-list li{font-size:15px;font-weight:500;display:flex;align-items:center;gap:10px}
-.transform-before .transform-list li{color:var(--gray-400)}
-.transform-after .transform-list li{color:var(--gray-200)}
-.transform-list li svg{flex-shrink:0}
-.transform-arrow{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:48px;color:var(--gray-500)}
-@media(max-width:768px){.transform-arrow{transform:rotate(90deg)}}
+/* ===================================================
+   GLASS ASSEMBLE ANIMATION
+   =================================================== */
+.glass-section{position:relative;overflow:hidden}
+.glass-section::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.glass-wrap{position:relative;width:420px;height:282px;margin:0 auto 40px;perspective:1000px;transform-style:preserve-3d}
+@media(max-width:600px){.glass-wrap{width:280px;height:188px;margin:0 auto 24px}}
+@media(max-width:600px){.glass-wrap .shard{font-size:7px}}
+.glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
+.glass-wrap.assembled .glass-glow{opacity:1}
+.glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px}
+.glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
+.glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
+.glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
+@media(max-width:600px){.glass-label-name{font-size:12px}.glass-label-tag{font-size:8px}}
+.glass-wrap.assembled .glass-label{opacity:1}
+.shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
+.glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
+.glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.025)}
 
-/* ═══════════════════════════════════════════════════
+/* Tool icon cards below glass */
+.glass-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px;max-width:580px;margin-left:auto;margin-right:auto}
+@media(max-width:600px){.glass-tools{grid-template-columns:repeat(2,1fr)}}
+.glass-tool{background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:16px 14px;transition:all .3s var(--ease)}
+.glass-tool:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg)}
+.glass-tool-icon{width:28px;height:28px;border-radius:8px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.glass-tool h4{font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px}
+.glass-tool p{font-size:11px;color:var(--g400);line-height:1.4}
+.glass-supporting{font-size:16px;font-weight:400;color:var(--g300);max-width:540px;margin:32px auto 0;text-align:center;line-height:1.65}
+.glass-supporting strong{color:var(--g100);font-weight:600}
+
+/* ===================================================
    HOW IT WORKS
-   ═══════════════════════════════════════════════════ */
-.how{background:var(--gray-800);border-top:1px solid rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.04)}
+   =================================================== */
+.how{background:var(--bg-alt);border-top:1px solid var(--divider);border-bottom:1px solid var(--divider)}
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:56px}
 @media(max-width:900px){.steps{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.steps{grid-template-columns:1fr}}
-.step{position:relative;padding:32px 24px;border-radius:20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);transition:all 0.3s var(--ease)}
-.step:hover{border-color:rgba(200,168,78,0.15);background:rgba(200,168,78,0.02)}
+.step{position:relative;padding:32px 24px;border-radius:24px;background:var(--card-bg);border:1px solid var(--card-border);transition:all 0.3s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.step:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg);transform:translateY(-3px)}
 .step-num{font-size:48px;font-weight:900;font-family:'Nunito',sans-serif;letter-spacing:-0.04em;color:rgba(200,168,78,0.12);line-height:1;margin-bottom:16px}
 .step h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
-.step p{font-size:14px;color:var(--gray-400);line-height:1.5}
+.step p{font-size:14px;color:var(--g400);line-height:1.5}
 
-/* ═══════════════════════════════════════════════════
-   FEATURES
-   ═══════════════════════════════════════════════════ */
-.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
-@media(max-width:768px){.features-grid{grid-template-columns:1fr}}
-.feature{border-radius:20px;padding:32px 28px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);transition:all 0.3s var(--ease)}
-.feature:hover{border-color:rgba(200,168,78,0.15);background:rgba(200,168,78,0.02);transform:translateY(-2px)}
-.feature-icon{width:44px;height:44px;border-radius:13px;background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
-.feature h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
-.feature p{font-size:14px;color:var(--gray-400);line-height:1.5}
-
-/* ═══════════════════════════════════════════════════
-   DIFFERENTIATION
-   ═══════════════════════════════════════════════════ */
-.diff{background:var(--gray-900)}
-.diff::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
-.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:56px;max-width:780px}
-@media(max-width:600px){.diff-grid{grid-template-columns:1fr}}
-.diff-card{border-radius:20px;padding:32px 28px}
-.diff-old{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)}
-.diff-new{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.15)}
-.diff-card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:18px}
-.diff-old .diff-card-label{color:var(--gray-400)}
-.diff-new .diff-card-label{color:var(--accent)}
-.diff-card ul{list-style:none;display:flex;flex-direction:column;gap:10px}
-.diff-card li{font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;line-height:1.4}
-.diff-old li{color:var(--gray-400)}
-.diff-new li{color:var(--gray-200)}
-
-/* ═══════════════════════════════════════════════════
-   SIMPLICITY / VISUAL SECTION
-   ═══════════════════════════════════════════════════ */
-.simplicity{text-align:center;position:relative}
-.simplicity-visual{margin-top:56px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
-.sim-pill{display:flex;align-items:center;gap:10px;padding:14px 24px;border-radius:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);font-size:14px;font-weight:600;color:var(--gray-200);transition:all 0.3s var(--ease)}
-.sim-pill:hover{border-color:rgba(200,168,78,0.2);background:rgba(200,168,78,0.03)}
-.sim-pill svg{color:var(--accent);flex-shrink:0}
-.simplicity-quote{margin-top:48px;max-width:500px;margin-left:auto;margin-right:auto}
-.simplicity-quote p{font-size:20px;font-weight:600;color:var(--gray-200);line-height:1.5;font-style:italic;letter-spacing:-0.01em}
-.simplicity-quote span{display:block;margin-top:12px;font-size:13px;font-weight:500;color:var(--gray-400);font-style:normal}
-
-/* ═══════════════════════════════════════════════════
-   CTA SECTION
-   ═══════════════════════════════════════════════════ */
-.cta-section{padding:120px 0 140px;text-align:center;position:relative}
-.cta-section::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.4}
-.cta-section h2{font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-0.04em;line-height:1.1;color:var(--white);margin-bottom:16px}
-.cta-section h2 span{background:linear-gradient(135deg,var(--accent),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.cta-section .section-sub{margin:0 auto 40px;max-width:460px}
-.cta-form{display:flex;align-items:center;gap:10px;justify-content:center;max-width:440px;margin:0 auto;flex-wrap:wrap}
-.cta-input{flex:1;min-width:200px;font-family:inherit;font-size:15px;font-weight:500;color:var(--white);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px 20px;outline:none;transition:all 0.2s}
-.cta-input::placeholder{color:var(--gray-500)}
-.cta-input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(200,168,78,0.1)}
-.cta-note{margin-top:14px;font-size:12px;font-weight:500;color:var(--gray-500)}
-
-/* ═══════════════════════════════════════════════════
-   FOOTER
-   ═══════════════════════════════════════════════════ */
-footer{border-top:1px solid rgba(255,255,255,0.04);padding:40px 0}
-.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
-.footer-brand{font-size:14px;font-weight:700;color:var(--gray-400);display:flex;align-items:center;gap:8px}
-.footer-links{display:flex;gap:24px}
-.footer-links a{font-size:13px;font-weight:500;color:var(--gray-500);transition:color 0.2s}
-.footer-links a:hover{color:var(--gray-300)}
-.footer-copy{font-size:12px;color:var(--gray-600)}
-
-/* ═══════════════════════════════════════════════════
-   TERMINAL BOOT SEQUENCE
-   ═══════════════════════════════════════════════════ */
-.hero-terminal{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:32px 40px;background:var(--gray-800);border-radius:17px;transition:opacity 0.6s var(--ease)}
-.hero-terminal.done{opacity:0;pointer-events:none}
-.term-line{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--gray-400);opacity:0;transform:translateY(4px);transition:opacity 0.15s,transform 0.15s;line-height:1.8;white-space:nowrap}
-.term-line.show{opacity:1;transform:translateY(0)}
-.term-line .term-ok{color:var(--accent);font-weight:500}
-.term-line .term-dots{color:var(--gray-500)}
-.term-line.term-final{color:var(--accent);font-weight:600;font-size:14px;margin-top:8px}
-.term-cursor{display:inline-block;width:8px;height:16px;background:var(--accent);margin-left:4px;vertical-align:text-bottom;animation:termBlink 0.8s step-end infinite}
-@keyframes termBlink{0%,100%{opacity:1}50%{opacity:0}}
-
-/* ═══════════════════════════════════════════════════
-   SAGE AI DEMO CHAT
-   ═══════════════════════════════════════════════════ */
-.sage-demo{background:var(--gray-900);position:relative}
+/* ===================================================
+   SAGE AI DEMO
+   =================================================== */
+.sage-demo{position:relative}
 .sage-demo::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(200,168,78,0.1),transparent)}
-.sage-window{max-width:640px;margin:56px auto 0;border-radius:24px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,0.4)}
-.sage-window-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01)}
-.sage-window-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.06)}
-.sage-window-title{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--gray-400);letter-spacing:0.02em}
+.sage-window{max-width:640px;margin:56px auto 0;border-radius:24px;border:1px solid var(--card-border);background:var(--card-bg);overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,0.4)}
+.sage-window-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid var(--card-border);background:var(--card-bg)}
+.sage-window-dot{width:10px;height:10px;border-radius:50%;background:var(--g600)}
+.sage-window-title{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--g400);letter-spacing:0.02em}
 .sage-chat{padding:24px 20px;display:flex;flex-direction:column;gap:16px;min-height:280px}
 .sage-msg{max-width:85%;display:flex;gap:10px;opacity:0;transform:translateY(10px);transition:opacity 0.4s var(--ease),transform 0.4s var(--ease)}
 .sage-msg.show{opacity:1;transform:translateY(0)}
 .sage-msg-user{align-self:flex-end;flex-direction:row-reverse}
 .sage-msg-ai{align-self:flex-start}
 .sage-msg-orb{width:30px;height:30px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
-.sage-msg-user .sage-msg-orb{background:rgba(255,255,255,0.06);color:var(--gray-300)}
-.sage-msg-ai .sage-msg-orb{background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#111}
+.sage-msg-user .sage-msg-orb{background:var(--card-bg);border:1px solid var(--card-border);color:var(--g300)}
+.sage-msg-ai .sage-msg-orb{background:linear-gradient(135deg,var(--accent),var(--accent-l));color:#111}
 .sage-bubble{border-radius:16px;padding:14px 18px;font-size:14px;font-weight:500;line-height:1.55}
-.sage-msg-user .sage-bubble{background:rgba(255,255,255,0.06);color:var(--gray-200);border-bottom-right-radius:6px}
-.sage-msg-ai .sage-bubble{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--gray-200);border-bottom-left-radius:6px}
+.sage-msg-user .sage-bubble{background:var(--card-bg);border:1px solid var(--card-border);color:var(--g200);border-bottom-right-radius:6px}
+.sage-msg-ai .sage-bubble{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--g200);border-bottom-left-radius:6px}
 .sage-bubble strong{color:var(--accent);font-weight:700}
-.sage-bubble .sage-metric{display:flex;align-items:center;gap:6px;margin-top:6px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--gray-300)}
+.sage-bubble .sage-metric{display:flex;align-items:center;gap:6px;margin-top:6px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--g300)}
 .sage-bubble .sage-metric-up{color:#4ade80}
-.sage-bubble .sage-rec{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);font-size:13px;color:var(--gray-300)}
+.sage-bubble .sage-rec{margin-top:10px;padding-top:10px;border-top:1px solid var(--divider);font-size:13px;color:var(--g300)}
 .sage-bubble .sage-rec strong{color:var(--accent)}
 .sage-typing{display:flex;gap:4px;padding:14px 18px}
-.sage-typing span{width:6px;height:6px;border-radius:50%;background:var(--gray-500);animation:typingDot 1.2s ease-in-out infinite}
+.sage-typing span{width:6px;height:6px;border-radius:50%;background:var(--g500);animation:typingDot 1.2s ease-in-out infinite}
 .sage-typing span:nth-child(2){animation-delay:0.15s}
 .sage-typing span:nth-child(3){animation-delay:0.3s}
 @keyframes typingDot{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
 .sage-input-wrap{padding:12px 20px 20px;display:flex;gap:8px;opacity:0;transition:opacity 0.4s var(--ease)}
 .sage-input-wrap.show{opacity:1}
-.sage-input{flex:1;font-family:inherit;font-size:14px;font-weight:500;color:var(--white);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 16px;outline:none;transition:all 0.2s}
-.sage-input::placeholder{color:var(--gray-500)}
+.sage-input{flex:1;font-family:inherit;font-size:14px;font-weight:500;color:var(--white);background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:12px 16px;outline:none;transition:all 0.2s}
+.sage-input::placeholder{color:var(--g500)}
 .sage-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
 .sage-send{width:40px;height:40px;border-radius:12px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
-.sage-send:hover{background:var(--accent-light);transform:scale(1.05)}
+.sage-send:hover{background:var(--accent-l);transform:scale(1.05)}
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
+   PROTOTYPE EMBED
+   =================================================== */
+.demo{background:var(--bg-alt)}
+.demo::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.demo-frame-wrap{margin-top:48px;position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--card-border);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.demo-topbar{background:var(--card-bg);border-bottom:1px solid var(--card-border);padding:10px 16px;display:flex;align-items:center;gap:8px}
+.demo-dot{width:10px;height:10px;border-radius:50%;background:var(--g600)}
+.demo-dot:first-child{background:#e05a42}
+.demo-dot:nth-child(2){background:#e0a842}
+.demo-dot:nth-child(3){background:#42e05a}
+.demo-url{flex:1;text-align:center;font-size:11px;font-weight:500;color:var(--g500);font-family:'DM Mono',monospace}
+.demo-iframe{width:100%;height:680px;border:none;background:var(--bg)}
+@media(max-width:768px){.demo-iframe{height:480px}}
+
+/* ===================================================
+   FEATURES (2x2)
+   =================================================== */
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:56px}
+@media(max-width:768px){.features-grid{grid-template-columns:1fr}}
+.feature{border-radius:24px;padding:36px 32px;background:var(--card-bg);border:1px solid var(--card-border);transition:all 0.3s var(--ease);box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.feature:hover{border-color:var(--card-hover-border);background:var(--card-hover-bg);transform:translateY(-3px)}
+.feature-icon{width:44px;height:44px;border-radius:13px;background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.feature h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
+.feature p{font-size:14px;color:var(--g400);line-height:1.5}
+
+/* ===================================================
+   TESTIMONIALS + RESULT PILLS
+   =================================================== */
+.testimonials{position:relative}
+.testimonials::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.result-pills{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:48px}
+.result-pill{font-size:13px;font-weight:700;color:var(--accent);background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.12);border-radius:10px;padding:10px 18px}
+.testimonial-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media(max-width:600px){.testimonial-grid{grid-template-columns:1fr}}
+.testimonial-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease);position:relative}
+.testimonial-card:hover{border-color:var(--card-hover-border)}
+.testimonial-card::before{content:'\201C';position:absolute;top:16px;left:20px;font-size:48px;font-family:Georgia,serif;color:rgba(200,168,78,0.15);line-height:1}
+.testimonial-quote{font-size:14px;font-weight:400;color:var(--g200);line-height:1.6;font-style:italic;margin-bottom:16px;padding-top:8px}
+.testimonial-author{font-size:12px;font-weight:700;color:var(--white)}
+.testimonial-role{font-size:11px;font-weight:500;color:var(--g400);margin-top:2px}
+.testimonial-result{font-size:13px;font-weight:700;color:var(--accent);margin-top:10px}
+
+/* ===================================================
+   DIFFERENTIATION
+   =================================================== */
+.diff{background:var(--bg-alt)}
+.diff::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:56px;max-width:780px}
+@media(max-width:600px){.diff-grid{grid-template-columns:1fr}}
+.diff-card{border-radius:24px;padding:32px 28px}
+.diff-old{background:var(--card-bg);border:1px solid var(--card-border)}
+.diff-new{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.15)}
+.diff-card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:18px}
+.diff-old .diff-card-label{color:var(--g400)}
+.diff-new .diff-card-label{color:var(--accent)}
+.diff-card ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.diff-card li{font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;line-height:1.4}
+.diff-old li{color:var(--g400)}
+.diff-new li{color:var(--g200)}
+
+/* ===================================================
    REVENUE CALCULATOR
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 .calc{position:relative}
 .calc::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:400px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.2}
 .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:56px;max-width:860px;margin-left:auto;margin-right:auto;align-items:start}
@@ -287,29 +339,68 @@ footer{border-top:1px solid rgba(255,255,255,0.04);padding:40px 0}
 .calc-controls{display:flex;flex-direction:column;gap:24px}
 .calc-slider-group{display:flex;flex-direction:column;gap:8px}
 .calc-slider-header{display:flex;justify-content:space-between;align-items:center}
-.calc-slider-label{font-size:13px;font-weight:600;color:var(--gray-300)}
+.calc-slider-label{font-size:13px;font-weight:600;color:var(--g300)}
 .calc-slider-value{font-size:15px;font-weight:800;color:var(--white);font-family:'Nunito',sans-serif}
-.calc-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:var(--gray-700);outline:none;cursor:pointer}
-.calc-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--gray-800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3);transition:transform 0.15s}
+.calc-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:var(--g700);outline:none;cursor:pointer}
+.calc-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--g800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3);transition:transform 0.15s}
 .calc-slider::-webkit-slider-thumb:hover{transform:scale(1.15)}
-.calc-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--gray-800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3)}
-.calc-results{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:20px}
+.calc-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--g800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3)}
+.calc-results{background:var(--card-bg);border:1px solid var(--card-border);border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:20px}
 .calc-result-row{display:flex;flex-direction:column;gap:4px}
-.calc-result-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-400)}
+.calc-result-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--g400)}
 .calc-result-value{font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;letter-spacing:-0.03em;color:var(--white);line-height:1}
 .calc-result-value.accent{color:var(--accent)}
 .calc-result-value.red{color:#e05a42}
-.calc-result-sub{font-size:12px;font-weight:500;color:var(--gray-500);margin-top:2px}
-.calc-divider{height:1px;background:rgba(255,255,255,0.06)}
+.calc-result-sub{font-size:12px;font-weight:500;color:var(--g500);margin-top:2px}
+.calc-divider{height:1px;background:var(--divider)}
 
-/* ═══════════════════════════════════════════════════
-   PARALLAX
-   ═══════════════════════════════════════════════════ */
-.hero-mockup-grid,.hero h1,.hero-sub{will-change:transform}
+/* ===================================================
+   CTA SECTION
+   =================================================== */
+.cta-section{padding:120px 0 140px;text-align:center;position:relative}
+.cta-section::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.4}
+.cta-section h2{font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-0.04em;line-height:1.1;color:var(--white);margin-bottom:16px}
+.cta-section h2 span{background:linear-gradient(135deg,var(--accent),var(--accent-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta-section .section-sub{margin:0 auto 32px;max-width:460px}
+.cta-form{display:flex;align-items:center;gap:10px;justify-content:center;max-width:440px;margin:0 auto;flex-wrap:wrap}
+.cta-input{flex:1;min-width:200px;font-family:inherit;font-size:15px;font-weight:500;color:var(--white);background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:14px 20px;outline:none;transition:all 0.2s}
+.cta-input::placeholder{color:var(--g500)}
+.cta-input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(200,168,78,0.1)}
+.cta-note{margin-top:14px;font-size:12px;font-weight:500;color:var(--g500)}
 
-/* ═══════════════════════════════════════════════════
+/* ===================================================
+   FOOTER
+   =================================================== */
+footer{border-top:1px solid var(--card-border);padding:40px 0}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-brand{font-size:14px;font-weight:700;color:var(--g400);display:flex;align-items:center;gap:8px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;font-weight:500;color:var(--g500);transition:color 0.2s}
+.footer-links a:hover{color:var(--g300)}
+.footer-copy{font-size:12px;color:var(--g600)}
+
+/* ===================================================
+   TERMINAL BOOT SEQUENCE
+   =================================================== */
+.hero-terminal{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:32px 40px;background:var(--g800);border-radius:17px;transition:opacity 0.6s var(--ease)}
+.hero-terminal.done{opacity:0;pointer-events:none}
+.term-line{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--g400);opacity:0;transform:translateY(4px);transition:opacity 0.15s,transform 0.15s;line-height:1.8;white-space:nowrap}
+.term-line.show{opacity:1;transform:translateY(0)}
+.term-line .term-ok{color:var(--accent);font-weight:500}
+.term-line .term-dots{color:var(--g500)}
+.term-line.term-final{color:var(--accent);font-weight:600;font-size:14px;margin-top:8px}
+.term-cursor{display:inline-block;width:8px;height:16px;background:var(--accent);margin-left:4px;vertical-align:text-bottom;animation:termBlink 0.8s step-end infinite}
+@keyframes termBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ===================================================
+   SCAN LINE
+   =================================================== */
+.scan-line{position:absolute;left:0;right:0;height:1.5px;z-index:3;background:linear-gradient(90deg,transparent,var(--accent),transparent);box-shadow:0 0 8px rgba(200,168,78,0.4);pointer-events:none;animation:scanMove 5s cubic-bezier(0.4,0,0.6,1) infinite}
+@keyframes scanMove{0%{top:0;opacity:1}50%{top:100%;opacity:1}50.01%{top:100%;opacity:0}70%{top:100%;opacity:0}70.01%{top:0;opacity:0}80%{top:0;opacity:1}100%{top:0;opacity:1}}
+
+/* ===================================================
    HERO ENTRANCE SEQUENCE
-   ═══════════════════════════════════════════════════ */
+   =================================================== */
 .hero-entrance .hero-badge,
 .hero-entrance .hero-h1-line1,
 .hero-entrance .hero-h1-line2,
@@ -319,55 +410,26 @@ footer{border-top:1px solid rgba(255,255,255,0.04);padding:40px 0}
 .hero-entrance .hero-trust{opacity:0;transform:translateY(24px)}
 .hero-anim-in{transition:opacity 600ms cubic-bezier(0.4,0,0.2,1),transform 600ms cubic-bezier(0.4,0,0.2,1)!important;opacity:1!important;transform:translateY(0)!important}
 .hero-h1-line1,.hero-h1-line2{display:inline}
-/* Gold glow flash on h1 span */
 @keyframes goldTextFlash{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 30px rgba(200,168,78,0.5),0 0 60px rgba(200,168,78,0.2)}100%{text-shadow:0 0 0 transparent}}
 .hero-glow-flash{animation:goldTextFlash 300ms ease-out}
-/* Gold glow flash on hero-visual */
 @keyframes goldBorderFlash{0%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}30%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(200,168,78,0.4),0 0 40px rgba(200,168,78,0.15)}100%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}}
 .hero-visual-glow-flash .hero-visual-inner{animation:goldBorderFlash 600ms ease-out}
 
-/* ═══════════════════════════════════════════════════
-   BADGE TEXT CYCLING
-   ═══════════════════════════════════════════════════ */
-.hero-badge{overflow:hidden;transition:max-width 0.4s var(--ease)}
-.hero-badge-text{display:inline-block;transition:opacity 250ms var(--ease),transform 250ms var(--ease);white-space:nowrap}
-.hero-badge-text.out{opacity:0;transform:translateY(-8px)}
+/* ===================================================
+   PARALLAX
+   =================================================== */
+.hero-mockup-grid,.hero h1,.hero-sub{will-change:transform}
 
-/* ═══════════════════════════════════════════════════
-   SCAN LINE
-   ═══════════════════════════════════════════════════ */
-.scan-line{position:absolute;left:0;right:0;height:1.5px;z-index:3;background:linear-gradient(90deg,transparent,#c8a84e,transparent);box-shadow:0 0 8px rgba(200,168,78,0.4);pointer-events:none;animation:scanMove 5s cubic-bezier(0.4,0,0.6,1) infinite}
-@keyframes scanMove{0%{top:0}50%{top:100%}50.01%,100%{top:100%}0.01%{top:0}}
-/* Two-phase: slide down 2.5s, hold 1.5s at bottom, jump top 0s, hold 1s at top */
-@keyframes scanMove{0%{top:0;opacity:1}50%{top:100%;opacity:1}50.01%{top:100%;opacity:0}70%{top:100%;opacity:0}70.01%{top:0;opacity:0}80%{top:0;opacity:1}100%{top:0;opacity:1}}
-
-/* STYLING UPGRADE */
-.hero{padding:200px 0 160px}
-.hero::before{opacity:0.8;width:1000px;height:1000px}
-.hero h1{font-size:clamp(48px,7vw,80px);letter-spacing:-0.05em}
-.hero-sub{font-size:clamp(17px,2.2vw,21px)}
-.hero-visual{margin-top:96px}
-.hero-visual-inner{border-color:rgba(255,255,255,0.08);box-shadow:0 32px 100px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.04);border-top:1px solid rgba(200,168,78,0.08)}
-.section-title{font-size:clamp(34px,4.5vw,52px);letter-spacing:-0.04em}
-.problem-card,.feature{padding:36px 32px;border-radius:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
-.problem-card:hover{transform:translateY(-3px)}
-.feature:hover{transform:translateY(-3px);border-color:rgba(200,168,78,0.2)}
-.step,.diff-card,.kanban-col,.calc-results,.sage-window,.dashCard{border-radius:24px}
-.btn-primary{padding:16px 36px;border-radius:16px;letter-spacing:0.01em}
-.btn-primary:hover{box-shadow:0 12px 40px rgba(200,168,78,0.35)}
-.btn-secondary{letter-spacing:0.01em}
-.nav-cta{border-radius:12px}
-nav.scrolled{background:rgba(9,9,11,0.92)}
-/* Section dividers */
-.problem::after,.solution::after,.how::after,.features::after,.diff::after,.sage-demo::after,.simplicity::after,.calc::after{content:'';display:block;position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
-.problem,.solution,.how,.features,.diff,.sage-demo,.simplicity,.calc{position:relative}
+/* Section bottom dividers */
+.glass-section::after,.how::after,.sage-demo::after,.features-section::after,.diff::after,.calc::after,.testimonials::after{content:'';display:block;position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--divider),transparent)}
+.glass-section,.how,.sage-demo,.features-section,.diff,.calc,.testimonials{position:relative}
 </style>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      NAV
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <nav id="nav">
   <div class="nav-inner">
     <a href="#" class="nav-logo">
@@ -377,14 +439,18 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
     <div class="nav-links">
       <a href="#how">How It Works</a>
       <a href="#features">Features</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="icon-moon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
       <a href="#cta" class="nav-cta">Get Early Access</a>
     </div>
   </div>
 </nav>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      HERO
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <section class="hero">
   <div class="container">
     <div class="hero-badge">
@@ -392,10 +458,10 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
       <span class="hero-badge-text">Basketball Academies</span>
     </div>
     <h1>
-      <span class="hero-h1-line1">Run your whole business</span><br><span class="hero-h1-line2">from <span>one place</span></span>
+      <span class="hero-h1-line1">Talk to your business.</span><br><span class="hero-h1-line2">It <span>listens, decides, and executes</span>.</span>
     </h1>
     <p class="hero-sub">
-      The AI-powered command center for sports and fitness operators.
+      If you're not using AI, you're already falling behind. The real separator isn't technology &mdash; it's the operators who use it to double down on relationships.
     </p>
     <div class="hero-actions">
       <a href="#cta" class="btn-primary">
@@ -433,102 +499,78 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
 
     <div class="hero-trust">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      Built for service businesses that are done with chaos
+      Built for operators who refuse to fall behind
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
-     PROBLEM
-     ═══════════════════════════════════════════════════ -->
-<section class="problem" id="problem">
+<!-- ===================================================
+     BELIEF STATEMENT
+     =================================================== -->
+<section class="belief" id="belief">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">Our belief</div>
+      <h2 class="section-title reveal reveal-delay-1">The best operators won't be<br>the most tech-savvy</h2>
+    </div>
+    <div class="bq reveal reveal-delay-2">
+      <p>If you're not using AI, you're already falling behind. But the operators who win won't be the ones who understand technology best &mdash; they'll be the ones who master&nbsp;<em>relationships, communication, and culture</em> and let AI handle the rest. Soon, <em>quality humans and connectors</em> will trump tech savvy.</p>
+    </div>
+    <div class="section-center reveal reveal-delay-3">
+      <div class="belief-body">
+        <p><strong>FullControl</strong> exists to make this real for you &mdash; so you can focus on coaching, connecting, and building culture, not managing software.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================
+     SHATTERED GLASS PROBLEM
+     =================================================== -->
+<section class="glass-section" id="problem">
   <div class="container">
     <div class="section-center">
       <div class="section-label reveal">The problem</div>
-      <h2 class="section-title reveal">Your business runs on duct tape</h2>
-      <p class="section-sub reveal">One tool for CRM. Another for scheduling. Another for marketing. Another for payments. None of them talk to each other.</p>
+      <h2 class="section-title reveal reveal-delay-1">Your business software<br>is shattered glass</h2>
     </div>
 
-    <div class="problem-grid">
-      <div class="problem-card reveal reveal-delay-1">
-        <div class="problem-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
-        </div>
-        <h3>Too many tools</h3>
-        <p>You're paying for 5+ platforms that each do one thing. Switching between them wastes hours every week.</p>
+    <!-- Glass assemble animation -->
+    <div class="glass-wrap reveal reveal-delay-2" id="glassAssemble">
+      <div class="glass-glow"></div>
+      <div class="glass-label">
+        <span class="glass-label-name">FullControl</span>
+        <span class="glass-label-tag">Hundreds of tools. One place. Full control.</span>
       </div>
-      <div class="problem-card reveal reveal-delay-2">
-        <div class="problem-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-        </div>
-        <h3>No visibility</h3>
-        <p>You can't see the full picture. Data lives in silos. Decisions are based on gut feel, not clarity.</p>
-      </div>
-      <div class="problem-card reveal reveal-delay-3">
-        <div class="problem-icon">
-          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
-        </div>
-        <h3>Decision fatigue</h3>
-        <p>Every day is a new fire. You're reacting instead of building. The tools don't tell you what to do next.</p>
-      </div>
+      <!-- Row 1 -->
+      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-160px;--sy:-100px;--sr:-22deg;--rx:15deg;--ry:-20deg">CRM</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:30px;--sy:-120px;--sr:15deg;--rx:-12deg;--ry:18deg">Schedule</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:170px;--sy:-90px;--sr:-18deg;--rx:10deg;--ry:22deg">Payments</div>
+      <!-- Row 2 -->
+      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-180px;--sy:40px;--sr:25deg;--rx:-18deg;--ry:-15deg">Marketing</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:130px;--sr:-10deg;--rx:8deg;--ry:-8deg">Analytics</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:190px;--sy:30px;--sr:-24deg;--rx:-14deg;--ry:20deg">Members</div>
+      <!-- Row 3 -->
+      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-130px;--sy:140px;--sr:18deg;--rx:12deg;--ry:-18deg">Leads</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:140px;--sy:130px;--sr:-16deg;--rx:-10deg;--ry:15deg">Content</div>
     </div>
+
+    <!-- Tool icon cards -->
+    <div class="glass-tools reveal reveal-delay-3">
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><h4>CRM</h4><p>Track leads &amp; contacts</p></div>
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h4>Scheduling</h4><p>Manage sessions &amp; classes</p></div>
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h4>Payments</h4><p>Collect &amp; reconcile revenue</p></div>
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><h4>Marketing</h4><p>Run campaigns &amp; outreach</p></div>
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h4>Analytics</h4><p>Measure what matters</p></div>
+      <div class="glass-tool"><div class="glass-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h4>Members</h4><p>Manage rosters &amp; retention</p></div>
+    </div>
+
+    <p class="glass-supporting reveal reveal-delay-4">Every tool you bolt on makes the cracks wider. <strong>The operators who thrive next will be the ones who consolidate into one intelligent system.</strong></p>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
-     SOLUTION / TRANSFORMATION
-     ═══════════════════════════════════════════════════ -->
-<section class="solution" id="solution">
-  <div class="container">
-    <div class="section-center">
-      <div class="section-label reveal">The shift</div>
-      <h2 class="section-title reveal">From chaos to command</h2>
-      <p class="section-sub reveal">FullControl doesn't just give you tools. It gives you clarity, confidence, and control.</p>
-    </div>
-
-    <div class="transformation reveal">
-      <div class="transform-side">
-        <div class="transform-before">
-          <div class="transform-label transform-label-before">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            Without FullControl
-          </div>
-          <ul class="transform-list">
-            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Scattered across 5+ platforms</li>
-            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Decisions based on guesswork</li>
-            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Hours spent on manual tasks</li>
-            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Always reacting, never building</li>
-            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>No idea what's actually working</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="transform-arrow">
-        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
-      </div>
-
-      <div class="transform-side">
-        <div class="transform-after">
-          <div class="transform-label transform-label-after">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-            With FullControl
-          </div>
-          <ul class="transform-list">
-            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>One system for everything</li>
-            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI tells you what matters</li>
-            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Automate the repetitive work</li>
-            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Proactive recommendations</li>
-            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Total clarity, total control</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      HOW IT WORKS
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <section class="how" id="how">
   <div class="container">
     <div class="section-center">
@@ -545,125 +587,32 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
       </div>
       <div class="step reveal reveal-delay-2">
         <div class="step-num">02</div>
-        <h3>See the full picture</h3>
-        <p>Your entire business — members, leads, schedule, revenue — on one intelligent dashboard.</p>
+        <h3>See everything at once</h3>
+        <p>One screen. Members, leads, revenue, schedule &mdash; your entire business in a single view.</p>
       </div>
       <div class="step reveal reveal-delay-3">
         <div class="step-num">03</div>
-        <h3>Get guided by AI</h3>
-        <p>FullControl analyzes what's happening and tells you what to focus on. No more guessing.</p>
+        <h3>Talk to your business</h3>
+        <p>Ask a question. Get an answer. Take action. Sage AI reads your data and responds instantly.</p>
       </div>
       <div class="step reveal reveal-delay-4">
         <div class="step-num">04</div>
-        <h3>Take action instantly</h3>
-        <p>Follow up with a lead, adjust pricing, send a campaign — all from one place with one click.</p>
+        <h3>Focus on what matters</h3>
+        <p>AI handles the busywork. You handle the relationships, coaching, and culture.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
-     FEATURES
-     ═══════════════════════════════════════════════════ -->
-<section class="features" id="features">
-  <div class="container">
-    <div class="section-center">
-      <div class="section-label reveal">What you get</div>
-      <h2 class="section-title reveal">Everything you need. Nothing you don't.</h2>
-      <p class="section-sub reveal">Not more features. Better outcomes.</p>
-    </div>
-
-    <div class="features-grid">
-      <div class="feature reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        </div>
-        <h3>Unified dashboard</h3>
-        <p>Members, leads, schedule, revenue, content — everything on one screen. No more tab-switching.</p>
-      </div>
-      <div class="feature reveal reveal-delay-2">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        </div>
-        <h3>AI-powered insights</h3>
-        <p>Your AI advisor reads your data and surfaces what matters. It tells you what to do, not just what happened.</p>
-      </div>
-      <div class="feature reveal reveal-delay-3">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        </div>
-        <h3>Lead & member management</h3>
-        <p>Track every lead from first touch to loyal member. Automated follow-ups. Smart pipeline. Zero spreadsheets.</p>
-      </div>
-      <div class="feature reveal reveal-delay-1">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <h3>Smart scheduling</h3>
-        <p>Classes, sessions, and 1-on-1s managed effortlessly. Roster tracking, capacity alerts, and coach assignments built in.</p>
-      </div>
-      <div class="feature reveal reveal-delay-2">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </div>
-        <h3>Marketing & content</h3>
-        <p>AI generates content from your brand voice. Schedule posts. Run campaigns. Track what converts — all from one place.</p>
-      </div>
-      <div class="feature reveal reveal-delay-3">
-        <div class="feature-icon">
-          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-        </div>
-        <h3>Real-time analytics</h3>
-        <p>Know your numbers instantly. Revenue, retention, conversion, engagement — with trends and AI commentary.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════
-     DIFFERENTIATION
-     ═══════════════════════════════════════════════════ -->
-<section class="diff">
-  <div class="container">
-    <div class="section-center">
-      <div class="section-label reveal">Why this is different</div>
-      <h2 class="section-title reveal">Tools give you buttons.<br>FullControl gives you answers.</h2>
-    </div>
-
-    <div class="diff-grid reveal" style="margin-left:auto;margin-right:auto">
-      <div class="diff-card diff-old">
-        <div class="diff-card-label">Traditional tools</div>
-        <ul>
-          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Here are 200 features, figure it out</li>
-          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Data lives in 6 different dashboards</li>
-          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>You still make every decision alone</li>
-          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Requires hours of setup and training</li>
-          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Reports what happened yesterday</li>
-        </ul>
-      </div>
-      <div class="diff-card diff-new">
-        <div class="diff-card-label">FullControl</div>
-        <ul>
-          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>One guided system, zero learning curve</li>
-          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything on one intelligent screen</li>
-          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI recommends your next move</li>
-          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Works in minutes, not weeks</li>
-          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Tells you what to do right now</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      SAGE AI DEMO
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <section class="sage-demo" id="sage-demo">
   <div class="container">
     <div class="section-center">
       <div class="section-label reveal">Meet Sage</div>
-      <h2 class="section-title reveal">Your AI advisor.<br>Always on. Always clear.</h2>
-      <p class="section-sub reveal">Ask anything about your business. Sage reads your data and gives you the answer — not a dashboard to figure out yourself.</p>
+      <h2 class="section-title reveal">Talk to your business like it's<br>your best employee</h2>
+      <p class="section-sub reveal">Ask anything. Sage reads your data, gives you the answer, and executes &mdash; with more speed and precision than your best hire.</p>
     </div>
 
     <div class="sage-window reveal">
@@ -690,7 +639,7 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
             <div class="sage-metric"><span>Trial conversions</span> <strong>2 of 3</strong> <span class="sage-metric-up">67%</span></div>
             <div class="sage-metric"><span>Class fill rate</span> <strong>84%</strong></div>
             <div class="sage-metric"><span>Revenue pacing</span> <strong>$18.4k</strong> <span class="sage-metric-up">on track</span></div>
-            <div class="sage-rec"><strong>Recommendation:</strong> You have 1 unconverted trial from Monday — Sarah Chen. She attended 2 classes but hasn't signed up. Want me to draft a follow-up message?</div>
+            <div class="sage-rec"><strong>Recommendation:</strong> You have 1 unconverted trial from Monday &mdash; Sarah Chen. She attended 2 classes but hasn't signed up. Want me to draft a follow-up message?</div>
           </div>
         </div>
       </div>
@@ -704,40 +653,146 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
-     SIMPLICITY
-     ═══════════════════════════════════════════════════ -->
-<section class="simplicity">
+<!-- ===================================================
+     PROTOTYPE EMBED
+     =================================================== -->
+<section class="demo" id="demo">
   <div class="container">
-    <div class="section-label reveal">Designed for clarity</div>
-    <h2 class="section-title reveal">Simple enough for day one.<br>Powerful enough for year ten.</h2>
-    <p class="section-sub reveal" style="margin:0 auto">No training manuals. No onboarding calls. Open it and go.</p>
-
-    <div class="simplicity-visual reveal">
-      <div class="sim-pill">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        Ask anything
-      </div>
-      <div class="sim-pill">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Get instant answers
-      </div>
-      <div class="sim-pill">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        Take action in one click
-      </div>
+    <div class="section-center">
+      <div class="section-label reveal">Product</div>
+      <h2 class="section-title reveal reveal-delay-1">See it in action</h2>
+      <p class="section-sub reveal reveal-delay-2">The FullControl command center &mdash; a live interactive prototype of the operator experience.</p>
     </div>
-
-    <div class="simplicity-quote reveal">
-      <p>"It's like having a business partner who never sleeps, never forgets, and always knows what to do next."</p>
-      <span>The feeling every operator deserves</span>
+    <div class="demo-frame-wrap reveal reveal-delay-3">
+      <div class="demo-topbar">
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+        <div class="demo-dot"></div>
+        <div class="demo-url">app.fullcontrol.io</div>
+      </div>
+      <iframe class="demo-iframe" src="../sales-desktop/dist/index.html" loading="lazy" title="FullControl Prototype"></iframe>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
+<div class="div-line"></div>
+
+<!-- ===================================================
+     FEATURES (condensed 2x2)
+     =================================================== -->
+<section class="features-section" id="features">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">What you get</div>
+      <h2 class="section-title reveal">Everything you need. Nothing you don't.</h2>
+      <p class="section-sub reveal">Not more features. Better outcomes.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <h3>Unified dashboard</h3>
+        <p>Members, leads, schedule, revenue, content &mdash; everything on one screen. No more tab-switching.</p>
+      </div>
+      <div class="feature reveal reveal-delay-2">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>AI-powered insights</h3>
+        <p>Your AI advisor reads your data and surfaces what matters. It tells you what to do, not just what happened.</p>
+      </div>
+      <div class="feature reveal reveal-delay-3">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Lead &amp; member management</h3>
+        <p>Track every lead from first touch to loyal member. Automated follow-ups. Smart pipeline. Zero spreadsheets.</p>
+      </div>
+      <div class="feature reveal reveal-delay-4">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h3>Smart scheduling</h3>
+        <p>Classes, sessions, and 1-on-1s managed effortlessly. Roster tracking, capacity alerts, and coach assignments built in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================
+     TESTIMONIALS + RESULT PILLS
+     =================================================== -->
+<section class="testimonials" id="testimonials">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">Results</div>
+      <h2 class="section-title reveal">Operators are already seeing the difference</h2>
+    </div>
+
+    <div class="result-pills reveal reveal-delay-1" style="margin-top:40px">
+      <div class="result-pill">2x &ndash; 10x ARR growth</div>
+      <div class="result-pill">30 &ndash; 40 hrs/week saved</div>
+      <div class="result-pill">20+ academies consulted</div>
+      <div class="result-pill">Live prototype tested with operators</div>
+    </div>
+
+    <div class="testimonial-grid reveal reveal-delay-2">
+      <div class="testimonial-card">
+        <div class="testimonial-quote">Working with Cole and the FullControl methodology took my basketball training from a $2K/month side hustle to a $20K/month business. I finally had the systems and clarity to focus on coaching instead of chasing admin work.</div>
+        <div class="testimonial-author">Brantley Osborne</div>
+        <div class="testimonial-role">By Any Means &mdash; West Virginia</div>
+        <div class="testimonial-result">$2K &rarr; $20K/month</div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-quote">In just 6 months of working together, I doubled my business while cutting my weekly admin time to under 10 hours. Having one system that shows me everything and tells me what to focus on changed the game completely.</div>
+        <div class="testimonial-author">Josh Mercado</div>
+        <div class="testimonial-role">Prime By Design Basketball</div>
+        <div class="testimonial-result">Doubled business in 6 months &bull; 10 hrs/week admin</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================
+     DIFFERENTIATION
+     =================================================== -->
+<section class="diff">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">Why this is different</div>
+      <h2 class="section-title reveal">Tools give you buttons.<br>FullControl gives you answers.</h2>
+    </div>
+
+    <div class="diff-grid reveal" style="margin-left:auto;margin-right:auto">
+      <div class="diff-card diff-old">
+        <div class="diff-card-label">Traditional tools</div>
+        <ul>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Here are 200 features, figure it out</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Data lives in 6 different dashboards</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>You still make every decision alone</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Requires hours of setup and training</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Reports what happened yesterday</li>
+        </ul>
+      </div>
+      <div class="diff-card diff-new">
+        <div class="diff-card-label">FullControl</div>
+        <ul>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>One guided system, zero learning curve</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything on one intelligent screen</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI recommends your next move</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Talk to it like an employee &mdash; it executes</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Tells you what to do right now</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================
      REVENUE CALCULATOR
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <section class="calc" id="calculator">
   <div class="container">
     <div class="section-center">
@@ -793,14 +848,21 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      CTA
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <section class="cta-section" id="cta">
   <div class="container">
     <div class="section-label reveal">Ready?</div>
-    <h2 class="reveal">Stop managing chaos.<br>Start running with <span>FullControl</span>.</h2>
+    <h2 class="reveal">Your business should work<br>as hard as <span>you do</span>.</h2>
     <p class="section-sub reveal">Join the early access list. Be the first to experience what running a business should feel like.</p>
+
+    <div class="result-pills reveal" style="margin-top:32px;margin-bottom:32px;justify-content:center">
+      <div class="result-pill">2x &ndash; 10x ARR growth</div>
+      <div class="result-pill">30 &ndash; 40 hrs/week saved</div>
+      <div class="result-pill">Live prototype tested</div>
+    </div>
+
     <form class="cta-form reveal" onsubmit="event.preventDefault()">
       <input type="email" class="cta-input" placeholder="Enter your email" required>
       <button type="submit" class="btn-primary">Get Early Access</button>
@@ -809,9 +871,9 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
   </div>
 </section>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      FOOTER
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <footer>
   <div class="container">
     <div class="footer-inner">
@@ -829,50 +891,72 @@ nav.scrolled{background:rgba(9,9,11,0.92)}
   </div>
 </footer>
 
-<!-- ═══════════════════════════════════════════════════
+<!-- ===================================================
      SCRIPTS
-     ═══════════════════════════════════════════════════ -->
+     =================================================== -->
 <script>
-// Nav scroll effect
-const nav = document.getElementById('nav');
-window.addEventListener('scroll', () => {
+// ===================================================
+// THEME TOGGLE
+// ===================================================
+(function() {
+  var html = document.documentElement;
+  var themeBtn = document.getElementById('themeToggle');
+  var saved = localStorage.getItem('fc-theme');
+  if (saved) html.setAttribute('data-theme', saved);
+
+  themeBtn.addEventListener('click', function() {
+    var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('fc-theme', next);
+  });
+})();
+
+// ===================================================
+// NAV SCROLL EFFECT
+// ===================================================
+var nav = document.getElementById('nav');
+window.addEventListener('scroll', function() {
   nav.classList.toggle('scrolled', window.scrollY > 40);
 });
 
-// Reveal on scroll
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
+// ===================================================
+// REVEAL ON SCROLL
+// ===================================================
+var observer = new IntersectionObserver(function(entries) {
+  entries.forEach(function(entry) {
     if (entry.isIntersecting) {
       entry.target.classList.add('visible');
     }
   });
 }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
 
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
 
-// Smooth scroll for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-  anchor.addEventListener('click', e => {
+// ===================================================
+// SMOOTH SCROLL
+// ===================================================
+document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+  anchor.addEventListener('click', function(e) {
     e.preventDefault();
-    const target = document.querySelector(anchor.getAttribute('href'));
+    var target = document.querySelector(anchor.getAttribute('href'));
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
 });
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // TERMINAL BOOT SEQUENCE
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
-  const terminal = document.getElementById('heroTerminal');
-  const mockupContent = document.getElementById('heroMockupContent');
+  var terminal = document.getElementById('heroTerminal');
+  var mockupContent = document.getElementById('heroMockupContent');
   if (!terminal || !mockupContent) return;
 
-  const lines = terminal.querySelectorAll('.term-line');
-  let started = false;
+  var lines = terminal.querySelectorAll('.term-line');
+  var started = false;
 
-  const bootObserver = new IntersectionObserver((entries) => {
+  var bootObserver = new IntersectionObserver(function(entries) {
     if (entries[0].isIntersecting && !started) {
       started = true;
       runBoot();
@@ -882,43 +966,40 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   bootObserver.observe(document.getElementById('heroMockup'));
 
   function runBoot() {
-    lines.forEach((line, i) => {
-      const delay = parseInt(line.dataset.delay) || (i * 400);
-      setTimeout(() => {
+    lines.forEach(function(line, i) {
+      var delay = parseInt(line.dataset.delay) || (i * 400);
+      setTimeout(function() {
         line.classList.add('show');
-        // Remove cursor from previous lines
-        lines.forEach((l, j) => {
+        lines.forEach(function(l, j) {
           if (j < i) {
-            const cursor = l.querySelector('.term-cursor');
+            var cursor = l.querySelector('.term-cursor');
             if (cursor) cursor.style.display = 'none';
           }
         });
       }, delay);
     });
 
-    // After last line, fade terminal out and reveal mockup
-    const lastDelay = parseInt(lines[lines.length - 1].dataset.delay) || 2600;
-    setTimeout(() => {
+    var lastDelay = parseInt(lines[lines.length - 1].dataset.delay) || 2600;
+    setTimeout(function() {
       terminal.classList.add('done');
       mockupContent.style.opacity = '1';
     }, lastDelay + 1000);
   }
 })();
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // SAGE AI DEMO CHAT
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
-  const chat = document.getElementById('sageChat');
-  const typingMsg = document.getElementById('sageTypingMsg');
-  const responseMsg = document.getElementById('sageResponseMsg');
-  const inputWrap = document.getElementById('sageInputWrap');
+  var chat = document.getElementById('sageChat');
+  var typingMsg = document.getElementById('sageTypingMsg');
+  var responseMsg = document.getElementById('sageResponseMsg');
+  var inputWrap = document.getElementById('sageInputWrap');
   if (!chat) return;
 
-  let started = false;
-  const msgs = chat.querySelectorAll('.sage-msg[data-delay]');
+  var started = false;
 
-  const sageObserver = new IntersectionObserver((entries) => {
+  var sageObserver = new IntersectionObserver(function(entries) {
     if (entries[0].isIntersecting && !started) {
       started = true;
       runChat();
@@ -928,74 +1009,55 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   sageObserver.observe(chat);
 
   function runChat() {
-    // Step 1: Show user message
-    const userMsg = msgs[0];
-    setTimeout(() => {
-      userMsg.classList.add('show');
-    }, 400);
-
-    // Step 2: Show typing indicator
-    setTimeout(() => {
-      typingMsg.style.display = 'flex';
-      typingMsg.classList.add('show');
-    }, 1200);
-
-    // Step 3: Hide typing, show response
-    setTimeout(() => {
-      typingMsg.style.display = 'none';
-      responseMsg.classList.add('show');
-    }, 2800);
-
-    // Step 4: Show input field
-    setTimeout(() => {
-      inputWrap.classList.add('show');
-    }, 3400);
+    var userMsg = chat.querySelectorAll('.sage-msg[data-delay]')[0];
+    setTimeout(function() { userMsg.classList.add('show'); }, 400);
+    setTimeout(function() { typingMsg.style.display = 'flex'; typingMsg.classList.add('show'); }, 1200);
+    setTimeout(function() { typingMsg.style.display = 'none'; responseMsg.classList.add('show'); }, 2800);
+    setTimeout(function() { inputWrap.classList.add('show'); }, 3400);
   }
 })();
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // REVENUE CALCULATOR
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
-  const membersSlider = document.getElementById('calcMembers');
-  const rateSlider = document.getElementById('calcRate');
-  const churnSlider = document.getElementById('calcChurn');
+  var membersSlider = document.getElementById('calcMembers');
+  var rateSlider = document.getElementById('calcRate');
+  var churnSlider = document.getElementById('calcChurn');
   if (!membersSlider) return;
 
-  const membersVal = document.getElementById('calcMembersVal');
-  const rateVal = document.getElementById('calcRateVal');
-  const churnVal = document.getElementById('calcChurnVal');
-  const revenueEl = document.getElementById('calcRevenue');
-  const lostEl = document.getElementById('calcLost');
-  const lostSubEl = document.getElementById('calcLostSub');
-  const recoveryEl = document.getElementById('calcRecovery');
+  var membersVal = document.getElementById('calcMembersVal');
+  var rateVal = document.getElementById('calcRateVal');
+  var churnVal = document.getElementById('calcChurnVal');
+  var revenueEl = document.getElementById('calcRevenue');
+  var lostEl = document.getElementById('calcLost');
+  var lostSubEl = document.getElementById('calcLostSub');
+  var recoveryEl = document.getElementById('calcRecovery');
 
   function fmt(n) {
     return '$' + Math.round(n).toLocaleString('en-US');
   }
 
   function update() {
-    const members = parseInt(membersSlider.value);
-    const rate = parseInt(rateSlider.value);
-    const churnPct = parseFloat(churnSlider.value) / 100;
+    var members = parseInt(membersSlider.value);
+    var rate = parseInt(rateSlider.value);
+    var churnPct = parseFloat(churnSlider.value) / 100;
 
     membersVal.textContent = members;
     rateVal.textContent = '$' + rate;
     churnVal.textContent = churnSlider.value + '%';
 
-    const annualRevenue = members * rate * 12;
-    // Compound churn: members lost over 12 months
-    const membersEnd = members * Math.pow(1 - churnPct, 12);
-    const avgMembers = (members + membersEnd) / 2;
-    const revenueWithChurn = avgMembers * rate * 12;
-    const lostToChurn = annualRevenue - revenueWithChurn;
-    const membersLost = Math.round(members - membersEnd);
-    // FullControl recovery: 40% churn reduction
-    const reducedChurn = churnPct * 0.6;
-    const membersEndReduced = members * Math.pow(1 - reducedChurn, 12);
-    const avgMembersReduced = (members + membersEndReduced) / 2;
-    const revenueReduced = avgMembersReduced * rate * 12;
-    const recovery = revenueReduced - revenueWithChurn;
+    var annualRevenue = members * rate * 12;
+    var membersEnd = members * Math.pow(1 - churnPct, 12);
+    var avgMembers = (members + membersEnd) / 2;
+    var revenueWithChurn = avgMembers * rate * 12;
+    var lostToChurn = annualRevenue - revenueWithChurn;
+    var membersLost = Math.round(members - membersEnd);
+    var reducedChurn = churnPct * 0.6;
+    var membersEndReduced = members * Math.pow(1 - reducedChurn, 12);
+    var avgMembersReduced = (members + membersEndReduced) / 2;
+    var revenueReduced = avgMembersReduced * rate * 12;
+    var recovery = revenueReduced - revenueWithChurn;
 
     revenueEl.textContent = fmt(annualRevenue);
     lostEl.textContent = fmt(lostToChurn);
@@ -1009,46 +1071,41 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   update();
 })();
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // MOUSE PARALLAX
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
   if (window.matchMedia('(max-width:768px)').matches) return;
-  const hero = document.querySelector('.hero');
+  var hero = document.querySelector('.hero');
   if (!hero) return;
-  const glow = hero; // ::before follows hero transform-origin
-  const grid = hero.querySelector('.hero-mockup-grid');
-  const h1 = hero.querySelector('h1');
-  const sub = hero.querySelector('.hero-sub');
+  var grid = hero.querySelector('.hero-mockup-grid');
+  var h1 = hero.querySelector('h1');
+  var sub = hero.querySelector('.hero-sub');
 
-  let targetX = 0, targetY = 0;
-  let currentX = 0, currentY = 0;
-  let ticking = false;
+  var targetX = 0, targetY = 0;
+  var currentX = 0, currentY = 0;
+  var ticking = false;
 
-  hero.addEventListener('mousemove', e => {
-    const rect = hero.getBoundingClientRect();
+  hero.addEventListener('mousemove', function(e) {
+    var rect = hero.getBoundingClientRect();
     targetX = (e.clientX - rect.left - rect.width / 2);
     targetY = (e.clientY - rect.top - rect.height / 2);
     if (!ticking) { ticking = true; requestAnimationFrame(lerp); }
   });
 
-  hero.addEventListener('mouseleave', () => {
+  hero.addEventListener('mouseleave', function() {
     targetX = 0; targetY = 0;
   });
 
   function lerp() {
-    const factor = 0.08;
+    var factor = 0.08;
     currentX += (targetX - currentX) * factor;
     currentY += (targetY - currentY) * factor;
 
-    // Glow: 1/10th speed
     hero.style.setProperty('--px-glow-x', (currentX / 10) + 'px');
     hero.style.setProperty('--px-glow-y', (currentY / 10) + 'px');
 
-    // Grid: 1/20th speed
     if (grid) grid.style.transform = 'translate(' + (currentX / 20) + 'px,' + (currentY / 20) + 'px)';
-
-    // h1 + sub: 1/40th speed
     if (h1) h1.style.transform = 'translate(' + (currentX / 40) + 'px,' + (currentY / 40) + 'px)';
     if (sub) sub.style.transform = 'translate(' + (currentX / 40) + 'px,' + (currentY / 40) + 'px)';
 
@@ -1059,74 +1116,128 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     }
   }
 
-  // Override ::before position via CSS custom property
-  const style = document.createElement('style');
+  var style = document.createElement('style');
   style.textContent = '.hero::before{transform:translateX(calc(-50% + var(--px-glow-x,0px))) translateY(var(--px-glow-y,0px));will-change:transform}';
   document.head.appendChild(style);
 })();
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // HERO ENTRANCE SEQUENCE
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
-  const hero = document.querySelector('.hero');
+  var hero = document.querySelector('.hero');
   if (!hero) return;
   hero.classList.add('hero-entrance');
 
-  const sequence = [
+  var sequence = [
     { sel: '.hero-badge', delay: 150 },
     { sel: '.hero-h1-line1', delay: 400 },
     { sel: '.hero-h1-line2', delay: 600, glowFlash: true },
     { sel: '.hero-sub', delay: 850 },
     { sel: '.hero-actions', delay: 1050 },
     { sel: '.hero-visual', delay: 1300, borderFlash: true },
-    { sel: '.hero-trust', delay: 1600 },
+    { sel: '.hero-trust', delay: 1600 }
   ];
 
-  sequence.forEach(({ sel, delay, glowFlash, borderFlash }) => {
-    const el = hero.querySelector(sel);
+  sequence.forEach(function(item) {
+    var el = hero.querySelector(item.sel);
     if (!el) return;
-    setTimeout(() => {
+    setTimeout(function() {
       el.classList.add('hero-anim-in');
-      if (glowFlash) {
-        const goldSpan = el.querySelector('span');
+      if (item.glowFlash) {
+        var goldSpan = el.querySelector('span');
         if (goldSpan) goldSpan.classList.add('hero-glow-flash');
       }
-      if (borderFlash) {
+      if (item.borderFlash) {
         el.classList.add('hero-visual-glow-flash');
       }
-    }, delay);
+    }, item.delay);
   });
 })();
 
-// ═══════════════════════════════════════════════════
+// ===================================================
 // BADGE TEXT CYCLING
-// ═══════════════════════════════════════════════════
+// ===================================================
 (function() {
-  const textEl = document.querySelector('.hero-badge-text');
+  var textEl = document.querySelector('.hero-badge-text');
   if (!textEl) return;
 
-  const labels = [
+  var labels = [
     'Basketball Academies',
     'Jiu Jitsu Gyms',
     'Pilates Studios',
     'Soccer Clubs',
     'Training Centers',
     'Martial Arts Schools',
-    'Strength & Conditioning',
+    'Strength & Conditioning'
   ];
-  let idx = 0;
+  var idx = 0;
 
-  setInterval(() => {
-    // Fade out
+  setInterval(function() {
     textEl.classList.add('out');
-    setTimeout(() => {
+    setTimeout(function() {
       idx = (idx + 1) % labels.length;
       textEl.textContent = labels[idx];
-      // Remove out class to trigger fade in
       textEl.classList.remove('out');
     }, 250);
   }, 2500);
+})();
+
+// ===================================================
+// GLASS ASSEMBLE ANIMATION
+// ===================================================
+(function() {
+  var gw = document.getElementById('glassAssemble');
+  if (!gw) return;
+  var shards = gw.querySelectorAll('.shard');
+  var done = false;
+  var mobile = window.innerWidth <= 600;
+  var scale = mobile ? 0.667 : 1;
+
+  // Scale shard positions on mobile
+  if (mobile) {
+    for (var m = 0; m < shards.length; m++) {
+      var ms = shards[m];
+      ms.style.width = (parseFloat(ms.style.width) * scale) + 'px';
+      ms.style.height = (parseFloat(ms.style.height) * scale) + 'px';
+      ms.style.top = (parseFloat(ms.style.top) * scale) + 'px';
+      ms.style.left = (parseFloat(ms.style.left) * scale) + 'px';
+    }
+  }
+
+  // Set initial scattered positions
+  var scatterScale = mobile ? 0.5 : 1;
+  for (var i = 0; i < shards.length; i++) {
+    var s = shards[i];
+    var sx = parseFloat(s.style.getPropertyValue('--sx')) || 0;
+    var sy = parseFloat(s.style.getPropertyValue('--sy')) || 0;
+    var sr = s.style.getPropertyValue('--sr') || '0deg';
+    var rx = s.style.getPropertyValue('--rx') || '0deg';
+    var ry = s.style.getPropertyValue('--ry') || '0deg';
+    s.style.transform = 'translate(' + (sx * scatterScale) + 'px,' + (sy * scatterScale) + 'px) rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
+  }
+
+  function doAssemble() {
+    if (done) return;
+    var r = gw.getBoundingClientRect();
+    if (r.top < window.innerHeight && r.bottom > 0) {
+      done = true;
+      window.removeEventListener('scroll', doAssemble);
+      setTimeout(function() {
+        gw.classList.add('assembled');
+        for (var j = 0; j < shards.length; j++) {
+          shards[j].style.transform = '';
+          shards[j].style.opacity = '';
+        }
+      }, 800);
+    }
+  }
+
+  window.addEventListener('scroll', doAssemble, false);
+  doAssemble();
+  setTimeout(doAssemble, 200);
+  setTimeout(doAssemble, 1000);
+  setTimeout(doAssemble, 3000);
 })();
 </script>
 
