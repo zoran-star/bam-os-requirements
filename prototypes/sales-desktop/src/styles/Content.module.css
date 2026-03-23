@@ -1,0 +1,255 @@
+/* ─── COMMAND BAR HEADER ─── */
+.cmdBarHeader{position:relative;flex-shrink:0;padding:20px 28px;overflow:hidden;background:linear-gradient(135deg,rgba(200,168,78,0.04),rgba(200,168,78,0.01))}
+.cmdBarCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.45}
+.cmdBarInner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.cmdLeft{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
+.cmdGreeting{font-size:22px;font-weight:900;color:var(--tp);letter-spacing:-0.02em;line-height:1.1;margin:0}
+.cmdSubGreeting{font-size:12px;font-weight:500;color:var(--tm)}
+.cmdCenter{flex:1;display:flex;align-items:center;gap:8px;background:var(--surf);border:2px solid var(--borderm);border-radius:16px;padding:8px 14px;transition:all 200ms var(--es);max-width:480px}
+.cmdCenter:hover,.cmdCenter:focus-within{border-color:var(--gold);box-shadow:0 0 0 4px rgba(200,168,78,0.08);max-width:540px}
+.cmdSageOrb{width:28px;height:28px;border-radius:10px;background:linear-gradient(135deg,var(--gold),var(--goldl));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff;flex-shrink:0}
+.cmdSageInput{flex:1;font-family:var(--ff);font-size:14px;font-weight:600;color:var(--tp);background:none;border:none;outline:none;min-width:0}
+.cmdSageInput::placeholder{color:var(--tm);font-weight:500}
+.cmdListenBadge{font-size:10px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.12);padding:2px 8px;border-radius:6px;white-space:nowrap;animation:listenPulse 1s ease-in-out infinite}
+@keyframes listenPulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.cmdMicBtn{width:32px;height:32px;border-radius:10px;border:none;background:none;color:var(--tm);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 160ms;flex-shrink:0}
+.cmdMicBtn:hover{color:var(--gold);background:rgba(200,168,78,0.08)}
+.cmdMicBtnActive{color:var(--gold);background:rgba(200,168,78,0.12);animation:listenPulse 1s ease-in-out infinite}
+.cmdSendBtn{width:32px;height:32px;border-radius:10px;background:var(--gold);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 160ms;flex-shrink:0}
+.cmdSendBtn:hover:not(:disabled){background:var(--goldl);transform:scale(1.05)}
+.cmdSendBtn:disabled{opacity:0.3;cursor:not-allowed}
+
+/* ─── SAGE RESPONSE ─── */
+@keyframes cmdFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.cmdResponse{background:var(--surf);border:1px solid rgba(200,168,78,0.2);border-radius:18px;padding:18px 22px;display:flex;flex-direction:column;gap:10px;animation:cmdFadeIn 0.3s ease}
+.cmdResponseQ{font-size:12px;font-weight:600;color:var(--tm);font-style:italic}
+.cmdResponseA{font-size:14px;font-weight:600;color:var(--tp);line-height:1.5}
+.cmdResponseActions{display:flex;gap:8px;margin-top:2px}
+.cmdActionConfirm{font-family:var(--ff);font-size:12px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
+.cmdActionConfirm:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.cmdActionCancel{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--ts);background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms}
+.cmdActionCancel:hover{background:var(--surf3);color:var(--tp)}
+
+/* ─── SUB-NAV TABS ─── */
+.subNav{display:flex;gap:2px;background:var(--surf2);border-radius:14px;padding:4px;width:fit-content}
+.subNavBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tm);background:none;border:none;border-radius:10px;padding:8px 18px;cursor:pointer;transition:all 180ms;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.subNavBtn:hover{color:var(--tp)}
+.subNavBtnActive{background:var(--surf);color:var(--tp);box-shadow:var(--shadow-sm)}
+.subNavIcon{display:flex;align-items:center}
+
+/* ─── QUICK ACTION CHIPS ─── */
+.cmdChips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cmdChip{font-family:var(--ff);font-size:12px;font-weight:600;color:var(--ts);background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:7px 14px;cursor:pointer;transition:all 180ms;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.cmdChip:hover{border-color:var(--gold);color:var(--tp);background:rgba(200,168,78,0.05);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.cmdChipIcon{display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ─── STATS BAR ─── */
+.statsBar{display:flex;gap:12px;animation:cmdFadeIn 0.3s ease}
+.statCard{flex:1;background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:16px 20px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.statCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.statLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--tm)}
+.statValue{font-size:24px;font-weight:900;color:var(--tp);font-family:'Nunito',sans-serif;letter-spacing:-0.03em;line-height:1}
+.statSuffix{font-size:12px;font-weight:600;color:var(--ts);margin-top:2px}
+.statDelta{font-size:11px;font-weight:700;display:flex;align-items:center;gap:3px;margin-top:2px}
+.statDeltaUp{color:var(--green)}
+.statDeltaDown{color:var(--red)}
+
+/* ─── CONTENT PLAN SWITCHER ─── */
+.planSwitcher{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.planSelect{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tp);background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:6px 28px 6px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='8' height='5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23A5A19A' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:all 160ms;outline:none}
+.planSelect:hover{border-color:var(--gold);color:var(--gold)}
+.planSelect:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.planLabel{font-size:11px;font-weight:600;color:var(--tm)}
+
+/* ─── DASHBOARD VIEW ─── */
+.dashGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.dashCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:20px 24px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:12px;transition:all 200ms}
+.dashCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.dashCardFull{grid-column:1/-1}
+.dashCardTitle{font-size:13px;font-weight:700;color:var(--tp);display:flex;align-items:center;gap:8px}
+.dashCardTitleIcon{color:var(--gold)}
+
+/* ─── PENDING REVIEW CARD ─── */
+.pendingList{display:flex;flex-direction:column;gap:8px}
+.pendingItem{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--surf2);border-radius:14px;transition:all 160ms;cursor:pointer}
+.pendingItem:hover{background:var(--surf3);transform:translateX(2px)}
+.pendingTypeIcon{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.pendingTypeReel{background:rgba(200,168,78,0.12);color:var(--gold)}
+.pendingTypeCarousel{background:rgba(99,102,241,0.1);color:#6366f1}
+.pendingTypeThread{background:rgba(107,138,224,0.1);color:#6B8AE0}
+.pendingTypeBlog{background:rgba(62,175,92,0.1);color:var(--green)}
+.pendingTypeNewsletter{background:rgba(224,157,36,0.1);color:var(--warn)}
+.pendingInfo{flex:1;min-width:0}
+.pendingHook{font-size:13px;font-weight:600;color:var(--tp);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pendingType{font-size:11px;font-weight:500;color:var(--tm)}
+.pendingActions{display:flex;gap:4px}
+.pendingActionBtn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--tm);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 160ms;font-size:12px}
+.pendingApproveBtn:hover{border-color:var(--green);color:var(--green);background:rgba(62,175,92,0.06)}
+.pendingRejectBtn:hover{border-color:var(--red);color:var(--red);background:rgba(224,90,66,0.06)}
+
+/* ─── PIPELINE VIEW ─── */
+.pipelineWrap{display:flex;flex-direction:column;gap:16px}
+.pipelineViewToggle{display:flex;gap:2px;background:var(--surf2);border-radius:10px;padding:3px;width:fit-content}
+.pipelineViewBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tm);background:none;border:none;border-radius:7px;padding:7px 16px;cursor:pointer;transition:all 180ms;white-space:nowrap}
+.pipelineViewBtn:hover{color:var(--tp)}
+.pipelineViewBtnActive{background:var(--surf);color:var(--tp);box-shadow:var(--shadow-sm)}
+.kanbanBoard{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;min-height:0}
+.kanbanCol{background:var(--surf2);border-radius:20px;padding:14px;display:flex;flex-direction:column;gap:8px;min-height:200px}
+.kanbanColHeader{display:flex;align-items:center;justify-content:space-between;padding:0 4px 8px}
+.kanbanColTitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;display:flex;align-items:center;gap:6px}
+.kanbanColDot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kanbanColCount{font-size:11px;font-weight:700;color:var(--tm);background:var(--surf);border-radius:6px;padding:2px 7px}
+.kanbanCard{background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:all 180ms}
+.kanbanCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:rgba(200,168,78,0.2)}
+.kanbanCardType{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;display:flex;align-items:center;gap:4px}
+.kanbanCardHook{font-size:13px;font-weight:600;color:var(--tp);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kanbanCardMeta{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--tm)}
+.kanbanCardAvatar{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--gold),var(--goldl));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff;flex-shrink:0}
+.kanbanCardScheduled{font-size:10px;font-weight:600;color:var(--gold);background:rgba(200,168,78,0.1);padding:2px 8px;border-radius:5px;display:flex;align-items:center;gap:3px}
+
+/* Pipeline list view */
+.pipelineList{display:flex;flex-direction:column;gap:6px}
+.pipelineRow{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surf);border:1px solid var(--border);border-radius:14px;transition:all 160ms;cursor:pointer}
+.pipelineRow:hover{box-shadow:var(--shadow-sm);border-color:rgba(200,168,78,0.2)}
+.pipelineRowType{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.pipelineRowHook{flex:1;font-size:13px;font-weight:600;color:var(--tp);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pipelineRowStatus{font-size:11px;font-weight:700;padding:4px 10px;border-radius:8px;white-space:nowrap}
+.pipelineRowDate{font-size:11px;font-weight:500;color:var(--tm);font-family:var(--fm);white-space:nowrap}
+
+/* ─── CALENDAR VIEW ─── */
+.calToolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.weekNav{display:flex;align-items:center;gap:10px}
+.weekNavBtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--surf);color:var(--ts);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 160ms;font-size:14px}
+.weekNavBtn:hover{border-color:var(--gold);color:var(--gold);background:rgba(200,168,78,0.04)}
+.weekLabel{font-size:15px;font-weight:800;color:var(--tp);letter-spacing:-0.01em;min-width:180px;text-align:center}
+.calendarGrid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;min-height:0}
+.calDay{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:10px;display:flex;flex-direction:column;gap:6px;min-height:140px;transition:all 160ms}
+.calDay:hover{box-shadow:var(--shadow-sm)}
+.calDayToday{border-color:rgba(200,168,78,0.3);background:rgba(200,168,78,0.02)}
+.calDayLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--tm)}
+.calDayNum{font-size:16px;font-weight:800;color:var(--tp)}
+.calDayNumToday{color:var(--gold)}
+.calEvent{font-size:10px;font-weight:600;padding:4px 8px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:all 140ms;border-left:3px solid}
+.calEvent:hover{transform:translateX(2px)}
+.calEventReel{background:rgba(200,168,78,0.08);border-color:var(--gold);color:var(--gold)}
+.calEventCarousel{background:rgba(99,102,241,0.06);border-color:#6366f1;color:#6366f1}
+.calEventThread{background:rgba(107,138,224,0.06);border-color:#6B8AE0;color:#6B8AE0}
+.calEventBlog{background:rgba(62,175,92,0.06);border-color:var(--green);color:var(--green)}
+.calEventNewsletter{background:rgba(224,157,36,0.06);border-color:var(--warn);color:var(--warn)}
+
+/* ─── BRIEF VIEW ─── */
+.briefWrap{display:flex;flex-direction:column;gap:16px}
+.briefStep{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm)}
+.briefStepNum{width:28px;height:28px;border-radius:50%;background:var(--gold);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.briefStepHeader{display:flex;align-items:center;gap:10px}
+.briefStepTitle{font-size:15px;font-weight:800;color:var(--tp)}
+.briefTextarea{font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;outline:none;resize:vertical;min-height:120px;transition:all 200ms;line-height:1.6}
+.briefTextarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.briefCharCount{font-size:11px;font-weight:500;color:var(--tm);text-align:right}
+.briefAngleCard{background:var(--surf2);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:all 160ms}
+.briefAngleCard:hover{border-color:rgba(200,168,78,0.3)}
+.briefAngleCardSelected{border-color:var(--gold);background:rgba(200,168,78,0.04)}
+.briefAngleTitle{font-size:13px;font-weight:700;color:var(--tp)}
+.briefAngleHook{font-size:12px;font-weight:500;color:var(--ts);font-style:italic;line-height:1.4}
+.briefAngleTags{display:flex;gap:4px;flex-wrap:wrap}
+.briefAngleTag{font-size:10px;font-weight:600;color:var(--gold);background:rgba(200,168,78,0.1);padding:2px 8px;border-radius:5px}
+.briefBtn{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:12px 28px;cursor:pointer;transition:all 180ms;display:flex;align-items:center;gap:8px;width:fit-content}
+.briefBtn:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.briefBtn:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* ─── CONTENT PLANS VIEW ─── */
+.plansGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.planCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm);transition:all 200ms;cursor:pointer}
+.planCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:rgba(200,168,78,0.2)}
+.planCardDefault{border-color:rgba(200,168,78,0.3)}
+.planCardHeader{display:flex;align-items:center;justify-content:space-between}
+.planCardName{font-size:16px;font-weight:800;color:var(--tp)}
+.planCardDefaultBadge{font-size:10px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.12);padding:3px 10px;border-radius:6px}
+.planCardDesc{font-size:13px;font-weight:500;color:var(--ts);line-height:1.4}
+.planCardStats{display:flex;gap:16px}
+.planCardStat{display:flex;flex-direction:column;gap:2px}
+.planCardStatLabel{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--tm)}
+.planCardStatValue{font-size:16px;font-weight:800;color:var(--tp);font-family:'Nunito',sans-serif}
+.planCardStack{display:flex;gap:6px;flex-wrap:wrap}
+.planCardStackItem{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;display:flex;align-items:center;gap:4px}
+
+/* ─── ANALYTICS VIEW ─── */
+.analyticsWrap{display:flex;flex-direction:column;gap:16px}
+.analyticsPeriod{display:flex;gap:2px;background:var(--surf2);border-radius:10px;padding:3px;width:fit-content}
+.analyticsPeriodBtn{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tm);background:none;border:none;border-radius:7px;padding:7px 16px;cursor:pointer;transition:all 180ms;white-space:nowrap}
+.analyticsPeriodBtn:hover{color:var(--tp)}
+.analyticsPeriodBtnActive{background:var(--surf);color:var(--tp);box-shadow:var(--shadow-sm)}
+.funnelWrap{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow-sm)}
+.funnelTitle{font-size:13px;font-weight:700;color:var(--tp)}
+.funnelSteps{display:flex;gap:8px;align-items:flex-end}
+.funnelStep{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+.funnelBar{width:100%;border-radius:8px 8px 0 0;transition:height 500ms var(--es);min-height:4px}
+.funnelStepLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--tm);text-align:center}
+.funnelStepCount{font-size:16px;font-weight:800;color:var(--tp);font-family:'Nunito',sans-serif}
+.typeBreakdown{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm)}
+.typeRow{display:flex;align-items:center;gap:12px;padding:6px 0}
+.typeIcon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.typeLabel{flex:1;font-size:13px;font-weight:600;color:var(--tp)}
+.typeBarWrap{width:120px;height:6px;background:var(--surf3);border-radius:3px;overflow:hidden;flex-shrink:0}
+.typeBarFill{height:100%;border-radius:3px;transition:width 500ms var(--es)}
+.typeCount{font-size:13px;font-weight:700;color:var(--tp);font-family:var(--fm);min-width:24px;text-align:right}
+
+/* ─── CONTENT DETAIL DRAWER ─── */
+.drawerOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:100;display:flex;justify-content:flex-end;animation:overlayIn 200ms ease}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.drawer{width:480px;max-width:90vw;height:100%;background:var(--surf);border-left:1px solid var(--border);overflow-y:auto;padding:28px;display:flex;flex-direction:column;gap:20px;animation:drawerSlide 250ms var(--es)}
+@keyframes drawerSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.drawerClose{align-self:flex-end;background:none;border:none;font-size:18px;color:var(--tm);cursor:pointer;padding:4px 8px;border-radius:6px;transition:all 140ms;flex-shrink:0}
+.drawerClose:hover{color:var(--tp);background:var(--surf2)}
+.drawerHeader{display:flex;flex-direction:column;gap:10px}
+.drawerType{display:flex;align-items:center;gap:8px}
+.drawerTypeDot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.drawerTypeLabel{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
+.drawerTitle{font-size:18px;font-weight:800;color:var(--tp);line-height:1.3}
+.drawerStatus{font-size:11px;font-weight:700;padding:4px 12px;border-radius:8px;width:fit-content}
+.drawerSection{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--border)}
+.drawerSectionTitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gold)}
+.drawerBody{font-size:14px;font-weight:500;color:var(--tp);line-height:1.6;white-space:pre-wrap}
+.drawerRow{display:flex;justify-content:space-between;font-size:13px}
+.drawerRow span:first-child{font-weight:500;color:var(--tm)}
+.drawerRow span:last-child{font-weight:600;color:var(--tp)}
+.drawerFooter{display:flex;gap:8px;margin-top:auto;padding-top:14px;border-top:1px solid var(--border)}
+.btnPrimary{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:10px 22px;cursor:pointer;transition:all 180ms}
+.btnPrimary:hover:not(:disabled){background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.btnSecondary{font-family:var(--ff);font-size:13px;font-weight:700;color:var(--ts);background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:10px 22px;cursor:pointer;transition:all 180ms}
+.btnSecondary:hover{background:var(--surf3);color:var(--tp)}
+.btnDanger{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--red);border:none;border-radius:12px;padding:10px 22px;cursor:pointer;transition:all 180ms}
+.btnDanger:hover{background:#c9483a;transform:translateY(-1px)}
+
+/* ─── EMPTY STATE ─── */
+.emptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;gap:12px;color:var(--tm)}
+.emptyIcon{font-size:36px;opacity:0.4}
+.emptyText{font-size:14px;font-weight:600;text-align:center}
+
+/* ─── GENERATE MODAL ─── */
+.modalOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;animation:overlayIn 200ms ease}
+.modal{background:var(--surf);border-radius:24px;padding:28px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow-lg);animation:modalIn 0.25s var(--es)}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modalHead{display:flex;align-items:center;gap:10px}
+.modalHead h3{font-size:17px;font-weight:800;color:var(--tp);flex:1}
+.modalClose{background:none;border:none;font-size:18px;color:var(--tm);cursor:pointer;padding:4px 8px;border-radius:6px;transition:all 140ms}
+.modalClose:hover{color:var(--tp);background:var(--surf2)}
+.modalFooter{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.formGroup{display:flex;flex-direction:column;gap:6px}
+.formLabel{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--tm)}
+.formSelect{font-family:var(--ff);font-size:13px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A5A19A' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;transition:all 200ms}
+.formSelect:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.formInput{font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;outline:none;transition:all 200ms}
+.formInput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+
+/* ─── SWIPE REVIEW CARDS ─── */
+.swipeCard{background:var(--surf);border:2px solid var(--border);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;max-width:440px;margin:0 auto;box-shadow:var(--shadow-md);transition:all 300ms var(--es)}
+.swipeCardType{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em}
+.swipeCardHook{font-size:16px;font-weight:700;color:var(--tp);line-height:1.4}
+.swipeCardBody{font-size:13px;font-weight:500;color:var(--ts);line-height:1.6;max-height:200px;overflow-y:auto}
+.swipeActions{display:flex;justify-content:center;gap:16px;margin-top:8px}
+.swipeBtn{width:52px;height:52px;border-radius:50%;border:2px solid var(--border);background:var(--surf);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 200ms;font-size:18px}
+.swipeBtnApprove:hover{border-color:var(--green);color:var(--green);background:rgba(62,175,92,0.06);transform:scale(1.1)}
+.swipeBtnReject:hover{border-color:var(--red);color:var(--red);background:rgba(224,90,66,0.06);transform:scale(1.1)}
+.swipeBtnSkip:hover{border-color:var(--gold);color:var(--gold);background:rgba(200,168,78,0.06);transform:scale(1.1)}
+.swipeCounter{font-size:12px;font-weight:600;color:var(--tm);text-align:center}

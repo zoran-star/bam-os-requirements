@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
+import { useLocation } from '../context/LocationContext';
 import s from '../styles/Members.module.css';
 import sh from '../styles/shared.module.css';
 
@@ -28,24 +29,25 @@ const QUICK_ACTIONS = [
   { label: 'Create announcement', icon: 'announcement', action: 'announcement' },
   { label: 'Issue refund', icon: 'refund', action: 'refund' },
   { label: 'Issue credit', icon: 'credit', action: 'credit' },
+  { label: 'Extend member', icon: 'credit', action: 'extend' },
   { label: 'Apply discount', icon: 'discount', action: 'discount' },
   { label: 'Pause a member', icon: 'cmd', action: 'cmd' },
 ];
 
 const MEMBERS = [
-  { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050 },
-  { id: 2, name: 'Mia Thompson', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 15', joined: 'Nov 2025', health: 'green', photo: 'MT', payStatus: 'Current', email: 'mia.t@email.com', sessions: 24, streak: 3, revenue: 625 },
-  { id: 3, name: 'Jaylen Brooks', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 12', joined: 'Jun 2025', health: 'yellow', photo: 'JB', payStatus: 'Current', email: 'jaylen.b@email.com', sessions: 52, streak: 1, revenue: 1575 },
-  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: '—', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0 },
-  { id: 5, name: 'Ethan Nguyen', status: 'Paused', plan: 'Beginner', price: 95, lastSession: 'Feb 22', joined: 'Aug 2025', health: 'yellow', photo: 'EN', payStatus: 'Paused', email: 'ethan.n@email.com', sessions: 18, streak: 0, revenue: 665 },
-  { id: 6, name: 'Ava Chen', status: 'Active', plan: 'Beginner', price: 95, lastSession: 'Mar 13', joined: 'Jan 2026', health: 'green', photo: 'AC', payStatus: 'Current', email: 'ava.c@email.com', sessions: 12, streak: 3, revenue: 285 },
-  { id: 7, name: 'Marcus Davis', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 11', joined: 'Apr 2025', health: 'red', photo: 'MD', payStatus: 'Failed', email: 'marcus.d@email.com', sessions: 44, streak: 0, revenue: 1375 },
-  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: '—', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: '—', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475 },
+  { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050, location: 'Downtown' },
+  { id: 2, name: 'Mia Thompson', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 15', joined: 'Nov 2025', health: 'green', photo: 'MT', payStatus: 'Current', email: 'mia.t@email.com', sessions: 24, streak: 3, revenue: 625, location: 'Downtown' },
+  { id: 3, name: 'Jaylen Brooks', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 12', joined: 'Jun 2025', health: 'yellow', photo: 'JB', payStatus: 'Current', email: 'jaylen.b@email.com', sessions: 52, streak: 1, revenue: 1575, location: 'Downtown' },
+  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: '—', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0, location: 'Downtown' },
+  { id: 5, name: 'Ethan Nguyen', status: 'Paused', plan: 'Beginner', price: 95, lastSession: 'Feb 22', joined: 'Aug 2025', health: 'yellow', photo: 'EN', payStatus: 'Paused', email: 'ethan.n@email.com', sessions: 18, streak: 0, revenue: 665, location: 'Westside' },
+  { id: 6, name: 'Ava Chen', status: 'Active', plan: 'Beginner', price: 95, lastSession: 'Mar 13', joined: 'Jan 2026', health: 'green', photo: 'AC', payStatus: 'Current', email: 'ava.c@email.com', sessions: 12, streak: 3, revenue: 285, location: 'Westside' },
+  { id: 7, name: 'Marcus Davis', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 11', joined: 'Apr 2025', health: 'red', photo: 'MD', payStatus: 'Failed', email: 'marcus.d@email.com', sessions: 44, streak: 0, revenue: 1375, location: 'Westside' },
+  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: '—', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: '—', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475, location: 'Westside' },
 ];
 
 const PAUSES = [
-  { name: 'Ethan Nguyen', player: 'Ethan Jr.', start: 'Feb 23', resume: 'Mar 23', reason: 'Family vacation', daysLeft: 7 },
-  { name: 'Zara Okafor', player: 'Zara', start: 'Mar 1', resume: 'Apr 1', reason: 'Injury recovery', daysLeft: 16 },
+  { name: 'Ethan Nguyen', player: 'Ethan Jr.', start: 'Feb 23', resume: 'Mar 23', reason: 'Family vacation', daysLeft: 7, location: 'Westside' },
+  { name: 'Zara Okafor', player: 'Zara', start: 'Mar 1', resume: 'Apr 1', reason: 'Injury recovery', daysLeft: 16, location: 'Downtown' },
 ];
 
 const ACTIVITY_ICONS = {
@@ -61,23 +63,23 @@ const ACTIVITY_ICONS = {
 };
 
 const ACTIVITY = [
-  { type: 'payment', text: 'Payment received — Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez' },
-  { type: 'signup', text: 'New trial booked — Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes' },
-  { type: 'alert', text: 'Payment failed — Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis' },
-  { type: 'pause', text: 'Membership paused — Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen' },
-  { type: 'message', text: 'New reply — Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson' },
-  { type: 'cancel', text: 'Cancellation confirmed — Lily Park', time: '3d ago', member: 'Lily Park' },
-  { type: 'refund', text: 'Refund issued — Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park' },
-  { type: 'credit', text: 'Make-up credit issued — Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks' },
-  { type: 'announcement', text: 'Announcement published — "Spring Break Schedule Changes"', time: '5d ago', member: null },
+  { type: 'payment', text: 'Payment received — Carlos Martinez ($175)', time: '2h ago', member: 'Carlos Martinez', location: 'Downtown' },
+  { type: 'signup', text: 'New trial booked — Sofia Reyes (Saturday 10am)', time: '4h ago', member: 'Sofia Reyes', location: 'Downtown' },
+  { type: 'alert', text: 'Payment failed — Marcus Davis ($125)', time: '6h ago', member: 'Marcus Davis', location: 'Westside' },
+  { type: 'pause', text: 'Membership paused — Ethan Nguyen (vacation)', time: '1d ago', member: 'Ethan Nguyen', location: 'Westside' },
+  { type: 'message', text: 'New reply — Mia Thompson: "Sounds great, see you Saturday!"', time: '1d ago', member: 'Mia Thompson', location: 'Downtown' },
+  { type: 'cancel', text: 'Cancellation confirmed — Lily Park', time: '3d ago', member: 'Lily Park', location: 'Westside' },
+  { type: 'refund', text: 'Refund issued — Lily Park ($125, final month)', time: '3d ago', member: 'Lily Park', location: 'Westside' },
+  { type: 'credit', text: 'Make-up credit issued — Jaylen Brooks (Saturday makeup)', time: '4d ago', member: 'Jaylen Brooks', location: 'Downtown' },
+  { type: 'announcement', text: 'Announcement published — "Spring Break Schedule Changes"', time: '5d ago', member: null, location: null },
 ];
 
 const KPIS = [
   { label: 'Active Members', value: '42', trend: '+3', trendUp: true, ref: 'MEM-003a', explain: 'Members with an active, non-paused subscription right now. This is your core headcount.', pb: true },
   { label: 'New This Month', value: '6', trend: '+2 vs last', trendUp: true, ref: 'MEM-003b', explain: 'Members who started their first subscription this month. Shows how fast you\'re growing.', pb: false },
-  { label: 'Churned', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c', explain: 'Members who cancelled this month. Fewer is better — every lost member is lost revenue.', pb: true },
-  { label: 'Pause Rate', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d', explain: 'Percentage of active members who paused this month. High pause rates can signal dissatisfaction.', pb: false },
-  { label: 'Churn Rate', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g', explain: 'Percentage of members at the start of the month who cancelled before the end. Under 5% is strong.', pb: true },
+  { label: 'Churned (30d)', value: '1', trend: '-1 vs last', trendUp: true, ref: 'MEM-003c', explain: 'Members who cancelled in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window.', pb: true },
+  { label: 'Pause Rate (30d)', value: '4.8%', trend: 'Stable', trendUp: true, ref: 'MEM-003d', explain: 'Percentage of active members who paused in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window.', pb: false },
+  { label: 'Churn Rate (30d)', value: '2.4%', trend: 'Healthy', trendUp: true, ref: 'MEM-003g', explain: 'Percentage of members who cancelled in the last 30 days. This is not month to date — it is calculated over a rolling 30-day window. Under 5% is strong.', pb: true },
   { label: 'Avg Attendance', value: '8.2', trend: 'per class', trendUp: true, ref: 'MEM-003f', explain: 'Average number of athletes per session. Higher attendance means better class utilization and energy.', pb: false },
   { label: 'Avg Duration', value: '7.4mo', trend: '+0.6 vs last', trendUp: true, ref: 'MEM-003h', explain: 'How long members stay on average before cancelling. Longer duration = more lifetime revenue per member.', pb: true },
 ];
@@ -105,13 +107,13 @@ const NOTIFICATIONS = [
 
 /* ─── ATTENDANCE CHECK-IN (MEM-036) ─── */
 const TODAYS_SESSIONS = [
-  { id: 'sess1', time: '10:00 AM', name: 'Saturday Elite', coach: 'Coach Rivera', roster: [
+  { id: 'sess1', time: '10:00 AM', name: 'Saturday Elite', coach: 'Coach Rivera', location: 'Downtown', roster: [
     { id: 1, name: 'Carlos Martinez', initials: 'CM', checked: false },
     { id: 2, name: 'Mia Thompson', initials: 'MT', checked: false },
     { id: 3, name: 'Jaylen Brooks', initials: 'JB', checked: false },
     { id: 6, name: 'Ava Chen', initials: 'AC', checked: false },
   ]},
-  { id: 'sess2', time: '2:00 PM', name: 'Saturday Intermediate', coach: 'Coach Z', roster: [
+  { id: 'sess2', time: '2:00 PM', name: 'Saturday Intermediate', coach: 'Coach Z', location: 'Westside', roster: [
     { id: 7, name: 'Marcus Davis', initials: 'MD', checked: false },
     { id: 4, name: 'Sofia Reyes', initials: 'SR', checked: false },
   ]},
@@ -618,8 +620,86 @@ function FullDashboard({ onClose }) {
 }
 
 
+/* Extension Modal — Issue Credit */
+function ExtendModal({ onClose }) {
+  const [extType, setExtType] = useState('date');
+  const [member, setMember] = useState('');
+  const [days, setDays] = useState('7');
+  const [credits, setCredits] = useState('1');
+  const [saved, setSaved] = useState(false);
+
+  const handleIssue = () => { setSaved(true); setTimeout(onClose, 1500); };
+
+  return (
+    <div className={s.modalOverlay} onClick={onClose}>
+      <div className={s.modal} onClick={e => e.stopPropagation()}>
+        <div className={s.modalHead}>
+          <h3>Issue Credit / Extension</h3>
+          <span className={s.modalRef}>P1</span>
+          <button className={s.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Member</label>
+          <select className={s.formSelect} value={member} onChange={e => setMember(e.target.value)}>
+            <option value="">Select a member...</option>
+            {MEMBERS.filter(m => m.status !== 'Cancelled').map(m => (
+              <option key={m.id} value={m.name}>{m.name} — {m.plan}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Extension type</label>
+          <div className={s.radioGroup}>
+            <label className={`${s.radioOption} ${extType === 'date' ? s.radioActive : ''}`}>
+              <input type="radio" name="extType" value="date" checked={extType === 'date'} onChange={() => setExtType('date')} />
+              <span>Extend next payment date</span>
+            </label>
+            <label className={`${s.radioOption} ${extType === 'credits' ? s.radioActive : ''}`}>
+              <input type="radio" name="extType" value="credits" checked={extType === 'credits'} onChange={() => setExtType('credits')} />
+              <span>Add session credits</span>
+            </label>
+          </div>
+        </div>
+
+        {extType === 'date' ? (
+          <div className={s.formGroup}>
+            <label className={s.formLabel}>Extend by (days)</label>
+            <input className={s.formInput} type="number" value={days} onChange={e => setDays(e.target.value)} />
+            <div className={s.creditInfo}>
+              <div className={s.creditInfoRow}><span>Effect</span><span>Next payment pushed back {days} days</span></div>
+              <div className={s.creditInfoRow}><span>Billing adjustment</span><span>Automatic via Stripe</span></div>
+            </div>
+          </div>
+        ) : (
+          <div className={s.formGroup}>
+            <label className={s.formLabel}>Number of credits</label>
+            <input className={s.formInput} type="number" value={credits} onChange={e => setCredits(e.target.value)} />
+            <div className={s.creditInfo}>
+              <div className={s.creditInfoRow}><span>Credit value</span><span>{credits} session(s)</span></div>
+              <div className={s.creditInfoRow}><span>Expires</span><span>30 days from issue</span></div>
+            </div>
+          </div>
+        )}
+
+        {saved ? (
+          <div className={s.sentConfirm}>{extType === 'date' ? `Payment date extended by ${days} days` : `${credits} credit(s) issued`}</div>
+        ) : (
+          <div className={s.modalFooter}>
+            <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
+            <button className={s.btnPrimary} onClick={handleIssue} disabled={!member}>Issue {extType === 'date' ? 'extension' : 'credits'}</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 /* ─── MAIN COMPONENT ─── */
 export default function Members() {
+  const { location: activeLocation, setLocation: setActiveLocation } = useLocation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [drawerMember, setDrawerMember] = useState(null);
@@ -628,6 +708,10 @@ export default function Members() {
   const [cmdResponse, setCmdResponse] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const typewriterText = useTypewriter(SAGE_PROMPTS);
+
+  const filteredMembers = activeLocation === 'all' ? MEMBERS : MEMBERS.filter(m => m.location.toLowerCase() === activeLocation);
+  const filteredPauses = activeLocation === 'all' ? PAUSES : PAUSES.filter(p => p.location.toLowerCase() === activeLocation);
+  const filteredActivityByLocation = activeLocation === 'all' ? ACTIVITY : ACTIVITY.filter(a => !a.location || a.location.toLowerCase() === activeLocation);
 
   /* View & sort state for directory */
   const [viewMode, setViewMode] = useState('table');
@@ -643,6 +727,7 @@ export default function Members() {
   const [discountOpen, setDiscountOpen] = useState(false);
   const [creditOpen, setCreditOpen] = useState(false);
   const [creditMember, setCreditMember] = useState(null);
+  const [extendOpen, setExtendOpen] = useState(false);
   const [dashOpen, setDashOpen] = useState(false);
   const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const [activityFilter, setActivityFilter] = useState('all');
@@ -650,12 +735,13 @@ export default function Members() {
   const [notifications, setNotifications] = useState(NOTIFICATIONS);
   const [bellFilter, setBellFilter] = useState('All');
   const [sessions, setSessions] = useState(TODAYS_SESSIONS);
+  const filteredSessionsData = activeLocation === 'all' ? sessions : sessions.filter(sess => sess.location.toLowerCase() === activeLocation);
 
   const canvasRef = useRef(null);
   useBannerCanvas(canvasRef);
 
-  const activeCount = MEMBERS.filter(m => m.status === 'Active').length;
-  const pausedCount = MEMBERS.filter(m => m.status === 'Paused').length;
+  const activeCount = filteredMembers.filter(m => m.status === 'Active').length;
+  const pausedCount = filteredMembers.filter(m => m.status === 'Paused').length;
   const unreadNotifs = notifications.filter(n => n.unread).length;
 
   /* Quick action handler */
@@ -664,6 +750,7 @@ export default function Members() {
     if (action === 'announcement') return setAnnouncementOpen(true);
     if (action === 'refund') { setRefundMember(null); return setRefundOpen(true); }
     if (action === 'credit') { setCreditMember(null); return setCreditOpen(true); }
+    if (action === 'extend') return setExtendOpen(true);
     if (action === 'discount') return setDiscountOpen(true);
     handleCommand(text);
   };
@@ -699,7 +786,7 @@ export default function Members() {
   };
 
   const filtered = useMemo(() => {
-    let list = MEMBERS.filter(m => {
+    let list = filteredMembers.filter(m => {
       const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === 'All' || m.status === statusFilter;
       return matchesSearch && matchesStatus;
@@ -717,9 +804,9 @@ export default function Members() {
       return 0;
     });
     return list;
-  }, [search, statusFilter, sortCol, sortDir]);
+  }, [search, statusFilter, sortCol, sortDir, filteredMembers]);
 
-  const filteredActivity = activityFilter === 'all' ? ACTIVITY : ACTIVITY.filter(a => a.type === activityFilter);
+  const filteredActivity = activityFilter === 'all' ? filteredActivityByLocation : filteredActivityByLocation.filter(a => a.type === activityFilter);
 
   const healthColor = h => h === 'green' ? s.healthGreen : h === 'yellow' ? s.healthYellow : s.healthRed;
   const statusClass = st =>
@@ -730,7 +817,7 @@ export default function Members() {
   const sortIcon = (col) => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : '';
 
   const openMemberInDrawer = (memberName) => {
-    const m = MEMBERS.find(mb => mb.name === memberName);
+    const m = filteredMembers.find(mb => mb.name === memberName);
     if (m) setDrawerMember(m);
   };
 
@@ -772,6 +859,14 @@ export default function Members() {
             </button>
           </div>
           <div className={s.cmdRight}>
+            <div className={sh.locationFilter}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <select className={sh.locationSelect} value={activeLocation} onChange={e => setActiveLocation(e.target.value)}>
+                <option value="all">All Locations</option>
+                <option value="downtown">Downtown</option>
+                <option value="westside">Westside</option>
+              </select>
+            </div>
             <button className={s.cmdChipH} onClick={() => setDashOpen(true)}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
               Dashboard
@@ -987,7 +1082,7 @@ export default function Members() {
               <h3 className={s.sectionTitle}>Attendance Check-In</h3>
               <span className={s.sectionRef}>MEM-036</span>
             </div>
-            {sessions.map(sess => {
+            {filteredSessionsData.map(sess => {
               const checkedCount = sess.roster.filter(r => r.checked).length;
               return (
                 <div key={sess.id} className={s.attendSession}>
@@ -1032,7 +1127,7 @@ export default function Members() {
               <h3 className={s.sectionTitle}>Active Pauses</h3>
               <span className={s.sectionRef}>MEM-012</span>
             </div>
-            {PAUSES.map(p => (
+            {filteredPauses.map(p => (
               <div key={p.name} className={s.pauseCard}>
                 <div className={s.pauseLeft}>
                   <div className={s.pauseName}>{p.name}</div>
@@ -1049,6 +1144,34 @@ export default function Members() {
                 </div>
               </div>
             ))}
+
+            <div className={s.sectionHead} style={{ marginTop: 24 }}>
+              <h3 className={s.sectionTitle}>Failed Payments & Dunning</h3>
+              <span className={s.sectionRef}>MEM-015a</span>
+            </div>
+            {FAILED_PAYMENTS.map(fp => (
+              <div key={fp.id} className={s.fpCard}>
+                <div className={s.fpLeft}>
+                  <div className={s.fpAvatar}>{fp.initials}</div>
+                  <div className={s.fpInfo}>
+                    <div className={s.fpName}>{fp.name}</div>
+                    <div className={s.fpMeta}>{fp.plan} · ${fp.amount}/mo · {fp.reason}</div>
+                  </div>
+                </div>
+                <div className={s.fpRight}>
+                  <div className={s.fpDetail}><span className={s.fpDetailLabel}>Attempts</span><span className={s.fpDetailValue}>{fp.attempts}/3</span></div>
+                  <div className={s.fpActions}>
+                    <button className={s.pauseAction}>Retry now</button>
+                    <button className={s.pauseAction}>Send dunning message</button>
+                    <button className={s.pauseAction}>Contact</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div className={s.sageTip}>
+              <span className={s.sageTipLabel}>Sage</span>
+              <span>Failed payments trigger automatic dunning sequences. If all retries fail, the member is flagged here for manual follow-up.</span>
+            </div>
           </>
         )}
 
@@ -1283,6 +1406,7 @@ export default function Members() {
       {refundOpen && <RefundModal onClose={() => { setRefundOpen(false); setRefundMember(null); }} member={refundMember} />}
       {discountOpen && <DiscountModal onClose={() => setDiscountOpen(false)} />}
       {creditOpen && <CreditModal onClose={() => { setCreditOpen(false); setCreditMember(null); }} member={creditMember} />}
+      {extendOpen && <ExtendModal onClose={() => setExtendOpen(false)} />}
     </main>
   );
 }

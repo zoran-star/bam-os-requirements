@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — The AI Command Center for Sports & Fitness</title>
+<meta name="description" content="FullControl is the AI-powered operating system for sports and fitness businesses. One system. Total clarity. Full control.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#08080a;color:#e4e4e7;line-height:1.7;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none}
+
+/* ═══════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════ */
+:root{
+  --white:#fafafa;
+  --g50:#f4f4f5;--g100:#e4e4e7;--g200:#d4d4d8;--g300:#a1a1aa;
+  --g400:#71717a;--g500:#52525b;--g600:#3f3f46;--g700:#27272a;
+  --g800:#18181b;--g900:#09090b;
+  --accent:#c8a84e;--accent-l:#d4b65c;
+  --glow:rgba(200,168,78,0.12);
+  --max:1080px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+  --spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ═══════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════ */
+.w{max-width:var(--max);margin:0 auto;padding:0 28px}
+section{padding:140px 0;position:relative}
+@media(max-width:768px){section{padding:96px 0}.w{padding:0 20px}}
+
+/* ═══════════════════════════════════════════
+   REVEAL
+   ═══════════════════════════════════════════ */
+.rv{opacity:0;transform:translateY(28px);transition:opacity 0.8s var(--ease),transform 0.8s var(--ease)}
+.rv.vis{opacity:1;transform:translateY(0)}
+.rv-d1{transition-delay:0.08s}.rv-d2{transition-delay:0.16s}
+.rv-d3{transition-delay:0.24s}.rv-d4{transition-delay:0.32s}
+.rv-d5{transition-delay:0.4s}
+
+/* ═══════════════════════════════════════════
+   DIVIDER
+   ═══════════════════════════════════════════ */
+.div-line{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent);margin:0}
+
+/* ═══════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 0;transition:all .3s var(--ease)}
+nav.scrolled{background:rgba(8,8,10,0.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid rgba(255,255,255,0.04)}
+.nav-in{max-width:var(--max);margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:17px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:9px;color:var(--white)}
+.nav-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#111;letter-spacing:0}
+.nav-links{display:flex;gap:28px;align-items:center}
+.nav-links a{font-size:13px;font-weight:500;color:var(--g300);transition:color .2s}
+.nav-links a:hover{color:var(--white)}
+.nav-contact{font-size:12px;font-weight:700;color:#111;background:var(--accent);padding:8px 20px;border-radius:10px;transition:all .2s;letter-spacing:0.01em}
+.nav-contact:hover{background:var(--accent-l);transform:translateY(-1px);box-shadow:0 6px 24px rgba(200,168,78,0.25)}
+@media(max-width:640px){.nav-links a:not(.nav-contact){display:none}}
+
+/* ═══════════════════════════════════════════
+   HERO
+   ═══════════════════════════════════════════ */
+.hero{padding:220px 0 160px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-300px;left:50%;transform:translateX(-50%);width:1100px;height:1100px;background:radial-gradient(ellipse,var(--glow) 0%,transparent 65%);pointer-events:none;opacity:0.7}
+.hero-label{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.1);border-radius:100px;padding:5px 14px;margin-bottom:32px;letter-spacing:0.06em;text-transform:uppercase}
+.hero-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:hrPulse 2.5s ease-in-out infinite}
+@keyframes hrPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.hero h1{font-size:clamp(44px,7.5vw,88px);font-weight:900;letter-spacing:-0.055em;line-height:0.98;color:var(--white);margin-bottom:28px}
+.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--accent),var(--accent-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(17px,2.2vw,22px);font-weight:400;color:var(--g300);max-width:560px;margin:0 auto 48px;line-height:1.65;letter-spacing:-0.01em}
+.hero-cta{display:inline-flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.hero-cta a{font-size:14px;font-weight:700;padding:15px 34px;border-radius:14px;transition:all .25s var(--ease);letter-spacing:0.01em}
+.btn-gold{color:#111;background:var(--accent)}
+.btn-gold:hover{background:var(--accent-l);transform:translateY(-2px);box-shadow:0 10px 36px rgba(200,168,78,0.3)}
+.btn-ghost{color:var(--g300);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08)}
+.btn-ghost:hover{color:var(--white);border-color:rgba(255,255,255,0.15);background:rgba(255,255,255,0.06)}
+
+/* ═══════════════════════════════════════════
+   SECTION TYPOGRAPHY
+   ═══════════════════════════════════════════ */
+.sec-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--accent);margin-bottom:16px}
+.sec-title{font-size:clamp(30px,4.5vw,50px);font-weight:900;letter-spacing:-0.045em;line-height:1.05;color:var(--white);margin-bottom:18px}
+.sec-sub{font-size:17px;font-weight:400;color:var(--g300);max-width:540px;line-height:1.65}
+.sec-center{text-align:center}
+.sec-center .sec-sub{margin:0 auto}
+
+/* ═══════════════════════════════════════════
+   MISSION
+   ═══════════════════════════════════════════ */
+.mission{background:var(--g900)}
+.mission-body{max-width:680px;margin:0 auto;text-align:center}
+.mission-body p{font-size:18px;font-weight:400;color:var(--g200);line-height:1.7;margin-bottom:20px}
+.mission-body p:last-child{margin-bottom:0}
+.mission-body strong{color:var(--white);font-weight:700}
+
+/* ═══════════════════════════════════════════
+   BLOCKQUOTE
+   ═══════════════════════════════════════════ */
+.bq{position:relative;max-width:640px;margin:48px auto;padding:32px 0 32px 28px;border-left:2px solid var(--accent)}
+.bq p{font-size:20px;font-weight:500;color:var(--g100);line-height:1.55;letter-spacing:-0.01em;font-style:italic}
+@media(max-width:768px){.bq p{font-size:17px}}
+
+/* ═══════════════════════════════════════════
+   PROBLEM
+   ═══════════════════════════════════════════ */
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:56px;align-items:start}
+@media(max-width:768px){.problem-grid{grid-template-columns:1fr;gap:32px}}
+.problem-text p{font-size:16px;color:var(--g300);line-height:1.7;margin-bottom:16px}
+.problem-text strong{color:var(--g100);font-weight:600}
+.problem-list{list-style:none;display:flex;flex-direction:column;gap:10px}
+.problem-list li{font-size:15px;font-weight:500;color:var(--g300);display:flex;align-items:center;gap:10px;line-height:1.4}
+.problem-list li svg{flex-shrink:0;color:var(--g500)}
+.problem-stat{background:rgba(224,90,66,0.04);border:1px solid rgba(224,90,66,0.08);border-radius:20px;padding:28px;margin-top:24px}
+.problem-stat-num{font-size:40px;font-weight:900;font-family:'Nunito',sans-serif;color:#e05a42;letter-spacing:-0.03em;line-height:1}
+.problem-stat-label{font-size:14px;font-weight:500;color:var(--g400);margin-top:6px}
+
+/* ═══════════════════════════════════════════
+   SHIFT
+   ═══════════════════════════════════════════ */
+.shift{text-align:center;padding:100px 0}
+.shift-text{font-size:clamp(22px,3.5vw,36px);font-weight:700;letter-spacing:-0.03em;line-height:1.35;color:var(--g200);max-width:620px;margin:0 auto}
+.shift-text em{font-style:normal;color:var(--accent);font-weight:800}
+
+/* ═══════════════════════════════════════════
+   SOLUTION
+   ═══════════════════════════════════════════ */
+.sol-features{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:48px}
+@media(max-width:600px){.sol-features{grid-template-columns:1fr}}
+.sol-feat{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease)}
+.sol-feat:hover{border-color:rgba(200,168,78,0.12);background:rgba(200,168,78,0.02);transform:translateY(-2px)}
+.sol-feat h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:5px;letter-spacing:-0.01em}
+.sol-feat p{font-size:13px;color:var(--g400);line-height:1.5}
+.sol-feat-icon{width:36px;height:36px;border-radius:10px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.08);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+
+/* ═══════════════════════════════════════════
+   CORE IDEA
+   ═══════════════════════════════════════════ */
+.core{text-align:center;padding:120px 0}
+.core-flow{display:flex;align-items:center;justify-content:center;gap:20px;margin-top:48px;flex-wrap:wrap}
+.core-node{font-size:16px;font-weight:700;color:var(--g200);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:16px 28px;transition:all .3s var(--ease)}
+.core-node:hover{border-color:rgba(200,168,78,0.15);background:rgba(200,168,78,0.03)}
+.core-node.active{color:var(--accent);border-color:rgba(200,168,78,0.25);background:rgba(200,168,78,0.06);box-shadow:0 0 24px rgba(200,168,78,0.08)}
+.core-arrow{color:var(--g600);flex-shrink:0}
+
+/* ═══════════════════════════════════════════
+   HOW IT WORKS
+   ═══════════════════════════════════════════ */
+.how-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-top:56px}
+@media(max-width:900px){.how-steps{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.how-steps{grid-template-columns:1fr}}
+.how-step{padding:28px 24px;border-radius:20px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);transition:all .3s var(--ease)}
+.how-step:hover{border-color:rgba(200,168,78,0.12);background:rgba(200,168,78,0.015)}
+.how-num{font-size:42px;font-weight:900;font-family:'Nunito',sans-serif;color:rgba(200,168,78,0.1);line-height:1;margin-bottom:14px;letter-spacing:-0.04em}
+.how-step h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:5px}
+.how-step p{font-size:13px;color:var(--g400);line-height:1.5}
+
+/* ═══════════════════════════════════════════
+   WEDGE / MVP
+   ═══════════════════════════════════════════ */
+.wedge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:48px}
+@media(max-width:600px){.wedge-grid{grid-template-columns:1fr}}
+.wedge-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease)}
+.wedge-card:hover{border-color:rgba(200,168,78,0.12);transform:translateY(-2px)}
+.wedge-card h3{font-size:15px;font-weight:700;color:var(--white);margin-bottom:5px;display:flex;align-items:center;gap:8px}
+.wedge-card h3 svg{color:var(--accent);flex-shrink:0}
+.wedge-card p{font-size:13px;color:var(--g400);line-height:1.5}
+
+/* ═══════════════════════════════════════════
+   MARKET
+   ═══════════════════════════════════════════ */
+.market-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:32px}
+.market-tag{font-size:13px;font-weight:600;color:var(--g200);background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px 18px;transition:all .25s var(--ease)}
+.market-tag:hover{border-color:rgba(200,168,78,0.15);color:var(--accent)}
+.market-traits{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:32px}
+@media(max-width:600px){.market-traits{grid-template-columns:1fr}}
+.market-trait{font-size:14px;font-weight:500;color:var(--g300);display:flex;align-items:flex-start;gap:10px;padding:14px 18px;background:rgba(255,255,255,0.015);border:1px solid rgba(255,255,255,0.04);border-radius:14px;line-height:1.4}
+.market-trait svg{flex-shrink:0;color:var(--accent);margin-top:2px}
+
+/* ═══════════════════════════════════════════
+   WHY SECTIONS (shared)
+   ═══════════════════════════════════════════ */
+.why-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-top:48px;align-items:start}
+@media(max-width:768px){.why-grid{grid-template-columns:1fr;gap:32px}}
+.why-list{list-style:none;display:flex;flex-direction:column;gap:14px}
+.why-list li{font-size:15px;font-weight:500;color:var(--g200);display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.why-list li svg{flex-shrink:0;color:var(--accent);margin-top:3px}
+
+/* ═══════════════════════════════════════════
+   WHY US
+   ═══════════════════════════════════════════ */
+.why-us-note{font-size:16px;font-weight:500;color:var(--g200);line-height:1.6;max-width:540px;margin-top:16px}
+.why-us-note strong{color:var(--white);font-weight:700}
+
+/* ═══════════════════════════════════════════
+   SCALE
+   ═══════════════════════════════════════════ */
+.scale-table{margin-top:48px;max-width:640px}
+.scale-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;padding:20px 0;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center}
+.scale-row:last-child{border-bottom:none}
+.scale-row.scale-header{border-bottom:1px solid rgba(255,255,255,0.08)}
+.scale-header span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--g500)}
+.scale-row span{font-size:15px;font-weight:500;color:var(--g300)}
+.scale-row .scale-arr{font-size:20px;font-weight:900;font-family:'Nunito',sans-serif;color:var(--accent);letter-spacing:-0.02em}
+.scale-note{font-size:14px;color:var(--g400);margin-top:24px;line-height:1.6;max-width:540px}
+
+/* ═══════════════════════════════════════════
+   VISION
+   ═══════════════════════════════════════════ */
+.vision{text-align:center;padding:160px 0;position:relative}
+.vision::before{content:'';position:absolute;bottom:-100px;left:50%;transform:translateX(-50%);width:900px;height:700px;background:radial-gradient(ellipse,var(--glow) 0%,transparent 60%);pointer-events:none;opacity:0.5}
+.vision-text{font-size:clamp(20px,3vw,28px);font-weight:500;color:var(--g200);max-width:600px;margin:0 auto;line-height:1.6;letter-spacing:-0.01em}
+.vision-text strong{color:var(--white);font-weight:700}
+.vision-closer{font-size:16px;font-weight:500;color:var(--g400);margin-top:28px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════ */
+footer{border-top:1px solid rgba(255,255,255,0.04);padding:36px 0}
+.foot-in{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.foot-brand{font-size:13px;font-weight:700;color:var(--g400);display:flex;align-items:center;gap:7px}
+.foot-copy{font-size:11px;color:var(--g600)}
+.foot-links{display:flex;gap:20px}
+.foot-links a{font-size:12px;font-weight:500;color:var(--g500);transition:color .2s}
+.foot-links a:hover{color:var(--g300)}
+
+/* ═══════════════════════════════════════════
+   HORIZONTAL RULE (between why sections)
+   ═══════════════════════════════════════════ */
+.thin-rule{height:1px;background:rgba(255,255,255,0.04);max-width:var(--max);margin:0 auto}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="nav-in">
+    <a href="#" class="nav-logo"><span class="nav-mark">FC</span>FullControl</a>
+    <div class="nav-links">
+      <a href="#mission">Mission</a>
+      <a href="#solution">Solution</a>
+      <a href="#market">Market</a>
+      <a href="#vision">Vision</a>
+      <a href="mailto:hello@fullcontrol.io" class="nav-contact">Get in Touch</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     HERO
+     ═══════════════════════════════════════════ -->
+<section class="hero">
+  <div class="w">
+    <div class="hero-label rv"><span class="hero-dot"></span>Company Overview</div>
+    <h1 class="rv rv-d1">The AI Command Center<br>for <em>Sports & Fitness</em></h1>
+    <p class="hero-sub rv rv-d2">One intelligent system to understand your business, decide what matters, and take action.</p>
+    <div class="hero-cta rv rv-d3">
+      <a href="mailto:hello@fullcontrol.io" class="btn-gold">Get in Touch</a>
+      <a href="#mission" class="btn-ghost">Read More</a>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     MISSION
+     ═══════════════════════════════════════════ -->
+<section class="mission" id="mission">
+  <div class="w">
+    <div class="sec-center">
+      <div class="sec-label rv">Mission</div>
+      <h2 class="sec-title rv rv-d1">Built for the people who<br>build communities</h2>
+    </div>
+    <div class="mission-body rv rv-d2">
+      <p>FullControl exists to empower coaches and operators who got into this industry to make an impact &mdash; not to manage software.</p>
+      <p>The best operators understand people. They build strong cultures. They develop athletes and communities. But they struggle with the technical side of running a business, and it limits their potential.</p>
+      <p>Our belief is simple: <strong>the people who master relationships, communication, and culture will be the most successful &mdash; once they learn to use AI the right way.</strong></p>
+      <p>FullControl gives them that ability.</p>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     WHAT IT IS
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="sec-center">
+      <div class="sec-label rv">What it is</div>
+      <h2 class="sec-title rv rv-d1">The operating system for<br>sports & fitness businesses</h2>
+      <p class="sec-sub rv rv-d2">A single intelligent system that helps you understand your business, decide what matters, and take action.</p>
+    </div>
+    <div class="bq rv rv-d3">
+      <p>You won't just use your software. You'll talk to it &mdash; and it'll execute with power, speed, and precision that's exponentially better than your best employee.</p>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     PROBLEM
+     ═══════════════════════════════════════════ -->
+<section id="problem">
+  <div class="w">
+    <div class="sec-label rv">The problem</div>
+    <h2 class="sec-title rv rv-d1">Today's business software<br>is shattered glass</h2>
+    <div class="problem-grid">
+      <div class="rv rv-d2">
+        <div class="problem-text">
+          <p>Operators are forced to piece together CRM, scheduling, payments, marketing, analytics, and member systems. Each solves part of the problem. <strong>None of them truly work together.</strong></p>
+          <p>The result: constant switching, manual workflows, unclear priorities, lost opportunities.</p>
+          <p>It feels like trying to run your business while stepping over broken pieces &mdash; and constantly trying to fit them back together.</p>
+        </div>
+      </div>
+      <div class="rv rv-d3">
+        <ul class="problem-list">
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Fragmented across 5+ platforms</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Hours of manual labor weekly</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>No unified view of operations</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Decisions based on gut feel</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Opportunities slipping through cracks</li>
+        </ul>
+        <div class="problem-stat rv rv-d4">
+          <div class="problem-stat-num">15+</div>
+          <div class="problem-stat-label">hours saved weekly per operator with just basic automations &mdash; before FullControl's full capabilities</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SHIFT
+     ═══════════════════════════════════════════ -->
+<section class="shift">
+  <div class="w">
+    <div class="div-line" style="margin-bottom:100px"></div>
+    <p class="shift-text rv">Software shouldn't be something you struggle to manage.<br><em>It should run your business for you.</em></p>
+    <div class="div-line" style="margin-top:100px"></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════
+     SOLUTION
+     ═══════════════════════════════════════════ -->
+<section id="solution">
+  <div class="w">
+    <div class="sec-center">
+      <div class="sec-label rv">The solution</div>
+      <h2 class="sec-title rv rv-d1">Everything in one system.<br>Intelligence on top.</h2>
+      <p class="sec-sub rv rv-d2">Instead of fragmented tools, you get one unified platform, one view of your business, one system guiding decisions.</p>
+    </div>
+    <div class="sol-features">
+      <div class="sol-feat rv rv-d1">
+        <div class="sol-feat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>Shows you what's happening</h3>
+        <p>Real-time visibility across every part of your business in one place.</p>
+      </div>
+      <div class="sol-feat rv rv-d2">
+        <div class="sol-feat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+        <h3>Highlights what matters</h3>
+        <p>AI surfaces priorities so you focus on what moves the needle.</p>
+      </div>
+      <div class="sol-feat rv rv-d3">
+        <div class="sol-feat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
+        <h3>Tells you what to do next</h3>
+        <p>Proactive recommendations based on your data, not generic best practices.</p>
+      </div>
+      <div class="sol-feat rv rv-d4">
+        <div class="sol-feat-icon"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <h3>Executes for you immediately</h3>
+        <p>Run your business through simple interaction with a superpowered AI co-pilot.</p>
+      </div>
+    </div>
+    <div class="bq rv">
+      <p>Run your business through simple interaction with a superpowered AI employee.</p>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     CORE IDEA
+     ═══════════════════════════════════════════ -->
+<section class="core">
+  <div class="w">
+    <div class="sec-label rv">Core idea</div>
+    <h2 class="sec-title rv rv-d1">The next evolution</h2>
+    <div class="core-flow rv rv-d2">
+      <div class="core-node">Tools</div>
+      <svg class="core-arrow" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      <div class="core-node">Systems</div>
+      <svg class="core-arrow" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      <div class="core-node active">Intelligence</div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     HOW IT WORKS
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="sec-center">
+      <div class="sec-label rv">How it works</div>
+      <h2 class="sec-title rv rv-d1">Simple by design</h2>
+    </div>
+    <div class="how-steps">
+      <div class="how-step rv rv-d1">
+        <div class="how-num">01</div>
+        <h3>Connect your business</h3>
+        <p>Link existing tools or start fresh. Data syncs automatically.</p>
+      </div>
+      <div class="how-step rv rv-d2">
+        <div class="how-num">02</div>
+        <h3>FullControl understands</h3>
+        <p>The system maps your operations, members, revenue, and patterns.</p>
+      </div>
+      <div class="how-step rv rv-d3">
+        <div class="how-num">03</div>
+        <h3>Key insights surface</h3>
+        <p>AI identifies what matters most and what needs your attention.</p>
+      </div>
+      <div class="how-step rv rv-d4">
+        <div class="how-num">04</div>
+        <h3>Take action instantly</h3>
+        <p>Execute directly or let AI handle it. One click or one sentence.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     MVP WEDGE
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="sec-label rv">Product wedge</div>
+    <h2 class="sec-title rv rv-d1">Start where leverage is highest</h2>
+    <p class="sec-sub rv rv-d2">Begin with the areas that move the needle most, then expand into full operational control.</p>
+    <div class="wedge-grid">
+      <div class="wedge-card rv rv-d1">
+        <h3><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Sales</h3>
+        <p>Lead tracking, follow-up automation, conversion visibility across the entire pipeline.</p>
+      </div>
+      <div class="wedge-card rv rv-d2">
+        <h3><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Marketing & Content</h3>
+        <p>Performance insights, optimization guidance, and automated content production.</p>
+      </div>
+      <div class="wedge-card rv rv-d3">
+        <h3><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Member & Facility Management</h3>
+        <p>Take care of member needs, manage facilities, and run your schedule effortlessly.</p>
+      </div>
+      <div class="wedge-card rv rv-d4">
+        <h3><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Command Center</h3>
+        <p>A single place to see and manage everything. The intelligent home base for your business.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     MARKET
+     ═══════════════════════════════════════════ -->
+<section id="market">
+  <div class="w">
+    <div class="sec-label rv">Market</div>
+    <h2 class="sec-title rv rv-d1">A massive, underserved category</h2>
+    <div class="market-tags rv rv-d2">
+      <div class="market-tag">Training Academies</div>
+      <div class="market-tag">Gyms</div>
+      <div class="market-tag">Performance Centers</div>
+      <div class="market-tag">Boutique Studios</div>
+      <div class="market-tag">Coaching Businesses</div>
+    </div>
+    <div class="market-traits">
+      <div class="market-trait rv rv-d1"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Operationally complex</div>
+      <div class="market-trait rv rv-d2"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Recurring revenue driven</div>
+      <div class="market-trait rv rv-d3"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Highly dependent on systems</div>
+      <div class="market-trait rv rv-d4"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Underserved by current tools</div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     WHY THIS MARKET + WHY NOW
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="why-grid">
+      <div>
+        <div class="sec-label rv">Why this market</div>
+        <h2 class="sec-title rv rv-d1" style="font-size:clamp(24px,3.5vw,36px)">Clear pain.<br>Clear ROI.</h2>
+        <ul class="why-list rv rv-d2">
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Strong need for coordination across members, staff, and schedules</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Heavy reliance on software with limited manpower to run it</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Poor existing solutions with low switching costs</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Clear, measurable ROI for better systems</li>
+        </ul>
+      </div>
+      <div>
+        <div class="sec-label rv">Why now</div>
+        <h2 class="sec-title rv rv-d1" style="font-size:clamp(24px,3.5vw,36px)">The window<br>is open.</h2>
+        <ul class="why-list rv rv-d2">
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI makes truly intelligent systems possible for the first time</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Existing platforms are outdated and fragmented</li>
+          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Operators are actively seeking simplicity and clarity</li>
+        </ul>
+        <p class="why-us-note rv rv-d3"><strong>This shift is inevitable.</strong> We intend to be ahead of it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     WHY US
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="sec-label rv">Why us</div>
+    <h2 class="sec-title rv rv-d1">Built from the field,<br>not from a whiteboard</h2>
+    <ul class="why-list rv rv-d2" style="max-width:640px">
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We operate in this space directly &mdash; running academies and consulting for 20+ others across all stages and markets</li>
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We've already built systems that help these businesses grow</li>
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We have direct access to early users and real feedback loops</li>
+      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>We understand both the craft and the business</li>
+    </ul>
+    <p class="why-us-note rv rv-d3">This is built from real experience &mdash; <strong>not theory and guesses.</strong></p>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     SCALE
+     ═══════════════════════════════════════════ -->
+<section>
+  <div class="w">
+    <div class="sec-label rv">Projected scale</div>
+    <h2 class="sec-title rv rv-d1">Subscription SaaS model<br>with compounding upside</h2>
+    <div class="scale-table rv rv-d2">
+      <div class="scale-row scale-header">
+        <span>Facilities</span>
+        <span>Price / mo</span>
+        <span>ARR</span>
+      </div>
+      <div class="scale-row">
+        <span>1,000</span>
+        <span>~$300</span>
+        <span class="scale-arr">$3.6M</span>
+      </div>
+      <div class="scale-row">
+        <span>5,000</span>
+        <span>~$300</span>
+        <span class="scale-arr">$18M</span>
+      </div>
+      <div class="scale-row">
+        <span>10,000</span>
+        <span>~$300</span>
+        <span class="scale-arr">$36M</span>
+      </div>
+    </div>
+    <p class="scale-note rv rv-d3">Core subscription only. As the system becomes more embedded in operations, revenue per customer increases through deeper workflow ownership, expanded functionality, and higher-value tiers.</p>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     VISION
+     ═══════════════════════════════════════════ -->
+<section class="vision" id="vision">
+  <div class="w">
+    <div class="sec-label rv">Vision</div>
+    <h2 class="sec-title rv rv-d1">The future we're building</h2>
+    <p class="vision-text rv rv-d2">A world where sports and fitness businesses run on <strong>intelligent systems</strong> instead of fragmented tools. Where great coaches and operators are no longer limited by software &mdash; and can fully focus on impact.</p>
+    <p class="vision-closer rv rv-d3">That's FullControl.</p>
+    <div style="margin-top:48px" class="rv rv-d4">
+      <a href="mailto:hello@fullcontrol.io" class="btn-gold" style="font-size:15px;padding:16px 40px;border-radius:16px">Get in Touch</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="w">
+    <div class="foot-in">
+      <div class="foot-brand"><span class="nav-mark" style="width:20px;height:20px;border-radius:5px;font-size:7px">FC</span>FullControl</div>
+      <div class="foot-links">
+        <a href="mailto:hello@fullcontrol.io">Contact</a>
+      </div>
+      <div class="foot-copy">&copy; 2026 FullControl. All rights reserved.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Nav scroll
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>{nav.classList.toggle('scrolled',window.scrollY>40)});
+
+// Reveal on scroll
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis')});
+},{threshold:0.08,rootMargin:'0px 0px -32px 0px'});
+document.querySelectorAll('.rv').forEach(el=>obs.observe(el));
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const t=document.querySelector(a.getAttribute('href'));
+    if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+</script>
+</body>
+</html>

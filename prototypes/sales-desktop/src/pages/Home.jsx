@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useLocation } from '../context/LocationContext';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
 import useCountUp from '../hooks/useCountUp';
@@ -38,16 +40,16 @@ const KPI_ICONS = {
 };
 
 const ALL_KPIS = [
-  { id: 'new_members', label: 'New Members', current: 6, target: 10, unit: '', color: '#3EAF5C', desc: 'New subscriptions this month' },
-  { id: 'mrr_growth', label: 'MRR Growth', current: 8.2, target: 10, unit: '%', color: '#C8A84E', desc: 'Monthly recurring revenue growth' },
-  { id: 'classes_filled', label: 'Classes Filled', current: 18, target: 24, unit: '', color: '#6366f1', desc: 'Sessions at 80%+ capacity' },
-  { id: 'trials_booked', label: 'Trials Booked', current: 4, target: 6, unit: '', color: '#E09D24', desc: 'Free trial signups this month' },
-  { id: 'churn_rate', label: 'Churn Rate', current: 2.4, target: 5, unit: '%', color: '#E05A42', desc: 'Member cancellation rate (lower is better)' },
-  { id: 'avg_attendance', label: 'Avg Attendance', current: 8.2, target: 12, unit: '', color: '#3EAF5C', desc: 'Average athletes per session' },
-  { id: 'trial_conversion', label: 'Trial Conversion', current: 67, target: 80, unit: '%', color: '#C8A84E', desc: 'Trials converting to paid members' },
-  { id: 'revenue_per_member', label: 'Revenue / Member', current: 126, target: 150, unit: '$', color: '#6366f1', desc: 'Average monthly revenue per member' },
-  { id: 'referral_rate', label: 'Referral Rate', current: 12, target: 20, unit: '%', color: '#E09D24', desc: 'Members who referred someone' },
-  { id: 'session_fill_rate', label: 'Fill Rate', current: 75, target: 90, unit: '%', color: '#3EAF5C', desc: 'Average class capacity utilization' },
+  { id: 'new_members', label: 'New Members', current: 6, target: 10, unit: '', color: '#3EAF5C', desc: 'New subscriptions this month', link: '/members' },
+  { id: 'mrr_growth', label: 'MRR Growth', current: 8.2, target: 10, unit: '%', color: '#C8A84E', desc: 'Monthly recurring revenue growth', link: '/members' },
+  { id: 'classes_filled', label: 'Classes Filled', current: 18, target: 24, unit: '', color: '#6366f1', desc: 'Sessions at 80%+ capacity', link: '/members' },
+  { id: 'trials_booked', label: 'Trials Booked', current: 4, target: 6, unit: '', color: '#E09D24', desc: 'Free trial signups this month', link: '/sales' },
+  { id: 'churn_rate', label: 'Churn Rate', current: 2.4, target: 5, unit: '%', color: '#E05A42', desc: 'Member cancellation rate (lower is better)', link: '/members' },
+  { id: 'avg_attendance', label: 'Avg Attendance', current: 8.2, target: 12, unit: '', color: '#3EAF5C', desc: 'Average athletes per session', link: '/members' },
+  { id: 'trial_conversion', label: 'Trial Conversion', current: 67, target: 80, unit: '%', color: '#C8A84E', desc: 'Trials converting to paid members', link: '/sales' },
+  { id: 'revenue_per_member', label: 'Revenue / Member', current: 126, target: 150, unit: '$', color: '#6366f1', desc: 'Average monthly revenue per member', link: '/members' },
+  { id: 'referral_rate', label: 'Referral Rate', current: 12, target: 20, unit: '%', color: '#E09D24', desc: 'Members who referred someone', link: '/marketing' },
+  { id: 'session_fill_rate', label: 'Fill Rate', current: 75, target: 90, unit: '%', color: '#3EAF5C', desc: 'Average class capacity utilization', link: '/members' },
 ];
 
 const DEFAULT_SELECTED = ['new_members', 'mrr_growth', 'classes_filled', 'trials_booked'];
@@ -249,8 +251,7 @@ function KpiPicker({ selected, onSave, onClose }) {
    MAIN COMPONENT
    ═══════════════════════════════════════════ */
 export default function Home() {
-  const isFirstVisit = useRef(!sessionStorage.getItem('bam_home_visited'));
-  const [loaded, setLoaded] = useState(!isFirstVisit.current);
+  const [loaded, setLoaded] = useState(false);
   const [introText, setIntroText] = useState('');
   const [introFading, setIntroFading] = useState(false);
   const [milestoneVisible, setMilestoneVisible] = useState(false);
@@ -261,6 +262,9 @@ export default function Home() {
   const [sageResponse, setSageResponse] = useState(null);
   const [selectedKpis, setSelectedKpis] = useState(DEFAULT_SELECTED);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const navigate = useNavigate();
+  const { location: activeLocation, setLocation: setActiveLocation } = useLocation();
+  const locationLabel = activeLocation === 'all' ? '' : ` · ${activeLocation.charAt(0).toUpperCase() + activeLocation.slice(1)}`;
   const typewriterText = useTypewriter(ADVISOR_PROMPTS);
   const actionCount = useCountUp(7);
   const sageInputRef = useRef(null);
@@ -307,8 +311,6 @@ export default function Home() {
   }, [loaded, sageExpanded]);
 
   useEffect(() => {
-    if (!isFirstVisit.current) return;
-    sessionStorage.setItem('bam_home_visited', '1');
     const greeting = `${GREETING}, Zoran`;
     let i = 0;
     const typeTimer = setInterval(() => {
@@ -384,7 +386,7 @@ export default function Home() {
         </div>
         <div className={s.cmdLeft}>
           <div className={s.cmdGreeting}>{GREETING}, Zoran</div>
-          <div className={s.cmdDate}>{TODAY}</div>
+          <div className={s.cmdDate}>{TODAY}{locationLabel}</div>
         </div>
         <div className={s.cmdCenter}>
           <div className={s.cmdSearch}>
@@ -394,6 +396,14 @@ export default function Home() {
           </div>
         </div>
         <div className={s.cmdRight}>
+          <div className={sh.locationFilter}>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <select className={sh.locationSelect} value={activeLocation} onChange={e => setActiveLocation(e.target.value)}>
+              <option value="all">All Locations</option>
+              <option value="downtown">Downtown</option>
+              <option value="westside">Westside</option>
+            </select>
+          </div>
           <div className={s.cmdChip} onClick={() => setSageExpanded(true)}>
             <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
             <span className={s.cmdChipValue}>{actionCount}</span>
@@ -527,7 +537,7 @@ export default function Home() {
             {rings.map(r => {
               const pct = Math.round((r.current / r.target) * 100);
               return (
-                <div key={r.id} className={s.ringCard}>
+                <div key={r.id} className={s.ringCard} onClick={() => navigate(r.link)} style={{ cursor: 'pointer' }}>
                   <div className={s.ringVisual}>
                     <ProgressRing current={r.current} target={r.target} color={r.color} />
                     <div className={s.ringCenter}>

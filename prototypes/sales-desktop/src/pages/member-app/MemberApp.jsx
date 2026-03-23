@@ -388,6 +388,7 @@ export default function MemberApp({ onClose }) {
         <button className={s.qrCheckinBtn} onClick={() => setQrOpen(true)}>
           <svg width="18" height="18" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/><rect x="14" y="18" width="3" height="3"/><rect x="18" y="14" width="3" height="3"/></svg>
           Check In with QR Code
+          <span style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, marginLeft: 8 }}>P2</span>
         </button>
       </div>
 
@@ -1094,7 +1095,10 @@ export default function MemberApp({ onClose }) {
         </div>
 
         {selectedClass.booked ? (
-          <button className={s.detailBookBtn} style={{ background: 'var(--green)' }}>Booked ✓</button>
+          <>
+            <button className={s.detailBookBtn} style={{ background: 'var(--green)' }}>Booked ✓</button>
+            <button className={s.detailCancelBookingBtn} onClick={() => { setCancelConfirm(selectedClass); setSelectedClass(null); }}>Cancel Booking</button>
+          </>
         ) : selectedClass.full ? (
           <button className={s.detailBookBtn} style={{ background: 'var(--warn)' }}>Join Waitlist</button>
         ) : (

@@ -4,10 +4,11 @@ import sh from '../styles/shared.module.css';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import useCountUp from '../hooks/useCountUp';
 import useTypewriter from '../hooks/useTypewriter';
+import { useLocation } from '../context/LocationContext';
 
 /* ─── DATA ─── */
 const INITIAL_LEADS = [
-  { id: 'l1', name: 'Marcus Johnson', lastActivity: '4h ago', needsAttention: false, stage: 'interested',
+  { id: 'l1', name: 'Marcus Johnson', lastActivity: '4h ago', needsAttention: false, stage: 'interested', location: 'downtown',
     parentName: 'Marcus Johnson Sr.', athleteName: 'Marcus Johnson Jr.',
     salesNotes: { childAge: '9', goal: 'Build confidence and discipline', source: 'Instagram', budget: '$150/mo', availability: 'Weekends', notes: 'Dad coaches little league, very motivated' },
     messages: [
@@ -16,7 +17,7 @@ const INITIAL_LEADS = [
       { from: 'parent', text: 'That works! What age groups do you have?', time: '1d ago' },
       { from: 'ai', text: 'We have groups for ages 6-8, 9-12, and 13+. Your son would be in our 9-12 group with Coach Rivera.', time: '4h ago' },
     ] },
-  { id: 'l2', name: 'Sarah Chen', lastActivity: '1d ago', needsAttention: false, stage: 'interested',
+  { id: 'l2', name: 'Sarah Chen', lastActivity: '1d ago', needsAttention: false, stage: 'interested', location: 'westside',
     parentName: 'Wei Chen', athleteName: 'Sarah Chen',
     salesNotes: { childAge: '7', goal: 'Social skills and teamwork', source: 'Referral', budget: '$130/mo', availability: 'Sat & Sun mornings', notes: 'Friend of Emily Watson family' },
     messages: [
@@ -24,7 +25,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: 'Absolutely! Our 6-8 group has a few spots. Would you like to schedule a free trial?', time: '2d ago' },
       { from: 'parent', text: 'Yes please! Weekends work best for us.', time: '1d ago' },
     ] },
-  { id: 'l3', name: 'David Ortiz', lastActivity: '3d ago', needsAttention: true, stage: 'interested',
+  { id: 'l3', name: 'David Ortiz', lastActivity: '3d ago', needsAttention: true, stage: 'interested', location: 'downtown',
     parentName: 'Carmen Ortiz', athleteName: 'David Ortiz Jr.',
     salesNotes: { childAge: '11', goal: 'Compete at regional level', source: 'Facebook', budget: '$200/mo', availability: 'Weekdays after 4pm', notes: 'Has prior soccer experience' },
     messages: [
@@ -33,7 +34,7 @@ const INITIAL_LEADS = [
       { from: 'parent', text: 'Sounds great, what are the rates?', time: '4d ago' },
       { from: 'ai', text: "Our competitive program is $200/mo for 3x/week sessions. Want to book a trial this week?", time: '3d ago' },
     ] },
-  { id: 'l4', name: 'Emily Watson', lastActivity: '6h ago', needsAttention: false, stage: 'interested',
+  { id: 'l4', name: 'Emily Watson', lastActivity: '6h ago', needsAttention: false, stage: 'interested', location: 'westside',
     parentName: 'Emily Watson', athleteName: 'Lily Watson',
     salesNotes: { childAge: '8', goal: 'After-school activity', source: 'Google', budget: '$140/mo', availability: 'Weekdays 3:30-5pm', notes: 'Looking for something close to school' },
     messages: [
@@ -41,7 +42,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: 'Of course! I have 9am or 10:30am available this Saturday. Which works better?', time: '6h ago' },
       { from: 'parent', text: "10:30 would be perfect, thank you!", time: '6h ago' },
     ] },
-  { id: 'l5', name: 'Jake Rivera', lastActivity: '2d ago', needsAttention: true, stage: 'interested',
+  { id: 'l5', name: 'Jake Rivera', lastActivity: '2d ago', needsAttention: true, stage: 'interested', location: 'downtown',
     parentName: 'Mike Rivera', athleteName: 'Jake Rivera',
     salesNotes: { childAge: '13', goal: 'Make the school team', source: 'SMS outbound', budget: '$180/mo', availability: 'Flexible', notes: 'Tryouts in 6 weeks, needs intensive prep' },
     messages: [
@@ -49,7 +50,7 @@ const INITIAL_LEADS = [
       { from: 'parent', text: "Yeah maybe. When do you have openings?", time: '3d ago' },
       { from: 'ai', text: 'We have Tuesday at 4pm or Thursday at 5pm. Both are with our teen competitive group.', time: '2d ago' },
     ] },
-  { id: 'l6', name: 'Mia Thompson', lastActivity: '1h ago', trialDate: 'today', trialTime: '10:00am', needsAttention: false, stage: 'bookedTrial',
+  { id: 'l6', name: 'Mia Thompson', lastActivity: '1h ago', trialDate: 'today', trialTime: '10:00am', needsAttention: false, stage: 'bookedTrial', location: 'westside',
     parentName: 'Rachel Thompson', athleteName: 'Mia Thompson',
     salesNotes: { childAge: '8', goal: 'Fun and fitness', source: 'Instagram', budget: '$120/mo', availability: 'Saturday mornings', notes: 'Trial booked for today 10am' },
     messages: [
@@ -57,7 +58,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: 'Just comfortable athletic clothes and sneakers! Water bottles provided. See you at 10am! 🏀', time: '2h ago' },
       { from: 'parent', text: 'Perfect, see you soon!', time: '1h ago' },
     ] },
-  { id: 'l7', name: 'Liam Park', lastActivity: '4h ago', trialDate: 'Fri Mar 21', trialTime: '5:30pm', needsAttention: false, stage: 'bookedTrial',
+  { id: 'l7', name: 'Liam Park', lastActivity: '4h ago', trialDate: 'Fri Mar 21', trialTime: '5:30pm', needsAttention: false, stage: 'bookedTrial', location: 'downtown',
     parentName: 'James Park', athleteName: 'Liam Park',
     salesNotes: { childAge: '10', goal: 'Build skills and have fun', source: 'Website', budget: '$160/mo', availability: 'Weekday evenings', notes: 'Plays rec league, wants more structured training' },
     messages: [
@@ -65,7 +66,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: 'Confirmed! Yes, free parking in the lot behind the building. Enter through the side entrance.', time: '1d ago' },
       { from: 'parent', text: 'Great, thanks!', time: '4h ago' },
     ] },
-  { id: 'l11', name: 'Sofia Reyes', lastActivity: '30m ago', trialDate: 'today', trialTime: '3:00pm', needsAttention: false, stage: 'bookedTrial',
+  { id: 'l11', name: 'Sofia Reyes', lastActivity: '30m ago', trialDate: 'today', trialTime: '3:00pm', needsAttention: false, stage: 'bookedTrial', location: 'westside',
     parentName: 'Maria Reyes', athleteName: 'Sofia Reyes',
     salesNotes: { childAge: '9', goal: 'Confidence and coordination', source: 'Referral', budget: '$150/mo', availability: 'Weekends & Wed afternoons', notes: 'Referred by Mia Thompson family' },
     messages: [
@@ -73,7 +74,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: "We'd love to have Sofia! How about a trial this Saturday at 3pm?", time: '2d ago' },
       { from: 'parent', text: "Today works! We'll be there at 3.", time: '30m ago' },
     ] },
-  { id: 'l8', name: 'Ava Martinez', lastActivity: '1d ago', daysSinceTrial: '1d', needsAttention: true, stage: 'doneTrial',
+  { id: 'l8', name: 'Ava Martinez', lastActivity: '1d ago', daysSinceTrial: '1d', needsAttention: true, stage: 'doneTrial', location: 'downtown',
     parentName: 'Carlos Martinez', athleteName: 'Ava Martinez',
     salesNotes: { childAge: '10', goal: 'Competitive development', source: 'Instagram', budget: '$175/mo', availability: 'Tue/Thu/Sat', notes: 'Loved the trial, asking about membership options' },
     messages: [
@@ -81,7 +82,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: "So glad to hear that! We have 2x/week at $150/mo or 3x/week at $175/mo. Both include access to open gym on Saturdays.", time: '1d ago' },
       { from: 'parent', text: "The 3x sounds good. Can we start next week?", time: '1d ago' },
     ] },
-  { id: 'l9', name: 'Noah Kim', lastActivity: 'Today', daysSinceTrial: '0d', needsAttention: false, stage: 'doneTrial',
+  { id: 'l9', name: 'Noah Kim', lastActivity: 'Today', daysSinceTrial: '0d', needsAttention: false, stage: 'doneTrial', location: 'westside',
     parentName: 'Susan Kim', athleteName: 'Noah Kim',
     salesNotes: { childAge: '12', goal: 'Pre-season conditioning', source: 'Google', budget: '$200/mo', availability: 'Mon/Wed/Fri after school', notes: 'Just finished trial today, very enthusiastic' },
     messages: [
@@ -89,7 +90,7 @@ const INITIAL_LEADS = [
       { from: 'ai', text: "Welcome Noah! Next beginner session is Monday at 4pm. We'll send a welcome packet tonight.", time: '1h ago' },
       { from: 'parent', text: "Can't wait!", time: '30m ago' },
     ] },
-  { id: 'l10', name: 'Chloe Davis', lastActivity: '2d ago', daysSinceTrial: '2d', needsAttention: false, stage: 'doneTrial',
+  { id: 'l10', name: 'Chloe Davis', lastActivity: '2d ago', daysSinceTrial: '2d', needsAttention: false, stage: 'doneTrial', location: 'downtown',
     parentName: 'Tom Davis', athleteName: 'Chloe Davis',
     salesNotes: { childAge: '11', goal: 'Stay active year-round', source: 'Facebook', budget: '$140/mo', availability: 'Weekends only', notes: 'Also does swimming, looking for weekend-only option' },
     messages: [
@@ -597,10 +598,16 @@ export default function Sales() {
   // Banner canvas
   useBannerCanvas(canvasRef);
 
+  // Location filtering
+  const { location: activeLocation, setLocation: setActiveLocation } = useLocation();
+  const filteredLeads = activeLocation === 'all'
+    ? leads
+    : leads.filter(l => l.location === activeLocation);
+
   // Derived: group leads by stage (today trials sorted first)
   const leadsByStage = {};
   STAGES.forEach(st => {
-    let stageLeads = leads.filter(l => l.stage === st.id);
+    let stageLeads = filteredLeads.filter(l => l.stage === st.id);
     if (st.id === 'bookedTrial') {
       stageLeads = [
         ...stageLeads.filter(l => l.trialDate === 'today'),
@@ -761,6 +768,14 @@ export default function Sales() {
           </div>
 
           <div className={s.cmdRight}>
+            <div className={sh.locationFilter}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <select className={sh.locationSelect} value={activeLocation} onChange={e => setActiveLocation(e.target.value)}>
+                <option value="all">All Locations</option>
+                <option value="downtown">Downtown</option>
+                <option value="westside">Westside</option>
+              </select>
+            </div>
             <Tooltip text="Active leads in pipeline">
               <div className={s.cmdChip}>
                 <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />

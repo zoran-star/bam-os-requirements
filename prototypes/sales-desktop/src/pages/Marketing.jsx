@@ -14,12 +14,12 @@ const SAGE_PROMPTS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Create new ad', icon: '🎬' },
-  { label: 'Adjust budget', icon: '💰' },
-  { label: 'Pause an ad', icon: '⏸️' },
+  { label: 'Ask Sage', icon: '🧠' },
+  { label: 'Create ad', icon: '🎬' },
+  { label: 'Improve ads', icon: '✨' },
+  { label: 'Pause a campaign', icon: '⏸️' },
   { label: 'Generate content brief', icon: '✍️' },
-  { label: 'Lead source report', icon: '📊' },
-  { label: 'Refresh stale ads', icon: '🔄' },
+  { label: 'Adjust budget', icon: '💰' },
 ];
 
 const CHANNELS = [
@@ -587,8 +587,11 @@ export default function Marketing() {
           <div className={s.topChips}>
             {QUICK_ACTIONS.map(a => (
               <button key={a.label} className={s.topActionChip} onClick={() => {
-                if (a.label === 'Create new ad') setCreateAdOpen(true);
+                if (a.label === 'Ask Sage') cmdInputRef.current?.focus();
+                else if (a.label === 'Create ad') setCreateAdOpen(true);
                 else if (a.label === 'Adjust budget') setBudgetOpen(true);
+                else if (a.label === 'Improve ads') { /* already at top */ }
+                else if (a.label === 'Pause a campaign') handleCommand('Pause a campaign');
                 else handleCommand(a.label);
               }}>
                 <span>{a.icon}</span> {a.label}
@@ -609,37 +612,49 @@ export default function Marketing() {
         </div>
 
         <div className={sh.scroll}>
-          {/* ═══ PRIORITIES — what needs attention now ═══ */}
-          <div className={s.sectionBanner} style={{ '--accent': 'var(--red)' }}>
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <span>Needs attention</span>
+          {/* ═══ IMPROVE YOUR ADS — good vs bad comparison ═══ */}
+          <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span>Improve your ads</span>
           </div>
 
-          {/* Sage insight */}
+          {/* Improve Ads — good vs bad comparison */}
           <div className={s.sageTip}>
             <span className={s.sageTipLabel}>Sage</span>
-            <span>Your Saturday ad is outperforming everything else by 3x — worth putting more budget there this week.</span>
+            <span>Here's what's working and what's not. I can replace the underperformers with fresh creative based on your top ads.</span>
           </div>
 
-          {/* Ads needing refresh */}
-          {ADS_NEEDING_REFRESH.map(ad => (
-            <div key={ad.name} className={s.alertCard}>
-              <div className={s.alertLeft}>
-                <div className={s.alertName}>{ad.name}</div>
-                <div className={s.alertMeta}>
-                  <span>{ad.days} days running</span>
-                  <span>·</span>
-                  <span>{ad.spend} spent</span>
-                  <span>·</span>
-                  <span>{ad.conversions} conversions</span>
+          <div className={s.improveGrid}>
+            <div className={s.improveCol}>
+              <div className={s.improveColLabel} style={{ color: 'var(--green)' }}>Working well</div>
+              {TOP_ADS.slice(0, 2).map(ad => (
+                <div key={ad.name} className={s.improveCard} style={{ borderColor: 'var(--green)' }}>
+                  <div className={s.alertName}>{ad.name}</div>
+                  <div className={s.alertMeta}>
+                    <span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span><span>·</span><span>{ad.ctr} CTR</span>
+                  </div>
+                  <span className={s.adBadgeHealthy}>Healthy</span>
                 </div>
-              </div>
-              <div className={s.alertRight}>
-                <span className={ad.status === 'Stop-loss' ? s.alertBadgeRed : s.alertBadgeYellow}>{ad.status}</span>
-                <button className={s.alertCta}>See Sage suggestion</button>
-              </div>
+              ))}
             </div>
-          ))}
+            <div className={s.improveCol}>
+              <div className={s.improveColLabel} style={{ color: 'var(--red)' }}>Underperforming</div>
+              {ADS_NEEDING_REFRESH.map(ad => (
+                <div key={ad.name} className={s.improveCard} style={{ borderColor: 'var(--red)' }}>
+                  <div className={s.alertName}>{ad.name}</div>
+                  <div className={s.alertMeta}>
+                    <span>{ad.days} days running</span><span>·</span><span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span>
+                  </div>
+                  <span className={ad.status === 'Stop-loss' ? s.alertBadgeRed : s.alertBadgeYellow}>{ad.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)} style={{ marginTop: '12px', marginBottom: '24px' }}>
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Replace underperformers with new ads
+          </button>
 
           {/* ═══ PERFORMANCE — channels + budget ═══ */}
           <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>

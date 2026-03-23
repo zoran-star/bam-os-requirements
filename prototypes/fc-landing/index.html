@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — The Command Center for Your Business</title>
+<meta name="description" content="Stop juggling tools. FullControl is the AI-powered command center that runs your entire service business from one place.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:#09090b;color:#fafafa;line-height:1.6;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none}
+img{max-width:100%;display:block}
+
+/* ═══════════════════════════════════════════════════
+   TOKENS
+   ═══════════════════════════════════════════════════ */
+:root{
+  --white:#fafafa;
+  --gray-50:#f4f4f5;
+  --gray-100:#e4e4e7;
+  --gray-200:#d4d4d8;
+  --gray-300:#a1a1aa;
+  --gray-400:#71717a;
+  --gray-500:#52525b;
+  --gray-600:#3f3f46;
+  --gray-700:#27272a;
+  --gray-800:#18181b;
+  --gray-900:#09090b;
+  --accent:#c8a84e;
+  --accent-light:#d4b65c;
+  --accent-glow:rgba(200,168,78,0.15);
+  --accent-subtle:rgba(200,168,78,0.06);
+  --max-w:1120px;
+  --ease:cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ═══════════════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════════════ */
+.container{max-width:var(--max-w);margin:0 auto;padding:0 24px}
+section{padding:120px 0}
+@media(max-width:768px){section{padding:80px 0}}
+
+/* ═══════════════════════════════════════════════════
+   SCROLL ANIMATIONS
+   ═══════════════════════════════════════════════════ */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity 0.7s var(--ease),transform 0.7s var(--ease)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-delay-1{transition-delay:0.1s}
+.reveal-delay-2{transition-delay:0.2s}
+.reveal-delay-3{transition-delay:0.3s}
+.reveal-delay-4{transition-delay:0.4s}
+
+/* ═══════════════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════════════ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;transition:all 0.3s var(--ease)}
+nav.scrolled{background:rgba(9,9,11,0.85);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,0.04)}
+.nav-inner{max-width:var(--max-w);margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{font-size:18px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:8px}
+.nav-logo-mark{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-light));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#111}
+.nav-links{display:flex;align-items:center;gap:32px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--gray-300);transition:color 0.2s}
+.nav-links a:hover{color:var(--white)}
+.nav-cta{font-size:13px;font-weight:700;color:#111;background:var(--accent);padding:9px 22px;border-radius:10px;transition:all 0.2s}
+.nav-cta:hover{background:var(--accent-light);transform:translateY(-1px);box-shadow:0 4px 20px rgba(200,168,78,0.25)}
+@media(max-width:768px){
+  .nav-links a:not(.nav-cta){display:none}
+}
+
+/* ═══════════════════════════════════════════════════
+   HERO
+   ═══════════════════════════════════════════════════ */
+.hero{padding:180px 0 140px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.6}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.12);border-radius:100px;padding:6px 16px;margin-bottom:28px;letter-spacing:0.02em}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.hero h1{font-size:clamp(42px,6vw,72px);font-weight:900;letter-spacing:-0.04em;line-height:1.05;color:var(--white);margin-bottom:20px}
+.hero h1 span{background:linear-gradient(135deg,var(--accent),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:clamp(16px,2vw,20px);font-weight:400;color:var(--gray-300);max-width:540px;margin:0 auto 40px;line-height:1.6}
+.hero-actions{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}
+.btn-primary{font-size:15px;font-weight:700;color:#111;background:var(--accent);padding:14px 32px;border-radius:14px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px}
+.btn-primary:hover{background:var(--accent-light);transform:translateY(-2px);box-shadow:0 8px 30px rgba(200,168,78,0.3)}
+.btn-secondary{font-size:15px;font-weight:600;color:var(--gray-300);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:14px 32px;border-radius:14px;transition:all 0.25s var(--ease);display:inline-flex;align-items:center;gap:8px}
+.btn-secondary:hover{color:var(--white);border-color:rgba(255,255,255,0.16);background:rgba(255,255,255,0.08)}
+.hero-visual{margin-top:80px;position:relative}
+.hero-visual-inner{max-width:900px;margin:0 auto;border-radius:20px;border:1px solid rgba(255,255,255,0.06);background:linear-gradient(180deg,rgba(255,255,255,0.02) 0%,rgba(255,255,255,0.005) 100%);padding:3px;overflow:hidden;box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}
+.hero-mockup{width:100%;border-radius:17px;background:var(--gray-800);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.hero-mockup-grid{position:absolute;inset:0;opacity:0.04;background-image:linear-gradient(rgba(255,255,255,0.3) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.3) 1px,transparent 1px);background-size:40px 40px}
+.hero-mockup-content{position:relative;z-index:1;text-align:center;padding:40px}
+.hero-mockup-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gray-400);margin-bottom:8px}
+.hero-mockup-title{font-size:28px;font-weight:800;letter-spacing:-0.03em;color:var(--gray-200)}
+.hero-mockup-orb{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent-light));margin:20px auto 0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#111;box-shadow:0 0 40px rgba(200,168,78,0.3)}
+.hero-trust{margin-top:48px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:500;color:var(--gray-400)}
+.hero-trust svg{flex-shrink:0}
+
+/* ═══════════════════════════════════════════════════
+   SECTION HEADERS
+   ═══════════════════════════════════════════════════ */
+.section-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--accent);margin-bottom:14px}
+.section-title{font-size:clamp(30px,4vw,44px);font-weight:900;letter-spacing:-0.035em;line-height:1.1;color:var(--white);margin-bottom:16px}
+.section-sub{font-size:17px;font-weight:400;color:var(--gray-300);max-width:520px;line-height:1.6}
+.section-center{text-align:center}
+.section-center .section-sub{margin:0 auto}
+
+/* ═══════════════════════════════════════════════════
+   PROBLEM SECTION
+   ═══════════════════════════════════════════════════ */
+.problem{background:var(--gray-900);position:relative}
+.problem::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
+.problem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
+@media(max-width:768px){.problem-grid{grid-template-columns:1fr;gap:12px}}
+.problem-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:18px;padding:28px 24px;transition:all 0.3s var(--ease)}
+.problem-card:hover{border-color:rgba(224,90,66,0.15);background:rgba(224,90,66,0.02)}
+.problem-icon{width:40px;height:40px;border-radius:12px;background:rgba(224,90,66,0.08);color:#e05a42;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.problem-card h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
+.problem-card p{font-size:14px;color:var(--gray-400);line-height:1.5}
+
+/* ═══════════════════════════════════════════════════
+   SOLUTION / TRANSFORMATION
+   ═══════════════════════════════════════════════════ */
+.solution{position:relative}
+.solution::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.3}
+.transformation{display:flex;gap:48px;margin-top:56px;align-items:center}
+@media(max-width:768px){.transformation{flex-direction:column;gap:32px}}
+.transform-side{flex:1}
+.transform-before,.transform-after{border-radius:20px;padding:32px;position:relative}
+.transform-before{background:rgba(224,90,66,0.03);border:1px solid rgba(224,90,66,0.1)}
+.transform-after{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.12)}
+.transform-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.transform-label-before{color:#e05a42}
+.transform-label-after{color:var(--accent)}
+.transform-list{list-style:none;display:flex;flex-direction:column;gap:12px}
+.transform-list li{font-size:15px;font-weight:500;display:flex;align-items:center;gap:10px}
+.transform-before .transform-list li{color:var(--gray-400)}
+.transform-after .transform-list li{color:var(--gray-200)}
+.transform-list li svg{flex-shrink:0}
+.transform-arrow{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:48px;color:var(--gray-500)}
+@media(max-width:768px){.transform-arrow{transform:rotate(90deg)}}
+
+/* ═══════════════════════════════════════════════════
+   HOW IT WORKS
+   ═══════════════════════════════════════════════════ */
+.how{background:var(--gray-800);border-top:1px solid rgba(255,255,255,0.04);border-bottom:1px solid rgba(255,255,255,0.04)}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:56px}
+@media(max-width:900px){.steps{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.steps{grid-template-columns:1fr}}
+.step{position:relative;padding:32px 24px;border-radius:20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);transition:all 0.3s var(--ease)}
+.step:hover{border-color:rgba(200,168,78,0.15);background:rgba(200,168,78,0.02)}
+.step-num{font-size:48px;font-weight:900;font-family:'Nunito',sans-serif;letter-spacing:-0.04em;color:rgba(200,168,78,0.12);line-height:1;margin-bottom:16px}
+.step h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
+.step p{font-size:14px;color:var(--gray-400);line-height:1.5}
+
+/* ═══════════════════════════════════════════════════
+   FEATURES
+   ═══════════════════════════════════════════════════ */
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:56px}
+@media(max-width:768px){.features-grid{grid-template-columns:1fr}}
+.feature{border-radius:20px;padding:32px 28px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);transition:all 0.3s var(--ease)}
+.feature:hover{border-color:rgba(200,168,78,0.15);background:rgba(200,168,78,0.02);transform:translateY(-2px)}
+.feature-icon{width:44px;height:44px;border-radius:13px;background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.feature h3{font-size:16px;font-weight:700;color:var(--white);margin-bottom:6px;letter-spacing:-0.01em}
+.feature p{font-size:14px;color:var(--gray-400);line-height:1.5}
+
+/* ═══════════════════════════════════════════════════
+   DIFFERENTIATION
+   ═══════════════════════════════════════════════════ */
+.diff{background:var(--gray-900)}
+.diff::before{content:'';display:block;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
+.diff-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:56px;max-width:780px}
+@media(max-width:600px){.diff-grid{grid-template-columns:1fr}}
+.diff-card{border-radius:20px;padding:32px 28px}
+.diff-old{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05)}
+.diff-new{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.15)}
+.diff-card-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:18px}
+.diff-old .diff-card-label{color:var(--gray-400)}
+.diff-new .diff-card-label{color:var(--accent)}
+.diff-card ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.diff-card li{font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;line-height:1.4}
+.diff-old li{color:var(--gray-400)}
+.diff-new li{color:var(--gray-200)}
+
+/* ═══════════════════════════════════════════════════
+   SIMPLICITY / VISUAL SECTION
+   ═══════════════════════════════════════════════════ */
+.simplicity{text-align:center;position:relative}
+.simplicity-visual{margin-top:56px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
+.sim-pill{display:flex;align-items:center;gap:10px;padding:14px 24px;border-radius:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);font-size:14px;font-weight:600;color:var(--gray-200);transition:all 0.3s var(--ease)}
+.sim-pill:hover{border-color:rgba(200,168,78,0.2);background:rgba(200,168,78,0.03)}
+.sim-pill svg{color:var(--accent);flex-shrink:0}
+.simplicity-quote{margin-top:48px;max-width:500px;margin-left:auto;margin-right:auto}
+.simplicity-quote p{font-size:20px;font-weight:600;color:var(--gray-200);line-height:1.5;font-style:italic;letter-spacing:-0.01em}
+.simplicity-quote span{display:block;margin-top:12px;font-size:13px;font-weight:500;color:var(--gray-400);font-style:normal}
+
+/* ═══════════════════════════════════════════════════
+   CTA SECTION
+   ═══════════════════════════════════════════════════ */
+.cta-section{padding:120px 0 140px;text-align:center;position:relative}
+.cta-section::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.4}
+.cta-section h2{font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-0.04em;line-height:1.1;color:var(--white);margin-bottom:16px}
+.cta-section h2 span{background:linear-gradient(135deg,var(--accent),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.cta-section .section-sub{margin:0 auto 40px;max-width:460px}
+.cta-form{display:flex;align-items:center;gap:10px;justify-content:center;max-width:440px;margin:0 auto;flex-wrap:wrap}
+.cta-input{flex:1;min-width:200px;font-family:inherit;font-size:15px;font-weight:500;color:var(--white);background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:14px 20px;outline:none;transition:all 0.2s}
+.cta-input::placeholder{color:var(--gray-500)}
+.cta-input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(200,168,78,0.1)}
+.cta-note{margin-top:14px;font-size:12px;font-weight:500;color:var(--gray-500)}
+
+/* ═══════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════ */
+footer{border-top:1px solid rgba(255,255,255,0.04);padding:40px 0}
+.footer-inner{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.footer-brand{font-size:14px;font-weight:700;color:var(--gray-400);display:flex;align-items:center;gap:8px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;font-weight:500;color:var(--gray-500);transition:color 0.2s}
+.footer-links a:hover{color:var(--gray-300)}
+.footer-copy{font-size:12px;color:var(--gray-600)}
+
+/* ═══════════════════════════════════════════════════
+   TERMINAL BOOT SEQUENCE
+   ═══════════════════════════════════════════════════ */
+.hero-terminal{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;padding:32px 40px;background:var(--gray-800);border-radius:17px;transition:opacity 0.6s var(--ease)}
+.hero-terminal.done{opacity:0;pointer-events:none}
+.term-line{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--gray-400);opacity:0;transform:translateY(4px);transition:opacity 0.15s,transform 0.15s;line-height:1.8;white-space:nowrap}
+.term-line.show{opacity:1;transform:translateY(0)}
+.term-line .term-ok{color:var(--accent);font-weight:500}
+.term-line .term-dots{color:var(--gray-500)}
+.term-line.term-final{color:var(--accent);font-weight:600;font-size:14px;margin-top:8px}
+.term-cursor{display:inline-block;width:8px;height:16px;background:var(--accent);margin-left:4px;vertical-align:text-bottom;animation:termBlink 0.8s step-end infinite}
+@keyframes termBlink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ═══════════════════════════════════════════════════
+   SAGE AI DEMO CHAT
+   ═══════════════════════════════════════════════════ */
+.sage-demo{background:var(--gray-900);position:relative}
+.sage-demo::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(200,168,78,0.1),transparent)}
+.sage-window{max-width:640px;margin:56px auto 0;border-radius:24px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);overflow:hidden;box-shadow:0 16px 60px rgba(0,0,0,0.4)}
+.sage-window-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01)}
+.sage-window-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.06)}
+.sage-window-title{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--gray-400);letter-spacing:0.02em}
+.sage-chat{padding:24px 20px;display:flex;flex-direction:column;gap:16px;min-height:280px}
+.sage-msg{max-width:85%;display:flex;gap:10px;opacity:0;transform:translateY(10px);transition:opacity 0.4s var(--ease),transform 0.4s var(--ease)}
+.sage-msg.show{opacity:1;transform:translateY(0)}
+.sage-msg-user{align-self:flex-end;flex-direction:row-reverse}
+.sage-msg-ai{align-self:flex-start}
+.sage-msg-orb{width:30px;height:30px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+.sage-msg-user .sage-msg-orb{background:rgba(255,255,255,0.06);color:var(--gray-300)}
+.sage-msg-ai .sage-msg-orb{background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#111}
+.sage-bubble{border-radius:16px;padding:14px 18px;font-size:14px;font-weight:500;line-height:1.55}
+.sage-msg-user .sage-bubble{background:rgba(255,255,255,0.06);color:var(--gray-200);border-bottom-right-radius:6px}
+.sage-msg-ai .sage-bubble{background:var(--accent-subtle);border:1px solid rgba(200,168,78,0.1);color:var(--gray-200);border-bottom-left-radius:6px}
+.sage-bubble strong{color:var(--accent);font-weight:700}
+.sage-bubble .sage-metric{display:flex;align-items:center;gap:6px;margin-top:6px;font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--gray-300)}
+.sage-bubble .sage-metric-up{color:#4ade80}
+.sage-bubble .sage-rec{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);font-size:13px;color:var(--gray-300)}
+.sage-bubble .sage-rec strong{color:var(--accent)}
+.sage-typing{display:flex;gap:4px;padding:14px 18px}
+.sage-typing span{width:6px;height:6px;border-radius:50%;background:var(--gray-500);animation:typingDot 1.2s ease-in-out infinite}
+.sage-typing span:nth-child(2){animation-delay:0.15s}
+.sage-typing span:nth-child(3){animation-delay:0.3s}
+@keyframes typingDot{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
+.sage-input-wrap{padding:12px 20px 20px;display:flex;gap:8px;opacity:0;transition:opacity 0.4s var(--ease)}
+.sage-input-wrap.show{opacity:1}
+.sage-input{flex:1;font-family:inherit;font-size:14px;font-weight:500;color:var(--white);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 16px;outline:none;transition:all 0.2s}
+.sage-input::placeholder{color:var(--gray-500)}
+.sage-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+.sage-send{width:40px;height:40px;border-radius:12px;background:var(--accent);color:#111;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.sage-send:hover{background:var(--accent-light);transform:scale(1.05)}
+
+/* ═══════════════════════════════════════════════════
+   REVENUE CALCULATOR
+   ═══════════════════════════════════════════════════ */
+.calc{position:relative}
+.calc::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:400px;background:radial-gradient(ellipse,var(--accent-glow) 0%,transparent 70%);pointer-events:none;opacity:0.2}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:56px;max-width:860px;margin-left:auto;margin-right:auto;align-items:start}
+@media(max-width:768px){.calc-grid{grid-template-columns:1fr;gap:24px}}
+.calc-controls{display:flex;flex-direction:column;gap:24px}
+.calc-slider-group{display:flex;flex-direction:column;gap:8px}
+.calc-slider-header{display:flex;justify-content:space-between;align-items:center}
+.calc-slider-label{font-size:13px;font-weight:600;color:var(--gray-300)}
+.calc-slider-value{font-size:15px;font-weight:800;color:var(--white);font-family:'Nunito',sans-serif}
+.calc-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:var(--gray-700);outline:none;cursor:pointer}
+.calc-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--gray-800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3);transition:transform 0.15s}
+.calc-slider::-webkit-slider-thumb:hover{transform:scale(1.15)}
+.calc-slider::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);border:3px solid var(--gray-800);cursor:pointer;box-shadow:0 0 12px rgba(200,168,78,0.3)}
+.calc-results{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:24px;padding:32px;display:flex;flex-direction:column;gap:20px}
+.calc-result-row{display:flex;flex-direction:column;gap:4px}
+.calc-result-label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--gray-400)}
+.calc-result-value{font-size:32px;font-weight:900;font-family:'Nunito',sans-serif;letter-spacing:-0.03em;color:var(--white);line-height:1}
+.calc-result-value.accent{color:var(--accent)}
+.calc-result-value.red{color:#e05a42}
+.calc-result-sub{font-size:12px;font-weight:500;color:var(--gray-500);margin-top:2px}
+.calc-divider{height:1px;background:rgba(255,255,255,0.06)}
+
+/* ═══════════════════════════════════════════════════
+   PARALLAX
+   ═══════════════════════════════════════════════════ */
+.hero-mockup-grid,.hero h1,.hero-sub{will-change:transform}
+
+/* ═══════════════════════════════════════════════════
+   HERO ENTRANCE SEQUENCE
+   ═══════════════════════════════════════════════════ */
+.hero-entrance .hero-badge,
+.hero-entrance .hero-h1-line1,
+.hero-entrance .hero-h1-line2,
+.hero-entrance .hero-sub,
+.hero-entrance .hero-actions,
+.hero-entrance .hero-visual,
+.hero-entrance .hero-trust{opacity:0;transform:translateY(24px)}
+.hero-anim-in{transition:opacity 600ms cubic-bezier(0.4,0,0.2,1),transform 600ms cubic-bezier(0.4,0,0.2,1)!important;opacity:1!important;transform:translateY(0)!important}
+.hero-h1-line1,.hero-h1-line2{display:inline}
+/* Gold glow flash on h1 span */
+@keyframes goldTextFlash{0%{text-shadow:0 0 0 transparent}30%{text-shadow:0 0 30px rgba(200,168,78,0.5),0 0 60px rgba(200,168,78,0.2)}100%{text-shadow:0 0 0 transparent}}
+.hero-glow-flash{animation:goldTextFlash 300ms ease-out}
+/* Gold glow flash on hero-visual */
+@keyframes goldBorderFlash{0%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}30%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(200,168,78,0.4),0 0 40px rgba(200,168,78,0.15)}100%{box-shadow:0 20px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.03)}}
+.hero-visual-glow-flash .hero-visual-inner{animation:goldBorderFlash 600ms ease-out}
+
+/* ═══════════════════════════════════════════════════
+   BADGE TEXT CYCLING
+   ═══════════════════════════════════════════════════ */
+.hero-badge{overflow:hidden;transition:max-width 0.4s var(--ease)}
+.hero-badge-text{display:inline-block;transition:opacity 250ms var(--ease),transform 250ms var(--ease);white-space:nowrap}
+.hero-badge-text.out{opacity:0;transform:translateY(-8px)}
+
+/* ═══════════════════════════════════════════════════
+   SCAN LINE
+   ═══════════════════════════════════════════════════ */
+.scan-line{position:absolute;left:0;right:0;height:1.5px;z-index:3;background:linear-gradient(90deg,transparent,#c8a84e,transparent);box-shadow:0 0 8px rgba(200,168,78,0.4);pointer-events:none;animation:scanMove 5s cubic-bezier(0.4,0,0.6,1) infinite}
+@keyframes scanMove{0%{top:0}50%{top:100%}50.01%,100%{top:100%}0.01%{top:0}}
+/* Two-phase: slide down 2.5s, hold 1.5s at bottom, jump top 0s, hold 1s at top */
+@keyframes scanMove{0%{top:0;opacity:1}50%{top:100%;opacity:1}50.01%{top:100%;opacity:0}70%{top:100%;opacity:0}70.01%{top:0;opacity:0}80%{top:0;opacity:1}100%{top:0;opacity:1}}
+
+/* STYLING UPGRADE */
+.hero{padding:200px 0 160px}
+.hero::before{opacity:0.8;width:1000px;height:1000px}
+.hero h1{font-size:clamp(48px,7vw,80px);letter-spacing:-0.05em}
+.hero-sub{font-size:clamp(17px,2.2vw,21px)}
+.hero-visual{margin-top:96px}
+.hero-visual-inner{border-color:rgba(255,255,255,0.08);box-shadow:0 32px 100px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.04);border-top:1px solid rgba(200,168,78,0.08)}
+.section-title{font-size:clamp(34px,4.5vw,52px);letter-spacing:-0.04em}
+.problem-card,.feature{padding:36px 32px;border-radius:24px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.problem-card:hover{transform:translateY(-3px)}
+.feature:hover{transform:translateY(-3px);border-color:rgba(200,168,78,0.2)}
+.step,.diff-card,.kanban-col,.calc-results,.sage-window,.dashCard{border-radius:24px}
+.btn-primary{padding:16px 36px;border-radius:16px;letter-spacing:0.01em}
+.btn-primary:hover{box-shadow:0 12px 40px rgba(200,168,78,0.35)}
+.btn-secondary{letter-spacing:0.01em}
+.nav-cta{border-radius:12px}
+nav.scrolled{background:rgba(9,9,11,0.92)}
+/* Section dividers */
+.problem::after,.solution::after,.how::after,.features::after,.diff::after,.sage-demo::after,.simplicity::after,.calc::after{content:'';display:block;position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
+.problem,.solution,.how,.features,.diff,.sage-demo,.simplicity,.calc{position:relative}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     NAV
+     ═══════════════════════════════════════════════════ -->
+<nav id="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <span class="nav-logo-mark">FC</span>
+      FullControl
+    </a>
+    <div class="nav-links">
+      <a href="#how">How It Works</a>
+      <a href="#features">Features</a>
+      <a href="#cta" class="nav-cta">Get Early Access</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════
+     HERO
+     ═══════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      <span class="hero-badge-text">Basketball Academies</span>
+    </div>
+    <h1>
+      <span class="hero-h1-line1">Run your whole business</span><br><span class="hero-h1-line2">from <span>one place</span></span>
+    </h1>
+    <p class="hero-sub">
+      The AI-powered command center for sports and fitness operators.
+    </p>
+    <div class="hero-actions">
+      <a href="#cta" class="btn-primary">
+        Get Early Access
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="#how" class="btn-secondary">
+        See How It Works
+      </a>
+    </div>
+
+    <div class="hero-visual reveal">
+      <div class="hero-visual-inner">
+        <div class="hero-mockup" id="heroMockup">
+          <div class="hero-mockup-grid"></div>
+          <div class="scan-line"></div>
+          <!-- Terminal boot sequence -->
+          <div class="hero-terminal" id="heroTerminal">
+            <div class="term-line" data-delay="200">$ fullcontrol init<span class="term-cursor"></span></div>
+            <div class="term-line" data-delay="600"><span class="term-dots">[=&gt;]</span> Scanning operations<span class="term-dots">...</span> <span class="term-ok">done</span></div>
+            <div class="term-line" data-delay="1000"><span class="term-dots">[=&gt;]</span> Loading athlete data<span class="term-dots">...</span> <span class="term-ok">142 members synced</span></div>
+            <div class="term-line" data-delay="1500"><span class="term-dots">[=&gt;]</span> Mapping revenue streams<span class="term-dots">...</span> <span class="term-ok">$18.4k MRR</span></div>
+            <div class="term-line" data-delay="2000"><span class="term-dots">[=&gt;]</span> Calibrating Sage AI<span class="term-dots">...</span> <span class="term-ok">ready</span></div>
+            <div class="term-line term-final" data-delay="2600">&#x2713; Full control established.</div>
+          </div>
+          <!-- Mockup content (revealed after boot) -->
+          <div class="hero-mockup-content" id="heroMockupContent" style="opacity:0;transition:opacity 0.8s var(--ease)">
+            <div class="hero-mockup-label">Your Command Center</div>
+            <div class="hero-mockup-title">Everything. One screen.</div>
+            <div class="hero-mockup-orb">S</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-trust">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Built for service businesses that are done with chaos
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     PROBLEM
+     ═══════════════════════════════════════════════════ -->
+<section class="problem" id="problem">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">The problem</div>
+      <h2 class="section-title reveal">Your business runs on duct tape</h2>
+      <p class="section-sub reveal">One tool for CRM. Another for scheduling. Another for marketing. Another for payments. None of them talk to each other.</p>
+    </div>
+
+    <div class="problem-grid">
+      <div class="problem-card reveal reveal-delay-1">
+        <div class="problem-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+        </div>
+        <h3>Too many tools</h3>
+        <p>You're paying for 5+ platforms that each do one thing. Switching between them wastes hours every week.</p>
+      </div>
+      <div class="problem-card reveal reveal-delay-2">
+        <div class="problem-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        </div>
+        <h3>No visibility</h3>
+        <p>You can't see the full picture. Data lives in silos. Decisions are based on gut feel, not clarity.</p>
+      </div>
+      <div class="problem-card reveal reveal-delay-3">
+        <div class="problem-icon">
+          <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <h3>Decision fatigue</h3>
+        <p>Every day is a new fire. You're reacting instead of building. The tools don't tell you what to do next.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SOLUTION / TRANSFORMATION
+     ═══════════════════════════════════════════════════ -->
+<section class="solution" id="solution">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">The shift</div>
+      <h2 class="section-title reveal">From chaos to command</h2>
+      <p class="section-sub reveal">FullControl doesn't just give you tools. It gives you clarity, confidence, and control.</p>
+    </div>
+
+    <div class="transformation reveal">
+      <div class="transform-side">
+        <div class="transform-before">
+          <div class="transform-label transform-label-before">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Without FullControl
+          </div>
+          <ul class="transform-list">
+            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Scattered across 5+ platforms</li>
+            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Decisions based on guesswork</li>
+            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Hours spent on manual tasks</li>
+            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Always reacting, never building</li>
+            <li><svg width="14" height="14" fill="none" stroke="#e05a42" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>No idea what's actually working</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="transform-arrow">
+        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="transform-side">
+        <div class="transform-after">
+          <div class="transform-label transform-label-after">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            With FullControl
+          </div>
+          <ul class="transform-list">
+            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>One system for everything</li>
+            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI tells you what matters</li>
+            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Automate the repetitive work</li>
+            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Proactive recommendations</li>
+            <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Total clarity, total control</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     HOW IT WORKS
+     ═══════════════════════════════════════════════════ -->
+<section class="how" id="how">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">How it works</div>
+      <h2 class="section-title reveal">Up and running in minutes</h2>
+      <p class="section-sub reveal">No complex setup. No learning curve. FullControl meets you where you are.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal reveal-delay-1">
+        <div class="step-num">01</div>
+        <h3>Connect your business</h3>
+        <p>Link your existing tools or start fresh. FullControl syncs your data automatically.</p>
+      </div>
+      <div class="step reveal reveal-delay-2">
+        <div class="step-num">02</div>
+        <h3>See the full picture</h3>
+        <p>Your entire business — members, leads, schedule, revenue — on one intelligent dashboard.</p>
+      </div>
+      <div class="step reveal reveal-delay-3">
+        <div class="step-num">03</div>
+        <h3>Get guided by AI</h3>
+        <p>FullControl analyzes what's happening and tells you what to focus on. No more guessing.</p>
+      </div>
+      <div class="step reveal reveal-delay-4">
+        <div class="step-num">04</div>
+        <h3>Take action instantly</h3>
+        <p>Follow up with a lead, adjust pricing, send a campaign — all from one place with one click.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     FEATURES
+     ═══════════════════════════════════════════════════ -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">What you get</div>
+      <h2 class="section-title reveal">Everything you need. Nothing you don't.</h2>
+      <p class="section-sub reveal">Not more features. Better outcomes.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <h3>Unified dashboard</h3>
+        <p>Members, leads, schedule, revenue, content — everything on one screen. No more tab-switching.</p>
+      </div>
+      <div class="feature reveal reveal-delay-2">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3>AI-powered insights</h3>
+        <p>Your AI advisor reads your data and surfaces what matters. It tells you what to do, not just what happened.</p>
+      </div>
+      <div class="feature reveal reveal-delay-3">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Lead & member management</h3>
+        <p>Track every lead from first touch to loyal member. Automated follow-ups. Smart pipeline. Zero spreadsheets.</p>
+      </div>
+      <div class="feature reveal reveal-delay-1">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h3>Smart scheduling</h3>
+        <p>Classes, sessions, and 1-on-1s managed effortlessly. Roster tracking, capacity alerts, and coach assignments built in.</p>
+      </div>
+      <div class="feature reveal reveal-delay-2">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h3>Marketing & content</h3>
+        <p>AI generates content from your brand voice. Schedule posts. Run campaigns. Track what converts — all from one place.</p>
+      </div>
+      <div class="feature reveal reveal-delay-3">
+        <div class="feature-icon">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>Real-time analytics</h3>
+        <p>Know your numbers instantly. Revenue, retention, conversion, engagement — with trends and AI commentary.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     DIFFERENTIATION
+     ═══════════════════════════════════════════════════ -->
+<section class="diff">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">Why this is different</div>
+      <h2 class="section-title reveal">Tools give you buttons.<br>FullControl gives you answers.</h2>
+    </div>
+
+    <div class="diff-grid reveal" style="margin-left:auto;margin-right:auto">
+      <div class="diff-card diff-old">
+        <div class="diff-card-label">Traditional tools</div>
+        <ul>
+          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Here are 200 features, figure it out</li>
+          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Data lives in 6 different dashboards</li>
+          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>You still make every decision alone</li>
+          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Requires hours of setup and training</li>
+          <li><svg width="14" height="14" fill="none" stroke="#71717a" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>Reports what happened yesterday</li>
+        </ul>
+      </div>
+      <div class="diff-card diff-new">
+        <div class="diff-card-label">FullControl</div>
+        <ul>
+          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>One guided system, zero learning curve</li>
+          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Everything on one intelligent screen</li>
+          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>AI recommends your next move</li>
+          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Works in minutes, not weeks</li>
+          <li><svg width="14" height="14" fill="none" stroke="#c8a84e" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Tells you what to do right now</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SAGE AI DEMO
+     ═══════════════════════════════════════════════════ -->
+<section class="sage-demo" id="sage-demo">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">Meet Sage</div>
+      <h2 class="section-title reveal">Your AI advisor.<br>Always on. Always clear.</h2>
+      <p class="section-sub reveal">Ask anything about your business. Sage reads your data and gives you the answer — not a dashboard to figure out yourself.</p>
+    </div>
+
+    <div class="sage-window reveal">
+      <div class="sage-window-bar">
+        <div class="sage-window-dot"></div>
+        <div class="sage-window-dot"></div>
+        <div class="sage-window-dot"></div>
+        <div class="sage-window-title">Sage AI</div>
+      </div>
+      <div class="sage-chat" id="sageChat">
+        <div class="sage-msg sage-msg-user" data-delay="400">
+          <div class="sage-msg-orb">You</div>
+          <div class="sage-bubble">How are we doing this week?</div>
+        </div>
+        <div class="sage-msg sage-msg-ai" id="sageTypingMsg" data-delay="1200" style="display:none">
+          <div class="sage-msg-orb">S</div>
+          <div class="sage-typing"><span></span><span></span><span></span></div>
+        </div>
+        <div class="sage-msg sage-msg-ai" id="sageResponseMsg" data-delay="2400">
+          <div class="sage-msg-orb">S</div>
+          <div class="sage-bubble">
+            Looking good. Here's your week so far:
+            <div class="sage-metric"><span>New members</span> <strong>4</strong> <span class="sage-metric-up">&#9650; 33% vs last week</span></div>
+            <div class="sage-metric"><span>Trial conversions</span> <strong>2 of 3</strong> <span class="sage-metric-up">67%</span></div>
+            <div class="sage-metric"><span>Class fill rate</span> <strong>84%</strong></div>
+            <div class="sage-metric"><span>Revenue pacing</span> <strong>$18.4k</strong> <span class="sage-metric-up">on track</span></div>
+            <div class="sage-rec"><strong>Recommendation:</strong> You have 1 unconverted trial from Monday — Sarah Chen. She attended 2 classes but hasn't signed up. Want me to draft a follow-up message?</div>
+          </div>
+        </div>
+      </div>
+      <div class="sage-input-wrap" id="sageInputWrap">
+        <input type="text" class="sage-input" placeholder="Ask Sage anything about your business...">
+        <button class="sage-send">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     SIMPLICITY
+     ═══════════════════════════════════════════════════ -->
+<section class="simplicity">
+  <div class="container">
+    <div class="section-label reveal">Designed for clarity</div>
+    <h2 class="section-title reveal">Simple enough for day one.<br>Powerful enough for year ten.</h2>
+    <p class="section-sub reveal" style="margin:0 auto">No training manuals. No onboarding calls. Open it and go.</p>
+
+    <div class="simplicity-visual reveal">
+      <div class="sim-pill">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Ask anything
+      </div>
+      <div class="sim-pill">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Get instant answers
+      </div>
+      <div class="sim-pill">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        Take action in one click
+      </div>
+    </div>
+
+    <div class="simplicity-quote reveal">
+      <p>"It's like having a business partner who never sleeps, never forgets, and always knows what to do next."</p>
+      <span>The feeling every operator deserves</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     REVENUE CALCULATOR
+     ═══════════════════════════════════════════════════ -->
+<section class="calc" id="calculator">
+  <div class="container">
+    <div class="section-center">
+      <div class="section-label reveal">See the impact</div>
+      <h2 class="section-title reveal">How much is churn costing you?</h2>
+      <p class="section-sub reveal">Slide the numbers. See what FullControl could recover.</p>
+    </div>
+
+    <div class="calc-grid reveal">
+      <div class="calc-controls">
+        <div class="calc-slider-group">
+          <div class="calc-slider-header">
+            <span class="calc-slider-label">Active Members</span>
+            <span class="calc-slider-value" id="calcMembersVal">100</span>
+          </div>
+          <input type="range" class="calc-slider" id="calcMembers" min="10" max="500" value="100" step="5">
+        </div>
+        <div class="calc-slider-group">
+          <div class="calc-slider-header">
+            <span class="calc-slider-label">Monthly Rate</span>
+            <span class="calc-slider-value" id="calcRateVal">$150</span>
+          </div>
+          <input type="range" class="calc-slider" id="calcRate" min="50" max="500" value="150" step="10">
+        </div>
+        <div class="calc-slider-group">
+          <div class="calc-slider-header">
+            <span class="calc-slider-label">Monthly Churn</span>
+            <span class="calc-slider-value" id="calcChurnVal">5%</span>
+          </div>
+          <input type="range" class="calc-slider" id="calcChurn" min="1" max="20" value="5" step="0.5">
+        </div>
+      </div>
+
+      <div class="calc-results">
+        <div class="calc-result-row">
+          <span class="calc-result-label">Annual Revenue</span>
+          <span class="calc-result-value" id="calcRevenue">$180,000</span>
+        </div>
+        <div class="calc-divider"></div>
+        <div class="calc-result-row">
+          <span class="calc-result-label">Lost to Churn (per year)</span>
+          <span class="calc-result-value red" id="calcLost">$90,000</span>
+          <span class="calc-result-sub" id="calcLostSub">60 members lost annually at current rate</span>
+        </div>
+        <div class="calc-divider"></div>
+        <div class="calc-result-row">
+          <span class="calc-result-label">Projected Recovery with FullControl</span>
+          <span class="calc-result-value accent" id="calcRecovery">+$36,000</span>
+          <span class="calc-result-sub">Based on 40% churn reduction from AI-driven retention</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     CTA
+     ═══════════════════════════════════════════════════ -->
+<section class="cta-section" id="cta">
+  <div class="container">
+    <div class="section-label reveal">Ready?</div>
+    <h2 class="reveal">Stop managing chaos.<br>Start running with <span>FullControl</span>.</h2>
+    <p class="section-sub reveal">Join the early access list. Be the first to experience what running a business should feel like.</p>
+    <form class="cta-form reveal" onsubmit="event.preventDefault()">
+      <input type="email" class="cta-input" placeholder="Enter your email" required>
+      <button type="submit" class="btn-primary">Get Early Access</button>
+    </form>
+    <p class="cta-note reveal">No spam. No credit card. Just early access.</p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════ -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="nav-logo-mark" style="width:22px;height:22px;border-radius:6px;font-size:9px">FC</span>
+        FullControl
+      </div>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="mailto:hello@fullcontrol.io">Contact</a>
+      </div>
+      <div class="footer-copy">&copy; 2026 FullControl. All rights reserved.</div>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════ -->
+<script>
+// Nav scroll effect
+const nav = document.getElementById('nav');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 40);
+});
+
+// Reveal on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(anchor.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════
+// TERMINAL BOOT SEQUENCE
+// ═══════════════════════════════════════════════════
+(function() {
+  const terminal = document.getElementById('heroTerminal');
+  const mockupContent = document.getElementById('heroMockupContent');
+  if (!terminal || !mockupContent) return;
+
+  const lines = terminal.querySelectorAll('.term-line');
+  let started = false;
+
+  const bootObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !started) {
+      started = true;
+      runBoot();
+    }
+  }, { threshold: 0.3 });
+
+  bootObserver.observe(document.getElementById('heroMockup'));
+
+  function runBoot() {
+    lines.forEach((line, i) => {
+      const delay = parseInt(line.dataset.delay) || (i * 400);
+      setTimeout(() => {
+        line.classList.add('show');
+        // Remove cursor from previous lines
+        lines.forEach((l, j) => {
+          if (j < i) {
+            const cursor = l.querySelector('.term-cursor');
+            if (cursor) cursor.style.display = 'none';
+          }
+        });
+      }, delay);
+    });
+
+    // After last line, fade terminal out and reveal mockup
+    const lastDelay = parseInt(lines[lines.length - 1].dataset.delay) || 2600;
+    setTimeout(() => {
+      terminal.classList.add('done');
+      mockupContent.style.opacity = '1';
+    }, lastDelay + 1000);
+  }
+})();
+
+// ═══════════════════════════════════════════════════
+// SAGE AI DEMO CHAT
+// ═══════════════════════════════════════════════════
+(function() {
+  const chat = document.getElementById('sageChat');
+  const typingMsg = document.getElementById('sageTypingMsg');
+  const responseMsg = document.getElementById('sageResponseMsg');
+  const inputWrap = document.getElementById('sageInputWrap');
+  if (!chat) return;
+
+  let started = false;
+  const msgs = chat.querySelectorAll('.sage-msg[data-delay]');
+
+  const sageObserver = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !started) {
+      started = true;
+      runChat();
+    }
+  }, { threshold: 0.3 });
+
+  sageObserver.observe(chat);
+
+  function runChat() {
+    // Step 1: Show user message
+    const userMsg = msgs[0];
+    setTimeout(() => {
+      userMsg.classList.add('show');
+    }, 400);
+
+    // Step 2: Show typing indicator
+    setTimeout(() => {
+      typingMsg.style.display = 'flex';
+      typingMsg.classList.add('show');
+    }, 1200);
+
+    // Step 3: Hide typing, show response
+    setTimeout(() => {
+      typingMsg.style.display = 'none';
+      responseMsg.classList.add('show');
+    }, 2800);
+
+    // Step 4: Show input field
+    setTimeout(() => {
+      inputWrap.classList.add('show');
+    }, 3400);
+  }
+})();
+
+// ═══════════════════════════════════════════════════
+// REVENUE CALCULATOR
+// ═══════════════════════════════════════════════════
+(function() {
+  const membersSlider = document.getElementById('calcMembers');
+  const rateSlider = document.getElementById('calcRate');
+  const churnSlider = document.getElementById('calcChurn');
+  if (!membersSlider) return;
+
+  const membersVal = document.getElementById('calcMembersVal');
+  const rateVal = document.getElementById('calcRateVal');
+  const churnVal = document.getElementById('calcChurnVal');
+  const revenueEl = document.getElementById('calcRevenue');
+  const lostEl = document.getElementById('calcLost');
+  const lostSubEl = document.getElementById('calcLostSub');
+  const recoveryEl = document.getElementById('calcRecovery');
+
+  function fmt(n) {
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function update() {
+    const members = parseInt(membersSlider.value);
+    const rate = parseInt(rateSlider.value);
+    const churnPct = parseFloat(churnSlider.value) / 100;
+
+    membersVal.textContent = members;
+    rateVal.textContent = '$' + rate;
+    churnVal.textContent = churnSlider.value + '%';
+
+    const annualRevenue = members * rate * 12;
+    // Compound churn: members lost over 12 months
+    const membersEnd = members * Math.pow(1 - churnPct, 12);
+    const avgMembers = (members + membersEnd) / 2;
+    const revenueWithChurn = avgMembers * rate * 12;
+    const lostToChurn = annualRevenue - revenueWithChurn;
+    const membersLost = Math.round(members - membersEnd);
+    // FullControl recovery: 40% churn reduction
+    const reducedChurn = churnPct * 0.6;
+    const membersEndReduced = members * Math.pow(1 - reducedChurn, 12);
+    const avgMembersReduced = (members + membersEndReduced) / 2;
+    const revenueReduced = avgMembersReduced * rate * 12;
+    const recovery = revenueReduced - revenueWithChurn;
+
+    revenueEl.textContent = fmt(annualRevenue);
+    lostEl.textContent = fmt(lostToChurn);
+    lostSubEl.textContent = membersLost + ' members lost annually at current rate';
+    recoveryEl.textContent = '+' + fmt(recovery);
+  }
+
+  membersSlider.addEventListener('input', update);
+  rateSlider.addEventListener('input', update);
+  churnSlider.addEventListener('input', update);
+  update();
+})();
+
+// ═══════════════════════════════════════════════════
+// MOUSE PARALLAX
+// ═══════════════════════════════════════════════════
+(function() {
+  if (window.matchMedia('(max-width:768px)').matches) return;
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  const glow = hero; // ::before follows hero transform-origin
+  const grid = hero.querySelector('.hero-mockup-grid');
+  const h1 = hero.querySelector('h1');
+  const sub = hero.querySelector('.hero-sub');
+
+  let targetX = 0, targetY = 0;
+  let currentX = 0, currentY = 0;
+  let ticking = false;
+
+  hero.addEventListener('mousemove', e => {
+    const rect = hero.getBoundingClientRect();
+    targetX = (e.clientX - rect.left - rect.width / 2);
+    targetY = (e.clientY - rect.top - rect.height / 2);
+    if (!ticking) { ticking = true; requestAnimationFrame(lerp); }
+  });
+
+  hero.addEventListener('mouseleave', () => {
+    targetX = 0; targetY = 0;
+  });
+
+  function lerp() {
+    const factor = 0.08;
+    currentX += (targetX - currentX) * factor;
+    currentY += (targetY - currentY) * factor;
+
+    // Glow: 1/10th speed
+    hero.style.setProperty('--px-glow-x', (currentX / 10) + 'px');
+    hero.style.setProperty('--px-glow-y', (currentY / 10) + 'px');
+
+    // Grid: 1/20th speed
+    if (grid) grid.style.transform = 'translate(' + (currentX / 20) + 'px,' + (currentY / 20) + 'px)';
+
+    // h1 + sub: 1/40th speed
+    if (h1) h1.style.transform = 'translate(' + (currentX / 40) + 'px,' + (currentY / 40) + 'px)';
+    if (sub) sub.style.transform = 'translate(' + (currentX / 40) + 'px,' + (currentY / 40) + 'px)';
+
+    if (Math.abs(targetX - currentX) > 0.1 || Math.abs(targetY - currentY) > 0.1) {
+      requestAnimationFrame(lerp);
+    } else {
+      ticking = false;
+    }
+  }
+
+  // Override ::before position via CSS custom property
+  const style = document.createElement('style');
+  style.textContent = '.hero::before{transform:translateX(calc(-50% + var(--px-glow-x,0px))) translateY(var(--px-glow-y,0px));will-change:transform}';
+  document.head.appendChild(style);
+})();
+
+// ═══════════════════════════════════════════════════
+// HERO ENTRANCE SEQUENCE
+// ═══════════════════════════════════════════════════
+(function() {
+  const hero = document.querySelector('.hero');
+  if (!hero) return;
+  hero.classList.add('hero-entrance');
+
+  const sequence = [
+    { sel: '.hero-badge', delay: 150 },
+    { sel: '.hero-h1-line1', delay: 400 },
+    { sel: '.hero-h1-line2', delay: 600, glowFlash: true },
+    { sel: '.hero-sub', delay: 850 },
+    { sel: '.hero-actions', delay: 1050 },
+    { sel: '.hero-visual', delay: 1300, borderFlash: true },
+    { sel: '.hero-trust', delay: 1600 },
+  ];
+
+  sequence.forEach(({ sel, delay, glowFlash, borderFlash }) => {
+    const el = hero.querySelector(sel);
+    if (!el) return;
+    setTimeout(() => {
+      el.classList.add('hero-anim-in');
+      if (glowFlash) {
+        const goldSpan = el.querySelector('span');
+        if (goldSpan) goldSpan.classList.add('hero-glow-flash');
+      }
+      if (borderFlash) {
+        el.classList.add('hero-visual-glow-flash');
+      }
+    }, delay);
+  });
+})();
+
+// ═══════════════════════════════════════════════════
+// BADGE TEXT CYCLING
+// ═══════════════════════════════════════════════════
+(function() {
+  const textEl = document.querySelector('.hero-badge-text');
+  if (!textEl) return;
+
+  const labels = [
+    'Basketball Academies',
+    'Jiu Jitsu Gyms',
+    'Pilates Studios',
+    'Soccer Clubs',
+    'Training Centers',
+    'Martial Arts Schools',
+    'Strength & Conditioning',
+  ];
+  let idx = 0;
+
+  setInterval(() => {
+    // Fade out
+    textEl.classList.add('out');
+    setTimeout(() => {
+      idx = (idx + 1) % labels.length;
+      textEl.textContent = labels[idx];
+      // Remove out class to trigger fade in
+      textEl.classList.remove('out');
+    }, 250);
+  }, 2500);
+})();
+</script>
+
+</body>
+</html>

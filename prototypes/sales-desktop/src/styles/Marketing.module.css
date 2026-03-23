@@ -153,6 +153,34 @@
 .alertCta{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:6px 14px;cursor:pointer;transition:all 180ms;white-space:nowrap}
 .alertCta:hover{background:rgba(200,168,78,0.18);border-color:var(--gold)}
 
+/* ─── IMPROVE ADS GRID ─── */
+.improveGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.improveCol {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.improveColLabel {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.improveCard {
+  background: var(--surf2);
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 /* ─── BEST PERFORMING ADS GRID ─── */
 .adsGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .adCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm);transition:all 180ms}

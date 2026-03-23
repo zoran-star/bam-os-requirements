@@ -43,7 +43,6 @@ const CHECKLIST_ITEMS = [
   { id: 'ck6', label: 'Set up AI brand voice', ref: 'SAL-004c', done: true },
   { id: 'ck7', label: 'Create training offers', ref: 'SAL-014', done: true },
   { id: 'ck8', label: 'Generate an onboarding link', ref: 'SET-005', done: true },
-  { id: 'ck9', label: 'Configure notification preferences', ref: 'SET-007', done: false },
   { id: 'ck10', label: 'Connect Meta Conversions API', ref: 'SET-010', done: false },
 ];
 
@@ -53,11 +52,9 @@ const NAV_SECTIONS = [
   { id: 'plans', label: 'Plans & Pricing', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
   { id: 'policies', label: 'Policies', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
   { id: 'brand', label: 'AI Brand Voice', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
-  { id: 'offers', label: 'Offer Builder', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg> },
   { id: 'links', label: 'Onboarding Links', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
   { id: 'integrations', label: 'Integrations', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> },
-  { id: 'notifications', label: 'Notifications', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> },
-  { id: 'billing', label: 'BAM OS Billing', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+  { id: 'billing', label: 'FullControl Billing', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
   { id: 'appearance', label: 'Appearance', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> },
 ];
 
@@ -91,15 +88,6 @@ export default function Settings() {
   const [pausePerYear, setPausePerYear] = useState('2');
   const [cancelNotice, setCancelNotice] = useState('7');
   const [dunningRetries, setDunningRetries] = useState('3');
-  const [trialDuration, setTrialDuration] = useState('1 session');
-
-  // Notifications
-  const [smsName, setSmsName] = useState('BAM Academy');
-  const [replyTo, setReplyTo] = useState('coach@bamacademy.com');
-  const [notifDefaults, setNotifDefaults] = useState({
-    session_reminder: true, booking_confirm: true, coach_message: true,
-    payment_reminder: true, report_published: true, announcements: true,
-  });
 
   // Appearance
   const [theme, setTheme] = useState('light');
@@ -220,7 +208,7 @@ export default function Settings() {
             <>
               <div className={s.sectionHead}>
                 <h3 className={s.sectionTitle}>Membership Plans</h3>
-                <div className={s.sectionActions}><button className={s.addBtn}>+ Create Plan</button><span className={s.sectionRef}>SET-003</span></div>
+                <div className={s.sectionActions}><button className={s.addBtn} onClick={() => { setShowOfferWizard(true); setWizardStep(0); }}>+ Create Plan</button><span className={s.sectionRef}>SET-003</span></div>
               </div>
               <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Plans are synced with Stripe Products & Prices. Price is immutable after creation — archive the plan and create a new one to change pricing.</span></div>
               <div className={s.planGrid}>
@@ -240,6 +228,33 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
+
+              {/* Product Builder — merged from Offer Builder */}
+              <div className={s.sectionHead} style={{ marginTop: 32 }}>
+                <h3 className={s.sectionTitle}>Products</h3>
+                <span className={s.sectionRef}>SAL-014</span>
+              </div>
+              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Products are injected into the AI sales agent context. When a lead asks about pricing or programs, the AI references these directly.</span></div>
+              <div className={s.offerGrid}>
+                {offers.map(o => (
+                  <div key={o.id} className={s.offerCard}>
+                    <div className={s.offerHeader}>
+                      <div className={s.offerName}>{o.name}</div>
+                      <span className={s.statusActive}>{o.status}</span>
+                    </div>
+                    <div className={s.offerDetails}>
+                      <div className={s.offerRow}><span className={s.offerLabel}>Athletes</span><span>{o.athletes}</span></div>
+                      <div className={s.offerRow}><span className={s.offerLabel}>Sessions</span><span>{o.sessions}</span></div>
+                      <div className={s.offerRow}><span className={s.offerLabel}>Price</span><span className={s.offerPrice}>{o.price}</span></div>
+                    </div>
+                    <div className={s.offerActions}>
+                      <button className={s.editBtn}>Edit</button>
+                      <button className={s.archiveBtn}>Archive</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button className={s.addOfferBtn} onClick={() => { setShowOfferWizard(true); setWizardStep(0); }}>+ Create New Product</button>
             </>
           )}
 
@@ -265,14 +280,6 @@ export default function Settings() {
                 <div className={s.policySection}>
                   <div className={s.policySectionTitle}>Dunning Behavior</div>
                   <div className={s.formGroup}><label className={s.formLabel}>Auto-retry Attempts Before Flagging</label><input className={s.formInput} type="number" value={dunningRetries} onChange={e => setDunningRetries(e.target.value)} /></div>
-                </div>
-                <div className={s.policySection}>
-                  <div className={s.policySectionTitle}>Trial Behavior</div>
-                  <div className={s.formGroup}><label className={s.formLabel}>Trial Duration</label>
-                    <select className={s.formSelect} value={trialDuration} onChange={e => setTrialDuration(e.target.value)}>
-                      <option>1 session</option><option>3 sessions</option><option>1 week</option><option>2 weeks</option>
-                    </select>
-                  </div>
                 </div>
               </div>
               <button className={s.saveBtn} onClick={showToast}>Save Policies</button>
@@ -329,37 +336,6 @@ export default function Settings() {
                 ))}
               </div>
               <button className={s.saveBtn} onClick={showToast}>Save Brand Voice</button>
-            </>
-          )}
-
-          {/* ═══ OFFER BUILDER (SAL-014) ═══ */}
-          {tab === 'offers' && (
-            <>
-              <div className={s.sectionHead}>
-                <h3 className={s.sectionTitle}>Training Offers</h3>
-                <span className={s.sectionRef}>SAL-014</span>
-              </div>
-              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>These offers are injected into the AI sales agent context. When a lead asks about pricing or programs, the AI references these directly.</span></div>
-              <div className={s.offerGrid}>
-                {offers.map(o => (
-                  <div key={o.id} className={s.offerCard}>
-                    <div className={s.offerHeader}>
-                      <div className={s.offerName}>{o.name}</div>
-                      <span className={s.statusActive}>{o.status}</span>
-                    </div>
-                    <div className={s.offerDetails}>
-                      <div className={s.offerRow}><span className={s.offerLabel}>Athletes</span><span>{o.athletes}</span></div>
-                      <div className={s.offerRow}><span className={s.offerLabel}>Sessions</span><span>{o.sessions}</span></div>
-                      <div className={s.offerRow}><span className={s.offerLabel}>Price</span><span className={s.offerPrice}>{o.price}</span></div>
-                    </div>
-                    <div className={s.offerActions}>
-                      <button className={s.editBtn}>Edit</button>
-                      <button className={s.archiveBtn}>Archive</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button className={s.addOfferBtn} onClick={() => { setShowOfferWizard(true); setWizardStep(0); }}>+ Create New Offer</button>
             </>
           )}
 
@@ -450,47 +426,16 @@ export default function Settings() {
             </>
           )}
 
-          {/* ═══ NOTIFICATIONS (SET-007) ═══ */}
-          {tab === 'notifications' && (
-            <>
-              <div className={s.sectionHead}>
-                <h3 className={s.sectionTitle}>Notification & Communication Settings</h3>
-                <span className={s.sectionRef}>SET-007</span>
-              </div>
-              <div className={s.formCard}>
-                <div className={s.formRow}>
-                  <div className={s.formGroup}><label className={s.formLabel}>SMS Sender Name</label><input className={s.formInput} value={smsName} onChange={e => setSmsName(e.target.value)} /></div>
-                  <div className={s.formGroup}><label className={s.formLabel}>Email Reply-To</label><input className={s.formInput} value={replyTo} onChange={e => setReplyTo(e.target.value)} /></div>
-                </div>
-              </div>
-
-              <div className={s.sectionHead} style={{ marginTop: 16 }}>
-                <h3 className={s.sectionTitle}>Default Notification Preferences for New Members</h3>
-              </div>
-              <div className={s.formCard}>
-                {Object.entries(notifDefaults).map(([key, val]) => (
-                  <div key={key} className={s.toggleRow}>
-                    <span className={s.toggleLabel}>{key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
-                    <button className={`${s.toggle} ${val ? s.toggleOn : ''}`} onClick={() => setNotifDefaults(prev => ({ ...prev, [key]: !prev[key] }))}>
-                      <div className={s.toggleKnob} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button className={s.saveBtn} onClick={showToast}>Save Notification Settings</button>
-            </>
-          )}
-
-          {/* ═══ BAM OS BILLING (SET-008) ═══ */}
+          {/* ═══ FullControl BILLING (SET-008) ═══ */}
           {tab === 'billing' && (
             <>
               <div className={s.sectionHead}>
-                <h3 className={s.sectionTitle}>BAM OS Subscription</h3>
+                <h3 className={s.sectionTitle}>FullControl Subscription</h3>
                 <span className={s.sectionRef}>SET-008</span>
               </div>
               <div className={s.billingCard}>
                 <div className={s.billingPlan}>
-                  <div className={s.billingPlanName}>BAM OS Pro</div>
+                  <div className={s.billingPlanName}>FullControl Pro</div>
                   <div className={s.billingPlanPrice}>$49<span>/mo</span></div>
                 </div>
                 <div className={s.billingMeta}>

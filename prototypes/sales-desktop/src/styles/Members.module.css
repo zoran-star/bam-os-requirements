@@ -1,7 +1,7 @@
 /* ─── COMMAND BAR HEADER ─── */
 .cmdBarHeader{position:relative;flex-shrink:0;padding:20px 28px;overflow:hidden;background:linear-gradient(135deg,rgba(200,168,78,0.04),rgba(200,168,78,0.01))}
 .cmdBarCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:0.45}
-.cmdBarInner{position:relative;z-index:1;display:flex;align-items:center;gap:16px}
+.cmdBarInner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px}
 .cmdLeft{display:flex;flex-direction:column;gap:2px;flex-shrink:0}
 .cmdGreeting{font-size:22px;font-weight:900;color:var(--tp);letter-spacing:-0.02em;line-height:1.1;margin:0}
 .cmdSubGreeting{font-size:12px;font-weight:500;color:var(--tm)}

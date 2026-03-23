@@ -38,6 +38,13 @@
 .kpiCard{background:var(--surf);border:1px solid var(--border);border-radius:24px;padding:20px 24px 16px;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:12px;transition:box-shadow 200ms ease}
 .kpiCardTitle{font-size:13px;font-weight:700;color:var(--tp)}
 
+/* ─── LOCATION FILTER (on-page) ─── */
+.locationFilter{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.locationIcon{display:flex;align-items:center;color:var(--tm)}
+.locationSelect{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--tp);background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:6px 28px 6px 10px;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='8' height='5' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23A5A19A' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:all 160ms;outline:none}
+.locationSelect:hover{border-color:var(--gold);color:var(--gold)}
+.locationSelect:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
+
 /* ─── SHARED KEYFRAMES ─── */
 @keyframes heroFadeUp{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
 @keyframes fadeUp{0%{opacity:0;transform:translateY(9px)}100%{opacity:1;transform:translateY(0)}}

@@ -1,20 +1,20 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation as useRouterLocation } from 'react-router-dom';
 import s from '../styles/Sidebar.module.css';
 import MemberApp from '../pages/member-app/MemberApp';
 
 export default function Sidebar() {
-  const location = useLocation();
-  const isActive = (path) => location.pathname === path;
+  const routerLocation = useRouterLocation();
+  const isActive = (path) => routerLocation.pathname === path;
   const [showMemberApp, setShowMemberApp] = useState(false);
 
   return (
     <>
       <aside className={s.sidebar}>
         <div className={s.logoWrap}>
-          <div className={s.logoMark}>B</div>
+          <div className={s.logoMark}>FC</div>
           <div className={s.logoText}>
-            <div className={s.logoName}>BAM OS</div>
+            <div className={s.logoName}>FullControl</div>
             <div className={s.logoSub}>Command Center</div>
           </div>
         </div>
@@ -24,9 +24,17 @@ export default function Sidebar() {
             <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
             <span>Home</span>
           </Link>
+          <Link to="/schedule" className={`${s.navItem} ${isActive('/schedule') ? s.active : ''}`}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <span>Schedule</span>
+          </Link>
           <Link to="/marketing" className={`${s.navItem} ${isActive('/marketing') ? s.active : ''}`}>
             <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
             <span>Marketing</span>
+          </Link>
+          <Link to="/content" className={`${s.navItem} ${isActive('/content') ? s.active : ''}`}>
+            <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+            <span>Content</span>
           </Link>
           <Link to="/sales" className={`${s.navItem} ${isActive('/sales') ? s.active : ''}`}>
             <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></div>
