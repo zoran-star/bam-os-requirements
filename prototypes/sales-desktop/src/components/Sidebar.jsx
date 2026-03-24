@@ -3,7 +3,7 @@ import { Link, useLocation as useRouterLocation } from 'react-router-dom';
 import s from '../styles/Sidebar.module.css';
 import MemberApp from '../pages/member-app/MemberApp';
 
-export default function Sidebar() {
+export default function Sidebar({ onInboxToggle }) {
   const routerLocation = useRouterLocation();
   const isActive = (path) => routerLocation.pathname === path;
   const [showMemberApp, setShowMemberApp] = useState(false);
@@ -50,6 +50,17 @@ export default function Sidebar() {
             <div className={s.navIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg></div>
             <span>Member App</span>
             <span className={s.previewBadge}>Preview</span>
+          </div>
+          {/* Inbox card */}
+          <div className={s.inboxCard} onClick={onInboxToggle}>
+            <div className={s.inboxIcon}>
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span className={s.inboxDot} />
+            </div>
+            <div className={s.inboxText}>
+              <span className={s.inboxLabel}>Messages</span>
+              <span className={s.inboxCount}>5 unread</span>
+            </div>
           </div>
         </nav>
         <div className={s.sidebarFooter}>

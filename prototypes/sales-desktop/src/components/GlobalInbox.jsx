@@ -15,8 +15,13 @@ const CONVERSATIONS = [
   { id: 'c9', type: 'member', initials: 'MD', name: 'Marcus Davis', time: '4d ago', preview: 'My card was updated, can you retry the payment?', channel: 'In-App', unread: true },
 ];
 
-export default function GlobalInbox() {
+export const UNREAD_COUNT = 5; // expose for sidebar
+
+export default function GlobalInbox({ isOpen, onToggle }) {
   const [open, setOpen] = useState(false);
+  const actualOpen = isOpen !== undefined ? isOpen : open;
+  const toggle = onToggle || (() => setOpen(p => !p));
+  const close = () => { if (onToggle) onToggle(); else setOpen(false); };
   const [filter, setFilter] = useState('All');
   const [sortBy, setSortBy] = useState('recent');
   const [conversations, setConversations] = useState(CONVERSATIONS);
@@ -40,22 +45,14 @@ export default function GlobalInbox() {
 
   return (
     <>
-      {/* Floating button */}
-      <button className={s.btn} onClick={() => setOpen(p => !p)}>
-        <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-        </svg>
-        {unreadCount > 0 && <div className={s.badge}>{unreadCount}</div>}
-      </button>
-
       {/* Overlay */}
-      {open && <div className={s.overlay} onClick={() => setOpen(false)} />}
+      {actualOpen && <div className={s.overlay} onClick={close} />}
 
       {/* Panel */}
-      <div className={`${s.panel} ${open ? s.panelOpen : ''}`}>
+      <div className={`${s.panel} ${actualOpen ? s.panelOpen : ''}`}>
         <div className={s.head}>
           <span className={s.title}>Messages</span>
-          <button className={s.closeBtn} onClick={() => setOpen(false)}>&times;</button>
+          <button className={s.closeBtn} onClick={close}>&times;</button>
         </div>
 
         <div className={s.controls}>

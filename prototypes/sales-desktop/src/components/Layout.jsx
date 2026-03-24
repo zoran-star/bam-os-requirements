@@ -1,20 +1,23 @@
+import { useState } from 'react';
 import Sidebar from './Sidebar';
 import GlobalInbox from './GlobalInbox';
-import SageFloat from './SageFloat';
+import SageBar from './SageBar';
 import ErrorBoundary from './ErrorBoundary';
 import s from '../styles/Layout.module.css';
 
 export default function Layout({ children }) {
+  const [inboxOpen, setInboxOpen] = useState(false);
+
   return (
     <div className={s.layout}>
-      <Sidebar />
+      <Sidebar onInboxToggle={() => setInboxOpen(p => !p)} />
       <div className={s.pageContent}>
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
+        <SageBar />
       </div>
-      <GlobalInbox />
-      <SageFloat />
+      <GlobalInbox isOpen={inboxOpen} onToggle={() => setInboxOpen(false)} />
     </div>
   );
 }
