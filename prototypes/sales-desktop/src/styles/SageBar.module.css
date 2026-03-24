@@ -11,68 +11,59 @@
   pointer-events: auto;
 }
 
-/* ─── Breathing ember glow ─── */
+/* ─── Horizon Line: full-width gold glow at bottom ─── */
 .glowLine {
-  height: 3px;
-  background: linear-gradient(90deg, transparent 5%, rgba(200,168,78,0.15) 25%, var(--gold) 50%, rgba(200,168,78,0.15) 75%, transparent 95%);
-  opacity: 0.3;
+  height: 2px;
+  background: var(--gold);
+  opacity: 0.2;
   cursor: pointer;
-  transition: all 0.6s var(--es);
   position: relative;
-  animation: glowBreath 3.5s ease-in-out infinite;
+  animation: horizonPulse 4s ease-in-out infinite;
 }
 
+/* Hover zone — invisible 44px tall area above the line */
 .glowLine::before {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 15%;
-  right: 15%;
-  height: 28px;
-  background: radial-gradient(ellipse at bottom, rgba(200,168,78,0.1) 0%, transparent 75%);
-  pointer-events: none;
-  transition: opacity 0.4s;
+  left: 0;
+  right: 0;
+  height: 44px;
+  cursor: pointer;
 }
 
+/* Soft upward glow — the "sunrise" ambient light */
 .glowLine::after {
-  content: 'Ask Sage anything...';
+  content: '';
   position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--gold);
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 0;
+  background: radial-gradient(ellipse at bottom center, rgba(200,168,78,0.12) 0%, transparent 70%);
+  transition: height 0.5s var(--es), opacity 0.5s;
   opacity: 0;
-  transition: opacity 0.3s;
-  white-space: nowrap;
-  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
 .glowLine:hover {
-  opacity: 0.7;
-  height: 4px;
-}
-
-.glowLine:hover::before {
-  height: 40px;
-  opacity: 1;
-}
-
-.glowLine:hover::after {
   opacity: 0.5;
 }
 
-@keyframes glowBreath {
-  0%, 100% { opacity: 0.2; filter: blur(0px); }
-  50% { opacity: 0.4; filter: blur(0.5px); }
+.glowLine:hover::after {
+  height: 60px;
+  opacity: 1;
 }
 
-/* ─── Floating input bubble ─── */
+@keyframes horizonPulse {
+  0%, 100% { opacity: 0.15; box-shadow: 0 0 6px rgba(200,168,78,0.05); }
+  50% { opacity: 0.3; box-shadow: 0 0 14px rgba(200,168,78,0.12); }
+}
+
+/* ─── Floating input bubble — fades up from below ─── */
 .bubble {
   position: absolute;
-  bottom: 16px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -82,16 +73,16 @@
   background: var(--surf);
   border: 1px solid var(--border);
   border-radius: 9999px;
-  box-shadow: var(--shadow-lg), 0 0 24px rgba(200,168,78,0.08), 0 0 60px rgba(200,168,78,0.03);
+  box-shadow: 0 -4px 24px rgba(200,168,78,0.06), var(--shadow-lg);
   min-width: 360px;
   max-width: 500px;
-  animation: bubbleUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: sunriseUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
   backdrop-filter: blur(12px);
 }
 
-@keyframes bubbleUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.92); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+@keyframes sunriseUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .sageIcon {
@@ -106,13 +97,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 10px rgba(200,168,78,0.3);
-  animation: sageGlow 3s ease-in-out infinite;
-}
-
-@keyframes sageGlow {
-  0%, 100% { box-shadow: 0 2px 10px rgba(200,168,78,0.3); }
-  50% { box-shadow: 0 2px 16px rgba(200,168,78,0.45); }
+  box-shadow: 0 2px 10px rgba(200,168,78,0.25);
 }
 
 .input {
@@ -130,12 +115,11 @@
 .input::placeholder {
   color: var(--tm);
   font-weight: 500;
-  transition: color 0.3s;
 }
 
 .input:focus::placeholder {
   color: var(--gold);
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .micBtn {
@@ -194,6 +178,5 @@
 }
 
 @media (max-width: 768px) {
-  .bubble { min-width: 260px; left: 12px; right: 12px; transform: none; max-width: none; bottom: 12px; }
-  .glowLine::after { display: none; }
+  .bubble { min-width: 260px; left: 12px; right: 12px; transform: none; max-width: none; bottom: 10px; }
 }
