@@ -572,7 +572,7 @@ export default function App() {
     6: 'How much would you pay monthly for FullControl?',
     7: 'What would you add to FullControl?',
     8: 'If all of that were included...',
-    9: 'One more thing...',
+    9: 'Quick question...',
     10: 'Last question.',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
@@ -598,7 +598,7 @@ export default function App() {
                   )}{cursor}
                 </h1>
               </motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle" style={{ fontSize: 17, maxWidth: 480 }}>This takes 4 minutes and could help your business immensely — so give it some thought.</p></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle" style={{ fontSize: 17, maxWidth: 480 }}>This takes 10 minutes and could help your business immensely — so give it some thought.</p></motion.div>
               <motion.div variants={fadeSlideUp}><button className="btn btn-primary" onClick={next} style={{ padding: '18px 48px', fontSize: 17, borderRadius: 16 }}>Let's go <span style={{ fontSize: 20 }}>&#8594;</span></button></motion.div>
             </motion.div>
           )}
@@ -607,6 +607,11 @@ export default function App() {
           {slide === 1 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
+
+              <motion.div variants={fadeSlideUp} style={{ marginBottom: 16 }}>
+                <input type="text" placeholder="Your name" value={userName} onChange={e => setUserName(e.target.value)}
+                  style={{ maxWidth: 320, margin: '0 auto', display: 'block', textAlign: 'center' }} />
+              </motion.div>
 
               <motion.div variants={fadeSlideUp}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How long have you been running your business?</p>
@@ -676,7 +681,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (businessStage && biggestChallenge && businessType && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && businessStage && biggestChallenge && businessType && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -731,7 +736,8 @@ export default function App() {
                   <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', lineHeight: 1.15, marginBottom: 16 }}>
                     That's what we've built to be<br /><span style={{ color: 'var(--gold)' }}>this command center.</span>
                   </h1>
-                  <p className="subtitle" style={{ fontSize: 17, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
+                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 500, marginBottom: 8 }}>Our mission is to help operators in sports and fitness use AI in the best, most effortless way possible — so you can shift your focus to making a real impact while your business works in the background.</p>
+                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
                   <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
                     Show me <span style={{ fontSize: 18 }}>&#8594;</span>
                   </button>
@@ -1031,15 +1037,13 @@ export default function App() {
           {slide === 11 && (
             <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
-              <motion.div variants={fadeSlideUp}><h1>You're in.</h1></motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle">Want early access when we launch? Drop your name and email and we'll keep you in the loop.</p></motion.div>
+              <motion.div variants={fadeSlideUp}><h1>You're in{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle">Want exclusive early access when we launch? Drop your email and we'll keep you in the loop.</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 16, width: '100%', maxWidth: 380, margin: '16px auto 0' }}>
-                <input type="text" placeholder="Your name" value={userName} onChange={e => setUserName(e.target.value)}
-                  style={{ width: '100%', textAlign: 'center' }} />
-                <input type="email" placeholder="Your email" value={userEmail} onChange={e => setUserEmail(e.target.value)}
-                  style={{ width: '100%', textAlign: 'center' }} />
-                <button className="btn btn-primary" onClick={() => { if (userName && userEmail) { playComplete(); /* TODO: submit to backend */ } }}
-                  style={{ marginTop: 8, opacity: (userName && userEmail) ? 1 : 0.4 }}>
+                <input type="email" placeholder="your@email.com" value={userEmail} onChange={e => setUserEmail(e.target.value)}
+                  className="early-access-email" />
+                <button className="btn btn-primary" onClick={() => { if (userEmail) { playComplete(); /* TODO: submit to backend */ } }}
+                  style={{ marginTop: 4, opacity: userEmail ? 1 : 0.4 }}>
                   Get early access <span style={{ fontSize: 18 }}>&#8594;</span>
                 </button>
               </motion.div>
