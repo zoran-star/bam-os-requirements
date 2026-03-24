@@ -274,7 +274,17 @@ const FAVORITE_SECTIONS = [
   { key: 'sage', label: 'Sage AI Advisor' },
 ]
 
-const TOTAL_SLIDES = 10 // added archetype slide
+const TOTAL_SLIDES = 12 // added Sean Ellis, NPS, early access
+
+const BUSINESS_TYPES = [
+  { key: 'sports-academy', label: 'Sports Academy', hasSport: true },
+  { key: 'fitness', label: 'Fitness / Personal Training', hasSport: false },
+  { key: 'martial-arts', label: 'Martial Arts', hasSport: false },
+]
+
+const SPORT_OPTIONS = ['Basketball', 'Soccer', 'Volleyball', 'Baseball', 'Tennis', 'Other']
+
+const CLIENT_COUNT_OPTIONS = ['1-10', '11-25', '26-50', '51-100', '100+']
 
 const BUSINESS_STAGES = [
   { key: 'early', label: 'Just getting started', desc: 'Less than 2 years', icon: '🌱' },
@@ -330,6 +340,14 @@ export default function App() {
 
   const [businessStage, setBusinessStage] = useState('')
   const [biggestChallenge, setBiggestChallenge] = useState('')
+  const [businessType, setBusinessType] = useState('')
+  const [sportType, setSportType] = useState('')
+  const [customSport, setCustomSport] = useState('')
+  const [clientCount, setClientCount] = useState('')
+  const [seanEllis, setSeanEllis] = useState('')
+  const [npsScore, setNpsScore] = useState(null)
+  const [userName, setUserName] = useState('')
+  const [userEmail, setUserEmail] = useState('')
 
   const [dreamText, setDreamText] = useState('')
   const [selectedChips, setSelectedChips] = useState([])
@@ -529,6 +547,8 @@ export default function App() {
     6: 'How much would you pay monthly for FullControl?',
     7: 'What would you add to FullControl?',
     8: 'If all of that were included...',
+    9: 'One more thing...',
+    10: 'Last question.',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
   const cursor = <span style={{ opacity: headlineDone ? 0 : 0.4 }}>|</span>
@@ -578,6 +598,44 @@ export default function App() {
               </motion.div>
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What type of business do you run?</p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
+                  {BUSINESS_TYPES.map(t => (
+                    <div key={t.key} className={`option-card ${businessType === t.key ? 'selected' : ''}`}
+                      onClick={() => { setBusinessType(t.key); if (!t.hasSport) setSportType(''); playClick() }}
+                      style={{ flex: '1 1 140px', maxWidth: 180, padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{t.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {businessType === 'sports-academy' && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ marginTop: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Which sport?</p>
+                    <div className="chips-wrap">
+                      {SPORT_OPTIONS.map(s => (
+                        <span key={s} className={`chip ${sportType === s ? 'selected' : ''}`}
+                          onClick={() => { setSportType(s); if (s !== 'Other') setCustomSport(''); playClick() }}>{s}</span>
+                      ))}
+                    </div>
+                    {sportType === 'Other' && (
+                      <input type="text" placeholder="Type your sport..." value={customSport} onChange={e => setCustomSport(e.target.value)}
+                        style={{ maxWidth: 260, margin: '8px auto 0', display: 'block', textAlign: 'center' }} />
+                    )}
+                  </motion.div>
+                )}
+              </motion.div>
+
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How many active clients do you have?</p>
+                <div className="chips-wrap">
+                  {CLIENT_COUNT_OPTIONS.map(c => (
+                    <span key={c} className={`chip ${clientCount === c ? 'selected' : ''}`}
+                      onClick={() => { setClientCount(c); playClick() }}>{c}</span>
+                  ))}
+                </div>
+              </motion.div>
+
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 18 }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your biggest challenge right now?</p>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
                   {CHALLENGE_OPTIONS.map(c => (
@@ -593,7 +651,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (businessStage && biggestChallenge) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (businessStage && biggestChallenge && businessType && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -886,18 +944,84 @@ export default function App() {
               <motion.div variants={fadeSlideUp}><p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 8 }}>per month</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={handleSubmit}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
+                <button className="btn btn-primary" onClick={() => { playComplete(); next() }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
 
-          {/* ──── SLIDE 9 — Thank You ──── */}
+          {/* ──── SLIDE 9 — Sean Ellis ──── */}
           {slide === 9 && (
+            <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
+              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">Imagine you had access to FullControl for the last 3 months...</p></motion.div>
+              <motion.div variants={fadeSlideUp}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', marginBottom: 16 }}>How would you feel if you could no longer use it?</p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 480, margin: '0 auto' }}>
+                  {[
+                    { key: 'very', label: 'Very disappointed', color: 'var(--gold)' },
+                    { key: 'somewhat', label: 'Somewhat disappointed', color: 'var(--text-2)' },
+                    { key: 'not', label: 'Not disappointed', color: 'var(--text-3)' },
+                  ].map(opt => (
+                    <div key={opt.key} className={`option-card ${seanEllis === opt.key ? 'selected' : ''}`}
+                      onClick={() => { setSeanEllis(opt.key); playClick() }}
+                      style={{ flex: '1 1 130px', maxWidth: 170, padding: '18px 14px', cursor: 'pointer' }}>
+                      <div style={{ fontSize: 14, fontWeight: 700 }}>{opt.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={prev}>Back</button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: seanEllis ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ──── SLIDE 10 — NPS ──── */}
+          {slide === 10 && (
+            <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
+              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">How likely are you to recommend FullControl to another trainer or gym owner?</p></motion.div>
+              <motion.div variants={fadeSlideUp}>
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 480, margin: '16px auto 0' }}>
+                  {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
+                    <button key={n} className={`rating-dot ${npsScore !== null && npsScore >= n ? 'active' : ''} ${npsScore === n ? 'current' : ''}`}
+                      onClick={() => { setNpsScore(n); playClick() }}
+                      style={{ width: 38, height: 38, fontSize: 14 }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 480, margin: '8px auto 0', fontSize: 11, color: 'var(--text-3)' }}>
+                  <span>Not likely</span>
+                  <span>Extremely likely</span>
+                </div>
+              </motion.div>
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={prev}>Back</button>
+                <button className="btn btn-primary" onClick={handleSubmit} style={{ opacity: npsScore !== null ? 1 : 0.4 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ──── SLIDE 11 — Early Access Signup ──── */}
+          {slide === 11 && (
             <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
-              <motion.div variants={fadeSlideUp}><h1>Thank you.</h1></motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle">Your input is shaping the future of FullControl. We'll keep you in the loop as we build exactly what you asked for.</p></motion.div>
-              <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 8, textTransform: 'uppercase' }}>FullControl</div></motion.div>
+              <motion.div variants={fadeSlideUp}><h1>You're in.</h1></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle">Want early access when we launch? Drop your name and email and we'll keep you in the loop.</p></motion.div>
+              <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 16, width: '100%', maxWidth: 380, margin: '16px auto 0' }}>
+                <input type="text" placeholder="Your name" value={userName} onChange={e => setUserName(e.target.value)}
+                  style={{ width: '100%', textAlign: 'center' }} />
+                <input type="email" placeholder="Your email" value={userEmail} onChange={e => setUserEmail(e.target.value)}
+                  style={{ width: '100%', textAlign: 'center' }} />
+                <button className="btn btn-primary" onClick={() => { if (userName && userEmail) { playComplete(); /* TODO: submit to backend */ } }}
+                  style={{ marginTop: 8, opacity: (userName && userEmail) ? 1 : 0.4 }}>
+                  Get early access <span style={{ fontSize: 18 }}>&#8594;</span>
+                </button>
+              </motion.div>
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 20 }}>
+                <button className="btn btn-ghost" onClick={() => {}} style={{ fontSize: 13, color: 'var(--text-3)' }}>Skip — just finish</button>
+              </motion.div>
+              <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 24, textTransform: 'uppercase' }}>FullControl</div></motion.div>
             </motion.div>
           )}
         </motion.div>
