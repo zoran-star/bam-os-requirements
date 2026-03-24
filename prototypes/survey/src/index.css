@@ -1028,6 +1028,28 @@ input[type="number"] {
   color: var(--gold);
 }
 
+.feedback-bank-note {
+  font-family: var(--font);
+  font-size: 12px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  outline: none;
+  transition: border-color 0.2s var(--ease);
+}
+
+.feedback-bank-note:focus {
+  border-color: var(--gold);
+}
+
+.feedback-bank-note::placeholder {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
 /* ---- FullControl brand pulse ---- */
 .brand-pulse {
   letter-spacing: 0.28em !important;

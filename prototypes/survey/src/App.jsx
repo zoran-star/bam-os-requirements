@@ -756,14 +756,23 @@ export default function App() {
                       <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
                         <div className="feedback-bank-header">Your ratings (tap to edit)</div>
                         {WALKTHROUGH_STEPS.filter(s => pageRatings[s.page]).map(step => (
-                          <div key={step.page} className="feedback-bank-item">
-                            <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13, minWidth: 80 }}>{step.page}</span>
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              {[1,2,3,4,5].map(n => (
-                                <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
-                                  onClick={() => setRating(step.page, n)} style={{ width: 26, height: 26, fontSize: 11 }}>{n}</button>
-                              ))}
+                          <div key={step.page} className="feedback-bank-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13, minWidth: 80 }}>{step.page}</span>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                {[1,2,3,4,5].map(n => (
+                                  <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
+                                    onClick={() => setRating(step.page, n)} style={{ width: 26, height: 26, fontSize: 11 }}>{n}</button>
+                                ))}
+                              </div>
                             </div>
+                            <input
+                              type="text"
+                              className="feedback-bank-note"
+                              placeholder="Add a note..."
+                              value={pageNotes[step.page] || ''}
+                              onChange={e => setNote(step.page, e.target.value)}
+                            />
                           </div>
                         ))}
                       </motion.div>
