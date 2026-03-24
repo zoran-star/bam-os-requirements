@@ -24,6 +24,14 @@ function RouteNotifier() {
 }
 
 export default function App() {
+  // Apply saved theme on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('fc_theme');
+      if (saved) document.documentElement.setAttribute('data-theme', saved);
+    } catch {}
+  }, []);
+
   return (
     <LocationProvider>
     <HashRouter>

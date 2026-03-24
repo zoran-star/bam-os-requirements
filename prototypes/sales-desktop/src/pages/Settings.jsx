@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import s from '../styles/Settings.module.css';
 import sh from '../styles/shared.module.css';
@@ -89,8 +89,14 @@ export default function Settings() {
   const [cancelNotice, setCancelNotice] = useState('7');
   const [dunningRetries, setDunningRetries] = useState('3');
 
-  // Appearance
-  const [theme, setTheme] = useState('light');
+  // Appearance — persisted + applied to document
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('fc_theme') || 'light'; } catch { return 'light'; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('fc_theme', theme); } catch {}
+  }, [theme]);
 
   // Checklist
   const [checklist, setChecklist] = useState(CHECKLIST_ITEMS);

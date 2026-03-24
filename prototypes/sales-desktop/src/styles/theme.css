@@ -1,10 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Nunito:wght@700;800;900&display=swap');
 
 :root {
-  --bg: #F5F3EE;
+  /* Slightly less cream, more white — cleaner but still warm */
+  --bg: #F8F7F5;
   --surf: #FFFFFF;
-  --surf2: #F9F7F3;
-  --surf3: #EEEAE3;
+  --surf2: #FAFAF8;
+  --surf3: #F0EFEC;
   --border: rgba(0,0,0,0.07);
   --borderm: rgba(0,0,0,0.12);
   --gold: #C8A84E;
@@ -84,6 +85,41 @@ input:focus-visible, textarea:focus-visible {
 .badge-gray { background: #8C7A66; color: #fff; }
 .badge-red { background: #C4342D; color: #fff; }
 .badge-blue { background: #3B6FA0; color: #fff; }
+
+/* ─── Dark Mode ─── */
+[data-theme="dark"] {
+  --bg: #0F0E0C;
+  --surf: #1A1916;
+  --surf2: #222120;
+  --surf3: #2C2B28;
+  --border: rgba(255,255,255,0.08);
+  --borderm: rgba(255,255,255,0.12);
+  --gold: #D4B65C;
+  --goldl: #C8A84E;
+  --goldd: #E0C56A;
+  --gglow: rgba(212,182,92,0.12);
+  --gsheen: rgba(212,182,92,0.06);
+  --tp: #F0EDE8;
+  --ts: #A5A19A;
+  --tm: #6E6B63;
+  --green: #4CC76A;
+  --greenl: rgba(76,199,106,0.12);
+  --warn: #F0B84A;
+  --warnl: rgba(240,184,74,0.12);
+  --red: #F07060;
+  --redl: rgba(240,112,96,0.12);
+  --gold-text: #D4B65C;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2);
+  --shadow-lg: 0 8px 28px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-gold: 0 4px 18px rgba(212,182,92,0.15), 0 2px 8px rgba(212,182,92,0.08);
+}
+
+[data-theme="dark"] .badge-green { background: #0E7C5F; }
+[data-theme="dark"] .badge-yellow { background: #C8A84E; }
+[data-theme="dark"] .badge-gray { background: #6E6B63; }
+[data-theme="dark"] .badge-red { background: #C4342D; }
+[data-theme="dark"] .badge-blue { background: #3B6FA0; }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
