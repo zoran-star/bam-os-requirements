@@ -83,10 +83,9 @@ export default function SageBar() {
 
   return (
     <>
-      {/* Horizon line + inline bubble */}
-      <div className={s.wrap} onMouseLeave={() => { if (!input && !listening) setExpanded(false) }}>
-        <div className={s.glowLine} onMouseEnter={handleExpand} onClick={handleExpand} />
-        {expanded && (
+      {/* Gold Tab Pull + inline bubble */}
+      <div className={s.wrap}>
+        {expanded ? (
           <div className={s.bubble}>
             <div className={s.sageIcon}>S</div>
             <input
@@ -105,6 +104,8 @@ export default function SageBar() {
             )}
             <button className={s.closeBtn} onClick={() => { setExpanded(false); setInput('') }} aria-label="Close">×</button>
           </div>
+        ) : (
+          <div className={s.tab} onClick={handleExpand} title="Ask Sage" />
         )}
       </div>
 

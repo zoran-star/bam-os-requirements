@@ -1,91 +1,75 @@
 .wrap {
   position: fixed;
   bottom: 0;
-  left: 220px; /* sidebar width */
+  left: 220px;
   right: 0;
   z-index: 50;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .wrap > * {
   pointer-events: auto;
 }
 
-/* ─── Horizon Line: full-width gold glow at bottom ─── */
-.glowLine {
-  height: 3px;
-  background: linear-gradient(90deg, transparent 5%, var(--gold) 30%, var(--gold) 70%, transparent 95%);
-  opacity: 0.45;
+/* ─── Gold Tab Pull (drawer handle) ─── */
+.tab {
+  width: 52px;
+  height: 18px;
+  background: linear-gradient(135deg, #C8A84E, #D4B85C);
+  border-radius: 8px 8px 0 0;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -2px 8px rgba(200,168,78,0.15);
+  animation: tabBob 3s ease-in-out infinite;
   position: relative;
-  animation: horizonPulse 4s ease-in-out infinite;
-  box-shadow: 0 0 8px rgba(200,168,78,0.15), 0 -2px 12px rgba(200,168,78,0.08);
 }
 
-/* Hover zone — invisible 44px tall area above the line */
-.glowLine::before {
+.tab::before {
   content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 44px;
-  cursor: pointer;
+  width: 20px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.5);
 }
 
-/* "Ask Sage" hint text centered above line */
-.glowLine::after {
-  content: 'Ask Sage ↑';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--gold);
-  opacity: 0.4;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: none;
-  transition: opacity 0.3s;
+.tab:hover {
+  height: 22px;
+  box-shadow: 0 -4px 16px rgba(200,168,78,0.25);
+  animation: none;
 }
 
-.glowLine:hover {
-  opacity: 0.65;
+@keyframes tabBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
-.glowLine:hover::after {
-  opacity: 0.7;
-}
-
-@keyframes horizonPulse {
-  0%, 100% { opacity: 0.35; box-shadow: 0 0 8px rgba(200,168,78,0.12), 0 -2px 12px rgba(200,168,78,0.06); }
-  50% { opacity: 0.55; box-shadow: 0 0 16px rgba(200,168,78,0.2), 0 -4px 20px rgba(200,168,78,0.1); }
-}
-
-/* ─── Floating input bubble — fades up from below ─── */
+/* ─── Floating input bubble ─── */
 .bubble {
   position: absolute;
-  bottom: 14px;
+  bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px 8px 8px;
+  padding: 8px 8px 8px 8px;
   background: var(--surf);
   border: 1px solid var(--border);
   border-radius: 9999px;
-  box-shadow: 0 -4px 24px rgba(200,168,78,0.06), var(--shadow-lg);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.08), 0 -2px 12px rgba(200,168,78,0.06);
   min-width: 360px;
   max-width: 500px;
-  animation: sunriseUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-  backdrop-filter: blur(12px);
+  animation: drawerUp 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes sunriseUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+@keyframes drawerUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
@@ -116,6 +100,8 @@
   min-width: 0;
 }
 
+.input:focus { outline: none; box-shadow: none; border: none; }
+.input:focus-visible { outline: none; box-shadow: none; border: none; }
 .input::placeholder { color: var(--tm); font-weight: 500; }
 .input:focus::placeholder { color: var(--gold); opacity: 0.45; }
 
@@ -161,7 +147,6 @@
   background: transparent; color: var(--ts); font-size: 18px;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: all 0.2s;
-  margin-left: -4px;
 }
 .closeBtn:hover { background: var(--surf2); color: var(--tp); }
 
@@ -192,7 +177,6 @@
   gap: 24px;
 }
 
-/* Big gold mic button */
 .voiceMic {
   width: 120px;
   height: 120px;
@@ -221,18 +205,11 @@
 
 @keyframes micGlow {
   0%, 100% {
-    box-shadow:
-      0 0 40px rgba(200,168,78,0.3),
-      0 0 80px rgba(200,168,78,0.1),
-      inset 0 2px 4px rgba(255,255,255,0.15);
+    box-shadow: 0 0 40px rgba(200,168,78,0.3), 0 0 80px rgba(200,168,78,0.1), inset 0 2px 4px rgba(255,255,255,0.15);
     transform: scale(1);
   }
   50% {
-    box-shadow:
-      0 0 60px rgba(200,168,78,0.5),
-      0 0 120px rgba(200,168,78,0.2),
-      0 0 180px rgba(200,168,78,0.08),
-      inset 0 2px 4px rgba(255,255,255,0.15);
+    box-shadow: 0 0 60px rgba(200,168,78,0.5), 0 0 120px rgba(200,168,78,0.2), 0 0 180px rgba(200,168,78,0.08), inset 0 2px 4px rgba(255,255,255,0.15);
     transform: scale(1.04);
   }
 }
@@ -256,7 +233,6 @@
   line-height: 1.4;
 }
 
-/* Sound wave bars */
 .voiceWaves {
   display: flex;
   align-items: center;
@@ -276,7 +252,6 @@
   50% { height: 28px; opacity: 0.8; }
 }
 
-/* "Type instead" button */
 .voiceTypeBtn {
   background: none;
   border: 1px solid rgba(200,168,78,0.3);
@@ -296,7 +271,6 @@
   background: rgba(200,168,78,0.06);
 }
 
-/* Type input when "type instead" is clicked */
 .voiceTypeWrap {
   display: flex;
   align-items: center;
@@ -320,9 +294,9 @@
   border-bottom: 1px solid rgba(255,255,255,0.12);
 }
 
-.voiceTypeInput::placeholder {
-  color: rgba(255,255,255,0.3);
-}
+.voiceTypeInput:focus { outline: none; }
+.voiceTypeInput:focus-visible { outline: none; }
+.voiceTypeInput::placeholder { color: rgba(255,255,255,0.3); }
 
 .voiceTypeSend {
   background: var(--gold);
@@ -338,12 +312,8 @@
   white-space: nowrap;
 }
 
-.voiceTypeSend:hover {
-  background: var(--goldl);
-  transform: scale(1.03);
-}
+.voiceTypeSend:hover { background: var(--goldl); transform: scale(1.03); }
 
-/* Esc hint */
 .voiceHint {
   font-size: 12px;
   color: rgba(255,255,255,0.25);
@@ -360,10 +330,9 @@
   color: rgba(255,255,255,0.35);
 }
 
-/* ─── Mobile ─── */
 @media (max-width: 768px) {
   .wrap { left: 0; }
-  .bubble { min-width: 260px; left: 12px; right: 12px; transform: none; max-width: none; bottom: 10px; }
+  .bubble { min-width: 260px; left: 12px; right: 12px; transform: none; max-width: none; bottom: 24px; }
   .voiceMic { width: 90px; height: 90px; }
   .voiceMic svg { width: 36px; height: 36px; }
   .voiceTypeWrap { min-width: 280px; }
