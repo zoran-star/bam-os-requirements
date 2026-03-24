@@ -309,6 +309,8 @@ export default function App() {
   const [blindPrice, setBlindPrice] = useState('')
   const [feedbackMode, setFeedbackMode] = useState('like')
   const [pinMode, setPinMode] = useState(false)
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false)
+  const [showFeedbackBank, setShowFeedbackBank] = useState(false)
   const [favorites, setFavorites] = useState([])
   const [hoursSaved, setHoursSaved] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
@@ -405,8 +407,17 @@ export default function App() {
     setPageNotes(prev => ({ ...prev, [page]: text }))
   }
 
-  const walkthroughNext = () => {
+  const handleWalkthroughNext = () => {
+    // Show rating prompt — user must rate before advancing
+    setShowRatingPrompt(true)
+    document.getElementById('root')?.scrollTo({ top: document.getElementById('root')?.scrollHeight, behavior: 'smooth' })
+  }
+
+  const submitRatingAndAdvance = () => {
+    const page = WALKTHROUGH_STEPS[walkthroughStep]?.page
+    if (!pageRatings[page]) return // must rate
     recordTimeSpent()
+    setShowRatingPrompt(false)
     if (walkthroughStep < WALKTHROUGH_STEPS.length - 1) {
       setWalkthroughStep(s => s + 1); playSwoosh()
     } else {
@@ -536,14 +547,13 @@ export default function App() {
               {walkthroughPhase === 'walkthrough' && (
                 <>
                   <div style={{ textAlign: 'center', marginBottom: 14 }}>
-                    <div className="brand brand-pulse" style={{ fontSize: 12, marginBottom: 8, textTransform: 'uppercase' }}>F U L L C O N T R O L</div>
                     <AnimatePresence mode="wait">
-                      <motion.div key={walkthroughStep} style={{ marginBottom: 12 }}
+                      <motion.div key={walkthroughStep} style={{ marginBottom: 10 }}
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
-                        <div style={{ display: 'inline-block', background: 'rgba(200,168,78,0.12)', border: '1px solid rgba(200,168,78,0.25)', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                        <div style={{ display: 'inline-block', background: 'rgba(200,168,78,0.12)', border: '1px solid rgba(200,168,78,0.25)', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
                           {WALKTHROUGH_STEPS[walkthroughStep]?.page}
                         </div>
-                        <p className="subtitle" style={{ fontSize: 15, maxWidth: 520, marginBottom: 10 }}>
+                        <p className="subtitle" style={{ fontSize: 15, maxWidth: 520, marginBottom: 8 }}>
                           {WALKTHROUGH_STEPS[walkthroughStep]?.text}
                         </p>
                         {WALKTHROUGH_STEPS[walkthroughStep]?.example && (
@@ -555,39 +565,77 @@ export default function App() {
                             {WALKTHROUGH_STEPS[walkthroughStep].example}
                           </div>
                         )}
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8, fontWeight: 600 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, fontWeight: 600 }}>
                           All of this works by talking to <span style={{ color: 'var(--gold)' }}>Sage</span> from the Home page.
                         </div>
                       </motion.div>
                     </AnimatePresence>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{walkthroughStep + 1} / {WALKTHROUGH_STEPS.length}</span>
-                      <button className="btn btn-primary" onClick={walkthroughNext} style={{ padding: '10px 28px', fontSize: 14 }}>
-                        {walkthroughStep < WALKTHROUGH_STEPS.length - 1 ? 'Next →' : 'Start exploring →'}
-                      </button>
-                    </div>
+                    {!showRatingPrompt && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{walkthroughStep + 1} / {WALKTHROUGH_STEPS.length}</span>
+                        <button className="btn btn-primary" onClick={handleWalkthroughNext} style={{ padding: '10px 28px', fontSize: 14 }}>
+                          Rate this section
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div className="walkthrough-proto-wrap">
                     <PrototypeIframe page={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
-                    <div className="walkthrough-dim-overlay" />
+                    {!showRatingPrompt && <div className="walkthrough-dim-overlay" style={{ opacity: 0.25 }} />}
                     <div className="walkthrough-page-label">
                       {WALKTHROUGH_STEPS[walkthroughStep]?.page}
                     </div>
-                    {/* Arrow pointing to the active nav item */}
-                    <div className="walkthrough-nav-pointer" style={{ top: [130, 170, 210, 250, 290, 330][walkthroughStep] || 130 }}>
+                    <div className="walkthrough-nav-pointer" style={{ top: [155, 200, 245, 290, 335, 380][walkthroughStep] || 155 }}>
                       <div className="walkthrough-nav-arrow" />
                     </div>
                   </div>
-                  <RatingDial
-                    value={pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] || 0}
-                    onChange={v => setRating(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
-                    page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
-                  />
-                  <PageNoteInput
-                    value={pageNotes[WALKTHROUGH_STEPS[walkthroughStep]?.page]}
-                    onChange={v => setNote(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
-                    page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
-                  />
+
+                  {/* Rating prompt — slides up when user clicks "Rate this section" */}
+                  <AnimatePresence>
+                    {showRatingPrompt && (
+                      <motion.div className="rating-prompt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}>
+                        <RatingDial
+                          value={pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] || 0}
+                          onChange={v => setRating(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
+                          page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
+                        />
+                        <PageNoteInput
+                          value={pageNotes[WALKTHROUGH_STEPS[walkthroughStep]?.page]}
+                          onChange={v => setNote(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
+                        />
+                        <button
+                          className={`btn btn-primary ${!pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] ? 'disabled' : ''}`}
+                          onClick={submitRatingAndAdvance}
+                          style={{ marginTop: 16, padding: '12px 32px', fontSize: 14, opacity: pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] ? 1 : 0.4 }}
+                        >
+                          {walkthroughStep < WALKTHROUGH_STEPS.length - 1 ? 'Submit & Next →' : 'Submit & Explore →'}
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Feedback bank bubble */}
+                  {Object.keys(pageRatings).length > 0 && (
+                    <button className="feedback-bubble" onClick={() => setShowFeedbackBank(!showFeedbackBank)}>
+                      <span className="feedback-bubble-count">{Object.keys(pageRatings).length}</span>
+                      <span className="feedback-bubble-label">rated</span>
+                    </button>
+                  )}
+
+                  {/* Feedback bank panel */}
+                  <AnimatePresence>
+                    {showFeedbackBank && (
+                      <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+                        <div className="feedback-bank-header">Your ratings</div>
+                        {WALKTHROUGH_STEPS.filter(s => pageRatings[s.page]).map(step => (
+                          <div key={step.page} className="feedback-bank-item">
+                            <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13 }}>{step.page}</span>
+                            <span style={{ color: 'var(--gold)', fontWeight: 700, fontSize: 14 }}>{pageRatings[step.page]}/5</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </>
               )}
 
@@ -596,32 +644,40 @@ export default function App() {
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
                     <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Take a closer look.</h2>
-                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>Click around freely. Update any ratings below if you change your mind.</p>
+                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>Click around freely. Your ratings are saved in the bubble below.</p>
                   </motion.div>
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
                     <PrototypeIframe />
                   </div>
-                  {/* Ratings summary — edit any rating */}
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} style={{ marginTop: 24, width: '100%', maxWidth: 600, margin: '24px auto 0' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12, textAlign: 'center' }}>Your ratings</div>
-                    <div className="ratings-summary">
-                      {WALKTHROUGH_STEPS.map(step => (
-                        <div key={step.page} className="rating-summary-row">
-                          <span className="rating-summary-page">{step.page}</span>
-                          <div className="rating-summary-dots">
-                            {[1,2,3,4,5].map(n => (
-                              <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
-                                onClick={() => setRating(step.page, n)}>{n}</button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
                   <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
                     <button className="btn btn-ghost" onClick={prev}>Back</button>
                     <button className="btn btn-primary" onClick={next}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
                   </div>
+                  {/* Feedback bank bubble */}
+                  {Object.keys(pageRatings).length > 0 && (
+                    <button className="feedback-bubble" onClick={() => setShowFeedbackBank(!showFeedbackBank)}>
+                      <span className="feedback-bubble-count">{Object.keys(pageRatings).length}</span>
+                      <span className="feedback-bubble-label">rated</span>
+                    </button>
+                  )}
+                  <AnimatePresence>
+                    {showFeedbackBank && (
+                      <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
+                        <div className="feedback-bank-header">Your ratings (tap to edit)</div>
+                        {WALKTHROUGH_STEPS.filter(s => pageRatings[s.page]).map(step => (
+                          <div key={step.page} className="feedback-bank-item">
+                            <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13 }}>{step.page}</span>
+                            <div className="rating-summary-dots" style={{ gap: 4 }}>
+                              {[1,2,3,4,5].map(n => (
+                                <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
+                                  onClick={() => setRating(step.page, n)} style={{ width: 26, height: 26, fontSize: 11 }}>{n}</button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </>
               )}
             </motion.div>
