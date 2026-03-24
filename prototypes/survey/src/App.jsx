@@ -1,51 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-// Real prototype is served at localhost:5173 and embedded via iframe
-
-const PROTO_URL = 'http://localhost:5173'
-
-function PrototypeFrame({ feedbackMode, pins, onAddPin, onDeletePin, onUpdatePin, interactive }) {
-  const overlayRef = useRef(null)
-  const pagePins = pins // all pins shown (page tracking would need postMessage)
-
-  const handleOverlayClick = (e) => {
-    if (!interactive) return
-    if (e.target.closest('[data-pin]') || e.target.tagName === 'INPUT') return
-    const rect = overlayRef.current.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const id = Date.now()
-    const number = pins.length + 1
-    onAddPin?.({ id, x, y, page: 'prototype', mode: feedbackMode, text: '', number })
-    playClick()
-  }
-
-  return (
-    <div style={{ position: 'relative', width: '100%', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}>
-      <iframe
-        src={PROTO_URL}
-        style={{ width: '100%', height: 560, border: 'none', borderRadius: 16, display: 'block' }}
-        allow="autoplay"
-      />
-      {/* Click overlay for pins — only when interactive */}
-      {interactive && (
-        <div
-          ref={overlayRef}
-          onClick={handleOverlayClick}
-          style={{
-            position: 'absolute', inset: 0,
-            cursor: feedbackMode === 'note' ? 'crosshair' : 'pointer',
-            zIndex: 5,
-          }}
-        >
-          {pagePins.map(pin => (
-            <PinMarker key={pin.id} pin={pin} onUpdate={onUpdatePin} onDelete={onDeletePin} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+import PrototypeMockup from './PrototypeMockup'
 
 function PinMarker({ pin, onUpdate, onDelete }) {
   const isNote = pin.mode === 'note'
@@ -305,6 +260,7 @@ export default function App() {
   const [extraChips, setExtraChips] = useState([])
   const [blindPrice, setBlindPrice] = useState('')
   const [feedbackMode, setFeedbackMode] = useState('like')
+  const [pinMode, setPinMode] = useState(false)
   const [favorites, setFavorites] = useState([])
   const [hoursSaved, setHoursSaved] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
@@ -500,6 +456,9 @@ export default function App() {
                     <AnimatePresence mode="wait">
                       <motion.div key={walkthroughStep} style={{ marginBottom: 12 }}
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
+                        <div style={{ display: 'inline-block', background: 'rgba(200,168,78,0.12)', border: '1px solid rgba(200,168,78,0.25)', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                          {WALKTHROUGH_STEPS[walkthroughStep]?.page}
+                        </div>
                         <p className="subtitle" style={{ fontSize: 15, maxWidth: 520, marginBottom: 10 }}>
                           {WALKTHROUGH_STEPS[walkthroughStep]?.text}
                         </p>
@@ -512,6 +471,9 @@ export default function App() {
                             {WALKTHROUGH_STEPS[walkthroughStep].example}
                           </div>
                         )}
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 8, fontWeight: 600 }}>
+                          All of this works by talking to <span style={{ color: 'var(--gold)' }}>Sage</span> from the Home page.
+                        </div>
                       </motion.div>
                     </AnimatePresence>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
@@ -521,8 +483,14 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                  <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
-                    <PrototypeFrame feedbackMode={feedbackMode} pins={[]} onAddPin={() => {}} onUpdatePin={() => {}} onDeletePin={() => {}} interactive={false} />
+                  <div className="walkthrough-proto-wrap">
+                    <div className="proto-wrap">
+                      <PrototypeMockup feedbackMode="like" pins={[]} onAddPin={() => {}} onUpdatePin={() => {}} onDeletePin={() => {}} walkthroughPage={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
+                    </div>
+                    <div className="walkthrough-dim-overlay" />
+                    <div className="walkthrough-page-label">
+                      {WALKTHROUGH_STEPS[walkthroughStep]?.page}
+                    </div>
                   </div>
                 </>
               )}
@@ -531,23 +499,26 @@ export default function App() {
               {walkthroughPhase === 'explore' && (
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <h2>Now it's your turn — explore and leave feedback.</h2>
-                    <p className="subtitle" style={{ fontSize: 14, marginBottom: 10 }}>Click anywhere on the prototype to react.</p>
+                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Explore and leave feedback.</h2>
+                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>{pinMode ? 'Click anywhere on the prototype to drop a pin.' : 'Click around the prototype freely. Toggle feedback mode to leave pins.'}</p>
                   </motion.div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
                     <div className="mode-toggle">
-                      <button className={`mode-btn interest ${feedbackMode === 'like' ? 'active' : ''}`} onClick={() => setFeedbackMode('like')}>&#9733; I like this</button>
-                      <button className={`mode-btn confused ${feedbackMode === 'confused' ? 'active' : ''}`} onClick={() => setFeedbackMode('confused')}>? Confused</button>
-                      <button className={`mode-btn ${feedbackMode === 'note' ? 'active' : ''}`} style={feedbackMode === 'note' ? { color: 'var(--gold)' } : {}} onClick={() => setFeedbackMode('note')}>&#9998; Leave a note</button>
+                      <button className={`mode-btn ${!pinMode ? 'active' : ''}`} style={!pinMode ? { color: 'var(--gold)' } : {}} onClick={() => setPinMode(false)}>Navigate</button>
+                      <button className={`mode-btn interest ${pinMode && feedbackMode === 'like' ? 'active' : ''}`} onClick={() => { setPinMode(true); setFeedbackMode('like') }}>&#9733; Like</button>
+                      <button className={`mode-btn confused ${pinMode && feedbackMode === 'confused' ? 'active' : ''}`} onClick={() => { setPinMode(true); setFeedbackMode('confused') }}>? Confused</button>
+                      <button className={`mode-btn ${pinMode && feedbackMode === 'note' ? 'active' : ''}`} style={pinMode && feedbackMode === 'note' ? { color: 'var(--gold)' } : {}} onClick={() => { setPinMode(true); setFeedbackMode('note') }}>&#9998; Note</button>
                     </div>
                     {undoStack.length > 0 && (
-                      <button onClick={undo} style={{ marginLeft: 8, background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600 }}>
+                      <button onClick={undo} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600 }}>
                         Undo
                       </button>
                     )}
                   </div>
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
-                    <PrototypeFrame feedbackMode={feedbackMode} pins={pins} onAddPin={addPin} onUpdatePin={updatePin} onDeletePin={deletePin} interactive={true} />
+                    <div className="proto-wrap">
+                      <PrototypeMockup feedbackMode={feedbackMode} pins={pinMode ? pins : []} onAddPin={pinMode ? addPin : () => {}} onUpdatePin={updatePin} onDeletePin={deletePin} />
+                    </div>
                   </div>
                   <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center' }}>
                     <button className="btn btn-ghost" onClick={prev}>Back</button>
