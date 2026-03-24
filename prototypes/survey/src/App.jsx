@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PrototypeMockup from './PrototypeMockup'
+import { supabase } from './supabase'
 
 const PROTO_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:5173'
@@ -535,7 +536,31 @@ export default function App() {
   const progress = ((slide) / (TOTAL_SLIDES - 1)) * 100
   const handleDreamNext = () => { setShowModal(true); playDing() }
   const handleModalDone = () => { setShowModal(false); next() }
-  const handleSubmit = () => { playComplete(); next() }
+  const handleSubmit = async () => {
+    playComplete()
+    // Submit to Supabase
+    try {
+      await supabase.from('survey_responses').insert({
+        business_stage: businessStage,
+        biggest_challenge: biggestChallenge,
+        dream_features_text: dreamText,
+        selected_chips: [...selectedChips, ...extraChips, ...customFeatures],
+        custom_features: customFeatures,
+        page_ratings: pageRatings,
+        pins: pins,
+        favorites: favorites,
+        hours_saved: hoursSaved ? parseInt(hoursSaved) : null,
+        hourly_rate: hourlyRate ? parseInt(hourlyRate) : null,
+        blind_price: blindPrice ? parseInt(blindPrice) : null,
+        smart_price: smartPrice ? parseInt(smartPrice) : null,
+        final_price: finalPrice ? parseInt(finalPrice) : null,
+        added_features: addedFeatures,
+      })
+    } catch (e) {
+      console.error('Survey submit error:', e)
+    }
+    next()
+  }
 
   const headlines = {
     0: "Let's do a quick thought exercise.",
