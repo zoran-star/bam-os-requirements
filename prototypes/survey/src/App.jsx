@@ -410,27 +410,21 @@ export default function App() {
 
   const handleWalkthroughNext = () => {
     recordTimeSpent()
-    if (walkthroughStep < WALKTHROUGH_STEPS.length - 1) {
-      // Advance to next walkthrough page
-      setWalkthroughStep(s => s + 1); playSwoosh()
-      document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
-      // All pages viewed — open rating modal starting from page 1
-      setRatingStep(0)
-      setShowRatingPrompt(true)
-      playDing()
-    }
+    // Show rating modal for the current page before advancing
+    setShowRatingPrompt(true)
+    playDing()
   }
 
   const submitRatingAndAdvance = () => {
-    const page = WALKTHROUGH_STEPS[ratingStep]?.page
+    const page = WALKTHROUGH_STEPS[walkthroughStep]?.page
     if (!pageRatings[page]) return // must rate
     playClick()
-    if (ratingStep < WALKTHROUGH_STEPS.length - 1) {
-      setRatingStep(s => s + 1)
+    setShowRatingPrompt(false)
+    if (walkthroughStep < WALKTHROUGH_STEPS.length - 1) {
+      setWalkthroughStep(s => s + 1); playSwoosh()
+      document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      // All rated — go to explore mode
-      setShowRatingPrompt(false)
+      // All pages rated — go to explore mode
       setWalkthroughPhase('explore')
       playDing()
       document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
@@ -584,13 +578,12 @@ export default function App() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                       <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{walkthroughStep + 1} / {WALKTHROUGH_STEPS.length}</span>
                       <button className="btn btn-primary" onClick={handleWalkthroughNext} style={{ padding: '10px 28px', fontSize: 14 }}>
-                        {walkthroughStep < WALKTHROUGH_STEPS.length - 1 ? 'Next →' : 'Done — rate each section'}
+                        Next →
                       </button>
                     </div>
                   </div>
                   <div className="walkthrough-proto-wrap">
                     <PrototypeIframe page={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
-                    <div className="walkthrough-dim-overlay" style={{ opacity: 0.25 }} />
                     <div className="walkthrough-page-label">
                       {WALKTHROUGH_STEPS[walkthroughStep]?.page}
                     </div>
@@ -599,28 +592,29 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Rating modal — centered popup after walkthrough completes */}
+                  {/* Rating modal — pops up when user clicks Next to leave a page */}
                   <AnimatePresence>
                     {showRatingPrompt && (
                       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
                         <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
+                          <h2 style={{ marginBottom: 4 }}>Before you move on...</h2>
                           <RatingDial
-                            value={pageRatings[WALKTHROUGH_STEPS[ratingStep]?.page] || 0}
-                            onChange={v => setRating(WALKTHROUGH_STEPS[ratingStep]?.page, v)}
-                            page={WALKTHROUGH_STEPS[ratingStep]?.page}
+                            value={pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] || 0}
+                            onChange={v => setRating(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
+                            page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
                           />
                           <PageNoteInput
-                            value={pageNotes[WALKTHROUGH_STEPS[ratingStep]?.page]}
-                            onChange={v => setNote(WALKTHROUGH_STEPS[ratingStep]?.page, v)}
+                            value={pageNotes[WALKTHROUGH_STEPS[walkthroughStep]?.page]}
+                            onChange={v => setNote(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
                           />
                           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{ratingStep + 1} / {WALKTHROUGH_STEPS.length}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{walkthroughStep + 1} / {WALKTHROUGH_STEPS.length}</span>
                             <button
                               className="btn btn-primary"
                               onClick={submitRatingAndAdvance}
-                              style={{ padding: '12px 32px', fontSize: 14, opacity: pageRatings[WALKTHROUGH_STEPS[ratingStep]?.page] ? 1 : 0.4 }}
+                              style={{ padding: '12px 32px', fontSize: 14, opacity: pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] ? 1 : 0.4 }}
                             >
-                              {ratingStep < WALKTHROUGH_STEPS.length - 1 ? 'Next →' : 'Done →'}
+                              {walkthroughStep < WALKTHROUGH_STEPS.length - 1 ? 'Submit & Next →' : 'Submit & Explore freely →'}
                             </button>
                           </div>
                         </motion.div>
