@@ -62,15 +62,18 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 
-/* Global focus indicator */
+/* Global focus indicator — subtle, not gold border */
 :focus-visible {
-  outline: 2px solid var(--gold);
+  outline: none;
+}
+
+button:focus-visible, a:focus-visible, select:focus-visible {
+  outline: 1px solid rgba(200,168,78,0.3);
   outline-offset: 2px;
 }
 
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: 2px;
+input:focus-visible, textarea:focus-visible {
+  outline: none;
 }
 
 /* Reduced motion */
