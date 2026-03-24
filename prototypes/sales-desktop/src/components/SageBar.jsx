@@ -33,15 +33,20 @@ export default function SageBar() {
   // Control key → voice mode overlay
   useEffect(() => {
     const down = (e) => {
-      if (e.key === 'Control' && !e.repeat && !voiceMode && !expanded) {
+      if (e.key === 'Control' && !e.repeat) {
         e.preventDefault()
-        setVoiceMode(true)
-        setListening(true)
-        // Simulate voice listening for 3s
-        setTimeout(() => {
+        if (voiceMode) {
+          setVoiceMode(false)
           setListening(false)
-          setInput(PROMPTS[Math.floor(Math.random() * PROMPTS.length)])
-        }, 3000)
+          setShowTypeBox(false)
+        } else if (!expanded) {
+          setVoiceMode(true)
+          setListening(true)
+          setTimeout(() => {
+            setListening(false)
+            setInput(PROMPTS[Math.floor(Math.random() * PROMPTS.length)])
+          }, 3000)
+        }
       }
       // Escape closes everything
       if (e.key === 'Escape') {
