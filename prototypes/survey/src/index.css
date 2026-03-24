@@ -1050,6 +1050,61 @@ input[type="number"] {
   font-size: 11px;
 }
 
+/* ---- Review pills ---- */
+.review-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.review-pill {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.25s var(--ease);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-pill:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  transform: translateY(-1px);
+}
+
+.review-pill.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(200,168,78,0.08);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.review-pill.rated {
+  background: var(--green, #4ADE80);
+  border-color: var(--green, #4ADE80);
+  color: #0E0D0B;
+}
+
+.review-pill.rated:hover {
+  background: #5CE891;
+  border-color: #5CE891;
+  color: #0E0D0B;
+}
+
+.review-pill-check {
+  font-size: 12px;
+  line-height: 1;
+}
+
 /* ---- FullControl brand pulse ---- */
 .brand-pulse {
   letter-spacing: 0.28em !important;

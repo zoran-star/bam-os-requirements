@@ -844,26 +844,60 @@ export default function App() {
                 </>
               )}
 
-              {/* Phase 2: Review (explore freely, rate when navigating away) */}
+              {/* Phase 2: Review (pill tracker + click to rate) */}
               {walkthroughPhase === 'review' && (
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Now explore each page and give feedback.</h2>
-                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 4 }}>
-                      Click through every page in the sidebar. When you navigate to a new page, we'll ask you to rate the one you just saw.
+                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Explore and rate each section.</h2>
+                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 10 }}>
+                      Tap a section below to explore it, then rate it. Complete all 6 to continue.
                     </p>
-                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{Object.keys(pageRatings).length} / {WALKTHROUGH_STEPS.length} rated</div>
+                    {/* Pill tracker */}
+                    <div className="review-pills">
+                      {WALKTHROUGH_STEPS.map((step, i) => {
+                        const rated = !!pageRatings[step.page]
+                        const active = reviewPageRef.current === step.page && !showRatingPrompt
+                        return (
+                          <button key={step.page}
+                            className={`review-pill ${rated ? 'rated' : ''} ${active ? 'active' : ''}`}
+                            onClick={() => { reviewPageRef.current = step.page; setReviewStep(i); setShowRatingPrompt(false); document.getElementById('review-iframe')?.setAttribute('src', PROTO_URL + '/#/' + step.page) }}
+                          >
+                            {rated && <span className="review-pill-check">&#10003;</span>}
+                            <span style={{ textTransform: 'capitalize' }}>{step.page}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </motion.div>
+
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)', position: 'relative' }}>
-                    <PrototypeIframe page="home" onNavigate={handleProtoNavigate} persistent />
+                    <iframe id="review-iframe" src={PROTO_URL + '/#/home'} style={{ width: '100%', height: 560, border: 'none', borderRadius: 16, display: 'block' }} allow="autoplay" />
                   </div>
 
-                  {/* Rating modal — triggered when user navigates away from a page */}
+                  {/* Rate button below prototype */}
+                  {!showRatingPrompt && (
+                    <div style={{ textAlign: 'center', marginTop: 16 }}>
+                      <button className="btn btn-primary" onClick={() => { setShowRatingPrompt(true); playDing() }} style={{ padding: '12px 32px', fontSize: 14 }}>
+                        Rate {reviewPageRef.current}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Continue button (only when all rated) */}
+                  {WALKTHROUGH_STEPS.every(s => pageRatings[s.page]) && !showRatingPrompt && (
+                    <div style={{ textAlign: 'center', marginTop: 12 }}>
+                      <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('explore'); playComplete(); next() }} style={{ padding: '14px 40px', fontSize: 15 }}>
+                        All rated, continue &#8594;
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Rating modal */}
                   <AnimatePresence>
                     {showRatingPrompt && (
                       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
                         <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                          <h2 style={{ marginBottom: 4 }}>Before you move on...</h2>
+                          <h2 style={{ marginBottom: 4 }}>Rate this section</h2>
                           <RatingDial
                             value={pageRatings[reviewPageRef.current] || 0}
                             onChange={v => setRating(reviewPageRef.current, v)}
@@ -875,47 +909,12 @@ export default function App() {
                           />
                           <button
                             className="btn btn-primary"
-                            onClick={submitRatingAndAdvance}
+                            onClick={() => { if (!pageRatings[reviewPageRef.current]) return; setShowRatingPrompt(false); playClick(); recordTimeSpent() }}
                             style={{ marginTop: 16, padding: '12px 32px', fontSize: 14, opacity: pageRatings[reviewPageRef.current] ? 1 : 0.4 }}
                           >
-                            Submit & continue
+                            Done
                           </button>
                         </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Feedback bank bubble */}
-                  {Object.keys(pageRatings).length > 0 && !showRatingPrompt && (
-                    <button className="feedback-bubble" onClick={() => setShowFeedbackBank(!showFeedbackBank)}>
-                      <span className="feedback-bubble-count">{Object.keys(pageRatings).length}</span>
-                      <span className="feedback-bubble-label">rated</span>
-                    </button>
-                  )}
-                  <AnimatePresence>
-                    {showFeedbackBank && !showRatingPrompt && (
-                      <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-                        <div className="feedback-bank-header">Your ratings (tap to edit)</div>
-                        {WALKTHROUGH_STEPS.filter(s => pageRatings[s.page]).map(step => (
-                          <div key={step.page} className="feedback-bank-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13, minWidth: 80 }}>{step.page}</span>
-                              <div style={{ display: 'flex', gap: 4 }}>
-                                {[1,2,3,4,5].map(n => (
-                                  <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
-                                    onClick={() => setRating(step.page, n)} style={{ width: 26, height: 26, fontSize: 11 }}>{n}</button>
-                                ))}
-                              </div>
-                            </div>
-                            <input
-                              type="text"
-                              className="feedback-bank-note"
-                              placeholder="Add a note..."
-                              value={pageNotes[step.page] || ''}
-                              onChange={e => setNote(step.page, e.target.value)}
-                            />
-                          </div>
-                        ))}
                       </motion.div>
                     )}
                   </AnimatePresence>
