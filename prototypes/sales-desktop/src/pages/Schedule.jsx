@@ -51,8 +51,13 @@ const typeClass = (type) => {
   return s.sessionElite;
 };
 
-/* Week of Mar 16–22, 2026 */
-const WEEK_START = new Date(2026, 2, 16); // Mon Mar 16
+/* Default to Monday of the current week */
+const WEEK_START = (() => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.getFullYear(), d.getMonth(), diff);
+})();
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_DATES = DAYS.map((_, i) => {
   const d = new Date(WEEK_START);
@@ -61,17 +66,17 @@ const DAY_DATES = DAYS.map((_, i) => {
 });
 
 const SESSIONS = [
-  { id: 1, day: 0, hour: 18, minutes: 0, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', booked: 12, capacity: 15, location: 'Downtown', notes: 'Focus on agility drills this week.' },
-  { id: 2, day: 1, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', booked: 8, capacity: 12, location: 'Westside', notes: '' },
-  { id: 3, day: 1, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', booked: 14, capacity: 15, location: 'Downtown', notes: 'Last group session before spring break adjustments.' },
-  { id: 4, day: 2, hour: 17, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Z', coachInitials: 'CZ', booked: 1, capacity: 1, location: 'Downtown', notes: 'One-on-one with Carlos.' },
-  { id: 5, day: 2, hour: 18, minutes: 30, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', booked: 10, capacity: 15, location: 'Downtown', notes: '' },
-  { id: 6, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', booked: 6, capacity: 12, location: 'Westside', notes: '' },
-  { id: 7, day: 3, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', booked: 15, capacity: 15, location: 'Downtown', notes: 'Session is full. Waitlist enabled.' },
-  { id: 8, day: 4, hour: 17, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Rivera', coachInitials: 'CR', booked: 2, capacity: 4, location: 'Downtown', notes: 'New athlete evaluations.' },
-  { id: 9, day: 5, hour: 9, minutes: 0, duration: 90, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', booked: 13, capacity: 15, location: 'Downtown', notes: 'Extended Saturday session.' },
-  { id: 10, day: 5, hour: 11, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Z', coachInitials: 'CZ', booked: 11, capacity: 15, location: 'Downtown', notes: '' },
-  { id: 11, day: 5, hour: 13, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', booked: 9, capacity: 12, location: 'Westside', notes: '' },
+  { id: 1, day: 0, hour: 18, minutes: 0, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 12, capacity: 15, location: 'Downtown', notes: 'Focus on agility drills this week.' },
+  { id: 2, day: 1, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 8, capacity: 12, location: 'Westside', notes: '' },
+  { id: 3, day: 1, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 14, capacity: 15, location: 'Downtown', notes: 'Last group session before spring break adjustments.' },
+  { id: 4, day: 2, hour: 17, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'One-on-one with Carlos.' },
+  { id: 5, day: 2, hour: 18, minutes: 30, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 10, capacity: 15, location: 'Downtown', notes: '' },
+  { id: 6, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 6, capacity: 12, location: 'Westside', notes: '' },
+  { id: 7, day: 3, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 15, capacity: 15, location: 'Downtown', notes: 'Session is full. Waitlist enabled.' },
+  { id: 8, day: 4, hour: 17, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 2, capacity: 4, location: 'Downtown', notes: 'New athlete evaluations.' },
+  { id: 9, day: 5, hour: 9, minutes: 0, duration: 90, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 13, capacity: 15, location: 'Downtown', notes: 'Extended Saturday session.' },
+  { id: 10, day: 5, hour: 11, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 11, capacity: 15, location: 'Downtown', notes: '' },
+  { id: 11, day: 5, hour: 13, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 9, capacity: 12, location: 'Westside', notes: '' },
 ];
 
 const SAMPLE_ROSTER = [
@@ -547,18 +552,26 @@ export default function Schedule() {
             <button className={s.weekNavBtn} onClick={() => setWeekOffset(w => w - 1)}>
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
             </button>
+            <button className={s.todayBtn} onClick={() => setWeekOffset(0)}>Today</button>
             <span className={s.weekLabel}>{formatWeekRange(currentWeekStart)}</span>
             <button className={s.weekNavBtn} onClick={() => setWeekOffset(w => w + 1)}>
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
-            {weekOffset !== 0 && (
-              <button className={s.todayBtn} onClick={() => setWeekOffset(0)}>Today</button>
-            )}
           </div>
           <div className={s.viewToggle}>
             <button className={`${s.viewBtn} ${calView === 'week' ? s.viewBtnActive : ''}`} onClick={() => setCalView('week')}>Week</button>
             <button className={`${s.viewBtn} ${calView === 'month' ? s.viewBtnActive : ''}`} onClick={() => setCalView('month')}>Month</button>
           </div>
+        </div>
+
+        {/* Session color legend */}
+        <div className={s.legend}>
+          {CLASS_TYPES.map(ct => (
+            <span key={ct.key} className={s.legendItem}>
+              <span className={s.legendDot} style={{ background: ct.color }} />
+              {ct.label}
+            </span>
+          ))}
         </div>
 
         {/* Calendar */}
@@ -611,7 +624,7 @@ export default function Schedule() {
                         <span className={s.sessionName}>{se.type}</span>
                         <span className={s.sessionTime}>{formatTime(se.hour, se.minutes)}</span>
                         <div className={s.sessionMeta}>
-                          <span className={s.sessionCoach}>{se.coachInitials}</span>
+                          <span className={s.sessionCoach} title={se.coachName}>{se.coachInitials}</span>
                           <span className={`${s.sessionCount} ${isFull ? s.sessionFull : ''}`}>{se.booked}/{se.capacity}</span>
                         </div>
                       </div>

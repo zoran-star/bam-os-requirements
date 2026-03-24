@@ -25,14 +25,20 @@ const QA_ICONS = {
 };
 
 const QUICK_ACTIONS = [
-  { label: 'Send message', icon: 'compose', action: 'compose' },
-  { label: 'Create announcement', icon: 'announcement', action: 'announcement' },
-  { label: 'Issue refund', icon: 'refund', action: 'refund' },
-  { label: 'Issue credit', icon: 'credit', action: 'credit' },
-  { label: 'Extend member', icon: 'credit', action: 'extend' },
-  { label: 'Apply discount', icon: 'discount', action: 'discount' },
-  { label: 'Pause a member', icon: 'cmd', action: 'cmd' },
+  { label: 'Send message', icon: 'compose', action: 'compose', group: null },
+  { label: 'Create announcement', icon: 'announcement', action: 'announcement', group: null },
+  { label: 'Issue refund', icon: 'refund', action: 'refund', group: 'billing', destructive: true },
+  { label: 'Issue credit', icon: 'credit', action: 'credit', group: 'billing' },
+  { label: 'Apply discount', icon: 'discount', action: 'discount', group: 'billing' },
+  { label: 'Extend member', icon: 'credit', action: 'extend', group: 'membership' },
+  { label: 'Pause a member', icon: 'cmd', action: 'cmd', group: 'membership', destructive: true },
 ];
+
+const HEALTH_TOOLTIPS = {
+  green: 'Healthy: attending regularly, payments current',
+  yellow: 'At risk: declining attendance or upcoming payment issue',
+  red: 'Critical: missed sessions or failed payment',
+};
 
 const MEMBERS = [
   { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050, location: 'Downtown' },
@@ -899,13 +905,43 @@ export default function Members() {
           </div>
         )}
 
-        {/* Quick action chips */}
+        {/* Quick action chips — consolidated with dropdowns */}
         <div className={s.cmdChips}>
-          {QUICK_ACTIONS.map(a => (
+          {QUICK_ACTIONS.filter(a => !a.group).map(a => (
             <button key={a.label} className={s.cmdChip} onClick={() => handleQuickAction(a.action, a.label)}>
               <span className={s.cmdChipIcon}>{QA_ICONS[a.icon]}</span> {a.label}
             </button>
           ))}
+          {/* Billing dropdown */}
+          <div className={s.moreToolsWrap} style={{ position: 'relative' }}>
+            <button className={s.cmdChip} onClick={e => { e.currentTarget.nextSibling.style.display = e.currentTarget.nextSibling.style.display === 'block' ? 'none' : 'block'; }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Billing ▾
+            </button>
+            <div style={{ display: 'none', position: 'absolute', top: '100%', left: 0, background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 10, padding: 4, zIndex: 40, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', marginTop: 4 }}>
+              {QUICK_ACTIONS.filter(a => a.group === 'billing').map(a => (
+                <button key={a.label} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: a.destructive ? '#A3402A' : 'var(--tp)', borderRadius: 6, textAlign: 'left' }}
+                  onClick={() => handleQuickAction(a.action, a.label)}>
+                  <span style={{ opacity: 0.6 }}>{QA_ICONS[a.icon]}</span> {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Membership dropdown */}
+          <div className={s.moreToolsWrap} style={{ position: 'relative' }}>
+            <button className={s.cmdChip} onClick={e => { e.currentTarget.nextSibling.style.display = e.currentTarget.nextSibling.style.display === 'block' ? 'none' : 'block'; }}>
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              Membership ▾
+            </button>
+            <div style={{ display: 'none', position: 'absolute', top: '100%', left: 0, background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 10, padding: 4, zIndex: 40, minWidth: 160, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', marginTop: 4 }}>
+              {QUICK_ACTIONS.filter(a => a.group === 'membership').map(a => (
+                <button key={a.label} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: a.destructive ? '#C8A84E' : 'var(--tp)', borderRadius: 6, textAlign: 'left' }}
+                  onClick={() => handleQuickAction(a.action, a.label)}>
+                  <span style={{ opacity: 0.6 }}>{QA_ICONS[a.icon]}</span> {a.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className={s.moreToolsWrap}>
             <button className={s.cmdChipMore} onClick={() => setMoreToolsOpen(!moreToolsOpen)}>
               <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -991,7 +1027,7 @@ export default function Members() {
                       <th className={s.sortable} onClick={() => handleSort('plan')}>Plan{sortIcon('plan')}</th>
                       <th className={s.sortable} onClick={() => handleSort('session')}>Last Session{sortIcon('session')}</th>
                       <th className={s.sortable} onClick={() => handleSort('payment')}>Payment{sortIcon('payment')}</th>
-                      <th>Health</th>
+                      <th title="Member health is based on attendance frequency, payment status, and engagement" style={{ cursor: 'help' }}>Health</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1010,7 +1046,7 @@ export default function Members() {
                         <td className={s.planCell}>{m.plan} {m.price ? `($${m.price}/mo)` : ''}</td>
                         <td className={s.sessionCell}>{m.lastSession}</td>
                         <td><span className={m.payStatus === 'Failed' ? s.payFailed : s.payNormal}>{m.payStatus}</span></td>
-                        <td><span className={`${s.healthDot} ${healthColor(m.health)}`} /></td>
+                        <td><span className={`${s.healthDot} ${healthColor(m.health)}`} title={HEALTH_TOOLTIPS[m.health]} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -1024,7 +1060,7 @@ export default function Members() {
                   <div key={m.id} className={s.memberCard} onClick={() => setDrawerMember(m)}>
                     <div className={s.memberCardTop}>
                       <div className={s.cardAvatar}>{m.photo}</div>
-                      <span className={`${s.healthDot} ${healthColor(m.health)}`} />
+                      <span className={`${s.healthDot} ${healthColor(m.health)}`} title={HEALTH_TOOLTIPS[m.health]} />
                     </div>
                     <div className={s.cardName}>{m.name}</div>
                     <span className={statusClass(m.status)}>{m.status}</span>

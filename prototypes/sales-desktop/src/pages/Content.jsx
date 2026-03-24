@@ -71,6 +71,13 @@ const CONTENT_PIECES = [
 /* ══════════════════════════════════════════════════════════════
    MOCK DATA — Research Insights
    ══════════════════════════════════════════════════════════════ */
+const SOURCE_LABELS = {
+  'r/personaltraining': 'Personal Training Communities',
+  'r/fitness': 'Fitness Communities',
+  'r/socialmediamarketing': 'Social Media Marketing',
+  'r/gym': 'Gym Communities',
+};
+
 const RESEARCH_INSIGHTS = [
   { id: 'r1', title: 'Members want more behind-the-scenes content', category: 'trend', source: 'r/personaltraining', relevance: 92 },
   { id: 'r2', title: '"Accountability partner" is the #1 reason cited for staying', category: 'pain_point', source: 'r/fitness', relevance: 88 },
@@ -286,14 +293,10 @@ export default function Content() {
                     <div className={s.pendingHook}>{piece.hook}</div>
                     <div className={s.pendingType}>{tc.label}{piece.avatar ? ` \u00B7 ${piece.avatar}` : ''}</div>
                   </div>
-                  <div className={s.pendingActions}>
-                    <button className={`${s.pendingActionBtn} ${s.pendingApproveBtn}`} onClick={e => { e.stopPropagation(); }} title="Approve">
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-                    </button>
-                    <button className={`${s.pendingActionBtn} ${s.pendingRejectBtn}`} onClick={e => { e.stopPropagation(); }} title="Reject">
-                      <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
+                  <button style={{ background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    onClick={e => { e.stopPropagation(); setDrawerPiece(piece); }}>
+                    Review
+                  </button>
                 </div>
               );
             })}
@@ -333,6 +336,7 @@ export default function Content() {
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             </span>
             Research Insights
+            <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--ts)', marginLeft: 8 }}>Trending topics from fitness communities relevant to your gym</span>
           </div>
           <div className={s.pendingList}>
             {RESEARCH_INSIGHTS.map(insight => (
@@ -342,8 +346,16 @@ export default function Content() {
                 </div>
                 <div className={s.pendingInfo}>
                   <div className={s.pendingHook}>{insight.title}</div>
-                  <div className={s.pendingType}>{insight.source} &middot; {insight.relevance}% relevance &middot; {insight.category.replace('_', ' ')}</div>
+                  <div className={s.pendingType}>
+                    {SOURCE_LABELS[insight.source] || insight.source} &middot;{' '}
+                    <span title="Based on your gym type, member demographics, and content history" style={{ cursor: 'help' }}>{insight.relevance}% match to your audience</span> &middot;{' '}
+                    {insight.category.replace('_', ' ')}
+                  </div>
                 </div>
+                <button style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600, color: 'var(--gold)', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onClick={() => {}}>
+                  Create content →
+                </button>
               </div>
             ))}
           </div>

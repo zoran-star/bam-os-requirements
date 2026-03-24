@@ -558,6 +558,50 @@ export default function Home() {
           )}
         </div>
 
+        {/* ═══ ACTION ITEMS + TODAY'S SCHEDULE ═══ */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          {/* Action Items */}
+          <div style={{ background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Action Items
+            </div>
+            {[
+              { label: '2 content pieces pending review', icon: '📝', color: '#6366f1', link: '/content' },
+              { label: '1 failed payment (Jake Rivera)', icon: '⚠️', color: '#E05A42', link: '/members' },
+              { label: '3 leads need follow-up', icon: '🔔', color: '#C8A84E', link: '/sales' },
+              { label: '4pm Intermediate — 3/12 spots filled', icon: '📅', color: '#3EAF5C', link: '/schedule' },
+            ].map((item, i) => (
+              <div key={i} onClick={() => navigate(item.link)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13, color: 'var(--tp)' }}>
+                <span style={{ fontSize: 14 }}>{item.icon}</span>
+                <span>{item.label}</span>
+                <svg width="12" height="12" fill="none" stroke="var(--ts)" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft: 'auto' }}><polyline points="9 18 15 12 9 6"/></svg>
+              </div>
+            ))}
+          </div>
+
+          {/* Today's Schedule */}
+          <div style={{ background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tp)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width="16" height="16" fill="none" stroke="var(--gold)" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Today's Schedule
+            </div>
+            {[
+              { name: 'Elite Training', time: '9:00 AM', fill: '13/15', color: '#C8A84E' },
+              { name: 'Group Training', time: '11:00 AM', fill: '11/15', color: '#3EAF5C' },
+              { name: 'Beginner', time: '4:00 PM', fill: '8/12', color: '#6B8AE0' },
+              { name: 'Individual Session', time: '5:00 PM', fill: '1/1', color: '#9B6BCC' },
+            ].map((session, i) => (
+              <div key={i} onClick={() => navigate('/schedule')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: session.color, flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, color: 'var(--tp)' }}>{session.name}</span>
+                <span style={{ color: 'var(--ts)' }}>{session.time}</span>
+                <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: 'var(--tp)', background: 'var(--surf2)', padding: '2px 8px', borderRadius: 6 }}>{session.fill}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ═══ PROGRESS RINGS ═══ */}
         <div className={s.ringsSection}>
           <div className={s.ringsSectionHead}>

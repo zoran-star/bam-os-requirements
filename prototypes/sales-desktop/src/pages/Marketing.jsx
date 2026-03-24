@@ -24,27 +24,27 @@ const QUICK_ACTIONS = [
 
 const CHANNELS = [
   {
-    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, icon: '📸', accent: '#E1306C',
+    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, cplTrend: '-6%', cplTrendGood: true, icon: '📸', accent: '#E1306C',
     campaigns: [
       { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
       { name: 'Summer Skills Camp Promo', spend: '$134', impressions: '6,820', cpm: '$19.65', reach: '5,100', frequency: '1.3', clicks: 245, ctr: '3.6%', cpc: '$0.55', lpv: 189, lpvRate: '77.1%', formFills: 5, trialBookings: 3, cpl: '$16.75', convRate: '4.2%', demo: { age: '25-38', gender: '71% F', geo: 'Within 10mi', onTarget: true } },
     ],
   },
   {
-    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, icon: '📘', accent: '#1877F2',
+    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, cplTrend: '+3%', cplTrendGood: false, icon: '📘', accent: '#1877F2',
     campaigns: [
       { name: 'Parent Testimonial — Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
       { name: 'Back-to-School Registration', spend: '$67', impressions: '3,150', cpm: '$21.27', reach: '2,800', frequency: '1.1', clicks: 98, ctr: '3.1%', cpc: '$0.68', lpv: 74, lpvRate: '75.5%', formFills: 2, trialBookings: 1, cpl: '$22.33', convRate: '4.1%', demo: { age: '22-35', gender: '65% F', geo: 'Within 25mi', onTarget: false, flag: 'Geo reaching beyond 20mi target radius' } },
     ],
   },
   {
-    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, icon: '🔍', accent: '#4285F4',
+    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, cplTrend: '-12%', cplTrendGood: true, icon: '🔍', accent: '#4285F4',
     campaigns: [
       { name: 'Search — Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
     ],
   },
   {
-    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, icon: '🤝', accent: '#3EAF5C',
+    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, cplTrend: '$0', cplTrendGood: true, icon: '🤝', accent: '#3EAF5C',
     campaigns: [
       { name: 'Member Referral Links', spend: '$0', impressions: '—', cpm: '—', reach: '—', frequency: '—', clicks: 28, ctr: '—', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
     ],
@@ -122,7 +122,7 @@ function FullDashboard({ onClose }) {
   const channelBreakdown = CHANNELS.map(ch => {
     const totalSpend = ch.campaigns.reduce((s, c) => s + parseFloat(c.spend.replace('$', '')), 0);
     const totalLeads = ch.campaigns.reduce((s, c) => s + c.formFills + c.trialBookings, 0);
-    return { name: ch.name, icon: ch.icon, spend: `$${totalSpend.toFixed(0)}`, leads: totalLeads, cpl: ch.cpl, trend: ch.trend, trendUp: ch.trendUp };
+    return { name: ch.name, icon: ch.icon, spend: `$${totalSpend.toFixed(0)}`, leads: totalLeads, cpl: ch.cpl, trend: ch.trend, trendUp: ch.trendUp, cplTrend: ch.cplTrend, cplTrendGood: ch.cplTrendGood };
   });
 
   return (
@@ -172,7 +172,7 @@ function FullDashboard({ onClose }) {
               <div className={s.dashChannelMeta}>
                 <span>Spend: {ch.spend}</span>
                 <span>CPL: {ch.cpl}</span>
-                <span className={ch.trendUp ? s.dashTrendUp : s.dashTrendDown}>{ch.trend}</span>
+                <span className={ch.cplTrendGood ? s.dashTrendUp : s.dashTrendDown}>{ch.cplTrend}</span>
               </div>
             </div>
           ))}
@@ -586,12 +586,12 @@ export default function Marketing() {
         <div className={s.topActions}>
           <div className={s.topChips}>
             {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className={s.topActionChip} onClick={() => {
+              <button key={a.label} className={s.topActionChip} style={a.label === 'Pause a campaign' ? { border: '1px solid #C8A84E', color: '#C8A84E', background: 'transparent' } : undefined} onClick={() => {
                 if (a.label === 'Ask Sage') cmdInputRef.current?.focus();
                 else if (a.label === 'Create ad') setCreateAdOpen(true);
                 else if (a.label === 'Adjust budget') setBudgetOpen(true);
                 else if (a.label === 'Improve ads') { /* already at top */ }
-                else if (a.label === 'Pause a campaign') handleCommand('Pause a campaign');
+                else if (a.label === 'Pause a campaign') { handleCommand('Pause a campaign'); }
                 else handleCommand(a.label);
               }}>
                 <span>{a.icon}</span> {a.label}
@@ -604,7 +604,7 @@ export default function Marketing() {
               <div className={s.topResponseA}>{cmdResponse.reply}</div>
               <div className={s.topResponseActions}>
                 {cmdResponse.actions.map(a => (
-                  <button key={a} className={a === 'Cancel' ? s.topResponseCancel : s.topResponseConfirm} onClick={() => setCmdResponse(null)}>{a}</button>
+                  <button key={a} className={a === 'Cancel' ? s.topResponseCancel : s.topResponseConfirm} style={a === 'Confirm pause' ? { border: '1px solid #C8A84E', color: '#C8A84E', background: 'transparent' } : undefined} onClick={() => setCmdResponse(null)}>{a}</button>
                 ))}
               </div>
             </div>
@@ -651,7 +651,7 @@ export default function Marketing() {
             </div>
           </div>
 
-          <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)} style={{ marginTop: '12px', marginBottom: '24px' }}>
+          <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)} style={{ marginTop: '12px', marginBottom: '24px', border: '1px solid #A3402A', color: '#A3402A', background: 'transparent', boxShadow: 'none' }}>
             <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             Replace underperformers with new ads
           </button>
@@ -700,7 +700,7 @@ export default function Marketing() {
                 <div className={s.channelLeads}>{ch.leads}</div>
                 <div className={s.channelMeta}>
                   <span className={s.channelCpl}>CPL {ch.cpl}</span>
-                  <span className={ch.trendUp ? s.channelTrendUp : s.channelTrendDown}>{ch.trend}</span>
+                  <span className={ch.cplTrendGood ? s.channelTrendUp : s.channelTrendDown}>{ch.cplTrend}</span>
                 </div>
                 {ch.campaigns.some(c => !c.demo.onTarget) && (
                   <div className={s.channelDemoFlag}>Demo off-target</div>
@@ -744,26 +744,24 @@ export default function Marketing() {
             <span>Tools</span>
           </div>
 
-          {/* Best Performing */}
-          <div className={s.sectionHead}>
-            <h3 className={s.sectionTitle}>Best Performing Ads</h3>
-            <span className={s.sectionRef}>MKT-004</span>
-          </div>
-          <div className={s.adsGrid}>
-            {TOP_ADS.map(ad => (
-              <div key={ad.name} className={s.adCard}>
-                <div className={s.adName}>{ad.name}</div>
-                <div className={s.adStats}>
-                  <div className={s.adStat}><span className={s.adStatLabel}>Spend</span><span className={s.adStatVal}>{ad.spend}</span></div>
-                  <div className={s.adStat}><span className={s.adStatLabel}>Conv.</span><span className={s.adStatVal}>{ad.conversions}</span></div>
-                  <div className={s.adStat}><span className={s.adStatLabel}>CTR</span><span className={s.adStatVal}>{ad.ctr}</span></div>
+          {/* Recently Paused Ads */}
+          <div className={s.toolSection}>
+            <div className={s.toolSectionTitle}>Recently Paused Ads</div>
+            <div className={s.adGrid}>
+              {[
+                { name: 'Summer Promo V1', pausedDate: 'Mar 18', reason: 'Below CTR threshold', ctr: '0.8%' },
+                { name: 'Free Trial — Generic', pausedDate: 'Mar 15', reason: 'Budget cap reached', ctr: '1.2%' },
+              ].map((ad, i) => (
+                <div key={i} className={s.adCard}>
+                  <div className={s.adThumb} />
+                  <div className={s.adInfo}>
+                    <div className={s.adName}>{ad.name}</div>
+                    <div className={s.adMeta}>Paused {ad.pausedDate} · {ad.reason}</div>
+                    <div className={s.adCtr}>CTR: {ad.ctr}</div>
+                  </div>
                 </div>
-                <div className={s.adFooter}>
-                  <span className={s.adDays}>{ad.days}d active</span>
-                  <span className={ad.status === 'new' ? s.adBadgeNew : s.adBadgeHealthy}>{ad.status}</span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)}>

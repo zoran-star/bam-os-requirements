@@ -195,6 +195,16 @@
 .adBadgeNew{font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,0.1);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
 .adBadgeHealthy{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
 
+/* ─── RECENTLY PAUSED ADS ─── */
+.toolSection{margin-bottom:20px}
+.toolSectionTitle{font-size:14px;font-weight:700;color:var(--tp);margin-bottom:12px}
+.adGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.adGrid .adCard{flex-direction:row;align-items:center;gap:14px;padding:16px}
+.adThumb{width:48px;height:48px;border-radius:10px;background:var(--surf2);flex-shrink:0}
+.adInfo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.adMeta{font-size:11px;font-weight:500;color:var(--tm);line-height:1.4}
+.adCtr{font-size:11px;font-weight:600;color:var(--ts)}
+
 /* ─── CREATE AD CTA ─── */
 .createAdBtn{font-family:var(--ff);font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--gold),var(--goldl));border:none;border-radius:16px;padding:16px 28px;cursor:pointer;transition:all 200ms;width:100%;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 12px rgba(200,168,78,0.2)}
 .createAdBtn:hover{transform:translateY(-2px);box-shadow:0 4px 24px rgba(200,168,78,0.3)}
@@ -207,9 +217,9 @@
 .briefInput{flex:1;font-family:var(--ff);font-size:14px;font-weight:500;color:var(--tp);background:var(--surf2);border:1px solid var(--borderm);border-radius:12px;padding:12px 16px;outline:none;transition:all 200ms}
 .briefInput::placeholder{color:var(--tm)}
 .briefInput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(200,168,78,0.08)}
-.briefBtn{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:var(--gold);border:none;border-radius:12px;padding:12px 22px;cursor:pointer;transition:all 180ms;white-space:nowrap}
-.briefBtn:hover:not(:disabled){background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
-.briefBtn:disabled{opacity:0.4;cursor:not-allowed}
+.briefBtn{font-family:var(--ff);font-size:13px;font-weight:700;color:#fff;background:#8B6914;border:none;border-radius:12px;padding:12px 22px;cursor:pointer;transition:all 180ms;white-space:nowrap}
+.briefBtn:hover:not(:disabled){background:#6B4F0E;transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.briefBtn:disabled{background:var(--surf3);color:var(--tm);opacity:1;cursor:not-allowed}
 .briefResult{background:rgba(200,168,78,0.05);border:1px solid rgba(200,168,78,0.15);border-radius:14px;padding:16px 20px;display:flex;flex-direction:column;gap:6px}
 .briefResultLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold)}
 .briefResultText{font-size:13px;font-weight:500;color:var(--tp);line-height:1.6}
