@@ -234,18 +234,18 @@ function Tooltip({ text }) {
 
 /* ─── Walkthrough data ─────────────────────────────────────────── */
 const WALKTHROUGH_STEPS = [
-  { page: 'home', text: 'Your command center. Everything happening in your business — at a glance.', example: '"How\'s this month looking compared to last?" → Sage pulls the numbers instantly.' },
-  { page: 'schedule', text: 'Say it, and it happens.', example: '"Send a message to everyone booked on Wednesday — session starts 15 minutes late." → Done. Texts go out automatically.' },
-  { page: 'marketing', text: 'Your ads, your leads, your spend — all managed.', example: '"Pause the Instagram ad that\'s not converting and put that budget on the one that is." → Sage handles it.' },
-  { page: 'sales', text: 'Every lead gets followed up with. Automatically.', example: '"Follow up with Marcus — he visited yesterday but didn\'t book a trial." → Sage drafts the message in your voice and sends it.' },
+  { page: 'home', text: 'Your command center. Everything happening in your business, at a glance.', example: '"How\'s this month looking compared to last?" → Sage pulls the numbers instantly.' },
+  { page: 'schedule', text: 'Say it, and it happens.', example: '"Send a message to everyone booked on Wednesday. Session starts 15 minutes late." → Done. Texts go out automatically.' },
+  { page: 'marketing', text: 'Your ads, your leads, your spend. All managed.', example: '"Pause the Instagram ad that\'s not converting and put that budget on the one that is." → Sage handles it.' },
+  { page: 'sales', text: 'Every lead gets followed up with. Automatically.', example: '"Follow up with Marcus, he visited yesterday but didn\'t book a trial." → Sage drafts the message in your voice and sends it.' },
   { page: 'members', text: 'You know every client. The AI watches for risk.', example: '"Cancel Ethan\'s membership and issue a prorated refund." → Done. Confirmation sent to Ethan automatically.' },
-  { page: 'content', text: 'Content that writes itself — in your voice.', example: '"Write a post about Saturday\'s session and schedule it for Monday morning." → Sage writes it, you approve, it goes live.' },
+  { page: 'content', text: 'Content that writes itself, in your voice.', example: '"Write a post about Saturday\'s session and schedule it for Monday morning." → Sage writes it, you approve, it goes live.' },
 ]
 
 /* ─── constants ────────────────────────────────────────────────── */
 const CORE_SUGGESTIONS = [
   'AI that talks to every lead and locks them in',
-  'Clients book themselves — zero back-and-forth',
+  'Clients book themselves, zero back-and-forth',
   'See exactly how much money is coming in next month',
   'Auto follow-ups that close deals while you sleep',
   'One inbox for every message across every platform',
@@ -259,7 +259,7 @@ const EXTRA_SUGGESTIONS = [
   'Clients earn rewards for referrals automatically',
   'AI tells you exactly what to charge and when to raise prices',
   'One dashboard across all your locations',
-  'Automated billing — never chase a payment again',
+  'Automated billing, never chase a payment again',
   'AI writes your emails, texts, and DMs in your voice',
   'See which marketing is actually bringing in money',
   'A branded app your clients download and love',
@@ -564,7 +564,7 @@ export default function App() {
 
   const headlines = {
     0: "Let's do a quick thought exercise.",
-    1: 'First — tell us a little about you.',
+    1: 'First, tell us a little about you.',
     2: 'If you could dream up an all-in-one command center for your business...',
     3: 'If you could pay monthly for that magical command center...',
     4: '', // walkthrough handles its own text
@@ -598,7 +598,7 @@ export default function App() {
                   )}{cursor}
                 </h1>
               </motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle" style={{ fontSize: 17, maxWidth: 480 }}>This takes 10 minutes and could help your business immensely — so give it some thought.</p></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle" style={{ fontSize: 17, maxWidth: 480 }}>This takes 10 minutes and could help your business immensely, so give it some thought.</p></motion.div>
               <motion.div variants={fadeSlideUp}><button className="btn btn-primary" onClick={next} style={{ padding: '18px 48px', fontSize: 17, borderRadius: 16 }}>Let's go <span style={{ fontSize: 20 }}>&#8594;</span></button></motion.div>
             </motion.div>
           )}
@@ -716,7 +716,7 @@ export default function App() {
           {/* ──── SLIDE 3 — Blind Price ──── */}
           {slide === 3 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">No strings attached — just a number that feels right for everything you described.</p></motion.div>
+              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">No strings attached. Just a number that feels right for everything you described.</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={blindPrice} onChange={e => setBlindPrice(e.target.value)} min="0" /></div></motion.div>
               <motion.div variants={fadeSlideUp}><p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 8 }}>per month</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -736,7 +736,7 @@ export default function App() {
                   <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', lineHeight: 1.15, marginBottom: 16 }}>
                     That's what we've built to be<br /><span style={{ color: 'var(--gold)' }}>this command center.</span>
                   </h1>
-                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 500, marginBottom: 8 }}>Our mission is to help operators in sports and fitness use AI in the best, most effortless way possible — so you can shift your focus to making a real impact while your business works in the background.</p>
+                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 500, marginBottom: 8 }}>Our mission is to help operators in sports and fitness use AI in the best, most effortless way possible, so you can shift your focus to making a real impact while your business works in the background.</p>
                   <p className="subtitle" style={{ fontSize: 15, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
                   <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
                     Show me <span style={{ fontSize: 18 }}>&#8594;</span>
@@ -943,7 +943,7 @@ export default function App() {
           {/* ──── SLIDE 6 — Smart Price ──── */}
           {slide === 6 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}<Tooltip text="We pre-filled this based on your hourly rate and hours saved — but change it to whatever feels right." /></h2></motion.div>
+              <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}<Tooltip text="We pre-filled this based on your hourly rate and hours saved, but change it to whatever feels right." /></h2></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={smartPrice} onChange={e => { setSmartPrice(e.target.value); setSmartPriceTouched(true) }} min="0" /></div></motion.div>
               {(parseFloat(hoursSaved) > 0 && parseFloat(hourlyRate) > 0) && (
                 <motion.div variants={fadeSlideUp}><div className="calc-display"><div className="calc-formula">{hoursSaved} hrs/week &times; ${hourlyRate}/hr &times; 4.33 = <strong style={{ color: 'var(--gold)' }}>${calcSuggested().toLocaleString()}/mo</strong> in time saved</div></div></motion.div>
@@ -958,7 +958,7 @@ export default function App() {
           {/* ──── SLIDE 7 — Feature Wishlist ──── */}
           {slide === 7 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Dream big. If there's a feature that would make this a must-have — tell us.</p></motion.div>
+              <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Dream big. If there's a feature that would make this a must-have, tell us.</p></motion.div>
               <motion.div variants={fadeSlideUp}><VoiceTextarea placeholder="I wish it could..." value={addedFeatures} onChange={setAddedFeatures} style={{ minHeight: 140 }} /></motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
@@ -1048,7 +1048,7 @@ export default function App() {
                 </button>
               </motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 20 }}>
-                <button className="btn btn-ghost" onClick={() => {}} style={{ fontSize: 13, color: 'var(--text-3)' }}>Skip — just finish</button>
+                <button className="btn btn-ghost" onClick={() => {}} style={{ fontSize: 13, color: 'var(--text-3)' }}>Skip for now</button>
               </motion.div>
               <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 24, textTransform: 'uppercase' }}>FullControl</div></motion.div>
             </motion.div>
@@ -1061,11 +1061,11 @@ export default function App() {
         {showModal && (
           <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
             <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-              <h2>Wait — are you sure there's <em>nothing</em> else?</h2>
+              <h2>Wait, are you sure there's <em>nothing</em> else?</h2>
               <p className="subtitle">Here are a few more ideas. Anything catch your eye?</p>
               <div className="chips-wrap">{EXTRA_SUGGESTIONS.map(s => (<span key={s} className={`chip ${extraChips.includes(s) ? 'selected' : ''}`} onClick={() => toggleChip(s, true)}>{s}</span>))}</div>
               <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
-                <button className="btn btn-primary" onClick={handleModalDone}>I'm done — let's move on <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={handleModalDone}>I'm done, let's move on <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </div>
             </motion.div>
           </motion.div>

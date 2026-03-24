@@ -1369,12 +1369,79 @@ input[type="number"] {
 }
 
 /* ---- Responsive ---- */
-@media (max-width: 640px) {
-  .slide-container { padding: 32px 20px; }
-  .proto-sidebar { width: 140px; padding: 16px 10px; }
-  .proto-main { padding: 18px; }
-  .proto-cards { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+  .slide-container { padding: 24px 16px; }
+  .slide-container.wide { padding-top: 70px; padding-bottom: 40px; max-width: 100%; }
+
+  h1 { font-size: clamp(24px, 6vw, 36px) !important; }
+  h2 { font-size: clamp(18px, 4.5vw, 24px) !important; }
+  .subtitle { font-size: 14px !important; max-width: 100% !important; }
+
+  /* Chips wrap better on mobile */
+  .chips-wrap { gap: 6px; }
+  .chip { font-size: 12px; padding: 7px 12px; }
+
+  /* Option cards stack */
+  .option-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .option-card { padding: 14px 10px; font-size: 13px; }
+
+  /* Prototype iframe smaller */
+  .walkthrough-proto-wrap { margin-top: 28px; }
+  .walkthrough-proto-wrap iframe,
+  .proto-wrap iframe { height: 400px !important; }
+  .walkthrough-page-label { top: -28px; font-size: 10px; padding: 4px 10px; }
+  .walkthrough-nav-pointer { display: none; }
+
+  /* Rating dial smaller */
+  .rating-dot { width: 38px; height: 38px; font-size: 14px; }
+  .rating-dial { gap: 6px; }
+  .rating-dial-label { font-size: 13px; }
+
+  /* NPS dots smaller */
+  .rating-dot[style] { width: 32px !important; height: 32px !important; font-size: 12px !important; }
+
+  /* Modal responsive */
+  .modal-overlay { padding: 16px; }
+  .modal { padding: 28px 20px; border-radius: 20px; }
+
+  /* Price input */
+  .price-input { font-size: 28px !important; }
+  .price-input-wrap .dollar { font-size: 28px; }
+
+  /* Bubble input */
+  .bubble-input-box { padding: 10px 52px 10px 12px; min-height: 60px; }
+  .bubble-tag { font-size: 11px; padding: 5px 10px; }
+
+  /* Feedback bank */
+  .feedback-bank { width: 280px; }
+  .feedback-bubble { bottom: 16px; left: 16px; padding: 8px 14px; font-size: 12px; }
+
+  /* Fields */
   .field-row { flex-direction: column; align-items: flex-start; gap: 8px; }
   .field-label { min-width: auto; }
   .field-row input { max-width: 100%; }
+  .field-stack { max-width: 100%; }
+
+  /* Step indicator */
+  .step-indicator { bottom: 16px; right: 16px; font-size: 11px; }
+
+  /* Progress bar */
+  .progress-bar { height: 2px; }
+
+  /* Proto mockup sidebar collapses */
+  .proto-sidebar { width: 120px; padding: 12px 8px; }
+  .proto-nav-item { padding: 8px 8px; font-size: 12px; gap: 6px; }
+  .proto-sidebar-brand { font-size: 13px; padding: 6px 8px 14px; }
+  .proto-main { padding: 14px; }
+  .proto-section-title { font-size: 18px; }
+  .proto-cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 400px) {
+  .slide-container { padding: 20px 14px; }
+  .option-grid { grid-template-columns: 1fr; }
+  .rating-dot { width: 34px; height: 34px; font-size: 13px; }
+  .rating-dial { gap: 4px; }
+  .walkthrough-proto-wrap iframe { height: 340px !important; }
+  .modal { padding: 24px 16px; }
 }
