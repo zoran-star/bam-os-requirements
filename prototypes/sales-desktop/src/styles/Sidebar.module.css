@@ -1,4 +1,4 @@
-.sidebar{width:240px;min-width:240px;background:var(--surf2);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;padding:28px 0 20px}
+.sidebar{width:240px;min-width:240px;background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;padding:28px 0 20px}
 .logoWrap{padding:0 20px 36px;display:flex;align-items:center;gap:12px}
 .logoMark{width:40px;height:40px;background:var(--gold);border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:var(--ff);font-weight:800;font-size:17px;color:#fff;letter-spacing:-.01em;flex-shrink:0;box-shadow:0 2px 8px rgba(200,168,78,0.3);position:relative;overflow:hidden}
 .logoMark::after{content:'';position:absolute;top:-50%;left:-150%;width:60%;height:200%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.35),transparent);transform:skewX(-25deg);pointer-events:none;animation:logoShimmer 4s ease-in-out infinite}
