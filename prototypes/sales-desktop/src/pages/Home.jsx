@@ -567,10 +567,10 @@ export default function Home() {
               Action Items
             </div>
             {[
-              { label: '2 content pieces pending review', icon: '📝', color: '#6366f1', link: '/content' },
-              { label: '1 failed payment (Jake Rivera)', icon: '⚠️', color: '#E05A42', link: '/members' },
-              { label: '3 leads need follow-up', icon: '🔔', color: '#C8A84E', link: '/sales' },
-              { label: '4pm Intermediate — 3/12 spots filled', icon: '📅', color: '#3EAF5C', link: '/schedule' },
+              { label: '2 content pieces pending review', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, color: '#6366f1', link: '/content' },
+              { label: '1 failed payment (Jake Rivera)', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>, color: '#E05A42', link: '/members' },
+              { label: '3 leads need follow-up', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>, color: '#C8A84E', link: '/sales' },
+              { label: '4pm Intermediate — 3/12 spots filled', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, color: '#3EAF5C', link: '/schedule' },
             ].map((item, i) => (
               <div key={i} onClick={() => navigate(item.link)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13, color: 'var(--tp)' }}>
                 <span style={{ fontSize: 14 }}>{item.icon}</span>

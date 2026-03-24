@@ -14,37 +14,37 @@ const SAGE_PROMPTS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Ask Sage', icon: '🧠' },
-  { label: 'Create ad', icon: '🎬' },
-  { label: 'Improve ads', icon: '✨' },
-  { label: 'Pause a campaign', icon: '⏸️' },
-  { label: 'Generate content brief', icon: '✍️' },
-  { label: 'Adjust budget', icon: '💰' },
+  { label: 'Ask Sage', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg> },
+  { label: 'Create ad', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg> },
+  { label: 'Improve ads', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
+  { label: 'Pause a campaign', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> },
+  { label: 'Generate content brief', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+  { label: 'Adjust budget', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
 ];
 
 const CHANNELS = [
   {
-    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, cplTrend: '-6%', cplTrendGood: true, icon: '📸', accent: '#E1306C',
+    name: 'Instagram', leads: 14, cpl: '$12.40', trend: '+22%', trendUp: true, cplTrend: '-6%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>, accent: '#E1306C',
     campaigns: [
       { name: 'Youth Basketball Reel — Saturday Energy', spend: '$89', impressions: '4,210', cpm: '$21.14', reach: '3,680', frequency: '1.1', clicks: 187, ctr: '4.2%', cpc: '$0.48', lpv: 142, lpvRate: '75.9%', formFills: 4, trialBookings: 2, cpl: '$14.83', convRate: '4.2%', demo: { age: '28-42', gender: '62% F', geo: 'Within 15mi', onTarget: true } },
       { name: 'Summer Skills Camp Promo', spend: '$134', impressions: '6,820', cpm: '$19.65', reach: '5,100', frequency: '1.3', clicks: 245, ctr: '3.6%', cpc: '$0.55', lpv: 189, lpvRate: '77.1%', formFills: 5, trialBookings: 3, cpl: '$16.75', convRate: '4.2%', demo: { age: '25-38', gender: '71% F', geo: 'Within 10mi', onTarget: true } },
     ],
   },
   {
-    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, cplTrend: '+3%', cplTrendGood: false, icon: '📘', accent: '#1877F2',
+    name: 'Facebook', leads: 8, cpl: '$18.60', trend: '+5%', trendUp: true, cplTrend: '+3%', cplTrendGood: false, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, accent: '#1877F2',
     campaigns: [
       { name: 'Parent Testimonial — Maria R.', spend: '$134', impressions: '5,430', cpm: '$24.68', reach: '4,200', frequency: '1.3', clicks: 206, ctr: '3.8%', cpc: '$0.65', lpv: 158, lpvRate: '76.7%', formFills: 3, trialBookings: 2, cpl: '$26.80', convRate: '3.2%', demo: { age: '30-45', gender: '58% F', geo: 'Within 20mi', onTarget: true } },
       { name: 'Back-to-School Registration', spend: '$67', impressions: '3,150', cpm: '$21.27', reach: '2,800', frequency: '1.1', clicks: 98, ctr: '3.1%', cpc: '$0.68', lpv: 74, lpvRate: '75.5%', formFills: 2, trialBookings: 1, cpl: '$22.33', convRate: '4.1%', demo: { age: '22-35', gender: '65% F', geo: 'Within 25mi', onTarget: false, flag: 'Geo reaching beyond 20mi target radius' } },
     ],
   },
   {
-    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, cplTrend: '-12%', cplTrendGood: true, icon: '🔍', accent: '#4285F4',
+    name: 'Google', leads: 6, cpl: '$24.10', trend: '-8%', trendUp: false, cplTrend: '-12%', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>, accent: '#4285F4',
     campaigns: [
       { name: 'Search — Basketball Training Near Me', spend: '$145', impressions: '2,300', cpm: '$63.04', reach: '2,100', frequency: '1.1', clicks: 89, ctr: '3.9%', cpc: '$1.63', lpv: 67, lpvRate: '75.3%', formFills: 4, trialBookings: 2, cpl: '$24.17', convRate: '9.0%', demo: { age: '28-50', gender: '52% M', geo: 'Within 12mi', onTarget: true } },
     ],
   },
   {
-    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, cplTrend: '$0', cplTrendGood: true, icon: '🤝', accent: '#3EAF5C',
+    name: 'Referral', leads: 4, cpl: '$0', trend: '+50%', trendUp: true, cplTrend: '$0', cplTrendGood: true, icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, accent: '#3EAF5C',
     campaigns: [
       { name: 'Member Referral Links', spend: '$0', impressions: '—', cpm: '—', reach: '—', frequency: '—', clicks: 28, ctr: '—', cpc: '$0', lpv: 22, lpvRate: '78.6%', formFills: 2, trialBookings: 2, cpl: '$0', convRate: '18.2%', demo: { age: '30-42', gender: '55% F', geo: 'Within 8mi', onTarget: true } },
     ],
@@ -72,13 +72,13 @@ const CAMPAIGN_BUDGETS = [
 ];
 
 const MORE_TOOLS = [
-  { name: 'Meta Ads', icon: '📘', enabled: true, ref: 'MKT-001' },
-  { name: 'Landing Pages', icon: '🌐', enabled: false, ref: 'MKT-007' },
-  { name: 'Email & SMS Campaigns', icon: '📧', enabled: false, ref: 'MKT-008' },
-  { name: 'Referral Campaigns', icon: '🤝', enabled: false, ref: 'MKT-009' },
-  { name: 'Content Calendar', icon: '📅', enabled: false, ref: 'MKT-010' },
-  { name: 'Google Business Profile', icon: '📍', enabled: false, ref: 'MKT-011' },
-  { name: 'Testimonial Collection', icon: '⭐', enabled: false, ref: 'MKT-012' },
+  { name: 'Meta Ads', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>, enabled: true, ref: 'MKT-001' },
+  { name: 'Landing Pages', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>, enabled: false, ref: 'MKT-007' },
+  { name: 'Email & SMS Campaigns', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>, enabled: false, ref: 'MKT-008' },
+  { name: 'Referral Campaigns', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>, enabled: false, ref: 'MKT-009' },
+  { name: 'Content Calendar', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, enabled: false, ref: 'MKT-010' },
+  { name: 'Google Business Profile', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>, enabled: false, ref: 'MKT-011' },
+  { name: 'Testimonial Collection', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>, enabled: false, ref: 'MKT-012' },
 ];
 
 const PERIODS = [
