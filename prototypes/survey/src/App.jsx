@@ -288,7 +288,7 @@ const SERVICES_OPTIONS = [
 
 const CLIENT_COUNT_OPTIONS = ['1-10', '11-25', '26-50', '51-100', '100+']
 
-const REVENUE_OPTIONS = ['Under $50K', '$50K–$100K', '$100K–$250K', '$250K+']
+const REVENUE_OPTIONS = ['Under $5K', '$5K–$10K', '$10K–$25K', '$25K–$50K', '$50K+']
 
 const BUSINESS_STAGES = [
   { key: 'early', label: 'Just getting started', desc: 'Less than 2 years', icon: '🌱' },
@@ -644,10 +644,8 @@ export default function App() {
               {/* Contact info */}
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380, margin: '0 auto 20px' }}>
                 <input type="text" placeholder="Your name *" value={userName} onChange={e => setUserName(e.target.value)} style={{ textAlign: 'center' }} />
-                <input type="email" placeholder="Email *" value={userEmail} onChange={e => setUserEmail(e.target.value)} style={{ textAlign: 'center' }} />
-                <input type="tel" placeholder="Phone (optional)" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
-                <input type="text" placeholder="Business name (optional)" value={businessName} onChange={e => setBusinessName(e.target.value)} style={{ textAlign: 'center' }} />
-                <input type="url" placeholder="Website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="tel" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="url" placeholder="Business website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
 
               {/* Business stage */}
@@ -695,7 +693,7 @@ export default function App() {
 
               {/* Revenue range */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your approximate annual revenue?</p>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your approximate monthly revenue?</p>
                 <div className="chips-wrap">
                   {REVENUE_OPTIONS.map(r => (
                     <span key={r} className={`chip ${revenueRange === r ? 'selected' : ''}`}
@@ -735,7 +733,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userEmail && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
