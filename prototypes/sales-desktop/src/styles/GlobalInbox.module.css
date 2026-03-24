@@ -1,5 +1,5 @@
 /* ─── FLOATING BUTTON ─── */
-.btn{position:fixed;bottom:28px;right:28px;width:54px;height:54px;background:var(--tp);border-radius:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100;border:none;transition:all 200ms var(--es);box-shadow:var(--shadow-lg)}
+.btn{position:fixed;bottom:90px;right:28px;width:48px;height:48px;background:var(--tp);border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:100;border:none;transition:all 200ms var(--es);box-shadow:var(--shadow-lg)}
 .btn:hover{transform:scale(1.06);box-shadow:0 8px 32px rgba(0,0,0,0.15);border-radius:18px}
 .btn svg{width:20px;height:20px;color:#fff;position:relative;z-index:1}
 .badge{position:absolute;top:-2px;right:-2px;background:var(--red);color:#fff;font-family:var(--fm);font-size:10px;font-weight:700;min-width:20px;height:20px;border-radius:9999px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);z-index:2;padding:0 4px;line-height:1}
