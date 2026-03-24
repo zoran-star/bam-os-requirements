@@ -277,15 +277,18 @@ const FAVORITE_SECTIONS = [
 
 const TOTAL_SLIDES = 12 // added Sean Ellis, NPS, early access
 
-const BUSINESS_TYPES = [
-  { key: 'sports-academy', label: 'Sports Academy', hasSport: true },
-  { key: 'fitness', label: 'Fitness / Personal Training', hasSport: false },
-  { key: 'martial-arts', label: 'Martial Arts', hasSport: false },
+const SERVICES_OPTIONS = [
+  { key: 'individual-training', label: 'Individual Training' },
+  { key: 'group-training', label: 'Group Training' },
+  { key: 'gym-rentals', label: 'Gym / Equipment Rentals' },
+  { key: 'team-competition', label: 'Team Competition' },
+  { key: 'house-league', label: 'Internal House League' },
+  { key: 'other', label: 'Other' },
 ]
 
-const SPORT_OPTIONS = ['Basketball', 'Soccer', 'Volleyball', 'Baseball', 'Tennis', 'Other']
-
 const CLIENT_COUNT_OPTIONS = ['1-10', '11-25', '26-50', '51-100', '100+']
+
+const REVENUE_OPTIONS = ['Under $50K', '$50K–$100K', '$100K–$250K', '$250K+']
 
 const BUSINESS_STAGES = [
   { key: 'early', label: 'Just getting started', desc: 'Less than 2 years', icon: '🌱' },
@@ -341,14 +344,20 @@ export default function App() {
 
   const [businessStage, setBusinessStage] = useState('')
   const [biggestChallenge, setBiggestChallenge] = useState('')
-  const [businessType, setBusinessType] = useState('')
-  const [sportType, setSportType] = useState('')
-  const [customSport, setCustomSport] = useState('')
+  const [services, setServices] = useState([])
+  const [servicesOther, setServicesOther] = useState('')
   const [clientCount, setClientCount] = useState('')
   const [seanEllis, setSeanEllis] = useState('')
   const [npsScore, setNpsScore] = useState(null)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
+  const [userPhone, setUserPhone] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [businessWebsite, setBusinessWebsite] = useState('')
+  const [revenueRange, setRevenueRange] = useState('')
+  const [location, setLocation] = useState('')
+  const [adminHours, setAdminHours] = useState('')
+  const [earlyAccess, setEarlyAccess] = useState(false)
 
   const [dreamText, setDreamText] = useState('')
   const [selectedChips, setSelectedChips] = useState([])
@@ -541,20 +550,44 @@ export default function App() {
     // Submit to Supabase
     try {
       await supabase.from('survey_responses').insert({
+        // Contact info
+        user_name: userName,
+        user_email: userEmail,
+        user_phone: userPhone || null,
+        business_name: businessName || null,
+        business_website: businessWebsite || null,
+        // Demographics
         business_stage: businessStage,
         biggest_challenge: biggestChallenge,
+        services: services,
+        services_other: servicesOther || null,
+        client_count: clientCount,
+        revenue_range: revenueRange || null,
+        location: location || null,
+        admin_hours: adminHours ? parseInt(adminHours) : null,
+        // Features
         dream_features_text: dreamText,
         selected_chips: [...selectedChips, ...extraChips, ...customFeatures],
         custom_features: customFeatures,
+        // Walkthrough
         page_ratings: pageRatings,
+        page_notes: pageNotes,
         pins: pins,
         favorites: favorites,
+        // Engagement
+        page_timestamps: pageTimestamps,
+        engagement_data: engagementData,
+        // Pricing
         hours_saved: hoursSaved ? parseInt(hoursSaved) : null,
         hourly_rate: hourlyRate ? parseInt(hourlyRate) : null,
         blind_price: blindPrice ? parseInt(blindPrice) : null,
         smart_price: smartPrice ? parseInt(smartPrice) : null,
         final_price: finalPrice ? parseInt(finalPrice) : null,
         added_features: addedFeatures,
+        // PMF signals
+        sean_ellis: seanEllis,
+        nps_score: npsScore,
+        early_access: earlyAccess,
       })
     } catch (e) {
       console.error('Survey submit error:', e)
@@ -603,16 +636,21 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 1 — About You (Archetype) ──── */}
+          {/* ──── SLIDE 1 — Contact Info + About You ──── */}
           {slide === 1 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
 
-              <motion.div variants={fadeSlideUp} style={{ marginBottom: 16 }}>
-                <input type="text" placeholder="Your name" value={userName} onChange={e => setUserName(e.target.value)}
-                  style={{ maxWidth: 320, margin: '0 auto', display: 'block', textAlign: 'center' }} />
+              {/* Contact info */}
+              <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380, margin: '0 auto 20px' }}>
+                <input type="text" placeholder="Your name *" value={userName} onChange={e => setUserName(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="email" placeholder="Email *" value={userEmail} onChange={e => setUserEmail(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="tel" placeholder="Phone (optional)" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="text" placeholder="Business name (optional)" value={businessName} onChange={e => setBusinessName(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="url" placeholder="Website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
 
+              {/* Business stage */}
               <motion.div variants={fadeSlideUp}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How long have you been running your business?</p>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
@@ -627,34 +665,24 @@ export default function App() {
                 </div>
               </motion.div>
 
+              {/* Services offered (multi-select) */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
-                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What type of business do you run?</p>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
-                  {BUSINESS_TYPES.map(t => (
-                    <div key={t.key} className={`option-card ${businessType === t.key ? 'selected' : ''}`}
-                      onClick={() => { setBusinessType(t.key); if (!t.hasSport) setSportType(''); playClick() }}
-                      style={{ flex: '1 1 140px', maxWidth: 180, padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{t.label}</div>
-                    </div>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What services do you offer? (select all that apply)</p>
+                <div className="chips-wrap">
+                  {SERVICES_OPTIONS.map(s => (
+                    <span key={s.key} className={`chip ${services.includes(s.key) ? 'selected' : ''}`}
+                      onClick={() => { setServices(prev => prev.includes(s.key) ? prev.filter(x => x !== s.key) : [...prev, s.key]); playClick() }}>{s.label}</span>
                   ))}
                 </div>
-                {businessType === 'sports-academy' && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ marginTop: 12 }}>
-                    <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Which sport?</p>
-                    <div className="chips-wrap">
-                      {SPORT_OPTIONS.map(s => (
-                        <span key={s} className={`chip ${sportType === s ? 'selected' : ''}`}
-                          onClick={() => { setSportType(s); if (s !== 'Other') setCustomSport(''); playClick() }}>{s}</span>
-                      ))}
-                    </div>
-                    {sportType === 'Other' && (
-                      <input type="text" placeholder="Type your sport..." value={customSport} onChange={e => setCustomSport(e.target.value)}
-                        style={{ maxWidth: 260, margin: '8px auto 0', display: 'block', textAlign: 'center' }} />
-                    )}
+                {services.includes('other') && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ marginTop: 8 }}>
+                    <input type="text" placeholder="Merchandise, consultation, etc." value={servicesOther} onChange={e => setServicesOther(e.target.value)}
+                      style={{ maxWidth: 320, margin: '0 auto', display: 'block', textAlign: 'center' }} />
                   </motion.div>
                 )}
               </motion.div>
 
+              {/* Client count */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How many active clients do you have?</p>
                 <div className="chips-wrap">
@@ -665,7 +693,33 @@ export default function App() {
                 </div>
               </motion.div>
 
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 18 }}>
+              {/* Revenue range */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your approximate annual revenue?</p>
+                <div className="chips-wrap">
+                  {REVENUE_OPTIONS.map(r => (
+                    <span key={r} className={`chip ${revenueRange === r ? 'selected' : ''}`}
+                      onClick={() => { setRevenueRange(r); playClick() }}>{r}</span>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* Location */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you located?</p>
+                <input type="text" placeholder="City, State / Country" value={location} onChange={e => setLocation(e.target.value)}
+                  style={{ maxWidth: 320, margin: '0 auto', display: 'block', textAlign: 'center' }} />
+              </motion.div>
+
+              {/* Hours on admin */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How many hours per week do you spend on non-coaching tasks?</p>
+                <input type="number" placeholder="e.g. 15" value={adminHours} onChange={e => setAdminHours(e.target.value)} min="0"
+                  style={{ maxWidth: 160, margin: '0 auto', display: 'block', textAlign: 'center' }} />
+              </motion.div>
+
+              {/* Biggest challenge */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your biggest challenge right now?</p>
                 <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
                   {CHALLENGE_OPTIONS.map(c => (
@@ -681,7 +735,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && businessStage && biggestChallenge && businessType && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userEmail && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -1033,24 +1087,22 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 11 — Early Access Signup ──── */}
+          {/* ──── SLIDE 11 — Thank You + Early Access Opt-in ──── */}
           {slide === 11 && (
             <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
-              <motion.div variants={fadeSlideUp}><h1>You're in{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle">Want exclusive early access when we launch? Drop your email and we'll keep you in the loop.</p></motion.div>
-              <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 16, width: '100%', maxWidth: 380, margin: '16px auto 0' }}>
-                <input type="email" placeholder="your@email.com" value={userEmail} onChange={e => setUserEmail(e.target.value)}
-                  className="early-access-email" />
-                <button className="btn btn-primary" onClick={() => { if (userEmail) { playComplete(); /* TODO: submit to backend */ } }}
-                  style={{ marginTop: 4, opacity: userEmail ? 1 : 0.4 }}>
-                  Get early access <span style={{ fontSize: 18 }}>&#8594;</span>
-                </button>
+              <motion.div variants={fadeSlideUp}><h1>Thank you{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle">Your input is shaping the future of FullControl. We'll keep you in the loop as we build exactly what you asked for.</p></motion.div>
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 24 }}>
+                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', fontSize: 15, color: 'var(--text-1)' }}
+                  onClick={() => { setEarlyAccess(!earlyAccess); playClick() }}>
+                  <div style={{ width: 24, height: 24, borderRadius: 6, border: earlyAccess ? '2px solid var(--gold)' : '2px solid var(--text-3)', background: earlyAccess ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
+                    {earlyAccess && <span style={{ color: '#0E0D0B', fontSize: 16, fontWeight: 700 }}>&#10003;</span>}
+                  </div>
+                  I want early access to Full Control
+                </label>
               </motion.div>
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 20 }}>
-                <button className="btn btn-ghost" onClick={() => {}} style={{ fontSize: 13, color: 'var(--text-3)' }}>Skip for now</button>
-              </motion.div>
-              <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 24, textTransform: 'uppercase' }}>FullControl</div></motion.div>
+              <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 32, textTransform: 'uppercase' }}>FullControl</div></motion.div>
             </motion.div>
           )}
         </motion.div>
