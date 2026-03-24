@@ -103,6 +103,7 @@ export default function SageBar() {
             {input && (
               <button className={s.sendBtn} onClick={handleSend} aria-label="Send">&#8593;</button>
             )}
+            <button className={s.closeBtn} onClick={() => { setExpanded(false); setInput('') }} aria-label="Close">×</button>
           </div>
         )}
       </div>
