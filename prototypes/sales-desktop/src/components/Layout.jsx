@@ -15,8 +15,8 @@ export default function Layout({ children }) {
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
-        <SageBar />
       </div>
+      <SageBar />
       <GlobalInbox isOpen={inboxOpen} onToggle={() => setInboxOpen(false)} />
     </div>
   );
