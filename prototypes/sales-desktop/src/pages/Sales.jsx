@@ -176,7 +176,11 @@ function LeadCard({ lead, onDragStart, onDragEnd, draggingId, droppedId, onSelec
         </div>
         <div className={s.cardRight}>
           {needsAttention && (
-            <div className={s.cardAttentionIcon} title="Needs attention">
+            <div className={s.cardAttentionIcon} title={
+              lead.stage === 'interested' ? `No reply in ${lead.lastActivity}` :
+              lead.stage === 'doneTrial' ? `Trial completed ${lead.daysSinceTrial || lead.lastActivity} ago, no conversion yet` :
+              `Last activity ${lead.lastActivity}, needs follow-up`
+            }>
               <svg width="16" height="16" fill="none" stroke="currentColor"
                 strokeWidth="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10"/>
@@ -643,6 +647,12 @@ export default function Sales() {
     const lead = leads.find(l => l.id === leadId);
     if (lead) dragSrcStage.current = lead.stage;
     e.dataTransfer.effectAllowed = 'move';
+    // Custom drag image
+    const el = e.currentTarget.cloneNode(true);
+    el.style.cssText = 'position:absolute;top:-1000px;opacity:0.8;transform:rotate(2deg);width:220px;';
+    document.body.appendChild(el);
+    e.dataTransfer.setDragImage(el, 110, 30);
+    setTimeout(() => el.remove(), 0);
   }, [leads]);
 
   const handleDragEnd = useCallback(() => {
@@ -692,6 +702,30 @@ export default function Sales() {
       o.start(); o.stop(a.currentTime + 0.11);
     } catch (_) {}
   }, [draggingId]);
+
+  /* ─── KEYBOARD SHORTCUTS ─── */
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      const stages = ['interested', 'bookedTrial', 'doneTrial', 'won'];
+      if (selectedLead) {
+        const currentIdx = stages.indexOf(selectedLead.stage);
+        if (e.key === 'ArrowRight' && currentIdx < stages.length - 1) {
+          const newStage = stages[currentIdx + 1];
+          setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, stage: newStage } : l));
+          setSelectedLead(prev => prev ? { ...prev, stage: newStage } : prev);
+        } else if (e.key === 'ArrowLeft' && currentIdx > 0) {
+          const newStage = stages[currentIdx - 1];
+          setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, stage: newStage } : l));
+          setSelectedLead(prev => prev ? { ...prev, stage: newStage } : prev);
+        } else if (e.key === 'Escape') {
+          setSelectedLead(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedLead]);
 
   /* ─── UPDATE LEAD ─── */
   function handleUpdateLead(id, patch) {

@@ -321,6 +321,11 @@ function CreateSessionModal({ onClose }) {
           </select>
         </div>
 
+        {(!classType || !date || !startTime || !endTime || !location || !coach || !capacity) && (
+          <div style={{ fontSize: 12, color: 'var(--warn)', textAlign: 'center', marginBottom: 8 }}>
+            Fill in all fields to create a session
+          </div>
+        )}
         <div className={s.modalFooter}>
           <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
           <button

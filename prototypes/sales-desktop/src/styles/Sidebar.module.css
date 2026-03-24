@@ -38,5 +38,6 @@
 .inboxPreview{font-size:11px;color:var(--ts);line-height:1.4;min-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .inboxCursor{color:var(--gold);opacity:0.6;animation:cursorBlink 1s step-end infinite;font-weight:300}
 @keyframes cursorBlink{0%,100%{opacity:0.6}50%{opacity:0}}
+@media (max-width: 768px){.sidebar{width:100%;min-width:auto;height:60px;flex-direction:row;padding:0 12px;border-right:none;border-bottom:1px solid var(--border);overflow-x:auto}.logoWrap{padding:0 8px 0 0}.logoText{display:none}.nav{display:flex;flex-direction:row;padding:0;gap:4px;flex:1;overflow-x:auto}.navLabel{display:none}.navItem{padding:8px 12px;margin:0;font-size:12px;white-space:nowrap}.navItem::before{display:none}.previewItem{display:none}.inboxCard{display:none}.sidebarFooter{display:none}}
 .locationFilter{padding:0 16px 12px}
 .locationSelect{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text1);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}

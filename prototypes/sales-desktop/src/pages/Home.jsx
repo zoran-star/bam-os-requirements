@@ -109,8 +109,9 @@ function KpiPicker({ selected, onSave, onClose }) {
   const [showSage, setShowSage] = useState(false);
 
   const toggle = (id) => {
-    if (picks.includes(id)) setPicks(picks.filter(p => p !== id));
-    else if (picks.length < 6) setPicks([...picks, id]);
+    if (picks.includes(id)) {
+      if (picks.length > 3) setPicks(picks.filter(p => p !== id));
+    } else if (picks.length < 6) setPicks([...picks, id]);
   };
 
   const handleDragStart = (idx) => setDragIdx(idx);
@@ -260,9 +261,18 @@ export default function Home() {
   const [sageExpanded, setSageExpanded] = useState(false);
   const [sageInput, setSageInput] = useState('');
   const [sageResponse, setSageResponse] = useState(null);
-  const [selectedKpis, setSelectedKpis] = useState(DEFAULT_SELECTED);
+  const [selectedKpis, setSelectedKpis] = useState(() => {
+    try { const saved = localStorage.getItem('fc_kpis'); return saved ? JSON.parse(saved) : DEFAULT_SELECTED; } catch { return DEFAULT_SELECTED; }
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Persist KPI selection
+  useEffect(() => {
+    try { localStorage.setItem('fc_kpis', JSON.stringify(selectedKpis)); } catch {}
+  }, [selectedKpis]);
   const { location: activeLocation, setLocation: setActiveLocation } = useLocation();
   const locationLabel = activeLocation === 'all' ? '' : ` · ${activeLocation.charAt(0).toUpperCase() + activeLocation.slice(1)}`;
   const typewriterText = useTypewriter(ADVISOR_PROMPTS);
@@ -389,10 +399,35 @@ export default function Home() {
           <div className={s.cmdDate}>{TODAY}{locationLabel}</div>
         </div>
         <div className={s.cmdCenter}>
-          <div className={s.cmdSearch}>
+          <div className={s.cmdSearch} style={{ position: 'relative' }}>
             <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input className={s.cmdInput} placeholder="Search members, classes, or ask Sage..." />
+            <input className={s.cmdInput} placeholder="Search members, classes, or ask Sage..."
+              value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setSearchOpen(!!e.target.value) }}
+              onFocus={() => searchQuery && setSearchOpen(true)} onBlur={() => setTimeout(() => setSearchOpen(false), 200)} />
             <kbd className={s.cmdKbd}>⌘K</kbd>
+            {searchOpen && searchQuery && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 12, marginTop: 4, boxShadow: '0 8px 28px rgba(0,0,0,0.1)', zIndex: 50, overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
+                {[
+                  { type: 'Member', name: 'Ava Chen', detail: 'Active · Elite Plan' },
+                  { type: 'Member', name: 'Carlos Martinez', detail: 'Active · Elite Plan' },
+                  { type: 'Member', name: 'Mia Thompson', detail: 'Active · Youth Plan' },
+                  { type: 'Lead', name: 'Marcus Johnson', detail: 'New inquiry · Instagram' },
+                  { type: 'Lead', name: 'Emily Watson', detail: 'Trial scheduled' },
+                  { type: 'Class', name: 'Elite Skills Training', detail: 'Today 9:00 AM · Coach Zoran' },
+                  { type: 'Class', name: 'Youth Development', detail: 'Today 10:30 AM · Coach Marcus' },
+                  { type: 'Class', name: 'Shooting Lab', detail: 'Today 4:00 PM' },
+                ].filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()) || r.type.toLowerCase().includes(searchQuery.toLowerCase()))
+                .slice(0, 5).map((r, i) => (
+                  <div key={i} style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}
+                    onMouseDown={() => { setSearchQuery(''); setSearchOpen(false); if (r.type === 'Member') navigate('/members'); else if (r.type === 'Lead') navigate('/sales'); else navigate('/schedule'); }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', minWidth: 48 }}>{r.type}</span>
+                    <span style={{ fontWeight: 600, color: 'var(--tp)' }}>{r.name}</span>
+                    <span style={{ color: 'var(--ts)', marginLeft: 'auto', fontSize: 11 }}>{r.detail}</span>
+                  </div>
+                ))}
+                {[].length === 0 && <div style={{ padding: 16, textAlign: 'center', color: 'var(--ts)', fontSize: 13 }}>No results</div>}
+              </div>
+            )}
           </div>
         </div>
         <div className={s.cmdRight}>
