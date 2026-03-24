@@ -1,4 +1,5 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { LocationProvider } from './context/LocationContext';
 import Layout from './components/Layout';
 import Sales from './pages/Sales';
@@ -10,10 +11,23 @@ import Content from './pages/Content';
 import Settings from './pages/Settings';
 import MemberApp from './pages/member-app/MemberApp';
 
+// Notify parent window (survey) of route changes
+function RouteNotifier() {
+  const location = useLocation();
+  useEffect(() => {
+    const page = location.pathname.replace('/', '');
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'fc-route-change', page }, '*');
+    }
+  }, [location]);
+  return null;
+}
+
 export default function App() {
   return (
     <LocationProvider>
     <HashRouter>
+      <RouteNotifier />
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Layout><Home /></Layout>} />

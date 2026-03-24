@@ -6,11 +6,26 @@ const PROTO_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:5173'
   : 'https://fullcontrol-prototype.vercel.app'
 
-function PrototypeIframe({ page }) {
+function PrototypeIframe({ page, onNavigate, persistent }) {
+  const iframeRef = useRef(null)
   const src = page ? PROTO_URL + '/#/' + page : PROTO_URL
+
+  // Listen for route change messages from the prototype
+  useEffect(() => {
+    if (!onNavigate) return
+    const handler = (e) => {
+      if (e.data?.type === 'fc-route-change' && e.data.page) {
+        onNavigate(e.data.page)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [onNavigate])
+
   return (
     <iframe
-      key={page}
+      ref={iframeRef}
+      key={persistent ? 'persistent' : page}
       src={src}
       style={{ width: '100%', height: 560, border: 'none', borderRadius: 16, display: 'block' }}
       allow="autoplay"
@@ -421,22 +436,47 @@ export default function App() {
     document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Phase 2: Review (explore + rate) — clicking Next triggers rating modal
-  const handleReviewNext = () => {
-    recordTimeSpent()
-    setShowRatingPrompt(true)
-    playDing()
-  }
+  // Phase 2: Review — detect when user navigates away from current page in iframe
+  const reviewPageRef = useRef('home')
+  const pendingNavRef = useRef(null)
+
+  const handleProtoNavigate = useCallback((newPage) => {
+    if (walkthroughPhase !== 'review') return
+    if (showRatingPrompt) return // already showing modal
+    const currentPage = reviewPageRef.current
+    if (newPage !== currentPage && currentPage) {
+      // They navigated away — show rating for the page they just left
+      pendingNavRef.current = newPage
+      setShowRatingPrompt(true)
+      playDing()
+    }
+  }, [walkthroughPhase, showRatingPrompt])
+
+  // Track which pages have been visited
+  const [visitedPages, setVisitedPages] = useState(new Set(['home']))
 
   const submitRatingAndAdvance = () => {
-    const page = WALKTHROUGH_STEPS[reviewStep]?.page
+    const page = reviewPageRef.current
     if (!pageRatings[page]) return
     playClick()
+    recordTimeSpent()
     setShowRatingPrompt(false)
-    if (reviewStep < WALKTHROUGH_STEPS.length - 1) {
-      setReviewStep(s => s + 1); playSwoosh()
-      document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
-    } else {
+
+    // Mark as visited
+    const newVisited = new Set(visitedPages)
+    newVisited.add(page)
+    if (pendingNavRef.current) newVisited.add(pendingNavRef.current)
+    setVisitedPages(newVisited)
+
+    // Update current review page to where they navigated
+    if (pendingNavRef.current) {
+      reviewPageRef.current = pendingNavRef.current
+      pendingNavRef.current = null
+    }
+
+    // Check if all pages are rated
+    const allRated = WALKTHROUGH_STEPS.every(s => pageRatings[s.page])
+    if (allRated) {
       setWalkthroughPhase('explore'); playDing()
       document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -607,53 +647,42 @@ export default function App() {
                 </>
               )}
 
-              {/* Phase 2: Review (explore + rate per page) */}
+              {/* Phase 2: Review (explore freely, rate when navigating away) */}
               {walkthroughPhase === 'review' && (
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Explore and give feedback.</h2>
-                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>
-                      Click around the <strong style={{ color: 'var(--gold)', textTransform: 'capitalize' }}>{WALKTHROUGH_STEPS[reviewStep]?.page}</strong> page freely. Hit Next when you're ready to rate it.
+                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Now explore each page and give feedback.</h2>
+                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 4 }}>
+                      Click through every page in the sidebar. When you navigate to a new page, we'll ask you to rate the one you just saw.
                     </p>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{reviewStep + 1} / {WALKTHROUGH_STEPS.length}</span>
-                      <button className="btn btn-primary" onClick={handleReviewNext} style={{ padding: '10px 28px', fontSize: 14 }}>
-                        Next →
-                      </button>
-                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{Object.keys(pageRatings).length} / {WALKTHROUGH_STEPS.length} rated</div>
                   </motion.div>
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)', position: 'relative' }}>
-                    <PrototypeIframe page={WALKTHROUGH_STEPS[reviewStep]?.page} />
-                    <div className="walkthrough-page-label">
-                      {WALKTHROUGH_STEPS[reviewStep]?.page}
-                    </div>
+                    <PrototypeIframe page="home" onNavigate={handleProtoNavigate} persistent />
                   </div>
 
-                  {/* Rating modal — pops up when leaving a page */}
+                  {/* Rating modal — triggered when user navigates away from a page */}
                   <AnimatePresence>
                     {showRatingPrompt && (
                       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
                         <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
                           <h2 style={{ marginBottom: 4 }}>Before you move on...</h2>
                           <RatingDial
-                            value={pageRatings[WALKTHROUGH_STEPS[reviewStep]?.page] || 0}
-                            onChange={v => setRating(WALKTHROUGH_STEPS[reviewStep]?.page, v)}
-                            page={WALKTHROUGH_STEPS[reviewStep]?.page}
+                            value={pageRatings[reviewPageRef.current] || 0}
+                            onChange={v => setRating(reviewPageRef.current, v)}
+                            page={reviewPageRef.current}
                           />
                           <PageNoteInput
-                            value={pageNotes[WALKTHROUGH_STEPS[reviewStep]?.page]}
-                            onChange={v => setNote(WALKTHROUGH_STEPS[reviewStep]?.page, v)}
+                            value={pageNotes[reviewPageRef.current]}
+                            onChange={v => setNote(reviewPageRef.current, v)}
                           />
-                          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{reviewStep + 1} / {WALKTHROUGH_STEPS.length}</span>
-                            <button
-                              className="btn btn-primary"
-                              onClick={submitRatingAndAdvance}
-                              style={{ padding: '12px 32px', fontSize: 14, opacity: pageRatings[WALKTHROUGH_STEPS[reviewStep]?.page] ? 1 : 0.4 }}
-                            >
-                              {reviewStep < WALKTHROUGH_STEPS.length - 1 ? 'Submit & Next →' : 'Submit & Explore freely →'}
-                            </button>
-                          </div>
+                          <button
+                            className="btn btn-primary"
+                            onClick={submitRatingAndAdvance}
+                            style={{ marginTop: 16, padding: '12px 32px', fontSize: 14, opacity: pageRatings[reviewPageRef.current] ? 1 : 0.4 }}
+                          >
+                            Submit & continue
+                          </button>
                         </motion.div>
                       </motion.div>
                     )}
