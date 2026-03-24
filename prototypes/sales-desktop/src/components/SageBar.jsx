@@ -47,12 +47,12 @@ export default function SageBar() {
 
   return (
     <div className={s.wrap} onMouseLeave={() => { if (!input && !listening) setExpanded(false) }}>
-      {/* Ambient glow (always visible) */}
-      <div className={`${s.glow} ${expanded ? s.glowExpanded : ''}`} onMouseEnter={handleExpand} onClick={handleExpand} />
+      {/* Subtle glow line at very bottom (always visible) */}
+      <div className={s.glowLine} onMouseEnter={handleExpand} onClick={handleExpand} />
 
-      {/* Expanded input bar */}
+      {/* Floating bubble (appears on hover) */}
       {expanded && (
-        <div className={s.bar}>
+        <div className={s.bubble}>
           <div className={s.sageIcon}>S</div>
           <input
             ref={inputRef}
@@ -68,13 +68,6 @@ export default function SageBar() {
           {input && (
             <button className={s.sendBtn} onClick={handleSend} aria-label="Send">&#8593;</button>
           )}
-        </div>
-      )}
-
-      {/* Hint text when not expanded */}
-      {!expanded && (
-        <div className={s.hint} onMouseEnter={handleExpand} onClick={handleExpand}>
-          Ask Sage anything...
         </div>
       )}
     </div>
