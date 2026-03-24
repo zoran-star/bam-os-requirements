@@ -122,10 +122,10 @@
 .memberJoined{font-size:11px;font-weight:500;color:var(--tm)}
 
 /* ─── STATUS BADGES ─── */
-.statusActive{font-size:11px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px}
-.statusPaused{font-size:11px;font-weight:700;color:var(--warn);background:var(--warnl);padding:3px 10px;border-radius:6px}
-.statusTrial{font-size:11px;font-weight:700;color:#6366f1;background:rgba(99,102,241,0.1);padding:3px 10px;border-radius:6px}
-.statusCancelled{font-size:11px;font-weight:700;color:var(--red);background:var(--redl);padding:3px 10px;border-radius:6px}
+.statusActive{font-size:12px;font-weight:600;color:#fff;background:#0E7C5F;padding:4px 12px;border-radius:4px}
+.statusPaused{font-size:12px;font-weight:600;color:#fff;background:#8C7A66;padding:4px 12px;border-radius:4px}
+.statusTrial{font-size:12px;font-weight:600;color:#fff;background:#3B6FA0;padding:4px 12px;border-radius:4px}
+.statusCancelled{font-size:12px;font-weight:600;color:#fff;background:#C4342D;padding:4px 12px;border-radius:4px}
 
 .planCell{font-size:13px;font-weight:500;color:var(--ts)}
 .sessionCell{font-size:13px;font-weight:600;color:var(--tp);font-family:var(--fm)}

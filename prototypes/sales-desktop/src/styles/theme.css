@@ -76,6 +76,15 @@ input:focus-visible, textarea:focus-visible {
   outline: none;
 }
 
+/* ─── Standardized Status Badges ─── */
+/* Usage: class="badge badge-green" etc. */
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 4px; line-height: 1; white-space: nowrap; }
+.badge-green { background: #0E7C5F; color: #fff; }
+.badge-yellow { background: #C8A84E; color: #fff; }
+.badge-gray { background: #8C7A66; color: #fff; }
+.badge-red { background: #C4342D; color: #fff; }
+.badge-blue { background: #3B6FA0; color: #fff; }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

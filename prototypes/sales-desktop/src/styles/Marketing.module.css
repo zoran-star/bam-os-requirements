@@ -148,8 +148,8 @@
 .alertName{font-size:14px;font-weight:700;color:var(--tp)}
 .alertMeta{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--tm)}
 .alertRight{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.alertBadgeRed{font-size:11px;font-weight:700;color:var(--red);background:var(--redl);padding:4px 12px;border-radius:8px}
-.alertBadgeYellow{font-size:11px;font-weight:700;color:#d4a017;background:rgba(212,160,23,0.12);padding:4px 12px;border-radius:8px}
+.alertBadgeRed{font-size:12px;font-weight:600;color:#fff;background:#C4342D;padding:4px 12px;border-radius:4px}
+.alertBadgeYellow{font-size:12px;font-weight:600;color:#fff;background:#C8A84E;padding:4px 12px;border-radius:4px}
 .alertCta{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:6px 14px;cursor:pointer;transition:all 180ms;white-space:nowrap}
 .alertCta:hover{background:rgba(200,168,78,0.18);border-color:var(--gold)}
 
@@ -192,8 +192,8 @@
 .adStatVal{font-size:15px;font-weight:800;color:var(--tp);font-family:var(--fm)}
 .adFooter{display:flex;align-items:center;justify-content:space-between;margin-top:auto}
 .adDays{font-size:11px;font-weight:500;color:var(--tm)}
-.adBadgeNew{font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,0.1);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
-.adBadgeHealthy{font-size:10px;font-weight:700;color:var(--green);background:var(--greenl);padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:0.06em}
+.adBadgeNew{font-size:12px;font-weight:600;color:#fff;background:#3B6FA0;padding:4px 12px;border-radius:4px}
+.adBadgeHealthy{font-size:12px;font-weight:600;color:#fff;background:#0E7C5F;padding:4px 12px;border-radius:4px}
 
 /* ─── RECENTLY PAUSED ADS ─── */
 .toolSection{margin-bottom:20px}
