@@ -296,7 +296,7 @@ export default function App() {
 
   const allSelectedFeatures = [...selectedChips, ...customFeatures, ...extraChips]
 
-  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh() }, [slide])
+  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); window.scrollTo({ top: 0 }) }, [slide])
   const next = useCallback(() => { if (slide < TOTAL_SLIDES - 1) go(slide + 1) }, [slide, go])
   const prev = useCallback(() => { if (slide > 0) go(slide - 1) }, [slide, go])
 
