@@ -83,31 +83,7 @@ export default function SageBar() {
 
   return (
     <>
-      {/* Gold Tab Pull + inline bubble */}
-      <div className={s.wrap}>
-        {expanded ? (
-          <div className={s.bubble}>
-            <div className={s.sageIcon}>S</div>
-            <input
-              ref={inputRef}
-              className={s.input}
-              placeholder={placeholder}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSend() }}
-            />
-            <button className={`${s.micBtn} ${listening ? s.micActive : ''}`} onClick={handleMic} aria-label="Voice input">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-            </button>
-            {input && (
-              <button className={s.sendBtn} onClick={handleSend} aria-label="Send">&#8593;</button>
-            )}
-            <button className={s.closeBtn} onClick={() => { setExpanded(false); setInput('') }} aria-label="Close">×</button>
-          </div>
-        ) : (
-          <div className={s.tab} onClick={handleExpand} title="Ask Sage" />
-        )}
-      </div>
+      {/* Bottom trigger removed — Sage accessible via Control key and page-level Sage bars */}
 
       {/* Voice mode fullscreen overlay (Control key) */}
       {voiceMode && (

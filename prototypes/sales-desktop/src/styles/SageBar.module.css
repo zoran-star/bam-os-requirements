@@ -100,8 +100,8 @@
   min-width: 0;
 }
 
-.input:focus { outline: none; box-shadow: none; border: none; }
-.input:focus-visible { outline: none; box-shadow: none; border: none; }
+.input:focus { outline: none !important; box-shadow: none !important; border: none !important; }
+.input:focus-visible { outline: none !important; box-shadow: none !important; border: none !important; }
 .input::placeholder { color: var(--tm); font-weight: 500; }
 .input:focus::placeholder { color: var(--gold); opacity: 0.45; }
 
