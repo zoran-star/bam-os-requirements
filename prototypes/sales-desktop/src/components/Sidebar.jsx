@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation as useRouterLocation } from 'react-router-dom';
 import s from '../styles/Sidebar.module.css';
 import MemberApp from '../pages/member-app/MemberApp';
+
+const UNREAD_PREVIEWS = [
+  { name: 'Marcus Johnson', text: 'Hey, I saw your academy on Instagram...' },
+  { name: 'Emily Watson', text: 'Can we reschedule to Saturday morning?' },
+  { name: 'Ava Martinez', text: 'My son loved the trial class!' },
+  { name: 'Mia Thompson', text: 'Sounds great, see you Saturday!' },
+  { name: 'Marcus Davis', text: 'My card was updated, can you retry?' },
+];
 
 export default function Sidebar({ onInboxToggle }) {
   const routerLocation = useRouterLocation();
@@ -52,16 +60,7 @@ export default function Sidebar({ onInboxToggle }) {
             <span className={s.previewBadge}>Preview</span>
           </div>
           {/* Inbox card */}
-          <div className={s.inboxCard} onClick={onInboxToggle}>
-            <div className={s.inboxIcon}>
-              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-              <span className={s.inboxDot} />
-            </div>
-            <div className={s.inboxText}>
-              <span className={s.inboxLabel}>Messages</span>
-              <span className={s.inboxCount}>5 unread</span>
-            </div>
-          </div>
+          <InboxCard onClick={onInboxToggle} />
         </nav>
         <div className={s.sidebarFooter}>
           <div className={s.av}>ZS</div>
@@ -77,5 +76,45 @@ export default function Sidebar({ onInboxToggle }) {
 
       {showMemberApp && <MemberApp onClose={() => setShowMemberApp(false)} />}
     </>
+  );
+}
+
+function InboxCard({ onClick }) {
+  const [previewIdx, setPreviewIdx] = useState(0);
+  const [typed, setTyped] = useState('');
+  const charRef = useRef(0);
+
+  useEffect(() => {
+    const msg = UNREAD_PREVIEWS[previewIdx];
+    const full = `${msg.name}: ${msg.text}`;
+    charRef.current = 0;
+    setTyped('');
+    const interval = setInterval(() => {
+      charRef.current++;
+      setTyped(full.slice(0, charRef.current));
+      if (charRef.current >= full.length) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setPreviewIdx(i => (i + 1) % UNREAD_PREVIEWS.length);
+        }, 2000);
+      }
+    }, 30);
+    return () => clearInterval(interval);
+  }, [previewIdx]);
+
+  return (
+    <div className={s.inboxCard} onClick={onClick}>
+      <div className={s.inboxTop}>
+        <div className={s.inboxIcon}>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span className={s.inboxDot} />
+        </div>
+        <div className={s.inboxText}>
+          <span className={s.inboxLabel}>Messages</span>
+          <span className={s.inboxCount}>5 unread</span>
+        </div>
+      </div>
+      <div className={s.inboxPreview}>{typed}<span className={s.inboxCursor}>|</span></div>
+    </div>
   );
 }

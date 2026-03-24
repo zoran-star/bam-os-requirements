@@ -10,13 +10,29 @@ const ANNOUNCEMENTS = [
   { id: 2, title: 'Summer Camp Registration Open', body: 'Early bird pricing through April 15. Limited spots — register now!', full: 'Summer Camp 2026 registration is now open! We\'re offering three age-group camps this year: Mini Ballers (6–8), Rising Stars (9–12), and Elite Prep (13–16). Each camp runs Monday–Friday, 9 AM – 3 PM. Early bird pricing is available through April 15: $299/week (regular $375). Space is limited to 20 campers per group. Register through the app or contact Coach Zoran.' },
 ];
 
+const ICON = {
+  calendar: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  schedule: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  ticket: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M2 9a3 3 0 0 1 0 6v5h20v-5a3 3 0 0 1 0-6V4H2z"/><line x1="13" y1="4" x2="13" y2="20" strokeDasharray="2 2"/></svg>,
+  chat: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  user: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  settings: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  card: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  bell: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  lock: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  phone: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  ban: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>,
+  trash: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  flame: <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><path d="M12 22c-4.97 0-9-2.69-9-6 0-4 5-11 9-14 4 3 9 10 9 14 0 3.31-4.03 6-9 6z"/></svg>,
+};
+
 const SHORTCUTS = [
-  { icon: '📅', label: 'Book a Class' },
-  { icon: '🗓️', label: 'My Schedule' },
-  { icon: '🎟️', label: 'My Credits' },
-  { icon: '💬', label: 'Messages' },
-  { icon: '👤', label: 'Profile' },
-  { icon: '⚙️', label: 'Settings' },
+  { icon: ICON.calendar, label: 'Book a Class' },
+  { icon: ICON.schedule, label: 'My Schedule' },
+  { icon: ICON.ticket, label: 'My Credits' },
+  { icon: ICON.chat, label: 'Messages' },
+  { icon: ICON.user, label: 'Profile' },
+  { icon: ICON.settings, label: 'Settings' },
 ];
 
 const CLASSES = [
@@ -56,7 +72,7 @@ const INBOX_MESSAGES = [
   { id: 1, from: 'Coach Zoran', avatar: 'CZ', time: '2h ago', preview: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', unread: true, messages: [
     { sender: 'Coach Zoran', text: 'Great work on the pull-up jumper today. Let\'s add some off-screen reps next session.', time: '2:15 PM' },
     { sender: 'You', text: 'Thanks coach! I felt way more comfortable shooting off movement today.', time: '2:20 PM' },
-    { sender: 'Coach Zoran', text: 'That\'s the goal. Keep putting in the work 💪', time: '2:22 PM' },
+    { sender: 'Coach Zoran', text: 'That\'s the goal. Keep putting in the work', time: '2:22 PM' },
   ]},
   { id: 2, from: 'BAM Academy', avatar: 'BA', time: '1d ago', preview: 'Your March progress report is ready. Tap to view.', unread: true, messages: [
     { sender: 'BAM Academy', text: 'Your March progress report is ready. Tap to view your shooting splits, attendance, and coach notes.', time: 'Yesterday' },
@@ -200,7 +216,7 @@ export default function MemberApp({ onClose }) {
     <div className={s.pageScroll}>
       <div className={s.homeGreeting}>
         <div className={s.greetingText}>Good morning</div>
-        <div className={s.greetingName}>Carlos 👋</div>
+        <div className={s.greetingName}>Carlos</div>
       </div>
 
       {/* P1: Trial banner — APP-034a/b */}
@@ -264,7 +280,7 @@ export default function MemberApp({ onClose }) {
 
       {/* Streak Widget — MEM-035 / APP-006 */}
       <div className={s.streakWidget}>
-        <div className={s.streakFire}>🔥</div>
+        <div className={s.streakFire}>{ICON.flame}</div>
         <div className={s.streakInfo}>
           <div className={s.streakCount}>4 Week Streak!</div>
           <div className={s.streakSub}>Keep it going — you're in the top 10%</div>
@@ -461,19 +477,19 @@ export default function MemberApp({ onClose }) {
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Membership</div>
           <div className={s.accountRow} onClick={() => setAccountView('billing')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>💳</span><span className={s.accountRowLabel}>Billing & Payments</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.card}</span><span className={s.accountRowLabel}>Billing & Payments</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('changePlan')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>⬆️</span><span className={s.accountRowLabel}>Change Plan</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg></span><span className={s.accountRowLabel}>Change Plan</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('pause')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>⏸️</span><span className={s.accountRowLabel}>Pause Membership</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}><svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg></span><span className={s.accountRowLabel}>Pause Membership</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('credits')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🎟️</span><span className={s.accountRowLabel}>Session Credits</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.ticket}</span><span className={s.accountRowLabel}>Session Credits</span></div>
             <ChevronRight />
           </div>
         </div>
@@ -481,15 +497,15 @@ export default function MemberApp({ onClose }) {
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Settings</div>
           <div className={s.accountRow} onClick={() => setAccountView('profile')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>👤</span><span className={s.accountRowLabel}>Edit Profile</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.user}</span><span className={s.accountRowLabel}>Edit Profile</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('notifications')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🔔</span><span className={s.accountRowLabel}>Notifications</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.bell}</span><span className={s.accountRowLabel}>Notifications</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => setAccountView('password')}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🔒</span><span className={s.accountRowLabel}>Change Password</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.lock}</span><span className={s.accountRowLabel}>Change Password</span></div>
             <ChevronRight />
           </div>
         </div>
@@ -497,7 +513,7 @@ export default function MemberApp({ onClose }) {
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Support</div>
           <div className={s.accountRow}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>💬</span><span className={s.accountRowLabel}>Contact Academy</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.chat}</span><span className={s.accountRowLabel}>Contact Academy</span></div>
             <ChevronRight />
           </div>
         </div>
@@ -505,11 +521,11 @@ export default function MemberApp({ onClose }) {
         <div className={s.accountSection}>
           <div className={s.accountSectionTitle}>Danger Zone</div>
           <div className={s.accountRow} onClick={() => { setCancelMemberStep(0); setAccountView('cancelMembership'); }}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🚫</span><span className={s.accountRowLabel} style={{ color: 'var(--warn)' }}>Cancel Membership</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.ban}</span><span className={s.accountRowLabel} style={{ color: 'var(--warn)' }}>Cancel Membership</span></div>
             <ChevronRight />
           </div>
           <div className={s.accountRow} onClick={() => { setDeleteStep(0); setAccountView('deleteAccount'); }}>
-            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>🗑️</span><span className={s.accountRowLabel} style={{ color: 'var(--red)' }}>Delete Account</span></div>
+            <div className={s.accountRowLeft}><span className={s.accountRowIcon}>{ICON.trash}</span><span className={s.accountRowLabel} style={{ color: 'var(--red)' }}>Delete Account</span></div>
             <ChevronRight />
           </div>
         </div>

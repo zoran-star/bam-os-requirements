@@ -25,13 +25,18 @@
 .previewItem{border:1px dashed rgba(200,168,78,0.3);background:rgba(200,168,78,0.03)}
 .previewItem:hover{border-color:var(--gold);background:rgba(200,168,78,0.06)}
 .previewBadge{font-size:9px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.12);padding:2px 7px;border-radius:5px;margin-left:auto}
-.inboxCard{display:flex;align-items:center;gap:10px;margin:16px 0 0;padding:12px 14px;border-radius:12px;background:var(--surf2);border:1px solid var(--border);cursor:pointer;transition:all 140ms var(--es)}
-.inboxCard:hover{border-color:var(--borderm);background:var(--surf3)}
-.inboxIcon{position:relative;color:var(--ts);display:flex;align-items:center}
+.inboxCard{display:flex;flex-direction:column;gap:8px;margin:16px 0 0;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,rgba(200,168,78,0.04),var(--surf2));border:1px solid rgba(200,168,78,0.15);cursor:pointer;transition:all 200ms var(--es);position:relative;overflow:hidden}
+.inboxCard::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0.3}
+.inboxCard:hover{border-color:rgba(200,168,78,0.35);background:linear-gradient(135deg,rgba(200,168,78,0.08),var(--surf2));transform:translateY(-1px);box-shadow:0 4px 12px rgba(200,168,78,0.08)}
+.inboxTop{display:flex;align-items:center;gap:10px}
+.inboxIcon{position:relative;color:var(--gold);display:flex;align-items:center}
 .inboxDot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--red);border:2px solid var(--surf2);animation:inboxPulse 2s ease-in-out infinite}
 @keyframes inboxPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(1.3)}}
 .inboxText{display:flex;flex-direction:column}
 .inboxLabel{font-size:12px;font-weight:700;color:var(--tp)}
-.inboxCount{font-size:10px;font-weight:500;color:var(--ts)}
+.inboxCount{font-size:10px;font-weight:500;color:var(--gold)}
+.inboxPreview{font-size:11px;color:var(--ts);line-height:1.4;min-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inboxCursor{color:var(--gold);opacity:0.6;animation:cursorBlink 1s step-end infinite;font-weight:300}
+@keyframes cursorBlink{0%,100%{opacity:0.6}50%{opacity:0}}
 .locationFilter{padding:0 16px 12px}
 .locationSelect{width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text1);cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
