@@ -90,7 +90,7 @@ html, body, #root {
   max-width: 1100px;
   min-height: auto;
   justify-content: flex-start;
-  padding-top: 60px;
+  padding-top: 100px;
   padding-bottom: 60px;
 }
 
@@ -442,6 +442,7 @@ input[type="number"] {
   position: relative;
   border-radius: 20px;
   padding: 2px;
+  margin-top: 40px;
   background: linear-gradient(135deg, rgba(200,168,78,0.30), transparent 40%, transparent 60%, rgba(200,168,78,0.20));
   box-shadow: 0 0 60px rgba(200,168,78,0.10);
   animation: walkthroughGlow 3s ease-in-out infinite;
@@ -464,8 +465,9 @@ input[type="number"] {
 
 .walkthrough-page-label {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
   background: var(--gold);
   color: #0E0D0B;
   font-family: var(--font);
@@ -473,11 +475,11 @@ input[type="number"] {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 5px 12px;
+  padding: 5px 14px;
   border-radius: 8px;
   z-index: 4;
   box-shadow: 0 2px 10px rgba(200,168,78,0.3);
-  animation: labelPulse 2s ease-in-out infinite;
+  white-space: nowrap;
 }
 
 @keyframes labelPulse {
