@@ -261,6 +261,38 @@ const FAVORITE_SECTIONS = [
 
 const TOTAL_SLIDES = 9 // removed redundant context slide
 
+/* ─── Rating Dial (1-5) ───────────────────────────────────────── */
+function RatingDial({ value, onChange, page }) {
+  const labels = ['', 'Not useful', 'Slightly useful', 'Useful', 'Very useful', 'Essential']
+  return (
+    <motion.div className="rating-dial-wrap" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+      <div className="rating-dial-label">How useful would <strong>{page}</strong> be for your business?</div>
+      <div className="rating-dial">
+        {[1,2,3,4,5].map(n => (
+          <button key={n} className={`rating-dot ${value >= n ? 'active' : ''} ${value === n ? 'current' : ''}`}
+            onClick={() => onChange(n)}>
+            <span className="rating-dot-num">{n}</span>
+          </button>
+        ))}
+        <div className="rating-track">
+          <div className="rating-fill" style={{ width: `${((value || 0) - 1) / 4 * 100}%` }} />
+        </div>
+      </div>
+      {value > 0 && <div className="rating-label">{labels[value]}</div>}
+    </motion.div>
+  )
+}
+
+/* ─── Note Input (optional comment per page) ──────────────────── */
+function PageNoteInput({ value, onChange, page }) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ width: '100%', maxWidth: 500, margin: '0 auto' }}>
+      <input type="text" className="page-note-input" placeholder="Anything specific about this section? (optional)"
+        value={value || ''} onChange={e => onChange(e.target.value)} />
+    </motion.div>
+  )
+}
+
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.15 } } }
 const fadeSlideUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } } }
 
@@ -289,7 +321,16 @@ export default function App() {
   const [walkthroughPhase, setWalkthroughPhase] = useState('intro1')
   const [walkthroughStep, setWalkthroughStep] = useState(0)
 
-  // Feedback pins (lifted from PrototypeMockup so we can show bank)
+  // Per-page ratings (1-5 dial) + optional notes
+  const [pageRatings, setPageRatings] = useState({})
+  const [pageNotes, setPageNotes] = useState({})
+
+  // Engagement tracking
+  const [pageTimestamps, setPageTimestamps] = useState({})
+  const [engagementData, setEngagementData] = useState({})
+  const stepStartRef = useRef(null)
+
+  // Legacy pin state (kept minimal for PrototypeMockup compatibility)
   const [pins, setPins] = useState([])
   const [showBank, setShowBank] = useState(false)
   const [undoStack, setUndoStack] = useState([])
@@ -339,7 +380,33 @@ export default function App() {
 
   // No auto-timer — user clicks "Show me" to start walkthrough
 
+  // Track time spent on each walkthrough page
+  useEffect(() => {
+    if (walkthroughPhase === 'walkthrough') {
+      stepStartRef.current = Date.now()
+    }
+  }, [walkthroughStep, walkthroughPhase])
+
+  const recordTimeSpent = () => {
+    if (stepStartRef.current) {
+      const page = WALKTHROUGH_STEPS[walkthroughStep]?.page
+      const elapsed = Math.round((Date.now() - stepStartRef.current) / 1000)
+      setPageTimestamps(prev => ({ ...prev, [page]: (prev[page] || 0) + elapsed }))
+      stepStartRef.current = Date.now()
+    }
+  }
+
+  const setRating = (page, value) => {
+    setPageRatings(prev => ({ ...prev, [page]: value }))
+    playClick()
+  }
+
+  const setNote = (page, text) => {
+    setPageNotes(prev => ({ ...prev, [page]: text }))
+  }
+
   const walkthroughNext = () => {
+    recordTimeSpent()
     if (walkthroughStep < WALKTHROUGH_STEPS.length - 1) {
       setWalkthroughStep(s => s + 1); playSwoosh()
     } else {
@@ -506,7 +573,21 @@ export default function App() {
                     <div className="walkthrough-page-label">
                       {WALKTHROUGH_STEPS[walkthroughStep]?.page}
                     </div>
+                    {/* Arrow pointing to the active nav item */}
+                    <div className="walkthrough-nav-pointer" style={{ top: [130, 170, 210, 250, 290, 330][walkthroughStep] || 130 }}>
+                      <div className="walkthrough-nav-arrow" />
+                    </div>
                   </div>
+                  <RatingDial
+                    value={pageRatings[WALKTHROUGH_STEPS[walkthroughStep]?.page] || 0}
+                    onChange={v => setRating(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
+                    page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
+                  />
+                  <PageNoteInput
+                    value={pageNotes[WALKTHROUGH_STEPS[walkthroughStep]?.page]}
+                    onChange={v => setNote(WALKTHROUGH_STEPS[walkthroughStep]?.page, v)}
+                    page={WALKTHROUGH_STEPS[walkthroughStep]?.page}
+                  />
                 </>
               )}
 
@@ -514,62 +595,33 @@ export default function App() {
               {walkthroughPhase === 'explore' && (
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Explore and leave feedback.</h2>
-                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>{pinMode ? 'Click anywhere on the prototype to drop a pin.' : 'Click around the prototype freely. Toggle feedback mode to leave pins.'}</p>
+                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Take a closer look.</h2>
+                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>Click around freely. Update any ratings below if you change your mind.</p>
                   </motion.div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-                    <div className="mode-toggle">
-                      <button className={`mode-btn ${!pinMode ? 'active' : ''}`} style={!pinMode ? { color: 'var(--gold)' } : {}} onClick={() => setPinMode(false)}>Navigate</button>
-                      <button className={`mode-btn interest ${pinMode && feedbackMode === 'like' ? 'active' : ''}`} onClick={() => { setPinMode(true); setFeedbackMode('like') }}>&#9733; Like</button>
-                      <button className={`mode-btn confused ${pinMode && feedbackMode === 'confused' ? 'active' : ''}`} onClick={() => { setPinMode(true); setFeedbackMode('confused') }}>? Confused</button>
-                      <button className={`mode-btn ${pinMode && feedbackMode === 'note' ? 'active' : ''}`} style={pinMode && feedbackMode === 'note' ? { color: 'var(--gold)' } : {}} onClick={() => { setPinMode(true); setFeedbackMode('note') }}>&#9998; Note</button>
-                    </div>
-                    {undoStack.length > 0 && (
-                      <button onClick={undo} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'var(--font)', fontWeight: 600 }}>
-                        Undo
-                      </button>
-                    )}
-                  </div>
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
                     <PrototypeIframe />
                   </div>
-                  <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center' }}>
+                  {/* Ratings summary — edit any rating */}
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} style={{ marginTop: 24, width: '100%', maxWidth: 600, margin: '24px auto 0' }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)', marginBottom: 12, textAlign: 'center' }}>Your ratings</div>
+                    <div className="ratings-summary">
+                      {WALKTHROUGH_STEPS.map(step => (
+                        <div key={step.page} className="rating-summary-row">
+                          <span className="rating-summary-page">{step.page}</span>
+                          <div className="rating-summary-dots">
+                            {[1,2,3,4,5].map(n => (
+                              <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
+                                onClick={() => setRating(step.page, n)}>{n}</button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                  <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
                     <button className="btn btn-ghost" onClick={prev}>Back</button>
                     <button className="btn btn-primary" onClick={next}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
                   </div>
-
-                  {/* Feedback bank toggle */}
-                  {pins.length > 0 && (
-                    <button className="feedback-bank-toggle" onClick={() => setShowBank(!showBank)}>
-                      Your feedback <span className="count">{pins.length}</span>
-                    </button>
-                  )}
-
-                  {/* Feedback bank panel */}
-                  <AnimatePresence>
-                    {showBank && (
-                      <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-                        <div className="feedback-bank-header">Your feedback ({pins.length})</div>
-                        {pins.map(pin => (
-                          <div key={pin.id} className="feedback-bank-item">
-                            <div className="feedback-bank-icon" style={{
-                              background: pin.mode === 'like' ? 'var(--gold)' : pin.mode === 'confused' ? 'var(--red)' : 'var(--text-1)',
-                              color: pin.mode === 'like' ? '#0E0D0B' : '#fff',
-                            }}>
-                              {pin.mode === 'like' ? '★' : pin.mode === 'confused' ? '?' : '✎'}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div className="feedback-bank-page">{pin.page}</div>
-                              {pin.text && <div className="feedback-bank-text">"{pin.text}"</div>}
-                            </div>
-                            <div className="feedback-bank-actions">
-                              <button onClick={() => deletePin(pin.id)}>Remove</button>
-                            </div>
-                          </div>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </>
               )}
             </motion.div>
@@ -589,9 +641,9 @@ export default function App() {
               </motion.div>
               <motion.div variants={fadeSlideUp}>
                 <h2 style={{ fontSize: 20, marginTop: 8 }}>A couple quick numbers...</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginTop: 12 }}>
-                  <div className="field-row"><span className="field-label">How many hours would this save you per week?</span><input type="number" placeholder="e.g. 10" value={hoursSaved} onChange={e => setHoursSaved(e.target.value)} min="0" /></div>
-                  <div className="field-row"><span className="field-label">What is an hour worth to you? ($)</span><input type="number" placeholder="e.g. 75" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} min="0" /></div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginTop: 12 }}>
+                  <div className="field-stack"><label className="field-label-full">How many hours would this save you per week?</label><input type="number" placeholder="e.g. 10" value={hoursSaved} onChange={e => setHoursSaved(e.target.value)} min="0" style={{ maxWidth: 200, textAlign: 'center' }} /></div>
+                  <div className="field-stack"><label className="field-label-full">What is an hour worth to you? ($)</label><input type="number" placeholder="e.g. 75" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} min="0" style={{ maxWidth: 200, textAlign: 'center' }} /></div>
                 </div>
               </motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
