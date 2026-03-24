@@ -275,7 +275,7 @@ const FAVORITE_SECTIONS = [
   { key: 'sage', label: 'Sage AI Advisor' },
 ]
 
-const TOTAL_SLIDES = 12 // added Sean Ellis, NPS, early access
+const TOTAL_SLIDES = 13 // added NDA slide after welcome
 
 const SERVICES_OPTIONS = [
   { key: 'individual-training', label: 'Individual Training' },
@@ -337,6 +337,94 @@ function PageNoteInput({ value, onChange, page }) {
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.15 } } }
 const fadeSlideUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } } }
 
+/* ─── Signature Canvas ─────────────────────────────────────────── */
+function SignatureCanvas({ onSignatureChange }) {
+  const canvasRef = useRef(null)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [hasDrawn, setHasDrawn] = useState(false)
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height),
+    }
+  }
+
+  const startDraw = (e) => {
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    setIsDrawing(true)
+  }
+
+  const draw = (e) => {
+    if (!isDrawing) return
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e)
+    ctx.strokeStyle = '#F0EDE6'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    setHasDrawn(true)
+  }
+
+  const endDraw = () => {
+    if (!isDrawing) return
+    setIsDrawing(false)
+    const canvas = canvasRef.current
+    const data = canvas.toDataURL('image/png')
+    onSignatureChange(data)
+  }
+
+  const clear = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setHasDrawn(false)
+    onSignatureChange('')
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    // Set internal resolution
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * 2
+    canvas.height = rect.height * 2
+    const ctx = canvas.getContext('2d')
+    ctx.scale(2, 2)
+  }, [])
+
+  return (
+    <div className="nda-canvas-wrap">
+      <label>Your Signature</label>
+      <canvas
+        ref={canvasRef}
+        className={`nda-canvas ${hasDrawn ? 'has-signature' : ''}`}
+        onMouseDown={startDraw}
+        onMouseMove={draw}
+        onMouseUp={endDraw}
+        onMouseLeave={endDraw}
+        onTouchStart={startDraw}
+        onTouchMove={draw}
+        onTouchEnd={endDraw}
+      />
+      {hasDrawn && <button className="nda-clear-sig" onClick={clear}>Clear</button>}
+    </div>
+  )
+}
+
 /* ─── App ──────────────────────────────────────────────────────── */
 export default function App() {
   const [slide, setSlide] = useState(0)
@@ -358,6 +446,12 @@ export default function App() {
   const [location, setLocation] = useState('')
   const [adminHours, setAdminHours] = useState('')
   const [earlyAccess, setEarlyAccess] = useState(false)
+
+  // NDA state
+  const [ndaName, setNdaName] = useState('')
+  const [ndaSignature, setNdaSignature] = useState('')
+  const [ndaAgreed, setNdaAgreed] = useState(false)
+  const [ndaTimestamp, setNdaTimestamp] = useState('')
 
   const [dreamText, setDreamText] = useState('')
   const [selectedChips, setSelectedChips] = useState([])
@@ -438,7 +532,7 @@ export default function App() {
 
   const calcSuggested = () => { const h = parseFloat(hoursSaved) || 0; const r = parseFloat(hourlyRate) || 0; return Math.round(h * r * 4.33) }
 
-  useEffect(() => { if (slide === 6 && !smartPriceTouched && calcSuggested() > 0) setSmartPrice(String(calcSuggested())) }, [slide])
+  useEffect(() => { if (slide === 7 && !smartPriceTouched && calcSuggested() > 0) setSmartPrice(String(calcSuggested())) }, [slide])
 
   // No auto-timer — user clicks "Show me" to start walkthrough
 
@@ -550,6 +644,11 @@ export default function App() {
     // Submit to Supabase
     try {
       await supabase.from('survey_responses').insert({
+        // NDA
+        nda_name: ndaName,
+        nda_signature: ndaSignature,
+        nda_agreed: ndaAgreed,
+        nda_timestamp: ndaTimestamp,
         // Contact info
         user_name: userName,
         user_email: userEmail,
@@ -597,16 +696,17 @@ export default function App() {
 
   const headlines = {
     0: "Let's do a quick thought exercise.",
-    1: 'First, tell us a little about you.',
-    2: 'If you could dream up an all-in-one command center for your business...',
-    3: 'If you could pay monthly for that magical command center...',
-    4: '', // walkthrough handles its own text
-    5: 'What were your favorite parts?',
-    6: 'How much would you pay monthly for FullControl?',
-    7: 'What would you add to FullControl?',
-    8: 'If all of that were included...',
-    9: 'Quick question...',
-    10: 'Last question.',
+    1: '', // NDA slide handles its own header
+    2: 'First, tell us a little about you.',
+    3: 'If you could dream up an all-in-one command center for your business...',
+    4: 'If you could pay monthly for that magical command center...',
+    5: '', // walkthrough handles its own text
+    6: 'What were your favorite parts?',
+    7: 'How much would you pay monthly for FullControl?',
+    8: 'What would you add to FullControl?',
+    9: 'If all of that were included...',
+    10: 'Quick question...',
+    11: 'Last question.',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
   const cursor = <span style={{ opacity: headlineDone ? 0 : 0.4 }}>|</span>
@@ -615,10 +715,10 @@ export default function App() {
     <>
       <div className="ambient-glow" />
       <div className="progress-bar" style={{ width: `${progress}%` }} />
-      {slide > 0 && slide < TOTAL_SLIDES - 1 && <div className="step-indicator">{slide} / {TOTAL_SLIDES - 2}</div>}
+      {slide > 1 && slide < TOTAL_SLIDES - 1 && <div className="step-indicator">{slide - 1} / {TOTAL_SLIDES - 3}</div>}
 
       <AnimatePresence mode="wait">
-        <motion.div key={slide} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className={`slide-container ${slide === 4 ? 'wide' : ''}`}>
+        <motion.div key={slide} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className={`slide-container ${slide === 5 ? 'wide' : ''}`}>
 
           {/* ──── SLIDE 0 — Welcome ──── */}
           {slide === 0 && (
@@ -636,8 +736,171 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 1 — Contact Info + About You ──── */}
+          {/* ──── SLIDE 1 — NDA ──── */}
           {slide === 1 && (
+            <motion.div className="nda-slide" variants={stagger} initial="hidden" animate="show">
+              <motion.div variants={fadeSlideUp} className="nda-header-text">
+                <div className="nda-pre-title">BAM Academy</div>
+                <h2>Non-Disclosure Agreement</h2>
+                <p className="subtitle" style={{ maxWidth: 520 }}>Before you see the product, please read and sign below.</p>
+                <div className="nda-conf">Confidential &mdash; Please read before proceeding</div>
+              </motion.div>
+
+              <motion.div variants={fadeSlideUp} className="nda-scroll-container">
+                <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, marginBottom: 20 }}>
+                  Thank you for participating in this review. Before you begin, you must read and agree to this Non-Disclosure Agreement (&ldquo;Agreement&rdquo;). By continuing, you confirm that you have read, understood, and agree to be legally bound by the terms below.
+                </div>
+
+                {/* Section 1 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">1. Parties</div>
+                  <div className="nda-section-text">
+                    This Agreement is entered into between:<br/>
+                    <strong>Disclosing Party:</strong> By Any Means Business, LLC (&ldquo;Company&rdquo;)<br/>
+                    <strong>Receiving Party:</strong> You, the reviewer / survey participant (&ldquo;Recipient&rdquo;)
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">This is between BAM Academy&apos;s company and you.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 2 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">2. What is Confidential</div>
+                  <div className="nda-section-text">
+                    You are being given access to non-public information including, but not limited to:
+                    <ul>
+                      <li>Product designs, prototypes, wireframes, and user interfaces</li>
+                      <li>Business concepts, strategies, and operational workflows</li>
+                      <li>Pricing models, feature sets, and product roadmaps</li>
+                      <li>Survey questions, internal processes, and any materials shared during this session</li>
+                    </ul>
+                    All of the above &mdash; in any format (visual, written, verbal, or digital) &mdash; is considered Confidential Information under this Agreement.
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">Everything you see today &mdash; the product, the designs, the strategy &mdash; is private.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 3 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">3. Your Obligations</div>
+                  <div className="nda-section-text">
+                    By proceeding, you agree to:
+                    <ul>
+                      <li>Keep all Confidential Information strictly private</li>
+                      <li>Not share, discuss, post, publish, or disclose any details with any third party &mdash; including friends, family, competitors, or on social media</li>
+                      <li>Not use any information you see for personal or competitive advantage</li>
+                      <li>Not take screenshots, photos, recordings, or copies of any materials unless explicitly authorized</li>
+                    </ul>
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">Don&apos;t share, screenshot, or talk about what you see. With anyone.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 4 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">4. Exceptions</div>
+                  <div className="nda-section-text">
+                    These obligations do not apply to information that:
+                    <ul>
+                      <li>Is or becomes publicly available through no fault of yours</li>
+                      <li>You can prove you already knew before this session</li>
+                      <li>Is required to be disclosed by law (you must notify us promptly if this occurs)</li>
+                    </ul>
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">If it&apos;s already public or you knew it before, you&apos;re fine.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 5 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">5. Duration</div>
+                  <div className="nda-section-text">
+                    This Agreement remains in effect for three (3) years from the date you sign below, or until BAM Academy publicly releases the product &mdash; whichever comes first.
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">This lasts 3 years, or until we publicly launch &mdash; whichever is sooner.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 6 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">6. Consequences of Breach</div>
+                  <div className="nda-section-text">
+                    You acknowledge that unauthorized disclosure could cause serious and irreparable harm to BAM Academy. In the event of a breach, BAM Academy reserves the right to seek all available legal remedies, including injunctive relief and monetary damages.
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">If you break this, we can take legal action.</div></div>
+                  </div>
+                </div>
+
+                {/* Section 7 */}
+                <div className="nda-section">
+                  <div className="nda-section-title">7. General</div>
+                  <div className="nda-section-text">
+                    <ul>
+                      <li>This Agreement constitutes the entire agreement between the parties regarding confidentiality.</li>
+                      <li>If any provision is found unenforceable, the remaining provisions remain in full effect.</li>
+                      <li>This Agreement is governed by the laws of the State of Florida, without regard to its conflict of law provisions.</li>
+                    </ul>
+                  </div>
+                  <div className="nda-callout">
+                    <div className="nda-callout-icon">&#128161;</div>
+                    <div><div className="nda-callout-label">TL;DR</div><div className="nda-callout-text">Florida law governs this. Standard legal stuff.</div></div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Signature area */}
+              <motion.div variants={fadeSlideUp} className="nda-sign-area">
+                <div className="nda-sign-row">
+                  <div className="nda-sign-field">
+                    <label>Full Name *</label>
+                    <input type="text" placeholder="Your full legal name" value={ndaName} onChange={e => setNdaName(e.target.value)} />
+                  </div>
+                  <div className="nda-sign-field">
+                    <label>Date</label>
+                    <div className="date-display">{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  </div>
+                </div>
+
+                <SignatureCanvas onSignatureChange={(data) => setNdaSignature(data)} />
+
+                <div className="nda-checkbox-row" onClick={() => { setNdaAgreed(!ndaAgreed); playClick() }}>
+                  <div className={`nda-checkbox ${ndaAgreed ? 'checked' : ''}`}>
+                    {ndaAgreed && <span style={{ color: '#0E0D0B', fontSize: 14, fontWeight: 700 }}>&#10003;</span>}
+                  </div>
+                  <span className="nda-checkbox-label">I have read and agree to this Non-Disclosure Agreement</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 8 }}>
+                  <button className="btn btn-ghost" onClick={prev}>Back</button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setNdaTimestamp(new Date().toISOString())
+                      next()
+                    }}
+                    style={{ opacity: (ndaName.trim() && ndaSignature && ndaAgreed) ? 1 : 0.4, pointerEvents: (ndaName.trim() && ndaSignature && ndaAgreed) ? 'auto' : 'none' }}
+                  >
+                    Continue <span style={{ fontSize: 18 }}>&#8594;</span>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ──── SLIDE 2 — Contact Info + About You ──── */}
+          {slide === 2 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
 
@@ -738,8 +1001,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 2 — Dream Features ──── */}
-          {slide === 2 && (
+          {/* ──── SLIDE 3 — Dream Features ──── */}
+          {slide === 3 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">It could do <em>anything</em>. Which features would you include?</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -765,8 +1028,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 3 — Blind Price ──── */}
-          {slide === 3 && (
+          {/* ──── SLIDE 4 — Blind Price ──── */}
+          {slide === 4 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">No strings attached. Just a number that feels right for everything you described.</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={blindPrice} onChange={e => setBlindPrice(e.target.value)} min="0" /></div></motion.div>
@@ -778,8 +1041,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 4 — Prototype (intro → walkthrough → explore) ──── */}
-          {slide === 4 && (
+          {/* ──── SLIDE 5 — Prototype (intro → walkthrough → explore) ──── */}
+          {slide === 5 && (
             <motion.div style={{ width: '100%' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
 
               {/* Intro — single screen */}
@@ -965,8 +1228,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 5 — Favorites + Time/Rate ──── */}
-          {slide === 5 && (
+          {/* ──── SLIDE 6 — Favorites + Time/Rate ──── */}
+          {slide === 6 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Select all that stood out to you.</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -991,8 +1254,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 6 — Smart Price ──── */}
-          {slide === 6 && (
+          {/* ──── SLIDE 7 — Smart Price ──── */}
+          {slide === 7 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}<Tooltip text="We pre-filled this based on your hourly rate and hours saved, but change it to whatever feels right." /></h2></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={smartPrice} onChange={e => { setSmartPrice(e.target.value); setSmartPriceTouched(true) }} min="0" /></div></motion.div>
@@ -1006,8 +1269,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 7 — Feature Wishlist ──── */}
-          {slide === 7 && (
+          {/* ──── SLIDE 8 — Feature Wishlist ──── */}
+          {slide === 8 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Dream big. If there's a feature that would make this a must-have, tell us.</p></motion.div>
               <motion.div variants={fadeSlideUp}><VoiceTextarea placeholder="I wish it could..." value={addedFeatures} onChange={setAddedFeatures} style={{ minHeight: 140 }} /></motion.div>
@@ -1018,8 +1281,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 8 — Final Price ──── */}
-          {slide === 8 && (
+          {/* ──── SLIDE 9 — Final Price ──── */}
+          {slide === 9 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Everything you just saw, plus every feature you just asked for. One platform. How much would you pay monthly?</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} min="0" /></div></motion.div>
@@ -1031,8 +1294,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 9 — Sean Ellis ──── */}
-          {slide === 9 && (
+          {/* ──── SLIDE 10 — Sean Ellis ──── */}
+          {slide === 10 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">Imagine you had access to FullControl for the last 3 months...</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -1058,8 +1321,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 10 — NPS ──── */}
-          {slide === 10 && (
+          {/* ──── SLIDE 11 — NPS ──── */}
+          {slide === 11 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">How likely are you to recommend FullControl to another trainer or gym owner?</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -1084,8 +1347,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 11 — Thank You + Early Access Opt-in ──── */}
-          {slide === 11 && (
+          {/* ──── SLIDE 12 — Thank You + Early Access Opt-in ──── */}
+          {slide === 12 && (
             <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
               <motion.div variants={fadeSlideUp}><h1>Thank you{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>

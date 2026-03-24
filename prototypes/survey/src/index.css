@@ -1423,6 +1423,256 @@ input[type="number"] {
   font-size: 16px;
 }
 
+/* ---- NDA Slide ---- */
+.nda-slide {
+  text-align: left;
+  width: 100%;
+  max-width: 800px;
+}
+
+.nda-scroll-container {
+  max-height: 50vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 16px;
+  padding: 28px 24px;
+  margin: 16px 0 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dark) var(--surface-2);
+}
+
+.nda-scroll-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nda-scroll-container::-webkit-scrollbar-track {
+  background: var(--surface-2);
+  border-radius: 3px;
+}
+
+.nda-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--gold-dark);
+  border-radius: 3px;
+}
+
+.nda-section {
+  margin-bottom: 24px;
+}
+
+.nda-section:last-child {
+  margin-bottom: 0;
+}
+
+.nda-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.nda-section-text {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.nda-section-text ul {
+  list-style: disc;
+  padding-left: 20px;
+  margin-top: 6px;
+}
+
+.nda-section-text ul li {
+  margin-bottom: 4px;
+}
+
+.nda-callout {
+  background: rgba(200,168,78,0.06);
+  border: 1px solid rgba(200,168,78,0.2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.nda-callout-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.nda-callout-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold-light);
+  line-height: 1.5;
+}
+
+.nda-callout-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+/* Signature area */
+.nda-sign-area {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.nda-sign-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.nda-sign-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nda-sign-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nda-sign-field input {
+  text-align: left;
+}
+
+.nda-sign-field .date-display {
+  font-size: 14px;
+  color: var(--text-2);
+  padding: 14px 20px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+}
+
+.nda-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.nda-canvas-wrap label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.nda-canvas {
+  width: 100%;
+  height: 120px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.nda-canvas.has-signature {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+.nda-clear-sig {
+  position: absolute;
+  top: 30px;
+  right: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nda-clear-sig:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.nda-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.nda-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid var(--text-3);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.nda-checkbox.checked {
+  border-color: var(--gold);
+  background: var(--gold);
+}
+
+.nda-checkbox-label {
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+.nda-header-text {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.nda-header-text .nda-pre-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+.nda-header-text h2 {
+  margin-bottom: 2px;
+}
+
+.nda-header-text .nda-conf {
+  font-size: 11px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 768px) {
   .slide-container { padding: 24px 16px; }
@@ -1476,6 +1726,12 @@ input[type="number"] {
   .field-label { min-width: auto; }
   .field-row input { max-width: 100%; }
   .field-stack { max-width: 100%; }
+
+  /* NDA slide */
+  .nda-scroll-container { max-height: 40vh; padding: 20px 16px; }
+  .nda-sign-row { flex-direction: column; }
+  .nda-canvas { height: 100px; }
+  .nda-slide { max-width: 100%; }
 
   /* Step indicator */
   .step-indicator { bottom: 16px; right: 16px; font-size: 11px; }
