@@ -11,39 +11,65 @@
   pointer-events: auto;
 }
 
-/* Subtle glow line at very bottom */
+/* ─── Breathing ember glow ─── */
 .glowLine {
   height: 3px;
-  background: linear-gradient(90deg, transparent 10%, var(--gold) 50%, transparent 90%);
-  opacity: 0.25;
+  background: linear-gradient(90deg, transparent 5%, rgba(200,168,78,0.15) 25%, var(--gold) 50%, rgba(200,168,78,0.15) 75%, transparent 95%);
+  opacity: 0.3;
   cursor: pointer;
-  transition: all 0.5s var(--es);
+  transition: all 0.6s var(--es);
   position: relative;
-  animation: glowBreath 4s ease-in-out infinite;
+  animation: glowBreath 3.5s ease-in-out infinite;
 }
 
 .glowLine::before {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 20%;
-  right: 20%;
-  height: 20px;
-  background: radial-gradient(ellipse at bottom, rgba(200,168,78,0.08) 0%, transparent 80%);
+  left: 15%;
+  right: 15%;
+  height: 28px;
+  background: radial-gradient(ellipse at bottom, rgba(200,168,78,0.1) 0%, transparent 75%);
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+
+.glowLine::after {
+  content: 'Ask Sage anything...';
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gold);
+  opacity: 0;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
 .glowLine:hover {
-  opacity: 0.6;
+  opacity: 0.7;
   height: 4px;
 }
 
-@keyframes glowBreath {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 0.35; }
+.glowLine:hover::before {
+  height: 40px;
+  opacity: 1;
 }
 
-/* Floating bubble */
+.glowLine:hover::after {
+  opacity: 0.5;
+}
+
+@keyframes glowBreath {
+  0%, 100% { opacity: 0.2; filter: blur(0px); }
+  50% { opacity: 0.4; filter: blur(0.5px); }
+}
+
+/* ─── Floating input bubble ─── */
 .bubble {
   position: absolute;
   bottom: 16px;
@@ -52,26 +78,27 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px 8px 8px;
+  padding: 8px 14px 8px 8px;
   background: var(--surf);
   border: 1px solid var(--border);
   border-radius: 9999px;
-  box-shadow: var(--shadow-lg), 0 4px 20px rgba(200,168,78,0.08);
-  min-width: 340px;
-  max-width: 480px;
-  animation: bubbleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: var(--shadow-lg), 0 0 24px rgba(200,168,78,0.08), 0 0 60px rgba(200,168,78,0.03);
+  min-width: 360px;
+  max-width: 500px;
+  animation: bubbleUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(12px);
 }
 
 @keyframes bubbleUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(12px) scale(0.95); }
+  from { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.92); }
   to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 .sageIcon {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
-  background: var(--gold);
+  background: linear-gradient(135deg, var(--gold), #D4B85C);
   color: #fff;
   font-weight: 800;
   font-size: 14px;
@@ -79,7 +106,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(200,168,78,0.25);
+  box-shadow: 0 2px 10px rgba(200,168,78,0.3);
+  animation: sageGlow 3s ease-in-out infinite;
+}
+
+@keyframes sageGlow {
+  0%, 100% { box-shadow: 0 2px 10px rgba(200,168,78,0.3); }
+  50% { box-shadow: 0 2px 16px rgba(200,168,78,0.45); }
 }
 
 .input {
@@ -97,11 +130,17 @@
 .input::placeholder {
   color: var(--tm);
   font-weight: 500;
+  transition: color 0.3s;
+}
+
+.input:focus::placeholder {
+  color: var(--gold);
+  opacity: 0.5;
 }
 
 .micBtn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
   border: 1px solid var(--border);
   background: var(--surf2);
@@ -117,6 +156,7 @@
 .micBtn:hover {
   color: var(--gold);
   border-color: var(--gold);
+  background: rgba(200,168,78,0.06);
 }
 
 .micActive {
@@ -132,8 +172,8 @@
 }
 
 .sendBtn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 9999px;
   border: none;
   background: var(--gold);
@@ -154,5 +194,6 @@
 }
 
 @media (max-width: 768px) {
-  .bubble { min-width: 280px; left: 16px; right: 16px; transform: none; max-width: none; }
+  .bubble { min-width: 260px; left: 12px; right: 12px; transform: none; max-width: none; bottom: 12px; }
+  .glowLine::after { display: none; }
 }
