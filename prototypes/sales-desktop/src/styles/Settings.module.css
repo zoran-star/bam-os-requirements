@@ -70,8 +70,8 @@
 .addOfferBtn:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-md)}
 
 /* ─── STATUS BADGES ─── */
-.statusActive{font-size:12px;font-weight:600;color:#fff;background:#0E7C5F;padding:4px 12px;border-radius:4px}
-.statusInactive{font-size:12px;font-weight:600;color:#fff;background:#8C7A66;padding:4px 12px;border-radius:4px}
+.statusActive{font-size:12px;font-weight:600;color:#fff;background:var(--status-healthy);padding:4px 12px;border-radius:4px}
+.statusInactive{font-size:12px;font-weight:600;color:#fff;background:var(--status-paused);padding:4px 12px;border-radius:4px}
 
 /* ─── TONE GRID ─── */
 .toneGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
