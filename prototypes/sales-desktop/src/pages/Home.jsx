@@ -458,7 +458,7 @@ export default function Home() {
           <div className={s.sageBorderGlow} />
 
           {!sageExpanded ? (
-            <div className={s.sagePill} onClick={() => setSageExpanded(true)}>
+            <div className={s.sagePill} onClick={() => setSageExpanded(true)} data-sage-tooltip>
               <div className={s.sagePillOrb}>
                 <span className={s.sagePillOrbLetter}>S</span>
                 <div className={s.sagePillOrbPulse} />

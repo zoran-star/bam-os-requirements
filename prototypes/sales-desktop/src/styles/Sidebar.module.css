@@ -10,7 +10,7 @@
 .navLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:var(--tm);padding:0 14px 10px;display:block}
 .navItem{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;cursor:pointer;transition:all 140ms var(--es);margin-bottom:2px;position:relative;color:var(--ts);font-size:13.5px;font-weight:600;border:1px solid transparent;overflow:hidden;text-decoration:none}
 .navItem:hover{background:var(--surf2);color:var(--tp)}
-.navItem.active{background:var(--surf2);color:var(--gold);border-color:var(--border)}
+.navItem.active{background:rgba(200,168,78,0.08);color:var(--gold);border-color:rgba(200,168,78,0.15)}
 .navItem::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:0;background:var(--gold);border-radius:0 3px 3px 0;transition:width 140ms var(--es)}
 .navItem.active::before{width:3px}
 .navIcon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.4}
