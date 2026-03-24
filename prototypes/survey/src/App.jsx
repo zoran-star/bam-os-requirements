@@ -274,7 +274,19 @@ const FAVORITE_SECTIONS = [
   { key: 'sage', label: 'Sage AI Advisor' },
 ]
 
-const TOTAL_SLIDES = 9 // removed redundant context slide
+const TOTAL_SLIDES = 10 // added archetype slide
+
+const BUSINESS_STAGES = [
+  { key: 'early', label: 'Just getting started', desc: 'Less than 2 years', icon: '🌱' },
+  { key: 'growing', label: 'Building momentum', desc: '2–5 years', icon: '🔥' },
+  { key: 'established', label: 'Well established', desc: '5+ years', icon: '🏛' },
+]
+
+const CHALLENGE_OPTIONS = [
+  { key: 'growth', label: 'Growing my business', desc: 'More clients, more revenue, more reach', icon: '📈' },
+  { key: 'time', label: 'Getting my time back', desc: 'Less admin, more coaching, more life', icon: '⏳' },
+  { key: 'both', label: 'Both equally', desc: 'I need growth AND freedom', icon: '⚡' },
+]
 
 /* ─── Rating Dial (1-5) ───────────────────────────────────────── */
 function RatingDial({ value, onChange, page }) {
@@ -316,6 +328,9 @@ export default function App() {
   const [slide, setSlide] = useState(0)
   const [dir, setDir] = useState(1)
 
+  const [businessStage, setBusinessStage] = useState('')
+  const [biggestChallenge, setBiggestChallenge] = useState('')
+
   const [dreamText, setDreamText] = useState('')
   const [selectedChips, setSelectedChips] = useState([])
   const [customFeatures, setCustomFeatures] = useState([])
@@ -356,7 +371,7 @@ export default function App() {
 
   const allSelectedFeatures = [...selectedChips, ...customFeatures, ...extraChips]
 
-  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }) }, [slide])
+  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }) }, [slide])
   const next = useCallback(() => { if (slide < TOTAL_SLIDES - 1) go(slide + 1) }, [slide, go])
   const prev = useCallback(() => { if (slide > 0) go(slide - 1) }, [slide, go])
 
@@ -395,7 +410,7 @@ export default function App() {
 
   const calcSuggested = () => { const h = parseFloat(hoursSaved) || 0; const r = parseFloat(hourlyRate) || 0; return Math.round(h * r * 4.33) }
 
-  useEffect(() => { if (slide === 5 && !smartPriceTouched && calcSuggested() > 0) setSmartPrice(String(calcSuggested())) }, [slide])
+  useEffect(() => { if (slide === 6 && !smartPriceTouched && calcSuggested() > 0) setSmartPrice(String(calcSuggested())) }, [slide])
 
   // No auto-timer — user clicks "Show me" to start walkthrough
 
@@ -506,13 +521,14 @@ export default function App() {
 
   const headlines = {
     0: "Let's do a quick thought exercise.",
-    1: 'If you could dream up an all-in-one command center for your business...',
-    2: 'If you could pay monthly for that magical command center...',
-    3: '', // walkthrough handles its own text
-    4: 'What were your favorite parts?',
-    5: 'How much would you pay monthly for FullControl?',
-    6: 'What would you add to FullControl?',
-    7: 'If all of that were included...',
+    1: 'First — tell us a little about you.',
+    2: 'If you could dream up an all-in-one command center for your business...',
+    3: 'If you could pay monthly for that magical command center...',
+    4: '', // walkthrough handles its own text
+    5: 'What were your favorite parts?',
+    6: 'How much would you pay monthly for FullControl?',
+    7: 'What would you add to FullControl?',
+    8: 'If all of that were included...',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
   const cursor = <span style={{ opacity: headlineDone ? 0 : 0.4 }}>|</span>
@@ -524,7 +540,7 @@ export default function App() {
       {slide > 0 && slide < TOTAL_SLIDES - 1 && <div className="step-indicator">{slide} / {TOTAL_SLIDES - 2}</div>}
 
       <AnimatePresence mode="wait">
-        <motion.div key={slide} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className={`slide-container ${slide === 3 ? 'wide' : ''}`}>
+        <motion.div key={slide} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className={`slide-container ${slide === 4 ? 'wide' : ''}`}>
 
           {/* ──── SLIDE 0 — Welcome ──── */}
           {slide === 0 && (
@@ -542,8 +558,48 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 1 — Dream Features ──── */}
+          {/* ──── SLIDE 1 — About You (Archetype) ──── */}
           {slide === 1 && (
+            <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
+              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
+
+              <motion.div variants={fadeSlideUp}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>How long have you been running your business?</p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
+                  {BUSINESS_STAGES.map(s => (
+                    <div key={s.key} className={`option-card ${businessStage === s.key ? 'selected' : ''}`}
+                      onClick={() => { setBusinessStage(s.key); playClick() }}
+                      style={{ flex: '1 1 140px', maxWidth: 165, padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{s.icon} {s.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{s.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>What's your biggest challenge right now?</p>
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 520, margin: '0 auto' }}>
+                  {CHALLENGE_OPTIONS.map(c => (
+                    <div key={c.key} className={`option-card ${biggestChallenge === c.key ? 'selected' : ''}`}
+                      onClick={() => { setBiggestChallenge(c.key); playClick() }}
+                      style={{ flex: '1 1 140px', maxWidth: 165, padding: '14px 12px', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)', marginBottom: 2 }}>{c.icon} {c.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{c.desc}</div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={prev}>Back</button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (businessStage && biggestChallenge) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ──── SLIDE 2 — Dream Features ──── */}
+          {slide === 2 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">It could do <em>anything</em>. Which features would you include?</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -569,8 +625,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 2 — Blind Price ──── */}
-          {slide === 2 && (
+          {/* ──── SLIDE 3 — Blind Price ──── */}
+          {slide === 3 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">No strings attached — just a number that feels right for everything you described.</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={blindPrice} onChange={e => setBlindPrice(e.target.value)} min="0" /></div></motion.div>
@@ -582,8 +638,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 3 — Prototype (intro → walkthrough → explore) ──── */}
-          {slide === 3 && (
+          {/* ──── SLIDE 4 — Prototype (intro → walkthrough → explore) ──── */}
+          {slide === 4 && (
             <motion.div style={{ width: '100%' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
 
               {/* Intro — single screen */}
@@ -755,8 +811,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 4 — Favorites + Time/Rate ──── */}
-          {slide === 4 && (
+          {/* ──── SLIDE 5 — Favorites + Time/Rate ──── */}
+          {slide === 5 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Select all that stood out to you.</p></motion.div>
               <motion.div variants={fadeSlideUp}>
@@ -781,8 +837,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 5 — Smart Price ──── */}
-          {slide === 5 && (
+          {/* ──── SLIDE 6 — Smart Price ──── */}
+          {slide === 6 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}<Tooltip text="We pre-filled this based on your hourly rate and hours saved — but change it to whatever feels right." /></h2></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={smartPrice} onChange={e => { setSmartPrice(e.target.value); setSmartPriceTouched(true) }} min="0" /></div></motion.div>
@@ -796,8 +852,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 6 — Feature Wishlist ──── */}
-          {slide === 6 && (
+          {/* ──── SLIDE 7 — Feature Wishlist ──── */}
+          {slide === 7 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Dream big. If there's a feature that would make this a must-have — tell us.</p></motion.div>
               <motion.div variants={fadeSlideUp}><VoiceTextarea placeholder="I wish it could..." value={addedFeatures} onChange={setAddedFeatures} style={{ minHeight: 140 }} /></motion.div>
@@ -808,8 +864,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 7 — Final Price ──── */}
-          {slide === 7 && (
+          {/* ──── SLIDE 8 — Final Price ──── */}
+          {slide === 8 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2>{typedHeadline}{cursor}</h2><p className="subtitle">Everything you just saw, plus every feature you just asked for. One platform. How much would you pay monthly?</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', justifyContent: 'center' }}><div className="price-input-wrap"><span className="dollar">$</span><input type="number" className="price-input" placeholder="0" value={finalPrice} onChange={e => setFinalPrice(e.target.value)} min="0" /></div></motion.div>
@@ -821,8 +877,8 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 8 — Thank You ──── */}
-          {slide === 8 && (
+          {/* ──── SLIDE 9 — Thank You ──── */}
+          {slide === 9 && (
             <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
               <motion.div variants={fadeSlideUp}><h1>Thank you.</h1></motion.div>

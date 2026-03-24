@@ -38,11 +38,12 @@ html, body, #root {
 
 #root {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   overflow-x: hidden;
   overflow-y: auto;
   position: relative;
+  min-height: 100%;
 }
 
 /* ---- Ambient glow background ---- */
