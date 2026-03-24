@@ -13,12 +13,13 @@
 
 /* ─── Horizon Line: full-width gold glow at bottom ─── */
 .glowLine {
-  height: 2px;
-  background: var(--gold);
-  opacity: 0.2;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 5%, var(--gold) 30%, var(--gold) 70%, transparent 95%);
+  opacity: 0.45;
   cursor: pointer;
   position: relative;
   animation: horizonPulse 4s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(200,168,78,0.15), 0 -2px 12px rgba(200,168,78,0.08);
 }
 
 /* Hover zone — invisible 44px tall area above the line */
@@ -56,8 +57,8 @@
 }
 
 @keyframes horizonPulse {
-  0%, 100% { opacity: 0.15; box-shadow: 0 0 6px rgba(200,168,78,0.05); }
-  50% { opacity: 0.3; box-shadow: 0 0 14px rgba(200,168,78,0.12); }
+  0%, 100% { opacity: 0.35; box-shadow: 0 0 8px rgba(200,168,78,0.12), 0 -2px 12px rgba(200,168,78,0.06); }
+  50% { opacity: 0.55; box-shadow: 0 0 16px rgba(200,168,78,0.2), 0 -4px 20px rgba(200,168,78,0.1); }
 }
 
 /* ─── Floating input bubble — fades up from below ─── */
