@@ -2,6 +2,22 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PrototypeMockup from './PrototypeMockup'
 
+const PROTO_URL = window.location.hostname === 'localhost'
+  ? 'http://localhost:5173'
+  : 'https://fullcontrol-prototype.vercel.app'
+
+function PrototypeIframe({ page }) {
+  const src = page ? PROTO_URL + '/#/' + page : PROTO_URL
+  return (
+    <iframe
+      key={page}
+      src={src}
+      style={{ width: '100%', height: 560, border: 'none', borderRadius: 16, display: 'block' }}
+      allow="autoplay"
+    />
+  )
+}
+
 function PinMarker({ pin, onUpdate, onDelete }) {
   const isNote = pin.mode === 'note'
   const [showInput, setShowInput] = useState(isNote)
@@ -329,6 +345,7 @@ export default function App() {
     } else {
       setWalkthroughPhase('explore'); playDing()
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Pin management (lifted up)
@@ -442,7 +459,7 @@ export default function App() {
                     That's what we've built to be<br /><span style={{ color: 'var(--gold)' }}>this command center.</span>
                   </h1>
                   <p className="subtitle" style={{ fontSize: 17, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
-                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh() }} style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
                     Show me <span style={{ fontSize: 18 }}>&#8594;</span>
                   </button>
                 </motion.div>
@@ -484,9 +501,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="walkthrough-proto-wrap">
-                    <div className="proto-wrap">
-                      <PrototypeMockup feedbackMode="like" pins={[]} onAddPin={() => {}} onUpdatePin={() => {}} onDeletePin={() => {}} walkthroughPage={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
-                    </div>
+                    <PrototypeIframe page={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
                     <div className="walkthrough-dim-overlay" />
                     <div className="walkthrough-page-label">
                       {WALKTHROUGH_STEPS[walkthroughStep]?.page}
@@ -516,9 +531,7 @@ export default function App() {
                     )}
                   </div>
                   <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
-                    <div className="proto-wrap">
-                      <PrototypeMockup feedbackMode={feedbackMode} pins={pinMode ? pins : []} onAddPin={pinMode ? addPin : () => {}} onUpdatePin={updatePin} onDeletePin={deletePin} />
-                    </div>
+                    <PrototypeIframe />
                   </div>
                   <div style={{ marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center' }}>
                     <button className="btn btn-ghost" onClick={prev}>Back</button>
@@ -577,8 +590,8 @@ export default function App() {
               <motion.div variants={fadeSlideUp}>
                 <h2 style={{ fontSize: 20, marginTop: 8 }}>A couple quick numbers...</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginTop: 12 }}>
-                  <div className="field-row"><span className="field-label">Hours saved per week</span><input type="number" placeholder="e.g. 10" value={hoursSaved} onChange={e => setHoursSaved(e.target.value)} min="0" /></div>
-                  <div className="field-row"><span className="field-label">Your hourly rate ($)</span><input type="number" placeholder="e.g. 75" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} min="0" /></div>
+                  <div className="field-row"><span className="field-label">How many hours would this save you per week?</span><input type="number" placeholder="e.g. 10" value={hoursSaved} onChange={e => setHoursSaved(e.target.value)} min="0" /></div>
+                  <div className="field-row"><span className="field-label">What is an hour worth to you? ($)</span><input type="number" placeholder="e.g. 75" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} min="0" /></div>
                 </div>
               </motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
