@@ -296,7 +296,7 @@ export default function App() {
 
   const allSelectedFeatures = [...selectedChips, ...customFeatures, ...extraChips]
 
-  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); window.scrollTo({ top: 0 }) }, [slide])
+  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }) }, [slide])
   const next = useCallback(() => { if (slide < TOTAL_SLIDES - 1) go(slide + 1) }, [slide, go])
   const prev = useCallback(() => { if (slide > 0) go(slide - 1) }, [slide, go])
 
@@ -345,7 +345,7 @@ export default function App() {
     } else {
       setWalkthroughPhase('explore'); playDing()
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // Pin management (lifted up)
@@ -459,7 +459,7 @@ export default function App() {
                     That's what we've built to be<br /><span style={{ color: 'var(--gold)' }}>this command center.</span>
                   </h1>
                   <p className="subtitle" style={{ fontSize: 17, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
-                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); window.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
                     Show me <span style={{ fontSize: 18 }}>&#8594;</span>
                   </button>
                 </motion.div>
