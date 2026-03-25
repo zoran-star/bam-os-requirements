@@ -415,6 +415,47 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 .count-up{font-variant-numeric:tabular-nums}
 
 /* ═══════════════════════════════════════════
+   FOUNDER STORY SECTION
+   ═══════════════════════════════════════════ */
+.founder-story{background:var(--bg-alt)}
+.founder-intro{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:start;margin-bottom:48px}
+@media(max-width:600px){.founder-intro{grid-template-columns:1fr}}
+.founder-avatar-lg{width:80px;height:80px;border-radius:20px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:#111;flex-shrink:0}
+.founder-name-lg{font-size:22px;font-weight:800;color:var(--white);letter-spacing:-0.02em}
+.founder-role-lg{font-size:13px;font-weight:600;color:var(--accent);margin-top:2px}
+.founder-bio{font-size:15px;color:var(--g300);line-height:1.65;margin-top:10px;max-width:560px}
+.founder-bio strong{color:var(--g100);font-weight:600}
+.credential-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.credential-tag{background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.1);border-radius:100px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--g300);transition:all .2s}
+.credential-tag:hover{border-color:rgba(200,168,78,0.2);color:var(--accent)}
+
+/* FOUNDER TIMELINE */
+.f-timeline{position:relative;padding-left:36px;margin-top:8px}
+.f-timeline::before{content:'';position:absolute;left:13px;top:0;bottom:0;width:2px;background:linear-gradient(to bottom,var(--accent),rgba(200,168,78,0.08))}
+.f-tl-item{position:relative;margin-bottom:36px}
+.f-tl-item:last-child{margin-bottom:0}
+.f-tl-dot{position:absolute;left:-29px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px rgba(200,168,78,0.25)}
+.f-tl-year{font-size:11px;font-weight:700;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase}
+.f-tl-title{font-size:15px;font-weight:700;color:var(--white);margin-top:2px;line-height:1.3}
+.f-tl-desc{font-size:13px;color:var(--g400);line-height:1.55;margin-top:4px;max-width:480px}
+
+/* BIG QUOTE SECTION */
+.big-quote-section{text-align:center;padding:120px 0;position:relative}
+.big-quote-section::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(200,168,78,0.04),transparent 70%)}
+.big-quote-text{font-size:clamp(18px,3vw,26px);font-weight:400;color:var(--g200);max-width:680px;margin:0 auto;line-height:1.55;letter-spacing:-0.01em;font-style:italic;position:relative}
+.big-quote-text em{font-style:normal;color:var(--accent);font-weight:700}
+.big-quote-attr{font-size:13px;font-weight:600;color:var(--g500);margin-top:20px}
+
+/* OBJECTION SECTION */
+.objection-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-top:48px}
+.objection-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;display:grid;grid-template-columns:1fr 1fr;gap:24px;transition:all .3s var(--ease)}
+.objection-card:hover{border-color:var(--card-hover-border)}
+@media(max-width:600px){.objection-card{grid-template-columns:1fr}}
+.objection-q h3{font-size:15px;font-weight:700;color:#e05a42;margin-bottom:6px;line-height:1.3}
+.objection-a h3{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px;line-height:1.3}
+.objection-q p,.objection-a p{font-size:13px;color:var(--g400);line-height:1.55}
+
+/* ═══════════════════════════════════════════
    STAGGERED LIST ITEMS
    ═══════════════════════════════════════════ */
 .stagger-list li,.stagger-list .comp-item,.problem-list li,.why-list li,.market-trait{opacity:0;transform:translateY(12px);transition:opacity .5s var(--ease),transform .5s var(--ease)}
@@ -511,8 +552,8 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
         <div class="hero-top-sub">Company Overview &mdash; 2026</div>
       </div>
     </div>
-    <h1 class="rv rv-d1">The AI-Powered<br>Command Center for<br><em>Sports & Fitness</em> Businesses</h1>
-    <p class="hero-desc rv rv-d2">A single intelligent system that helps operators understand their business, decide what matters, and take action.</p>
+    <h1 class="rv rv-d1">We Ran the Business.<br>We Felt the Pain.<br>So We Built <em>the Fix.</em></h1>
+    <p class="hero-desc rv rv-d2">FullControl is the AI-powered command center for sports &amp; fitness businesses. One system that helps operators understand what's happening, decide what matters, and take action &mdash; built by people who've done the job.</p>
     <div class="hero-stats rv rv-d3">
       <div class="hero-stat">
         <div class="hero-stat-num count-up" data-target="27.8" data-prefix="$" data-suffix="B" data-decimals="1">$0</div>
@@ -549,6 +590,73 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     <div class="sec-center rv rv-d3">
       <p style="font-size:clamp(14px,1.8vw,17px);font-weight:500;color:var(--g300);max-width:580px;margin:0 auto;line-height:1.65"><strong style="color:var(--white)">FullControl</strong> exists to facilitate this shift and empower the coaches and operators who got into this industry to make an impact &mdash; not to manage software.</p>
     </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     FOUNDER STORY — THE PERSONAL NARRATIVE
+     ═══════════════════════════════════════════ -->
+<section class="founder-story" id="founderStory">
+  <div class="w">
+    <div class="sec-label rv">Our story</div>
+    <h2 class="sec-title rv rv-d1">Built from experience,<br>not assumptions</h2>
+
+    <div class="founder-intro rv rv-d2">
+      <div class="founder-avatar-lg">Z</div>
+      <div>
+        <div class="founder-name-lg">Zoran Savic</div>
+        <div class="founder-role-lg">Co-Founder &middot; Product & Technology</div>
+        <p class="founder-bio">I studied math and business at <strong>Waterloo and Laurier</strong>, played D1 basketball for both universities, then went to <strong>Deloitte's Payments practice</strong> in Toronto where I learned how enterprise systems actually work. Then I left &mdash; and built the exact business FullControl is for.</p>
+        <div class="credential-tags">
+          <span class="credential-tag">🎓 Waterloo / Laurier Math + BBA</span>
+          <span class="credential-tag">🏢 Deloitte &mdash; Payments</span>
+          <span class="credential-tag">🏀 D1 University Basketball</span>
+          <span class="credential-tag">🏋️ Founded Basketball Academy</span>
+          <span class="credential-tag">💻 Built FullControl</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="f-timeline rv rv-d3">
+      <div class="f-tl-item">
+        <div class="f-tl-dot"></div>
+        <div class="f-tl-year">University</div>
+        <div class="f-tl-title">Waterloo + Laurier Double Degree & D1 Basketball</div>
+        <div class="f-tl-desc">Studied math and business simultaneously at two of Canada's top programs. Competed as a D1 basketball player for both schools &mdash; learned what structured performance systems look like from the athlete side.</div>
+      </div>
+      <div class="f-tl-item">
+        <div class="f-tl-dot"></div>
+        <div class="f-tl-year">Deloitte</div>
+        <div class="f-tl-title">Consultant &mdash; Payments Practice, Toronto</div>
+        <div class="f-tl-desc">Worked with major financial institutions on payments infrastructure. Learned how enterprise systems are architected, how data flows between platforms, and where operational complexity kills businesses.</div>
+      </div>
+      <div class="f-tl-item">
+        <div class="f-tl-dot"></div>
+        <div class="f-tl-year">Operator</div>
+        <div class="f-tl-title">Founded & Ran a Basketball Training Business</div>
+        <div class="f-tl-desc">Built it from scratch &mdash; scheduling, billing, member management, marketing, coaching. Used 6+ fragmented tools. Experienced firsthand how painful and broken the tech stack is. This is where the idea for FullControl was born.</div>
+      </div>
+      <div class="f-tl-item">
+        <div class="f-tl-dot"></div>
+        <div class="f-tl-year">Now</div>
+        <div class="f-tl-title">Building FullControl &mdash; The AI Command Center</div>
+        <div class="f-tl-desc">Combining everything &mdash; analytical training from Waterloo, enterprise systems thinking from Deloitte, and the raw operator pain from running a real business. Building the tool I wish existed.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
+     BIG QUOTE — EMOTIONAL ANCHOR
+     ═══════════════════════════════════════════ -->
+<section class="big-quote-section">
+  <div class="w">
+    <p class="big-quote-text rv">&ldquo;I don't need investors who get <em>AI</em>. I need investors who get that <em>running a small business is chaos</em> &mdash; and that an intelligent system can fix it.&rdquo;</p>
+    <p class="big-quote-attr rv rv-d1">&mdash; Zoran Savic, Co-Founder</p>
   </div>
 </section>
 
@@ -988,14 +1096,26 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
           <div class="team-avatar">ZS</div>
           <div><h3>Zoran Savic</h3><span>Co-Founder &middot; Product & Technology</span></div>
         </div>
-        <p>University of Waterloo grad with Big 5 corporate experience turned builder. Built the majority of BAM's business systems and designed the full FullControl product vision and technical stack. Built a fully autonomous training business in Toronto in under 2 years.</p>
+        <p>Math/BBA double degree from <strong style="color:var(--white)">Waterloo &amp; Laurier</strong>. Former consultant in <strong style="color:var(--white)">Deloitte's Payments practice</strong> in Toronto. D1 university basketball player. Founded and ran a basketball academy &mdash; experienced every pain point firsthand. Designed the full FullControl product vision, UX system, and technical architecture.</p>
+        <div class="credential-tags" style="margin-top:14px">
+          <span class="credential-tag">🎓 Waterloo + Laurier</span>
+          <span class="credential-tag">🏢 Deloitte</span>
+          <span class="credential-tag">🏀 D1 Athlete</span>
+          <span class="credential-tag">🏋️ Academy Founder</span>
+        </div>
       </div>
       <div class="team-card rv rv-d2">
         <div class="team-card-header">
           <div class="team-avatar">CA</div>
           <div><h3>Coleman Ayers</h3><span>Co-Founder &middot; Brand, Operations & Strategy</span></div>
         </div>
-        <p>CEO of By Any Means Basketball &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running basketball academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
+        <p>CEO of <strong style="color:var(--white)">By Any Means Basketball</strong> &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
+        <div class="credential-tags" style="margin-top:14px">
+          <span class="credential-tag">📱 500K+ Followers</span>
+          <span class="credential-tag">🏀 7 Years Operating</span>
+          <span class="credential-tag">🏢 Own Gym</span>
+          <span class="credential-tag">🌐 National Network</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1098,6 +1218,42 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
+     OBJECTION HANDLING — SHOWS SELF-AWARENESS
+     ═══════════════════════════════════════════ -->
+<section id="objectionsSection">
+  <div class="w">
+    <div class="sec-label rv">Honest answers</div>
+    <h2 class="sec-title rv rv-d1">Questions we know<br>you're thinking</h2>
+    <p class="sec-sub rv rv-d2">We've heard these before. Here's how we think about them.</p>
+
+    <div class="objection-grid">
+      <div class="objection-card rv rv-d2">
+        <div class="objection-q">
+          <h3>❓ &ldquo;Isn't this just GoHighLevel for gyms?&rdquo;</h3>
+          <p>GHL is a horizontal platform that's notoriously complex. FullControl is AI-native, vertical-first, and radically simpler. It's the difference between Salesforce and Toast &mdash; same category, completely different product philosophy.</p>
+        </div>
+        <div class="objection-a">
+          <h3>❓ &ldquo;The market is too niche.&rdquo;</h3>
+          <p>Basketball is the wedge, not the ceiling. Sports training → fitness → service businesses. Same playbook as Toast (restaurants → food service) or ServiceTitan (HVAC → all trades). Start narrow, expand with the platform.</p>
+        </div>
+      </div>
+      <div class="objection-card rv rv-d3">
+        <div class="objection-q">
+          <h3>❓ &ldquo;Why can't incumbents just add AI?&rdquo;</h3>
+          <p>Bolting AI onto a bloated legacy platform creates a worse experience, not a better one. FullControl is AI-native from day one &mdash; the architecture, UX, and data model are all built around intelligence. You can't retrofit that.</p>
+        </div>
+        <div class="objection-a">
+          <h3>❓ &ldquo;How do you know people will pay?&rdquo;</h3>
+          <p>We don't just think they will &mdash; we've already been consulting for 20+ academy operators. They're paying $500+/mo for fragmented tools that don't work together. Consolidating into one system at $300/mo is a no-brainer.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="div-line"></div>
+
+<!-- ═══════════════════════════════════════════
      VISION
      ═══════════════════════════════════════════ -->
 <section class="vision" id="vision">
@@ -1127,13 +1283,13 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 <!-- FLOATING DOT NAV -->
 <div class="dot-nav" id="dotNav">
   <div class="dot-nav-item" data-section="mission"><span class="dot-nav-label">Mission</span></div>
+  <div class="dot-nav-item" data-section="founderStory"><span class="dot-nav-label">Our Story</span></div>
   <div class="dot-nav-item" data-section="problem"><span class="dot-nav-label">Problem</span></div>
   <div class="dot-nav-item" data-section="solution"><span class="dot-nav-label">Solution</span></div>
-  <div class="dot-nav-item" data-section="howSection"><span class="dot-nav-label">How</span></div>
   <div class="dot-nav-item" data-section="market"><span class="dot-nav-label">Market</span></div>
   <div class="dot-nav-item" data-section="teamSection"><span class="dot-nav-label">Team</span></div>
   <div class="dot-nav-item" data-section="moatSection"><span class="dot-nav-label">Moat</span></div>
-  <div class="dot-nav-item" data-section="scaleSection"><span class="dot-nav-label">Scale</span></div>
+  <div class="dot-nav-item" data-section="objectionsSection"><span class="dot-nav-label">Q&A</span></div>
   <div class="dot-nav-item" data-section="vision"><span class="dot-nav-label">Vision</span></div>
 </div>
 
