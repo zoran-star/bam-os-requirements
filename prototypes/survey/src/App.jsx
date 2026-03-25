@@ -452,12 +452,10 @@ export default function App() {
   const lastSlideRef = useRef(0)
   const completedRef = useRef(false)
 
-  // Voice recording state
-  const [voiceBlob, setVoiceBlob] = useState(null)
+  // Voice transcript state (speech-to-text, no audio upload)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
   const [voiceRecording, setVoiceRecording] = useState(false)
-  const [voiceDuration, setVoiceDuration] = useState(0)
-  const voiceRecorderRef = useRef(null)
-  const voiceTimerRef = useRef(null)
+  const voiceRecognitionRef = useRef(null)
 
   // NDA state
   const [ndaName, setNdaName] = useState('')
@@ -545,37 +543,40 @@ export default function App() {
     playClick()
   }
 
-  // Voice recording helpers
-  const startVoiceRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      const chunks = []
-      recorder.ondataavailable = e => chunks.push(e.data)
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        setVoiceBlob(blob)
-        stream.getTracks().forEach(t => t.stop())
-        clearInterval(voiceTimerRef.current)
+  // Voice-to-text helpers (speech recognition → editable transcript)
+  const startVoiceRecording = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { alert('Speech recognition not supported. Try Chrome.'); return }
+    const r = new SR()
+    r.continuous = true
+    r.interimResults = true
+    r.lang = 'en-US'
+    let finalTranscript = voiceTranscript
+    r.onresult = (e) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalTranscript += (finalTranscript ? ' ' : '') + e.results[i][0].transcript
+        } else {
+          interim += e.results[i][0].transcript
+        }
       }
-      voiceRecorderRef.current = recorder
-      recorder.start()
-      setVoiceRecording(true)
-      setVoiceDuration(0)
-      voiceTimerRef.current = setInterval(() => setVoiceDuration(d => d + 1), 1000)
-    } catch (e) {
-      console.error('Mic access denied:', e)
+      setVoiceTranscript(finalTranscript + (interim ? ' ' + interim : ''))
     }
+    r.onerror = () => setVoiceRecording(false)
+    r.onend = () => setVoiceRecording(false)
+    voiceRecognitionRef.current = r
+    r.start()
+    setVoiceRecording(true)
   }
 
   const stopVoiceRecording = () => {
-    voiceRecorderRef.current?.stop()
+    voiceRecognitionRef.current?.stop()
     setVoiceRecording(false)
   }
 
   const deleteVoiceRecording = () => {
-    setVoiceBlob(null)
-    setVoiceDuration(0)
+    setVoiceTranscript('')
   }
 
   const addCustomFeature = (text) => {
@@ -719,20 +720,7 @@ export default function App() {
     completedRef.current = true
     const sessionDuration = Math.round((Date.now() - sessionStartRef.current) / 1000)
 
-    // Upload voice recording if exists
-    let voiceUrl = null
-    if (voiceBlob) {
-      try {
-        const filename = `voice_${Date.now()}_${userName.replace(/\s+/g, '_')}.webm`
-        const { data } = await supabase.storage.from('voice-recordings').upload(filename, voiceBlob, { contentType: 'audio/webm' })
-        if (data?.path) {
-          const { data: urlData } = supabase.storage.from('voice-recordings').getPublicUrl(data.path)
-          voiceUrl = urlData?.publicUrl || null
-        }
-      } catch (e) {
-        console.error('Voice upload error:', e)
-      }
-    }
+    // Voice transcript (no audio upload needed)
 
     // Submit to Supabase
     try {
@@ -783,9 +771,8 @@ export default function App() {
         session_duration: sessionDuration,
         drop_off_slide: null,
         drop_off_time: null,
-        // Voice recording
-        voice_recording_url: voiceUrl,
-        voice_duration: voiceBlob ? voiceDuration : null,
+        // Voice transcript
+        voice_transcript: voiceTranscript || null,
       })
       // #9 — Check for insert errors
       if (error) {
@@ -1422,25 +1409,34 @@ export default function App() {
                   <span>Extremely likely</span>
                 </div>
               </motion.div>
-              {/* Voice recording */}
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 28 }}>
-                <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 12 }}>Anything else you want to share? Leave a voice note. (optional)</p>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                  {!voiceBlob ? (
-                    <button
-                      className={`btn ${voiceRecording ? 'btn-recording' : 'btn-ghost'}`}
-                      onClick={voiceRecording ? stopVoiceRecording : startVoiceRecording}
-                      style={voiceRecording ? { background: '#e74c3c', color: '#fff', animation: 'pulse 1.5s infinite' } : {}}
-                    >
-                      {voiceRecording ? `Stop (${voiceDuration}s)` : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, verticalAlign: 'middle', marginRight: 6, display: 'inline-block' }}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>Record voice note</>}
-                    </button>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 13, color: 'var(--gold)' }}>Recorded ({voiceDuration}s)</span>
-                      <button className="btn btn-ghost" onClick={deleteVoiceRecording} style={{ fontSize: 12, padding: '4px 10px' }}>Remove</button>
+              {/* Voice-to-text note */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, maxWidth: 500, margin: '28px auto 0' }}>
+                <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 12 }}>Anything else you want to share? Speak or type below. (optional)</p>
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    placeholder="Tap the mic and speak, or just type here..."
+                    value={voiceTranscript}
+                    onChange={e => setVoiceTranscript(e.target.value)}
+                    style={{ minHeight: 100, width: '100%', paddingRight: 50 }}
+                  />
+                  <button
+                    className={`mic-btn ${voiceRecording ? 'recording' : ''}`}
+                    onClick={voiceRecording ? stopVoiceRecording : startVoiceRecording}
+                    style={{ position: 'absolute', top: 12, right: 12 }}
+                  >
+                    <MicIcon />
+                  </button>
+                  {voiceRecording && (
+                    <div style={{ position: 'absolute', bottom: 8, right: 12, fontSize: 11, color: '#e74c3c', fontWeight: 600 }}>
+                      Listening...
                     </div>
                   )}
                 </div>
+                {voiceTranscript && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                    <button className="btn btn-ghost" onClick={deleteVoiceRecording} style={{ fontSize: 11, padding: '3px 8px' }}>Clear</button>
+                  </div>
+                )}
               </motion.div>
 
               {/* #6 — Early access opt-in moved here from Thank You slide */}
