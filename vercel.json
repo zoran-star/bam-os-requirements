@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/investor", "destination": "/prototypes/fc-company/index.html" },
+    { "source": "/playbook", "destination": "/fullcontrol-investor-playbook.html" }
+  ]
+}
