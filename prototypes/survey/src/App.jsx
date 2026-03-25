@@ -447,6 +447,18 @@ export default function App() {
   const [adminHours, setAdminHours] = useState('')
   const [earlyAccess, setEarlyAccess] = useState(false)
 
+  // Drop-off & completion tracking
+  const sessionStartRef = useRef(Date.now())
+  const lastSlideRef = useRef(0)
+  const completedRef = useRef(false)
+
+  // Voice recording state
+  const [voiceBlob, setVoiceBlob] = useState(null)
+  const [voiceRecording, setVoiceRecording] = useState(false)
+  const [voiceDuration, setVoiceDuration] = useState(0)
+  const voiceRecorderRef = useRef(null)
+  const voiceTimerRef = useRef(null)
+
   // NDA state
   const [ndaName, setNdaName] = useState('')
   const [ndaSignature, setNdaSignature] = useState('')
@@ -493,9 +505,29 @@ export default function App() {
 
   const allSelectedFeatures = [...selectedChips, ...customFeatures, ...extraChips]
 
-  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }) }, [slide])
+  const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); lastSlideRef.current = Math.max(lastSlideRef.current, target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }) }, [slide])
   const next = useCallback(() => { if (slide < TOTAL_SLIDES - 1) go(slide + 1) }, [slide, go])
   const prev = useCallback(() => { if (slide > 0) go(slide - 1) }, [slide, go])
+
+  // Drop-off beacon — fires when user closes tab without submitting
+  useEffect(() => {
+    const handleUnload = () => {
+      if (completedRef.current) return // already submitted, no drop-off
+      const payload = JSON.stringify({
+        drop_off_slide: lastSlideRef.current,
+        drop_off_time: Math.round((Date.now() - sessionStartRef.current) / 1000),
+        completed: false,
+        user_name: userName || null,
+        user_phone: userPhone || null,
+      })
+      navigator.sendBeacon(
+        'https://raedfefzjudzlodtcxop.supabase.co/rest/v1/survey_dropoffs',
+        new Blob([payload], { type: 'application/json' })
+      )
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [userName, userPhone])
 
   const toggleChip = (label, isExtra) => {
     if (isExtra) {
@@ -505,6 +537,39 @@ export default function App() {
       setSelectedChips(prev => prev.includes(label) ? prev.filter(c => c !== label) : [...prev, label])
     }
     playClick()
+  }
+
+  // Voice recording helpers
+  const startVoiceRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      const chunks = []
+      recorder.ondataavailable = e => chunks.push(e.data)
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        setVoiceBlob(blob)
+        stream.getTracks().forEach(t => t.stop())
+        clearInterval(voiceTimerRef.current)
+      }
+      voiceRecorderRef.current = recorder
+      recorder.start()
+      setVoiceRecording(true)
+      setVoiceDuration(0)
+      voiceTimerRef.current = setInterval(() => setVoiceDuration(d => d + 1), 1000)
+    } catch (e) {
+      console.error('Mic access denied:', e)
+    }
+  }
+
+  const stopVoiceRecording = () => {
+    voiceRecorderRef.current?.stop()
+    setVoiceRecording(false)
+  }
+
+  const deleteVoiceRecording = () => {
+    setVoiceBlob(null)
+    setVoiceDuration(0)
   }
 
   const addCustomFeature = (text) => {
@@ -641,6 +706,24 @@ export default function App() {
   const handleModalDone = () => { setShowModal(false); next() }
   const handleSubmit = async () => {
     playComplete()
+    completedRef.current = true
+    const sessionDuration = Math.round((Date.now() - sessionStartRef.current) / 1000)
+
+    // Upload voice recording if exists
+    let voiceUrl = null
+    if (voiceBlob) {
+      try {
+        const filename = `voice_${Date.now()}_${userName.replace(/\s+/g, '_')}.webm`
+        const { data } = await supabase.storage.from('voice-recordings').upload(filename, voiceBlob, { contentType: 'audio/webm' })
+        if (data?.path) {
+          const { data: urlData } = supabase.storage.from('voice-recordings').getPublicUrl(data.path)
+          voiceUrl = urlData?.publicUrl || null
+        }
+      } catch (e) {
+        console.error('Voice upload error:', e)
+      }
+    }
+
     // Submit to Supabase
     try {
       await supabase.from('survey_responses').insert({
@@ -687,6 +770,14 @@ export default function App() {
         sean_ellis: seanEllis,
         nps_score: npsScore,
         early_access: earlyAccess,
+        // Completion & drop-off tracking
+        completed: true,
+        session_duration: sessionDuration,
+        drop_off_slide: null,
+        drop_off_time: null,
+        // Voice recording
+        voice_recording_url: voiceUrl,
+        voice_duration: voiceBlob ? voiceDuration : null,
       })
     } catch (e) {
       console.error('Survey submit error:', e)
@@ -1340,6 +1431,27 @@ export default function App() {
                   <span>Extremely likely</span>
                 </div>
               </motion.div>
+              {/* Voice recording */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 28 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 12 }}>Anything else you want to share? Leave a voice note. (optional)</p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+                  {!voiceBlob ? (
+                    <button
+                      className={`btn ${voiceRecording ? 'btn-recording' : 'btn-ghost'}`}
+                      onClick={voiceRecording ? stopVoiceRecording : startVoiceRecording}
+                      style={voiceRecording ? { background: '#e74c3c', color: '#fff', animation: 'pulse 1.5s infinite' } : {}}
+                    >
+                      {voiceRecording ? `Stop (${voiceDuration}s)` : '🎙 Record voice note'}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 13, color: 'var(--gold)' }}>Recorded ({voiceDuration}s)</span>
+                      <button className="btn btn-ghost" onClick={deleteVoiceRecording} style={{ fontSize: 12, padding: '4px 10px' }}>Remove</button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
                 <button className="btn btn-primary" onClick={handleSubmit} style={{ opacity: npsScore !== null ? 1 : 0.4 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
