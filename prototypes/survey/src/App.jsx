@@ -275,7 +275,7 @@ const FAVORITE_SECTIONS = [
   { key: 'sage', label: 'Sage AI Advisor' },
 ]
 
-const TOTAL_SLIDES = 12 // removed Sean Ellis slide
+const TOTAL_SLIDES = 12 // 0-11: Welcome, NDA, About, Dream, Blind, Walkthrough, Favorites, Smart, Wishlist, Final Price, Submit, Thank You
 
 const SERVICES_OPTIONS = [
   { key: 'individual-training', label: 'Individual Training' },
@@ -435,7 +435,7 @@ export default function App() {
   const [services, setServices] = useState([])
   const [servicesOther, setServicesOther] = useState('')
   const [clientCount, setClientCount] = useState('')
-  const [npsScore, setNpsScore] = useState(null)
+  // npsScore removed per request
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
@@ -763,8 +763,7 @@ export default function App() {
         smart_price: smartPrice ? Math.max(0, parseInt(smartPrice)) : null,
         final_price: finalPrice ? Math.max(0, parseInt(finalPrice)) : null,
         added_features: addedFeatures,
-        // PMF signals (#5 — removed sean_ellis)
-        nps_score: npsScore,
+        // PMF signals (#5 — removed sean_ellis, nps_score)
         early_access: earlyAccess,
         // Completion & drop-off tracking
         completed: true,
@@ -801,7 +800,7 @@ export default function App() {
     7: 'How much would you pay monthly for FullControl?',
     8: 'What would you add to FullControl?',
     9: 'If all of that were included...',
-    10: 'Last question.',
+    10: 'One last thing.',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
   const cursor = <span style={{ opacity: headlineDone ? 0 : 0.4 }}>|</span>
@@ -1390,28 +1389,13 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 10 — NPS ──── */}
+          {/* ──── SLIDE 10 — Final Thoughts + Early Access + Submit ──── */}
           {slide === 10 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">How likely are you to recommend FullControl to another trainer or gym owner?</p></motion.div>
-              <motion.div variants={fadeSlideUp}>
-                <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 480, margin: '16px auto 0' }}>
-                  {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
-                    <button key={n} className={`rating-dot ${npsScore === n ? 'active' : ''} ${npsScore === n ? 'current' : ''}`}
-                      onClick={() => { setNpsScore(n); playClick() }}
-                      style={{ width: 38, height: 38, fontSize: 14 }}>
-                      {n}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', maxWidth: 480, margin: '8px auto 0', fontSize: 11, color: 'var(--text-3)' }}>
-                  <span>Not likely</span>
-                  <span>Extremely likely</span>
-                </div>
-              </motion.div>
+              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">Anything else you want to share? Speak or type below. (optional)</p></motion.div>
+
               {/* Voice-to-text note */}
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, maxWidth: 500, margin: '28px auto 0' }}>
-                <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 12 }}>Anything else you want to share? Speak or type below. (optional)</p>
+              <motion.div variants={fadeSlideUp} style={{ maxWidth: 500, margin: '16px auto 0' }}>
                 <div style={{ position: 'relative' }}>
                   <textarea
                     placeholder="Tap the mic and speak, or just type here..."
@@ -1439,7 +1423,7 @@ export default function App() {
                 )}
               </motion.div>
 
-              {/* #6 — Early access opt-in moved here from Thank You slide */}
+              {/* Early access opt-in — before submit */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 24 }}>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', fontSize: 15, color: 'var(--text-1)' }}
                   onClick={() => { setEarlyAccess(!earlyAccess); playClick() }}>
@@ -1450,12 +1434,12 @@ export default function App() {
                 </label>
               </motion.div>
 
-              {/* #9 — Show submit error */}
+              {/* Show submit error */}
               {submitError && <div style={{ color: '#e74c3c', fontSize: 13, marginTop: 12, textAlign: 'center' }}>{submitError}</div>}
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 16, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={handleSubmit} style={{ opacity: npsScore !== null ? 1 : 0.4 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
+                <button className="btn btn-primary" onClick={handleSubmit}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
               </motion.div>
             </motion.div>
           )}
