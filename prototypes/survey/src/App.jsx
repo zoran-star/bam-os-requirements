@@ -275,7 +275,7 @@ const FAVORITE_SECTIONS = [
   { key: 'sage', label: 'Sage AI Advisor' },
 ]
 
-const TOTAL_SLIDES = 13 // added NDA slide after welcome
+const TOTAL_SLIDES = 12 // removed Sean Ellis slide
 
 const SERVICES_OPTIONS = [
   { key: 'individual-training', label: 'Individual Training' },
@@ -435,7 +435,6 @@ export default function App() {
   const [services, setServices] = useState([])
   const [servicesOther, setServicesOther] = useState('')
   const [clientCount, setClientCount] = useState('')
-  const [seanEllis, setSeanEllis] = useState('')
   const [npsScore, setNpsScore] = useState(null)
   const [userName, setUserName] = useState('')
   const [userEmail, setUserEmail] = useState('')
@@ -446,6 +445,7 @@ export default function App() {
   const [location, setLocation] = useState('')
   const [adminHours, setAdminHours] = useState('')
   const [earlyAccess, setEarlyAccess] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   // Drop-off & completion tracking
   const sessionStartRef = useRef(Date.now())
@@ -520,10 +520,16 @@ export default function App() {
         user_name: userName || null,
         user_phone: userPhone || null,
       })
-      navigator.sendBeacon(
-        'https://raedfefzjudzlodtcxop.supabase.co/rest/v1/survey_dropoffs',
-        new Blob([payload], { type: 'application/json' })
-      )
+      fetch('https://raedfefzjudzlodtcxop.supabase.co/rest/v1/survey_dropoffs', {
+        method: 'POST',
+        keepalive: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhZWRmZWZ6anVkemxvZHRjeG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMjM5MDQsImV4cCI6MjA4OTg5OTkwNH0.hZ_C-57ddIALKGkPThyEyayZAS1i2Sg_zBvnYCm1xuc',
+          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhZWRmZWZ6anVkemxvZHRjeG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMjM5MDQsImV4cCI6MjA4OTg5OTkwNH0.hZ_C-57ddIALKGkPThyEyayZAS1i2Sg_zBvnYCm1xuc',
+        },
+        body: payload,
+      })
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
@@ -598,6 +604,9 @@ export default function App() {
   const calcSuggested = () => { const h = parseFloat(hoursSaved) || 0; const r = parseFloat(hourlyRate) || 0; return Math.round(h * r * 4.33) }
 
   useEffect(() => { if (slide === 7 && !smartPriceTouched && calcSuggested() > 0) setSmartPrice(String(calcSuggested())) }, [slide])
+
+  // #11 — Reset smartPriceTouched when inputs change so suggested price updates on revisit
+  useEffect(() => { setSmartPriceTouched(false) }, [hoursSaved, hourlyRate])
 
   // No auto-timer — user clicks "Show me" to start walkthrough
 
@@ -706,6 +715,7 @@ export default function App() {
   const handleModalDone = () => { setShowModal(false); next() }
   const handleSubmit = async () => {
     playComplete()
+    setSubmitError('')
     completedRef.current = true
     const sessionDuration = Math.round((Date.now() - sessionStartRef.current) / 1000)
 
@@ -726,7 +736,7 @@ export default function App() {
 
     // Submit to Supabase
     try {
-      await supabase.from('survey_responses').insert({
+      const { error } = await supabase.from('survey_responses').insert({
         // NDA
         nda_name: ndaName,
         nda_signature: ndaSignature,
@@ -747,8 +757,7 @@ export default function App() {
         revenue_range: revenueRange || null,
         location: location || null,
         admin_hours: adminHours ? parseInt(adminHours) : null,
-        // Features
-        dream_features_text: dreamText,
+        // Features (#7 — removed dream_features_text since dreamText is always cleared)
         selected_chips: [...selectedChips, ...extraChips, ...customFeatures],
         custom_features: customFeatures,
         // Walkthrough
@@ -759,15 +768,14 @@ export default function App() {
         // Engagement
         page_timestamps: pageTimestamps,
         engagement_data: engagementData,
-        // Pricing
-        hours_saved: hoursSaved ? parseInt(hoursSaved) : null,
-        hourly_rate: hourlyRate ? parseInt(hourlyRate) : null,
-        blind_price: blindPrice ? parseInt(blindPrice) : null,
-        smart_price: smartPrice ? parseInt(smartPrice) : null,
-        final_price: finalPrice ? parseInt(finalPrice) : null,
+        // Pricing (#10 — clamp negatives)
+        hours_saved: hoursSaved ? Math.max(0, parseInt(hoursSaved)) : null,
+        hourly_rate: hourlyRate ? Math.max(0, parseInt(hourlyRate)) : null,
+        blind_price: blindPrice ? Math.max(0, parseInt(blindPrice)) : null,
+        smart_price: smartPrice ? Math.max(0, parseInt(smartPrice)) : null,
+        final_price: finalPrice ? Math.max(0, parseInt(finalPrice)) : null,
         added_features: addedFeatures,
-        // PMF signals
-        sean_ellis: seanEllis,
+        // PMF signals (#5 — removed sean_ellis)
         nps_score: npsScore,
         early_access: earlyAccess,
         // Completion & drop-off tracking
@@ -779,8 +787,18 @@ export default function App() {
         voice_recording_url: voiceUrl,
         voice_duration: voiceBlob ? voiceDuration : null,
       })
+      // #9 — Check for insert errors
+      if (error) {
+        console.error('Survey submit error:', error)
+        setSubmitError('Something went wrong submitting your response. Please try again.')
+        completedRef.current = false
+        return
+      }
     } catch (e) {
       console.error('Survey submit error:', e)
+      setSubmitError('Something went wrong submitting your response. Please try again.')
+      completedRef.current = false
+      return
     }
     next()
   }
@@ -796,8 +814,7 @@ export default function App() {
     7: 'How much would you pay monthly for FullControl?',
     8: 'What would you add to FullControl?',
     9: 'If all of that were included...',
-    10: 'Quick question...',
-    11: 'Last question.',
+    10: 'Last question.',
   }
   const [typedHeadline, headlineDone] = useTypewriter(headlines[slide] || '', 25, 200)
   const cursor = <span style={{ opacity: headlineDone ? 0 : 0.4 }}>|</span>
@@ -806,7 +823,7 @@ export default function App() {
     <>
       <div className="ambient-glow" />
       <div className="progress-bar" style={{ width: `${progress}%` }} />
-      {slide > 1 && slide < TOTAL_SLIDES - 1 && <div className="step-indicator">{slide - 1} / {TOTAL_SLIDES - 3}</div>}
+      {slide > 1 && slide < TOTAL_SLIDES - 1 && <div className="step-indicator">{slide - 1} / {TOTAL_SLIDES - 2}</div>}
 
       <AnimatePresence mode="wait">
         <motion.div key={slide} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className={`slide-container ${slide === 5 ? 'wide' : ''}`}>
@@ -991,6 +1008,7 @@ export default function App() {
           )}
 
           {/* ──── SLIDE 2 — Contact Info + About You ──── */}
+          {/* // TODO: Consider splitting this slide */}
           {slide === 2 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
@@ -998,7 +1016,7 @@ export default function App() {
               {/* Contact info */}
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380, margin: '0 auto 20px' }}>
                 <input type="text" placeholder="Your name *" value={userName} onChange={e => setUserName(e.target.value)} style={{ textAlign: 'center' }} />
-                <input type="tel" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="tel" inputMode="tel" pattern="[0-9+\-\s]{7,}" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="url" placeholder="Business website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
 
@@ -1059,7 +1077,7 @@ export default function App() {
               {/* Location */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 22 }}>
                 <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-3)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you located?</p>
-                <input type="text" placeholder="City, State / Country" value={location} onChange={e => setLocation(e.target.value)}
+                <input type="text" placeholder="e.g. Toronto, ON, Canada" value={location} onChange={e => setLocation(e.target.value)}
                   style={{ maxWidth: 320, margin: '0 auto', display: 'block', textAlign: 'center' }} />
               </motion.div>
 
@@ -1087,7 +1105,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4, pointerEvents: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 'auto' : 'none' }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -1127,7 +1145,7 @@ export default function App() {
               <motion.div variants={fadeSlideUp}><p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 8 }}>per month</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: blindPrice > 0 ? 1 : 0.4, pointerEvents: blindPrice > 0 ? 'auto' : 'none' }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -1380,46 +1398,19 @@ export default function App() {
               <motion.div variants={fadeSlideUp}><p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 8 }}>per month</p></motion.div>
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={() => { playComplete(); next() }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={() => { playComplete(); next() }} style={{ opacity: finalPrice > 0 ? 1 : 0.4, pointerEvents: finalPrice > 0 ? 'auto' : 'none' }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
 
-          {/* ──── SLIDE 10 — Sean Ellis ──── */}
+          {/* ──── SLIDE 10 — NPS ──── */}
           {slide === 10 && (
-            <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">Imagine you had access to FullControl for the last 3 months...</p></motion.div>
-              <motion.div variants={fadeSlideUp}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-2)', marginBottom: 16 }}>How would you feel if you could no longer use it?</p>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 480, margin: '0 auto' }}>
-                  {[
-                    { key: 'very', label: 'Very disappointed', color: 'var(--gold)' },
-                    { key: 'somewhat', label: 'Somewhat disappointed', color: 'var(--text-2)' },
-                    { key: 'not', label: 'Not disappointed', color: 'var(--text-3)' },
-                  ].map(opt => (
-                    <div key={opt.key} className={`option-card ${seanEllis === opt.key ? 'selected' : ''}`}
-                      onClick={() => { setSeanEllis(opt.key); playClick() }}
-                      style={{ flex: '1 1 130px', maxWidth: 170, padding: '18px 14px', cursor: 'pointer' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700 }}>{opt.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: seanEllis ? 1 : 0.4 }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {/* ──── SLIDE 11 — NPS ──── */}
-          {slide === 11 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">How likely are you to recommend FullControl to another trainer or gym owner?</p></motion.div>
               <motion.div variants={fadeSlideUp}>
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', maxWidth: 480, margin: '16px auto 0' }}>
                   {[0,1,2,3,4,5,6,7,8,9,10].map(n => (
-                    <button key={n} className={`rating-dot ${npsScore !== null && npsScore >= n ? 'active' : ''} ${npsScore === n ? 'current' : ''}`}
+                    <button key={n} className={`rating-dot ${npsScore === n ? 'active' : ''} ${npsScore === n ? 'current' : ''}`}
                       onClick={() => { setNpsScore(n); playClick() }}
                       style={{ width: 38, height: 38, fontSize: 14 }}>
                       {n}
@@ -1441,7 +1432,7 @@ export default function App() {
                       onClick={voiceRecording ? stopVoiceRecording : startVoiceRecording}
                       style={voiceRecording ? { background: '#e74c3c', color: '#fff', animation: 'pulse 1.5s infinite' } : {}}
                     >
-                      {voiceRecording ? `Stop (${voiceDuration}s)` : '🎙 Record voice note'}
+                      {voiceRecording ? `Stop (${voiceDuration}s)` : <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18, verticalAlign: 'middle', marginRight: 6, display: 'inline-block' }}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>Record voice note</>}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1452,19 +1443,7 @@ export default function App() {
                 </div>
               </motion.div>
 
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
-                <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={handleSubmit} style={{ opacity: npsScore !== null ? 1 : 0.4 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {/* ──── SLIDE 12 — Thank You + Early Access Opt-in ──── */}
-          {slide === 12 && (
-            <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
-              <motion.div variants={fadeSlideUp}><h1>Thank you{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>
-              <motion.div variants={fadeSlideUp}><p className="subtitle">Your input is shaping the future of FullControl. We'll keep you in the loop as we build exactly what you asked for.</p></motion.div>
+              {/* #6 — Early access opt-in moved here from Thank You slide */}
               <motion.div variants={fadeSlideUp} style={{ marginTop: 24 }}>
                 <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', fontSize: 15, color: 'var(--text-1)' }}
                   onClick={() => { setEarlyAccess(!earlyAccess); playClick() }}>
@@ -1474,6 +1453,23 @@ export default function App() {
                   I want early access to Full Control
                 </label>
               </motion.div>
+
+              {/* #9 — Show submit error */}
+              {submitError && <div style={{ color: '#e74c3c', fontSize: 13, marginTop: 12, textAlign: 'center' }}>{submitError}</div>}
+
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 16, display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <button className="btn btn-ghost" onClick={prev}>Back</button>
+                <button className="btn btn-primary" onClick={handleSubmit} style={{ opacity: npsScore !== null ? 1 : 0.4 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* ──── SLIDE 11 — Thank You ──── */}
+          {slide === 11 && (
+            <motion.div style={{ textAlign: 'center' }} variants={stagger} initial="hidden" animate="show">
+              <motion.div variants={fadeSlideUp}><div className="gold-ring" style={{ margin: '0 auto 28px' }}>&#10003;</div></motion.div>
+              <motion.div variants={fadeSlideUp}><h1>Thank you{userName ? `, ${userName.split(' ')[0]}` : ''}.</h1></motion.div>
+              <motion.div variants={fadeSlideUp}><p className="subtitle">Your input is shaping the future of FullControl. We'll keep you in the loop as we build exactly what you asked for.</p></motion.div>
               <motion.div variants={fadeSlideUp}><div className="brand brand-pulse" style={{ fontSize: 16, marginTop: 32, textTransform: 'uppercase' }}>FullControl</div></motion.div>
             </motion.div>
           )}
