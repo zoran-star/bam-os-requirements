@@ -349,8 +349,8 @@ function SignatureCanvas({ onSignatureChange }) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX
     const clientY = e.touches ? e.touches[0].clientY : e.clientY
     return {
-      x: (clientX - rect.left) * (canvas.width / rect.width),
-      y: (clientY - rect.top) * (canvas.height / rect.height),
+      x: clientX - rect.left,
+      y: clientY - rect.top,
     }
   }
 
