@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FullControl — The AI Command Center for Sports & Fitness</title>
 <meta name="description" content="FullControl is the AI-powered operating system for sports and fitness businesses. One system. Total clarity. Full control.">
+<meta property="og:title" content="FullControl — The AI Command Center for Sports & Fitness">
+<meta property="og:description" content="FullControl is the AI-powered operating system for sports and fitness businesses. One system. Total clarity. Full control.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fc-company.vercel.app">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FullControl — The AI Command Center for Sports & Fitness">
+<meta name="twitter:description" content="The AI-powered operating system for sports and fitness businesses.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -78,6 +86,7 @@ button{font-family:inherit;cursor:pointer;border:none}
   --spring:cubic-bezier(0.34,1.56,0.64,1);
 }
 [data-theme="light"] .nav-mark{color:#fff!important}
+.btn-gold{display:inline-block;background:linear-gradient(135deg,#c8a24e,#e0be6a);color:#1a1a1a;font-weight:700;text-decoration:none;transition:transform 0.2s var(--ease),box-shadow 0.2s var(--ease)}.btn-gold:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(200,162,78,0.3)}
 [data-theme="light"] .btn-gold{color:#fff!important}
 [data-theme="light"] .nav-contact{color:#fff!important}
 [data-theme="light"] .hero h1 em{-webkit-text-fill-color:var(--accent)}
@@ -1318,7 +1327,7 @@ window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', windo
 // REVEAL ON SCROLL
 // ═══════════════════════════════════════════
 const obs = new IntersectionObserver(entries => {
-  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('vis') });
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('vis'); obs.unobserve(e.target); } });
 }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
 document.querySelectorAll('.rv').forEach(el => obs.observe(el));
 
