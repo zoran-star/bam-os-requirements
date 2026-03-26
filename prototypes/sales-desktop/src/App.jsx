@@ -1,5 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { LocationProvider } from './context/LocationContext';
 import Layout from './components/Layout';
 import Sales from './pages/Sales';
@@ -23,6 +23,32 @@ function RouteNotifier() {
   return null;
 }
 
+// Track clicks inside the prototype and send to parent (survey)
+function ClickTracker() {
+  const location = useLocation();
+  const handleClick = useCallback((e) => {
+    if (window.parent === window) return;
+    const x = Math.round((e.clientX / window.innerWidth) * 10000) / 100;
+    const y = Math.round((e.clientY / window.innerHeight) * 10000) / 100;
+    const page = location.pathname.replace('/', '');
+    window.parent.postMessage({
+      type: 'fc-click',
+      x,
+      y,
+      target: e.target?.tagName || '',
+      page,
+      timestamp: Date.now(),
+    }, '*');
+  }, [location]);
+
+  useEffect(() => {
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [handleClick]);
+
+  return null;
+}
+
 export default function App() {
   // Apply saved theme on mount
   useEffect(() => {
@@ -36,6 +62,7 @@ export default function App() {
     <LocationProvider>
     <HashRouter>
       <RouteNotifier />
+      <ClickTracker />
       <Routes>
         <Route path="/" element={<Navigate to="/home" replace />} />
         <Route path="/home" element={<Layout><Home /></Layout>} />
