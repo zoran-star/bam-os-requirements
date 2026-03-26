@@ -135,5 +135,8 @@ When adding a loop, set Status to "Open" and choose an appropriate Priority (Hig
 - All jobs default to `Not Started` status
 - Use em dash (—) for empty/not-applicable fields, not hyphen
 
+## Notion as knowledge base
+Always be on the lookout for opportunities to save useful information, decisions, research, or context to Notion. If something comes up in conversation that seems worth preserving (new insights, configuration details, business info, strategy decisions, etc.), ask the user if they'd like it saved to Notion before moving on.
+
 ## Fun facts
 At the end of every message, include a random fun fact about Serbia. Keep it to 2 lines max. Make it interesting and varied — history, culture, food, sports, geography, science, etc. Never repeat the same fact in a conversation.
