@@ -473,7 +473,6 @@ export default function App() {
   const [pinMode, setPinMode] = useState(false)
   const [showRatingPrompt, setShowRatingPrompt] = useState(false)
   const [ratingStep, setRatingStep] = useState(0)
-  const [showFeedbackBank, setShowFeedbackBank] = useState(false)
   const [favorites, setFavorites] = useState([])
   const [hoursSaved, setHoursSaved] = useState('')
   const [hourlyRate, setHourlyRate] = useState('')
@@ -482,9 +481,8 @@ export default function App() {
   const [addedFeatures, setAddedFeatures] = useState('')
   const [finalPrice, setFinalPrice] = useState('')
 
-  // Walkthrough: 'intro1' → 'walkthrough' (view-only tour) → 'review' (explore+rate per page) → 'explore' (free)
+  // Walkthrough: 'intro1' → 'review' → next slide
   const [walkthroughPhase, setWalkthroughPhase] = useState('intro1')
-  const [walkthroughStep, setWalkthroughStep] = useState(0)
   const [reviewStep, setReviewStep] = useState(0)
 
   // Per-page ratings (1-5 dial) + optional notes
@@ -611,18 +609,20 @@ export default function App() {
 
   // No auto-timer — user clicks "Show me" to start walkthrough
 
-  // Track time spent on each walkthrough page
+  // Track time spent on each page during review phase
   useEffect(() => {
-    if (walkthroughPhase === 'walkthrough') {
+    if (walkthroughPhase === 'review') {
       stepStartRef.current = Date.now()
     }
-  }, [walkthroughStep, walkthroughPhase])
+  }, [walkthroughPhase])
 
   const recordTimeSpent = () => {
     if (stepStartRef.current) {
-      const page = WALKTHROUGH_STEPS[walkthroughStep]?.page
-      const elapsed = Math.round((Date.now() - stepStartRef.current) / 1000)
-      setPageTimestamps(prev => ({ ...prev, [page]: (prev[page] || 0) + elapsed }))
+      const page = reviewPageRef.current
+      if (page) {
+        const elapsed = Math.round((Date.now() - stepStartRef.current) / 1000)
+        setPageTimestamps(prev => ({ ...prev, [page]: (prev[page] || 0) + elapsed }))
+      }
       stepStartRef.current = Date.now()
     }
   }
@@ -636,63 +636,10 @@ export default function App() {
     setPageNotes(prev => ({ ...prev, [page]: text }))
   }
 
-  // Phase 1: Walkthrough (view-only tour)
-  const handleWalkthroughNext = () => {
-    recordTimeSpent()
-    if (walkthroughStep < WALKTHROUGH_STEPS.length - 1) {
-      setWalkthroughStep(s => s + 1); playSwoosh()
-    } else {
-      // Tour done → enter review phase (explore + rate per page)
-      setWalkthroughPhase('review'); setReviewStep(0); playDing()
-    }
-    document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  // Phase 2: Review — detect when user navigates away from current page in iframe
+  // Review — ref for current page being reviewed
   const reviewPageRef = useRef('home')
-  const pendingNavRef = useRef(null)
 
-  const handleProtoNavigate = useCallback((newPage) => {
-    if (walkthroughPhase !== 'review') return
-    if (showRatingPrompt) return // already showing modal
-    const currentPage = reviewPageRef.current
-    if (newPage !== currentPage && currentPage) {
-      // They navigated away — show rating for the page they just left
-      pendingNavRef.current = newPage
-      setShowRatingPrompt(true)
-      playDing()
-    }
-  }, [walkthroughPhase, showRatingPrompt])
 
-  // Track which pages have been visited
-  const [visitedPages, setVisitedPages] = useState(new Set(['home']))
-
-  const submitRatingAndAdvance = () => {
-    const page = reviewPageRef.current
-    if (!pageRatings[page]) return
-    playClick()
-    recordTimeSpent()
-    setShowRatingPrompt(false)
-
-    // Mark as visited
-    const newVisited = new Set(visitedPages)
-    newVisited.add(page)
-    if (pendingNavRef.current) newVisited.add(pendingNavRef.current)
-    setVisitedPages(newVisited)
-
-    // Update current review page to where they navigated
-    if (pendingNavRef.current) {
-      reviewPageRef.current = pendingNavRef.current
-      pendingNavRef.current = null
-    }
-
-    // Check if all pages are rated
-    const allRated = WALKTHROUGH_STEPS.every(s => pageRatings[s.page])
-    if (allRated) {
-      setWalkthroughPhase('explore'); playDing()
-      document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }
 
   // Pin management (lifted up)
   const addPin = (pin) => { setPins(prev => [...prev, pin]); setUndoStack(prev => [...prev, { action: 'add', pin }]) }
@@ -1136,7 +1083,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 5 — Prototype (intro → walkthrough → explore) ──── */}
+          {/* ──── SLIDE 5 — Prototype (intro → review) ──── */}
           {slide === 5 && (
             <motion.div style={{ width: '100%' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
 
@@ -1148,61 +1095,13 @@ export default function App() {
                   </h1>
                   <p className="subtitle" style={{ fontSize: 15, maxWidth: 500, marginBottom: 8 }}>Our mission is to help operators in sports and fitness use AI in the best, most effortless way possible, so you can shift your focus to making a real impact while your business works in the background.</p>
                   <p className="subtitle" style={{ fontSize: 15, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
-                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('walkthrough'); setWalkthroughStep(0); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('review'); setReviewStep(0); stepStartRef.current = Date.now(); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
                     Show me <span style={{ fontSize: 18 }}>&#8594;</span>
                   </button>
                 </motion.div>
               )}
 
-              {/* Walkthrough */}
-              {/* Phase 1: Walkthrough (guided tour, view-only) */}
-              {walkthroughPhase === 'walkthrough' && (
-                <>
-                  <div style={{ textAlign: 'center', marginBottom: 14 }}>
-                    <AnimatePresence mode="wait">
-                      <motion.div key={walkthroughStep} style={{ marginBottom: 10 }}
-                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
-                        <div style={{ display: 'inline-block', background: 'rgba(200,168,78,0.12)', border: '1px solid rgba(200,168,78,0.25)', borderRadius: 8, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: 'var(--gold)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
-                          {WALKTHROUGH_STEPS[walkthroughStep]?.page}
-                        </div>
-                        <p className="subtitle" style={{ fontSize: 15, maxWidth: 520, marginBottom: 8 }}>
-                          {WALKTHROUGH_STEPS[walkthroughStep]?.text}
-                        </p>
-                        {WALKTHROUGH_STEPS[walkthroughStep]?.example && (
-                          <div style={{
-                            display: 'inline-block', background: 'var(--surface-2)', border: '1px solid var(--border)',
-                            borderRadius: 12, padding: '8px 16px', fontSize: 13, color: 'var(--text-2)',
-                            fontStyle: 'italic', maxWidth: 500, lineHeight: 1.5, margin: '0 auto',
-                          }}>
-                            {WALKTHROUGH_STEPS[walkthroughStep].example}
-                          </div>
-                        )}
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6, fontWeight: 600 }}>
-                          All of this works by talking to <span style={{ color: 'var(--gold)' }}>Sage</span> from the Home page.
-                        </div>
-                      </motion.div>
-                    </AnimatePresence>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{walkthroughStep + 1} / {WALKTHROUGH_STEPS.length}</span>
-                      <button className="btn btn-primary" onClick={handleWalkthroughNext} style={{ padding: '10px 28px', fontSize: 14 }}>
-                        Next →
-                      </button>
-                    </div>
-                  </div>
-                  <div className="walkthrough-proto-wrap">
-                    <PrototypeIframe page={WALKTHROUGH_STEPS[walkthroughStep]?.page} />
-                    <div className="walkthrough-dim-overlay" />
-                    <div className="walkthrough-page-label">
-                      {WALKTHROUGH_STEPS[walkthroughStep]?.page}
-                    </div>
-                    <div className="walkthrough-nav-pointer" style={{ top: [155, 200, 245, 290, 335, 380][walkthroughStep] || 155 }}>
-                      <div className="walkthrough-nav-arrow" />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Phase 2: Review (pill tracker + click to rate) */}
+              {/* Review phase (pill tracker + click to rate) */}
               {walkthroughPhase === 'review' && (
                 <>
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
@@ -1218,7 +1117,7 @@ export default function App() {
                         return (
                           <button key={step.page}
                             className={`review-pill ${rated ? 'rated' : ''} ${active ? 'active' : ''}`}
-                            onClick={() => { reviewPageRef.current = step.page; setReviewStep(i); setShowRatingPrompt(false); document.getElementById('review-iframe')?.setAttribute('src', PROTO_URL + '/#/' + step.page) }}
+                            onClick={() => { recordTimeSpent(); reviewPageRef.current = step.page; setReviewStep(i); setShowRatingPrompt(false); document.getElementById('review-iframe')?.setAttribute('src', PROTO_URL + '/#/' + step.page) }}
                           >
                             {rated && <span className="review-pill-check">&#10003;</span>}
                             <span style={{ textTransform: 'capitalize' }}>{step.page}</span>
@@ -1235,7 +1134,7 @@ export default function App() {
                   {/* Rate button below prototype */}
                   {!showRatingPrompt && (
                     <div style={{ textAlign: 'center', marginTop: 16 }}>
-                      <button className="btn btn-primary" onClick={() => { setShowRatingPrompt(true); playDing() }} style={{ padding: '12px 32px', fontSize: 14 }}>
+                      <button className="btn btn-primary" onClick={() => { recordTimeSpent(); setShowRatingPrompt(true); playDing() }} style={{ padding: '12px 32px', fontSize: 14 }}>
                         Rate {reviewPageRef.current}
                       </button>
                     </div>
@@ -1244,7 +1143,7 @@ export default function App() {
                   {/* Continue button (only when all rated) */}
                   {WALKTHROUGH_STEPS.every(s => pageRatings[s.page]) && !showRatingPrompt && (
                     <div style={{ textAlign: 'center', marginTop: 12 }}>
-                      <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('explore'); playComplete(); next() }} style={{ padding: '14px 40px', fontSize: 15 }}>
+                      <button className="btn btn-primary" onClick={() => { recordTimeSpent(); playComplete(); next() }} style={{ padding: '14px 40px', fontSize: 15 }}>
                         All rated, continue &#8594;
                       </button>
                     </div>
@@ -1267,7 +1166,7 @@ export default function App() {
                           />
                           <button
                             className="btn btn-primary"
-                            onClick={() => { if (!pageRatings[reviewPageRef.current]) return; setShowRatingPrompt(false); playClick(); recordTimeSpent() }}
+                            onClick={() => { if (!pageRatings[reviewPageRef.current]) return; setShowRatingPrompt(false); playClick(); stepStartRef.current = Date.now() }}
                             style={{ marginTop: 16, padding: '12px 32px', fontSize: 14, opacity: pageRatings[reviewPageRef.current] ? 1 : 0.4 }}
                           >
                             Done
@@ -1279,47 +1178,6 @@ export default function App() {
                 </>
               )}
 
-              {/* Explore mode */}
-              {walkthroughPhase === 'explore' && (
-                <>
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <h2 style={{ fontSize: 'clamp(18px, 3vw, 24px)', marginBottom: 4 }}>Take a closer look.</h2>
-                    <p className="subtitle" style={{ fontSize: 13, marginBottom: 8 }}>Click around freely. Your ratings are saved in the bubble below.</p>
-                  </motion.div>
-                  <div style={{ borderRadius: 20, padding: 2, background: 'linear-gradient(135deg, rgba(200,168,78,0.25), transparent 40%, transparent 60%, rgba(200,168,78,0.15))', boxShadow: '0 0 60px rgba(200,168,78,0.08)' }}>
-                    <PrototypeIframe />
-                  </div>
-                  <div style={{ marginTop: 24, display: 'flex', gap: 12, justifyContent: 'center' }}>
-                    <button className="btn btn-ghost" onClick={prev}>Back</button>
-                    <button className="btn btn-primary" onClick={next}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
-                  </div>
-                  {/* Feedback bank bubble */}
-                  {Object.keys(pageRatings).length > 0 && (
-                    <button className="feedback-bubble" onClick={() => setShowFeedbackBank(!showFeedbackBank)}>
-                      <span className="feedback-bubble-count">{Object.keys(pageRatings).length}</span>
-                      <span className="feedback-bubble-label">rated</span>
-                    </button>
-                  )}
-                  <AnimatePresence>
-                    {showFeedbackBank && (
-                      <motion.div className="feedback-bank" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-                        <div className="feedback-bank-header">Your ratings (tap to edit)</div>
-                        {WALKTHROUGH_STEPS.filter(s => pageRatings[s.page]).map(step => (
-                          <div key={step.page} className="feedback-bank-item">
-                            <span style={{ fontWeight: 600, color: 'var(--text-2)', textTransform: 'capitalize', fontSize: 13 }}>{step.page}</span>
-                            <div className="rating-summary-dots" style={{ gap: 4 }}>
-                              {[1,2,3,4,5].map(n => (
-                                <button key={n} className={`rating-mini-dot ${(pageRatings[step.page] || 0) >= n ? 'active' : ''}`}
-                                  onClick={() => setRating(step.page, n)} style={{ width: 26, height: 26, fontSize: 11 }}>{n}</button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </>
-              )}
             </motion.div>
           )}
 
