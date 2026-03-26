@@ -492,6 +492,7 @@ export default function App() {
   // Engagement tracking
   const [pageTimestamps, setPageTimestamps] = useState({})
   const [engagementData, setEngagementData] = useState({})
+  const [clickData, setClickData] = useState([])
   const stepStartRef = useRef(null)
 
   // Legacy pin state (kept minimal for PrototypeMockup compatibility)
@@ -500,6 +501,23 @@ export default function App() {
   const [undoStack, setUndoStack] = useState([])
 
   const allSelectedFeatures = [...selectedChips, ...customFeatures, ...extraChips]
+
+  // Listen for click tracking messages from the prototype iframe
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === 'fc-click') {
+        setClickData(prev => [...prev, {
+          x: e.data.x,
+          y: e.data.y,
+          target: e.data.target,
+          page: e.data.page,
+          timestamp: e.data.timestamp,
+        }])
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   const go = useCallback((target) => { setDir(target > slide ? 1 : -1); setSlide(target); lastSlideRef.current = Math.max(lastSlideRef.current, target); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }) }, [slide])
   const next = useCallback(() => { if (slide < TOTAL_SLIDES - 1) go(slide + 1) }, [slide, go])
@@ -703,6 +721,7 @@ export default function App() {
         // Engagement
         page_timestamps: pageTimestamps,
         engagement_data: engagementData,
+        click_data: clickData,
         // Pricing (#10 — clamp negatives)
         hours_saved: hoursSaved ? Math.max(0, parseInt(hoursSaved)) : null,
         hourly_rate: hourlyRate ? Math.max(0, parseInt(hourlyRate)) : null,
