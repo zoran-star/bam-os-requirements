@@ -5,7 +5,7 @@ import { supabase } from './supabase'
 
 const PROTO_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:5173'
-  : 'https://fullcontrol-prototype.vercel.app'
+  : 'https://fc-prototype.vercel.app'
 
 function PrototypeIframe({ page, onNavigate, persistent }) {
   const iframeRef = useRef(null)
