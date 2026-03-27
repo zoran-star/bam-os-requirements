@@ -316,10 +316,6 @@ function ChannelDetail({ channel, onClose }) {
             </div>
           </div>
         </div>
-              <option key={c.name} value={c.name}>{c.name} ({c.status})</option>
-            ))}
-          </select>
-        </div>
 
         <div className={s.budgetCurrentCard}>
           <div className={s.budgetCurrentRow}><span>Current daily budget</span><span>{camp.daily}</span></div>
