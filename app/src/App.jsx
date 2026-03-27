@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useEffect, useCallback } from 'react';
+// Vercel auto-deploy verification — Mar 28, 2026
 import { LocationProvider } from './context/LocationContext';
 import Layout from './components/Layout';
 import Sales from './pages/Sales';
