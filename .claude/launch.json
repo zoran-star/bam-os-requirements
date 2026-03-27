@@ -2,23 +2,18 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "prototype",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8090", "--directory", "prototype"],
-      "port": 8090
-    },
-    {
-      "name": "sales-prototype",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "prototypes"],
-      "port": 8080
+      "name": "app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173,
+      "cwd": "app"
     },
     {
       "name": "survey",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5180,
-      "cwd": "prototypes/survey"
+      "cwd": "survey"
     }
   ]
 }

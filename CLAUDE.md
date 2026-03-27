@@ -29,24 +29,43 @@ When committing, include a summary of what changed in the commit message body �
 ## What this repo is
 This repository holds the interactive business requirements flow diagram for BAM OS (`bam_os_business_requirements_flow.html`). It is a single self-contained HTML file with embedded JavaScript data representing all business requirements across 7 domains.
 
+## Repo structure
+
+```
+bam-os-requirements/
+├── app/                ← FullControl prototype (Vite/React)
+│                         Auto-deploys to: https://fullcontrol-prototype.vercel.app
+├── survey/             ← User survey (Vite/React)
+│                         Auto-deploys to: https://full-control-survey.vercel.app
+├── docs/
+│   ├── fc-company/     ← Investor page
+│   └── fc-landing/     ← Product landing page (reference)
+├── prompts/            ← Prompt templates
+├── bam_os_business_requirements_flow.html
+└── CLAUDE.md
+```
+
 ### Key files
 - `bam_os_business_requirements_flow.html` — interactive flowchart with all requirements data
-- `ux/BAM_OS_UX_DECISIONS.md` — confirmed UX & interaction design decisions (navigation, Sage AI, design system, micro-interactions, notifications, multi-location, role-based views). This is the source of truth for how BAM OS looks, feels, and behaves.
-- `branding/CONTEXT.md` — brand & naming context
+- `docs/fc-company/index.html` — investor-facing page (active)
+- `docs/fc-landing/index.html` — product landing page (reference, not active)
 
-## Landing pages
+## Deployments
 
-### Investor page (`prototypes/fc-company/index.html`)
-This is the page we send to investors. It covers mission, market sizing, ARR projections, "why us / why now", and product wedge. **This is the active investor-facing page — edits go here.**
+Both apps auto-deploy on every push to `main` via Vercel Git integration:
 
-### Product landing page (`prototypes/fc-landing/index.html`)
-Initial prototype of the customer-facing landing page. General service-business positioning, feature grid, Sage AI demo, revenue calculator, early access signup. Not currently active — kept as a reference/starting point.
+| App | Directory | Live URL |
+|-----|-----------|----------|
+| Prototype | `app/` | https://fullcontrol-prototype.vercel.app |
+| Survey | `survey/` | https://full-control-survey.vercel.app |
+
+**Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
 
 ## Desktop prototype app
 The interactive desktop prototype is a Vite/React app located at:
 
 ```
-prototypes/sales-desktop/src/
+app/src/
 ```
 
 **This is where all UI/prototype edits should be made.** The app structure:
@@ -54,8 +73,6 @@ prototypes/sales-desktop/src/
 - `src/components/` — shared components (Layout, Sidebar, GlobalInbox, PageBanner, StatPill)
 - `src/styles/` — CSS modules per component/page
 - `src/hooks/` — custom React hooks
-
-When editing the prototype, always work in the `src/` directory above. Do NOT edit standalone HTML files in `prototype/` — those are legacy.
 
 **If the prototype app location ever changes**, update this section immediately to reflect the new path so all collaborators always know where to find it.
 
