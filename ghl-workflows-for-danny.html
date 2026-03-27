@@ -427,28 +427,146 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
   </div>
   <p class="section-desc">All pre-trial, post-trial, lead nurture, and maintenance workflows. This is the sales pipeline automation engine.</p>
 
-  <!-- PRE-TRIAL: CONTACT FORM -->
+  <!-- PRE-TRIAL: CONTACT FORM (DETAILED — actual GHL steps) -->
   <h3 style="color: var(--blue); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; CONTACT FORM</h3>
+  <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+  <!-- WORKFLOW 1: contact form filled in -->
+  <div class="wf-card" style="border-left: 3px solid var(--accent);">
+    <h4>Workflow: "contact form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>9</strong> enrolled)</span></h4>
+    <div class="wf-meta">23 versions | Last updated Oct 20, 2025</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <!-- TRIGGERS -->
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGERS (either one starts the workflow)</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Form Submitted: "Lead Texting Form"</div>
+      <div class="flow-label">OR</div>
+      <div class="flow-node trigger">Form Submitted: "Contact Form"</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 1 — Tag + Pipeline</div>
+      <div class="flow-row">
+        <div class="flow-node action">Add tags</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Put in "interested" pipeline stage</div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 2 — Wait, then notify + text</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 2 minutes</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Notify Sergio (internal)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Notify Zoran (internal)</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-arrow" style="margin-left: 20px;">&darr;</div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-node action" style="border-color: var(--green); max-width: 500px; white-space: normal;">
+          <strong>SMS to lead:</strong> "Hi {{first_name}}, It's coach from By Any Means Basketball. Just saw you filled in the form for extra info - is there anything I can help with?"
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 3 — Wait 1 day, then check</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Notify Zoran (reminder — lead hasn't responded)</div>
+      </div>
+    </div>
+
+    <!-- STEP 4 — WAIT/CONDITION -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 4 — Wait for booking (up to 1 day)</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Wait for condition:</strong> Tag "free trial booked" exists<br>
+          <span style="font-size: 0.7rem; color: var(--text-muted);">Timeout: 1 day</span>
+        </div>
+      </div>
+
+      <!-- BRANCH: Condition met -->
+      <div class="flow-group" style="border-left-color: var(--green); margin-top: 12px;">
+        <div class="flow-group-label" style="color: var(--green);">IF BOOKED (tag "free trial booked" found)</div>
+        <div class="flow-row">
+          <div class="flow-node outcome">END — "free trial booked" workflow takes over</div>
+        </div>
+      </div>
+
+      <!-- BRANCH: Timeout -->
+      <div class="flow-group" style="border-left-color: var(--red); margin-top: 12px;">
+        <div class="flow-group-label" style="color: var(--red);">IF NOT BOOKED (timeout after 1 day)</div>
+        <div class="flow-row">
+          <div class="flow-node action">Notify staff: "being put in ghosted" (x2)</div>
+        </div>
+        <div class="flow-row" style="margin-top: 8px;">
+          <div class="flow-arrow" style="margin-left: 20px;">&darr;</div>
+        </div>
+
+        <!-- SUB-CONDITION: Active member check -->
+        <div class="flow-row">
+          <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+            <strong>Check:</strong> Has tag "liveclient"?
+          </div>
+        </div>
+
+        <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+          <div class="flow-group-label" style="color: var(--green);">YES — Already an active member</div>
+          <div class="flow-row">
+            <div class="flow-node outcome">END — don't put members in ghosted</div>
+          </div>
+        </div>
+
+        <div class="flow-group" style="border-left-color: var(--red); margin-top: 8px;">
+          <div class="flow-group-label" style="color: var(--red);">NO — Not a member</div>
+          <div class="flow-row">
+            <div class="flow-node escalation">Add to "sms ghosted" workflow</div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node outcome">END</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW 2: replied to 'contact form filled in' -->
+  <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+    <h4>Workflow: "replied to 'contact form filled in'" <span class="tag published">Published</span> <span class="stat">(<strong>5</strong> enrolled)</span></h4>
+    <div class="wf-meta">7 versions | Last updated Oct 20, 2025 | Circuit breaker workflow</div>
+  </div>
+
   <div class="flow-container">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
     <div class="flow-row">
-      <div class="flow-node trigger">Contact form submitted on website</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">contact form filled in <span class="stat">(<strong>9</strong> enrolled)</span></div>
+      <div class="flow-node trigger">Customer Replied — filtered to replies to "contact form filled in" workflow</div>
     </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Sends immediate SMS + email follow-up to anyone who fills out the general contact/inquiry form on the website. Multi-step drip to book them into a free trial.</p>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">ACTION</div>
+      <div class="flow-row">
+        <div class="flow-node action">
+          <strong>Create/Update Opportunity</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Pipeline: TRAINING PIPELINE | Stage: "responded"</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
     </div>
-    <div class="flow-row">
-      <div class="flow-node response">Lead replies to any message</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">replied to 'contact form filled in' <span class="stat">(<strong>5</strong> enrolled)</span></div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>How these two connect:</strong> When the lead replies to any SMS sent by "contact form filled in", this workflow fires automatically. It moves their pipeline opportunity to "responded" stage — signaling to staff that a human conversation is happening. The original workflow's wait/condition steps will also detect activity via tags.
     </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted);">Stops the drip sequence and notifies staff. Human takes over conversation.</p>
-    </div>
-    <div class="connection-note">Connection: If lead never replies &rarr; eventually enters "sms ghosted" workflow</div>
   </div>
 
   <!-- PRE-TRIAL: FREE TRIALS -->
