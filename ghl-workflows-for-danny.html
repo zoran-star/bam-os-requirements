@@ -573,15 +573,106 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
   <h3 style="color: var(--blue); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; FREE TRIALS</h3>
   <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
 
-  <!-- trial form filled in — NOT YET DETAILED -->
-  <div class="wf-card" style="border-left: 3px solid var(--text-muted); opacity: 0.7;">
-    <h4>Workflow: "trial form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>349</strong> enrolled)</span></h4>
-    <div class="wf-meta">45 versions | Not yet detailed — to be documented next</div>
-    <div class="wf-desc">Sends SMS/email to confirm interest, push toward booking a free trial session. Tags contact, moves pipeline stage.</div>
+  <!-- WORKFLOW: trial form filled in (DETAILED) -->
+  <div class="wf-card" style="border-left: 3px solid var(--blue);">
+    <h4>Workflow: "trial form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>349</strong> enrolled, <strong>1</strong> active)</span></h4>
+    <div class="wf-meta">45 versions | Last updated Oct 7, 2025 | Catches leads who fill the pre-booking form but don't select a time</div>
   </div>
-  <div class="wf-card" style="border-left: 3px solid var(--text-muted); opacity: 0.7; margin-bottom: 24px;">
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <!-- TRIGGER -->
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Form Submitted: "main free trial form"<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Fires when someone fills out the booking form but doesn't pick a date/time</span>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 1 — Tag + Opportunity</div>
+      <div class="flow-row">
+        <div class="flow-node action">Add Tag "lead Free Session Form"</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Find Opportunity</strong>
+        </div>
+      </div>
+      <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+        <div class="flow-group-label" style="color: var(--green);">OPPORTUNITY FOUND</div>
+        <div class="flow-row"><div class="flow-node action">Update opportunity</div></div>
+      </div>
+      <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+        <div class="flow-group-label">OPPORTUNITY NOT FOUND</div>
+        <div class="flow-row"><div class="flow-node action">Create Opportunity</div></div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 2 — Wait, Notify, then SMS</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 40 minutes</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action">notify Sergio (internal)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">notify Zoran (internal)</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action" style="border-color: var(--green); max-width: 500px; white-space: normal;">
+          <strong>SMS to lead:</strong> "Hi {{first_name}}, it's coach from By Any Means GTA. I saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial? Here's the link to the calendar again: {{location.website}}/free-trial"
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 3 — Wait 1 day, then ghost</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action">notify Zoran</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">notify Sergio</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node escalation">Add to "sms ghosted" workflow</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+    </div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>Key context:</strong> This workflow fires for leads who filled the pre-booking form (name, info) but abandoned before selecting a time. It auto-stops if: (1) the contact books a trial (handled by "free trial booked" workflow), or (2) the contact replies to any SMS (handled by "responded to 'trial form filled in'" workflow). If neither happens within 1 day, the lead goes into ghosted.
+    </div>
+  </div>
+
+  <!-- WORKFLOW: responded to 'trial form filled in' -->
+  <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
     <h4>Workflow: "responded to 'trial form filled in'" <span class="tag published">Published</span> <span class="stat">(<strong>39</strong> enrolled)</span></h4>
-    <div class="wf-meta">Circuit breaker — not yet detailed</div>
+    <div class="wf-meta">3 versions | Last updated Jun 7, 2025 | Circuit breaker workflow</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 24px;">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Customer Replied — filtered to replies to "trial form filled in" workflow</div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">ACTION</div>
+      <div class="flow-row">
+        <div class="flow-node action">
+          <strong>Create/Update Opportunity</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Moves the opportunity to "responded" stage — signals human conversation happening</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+    </div>
   </div>
 
   <hr style="border-color: var(--border); margin: 24px 0;">
