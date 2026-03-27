@@ -569,44 +569,218 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
     </div>
   </div>
 
-  <!-- PRE-TRIAL: FREE TRIALS -->
+  <!-- PRE-TRIAL: FREE TRIALS (DETAILED — actual GHL steps) -->
   <h3 style="color: var(--blue); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; FREE TRIALS</h3>
+  <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+  <!-- trial form filled in — NOT YET DETAILED -->
+  <div class="wf-card" style="border-left: 3px solid var(--text-muted); opacity: 0.7;">
+    <h4>Workflow: "trial form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>349</strong> enrolled)</span></h4>
+    <div class="wf-meta">45 versions | Not yet detailed — to be documented next</div>
+    <div class="wf-desc">Sends SMS/email to confirm interest, push toward booking a free trial session. Tags contact, moves pipeline stage.</div>
+  </div>
+  <div class="wf-card" style="border-left: 3px solid var(--text-muted); opacity: 0.7; margin-bottom: 24px;">
+    <h4>Workflow: "responded to 'trial form filled in'" <span class="tag published">Published</span> <span class="stat">(<strong>39</strong> enrolled)</span></h4>
+    <div class="wf-meta">Circuit breaker — not yet detailed</div>
+  </div>
+
+  <hr style="border-color: var(--border); margin: 24px 0;">
+
+  <!-- WORKFLOW: free trial booked (DETAILED) -->
+  <div class="wf-card" style="border-left: 3px solid var(--accent);">
+    <h4>Workflow: "free trial booked" <span class="tag published">Published</span> <span class="stat">(<strong>277</strong> enrolled)</span></h4>
+    <div class="wf-meta">140 versions | Last updated Feb 11, 2026 | Highest-volume workflow — the core of the sales funnel</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <!-- TRIGGER -->
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Customer Booked Appointment — Calendar Group: "Book Your Free Trial"</div>
+    </div>
+
+    <!-- STEP 1: Cleanup + Pipeline -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 1 — Cleanup + Pipeline Setup</div>
+      <div class="flow-row">
+        <div class="flow-node action">Remove from Workflow (stops any prior sequences)</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action">Create/Update Opportunity</div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Confirmations -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 2 — Send Confirmations</div>
+      <div class="flow-row">
+        <div class="flow-node action" style="border-color: var(--green);">Confirmation text (SMS to lead)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--green);">Confirmation email (to lead)</div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Internal Notifications -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 3 — Notify Staff</div>
+      <div class="flow-row">
+        <div class="flow-node action">msg Zoran (internal)</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">msg Adrian (internal)</div>
+      </div>
+    </div>
+
+    <!-- STEP 4: Referral Check -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 4 — Referral Source Check</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Condition:</strong> Has tag "glueguyresponsible"?
+        </div>
+      </div>
+      <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+        <div class="flow-group-label" style="color: var(--green);">YES — came from referral partner</div>
+        <div class="flow-row">
+          <div class="flow-node action">Add Tag (referral tracking)</div>
+        </div>
+      </div>
+      <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+        <div class="flow-group-label">NO — organic / other source</div>
+        <div class="flow-row">
+          <div class="flow-node action">Go To (skip to next step)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5: Tag + Pipeline Stage -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 5 — Tag + Pipeline + Contact Field</div>
+      <div class="flow-row">
+        <div class="flow-node action">Add "free trial booked" tag</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Put in "scheduled trial" stage</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Update contact field</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action">Add "sentfreetrialconfirmation" tag</div>
+      </div>
+    </div>
+
+    <!-- STEP 6: Pre-Session Reminder (Saturday logic) -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 6 — Pre-Session Reminder (6 hours before appointment)</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait until 6 hours BEFORE appointment</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Condition:</strong> Is it Saturday?
+        </div>
+      </div>
+
+      <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+        <div class="flow-group-label">NOT SATURDAY (weekday)</div>
+        <div class="flow-row">
+          <div class="flow-node action" style="border-color: var(--green);">Check-in text (SMS to lead)</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Internal text: key info on trial athlete</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Internal text: key info (fit specific)</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Internal text: key info (addon specific)</div>
+        </div>
+      </div>
+
+      <div class="flow-group" style="border-left-color: var(--purple); margin-top: 8px;">
+        <div class="flow-group-label" style="color: var(--purple);">SATURDAY</div>
+        <div class="flow-row">
+          <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 2 hours before appointment</div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node action">Go To (joins the weekday flow)</div>
+        </div>
+        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Saturday sessions get a shorter lead time for reminders</p>
+      </div>
+    </div>
+
+    <!-- STEP 7: Wait for Reply -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 7 — Wait for Lead to Reply (70 min timeout)</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Wait for a reply</strong><br>
+          <span style="font-size: 0.7rem; color: var(--text-muted);">Timeout: 70 minutes</span>
+        </div>
+      </div>
+
+      <div class="flow-group" style="border-left-color: var(--green); margin-top: 12px;">
+        <div class="flow-group-label" style="color: var(--green);">CONTACT REPLIED (within 70 min)</div>
+        <div class="flow-row">
+          <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait until after session</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Post Trial Form to email — notify Zoran</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Post Trial Form to email — notify Filip</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action" style="border-color: var(--green);">Post Trial Form via email (to lead)</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node action">Post Trial Form via email — notify Adrian</div>
+        </div>
+        <div class="flow-row" style="margin-top: 6px;">
+          <div class="flow-node outcome">END</div>
+        </div>
+      </div>
+
+      <div class="flow-group" style="border-left-color: var(--red); margin-top: 12px;">
+        <div class="flow-group-label" style="color: var(--red);">TIMEOUT (no reply after 70 min)</div>
+        <div class="flow-row">
+          <div class="flow-node action">Notify Zoran</div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node action">Notify Sergio</div>
+          <div class="flow-arrow">&rarr;</div>
+          <div class="flow-node action">Go To (loops to post-trial form steps)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW 2: responded to 'free trial booked' -->
+  <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+    <h4>Workflow: "responded to 'free trial booked'" <span class="tag published">Published</span> <span class="stat">(<strong>48</strong> enrolled)</span></h4>
+    <div class="wf-meta">8 versions | Last updated Jul 21, 2025 | Circuit breaker workflow</div>
+  </div>
+
   <div class="flow-container">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
     <div class="flow-row">
-      <div class="flow-node trigger">Lead fills out trial interest form</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">trial form filled in <span class="stat">(<strong>349</strong> enrolled)</span></div>
-    </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Sends SMS/email to confirm interest, push toward booking a free trial session. Tags contact, moves pipeline stage.</p>
+      <div class="flow-node trigger">
+        Customer Replied — filtered to replies to "free trial booked" workflow<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Additional filter: Has Tag includes "sentfreetrialconfirmation"</span>
+      </div>
     </div>
 
-    <div class="flow-row">
-      <div class="flow-node response">Lead replies</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">responded to 'trial form filled in' <span class="stat">(<strong>39</strong> enrolled)</span></div>
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">ACTION</div>
+      <div class="flow-row">
+        <div class="flow-node action">
+          <strong>Remove Tag</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Removes the confirmation tag to prevent duplicate messages</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
     </div>
 
-    <hr style="border-color: var(--border); margin: 16px 0;">
-
-    <div class="flow-row">
-      <div class="flow-node trigger">Lead books a free trial session (calendar)</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">free trial booked <span class="stat">(<strong>277</strong> enrolled)</span></div>
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>How these connect:</strong> When a lead replies to any message from "free trial booked", this workflow fires and removes the "sentfreetrialconfirmation" tag. This prevents the reminder sequence from re-sending. After the trial session, the workflow sends the Post Trial Form to the lead and notifies staff (Zoran, Filip, Adrian) to follow up. If the lead doesn't reply within 70 minutes of the check-in text, staff are notified directly.
     </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">This is the <strong style="color: var(--accent);">highest-volume workflow</strong>. Sends confirmation SMS + email, appointment reminders (24hr, 1hr before), and day-of logistics. Also tags contact and updates pipeline stage. ~140 versions — heavily iterated.</p>
-    </div>
-
-    <div class="flow-row">
-      <div class="flow-node response">Lead replies to booking messages</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">responded to 'free trial booked' <span class="stat">(<strong>48</strong> enrolled)</span></div>
-    </div>
-
-    <div class="connection-note">Connection: After the trial session &rarr; "Done Trial" or "Missed Trial" workflow fires</div>
   </div>
 
   <!-- PRE-TRIAL: GHOSTED -->
