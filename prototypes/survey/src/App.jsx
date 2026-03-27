@@ -302,34 +302,102 @@ const CHALLENGE_OPTIONS = [
   { key: 'both', label: 'Both equally', desc: 'I need growth AND freedom', icon: '⚡' },
 ]
 
-/* ─── Rating Dial (1-5) ───────────────────────────────────────── */
-function RatingDial({ value, onChange, page }) {
-  const labels = ['', 'Not useful', 'Slightly useful', 'Useful', 'Very useful', 'Essential']
+/* ─── Voice Feedback (per-section mandatory voice note) ───────── */
+function VoiceFeedback({ value, onChange, page }) {
+  const [recording, setRecording] = useState(false)
+  const recognitionRef = useRef(null)
+  const [pulse, setPulse] = useState(false)
+
+  const toggleRecording = () => {
+    if (recording) { recognitionRef.current?.stop(); setRecording(false); return }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { alert('Speech recognition not supported. Try Chrome.'); return }
+    const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = 'en-US'
+    let finalTranscript = value || ''
+    r.onresult = (e) => {
+      let interim = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalTranscript += (finalTranscript ? ' ' : '') + e.results[i][0].transcript
+        } else {
+          interim += e.results[i][0].transcript
+        }
+      }
+      onChange(finalTranscript + (interim ? ' ' + interim : ''))
+    }
+    r.onerror = () => setRecording(false)
+    r.onend = () => setRecording(false)
+    recognitionRef.current = r; r.start(); setRecording(true)
+  }
+
+  // Pulse animation to draw attention to mic
+  useEffect(() => {
+    if (!value && !recording) {
+      const t = setTimeout(() => setPulse(true), 800)
+      return () => clearTimeout(t)
+    }
+    setPulse(false)
+  }, [value, recording])
+
   return (
-    <motion.div className="rating-dial-wrap" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-      <div className="rating-dial-label">How useful would <strong>{page}</strong> be for your business?</div>
-      <div className="rating-dial">
-        {[1,2,3,4,5].map(n => (
-          <button key={n} className={`rating-dot ${value >= n ? 'active' : ''} ${value === n ? 'current' : ''}`}
-            onClick={() => onChange(n)}>
-            <span className="rating-dot-num">{n}</span>
-          </button>
-        ))}
-        <div className="rating-track">
-          <div className="rating-fill" style={{ width: `${((value || 0) - 1) / 4 * 100}%` }} />
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} style={{ width: '100%', maxWidth: 460, margin: '0 auto' }}>
+      <div style={{ fontSize: 15, color: 'var(--text-2)', marginBottom: 16, lineHeight: 1.5 }}>
+        What do you think about <strong style={{ color: 'var(--gold)' }}>{page}</strong>? Love it, hate it, confused by it — just say what comes to mind.
+      </div>
+
+      {/* Big mic button */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <button
+          onClick={toggleRecording}
+          className={`voice-feedback-mic ${recording ? 'recording' : ''} ${pulse && !value ? 'pulse' : ''}`}
+          style={{
+            width: 80, height: 80, borderRadius: '50%',
+            background: recording ? '#e74c3c' : value ? 'rgba(200,168,78,0.15)' : 'rgba(200,168,78,0.25)',
+            border: recording ? '3px solid #e74c3c' : value ? '3px solid var(--gold)' : '3px solid rgba(200,168,78,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.3s ease',
+            boxShadow: recording ? '0 0 30px rgba(231,76,60,0.4)' : pulse && !value ? '0 0 20px rgba(200,168,78,0.3)' : 'none',
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke={recording ? '#fff' : 'var(--gold)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        </button>
+        <div style={{ fontSize: 13, color: recording ? '#e74c3c' : 'var(--text-3)', fontWeight: 600 }}>
+          {recording ? 'Listening... tap to stop' : value ? 'Tap to add more' : 'Tap to speak'}
         </div>
       </div>
-      {value > 0 && <div className="rating-label">{labels[value]}</div>}
-    </motion.div>
-  )
-}
 
-/* ─── Note Input (optional comment per page) ──────────────────── */
-function PageNoteInput({ value, onChange, page }) {
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} style={{ width: '100%', maxWidth: 500, margin: '0 auto' }}>
-      <input type="text" className="page-note-input" placeholder="Anything specific about this section? (optional)"
-        value={value || ''} onChange={e => onChange(e.target.value)} />
+      {/* Transcript display / edit */}
+      {value && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <textarea
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Or type your feedback here..."
+            style={{ width: '100%', minHeight: 80, fontSize: 14, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '12px 14px', color: 'var(--text-1)', resize: 'vertical', fontFamily: 'var(--font)' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+            <button onClick={() => onChange('')} style={{ background: 'none', border: 'none', fontSize: 11, color: 'var(--text-3)', cursor: 'pointer', fontFamily: 'var(--font)' }}>Clear</button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Type fallback if no voice */}
+      {!value && !recording && (
+        <div style={{ textAlign: 'center', marginTop: 4 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>or </span>
+          <textarea
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder="type your thoughts here..."
+            style={{ width: '100%', minHeight: 60, fontSize: 13, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '10px 12px', color: 'var(--text-1)', resize: 'vertical', fontFamily: 'var(--font)', marginTop: 6 }}
+          />
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -485,9 +553,10 @@ export default function App() {
   const [walkthroughPhase, setWalkthroughPhase] = useState('intro1')
   const [reviewStep, setReviewStep] = useState(0)
 
-  // Per-page ratings (1-5 dial) + optional notes
+  // Per-page ratings (1-5 dial) + voice feedback notes
   const [pageRatings, setPageRatings] = useState({})
   const [pageNotes, setPageNotes] = useState({})
+  const [showAllRatedModal, setShowAllRatedModal] = useState(false)
 
   // Engagement tracking
   const [pageTimestamps, setPageTimestamps] = useState({})
@@ -948,6 +1017,7 @@ export default function App() {
                     className="btn btn-primary"
                     onClick={() => {
                       setNdaTimestamp(new Date().toISOString())
+                      setUserName(ndaName.trim())
                       next()
                     }}
                     style={{ opacity: (ndaName.trim() && ndaSignature && ndaAgreed) ? 1 : 0.4, pointerEvents: (ndaName.trim() && ndaSignature && ndaAgreed) ? 'auto' : 'none' }}
@@ -967,7 +1037,6 @@ export default function App() {
 
               {/* Contact info */}
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380, margin: '0 auto 20px' }}>
-                <input type="text" placeholder="Your name *" value={userName} onChange={e => setUserName(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="tel" inputMode="tel" pattern="[0-9+\-\s]{7,}" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="url" placeholder="Business website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
@@ -1057,7 +1126,7 @@ export default function App() {
 
               <motion.div variants={fadeSlideUp} style={{ marginTop: 28, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={next} style={{ opacity: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4, pointerEvents: (userName && userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 'auto' : 'none' }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
+                <button className="btn btn-primary" onClick={next} style={{ opacity: (userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 1 : 0.4, pointerEvents: (userPhone && businessStage && biggestChallenge && services.length > 0 && clientCount) ? 'auto' : 'none' }}>Next <span style={{ fontSize: 18 }}>&#8594;</span></button>
               </motion.div>
             </motion.div>
           )}
@@ -1154,41 +1223,71 @@ export default function App() {
                   {!showRatingPrompt && (
                     <div style={{ textAlign: 'center', marginTop: 16 }}>
                       <button className="btn btn-primary" onClick={() => { recordTimeSpent(); setShowRatingPrompt(true); playDing() }} style={{ padding: '12px 32px', fontSize: 14 }}>
-                        Rate {reviewPageRef.current}
+                        Leave feedback on {reviewPageRef.current}
                       </button>
                     </div>
                   )}
 
-                  {/* Continue button (only when all rated) */}
-                  {WALKTHROUGH_STEPS.every(s => pageRatings[s.page]) && !showRatingPrompt && (
-                    <div style={{ textAlign: 'center', marginTop: 12 }}>
-                      <button className="btn btn-primary" onClick={() => { recordTimeSpent(); playComplete(); next() }} style={{ padding: '14px 40px', fontSize: 15 }}>
-                        All rated, continue &#8594;
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Rating modal */}
+                  {/* Feedback modal (voice note) */}
                   <AnimatePresence>
                     {showRatingPrompt && (
                       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                        <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                          <h2 style={{ marginBottom: 4 }}>Rate this section</h2>
-                          <RatingDial
-                            value={pageRatings[reviewPageRef.current] || 0}
-                            onChange={v => setRating(reviewPageRef.current, v)}
+                        <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} style={{ maxWidth: 520 }}>
+                          <h2 style={{ marginBottom: 4 }}>Tell us what you think</h2>
+                          <VoiceFeedback
+                            value={pageNotes[reviewPageRef.current] || ''}
+                            onChange={v => { setNote(reviewPageRef.current, v); setRating(reviewPageRef.current, 1) }}
                             page={reviewPageRef.current}
                           />
-                          <PageNoteInput
-                            value={pageNotes[reviewPageRef.current]}
-                            onChange={v => setNote(reviewPageRef.current, v)}
-                          />
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => { if (!pageRatings[reviewPageRef.current]) return; setShowRatingPrompt(false); playClick(); stepStartRef.current = Date.now() }}
-                            style={{ marginTop: 16, padding: '12px 32px', fontSize: 14, opacity: pageRatings[reviewPageRef.current] ? 1 : 0.4 }}
-                          >
-                            Done
+                          {(() => {
+                            const hasFeedback = !!(pageNotes[reviewPageRef.current]?.trim())
+                            const nextUnrated = WALKTHROUGH_STEPS.find(s => s.page !== reviewPageRef.current && !pageNotes[s.page]?.trim())
+                            const allDone = WALKTHROUGH_STEPS.every(s => pageNotes[s.page]?.trim())
+                            return (
+                              <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                                <button
+                                  className="btn btn-primary"
+                                  onClick={() => {
+                                    if (!hasFeedback) return
+                                    setShowRatingPrompt(false)
+                                    playClick()
+                                    stepStartRef.current = Date.now()
+                                    // If all done, show completion modal
+                                    if (WALKTHROUGH_STEPS.every(s => s.page === reviewPageRef.current ? true : !!pageNotes[s.page]?.trim())) {
+                                      setTimeout(() => { setShowRatingPrompt(false); playComplete(); setShowAllRatedModal(true) }, 300)
+                                    } else if (nextUnrated) {
+                                      // Navigate to next unrated section
+                                      setTimeout(() => {
+                                        const idx = WALKTHROUGH_STEPS.findIndex(s => s.page === nextUnrated.page)
+                                        reviewPageRef.current = nextUnrated.page
+                                        setReviewStep(idx)
+                                        document.getElementById('review-iframe')?.setAttribute('src', PROTO_URL + '/#/' + nextUnrated.page)
+                                      }, 200)
+                                    }
+                                  }}
+                                  style={{ padding: '12px 32px', fontSize: 14, opacity: hasFeedback ? 1 : 0.4 }}
+                                >
+                                  {hasFeedback && nextUnrated ? `Done — next: ${nextUnrated.page}` : hasFeedback ? 'Done' : 'Leave feedback to continue'}
+                                  {hasFeedback && <span style={{ fontSize: 18, marginLeft: 6 }}>&#8594;</span>}
+                                </button>
+                              </div>
+                            )
+                          })()}
+                        </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* All sections rated — completion modal */}
+                  <AnimatePresence>
+                    {showAllRatedModal && (
+                      <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                        <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
+                          <div style={{ fontSize: 48, marginBottom: 12 }}>&#10003;</div>
+                          <h2 style={{ marginBottom: 8 }}>All sections reviewed!</h2>
+                          <p className="subtitle" style={{ marginBottom: 20 }}>Great feedback. Let's keep going — just a few more questions.</p>
+                          <button className="btn btn-primary" onClick={() => { setShowAllRatedModal(false); recordTimeSpent(); playComplete(); next() }} style={{ padding: '16px 48px', fontSize: 16 }}>
+                            Continue <span style={{ fontSize: 20 }}>&#8594;</span>
                           </button>
                         </motion.div>
                       </motion.div>
@@ -1266,57 +1365,49 @@ export default function App() {
             </motion.div>
           )}
 
-          {/* ──── SLIDE 10 — Final Thoughts + Early Access + Submit ──── */}
+          {/* ──── SLIDE 10 — Early Access + Submit ──── */}
           {slide === 10 && (
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
-              <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">Anything else you want to share? Speak or type below. (optional)</p></motion.div>
-
-              {/* Voice-to-text note */}
-              <motion.div variants={fadeSlideUp} style={{ maxWidth: 500, margin: '16px auto 0' }}>
-                <div style={{ position: 'relative' }}>
-                  <textarea
-                    placeholder="Tap the mic and speak, or just type here..."
-                    value={voiceTranscript}
-                    onChange={e => setVoiceTranscript(e.target.value)}
-                    style={{ minHeight: 100, width: '100%', paddingRight: 50 }}
-                  />
-                  <button
-                    className={`mic-btn ${voiceRecording ? 'recording' : ''}`}
-                    onClick={voiceRecording ? stopVoiceRecording : startVoiceRecording}
-                    style={{ position: 'absolute', top: 12, right: 12 }}
-                  >
-                    <MicIcon />
-                  </button>
-                  {voiceRecording && (
-                    <div style={{ position: 'absolute', bottom: 8, right: 12, fontSize: 11, color: '#e74c3c', fontWeight: 600 }}>
-                      Listening...
-                    </div>
-                  )}
-                </div>
-                {voiceTranscript && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                    <button className="btn btn-ghost" onClick={deleteVoiceRecording} style={{ fontSize: 11, padding: '3px 8px' }}>Clear</button>
-                  </div>
-                )}
+              <motion.div variants={fadeSlideUp}>
+                <h2 style={{ minHeight: '1.4em', fontSize: 'clamp(26px, 4.5vw, 40px)' }}>{typedHeadline}{cursor}</h2>
               </motion.div>
 
-              {/* Early access opt-in — before submit */}
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 24 }}>
-                <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, cursor: 'pointer', fontSize: 15, color: 'var(--text-1)' }}
-                  onClick={() => { setEarlyAccess(!earlyAccess); playClick() }}>
-                  <div style={{ width: 24, height: 24, borderRadius: 6, border: earlyAccess ? '2px solid var(--gold)' : '2px solid var(--text-3)', background: earlyAccess ? 'var(--gold)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
-                    {earlyAccess && <span style={{ color: '#0E0D0B', fontSize: 16, fontWeight: 700 }}>&#10003;</span>}
+              {/* Early access — main focus */}
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 32 }}>
+                <div
+                  onClick={() => { setEarlyAccess(!earlyAccess); playClick() }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14,
+                    cursor: 'pointer', padding: '24px 32px', borderRadius: 16,
+                    background: earlyAccess ? 'rgba(200,168,78,0.12)' : 'rgba(255,255,255,0.03)',
+                    border: earlyAccess ? '2px solid var(--gold)' : '2px solid rgba(255,255,255,0.08)',
+                    transition: 'all 0.3s ease', maxWidth: 420, margin: '0 auto',
+                  }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                    border: earlyAccess ? '2px solid var(--gold)' : '2px solid var(--text-3)',
+                    background: earlyAccess ? 'var(--gold)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.2s',
+                  }}>
+                    {earlyAccess && <span style={{ color: '#0E0D0B', fontSize: 20, fontWeight: 700 }}>&#10003;</span>}
                   </div>
-                  I want early access to Full Control
-                </label>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)' }}>
+                    I want early access to Full Control
+                  </span>
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 12 }}>
+                  Be first in line when we launch.
+                </p>
               </motion.div>
 
               {/* Show submit error */}
               {submitError && <div style={{ color: '#e74c3c', fontSize: 13, marginTop: 12, textAlign: 'center' }}>{submitError}</div>}
 
-              <motion.div variants={fadeSlideUp} style={{ marginTop: 16, display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <motion.div variants={fadeSlideUp} style={{ marginTop: 32, display: 'flex', gap: 12, justifyContent: 'center' }}>
                 <button className="btn btn-ghost" onClick={prev}>Back</button>
-                <button className="btn btn-primary" onClick={handleSubmit}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
+                <button className="btn btn-primary" onClick={handleSubmit} style={{ padding: '16px 40px', fontSize: 16 }}>Submit <span style={{ fontSize: 18 }}>&#10003;</span></button>
               </motion.div>
             </motion.div>
           )}

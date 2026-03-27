@@ -12,6 +12,13 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8080", "--directory", "prototypes"],
       "port": 8080
+    },
+    {
+      "name": "survey",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5180,
+      "cwd": "prototypes/survey"
     }
   ]
 }
