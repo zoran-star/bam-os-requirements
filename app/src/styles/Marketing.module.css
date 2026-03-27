@@ -113,21 +113,20 @@
 
 /* ─── CHANNEL / LEAD SOURCE GRID ─── */
 .channelGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.channelCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-sm);transition:all 180ms;cursor:pointer;position:relative;overflow:hidden}
-.channelCard:hover{box-shadow:var(--shadow-md);transform:translateY(-2px);border-color:rgba(200,168,78,0.25)}
-.channelAccent{position:absolute;top:0;left:0;right:0;height:3px;background:var(--ch-accent);opacity:0.7;transition:opacity 180ms}
-.channelCard:hover .channelAccent{opacity:1}
+.channelCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;transition:all 200ms ease;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.channelCard:hover{box-shadow:0 6px 20px rgba(200,168,78,0.15), 0 2px 6px rgba(0,0,0,0.04);transform:translateY(-2px);border-color:rgba(200,168,78,0.3)}
+.channelAccent{display:none}
 .channelTop{display:flex;align-items:center;gap:8px}
-.channelIcon{font-size:18px}
+.channelIcon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:rgba(200,168,78,0.1);color:var(--gold);flex-shrink:0}
 .channelName{font-size:13px;font-weight:700;color:var(--tp);flex:1}
 .channelExpand{color:var(--tm);opacity:0;transition:opacity 150ms}
 .channelCard:hover .channelExpand{opacity:1}
-.channelLeads{font-size:36px;font-weight:900;color:var(--tp);letter-spacing:-0.03em;font-family:'Nunito',sans-serif;line-height:1}
+.channelLeads{font-size:32px;font-weight:900;color:var(--tp);letter-spacing:-0.03em;font-family:'Nunito',sans-serif;line-height:1}
 .channelMeta{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600}
 .channelCpl{color:var(--tm)}
-.channelTrendUp{color:var(--green);background:var(--greenl);padding:2px 8px;border-radius:6px}
-.channelTrendDown{color:var(--red);background:var(--redl);padding:2px 8px;border-radius:6px}
-.channelDemoFlag{font-size:10px;font-weight:700;color:#d4a017;background:rgba(212,160,23,0.1);padding:3px 10px;border-radius:6px;margin-top:2px;width:fit-content}
+.channelTrendUp{color:var(--green);font-size:11px;font-weight:700}
+.channelTrendDown{color:var(--red);font-size:11px;font-weight:700}
+.channelDemoFlag{font-size:10px;font-weight:700;color:#d4a017;background:rgba(212,160,23,0.08);padding:3px 10px;border-radius:6px;margin-top:2px;width:fit-content}
 
 /* ─── BUDGET PACING ─── */
 .budgetCard{background:var(--surf);border:1px solid var(--border);border-radius:20px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-sm)}
@@ -153,12 +152,275 @@
 .alertCta{font-family:var(--ff);font-size:12px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.1);border:1px solid rgba(200,168,78,0.2);border-radius:10px;padding:6px 14px;cursor:pointer;transition:all 180ms;white-space:nowrap}
 .alertCta:hover{background:rgba(200,168,78,0.18);border-color:var(--gold)}
 
+/* ─── CHANNEL DETAIL SECTION (Meta, Google, etc.) ─── */
+/* ─── CHANNEL SECTION WRAP + SWIPE NAV ─── */
+.channelSectionWrap {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  position: relative;
+}
+
+.channelSection {
+  flex: 1;
+  min-width: 0;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  transition: all 250ms ease;
+}
+.channelSection:hover {
+  box-shadow: 0 6px 24px rgba(200,168,78,0.10), 0 2px 8px rgba(0,0,0,0.04);
+  transform: translateY(-2px);
+  border-color: rgba(200,168,78,0.2);
+}
+
+/* Swipe nav chevron */
+.channelNavChevron {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 60px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: var(--gold);
+  opacity: 1;
+  transition: opacity 250ms, color 250ms, width 250ms, background 250ms, box-shadow 250ms;
+  padding: 16px 6px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(200,168,78,0.08) 0%, rgba(200,168,78,0.03) 100%);
+  border: 1px solid rgba(200,168,78,0.15);
+  position: relative;
+  box-shadow: 0 0 12px rgba(200,168,78,0.08);
+}
+.channelNavChevron::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 18px;
+  background: radial-gradient(circle at center, rgba(200,168,78,0.12) 0%, transparent 70%);
+  animation: chevronGlow 2s ease-in-out infinite;
+}
+@keyframes chevronGlow {
+  0%, 100% { opacity: 0.3; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.channelNavChevron:hover {
+  opacity: 1;
+  color: var(--gold);
+  width: 72px;
+  background: linear-gradient(135deg, rgba(200,168,78,0.14) 0%, rgba(200,168,78,0.06) 100%);
+  border-color: rgba(200,168,78,0.35);
+  box-shadow: 0 0 24px rgba(200,168,78,0.18);
+}
+.chevronLabel {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+}
+.channelNavChevron > svg {
+  width: 26px;
+  height: 26px;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 4px rgba(200,168,78,0.3));
+  animation: chevronPulse 1.5s ease-in-out infinite;
+}
+@keyframes chevronPulse {
+  0%, 100% { transform: translateX(0); opacity: 0.6; }
+  50% { transform: translateX(6px); opacity: 1; }
+}
+
+/* Chevron dropdown */
+.chevronDropdown {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 6px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  z-index: 20;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropIn 0.18s ease;
+}
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+.chevronDropdownTitle {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tm);
+  padding: 4px 12px 6px;
+}
+.chevronDropdownItem {
+  font-family: var(--ff);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tp);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 150ms;
+  text-align: left;
+  white-space: nowrap;
+}
+.chevronDropdownItem:hover {
+  background: rgba(200,168,78,0.08);
+}
+.chevronDropdownActive {
+  background: rgba(200,168,78,0.1);
+  color: var(--gold);
+}
+.chevronDropdownBadge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  margin-left: auto;
+}
+.chevronDropdownSoon {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tm);
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+/* Meta budget pacing inline */
+.metaBudget {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: rgba(200,168,78,0.04);
+  border: 1px solid rgba(200,168,78,0.12);
+  border-radius: 14px;
+}
+.metaBudgetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.metaBudgetTitle {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tm);
+}
+.metaBudgetEdit {
+  font-family: var(--ff);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid rgba(200,168,78,0.3);
+  border-radius: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.metaBudgetEdit:hover {
+  background: rgba(200,168,78,0.08);
+  border-color: var(--gold);
+}
+.metaBudgetStats {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 10px;
+}
+.metaBudgetStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.metaBudgetStatValue {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--tp);
+}
+.metaBudgetStatLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metaBudgetPacing {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--green);
+  font-size: 14px;
+}
+
+.channelSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.channelSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--tp);
+}
+.channelSectionActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.channelSectionBtn {
+  font-family: var(--ff);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ts);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 180ms;
+}
+.channelSectionBtn:hover {
+  border-color: rgba(200,168,78,0.3);
+  color: var(--tp);
+  background: rgba(200,168,78,0.06);
+}
+
 /* ─── IMPROVE ADS GRID ─── */
 .improveGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 .improveCol {
   display: flex;
@@ -172,13 +434,81 @@
   letter-spacing: 0.05em;
 }
 .improveCard {
-  background: var(--surf2);
-  border: 1px solid;
-  border-radius: 10px;
-  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+}
+.improveCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+}
+/* tinted backgrounds */
+.improveCardHealthy {
+  background: rgba(62, 175, 92, 0.06);
+  border-color: rgba(62, 175, 92, 0.12);
+}
+.improveCardHealthy:hover { border-color: rgba(62, 175, 92, 0.25); }
+.improveCardNew {
+  background: rgba(59, 111, 160, 0.06);
+  border-color: rgba(59, 111, 160, 0.12);
+}
+.improveCardNew:hover { border-color: rgba(59, 111, 160, 0.25); }
+.improveCardStale {
+  background: rgba(200, 168, 78, 0.06);
+  border-color: rgba(200, 168, 78, 0.12);
+}
+.improveCardStale:hover { border-color: rgba(200, 168, 78, 0.25); }
+.improveCardStopLoss {
+  background: rgba(196, 52, 45, 0.06);
+  border-color: rgba(196, 52, 45, 0.12);
+}
+.improveCardStopLoss:hover { border-color: rgba(196, 52, 45, 0.25); }
+
+/* icon-led status labels */
+.adStatusLabel {
+  display: flex;
+  align-items: center;
   gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.adStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.adStatusHealthy { color: #2D8A52; }
+.adStatusHealthy .adStatusDot { background: #2D8A52; }
+.adStatusNew { color: #3B6FA0; }
+.adStatusNew .adStatusDot { background: #3B6FA0; }
+.adStatusStale { color: #B08E30; }
+.adStatusStale .adStatusDot { background: #B08E30; }
+.adStatusStopLoss { color: #B5352F; }
+.adStatusStopLoss .adStatusDot { background: #B5352F; }
+
+/* ─── EDIT INDIVIDUAL ADS LINK ─── */
+.editAdsLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tm);
+  cursor: pointer;
+  transition: color 180ms;
+  margin-top: 4px;
+  width: fit-content;
+}
+.editAdsLink:hover {
+  color: var(--tp);
 }
 
 /* ─── BEST PERFORMING ADS GRID ─── */

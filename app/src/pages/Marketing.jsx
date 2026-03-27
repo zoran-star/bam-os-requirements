@@ -14,12 +14,10 @@ const SAGE_PROMPTS = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Ask Sage', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg> },
-  { label: 'Create ad', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg> },
-  { label: 'Improve ads', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> },
-  { label: 'Pause a campaign', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> },
-  { label: 'Generate content brief', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
-  { label: 'Adjust budget', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
+  { label: 'Ask Sage', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>, action: 'sage' },
+  { label: 'Create a campaign', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>, action: 'createAd' },
+  { label: 'Manage campaigns', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, action: 'manage' },
+  { label: 'Create ad content', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>, action: 'content' },
 ];
 
 const CHANNELS = [
@@ -318,36 +316,6 @@ function ChannelDetail({ channel, onClose }) {
             </div>
           </div>
         </div>
-
-        {/* Education tooltip — MKT-003 */}
-        {eduTip && METRIC_EDUCATION[eduTip] && (
-          <div className={s.eduTooltip}>
-            <div className={s.eduTooltipLabel}>{METRIC_EDUCATION[eduTip].label}</div>
-            <div className={s.eduTooltipText}>{METRIC_EDUCATION[eduTip].explain}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── BUDGET EDIT MODAL ─── */
-function BudgetEditor({ onClose }) {
-  const [selected, setSelected] = useState(CAMPAIGN_BUDGETS[0].name);
-  const camp = CAMPAIGN_BUDGETS.find(c => c.name === selected);
-  const [newDaily, setNewDaily] = useState(camp.daily.replace('$', ''));
-
-  return (
-    <div className={s.modalOverlay} onClick={onClose}>
-      <div className={s.modalPanel} onClick={e => e.stopPropagation()}>
-        <button className={s.modalClose} onClick={onClose}>✕</button>
-        <div className={s.modalTitle}>Adjust Campaign Budget</div>
-        <div className={s.modalRef}>MKT-006a</div>
-
-        <div className={s.budgetFormGroup}>
-          <label className={s.budgetFormLabel}>Select campaign</label>
-          <select className={s.budgetFormSelect} value={selected} onChange={e => { setSelected(e.target.value); const c = CAMPAIGN_BUDGETS.find(cb => cb.name === e.target.value); setNewDaily(c.daily.replace('$', '')); }}>
-            {CAMPAIGN_BUDGETS.map(c => (
               <option key={c.name} value={c.name}>{c.name} ({c.status})</option>
             ))}
           </select>
@@ -495,6 +463,15 @@ export default function Marketing() {
   const canvasRef = useRef(null);
   useBannerCanvas(canvasRef);
 
+  // Close tools dropdown on scroll
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const close = () => setToolsOpen(false);
+    const scrollEl = document.querySelector('[class*="scroll"]');
+    scrollEl?.addEventListener('scroll', close, { passive: true });
+    return () => scrollEl?.removeEventListener('scroll', close);
+  }, [toolsOpen]);
+
   const totalLeads = CHANNELS.reduce((sum, c) => sum + c.leads, 0);
   const avgCpl = '$14.80';
   const topChannel = CHANNELS[0].name;
@@ -610,22 +587,8 @@ export default function Marketing() {
           </div>
         </div>
 
-        {/* Quick action chips + Sage response — slide down from bar */}
+        {/* Sage response area (no chips) */}
         <div className={s.topActions}>
-          <div className={s.topChips}>
-            {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className={s.topActionChip} style={a.label === 'Pause a campaign' ? { border: '1px solid #C8A84E', color: '#C8A84E', background: 'transparent' } : undefined} onClick={() => {
-                if (a.label === 'Ask Sage') cmdInputRef.current?.focus();
-                else if (a.label === 'Create ad') setCreateAdOpen(true);
-                else if (a.label === 'Adjust budget') setBudgetOpen(true);
-                else if (a.label === 'Improve ads') { /* already at top */ }
-                else if (a.label === 'Pause a campaign') { handleCommand('Pause a campaign'); }
-                else handleCommand(a.label);
-              }}>
-                <span>{a.icon}</span> {a.label}
-              </button>
-            ))}
-          </div>
           {cmdResponse && (
             <div className={s.topResponse}>
               <div className={s.topResponseQ}>You said: &ldquo;{cmdResponse.input}&rdquo;</div>
@@ -640,49 +603,114 @@ export default function Marketing() {
         </div>
 
         <div className={sh.scroll}>
-          {/* ═══ IMPROVE YOUR ADS — good vs bad comparison ═══ */}
-          <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <span>Improve your ads</span>
-          </div>
-
-          {/* Improve Ads — good vs bad comparison */}
-          <div className={s.sageTip}>
-            <span className={s.sageTipLabel}>Sage</span>
-            <span>Here's what's working and what's not. I can replace the underperformers with fresh creative based on your top ads.</span>
-          </div>
-
-          <div className={s.improveGrid}>
-            <div className={s.improveCol}>
-              <div className={s.improveColLabel} style={{ color: 'var(--green)' }}>Working well</div>
-              {TOP_ADS.slice(0, 2).map(ad => (
-                <div key={ad.name} className={s.improveCard} style={{ borderColor: 'var(--green)' }}>
-                  <div className={s.alertName}>{ad.name}</div>
-                  <div className={s.alertMeta}>
-                    <span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span><span>·</span><span>{ad.ctr} CTR</span>
-                  </div>
-                  <span className={s.adBadgeHealthy}>Healthy</span>
-                </div>
-              ))}
+          {/* ═══ META ADS — channel detail section with swipe nav ═══ */}
+          <div className={s.channelSectionWrap}>
+            <div className={s.channelSection}>
+            <div className={s.channelSectionHead}>
+              <div className={s.channelSectionTitle}>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                <span>Meta Ads</span>
+              </div>
+              <div className={s.channelSectionActions}>
+                <button className={s.channelSectionBtn} onClick={() => setCreateAdOpen(true)}>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  Create campaign
+                </button>
+                <button className={s.channelSectionBtn} onClick={() => setBudgetOpen(true)}>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                  Manage
+                </button>
+                <button className={s.channelSectionBtn} onClick={() => setCreateAdOpen(true)}>
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Edit ads
+                </button>
+              </div>
             </div>
-            <div className={s.improveCol}>
-              <div className={s.improveColLabel} style={{ color: 'var(--red)' }}>Underperforming</div>
-              {ADS_NEEDING_REFRESH.map(ad => (
-                <div key={ad.name} className={s.improveCard} style={{ borderColor: 'var(--red)' }}>
-                  <div className={s.alertName}>{ad.name}</div>
-                  <div className={s.alertMeta}>
-                    <span>{ad.days} days running</span><span>·</span><span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span>
+
+            <div className={s.improveGrid}>
+              <div className={s.improveCol}>
+                <div className={s.improveColLabel} style={{ color: 'var(--green)' }}>Working well</div>
+                {TOP_ADS.slice(0, 2).map(ad => (
+                  <div key={ad.name} className={`${s.improveCard} ${ad.status === 'new' ? s.improveCardNew : s.improveCardHealthy}`}>
+                    <div className={s.alertName}>{ad.name}</div>
+                    <div className={s.alertMeta}>
+                      <span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span><span>·</span><span>{ad.ctr} CTR</span>
+                    </div>
+                    <div className={`${s.adStatusLabel} ${ad.status === 'new' ? s.adStatusNew : s.adStatusHealthy}`}>
+                      <span className={s.adStatusDot} />
+                      {ad.status === 'new' ? 'New' : 'Healthy'}
+                    </div>
                   </div>
-                  <span className={ad.status === 'Stop-loss' ? s.alertBadgeRed : s.alertBadgeYellow}>{ad.status}</span>
+                ))}
+              </div>
+              <div className={s.improveCol}>
+                <div className={s.improveColLabel} style={{ color: 'var(--red)' }}>Underperforming</div>
+                {ADS_NEEDING_REFRESH.map(ad => (
+                  <div key={ad.name} className={`${s.improveCard} ${ad.status === 'Stop-loss' ? s.improveCardStopLoss : s.improveCardStale}`}>
+                    <div className={s.alertName}>{ad.name}</div>
+                    <div className={s.alertMeta}>
+                      <span>{ad.days} days running</span><span>·</span><span>{ad.spend} spent</span><span>·</span><span>{ad.conversions} conversions</span>
+                    </div>
+                    <div className={`${s.adStatusLabel} ${ad.status === 'Stop-loss' ? s.adStatusStopLoss : s.adStatusStale}`}>
+                      <span className={s.adStatusDot} />
+                      {ad.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Budget Pacing — inside Meta section */}
+            <div className={s.metaBudget}>
+              <div className={s.metaBudgetHead}>
+                <span className={s.metaBudgetTitle}>Budget Pacing</span>
+                <button className={s.metaBudgetEdit} onClick={() => setBudgetOpen(true)}>Edit</button>
+              </div>
+              <div className={s.metaBudgetStats}>
+                <div className={s.metaBudgetStat}>
+                  <span className={s.metaBudgetStatValue}>${BUDGET.spent}</span>
+                  <span className={s.metaBudgetStatLabel}>of ${BUDGET.monthly}</span>
                 </div>
-              ))}
+                <div className={s.metaBudgetStat}>
+                  <span className={s.metaBudgetStatValue}>{BUDGET.daysLeft}</span>
+                  <span className={s.metaBudgetStatLabel}>days left</span>
+                </div>
+                <div className={s.metaBudgetStat}>
+                  <span className={`${s.metaBudgetStatValue} ${s.metaBudgetPacing}`}>
+                    <span className={s.pacingDot} />
+                    On pace
+                  </span>
+                  <span className={s.metaBudgetStatLabel}>status</span>
+                </div>
+              </div>
+              <div className={s.budgetBar}>
+                <div className={s.budgetBarFill} style={{ width: `${pacingPct}%` }} />
+              </div>
+            </div>
+
+            </div>
+            {/* Swipe nav chevron */}
+            <div className={s.channelNavChevron} onMouseEnter={() => setToolsOpen(true)} onMouseLeave={() => setToolsOpen(false)}>
+              <span className={s.chevronLabel}>more tools</span>
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+              {toolsOpen && (
+                <div className={s.chevronDropdown}>
+                  <div className={s.chevronDropdownTitle}>Switch tool</div>
+                  <button className={`${s.chevronDropdownItem} ${s.chevronDropdownActive}`}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    <span>Meta Ads</span>
+                    <span className={s.chevronDropdownBadge}>Active</span>
+                  </button>
+                  {MORE_TOOLS.filter(t => t.name !== 'Meta Ads').map(t => (
+                    <button key={t.name} className={s.chevronDropdownItem} onClick={e => { e.stopPropagation(); setToolsOpen(false); }}>
+                      <span>{t.icon}</span>
+                      <span>{t.name}</span>
+                      {!t.enabled && <span className={s.chevronDropdownSoon}>Soon</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
-          <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)} style={{ marginTop: '12px', marginBottom: '24px', border: '1px solid #A3402A', color: '#A3402A', background: 'transparent', boxShadow: 'none' }}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            Replace underperformers with new ads
-          </button>
 
           {/* ═══ PERFORMANCE — channels + budget ═══ */}
           <div className={s.sectionBanner} style={{ '--accent': 'var(--gold)' }}>
@@ -690,29 +718,9 @@ export default function Marketing() {
             <span>Performance</span>
           </div>
 
-          {/* Lead Sources + More Tools */}
+          {/* Lead Sources */}
           <div className={s.sectionHead}>
             <h3 className={s.sectionTitle}>Lead Sources</h3>
-            <div className={s.toolsWrap}>
-              <button className={s.toolsBtn} onClick={() => setToolsOpen(!toolsOpen)}>
-                More tools
-                <svg width="10" height="6" fill="none" viewBox="0 0 10 6"><path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </button>
-              {toolsOpen && (
-                <div className={s.toolsDropdown}>
-                  {MORE_TOOLS.map(t => (
-                    <button key={t.name} className={`${s.toolsItem} ${!t.enabled ? s.toolsDisabled : ''}`} onClick={() => { if (t.enabled) setToolsOpen(false); }}>
-                      <span className={s.toolsItemIcon}>{t.icon}</span>
-                      <div className={s.toolsItemText}>
-                        <span className={s.toolsItemName}>{t.name}</span>
-                        <span className={s.toolsItemRef}>{t.ref}</span>
-                      </div>
-                      {!t.enabled && <span className={s.toolsComingSoon}>Coming soon</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
           <div className={s.channelGrid}>
             {CHANNELS.map(ch => (
@@ -731,71 +739,16 @@ export default function Marketing() {
                   <span className={ch.cplTrendGood ? s.channelTrendUp : s.channelTrendDown}>{ch.cplTrend}</span>
                 </div>
                 {ch.campaigns.some(c => !c.demo.onTarget) && (
-                  <div className={s.channelDemoFlag}>Demo off-target</div>
+                  <div cladiff3: invalid print range
+ssName={s.channelDemoFlag}>Demo off-target</div>
                 )}
               </div>
             ))}
           </div>
 
-          {/* Budget Pacing moved into ChannelDetail modal */}
 
-          {/* ═══ TOOLS — ads, creation, briefs ═══ */}
-          <div className={s.sectionBanner} style={{ '--accent': 'var(--green)' }}>
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            <span>Tools</span>
-          </div>
-
-          {/* Recently Paused Ads */}
-          <div className={s.toolSection}>
-            <div className={s.toolSectionTitle}>Recently Paused Ads</div>
-            <div className={s.adGrid}>
-              {[
-                { name: 'Summer Promo V1', pausedDate: 'Mar 18', reason: 'Below CTR threshold', ctr: '0.8%' },
-                { name: 'Free Trial — Generic', pausedDate: 'Mar 15', reason: 'Budget cap reached', ctr: '1.2%' },
-              ].map((ad, i) => (
-                <div key={i} className={s.adCard}>
-                  <div className={s.adThumb} />
-                  <div className={s.adInfo}>
-                    <div className={s.adName}>{ad.name}</div>
-                    <div className={s.adMeta}>Paused {ad.pausedDate} · {ad.reason}</div>
-                    <div className={s.adCtr}>CTR: {ad.ctr}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <button className={s.createAdBtn} onClick={() => setCreateAdOpen(true)}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            Create New Ad Campaign
-          </button>
-
-          {/* Content Briefs */}
-          <div className={s.sectionHead}>
-            <h3 className={s.sectionTitle}>Content Briefs</h3>
-            <span className={s.sectionRef}>CNT-001</span>
-          </div>
-          <div className={s.briefCard}>
-            <div className={s.briefLabel}>Describe your target audience and content goal</div>
-            <div className={s.briefInputRow}>
-              <input
-                className={s.briefInput}
-                value={briefInput}
-                onChange={e => setBriefInput(e.target.value)}
-                placeholder="e.g. Parents of kids ages 8-12 who want competitive training"
-                onKeyDown={e => e.key === 'Enter' && handleGenerateBrief()}
-              />
-              <button className={s.briefBtn} onClick={handleGenerateBrief} disabled={!briefInput.trim()}>
-                Generate brief
-              </button>
-            </div>
-            {lastBrief && (
-              <div className={s.briefResult}>
-                <div className={s.briefResultLabel}>Generated brief</div>
-                <div className={s.briefResultText}>{lastBrief.brief}</div>
-              </div>
-            )}
-          </div>
+          {/* spacer before end */}
+          <div style={{ height: 24 }} />
         </div>
       </main>
 
