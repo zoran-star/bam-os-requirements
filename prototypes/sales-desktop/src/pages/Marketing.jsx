@@ -291,34 +291,6 @@ function ChannelDetail({ channel, onClose }) {
           </div>
         ))}
 
-        {/* Budget Pacing — inside channel detail */}
-        <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Budget Pacing</span>
-            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>MKT-006</span>
-          </div>
-          <div className={s.budgetCard}>
-            <div className={s.budgetRow}>
-              <span className={s.budgetLabel}>Monthly budget</span>
-              <span className={s.budgetValue}>${BUDGET.monthly}</span>
-            </div>
-            <div className={s.budgetRow}>
-              <span className={s.budgetLabel}>Spent to date</span>
-              <span className={s.budgetValue}>${BUDGET.spent}</span>
-            </div>
-            <div className={s.budgetBar}>
-              <div className={s.budgetBarFill} style={{ width: `${Math.round((BUDGET.spent / BUDGET.monthly) * 100)}%` }} />
-            </div>
-            <div className={s.budgetRow}>
-              <span className={s.budgetPacing}>
-                <span className={s.pacingDot} />
-                On pace
-              </span>
-              <span className={s.budgetDays}>{BUDGET.daysLeft} days left</span>
-            </div>
-          </div>
-        </div>
-
         {/* Education tooltip — MKT-003 */}
         {eduTip && METRIC_EDUCATION[eduTip] && (
           <div className={s.eduTooltip}>
@@ -737,7 +709,34 @@ export default function Marketing() {
             ))}
           </div>
 
-          {/* Budget Pacing moved into ChannelDetail modal */}
+          {/* Budget Pacing */}
+          <div className={s.sectionHead}>
+            <h3 className={s.sectionTitle}>Budget Pacing</h3>
+            <div className={s.sectionActions}>
+              <button className={s.editBudgetBtn} onClick={() => setBudgetOpen(true)}>Edit budget</button>
+              <span className={s.sectionRef}>MKT-006</span>
+            </div>
+          </div>
+          <div className={s.budgetCard}>
+            <div className={s.budgetRow}>
+              <span className={s.budgetLabel}>Monthly budget</span>
+              <span className={s.budgetValue}>${BUDGET.monthly}</span>
+            </div>
+            <div className={s.budgetRow}>
+              <span className={s.budgetLabel}>Spent to date</span>
+              <span className={s.budgetValue}>${BUDGET.spent}</span>
+            </div>
+            <div className={s.budgetBar}>
+              <div className={s.budgetBarFill} style={{ width: `${pacingPct}%` }} />
+            </div>
+            <div className={s.budgetRow}>
+              <span className={s.budgetPacing}>
+                <span className={s.pacingDot} />
+                On pace
+              </span>
+              <span className={s.budgetDays}>{BUDGET.daysLeft} days left</span>
+            </div>
+          </div>
 
           {/* ═══ TOOLS — ads, creation, briefs ═══ */}
           <div className={s.sectionBanner} style={{ '--accent': 'var(--green)' }}>
