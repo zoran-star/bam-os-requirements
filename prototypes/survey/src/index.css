@@ -272,6 +272,14 @@ input[type="number"] {
   50% { box-shadow: 0 0 40px rgba(231,76,60,0.5); }
 }
 
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(200,168,78,0.2); }
+  50% { box-shadow: 0 0 24px rgba(200,168,78,0.45); }
+}
+
 .voice-hint {
   font-size: 12px;
   color: var(--text-3);

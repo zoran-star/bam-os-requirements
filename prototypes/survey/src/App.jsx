@@ -549,8 +549,8 @@ export default function App() {
   const [addedFeatures, setAddedFeatures] = useState('')
   const [finalPrice, setFinalPrice] = useState('')
 
-  // Walkthrough: 'intro1' → 'review' → next slide
-  const [walkthroughPhase, setWalkthroughPhase] = useState('intro1')
+  // Walkthrough: straight to review
+  const [walkthroughPhase, setWalkthroughPhase] = useState('review')
   const [reviewStep, setReviewStep] = useState(0)
 
   // Per-page ratings (1-5 dial) + voice feedback notes
@@ -1035,8 +1035,9 @@ export default function App() {
             <motion.div style={{ textAlign: 'center', width: '100%' }} variants={stagger} initial="hidden" animate="show">
               <motion.div variants={fadeSlideUp}><h2 style={{ minHeight: '1.4em' }}>{typedHeadline}{cursor}</h2><p className="subtitle">This helps us understand what matters most to you.</p></motion.div>
 
-              {/* Contact info */}
+              {/* Contact info — name already captured from NDA */}
               <motion.div variants={fadeSlideUp} style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 380, margin: '0 auto 20px' }}>
+                <input type="email" placeholder="Email address *" value={userEmail} onChange={e => setUserEmail(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="tel" inputMode="tel" pattern="[0-9+\-\s]{7,}" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="url" placeholder="Business website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
@@ -1175,20 +1176,6 @@ export default function App() {
           {slide === 5 && (
             <motion.div style={{ width: '100%' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
 
-              {/* Intro — single screen */}
-              {walkthroughPhase === 'intro1' && (
-                <motion.div style={{ textAlign: 'center', padding: '60px 0' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
-                  <h1 style={{ fontSize: 'clamp(28px, 5vw, 44px)', lineHeight: 1.15, marginBottom: 16 }}>
-                    That's what we've built to be<br /><span style={{ color: 'var(--gold)' }}>this command center.</span>
-                  </h1>
-                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 500, marginBottom: 8 }}>Our mission is to help operators in sports and fitness use AI in the best, most effortless way possible, so you can shift your focus to making a real impact while your business works in the background.</p>
-                  <p className="subtitle" style={{ fontSize: 15, maxWidth: 460 }}>See what we've built, and leave some feedback.</p>
-                  <button className="btn btn-primary" onClick={() => { setWalkthroughPhase('review'); setReviewStep(0); stepStartRef.current = Date.now(); playSwoosh(); document.getElementById('root')?.scrollTo({ top: 0, behavior: 'smooth' }) }} style={{ marginTop: 8 }}>
-                    Show me <span style={{ fontSize: 18 }}>&#8594;</span>
-                  </button>
-                </motion.div>
-              )}
-
               {/* Review phase (pill tracker + click to rate) */}
               {walkthroughPhase === 'review' && (
                 <>
@@ -1221,10 +1208,11 @@ export default function App() {
 
                   {/* Rate button below prototype */}
                   {!showRatingPrompt && (
-                    <div style={{ textAlign: 'center', marginTop: 16 }}>
-                      <button className="btn btn-primary" onClick={() => { recordTimeSpent(); setShowRatingPrompt(true); playDing() }} style={{ padding: '12px 32px', fontSize: 14 }}>
-                        Leave feedback on {reviewPageRef.current}
+                    <div style={{ textAlign: 'center', marginTop: 20 }}>
+                      <button className="btn btn-primary pulse-glow" onClick={() => { recordTimeSpent(); setShowRatingPrompt(true); playDing() }} style={{ padding: '16px 40px', fontSize: 16, borderRadius: 16 }}>
+                        <span style={{ marginRight: 8 }}>🎤</span> Leave feedback on <span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{reviewPageRef.current}</span>
                       </button>
+                      <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>Tap the mic and tell us what you think — good or bad</p>
                     </div>
                   )}
 
@@ -1233,7 +1221,8 @@ export default function App() {
                     {showRatingPrompt && (
                       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
                         <motion.div className="modal" initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} style={{ maxWidth: 520 }}>
-                          <h2 style={{ marginBottom: 4 }}>Tell us what you think</h2>
+                          <h2 style={{ marginBottom: 4 }}>What do you think?</h2>
+                          <p style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>Be honest — we want the good <em>and</em> the bad.</p>
                           <VoiceFeedback
                             value={pageNotes[reviewPageRef.current] || ''}
                             onChange={v => { setNote(reviewPageRef.current, v); setRating(reviewPageRef.current, 1) }}
