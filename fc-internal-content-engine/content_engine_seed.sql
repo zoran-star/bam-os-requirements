@@ -1,70 +1,68 @@
--- Content Engine Seed Data — Informed by BAM OS Identity/Onboarding Section
+-- Content Engine Seed Data — from FullControl Content & Ad Planner
 -- Run AFTER content_engine_schema.sql
 
 -- ═══════════════════════════════════════════════════════════════
--- THEME 1: Effortless Setup
+-- THEME 1: AI Advantage
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000001', 'Effortless Setup', 'How easy it is to get started. Logo, name, contact info — done in minutes. No tech headaches.', 'paid', 'Coleman', 0, 1);
+('t1000000-0000-0000-0000-000000000001', 'AI Advantage', 'FOMO and competitive urgency angles — AI is the new unfair advantage for academy owners. Positions FC as inevitable evolution.', 'paid', 'Coleman', 0, 1);
 
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000001', 'Setup in 5 Minutes', 'Most gym software takes weeks to set up. We did it in 5 minutes.', 'Try the setup yourself — link in bio', 'Conversational', 'talking_head', 0, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000001', 'No IT Department Needed', 'You shouldn''t need a computer science degree to run a basketball academy.', 'See how simple it really is', 'Motivational', 'selfie', 0, 'organic', 'Coleman', 2),
-('a1000000-0000-0000-0000-000000000001', 'Your Logo, Your Brand, Day One', 'Upload your logo and your entire system matches your brand. Invoices, scheduling app, emails — all you.', 'Start your free trial', 'Authoritative', 'screen_record', 1, 'paid', 'Coleman', 3);
-
--- ═══════════════════════════════════════════════════════════════
--- THEME 2: One Place for Everything
--- ═══════════════════════════════════════════════════════════════
-INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000002', 'One Place for Everything', 'Stop juggling spreadsheets, DMs, emails, and payment apps. All your business info lives in one command center.', 'paid', 'Coleman', 0, 2);
-
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000002', 'The Scattered Coach', 'Your schedule''s in Google Cal. Payments in Venmo. Contacts in your phone. Marketing... nowhere. Sound familiar?', 'There''s a better way — link in bio', 'Storytelling', 'talking_head', 0, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000002', 'Everything Under One Roof', 'What if your business name, logo, contacts, schedule, payments, and marketing all lived in one place?', 'See it in action', 'Educational', 'screen_record', 1, 'paid', 'Coleman', 2),
-('a1000000-0000-0000-0000-000000000002', 'Stop Copy-Pasting Your Own Info', 'How many times have you typed your own business address this week? Your phone number? Your email?', 'Automate the basics — try free', 'Conversational', 'selfie', 0, 'organic', 'Coleman', 3);
+INSERT INTO content_creatives (theme_id, title, notes, mode, creator, phase, sort_order, psych_lever, persona) VALUES
+('t1000000-0000-0000-0000-000000000001', 'AI won''t replace owners — but AI users will outperform those who don''t', 'Fear-of-missing-out angle. Positions FC as inevitable evolution, not optional upgrade. Speaks to competitive anxiety every owner feels.', 'paid', 'Coleman', 0, 1, 'FOMO', ''),
+('t1000000-0000-0000-0000-000000000001', 'Running an academy means doing 8 jobs at once', 'Pain validation. Name all 8 roles (marketer, accountant, scheduler, coach, content creator, customer service, sales, strategist). Then reveal the solution.', 'paid', 'Coleman', 0, 2, 'Pain Point', ''),
+('t1000000-0000-0000-0000-000000000001', 'AI can now handle a huge portion of those jobs', 'Relief angle. Follow the ''8 jobs'' pain with the release: most of those jobs can now run on autopilot. Transition from overwhelm to possibility.', 'paid', 'Coleman', 0, 3, 'Solution', ''),
+('t1000000-0000-0000-0000-000000000001', 'Academies using AI will outperform those that don''t', 'Competitive gap angle. Not about working harder — about working smarter. The gap is widening. Which side are you on?', 'paid', 'Coleman', 0, 4, 'Urgency', ''),
+('t1000000-0000-0000-0000-000000000001', 'AI isn''t replacing coaches — it''s giving them leverage', 'Objection-handling angle. Addresses the ''AI is taking jobs'' fear head-on. AI handles the backend so coaches can focus on what they do best: coaching.', 'paid', 'Coleman', 0, 5, 'Objection Handler', ''),
+('t1000000-0000-0000-0000-000000000001', 'Stuff you used to pay thousands for is now ___', 'Value reframe. Compare cost of hiring a marketing agency, scheduler, bookkeeper vs. one platform. Fill in the blank with FC''s price point.', 'paid', 'Coleman', 0, 6, 'Value', '');
 
 -- ═══════════════════════════════════════════════════════════════
--- THEME 3: AI That Actually Knows You
+-- THEME 2: Command Center
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000003', 'AI That Actually Knows You', 'The AI learns your business from day one — your name, your style, your services, your members. It writes like you, talks like you.', 'paid', 'Coleman', 0, 3);
+('t1000000-0000-0000-0000-000000000002', 'Command Center', 'Category-defining messaging — FC isn''t a tool, it''s a command center. One dashboard, one source of truth. Vision-casting and simplification.', 'paid', 'Coleman', 0, 2);
 
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000003', 'It Knows Your Business Description', 'You tell the AI about your academy once. After that, every email, every text, every post — it sounds like YOU wrote it.', 'Meet Sage — your AI assistant', 'Conversational', 'talking_head', 0, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000003', 'Not Generic AI', 'ChatGPT doesn''t know your gym name. Doesn''t know your clients. Doesn''t know your voice. Sage does.', 'See the difference', 'Controversial', 'talking_head', 0, 'paid', 'Zoran', 2),
-('a1000000-0000-0000-0000-000000000003', 'Your AI Gets Smarter Over Time', 'The more you use FullControl, the more Sage learns. Your tone. Your schedule patterns. What your clients respond to.', 'Start training your AI today', 'Educational', 'pro_camera', 1, 'paid', 'Coleman', 3),
-('a1000000-0000-0000-0000-000000000003', 'AI Writes Your Bio', 'We asked Sage to write our academy description. It nailed it in 10 seconds. Here''s what it came up with.', 'Try it with your business', 'Conversational', 'selfie', 0, 'organic', 'Coleman', 4);
-
--- ═══════════════════════════════════════════════════════════════
--- THEME 4: Payments That Just Work
--- ═══════════════════════════════════════════════════════════════
-INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000004', 'Payments That Just Work', 'Stripe-powered payments. No chasing Venmo. No awkward DMs. Auto-billing, subscriptions, refunds — handled.', 'paid', 'Coleman', 1, 4);
-
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000004', 'Stop Chasing Payments', 'If you''ve ever sent a "hey just checking on that payment" text... this is for you.', 'Never chase a payment again', 'Conversational', 'talking_head', 0, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000004', 'Venmo Is Not a Business Tool', 'Real talk: if you''re running an academy and still getting paid through Venmo, you''re leaving money on the table.', 'Upgrade your payment system', 'Controversial', 'selfie', 0, 'organic', 'Coleman', 2),
-('a1000000-0000-0000-0000-000000000004', 'Auto-Billing Changed My Life', 'I used to spend 3 hours a week chasing payments. Now? Zero. Stripe handles it. FullControl tracks it.', 'See how it works', 'Storytelling', 'testimonial', 1, 'paid', 'Coleman', 3);
+INSERT INTO content_creatives (theme_id, title, notes, mode, creator, phase, sort_order, psych_lever, persona) VALUES
+('t1000000-0000-0000-0000-000000000002', 'Imagine a digital operator running your backend', 'Vision-casting. Paint the picture of waking up to leads already booked, payments collected, follow-ups sent. What would you do with that time?', 'paid', 'Coleman', 0, 1, 'Aspiration', ''),
+('t1000000-0000-0000-0000-000000000002', 'One place to see everything in your business', 'Simplification angle. No more switching between 6 tabs and 4 apps. One dashboard. One source of truth. Everything from leads to revenue.', 'paid', 'Coleman', 0, 2, 'Simplicity', ''),
+('t1000000-0000-0000-0000-000000000002', 'The AI command center for sports academies', 'Category-defining statement. Not a tool, not a CRM — a command center. Positions FC as a new category entirely.', 'paid', 'Coleman', 0, 3, 'Authority', ''),
+('t1000000-0000-0000-0000-000000000002', 'What if your entire academy ran from one dashboard?', 'Curiosity hook. Question format draws people in. Great for scroll-stopping openers. Follow with a prototype walkthrough.', 'paid', 'Coleman', 0, 4, 'Curiosity', '');
 
 -- ═══════════════════════════════════════════════════════════════
--- THEME 5: Your Brand, Everywhere
+-- THEME 3: Strategic Intel
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000005', 'Your Brand, Everywhere', 'Your logo, colors, and name show up on everything — the member app, invoices, emails, marketing. Professional from day one.', 'organic', 'Coleman', 1, 5);
+('t1000000-0000-0000-0000-000000000003', 'Strategic Intel', 'Data-driven direction — most owners are flying blind. FC turns raw data into strategic recommendations.', 'paid', 'Coleman', 0, 3);
 
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000005', 'Look Like a Big Brand', 'Your parents receive an invoice with YOUR logo. Your athletes open an app with YOUR name. That''s the standard now.', 'Make it yours — start free', 'Motivational', 'talking_head', 1, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000005', 'White-Label Everything', 'Most academy software looks generic. FullControl looks like YOUR software. Your brand, your colors, everywhere.', 'See it branded to you', 'Authoritative', 'screen_record', 1, 'paid', 'Zoran', 2),
-('a1000000-0000-0000-0000-000000000005', 'First Impressions Matter', 'When a parent gets a text from your academy, does it look professional? Or does it look like a random number?', 'Fix your first impression', 'Urgent', 'selfie', 0, 'organic', 'Coleman', 3);
+INSERT INTO content_creatives (theme_id, title, notes, mode, creator, phase, sort_order, psych_lever, persona) VALUES
+('t1000000-0000-0000-0000-000000000003', 'Most owners are flying blind — FC turns data into direction', 'Strategic intel angle. You don''t know your real churn rate, your cost per lead, or which location is underperforming. FC does.', 'paid', 'Coleman', 0, 1, 'Pain Point', ''),
+('t1000000-0000-0000-0000-000000000003', 'Value content → how to run your academy → FC as strategy agent', 'Content funnel angle. Lead with free value (how to run your academy), build trust, then reveal FC as the tool that does it all for you.', 'paid', 'Coleman', 0, 2, 'Authority', '');
 
 -- ═══════════════════════════════════════════════════════════════
--- THEME 6: Built for Basketball
+-- THEME 4: Ad Concepts
 -- ═══════════════════════════════════════════════════════════════
 INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000006', 'Built for Basketball', 'Not generic gym software. Not CrossFit tools. Built specifically for basketball academies, trainers, and youth programs.', 'organic', 'Coleman', 0, 6);
+('t1000000-0000-0000-0000-000000000004', 'Ad Concepts', 'Specific ad concepts — each is a distinct creative angle designed for Andromeda''s diversification engine. Ready-to-produce ideas.', 'paid', 'Coleman', 0, 4);
 
-INSERT INTO content_messages (theme_id, title, hook, cta, tone, video_style, phase, mode, creator, sort_order) VALUES
-('a1000000-0000-0000-0000-000000000006', 'We''re Coaches Too', 'We didn''t build this in Silicon Valley. We built it in the gym. Because we run one.', 'Built by coaches, for coaches', 'Storytelling', 'talking_head', 0, 'paid', 'Coleman', 1),
-('a1000000-0000-0000-0000-000000000006', 'Mindbody Doesn''t Get Basketball', 'Mindbody was built for yoga studios. We were built for the hardwood. There''s a difference.', 'See the difference', 'Controversial', 'talking_head', 0, 'paid', 'Zoran', 2),
-('a1000000-0000-0000-0000-000000000006', 'AAU, Private Training, Academy — All In', 'Whether you run AAU, private 1-on-1s, group skills sessions, or a full academy — this was built for your exact setup.', 'Tell us your setup, we''ll show you yours', 'Educational', 'pro_camera', 1, 'paid', 'Coleman', 3),
-('a1000000-0000-0000-0000-000000000006', '500K Coaches Can''t Be Wrong', 'We built BAM Basketball to 500K followers. Now we''re building the tools we wish we had from day one.', 'Join the movement', 'Motivational', 'selfie', 0, 'organic', 'Coleman', 4);
+INSERT INTO content_creatives (theme_id, title, notes, mode, creator, phase, sort_order, psych_lever, persona) VALUES
+('t1000000-0000-0000-0000-000000000004', 'This is insane — watch how I run my entire business (DITL)', 'Day-in-the-life format. Coleman walks through his morning: opens FC, sees leads booked overnight, payments collected, content scheduled. Authentic ''this is real'' energy.', 'paid', 'Coleman', 0, 1, 'Social Proof', ''),
+('t1000000-0000-0000-0000-000000000004', 'You probably just missed ANOTHER ___ — specific pain points', 'Series format. Each ad names a specific pain: missed DM, forgotten follow-up, double-booked session, lost lead. Then: ''FC catches what you miss.''', 'paid', 'Coleman', 0, 2, 'Pain Point', ''),
+('t1000000-0000-0000-0000-000000000004', 'AI literally turns annoying tasks into a game', 'Reframe angle. The boring stuff (invoicing, scheduling, follow-ups) becomes satisfying when it runs itself. Show the gamification of automation.', 'paid', 'Coleman', 0, 3, 'Humor', ''),
+('t1000000-0000-0000-0000-000000000004', 'Old school way vs FullControl way — price calculator format', 'Side-by-side comparison. Left: manual process (hours, cost, stress). Right: FC way (automated, instant, peaceful). End with price comparison.', 'paid', 'Coleman', 0, 4, 'Value', ''),
+('t1000000-0000-0000-0000-000000000004', 'I''ve fully automated my business... only the parts I don''t enjoy', 'Nuanced angle. Not ''replace everything'' — just the parts that drain you. You still coach, still connect. FC handles the rest.', 'paid', 'Coleman', 0, 5, 'Objection Handler', '');
+
+-- ═══════════════════════════════════════════════════════════════
+-- THEME 5: Organic Strategy
+-- ═══════════════════════════════════════════════════════════════
+INSERT INTO content_themes (id, title, description, mode, creator, phase, sort_order) VALUES
+('t1000000-0000-0000-0000-000000000005', 'Organic Strategy', 'Pre-launch content cadence — 5 organic pieces per campaign before any ad spend. Build audience, test angles, prime Andromeda.', 'organic', 'Coleman', 0, 5);
+
+INSERT INTO content_creatives (theme_id, title, notes, mode, creator, phase, sort_order, psych_lever, persona) VALUES
+('t1000000-0000-0000-0000-000000000005', 'Build in Public — 3x/week FC IG + Cole BAM pages', 'Share the journey: product screenshots, team meetings, design decisions, wins, setbacks. Build audience investment before launch.', 'organic', 'Coleman', 0, 1, 'Curiosity', ''),
+('t1000000-0000-0000-0000-000000000005', 'FullControl IG — Brand identity, curiosity, product teasers', 'Dedicated FC Instagram. Polished brand posts, feature reveals, ''coming soon'' teasers. 3x/week cadence. Build the brand before the product.', 'organic', 'Coleman', 0, 2, 'Curiosity', ''),
+('t1000000-0000-0000-0000-000000000005', 'AI Education — Build urgency before solution drops', 'Content that teaches AI''s impact on sports businesses WITHOUT mentioning FC. Build the problem awareness. When FC launches, they''re primed.', 'organic', 'Coleman', 0, 3, 'Urgency', ''),
+('t1000000-0000-0000-0000-000000000005', 'Founder Narrative — Cole: why I built this (4x/week)', 'Cole''s personal story. 500K+ followers. The credibility of someone who actually runs 5 locations saying ''I needed this to exist.''', 'organic', 'Coleman', 0, 4, 'Authority', ''),
+('t1000000-0000-0000-0000-000000000005', 'Founder Talking Heads — Cole + Zoran', 'Both founders on camera. Product vision, behind-the-scenes decisions, disagreements even. Humanizes the brand. Two perspectives, one mission.', 'organic', 'Coleman', 0, 5, 'Social Proof', ''),
+('t1000000-0000-0000-0000-000000000005', '''I can''t believe what we built'' teasers — no reveal yet', 'Hype without showing the product. Reactions, excited faces, vague screen glimpses. Build curiosity that demands to be satisfied.', 'organic', 'Coleman', 0, 6, 'Curiosity', ''),
+('t1000000-0000-0000-0000-000000000005', 'First curiosity post — mission + founder energy, no product reveal', 'Day 1 post. No product. Just the mission: ''We''re building something that changes how sports academies operate.'' Pure founder energy.', 'organic', 'Coleman', 0, 7, 'Aspiration', ''),
+('t1000000-0000-0000-0000-000000000005', 'BAM Business IG — AI for sports business, pain points (3x/week)', 'Business-focused account. Pain point content: missed DMs, churn problems, scheduling chaos. Position AI as the inevitable solution. 3x/week.', 'organic', 'Coleman', 0, 8, 'Pain Point', ''),
+('t1000000-0000-0000-0000-000000000005', 'Pain Point Content — 8 jobs problem, missed DM problem', 'Specific pain content that names the exact problems. ''You''re doing 8 jobs and none of them well.'' ''You missed 3 DMs last week. Each one was $200/month.''', 'organic', 'Coleman', 0, 9, 'Pain Point', '');

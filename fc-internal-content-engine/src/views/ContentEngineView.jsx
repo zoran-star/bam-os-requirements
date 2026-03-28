@@ -23,13 +23,13 @@
 //
 // ═══════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   fetchThemes, createTheme, updateTheme, deleteTheme,
-  fetchMessages, createMessage, updateMessage, deleteMessage,
+  fetchCreatives, createCreative, updateCreative, deleteCreative,
   fetchScripts, createScript, updateScriptStatus,
   fetchFeedback, createFeedback,
-  massImportThemes, massImportMessages,
+  massImportThemes, massImportCreatives,
 } from "../services/contentEngineService";
 
 const PHASE_LABELS = { 0: "Pre-Launch", 1: "Launch", 2: "Post-Launch" };
@@ -37,17 +37,18 @@ const PHASE_COLORS = (tokens) => ({ 0: tokens.green, 1: tokens.amber, 2: tokens.
 const PHASE_BG = (tokens) => ({ 0: tokens.greenSoft, 1: tokens.amberSoft, 2: `${tokens.blue}15` });
 
 const VIDEO_STYLES = [
-  { value: "talking_head", label: "Talking Head" },
-  { value: "selfie", label: "Selfie / iPhone" },
-  { value: "pro_camera", label: "Pro Camera" },
-  { value: "carousel", label: "Carousel" },
-  { value: "screen_record", label: "Screen Record" },
-  { value: "broll_voiceover", label: "B-Roll + Voiceover" },
-  { value: "testimonial", label: "Testimonial" },
-  { value: "other", label: "Other" },
+  { value: "talking_head", label: "Talking Head — Founder Direct" },
+  { value: "ugc", label: "UGC — User-Generated Style" },
+  { value: "screen_record", label: "Screen Recording — Product Demo" },
+  { value: "quick_graphics", label: "Quick Graphics — Motion Design" },
+  { value: "funny_jarvis", label: "Funny Vibes — Jarvis Concept" },
 ];
 
 const TONES = ["Educational", "Motivational", "Urgent", "Conversational", "Authoritative", "Storytelling", "Controversial"];
+
+const PSYCH_LEVERS = ["FOMO", "Pain Point", "Solution", "Urgency", "Aspiration", "Simplicity", "Curiosity", "Value", "Authority", "Objection Handler", "Social Proof", "Humor"];
+
+const PERSONAS = ["", "Young Hungry", "Established"];
 
 const STATUS_FLOW = ["draft", "approved", "recorded", "published"];
 const STATUS_COLORS = (tokens) => ({
@@ -56,6 +57,15 @@ const STATUS_COLORS = (tokens) => ({
   recorded: tokens.blue,
   published: tokens.green,
 });
+
+const ANDROMEDA_RULES = {
+  MIN_CREATIVES_PER_THEME: 8,
+  MAX_CREATIVES_PER_THEME: 20,
+  MIN_FORMATS: 3,
+  MIN_PSYCH_LEVERS: 3,
+  REFRESH_CADENCE_DAYS: 14,
+  ORGANIC_BEFORE_PAID: 5,
+};
 
 // ─── Small UI helpers ───
 
@@ -111,6 +121,219 @@ function EmptyState({ tokens, icon, title, subtitle }) {
       <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>{icon}</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 14, color: tokens.textMute }}>{subtitle}</div>
+    </div>
+  );
+}
+
+// ─── Diversity Score helper ───
+
+function getDiversityScore(creatives) {
+  if (!creatives || creatives.length === 0) return 0;
+  const uniqueLevers = new Set(creatives.map(c => c.psych_lever).filter(Boolean));
+  const uniqueFormats = new Set(creatives.map(c => c.video_style).filter(Boolean));
+  const count = creatives.length;
+  const leverScore = (uniqueLevers.size / PSYCH_LEVERS.length) * 0.4;
+  const formatScore = (uniqueFormats.size / VIDEO_STYLES.length) * 0.3;
+  const countScore = (Math.min(count, 15) / 15) * 0.3;
+  return leverScore + formatScore + countScore;
+}
+
+function getDiversityColor(score, tokens) {
+  if (score > 0.6) return tokens.green;
+  if (score >= 0.3) return tokens.amber;
+  return tokens.red;
+}
+
+function DiversityDot({ score, tokens }) {
+  const [hovered, setHovered] = useState(false);
+  const color = getDiversityColor(score, tokens);
+  return (
+    <span
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
+    >
+      <span style={{
+        width: 10, height: 10, borderRadius: "50%", background: color,
+        display: "inline-block", marginLeft: 6, flexShrink: 0,
+      }} />
+      {hovered && (
+        <span style={{
+          position: "absolute", bottom: "calc(100% + 4px)", left: "50%", transform: "translateX(-50%)",
+          fontSize: 11, fontWeight: 600, color: "#fff", background: "rgba(0,0,0,0.8)",
+          padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap", pointerEvents: "none",
+        }}>
+          Diversity: {Math.round(score * 100)}%
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ─── Andromeda Advisor ───
+
+function AndromedaAdvisor({ tokens, creatives }) {
+  const [dismissed, setDismissed] = useState(new Set());
+
+  const suggestions = useMemo(() => {
+    const results = [];
+    if (!creatives) return results;
+
+    // 1. Creative volume
+    if (creatives.length < ANDROMEDA_RULES.MIN_CREATIVES_PER_THEME) {
+      results.push({
+        id: "volume",
+        type: "volume",
+        severity: "critical",
+        message: `This theme has ${creatives.length} creative${creatives.length !== 1 ? "s" : ""}. Andromeda needs 8-15 for optimal matching.`,
+      });
+    }
+
+    // 2. Psych lever concentration
+    const leverCounts = {};
+    creatives.forEach(c => {
+      if (c.psych_lever) leverCounts[c.psych_lever] = (leverCounts[c.psych_lever] || 0) + 1;
+    });
+    const usedLevers = Object.keys(leverCounts);
+    const missingLevers = PSYCH_LEVERS.filter(l => !usedLevers.includes(l));
+    Object.entries(leverCounts).forEach(([lever, count]) => {
+      if (count >= 3) {
+        const suggestMissing = missingLevers.slice(0, 3).join(", ") || "other angles";
+        results.push({
+          id: `lever-${lever}`,
+          type: "lever_concentration",
+          severity: "warning",
+          message: `You have ${count} creatives using '${lever}' angles. Andromeda may cluster these. Diversify with ${suggestMissing}.`,
+        });
+      }
+    });
+
+    // 3. Format gap
+    const uniqueFormats = new Set(creatives.map(c => c.video_style).filter(Boolean));
+    if (uniqueFormats.size < ANDROMEDA_RULES.MIN_FORMATS) {
+      const missingFormats = VIDEO_STYLES.filter(s => !uniqueFormats.has(s.value)).map(s => s.label).slice(0, 3).join(", ");
+      results.push({
+        id: "format-gap",
+        type: "format_gap",
+        severity: "warning",
+        message: `Only ${uniqueFormats.size} format(s) used. Andromeda rewards format diversity — try ${missingFormats}.`,
+      });
+    }
+
+    // 4. Stale creatives
+    const now = Date.now();
+    const staleThreshold = ANDROMEDA_RULES.REFRESH_CADENCE_DAYS * 24 * 60 * 60 * 1000;
+    const staleCount = creatives.filter(c => c.created_at && (now - new Date(c.created_at).getTime()) > staleThreshold).length;
+    if (staleCount > 0) {
+      results.push({
+        id: "stale",
+        type: "stale",
+        severity: "info",
+        message: `${staleCount} creative${staleCount !== 1 ? "s are" : " is"} older than ${ANDROMEDA_RULES.REFRESH_CADENCE_DAYS} days. Consider refreshing hooks or thumbnails.`,
+      });
+    }
+
+    // 5. Phase imbalance
+    const phaseCounts = {};
+    creatives.forEach(c => {
+      const p = c.phase ?? 0;
+      phaseCounts[p] = (phaseCounts[p] || 0) + 1;
+    });
+    const phaseValues = Object.values(phaseCounts);
+    if (phaseValues.length > 1) {
+      const maxPhase = Math.max(...phaseValues);
+      const minPhase = Math.min(...phaseValues);
+      if (maxPhase >= minPhase * 3) {
+        const heavyPhase = Object.entries(phaseCounts).sort((a, b) => b[1] - a[1])[0];
+        results.push({
+          id: "phase-imbalance",
+          type: "phase_imbalance",
+          severity: "info",
+          message: `Your creatives skew toward ${PHASE_LABELS[heavyPhase[0]] || "a phase"}. Consider balancing across phases.`,
+        });
+      }
+    }
+
+    // 6. Persona balance
+    const personaCounts = {};
+    creatives.forEach(c => {
+      if (c.persona) personaCounts[c.persona] = (personaCounts[c.persona] || 0) + 1;
+    });
+    const personaKeys = Object.keys(personaCounts);
+    if (personaKeys.length === 1) {
+      results.push({
+        id: "persona-balance",
+        type: "persona_balance",
+        severity: "info",
+        message: `Library skews toward ${personaKeys[0]}. Create variations for the other persona.`,
+      });
+    } else if (personaKeys.length > 1) {
+      const personaVals = Object.values(personaCounts);
+      const maxP = Math.max(...personaVals);
+      const minP = Math.min(...personaVals);
+      if (maxP >= minP * 3) {
+        const heavyPersona = Object.entries(personaCounts).sort((a, b) => b[1] - a[1])[0];
+        results.push({
+          id: "persona-balance",
+          type: "persona_balance",
+          severity: "info",
+          message: `Library skews toward ${heavyPersona[0]}. Create variations for the other persona.`,
+        });
+      }
+    }
+
+    return results;
+  }, [creatives]);
+
+  const visibleSuggestions = suggestions.filter(s => !dismissed.has(s.id));
+
+  if (visibleSuggestions.length === 0) return null;
+
+  const severityColors = {
+    info: { bg: `${tokens.green}12`, border: `${tokens.green}30`, text: tokens.green },
+    warning: { bg: `${tokens.amber}12`, border: `${tokens.amber}30`, text: tokens.amber },
+    critical: { bg: `${tokens.red}12`, border: `${tokens.red}30`, text: tokens.red },
+  };
+
+  return (
+    <div style={{
+      padding: 16, borderRadius: 14, marginBottom: 20,
+      background: `${tokens.green}08`, border: `1px solid ${tokens.green}25`,
+      animation: "cardIn 0.3s ease both",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
+        fontSize: 14, fontWeight: 700, color: tokens.green,
+      }}>
+        <span style={{ fontSize: 16 }}>{"\u26A1"}</span>
+        Andromeda Advisor
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {visibleSuggestions.map(s => {
+          const colors = severityColors[s.severity] || severityColors.info;
+          return (
+            <div key={s.id} style={{
+              display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px",
+              borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}`,
+              fontSize: 13, color: tokens.text, lineHeight: 1.4,
+            }}>
+              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: colors.text, marginTop: 1 }}>
+                {s.severity === "critical" ? "\u2757" : s.severity === "warning" ? "\u26A0\uFE0F" : "\u2139\uFE0F"}
+              </span>
+              <span style={{ flex: 1 }}>{s.message}</span>
+              <button
+                onClick={() => setDismissed(prev => new Set([...prev, s.id]))}
+                style={{
+                  flexShrink: 0, background: "none", border: "none", color: tokens.textMute,
+                  cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, opacity: 0.5,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; }}
+              >&times;</button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -187,9 +410,9 @@ function AddThemeForm({ tokens, mode, onSave, onCancel }) {
   );
 }
 
-// ─── Add Message Form ───
+// ─── Add Creative Form ───
 
-function AddMessageForm({ tokens, themeId, mode, onSave, onCancel }) {
+function AddCreativeForm({ tokens, themeId, mode, onSave, onCancel }) {
   const [title, setTitle] = useState("");
   const [hook, setHook] = useState("");
   const [cta, setCta] = useState("");
@@ -197,6 +420,8 @@ function AddMessageForm({ tokens, themeId, mode, onSave, onCancel }) {
   const [videoStyle, setVideoStyle] = useState("talking_head");
   const [phase, setPhase] = useState(0);
   const [creator, setCreator] = useState("Coleman");
+  const [psychLever, setPsychLever] = useState("");
+  const [persona, setPersona] = useState("");
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
 
@@ -205,6 +430,7 @@ function AddMessageForm({ tokens, themeId, mode, onSave, onCancel }) {
     onSave({
       theme_id: themeId, title: title.trim(), hook: hook.trim(), cta: cta.trim(),
       tone, video_style: videoStyle, phase, mode, creator, sort_order: 0,
+      psych_lever: psychLever || null, persona: persona || null,
     });
   };
 
@@ -220,9 +446,9 @@ function AddMessageForm({ tokens, themeId, mode, onSave, onCancel }) {
       background: tokens.surfaceEl, marginBottom: 16,
       animation: "cardIn 0.25s ease both",
     }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text, marginBottom: 12 }}>New Message</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text, marginBottom: 12 }}>New Creative</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-        <input ref={ref} placeholder="Message title..." value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
+        <input ref={ref} placeholder="Creative title..." value={title} onChange={e => setTitle(e.target.value)} style={inputStyle} />
         <input placeholder="Hook line..." value={hook} onChange={e => setHook(e.target.value)} style={inputStyle} />
       </div>
       <input placeholder="Call to action..." value={cta} onChange={e => setCta(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} />
@@ -270,6 +496,36 @@ function AddMessageForm({ tokens, themeId, mode, onSave, onCancel }) {
               }}>{c}</button>
             ))}
           </div>
+        </div>
+      </div>
+      {/* Psych Lever pills */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: tokens.textMute, marginBottom: 6, letterSpacing: "0.04em" }}>PSYCH LEVER</div>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {PSYCH_LEVERS.map(lever => (
+            <button key={lever} onClick={() => setPsychLever(psychLever === lever ? "" : lever)} style={{
+              fontSize: 11, fontWeight: psychLever === lever ? 600 : 400, padding: "4px 10px",
+              borderRadius: 6, border: `1px solid ${psychLever === lever ? tokens.accentBorder : tokens.border}`,
+              background: psychLever === lever ? tokens.accentGhost : "transparent",
+              color: psychLever === lever ? tokens.accent : tokens.textSub,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s ease",
+            }}>{lever}</button>
+          ))}
+        </div>
+      </div>
+      {/* Persona selector */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: tokens.textMute, marginBottom: 6, letterSpacing: "0.04em" }}>PERSONA</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {PERSONAS.filter(p => p !== "").map(p => (
+            <button key={p} onClick={() => setPersona(persona === p ? "" : p)} style={{
+              fontSize: 11, fontWeight: persona === p ? 600 : 400, padding: "4px 10px",
+              borderRadius: 6, border: `1px solid ${persona === p ? tokens.accentBorder : tokens.border}`,
+              background: persona === p ? tokens.accentGhost : "transparent",
+              color: persona === p ? tokens.accent : tokens.textSub,
+              cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s ease",
+            }}>{p}</button>
+          ))}
         </div>
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -322,7 +578,7 @@ function MassImportPanel({ tokens, mode, onImport, onClose }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: tokens.text }}>Mass Import</div>
         <SegmentToggle
-          options={[{ value: "themes", label: "Themes" }, { value: "messages", label: "Messages" }]}
+          options={[{ value: "themes", label: "Themes" }, { value: "creatives", label: "Creatives" }]}
           value={importType} onChange={setImportType} tokens={tokens}
         />
         <div style={{ flex: 1 }} />
@@ -373,7 +629,7 @@ function MassImportPanel({ tokens, mode, onImport, onClose }) {
 
 // ─── Script Panel ───
 
-function ScriptPanel({ tokens, message, onBack }) {
+function ScriptPanel({ tokens, creative, onBack }) {
   const [scripts, setScripts] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [activeScript, setActiveScript] = useState(null);
@@ -384,10 +640,10 @@ function ScriptPanel({ tokens, message, onBack }) {
 
   useEffect(() => {
     loadScripts();
-  }, [message.id]);
+  }, [creative.id]);
 
   const loadScripts = async () => {
-    const { data } = await fetchScripts(message.id);
+    const { data } = await fetchScripts(creative.id);
     setScripts(data);
     if (data.length > 0) {
       setActiveScript(data[0]);
@@ -408,14 +664,14 @@ function ScriptPanel({ tokens, message, onBack }) {
       const res = await fetch("/api/content/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, feedback: feedback.slice(0, 5), version: nextVersion }),
+        body: JSON.stringify({ message: creative, feedback: feedback.slice(0, 5), version: nextVersion }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Generation failed");
 
       const { data } = await createScript({
-        message_id: message.id, version: nextVersion,
-        body: json.script, prompt_snapshot: { message, feedback: feedback.slice(0, 5) },
+        creative_id: creative.id, version: nextVersion,
+        body: json.script, prompt_snapshot: { creative, feedback: feedback.slice(0, 5) },
         status: "draft",
       });
       if (data) {
@@ -424,11 +680,11 @@ function ScriptPanel({ tokens, message, onBack }) {
         setFeedback([]);
       }
     } catch (err) {
-      const placeholderBody = `[Script Generation]\n\nConnect your Anthropic API key to generate scripts automatically.\n\nIn the meantime, here's the framework:\n\nHOOK: ${message.hook || "(no hook set)"}\n\nBODY:\nBased on the "${message.title}" message with a ${message.tone || "conversational"} tone.\nVideo Style: ${VIDEO_STYLES.find(s => s.value === message.video_style)?.label || message.video_style}\nPhase: ${PHASE_LABELS[message.phase] || "Pre-Launch"}\n\nCTA: ${message.cta || "(no CTA set)"}\n\n---\nReplace this with your own script or connect the API for AI generation.`;
+      const placeholderBody = `[Script Generation]\n\nConnect your Anthropic API key to generate scripts automatically.\n\nIn the meantime, here's the framework:\n\nHOOK: ${creative.hook || "(no hook set)"}\n\nBODY:\nBased on the "${creative.title}" creative with a ${creative.tone || "conversational"} tone.\nVideo Style: ${VIDEO_STYLES.find(s => s.value === creative.video_style)?.label || creative.video_style}\nPhase: ${PHASE_LABELS[creative.phase] || "Pre-Launch"}\n\nCTA: ${creative.cta || "(no CTA set)"}\n\n---\nReplace this with your own script or connect the API for AI generation.`;
 
       const { data } = await createScript({
-        message_id: message.id, version: nextVersion,
-        body: placeholderBody, prompt_snapshot: { message, error: err.message },
+        creative_id: creative.id, version: nextVersion,
+        body: placeholderBody, prompt_snapshot: { creative, error: err.message },
         status: "draft",
       });
       if (data) {
@@ -487,43 +743,49 @@ function ScriptPanel({ tokens, message, onBack }) {
     setListening(true);
   };
 
-  const vsLabel = VIDEO_STYLES.find(s => s.value === message.video_style)?.label || message.video_style;
+  const vsLabel = VIDEO_STYLES.find(s => s.value === creative.video_style)?.label || creative.video_style;
 
   return (
     <div style={{ animation: "cardIn 0.3s ease both" }}>
-      {/* Back + message meta */}
+      {/* Back + creative meta */}
       <div onClick={onBack} style={{
         fontSize: 13, fontWeight: 500, color: tokens.accent, cursor: "pointer",
         marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 6,
       }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        Back to Messages
+        Back to Creatives
       </div>
 
-      {/* Message attributes */}
+      {/* Creative attributes */}
       <div style={{
         padding: 20, borderRadius: 14, background: tokens.surfaceEl,
         border: `1px solid ${tokens.border}`, marginBottom: 20,
       }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: tokens.text, marginBottom: 10, letterSpacing: "-0.02em" }}>
-          {message.title}
+          {creative.title}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <Pill label={vsLabel} color={tokens.accent} bg={tokens.accentGhost} />
-          <Pill label={message.tone || "—"} color={tokens.textSub} bg={tokens.surfaceHov} />
-          <Pill label={PHASE_LABELS[message.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[message.phase]} bg={PHASE_BG(tokens)[message.phase]} />
-          <Pill label={message.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
+          <Pill label={creative.tone || "\u2014"} color={tokens.textSub} bg={tokens.surfaceHov} />
+          <Pill label={PHASE_LABELS[creative.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[creative.phase]} bg={PHASE_BG(tokens)[creative.phase]} />
+          <Pill label={creative.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
+          {creative.psych_lever && (
+            <Pill label={creative.psych_lever} color={tokens.blue} bg={`${tokens.blue}15`} />
+          )}
+          {creative.persona && (
+            <Pill label={creative.persona} color={tokens.amber} bg={tokens.amberSoft} />
+          )}
         </div>
-        {message.hook && (
+        {creative.hook && (
           <div style={{ fontSize: 13, marginBottom: 6 }}>
             <span style={{ fontWeight: 600, color: tokens.textMute }}>Hook: </span>
-            <span style={{ color: tokens.text }}>{message.hook}</span>
+            <span style={{ color: tokens.text }}>{creative.hook}</span>
           </div>
         )}
-        {message.cta && (
+        {creative.cta && (
           <div style={{ fontSize: 13 }}>
             <span style={{ fontWeight: 600, color: tokens.textMute }}>CTA: </span>
-            <span style={{ color: tokens.text }}>{message.cta}</span>
+            <span style={{ color: tokens.text }}>{creative.cta}</span>
           </div>
         )}
       </div>
@@ -700,7 +962,7 @@ function ThemeNotes({ tokens, theme, onSave }) {
 
 export default function ContentEngineView({ tokens, dark }) {
   // Navigation state
-  const [view, setView] = useState("themes"); // "themes" | "messages" | "script"
+  const [view, setView] = useState("themes"); // "themes" | "creatives" | "script"
   const [mode, setMode] = useState("paid"); // "paid" | "organic"
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [phaseFilter, setPhaseFilter] = useState(null);
@@ -708,13 +970,13 @@ export default function ContentEngineView({ tokens, dark }) {
   // Data state
   const [themes, setThemes] = useState([]);
   const [selectedTheme, setSelectedTheme] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [selectedMsg, setSelectedMsg] = useState(null);
+  const [creatives, setCreatives] = useState([]);
+  const [selectedCreative, setSelectedCreative] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // UI state
   const [showAddTheme, setShowAddTheme] = useState(false);
-  const [showAddMsg, setShowAddMsg] = useState(false);
+  const [showAddCreative, setShowAddCreative] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   // ─── Data loading ───
@@ -731,9 +993,9 @@ export default function ContentEngineView({ tokens, dark }) {
 
   useEffect(() => { loadThemes(); }, [loadThemes]);
 
-  const loadMessages = async (themeId) => {
-    const { data } = await fetchMessages(themeId);
-    setMessages(data);
+  const loadCreatives = async (themeId) => {
+    const { data } = await fetchCreatives(themeId);
+    setCreatives(data);
   };
 
   // ─── Handlers ───
@@ -748,14 +1010,14 @@ export default function ContentEngineView({ tokens, dark }) {
     setThemes(prev => prev.filter(t => t.id !== id));
   };
 
-  const handleCreateMessage = async (msg) => {
-    const { data } = await createMessage(msg);
-    if (data) { setMessages(prev => [data, ...prev]); setShowAddMsg(false); }
+  const handleCreateCreative = async (creative) => {
+    const { data } = await createCreative(creative);
+    if (data) { setCreatives(prev => [data, ...prev]); setShowAddCreative(false); }
   };
 
-  const handleDeleteMessage = async (id) => {
-    await deleteMessage(id);
-    setMessages(prev => prev.filter(m => m.id !== id));
+  const handleDeleteCreative = async (id) => {
+    await deleteCreative(id);
+    setCreatives(prev => prev.filter(m => m.id !== id));
   };
 
   const handleMassImport = async (rows, type) => {
@@ -765,31 +1027,31 @@ export default function ContentEngineView({ tokens, dark }) {
     } else {
       if (!selectedTheme) return;
       const withThemeId = rows.map(r => ({ ...r, theme_id: selectedTheme.id }));
-      const { data } = await massImportMessages(withThemeId);
-      if (data.length > 0) { loadMessages(selectedTheme.id); setShowImport(false); }
+      const { data } = await massImportCreatives(withThemeId);
+      if (data.length > 0) { loadCreatives(selectedTheme.id); setShowImport(false); }
     }
   };
 
   const drillIntoTheme = (theme) => {
     setSelectedTheme(theme);
-    setView("messages");
-    loadMessages(theme.id);
+    setView("creatives");
+    loadCreatives(theme.id);
   };
 
-  const drillIntoMessage = (msg) => {
-    setSelectedMsg(msg);
+  const drillIntoCreative = (creative) => {
+    setSelectedCreative(creative);
     setView("script");
   };
 
   const goBackToThemes = () => {
     setView("themes");
     setSelectedTheme(null);
-    setMessages([]);
+    setCreatives([]);
   };
 
-  const goBackToMessages = () => {
-    setView("messages");
-    setSelectedMsg(null);
+  const goBackToCreatives = () => {
+    setView("creatives");
+    setSelectedCreative(null);
   };
 
   // ─── Breadcrumb ───
@@ -803,17 +1065,17 @@ export default function ContentEngineView({ tokens, dark }) {
       {selectedTheme && (
         <>
           <span style={{ color: tokens.textMute }}>/</span>
-          <span onClick={view === "script" ? goBackToMessages : undefined} style={{
-            color: view === "messages" ? tokens.text : tokens.accent,
-            fontWeight: view === "messages" ? 600 : 400,
+          <span onClick={view === "script" ? goBackToCreatives : undefined} style={{
+            color: view === "creatives" ? tokens.text : tokens.accent,
+            fontWeight: view === "creatives" ? 600 : 400,
             cursor: view === "script" ? "pointer" : "default",
           }}>{selectedTheme.title}</span>
         </>
       )}
-      {selectedMsg && (
+      {selectedCreative && (
         <>
           <span style={{ color: tokens.textMute }}>/</span>
-          <span style={{ color: tokens.text, fontWeight: 600 }}>{selectedMsg.title}</span>
+          <span style={{ color: tokens.text, fontWeight: 600 }}>{selectedCreative.title}</span>
         </>
       )}
     </div>
@@ -869,12 +1131,12 @@ export default function ContentEngineView({ tokens, dark }) {
             }}>+ Add Theme</button>
           </div>
         )}
-        {view === "messages" && (
-          <button onClick={() => setShowAddMsg(p => !p)} style={{
+        {view === "creatives" && (
+          <button onClick={() => setShowAddCreative(p => !p)} style={{
             fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 8,
             border: "none", background: tokens.accent, color: "#fff",
             cursor: "pointer", fontFamily: "inherit",
-          }}>+ Add Message</button>
+          }}>+ Add Creative</button>
         )}
       </div>
 
@@ -909,7 +1171,9 @@ export default function ContentEngineView({ tokens, dark }) {
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {themes.map((theme, i) => {
-                const msgCount = theme.content_messages?.[0]?.count || 0;
+                const creativeCount = theme.content_creatives?.[0]?.count || 0;
+                // Count-based diversity score for themes view (no full creative data)
+                const countOnlyScore = (Math.min(creativeCount, 15) / 15) * 0.3;
                 return (
                   <div key={theme.id} onClick={() => drillIntoTheme(theme)} style={{
                     padding: 20, borderRadius: 14, background: tokens.surfaceEl,
@@ -937,8 +1201,9 @@ export default function ContentEngineView({ tokens, dark }) {
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                       <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
                       <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
-                      <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto" }}>
-                        {msgCount} message{msgCount !== 1 ? "s" : ""}
+                      <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
+                        {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
+                        <DiversityDot score={countOnlyScore} tokens={tokens} />
                       </span>
                     </div>
                     {theme.notes && (
@@ -955,8 +1220,8 @@ export default function ContentEngineView({ tokens, dark }) {
         </>
       )}
 
-      {/* MESSAGES VIEW */}
-      {view === "messages" && selectedTheme && (
+      {/* CREATIVES VIEW */}
+      {view === "creatives" && selectedTheme && (
         <>
           <div onClick={goBackToThemes} style={{
             fontSize: 13, fontWeight: 500, color: tokens.accent, cursor: "pointer",
@@ -980,45 +1245,48 @@ export default function ContentEngineView({ tokens, dark }) {
             <div style={{ display: "flex", gap: 6 }}>
               <Pill label={PHASE_LABELS[selectedTheme.phase]} color={PHASE_COLORS(tokens)[selectedTheme.phase]} bg={PHASE_BG(tokens)[selectedTheme.phase]} />
               <Pill label={selectedTheme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
-              <Pill label={`${messages.length} messages`} color={tokens.textMute} bg={tokens.surfaceHov} />
+              <Pill label={`${creatives.length} creatives`} color={tokens.textMute} bg={tokens.surfaceHov} />
             </div>
             <ThemeNotes tokens={tokens} theme={selectedTheme} onSave={updateTheme} />
           </div>
 
-          {showAddMsg && (
-            <AddMessageForm tokens={tokens} themeId={selectedTheme.id} mode={mode}
-              onSave={handleCreateMessage} onCancel={() => setShowAddMsg(false)} />
+          {/* Andromeda Advisor */}
+          <AndromedaAdvisor tokens={tokens} creatives={creatives} />
+
+          {showAddCreative && (
+            <AddCreativeForm tokens={tokens} themeId={selectedTheme.id} mode={mode}
+              onSave={handleCreateCreative} onCancel={() => setShowAddCreative(false)} />
           )}
 
           {/* Active cap indicator */}
-          {messages.length > 0 && (() => {
-            const activeCount = messages.filter(m => m.is_active !== false).length;
+          {creatives.length > 0 && (() => {
+            const activeCount = creatives.filter(m => m.is_active !== false).length;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12 }}>
                 <span style={{ fontWeight: 600, color: activeCount > 20 ? tokens.red : tokens.green }}>
                   {activeCount}/20 active
                 </span>
                 <span style={{ color: tokens.textMute }}>
-                  {messages.length - activeCount > 0 ? `\u00b7 ${messages.length - activeCount} queued` : ""}
+                  {creatives.length - activeCount > 0 ? `\u00b7 ${creatives.length - activeCount} queued` : ""}
                 </span>
               </div>
             );
           })()}
 
-          {messages.length === 0 ? (
-            <EmptyState tokens={tokens} icon={"\uD83D\uDCAC"} title="No messages yet"
-              subtitle="Add your first message to this theme." />
+          {creatives.length === 0 ? (
+            <EmptyState tokens={tokens} icon={"\uD83D\uDCAC"} title="No creatives yet"
+              subtitle="Add your first creative to this theme." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {messages.map((msg, i) => {
-                const vsLabel = VIDEO_STYLES.find(s => s.value === msg.video_style)?.label || msg.video_style || "\u2014";
-                const isQueued = msg.is_active === false;
+              {creatives.map((creative, i) => {
+                const vsLabel = VIDEO_STYLES.find(s => s.value === creative.video_style)?.label || creative.video_style || "\u2014";
+                const isQueued = creative.is_active === false;
                 return (
-                  <div key={msg.id} onClick={() => drillIntoMessage(msg)} style={{
+                  <div key={creative.id} onClick={() => drillIntoCreative(creative)} style={{
                     display: "flex", alignItems: "center", gap: 16, padding: "14px 20px",
                     borderRadius: 12, background: tokens.surfaceEl,
                     border: `1px solid ${tokens.border}`, cursor: "pointer",
-                    borderLeft: `3px solid ${isQueued ? tokens.textMute : (PHASE_COLORS(tokens)[msg.phase] || tokens.accent)}`,
+                    borderLeft: `3px solid ${isQueued ? tokens.textMute : (PHASE_COLORS(tokens)[creative.phase] || tokens.accent)}`,
                     opacity: isQueued ? 0.5 : 1,
                     transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
                     animation: `cardIn 0.3s ease ${i * 30}ms both`,
@@ -1027,20 +1295,26 @@ export default function ContentEngineView({ tokens, dark }) {
                     onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = tokens.border; }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{msg.title}</div>
-                      {msg.hook && (
+                      <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{creative.title}</div>
+                      {creative.hook && (
                         <div style={{ fontSize: 13, color: tokens.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {msg.hook}
+                          {creative.hook}
                         </div>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       {isQueued && <Pill label="Queued" color={tokens.textMute} bg={tokens.surfaceHov} />}
                       <Pill label={vsLabel} color={tokens.accent} bg={tokens.accentGhost} />
-                      <Pill label={msg.tone || "\u2014"} color={tokens.textSub} bg={tokens.surfaceHov} />
-                      <Pill label={PHASE_LABELS[msg.phase] || "\u2014"} color={PHASE_COLORS(tokens)[msg.phase]} bg={PHASE_BG(tokens)[msg.phase]} />
+                      <Pill label={creative.tone || "\u2014"} color={tokens.textSub} bg={tokens.surfaceHov} />
+                      <Pill label={PHASE_LABELS[creative.phase] || "\u2014"} color={PHASE_COLORS(tokens)[creative.phase]} bg={PHASE_BG(tokens)[creative.phase]} />
+                      {creative.psych_lever && (
+                        <Pill label={creative.psych_lever} color={tokens.blue} bg={`${tokens.blue}15`} />
+                      )}
+                      {creative.persona && (
+                        <Pill label={creative.persona} color={tokens.amber} bg={tokens.amberSoft} />
+                      )}
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }} style={{
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCreative(creative.id); }} style={{
                       background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
                       fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.3,
                     }}
@@ -1056,8 +1330,8 @@ export default function ContentEngineView({ tokens, dark }) {
       )}
 
       {/* SCRIPT VIEW */}
-      {view === "script" && selectedMsg && (
-        <ScriptPanel tokens={tokens} message={selectedMsg} onBack={goBackToMessages} />
+      {view === "script" && selectedCreative && (
+        <ScriptPanel tokens={tokens} creative={selectedCreative} onBack={goBackToCreatives} />
       )}
     </div>
   );

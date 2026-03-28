@@ -1,4 +1,4 @@
-// Content Engine Service — all Supabase CRUD for themes, messages, scripts, feedback
+// Content Engine Service — all Supabase CRUD for themes, creatives, scripts, feedback
 //
 // SETUP: Update the import path below to match your project's supabase client location
 import { supabase } from "../lib/supabase";
@@ -7,7 +7,7 @@ import { supabase } from "../lib/supabase";
 
 export async function fetchThemes({ mode, creator, phase } = {}) {
   try {
-    let q = supabase.from("content_themes").select("*, content_messages(count)").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+    let q = supabase.from("content_themes").select("*, content_creatives(count)").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
     if (mode) q = q.eq("mode", mode);
     if (creator && creator !== "all") q = q.eq("creator", creator);
     if (phase !== undefined && phase !== null) q = q.eq("phase", phase);
@@ -49,11 +49,11 @@ export async function deleteTheme(id) {
   }
 }
 
-// ─── Messages ───
+// ─── Creatives ───
 
-export async function fetchMessages(themeId) {
+export async function fetchCreatives(themeId) {
   try {
-    let q = supabase.from("content_messages").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+    let q = supabase.from("content_creatives").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
     if (themeId) q = q.eq("theme_id", themeId);
     const { data, error } = await q;
     if (error) throw error;
@@ -63,9 +63,9 @@ export async function fetchMessages(themeId) {
   }
 }
 
-export async function createMessage(msg) {
+export async function createCreative(creative) {
   try {
-    const { data, error } = await supabase.from("content_messages").insert(msg).select().single();
+    const { data, error } = await supabase.from("content_creatives").insert(creative).select().single();
     if (error) throw error;
     return { data, error: null };
   } catch (err) {
@@ -73,9 +73,9 @@ export async function createMessage(msg) {
   }
 }
 
-export async function updateMessage(id, fields) {
+export async function updateCreative(id, fields) {
   try {
-    const { data, error } = await supabase.from("content_messages").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id).select().single();
+    const { data, error } = await supabase.from("content_creatives").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id).select().single();
     if (error) throw error;
     return { data, error: null };
   } catch (err) {
@@ -83,9 +83,9 @@ export async function updateMessage(id, fields) {
   }
 }
 
-export async function deleteMessage(id) {
+export async function deleteCreative(id) {
   try {
-    const { error } = await supabase.from("content_messages").delete().eq("id", id);
+    const { error } = await supabase.from("content_creatives").delete().eq("id", id);
     if (error) throw error;
     return { error: null };
   } catch (err) {
@@ -95,9 +95,9 @@ export async function deleteMessage(id) {
 
 // ─── Scripts ───
 
-export async function fetchScripts(messageId) {
+export async function fetchScripts(creativeId) {
   try {
-    const { data, error } = await supabase.from("content_scripts").select("*").eq("message_id", messageId).order("version", { ascending: false });
+    const { data, error } = await supabase.from("content_scripts").select("*").eq("creative_id", creativeId).order("version", { ascending: false });
     if (error) throw error;
     return { data: data || [], error: null };
   } catch (err) {
@@ -159,9 +159,9 @@ export async function massImportThemes(rows) {
   }
 }
 
-export async function massImportMessages(rows) {
+export async function massImportCreatives(rows) {
   try {
-    const { data, error } = await supabase.from("content_messages").insert(rows).select();
+    const { data, error } = await supabase.from("content_creatives").insert(rows).select();
     if (error) throw error;
     return { data: data || [], error: null };
   } catch (err) {
