@@ -93,7 +93,7 @@ app/src/
    - [Strategy](https://www.notion.so/31c5aca8ac0f81da85dcc72bf057e3d6)
    - [Profiles & Identity](https://www.notion.so/3245aca8ac0f819e8166d52f994a5f7a)
    - [AI Advisor](https://www.notion.so/3245aca8ac0f81978b4ef0972967611c)
-   - Settings & Configuration (SET) — to be created
+   - [Settings & Configuration](https://www.notion.so/3315aca8ac0f81749b78f52144f369ba)
 
 **When adding or updating requirements, update Notion.** The prototype serves as the visual reference for what's been built. Notion is the authoritative spec for requirement details, job IDs, release targets, and field-level documentation.
 
