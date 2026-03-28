@@ -1,3 +1,7 @@
 {
-  "alias": ["fc-prototype.vercel.app"]
+  "alias": ["fc-prototype.vercel.app"],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

@@ -1,8 +1,20 @@
 import { useState, useRef, useMemo } from 'react';
 import useBannerCanvas from '../hooks/useBannerCanvas';
 import useTypewriter from '../hooks/useTypewriter';
+import ContentEngineView from '../views/ContentEngineView';
 import s from '../styles/Content.module.css';
 import sh from '../styles/shared.module.css';
+
+/* Token bridge for ContentEngineView */
+const CONTENT_ENGINE_TOKENS = {
+  bg: '#F8F7F5', surface: '#FFFFFF', surfaceEl: '#FAFAF8', surfaceHov: '#F0EFEC',
+  surfaceAlt: '#F5F4F1', border: 'rgba(0,0,0,0.07)', borderMed: 'rgba(0,0,0,0.12)',
+  borderStr: 'rgba(0,0,0,0.18)', text: '#1C1B18', textSub: '#6E6B63', textMute: '#A5A19A',
+  accent: '#C8A84E', accentGhost: 'rgba(200,168,78,0.08)', accentBorder: 'rgba(200,168,78,0.25)',
+  green: '#3EAF5C', greenSoft: 'rgba(62,175,92,0.10)', amber: '#E09D24', amberSoft: 'rgba(224,157,36,0.10)',
+  blue: '#6366f1', red: '#E05A42', redSoft: 'rgba(224,90,66,0.10)',
+  cardHover: 'rgba(200,168,78,0.04)', inputGlow: 'rgba(200,168,78,0.15)',
+};
 
 /* ══════════════════════════════════════════════════════════════
    SAGE AI PROMPTS
@@ -121,6 +133,7 @@ const TABS = [
   { key: 'brief', label: 'Brief', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
   { key: 'plans', label: 'Content Plans', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> },
   { key: 'analytics', label: 'Analytics', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+  { key: 'engine', label: 'Script Engine', icon: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> },
 ];
 
 /* ══════════════════════════════════════════════════════════════
@@ -904,6 +917,7 @@ export default function Content() {
     brief: renderBrief,
     plans: renderPlans,
     analytics: renderAnalytics,
+    engine: () => <ContentEngineView tokens={CONTENT_ENGINE_TOKENS} dark={false} />,
   };
 
   return (
