@@ -5,12 +5,13 @@ import { supabase } from "../lib/supabase";
 
 // ─── Themes ───
 
-export async function fetchThemes({ mode, creator, phase } = {}) {
+export async function fetchThemes({ mode, creator, phase, category } = {}) {
   try {
     let q = supabase.from("content_themes").select("*, content_creatives(count)").order("sort_order", { ascending: true }).order("created_at", { ascending: false });
     if (mode) q = q.eq("mode", mode);
     if (creator && creator !== "all") q = q.eq("creator", creator);
     if (phase !== undefined && phase !== null) q = q.eq("phase", phase);
+    if (category && category !== "all") q = q.eq("category", category);
     const { data, error } = await q;
     if (error) throw error;
     return { data: data || [], error: null };

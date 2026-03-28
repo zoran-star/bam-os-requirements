@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS content_themes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
+  category TEXT DEFAULT '',
   mode TEXT NOT NULL CHECK (mode IN ('paid', 'organic', 'both')) DEFAULT 'paid',
   creator TEXT NOT NULL DEFAULT 'Coleman',
   phase SMALLINT DEFAULT 0 CHECK (phase IN (0, 1, 2)),

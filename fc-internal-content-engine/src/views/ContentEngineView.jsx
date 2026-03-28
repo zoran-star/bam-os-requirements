@@ -343,6 +343,7 @@ function AndromedaAdvisor({ tokens, creatives }) {
 function AddThemeForm({ tokens, mode, onSave, onCancel }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("AI Advantage");
   const [creator, setCreator] = useState("Coleman");
   const [phase, setPhase] = useState(0);
   const ref = useRef(null);
@@ -350,7 +351,7 @@ function AddThemeForm({ tokens, mode, onSave, onCancel }) {
 
   const save = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), mode, creator, phase, sort_order: 0 });
+    onSave({ title: title.trim(), description: description.trim(), category, mode, creator, phase, sort_order: 0 });
   };
 
   const inputStyle = {
@@ -372,6 +373,17 @@ function AddThemeForm({ tokens, mode, onSave, onCancel }) {
       <input placeholder="Description (optional)" value={description} onChange={e => setDescription(e.target.value)}
         onKeyDown={e => e.key === "Enter" && save()} style={{ ...inputStyle, marginBottom: 12 }} />
       <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 4 }}>
+          {["AI Advantage", "Command Center", "Strategic Intel"].map(cat => (
+            <button key={cat} onClick={() => setCategory(cat)} style={{
+              fontSize: 12, fontWeight: category === cat ? 600 : 400, padding: "4px 12px",
+              borderRadius: 8, border: `1px solid ${category === cat ? tokens.accentBorder : tokens.border}`,
+              background: category === cat ? tokens.accentGhost : "transparent",
+              color: category === cat ? tokens.accent : tokens.textSub,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>{cat}</button>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: 4 }}>
           {["Coleman", "Zoran"].map(c => (
             <button key={c} onClick={() => setCreator(c)} style={{
@@ -964,6 +976,7 @@ export default function ContentEngineView({ tokens, dark }) {
   // Navigation state
   const [view, setView] = useState("themes"); // "themes" | "creatives" | "script"
   const [mode, setMode] = useState("paid"); // "paid" | "organic"
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [phaseFilter, setPhaseFilter] = useState(null);
 
@@ -984,12 +997,13 @@ export default function ContentEngineView({ tokens, dark }) {
   const loadThemes = useCallback(async () => {
     setLoading(true);
     const filters = { mode };
+    if (categoryFilter !== "all") filters.category = categoryFilter;
     if (creatorFilter !== "all") filters.creator = creatorFilter;
     if (phaseFilter !== null) filters.phase = phaseFilter;
     const { data } = await fetchThemes(filters);
     setThemes(data);
     setLoading(false);
-  }, [mode, creatorFilter, phaseFilter]);
+  }, [mode, categoryFilter, creatorFilter, phaseFilter]);
 
   useEffect(() => { loadThemes(); }, [loadThemes]);
 
@@ -1101,6 +1115,11 @@ export default function ContentEngineView({ tokens, dark }) {
         />
         <div style={{ width: 1, height: 24, background: tokens.border }} />
         <FilterPills
+          options={[{ value: "all", label: "All Categories" }, { value: "AI Advantage", label: "AI Advantage" }, { value: "Command Center", label: "Command Center" }, { value: "Strategic Intel", label: "Strategic Intel" }]}
+          value={categoryFilter} onChange={setCategoryFilter} tokens={tokens}
+        />
+        <div style={{ width: 1, height: 24, background: tokens.border }} />
+        <FilterPills
           options={[{ value: "all", label: "All" }, { value: "Coleman", label: "Coleman" }, { value: "Zoran", label: "Zoran" }]}
           value={creatorFilter} onChange={setCreatorFilter} tokens={tokens}
         />
@@ -1199,6 +1218,7 @@ export default function ContentEngineView({ tokens, dark }) {
                       <div style={{ fontSize: 13, color: tokens.textSub, marginBottom: 10, lineHeight: 1.4 }}>{theme.description}</div>
                     )}
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                      {theme.category && <Pill label={theme.category} color={tokens.accent} bg={tokens.accentGhost} />}
                       <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
                       <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
                       <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
