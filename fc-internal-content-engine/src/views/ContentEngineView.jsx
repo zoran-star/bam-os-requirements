@@ -125,7 +125,7 @@ function EmptyState({ tokens, icon, title, subtitle }) {
   );
 }
 
-// ─── Diversity Score helper ───
+// ─── Diversity Score helper (kept for future use) ───
 
 function getDiversityScore(creatives) {
   if (!creatives || creatives.length === 0) return 0;
@@ -144,6 +144,7 @@ function getDiversityColor(score, tokens) {
   return tokens.red;
 }
 
+// DiversityDot kept for later use — removed from themes view
 function DiversityDot({ score, tokens }) {
   const [hovered, setHovered] = useState(false);
   const color = getDiversityColor(score, tokens);
@@ -170,10 +171,11 @@ function DiversityDot({ score, tokens }) {
   );
 }
 
-// ─── Andromeda Advisor ───
+// ─── Andromeda Advisor (collapsible) ───
 
 function AndromedaAdvisor({ tokens, creatives }) {
   const [dismissed, setDismissed] = useState(new Set());
+  const [collapsed, setCollapsed] = useState(true);
 
   const suggestions = useMemo(() => {
     const results = [];
@@ -297,43 +299,63 @@ function AndromedaAdvisor({ tokens, creatives }) {
 
   return (
     <div style={{
-      padding: 16, borderRadius: 14, marginBottom: 20,
+      borderRadius: 14, marginBottom: 20,
       background: `${tokens.green}08`, border: `1px solid ${tokens.green}25`,
       animation: "cardIn 0.3s ease both",
+      overflow: "hidden",
     }}>
-      <div style={{
-        display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
-        fontSize: 14, fontWeight: 700, color: tokens.green,
-      }}>
+      <div
+        onClick={() => setCollapsed(prev => !prev)}
+        style={{
+          display: "flex", alignItems: "center", gap: 8, padding: 16,
+          fontSize: 14, fontWeight: 700, color: tokens.green,
+          cursor: "pointer", userSelect: "none",
+        }}
+      >
+        <span style={{
+          fontSize: 10, display: "inline-block",
+          transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          transition: "transform 0.2s ease",
+        }}>{"\u25BC"}</span>
         <span style={{ fontSize: 16 }}>{"\u26A1"}</span>
         Andromeda Advisor
+        {collapsed && (
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 9999,
+            background: `${tokens.green}20`, color: tokens.green, marginLeft: 8,
+          }}>
+            {visibleSuggestions.length} suggestion{visibleSuggestions.length !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {visibleSuggestions.map(s => {
-          const colors = severityColors[s.severity] || severityColors.info;
-          return (
-            <div key={s.id} style={{
-              display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px",
-              borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}`,
-              fontSize: 13, color: tokens.text, lineHeight: 1.4,
-            }}>
-              <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: colors.text, marginTop: 1 }}>
-                {s.severity === "critical" ? "\u2757" : s.severity === "warning" ? "\u26A0\uFE0F" : "\u2139\uFE0F"}
-              </span>
-              <span style={{ flex: 1 }}>{s.message}</span>
-              <button
-                onClick={() => setDismissed(prev => new Set([...prev, s.id]))}
-                style={{
-                  flexShrink: 0, background: "none", border: "none", color: tokens.textMute,
-                  cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, opacity: 0.5,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; }}
-              >&times;</button>
-            </div>
-          );
-        })}
-      </div>
+      {!collapsed && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 16px 16px" }}>
+          {visibleSuggestions.map(s => {
+            const colors = severityColors[s.severity] || severityColors.info;
+            return (
+              <div key={s.id} style={{
+                display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px",
+                borderRadius: 10, background: colors.bg, border: `1px solid ${colors.border}`,
+                fontSize: 13, color: tokens.text, lineHeight: 1.4,
+              }}>
+                <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: colors.text, marginTop: 1 }}>
+                  {s.severity === "critical" ? "\u2757" : s.severity === "warning" ? "\u26A0\uFE0F" : "\u2139\uFE0F"}
+                </span>
+                <span style={{ flex: 1 }}>{s.message}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDismissed(prev => new Set([...prev, s.id])); }}
+                  style={{
+                    flexShrink: 0, background: "none", border: "none", color: tokens.textMute,
+                    cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 0, opacity: 0.5,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = "0.5"; }}
+                >&times;</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -934,11 +956,12 @@ function ScriptPanel({ tokens, creative, onBack }) {
   );
 }
 
-// ─── Theme Notes Panel ───
+// ─── Theme Notes Panel (collapsible) ───
 
 function ThemeNotes({ tokens, theme, onSave }) {
   const [notes, setNotes] = useState(theme.notes || "");
   const [saved, setSaved] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const timer = useRef(null);
 
   const handleChange = (val) => {
@@ -953,17 +976,34 @@ function ThemeNotes({ tokens, theme, onSave }) {
 
   return (
     <div style={{ marginTop: 12 }}>
-      <textarea value={notes} onChange={e => handleChange(e.target.value)} rows={3}
-        placeholder="Theme notes..."
+      <span
+        onClick={() => setExpanded(prev => !prev)}
         style={{
-          width: "100%", fontSize: 13, padding: "10px 14px", borderRadius: 8,
-          border: `1px solid ${tokens.border}`, background: tokens.surface,
-          color: tokens.text, fontFamily: "inherit", outline: "none", resize: "vertical",
-          lineHeight: 1.5,
-        }} />
-      <div style={{ fontSize: 11, color: saved ? tokens.green : tokens.textMute, marginTop: 4 }}>
-        {saved ? "Saved" : "Saving..."}
-      </div>
+          fontSize: 12, color: tokens.textMute, cursor: "pointer",
+          display: "inline-flex", alignItems: "center", gap: 4,
+          userSelect: "none",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = tokens.text; }}
+        onMouseLeave={e => { e.currentTarget.style.color = tokens.textMute; }}
+      >
+        {"\uD83D\uDCDD"} Notes
+        {notes && !expanded && <span style={{ fontSize: 11, opacity: 0.6 }}> (has content)</span>}
+      </span>
+      {expanded && (
+        <>
+          <textarea value={notes} onChange={e => handleChange(e.target.value)} rows={3}
+            placeholder="Theme notes..."
+            style={{
+              width: "100%", fontSize: 13, padding: "10px 14px", borderRadius: 8,
+              border: `1px solid ${tokens.border}`, background: tokens.surface,
+              color: tokens.text, fontFamily: "inherit", outline: "none", resize: "vertical",
+              lineHeight: 1.5, marginTop: 8,
+            }} />
+          <div style={{ fontSize: 11, color: saved ? tokens.green : tokens.textMute, marginTop: 4 }}>
+            {saved ? "Saved" : "Saving..."}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -979,6 +1019,7 @@ export default function ContentEngineView({ tokens, dark }) {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [creatorFilter, setCreatorFilter] = useState("all");
   const [phaseFilter, setPhaseFilter] = useState(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Data state
   const [themes, setThemes] = useState([]);
@@ -1068,6 +1109,18 @@ export default function ContentEngineView({ tokens, dark }) {
     setSelectedCreative(null);
   };
 
+  // ─── Group themes by category ───
+
+  const groupedThemes = useMemo(() => {
+    const groups = {};
+    themes.forEach(theme => {
+      const cat = theme.category || "Uncategorized";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(theme);
+    });
+    return groups;
+  }, [themes]);
+
   // ─── Breadcrumb ───
 
   const Breadcrumb = () => (
@@ -1095,19 +1148,22 @@ export default function ContentEngineView({ tokens, dark }) {
     </div>
   );
 
+  // ─── Active advanced filter count for badge ───
+  const advancedFilterCount = (creatorFilter !== "all" ? 1 : 0) + (phaseFilter !== null ? 1 : 0);
+
   // ─── Render ───
 
   return (
     <div>
-      {/* These CSS keyframes are required — add to your global styles or keep here */}
+      {/* CSS keyframes */}
       <style>{`
         @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         @keyframes dashPulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
         @keyframes gentlePulse{0%,100%{opacity:1}50%{opacity:0.7}}
       `}</style>
 
-      {/* Header controls */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" }}>
+      {/* Header controls — simplified to 1 row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: showAdvancedFilters ? 8 : 24, flexWrap: "wrap" }}>
         <SegmentToggle
           options={[{ value: "paid", label: "Paid Ads" }, { value: "organic", label: "Organic" }]}
           value={mode} onChange={(v) => { setMode(v); setView("themes"); setSelectedTheme(null); }}
@@ -1119,45 +1175,90 @@ export default function ContentEngineView({ tokens, dark }) {
           value={categoryFilter} onChange={setCategoryFilter} tokens={tokens}
         />
         <div style={{ width: 1, height: 24, background: tokens.border }} />
-        <FilterPills
-          options={[{ value: "all", label: "All" }, { value: "Coleman", label: "Coleman" }, { value: "Zoran", label: "Zoran" }]}
-          value={creatorFilter} onChange={setCreatorFilter} tokens={tokens}
-        />
-        <div style={{ width: 1, height: 24, background: tokens.border }} />
-        <FilterPills
-          options={[
-            { value: null, label: "All Phases" },
-            { value: 0, label: "Pre-Launch" },
-            { value: 1, label: "Launch" },
-            { value: 2, label: "Post-Launch" },
-          ]}
-          value={phaseFilter} onChange={setPhaseFilter} tokens={tokens}
-        />
+        {/* Collapsible advanced filters toggle */}
+        <button
+          onClick={() => setShowAdvancedFilters(prev => !prev)}
+          style={{
+            fontSize: 12, fontWeight: 500, padding: "4px 10px", borderRadius: 8,
+            border: `1px solid ${showAdvancedFilters || advancedFilterCount > 0 ? tokens.accentBorder : tokens.border}`,
+            background: showAdvancedFilters || advancedFilterCount > 0 ? tokens.accentGhost : "transparent",
+            color: showAdvancedFilters || advancedFilterCount > 0 ? tokens.accent : tokens.textMute,
+            cursor: "pointer", fontFamily: "inherit",
+            display: "inline-flex", alignItems: "center", gap: 4,
+            transition: "all 0.15s ease",
+          }}
+        >
+          {"\u2699"} Filters
+          {advancedFilterCount > 0 && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, width: 16, height: 16, borderRadius: "50%",
+              background: tokens.accent, color: "#fff",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+            }}>{advancedFilterCount}</span>
+          )}
+        </button>
         <div style={{ flex: 1 }} />
         {view === "themes" && (
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setShowImport(p => !p)} style={{
-              fontSize: 13, fontWeight: 500, padding: "8px 14px", borderRadius: 8,
-              border: `1px solid ${tokens.border}`, background: "transparent",
-              color: tokens.textSub, cursor: "pointer", fontFamily: "inherit",
+              fontSize: 13, fontWeight: 400, padding: "6px 12px", borderRadius: 8,
+              border: "none", background: "transparent",
+              color: tokens.textMute, cursor: "pointer", fontFamily: "inherit",
               transition: "all 0.15s ease",
-            }}>Import</button>
+            }}
+              onMouseEnter={e => { e.currentTarget.style.color = tokens.text; }}
+              onMouseLeave={e => { e.currentTarget.style.color = tokens.textMute; }}
+            >Import</button>
             <button onClick={() => setShowAddTheme(p => !p)} style={{
-              fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 8,
-              border: "none", background: tokens.accent, color: "#fff",
-              cursor: "pointer", fontFamily: "inherit",
+              fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
+              border: `1px solid ${tokens.accentBorder}`, background: "transparent",
+              color: tokens.accent, cursor: "pointer", fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center", gap: 4,
               transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
-            }}>+ Add Theme</button>
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = tokens.accentGhost; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >+ Add Theme</button>
           </div>
         )}
         {view === "creatives" && (
           <button onClick={() => setShowAddCreative(p => !p)} style={{
-            fontSize: 13, fontWeight: 600, padding: "8px 18px", borderRadius: 8,
-            border: "none", background: tokens.accent, color: "#fff",
-            cursor: "pointer", fontFamily: "inherit",
-          }}>+ Add Creative</button>
+            fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
+            border: `1px solid ${tokens.accentBorder}`, background: "transparent",
+            color: tokens.accent, cursor: "pointer", fontFamily: "inherit",
+            display: "inline-flex", alignItems: "center", gap: 4,
+            transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.background = tokens.accentGhost; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >+ Add Creative</button>
         )}
       </div>
+
+      {/* Advanced filters row (Creator + Phase) — collapsed by default */}
+      {showAdvancedFilters && (
+        <div style={{
+          display: "flex", gap: 12, alignItems: "center", marginBottom: 24, paddingLeft: 4,
+          animation: "cardIn 0.2s ease both",
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: tokens.textMute, letterSpacing: "0.04em" }}>CREATOR</span>
+          <FilterPills
+            options={[{ value: "all", label: "All" }, { value: "Coleman", label: "Coleman" }, { value: "Zoran", label: "Zoran" }]}
+            value={creatorFilter} onChange={setCreatorFilter} tokens={tokens}
+          />
+          <div style={{ width: 1, height: 20, background: tokens.border }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: tokens.textMute, letterSpacing: "0.04em" }}>PHASE</span>
+          <FilterPills
+            options={[
+              { value: null, label: "All Phases" },
+              { value: 0, label: "Pre-Launch" },
+              { value: 1, label: "Launch" },
+              { value: 2, label: "Post-Launch" },
+            ]}
+            value={phaseFilter} onChange={setPhaseFilter} tokens={tokens}
+          />
+        </div>
+      )}
 
       <Breadcrumb />
 
@@ -1188,53 +1289,74 @@ export default function ContentEngineView({ tokens, dark }) {
             <EmptyState tokens={tokens} icon={"\uD83C\uDFAC"} title="No themes yet"
               subtitle={`Create your first ${mode === "paid" ? "paid ads" : "organic"} theme to get started.`} />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {themes.map((theme, i) => {
-                const creativeCount = theme.content_creatives?.[0]?.count || 0;
-                // Count-based diversity score for themes view (no full creative data)
-                const countOnlyScore = (Math.min(creativeCount, 15) / 15) * 0.3;
-                return (
-                  <div key={theme.id} onClick={() => drillIntoTheme(theme)} style={{
-                    padding: 20, borderRadius: 14, background: tokens.surfaceEl,
-                    border: `1px solid ${tokens.border}`, cursor: "pointer",
-                    transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
-                    animation: `cardIn 0.3s ease ${i * 40}ms both`,
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = tokens.cardHover; e.currentTarget.style.borderColor = tokens.borderStr; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = tokens.border; }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                      <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, flex: 1, lineHeight: 1.3 }}>{theme.title}</div>
-                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTheme(theme.id); }} style={{
-                        background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
-                        fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.4,
-                        transition: "opacity 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = "0.4"; e.currentTarget.style.color = tokens.textMute; }}
-                      >&times;</button>
-                    </div>
-                    {theme.description && (
-                      <div style={{ fontSize: 13, color: tokens.textSub, marginBottom: 10, lineHeight: 1.4 }}>{theme.description}</div>
-                    )}
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                      {theme.category && <Pill label={theme.category} color={tokens.accent} bg={tokens.accentGhost} />}
-                      <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
-                      <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
-                      <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", display: "inline-flex", alignItems: "center" }}>
-                        {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
-                        <DiversityDot score={countOnlyScore} tokens={tokens} />
-                      </span>
-                    </div>
-                    {theme.notes && (
-                      <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        Has notes
-                      </div>
-                    )}
+            <div>
+              {Object.entries(groupedThemes).map(([category, categoryThemes]) => (
+                <div key={category} style={{ marginBottom: 24 }}>
+                  {/* Category section header */}
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: tokens.textMute,
+                    letterSpacing: "0.06em", textTransform: "uppercase",
+                    marginBottom: 10, paddingLeft: 2,
+                  }}>
+                    {category}
                   </div>
-                );
-              })}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    {categoryThemes.map((theme, i) => {
+                      const creativeCount = theme.content_creatives?.[0]?.count || 0;
+                      return (
+                        <div key={theme.id} onClick={() => drillIntoTheme(theme)} style={{
+                          padding: 20, borderRadius: 14, background: tokens.surfaceEl,
+                          border: `1px solid ${tokens.border}`, cursor: "pointer",
+                          transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
+                          animation: `cardIn 0.3s ease ${i * 40}ms both`,
+                        }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.transform = "translateY(-4px)";
+                            e.currentTarget.style.boxShadow = "0 4px 20px rgba(200,168,78,0.08)";
+                            e.currentTarget.style.borderColor = `${tokens.accent}40`;
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "none";
+                            e.currentTarget.style.borderColor = tokens.border;
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, flex: 1, lineHeight: 1.3 }}>{theme.title}</div>
+                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTheme(theme.id); }} style={{
+                              background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
+                              fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.4,
+                              transition: "opacity 0.15s",
+                            }}
+                              onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
+                              onMouseLeave={e => { e.currentTarget.style.opacity = "0.4"; e.currentTarget.style.color = tokens.textMute; }}
+                            >&times;</button>
+                          </div>
+                          {theme.description && (
+                            <div style={{
+                              fontSize: 13, color: tokens.textSub, marginBottom: 10, lineHeight: 1.4,
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                            }}>{theme.description}</div>
+                          )}
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                            <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
+                            <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
+                            <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto" }}>
+                              {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
+                            </span>
+                          </div>
+                          {theme.notes && (
+                            <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              Has notes
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </>
@@ -1278,20 +1400,14 @@ export default function ContentEngineView({ tokens, dark }) {
               onSave={handleCreateCreative} onCancel={() => setShowAddCreative(false)} />
           )}
 
-          {/* Active cap indicator */}
-          {creatives.length > 0 && (() => {
-            const activeCount = creatives.filter(m => m.is_active !== false).length;
-            return (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12 }}>
-                <span style={{ fontWeight: 600, color: activeCount > 20 ? tokens.red : tokens.green }}>
-                  {activeCount}/20 active
-                </span>
-                <span style={{ color: tokens.textMute }}>
-                  {creatives.length - activeCount > 0 ? `\u00b7 ${creatives.length - activeCount} queued` : ""}
-                </span>
-              </div>
-            );
-          })()}
+          {/* Simple creative count */}
+          {creatives.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, fontSize: 12 }}>
+              <span style={{ fontWeight: 600, color: tokens.textMute }}>
+                {creatives.length} creative{creatives.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
 
           {creatives.length === 0 ? (
             <EmptyState tokens={tokens} icon={"\uD83D\uDCAC"} title="No creatives yet"
