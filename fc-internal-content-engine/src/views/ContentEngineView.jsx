@@ -1291,29 +1291,36 @@ export default function ContentEngineView({ tokens, dark }) {
           ) : (
             <div>
               {Object.entries(groupedThemes).map(([category, categoryThemes]) => (
-                <div key={category} style={{ marginBottom: 24 }}>
+                <div key={category} style={{ marginBottom: 32 }}>
                   {/* Category section header */}
                   <div style={{
-                    fontSize: 11, fontWeight: 700, color: tokens.textMute,
-                    letterSpacing: "0.06em", textTransform: "uppercase",
-                    marginBottom: 10, paddingLeft: 2,
+                    fontSize: 11, fontWeight: 800, color: tokens.accent,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    marginBottom: 14, paddingLeft: 4,
+                    display: "flex", alignItems: "center", gap: 8,
                   }}>
+                    <div style={{ width: 3, height: 14, borderRadius: 2, background: tokens.accent }} />
                     {category}
+                    <span style={{ fontSize: 10, fontWeight: 500, color: tokens.textMute, letterSpacing: "0.02em", textTransform: "none" }}>
+                      {categoryThemes.length} theme{categoryThemes.length !== 1 ? "s" : ""}
+                    </span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                     {categoryThemes.map((theme, i) => {
                       const creativeCount = theme.content_creatives?.[0]?.count || 0;
                       return (
                         <div key={theme.id} onClick={() => drillIntoTheme(theme)} style={{
-                          padding: 20, borderRadius: 14, background: tokens.surfaceEl,
-                          border: `1px solid ${tokens.border}`, cursor: "pointer",
+                          padding: 24, borderRadius: 16, background: tokens.surface,
+                          border: `1.5px solid ${tokens.border}`, cursor: "pointer",
                           transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
                           animation: `cardIn 0.3s ease ${i * 40}ms both`,
+                          minHeight: 160,
+                          display: "flex", flexDirection: "column",
                         }}
                           onMouseEnter={e => {
                             e.currentTarget.style.transform = "translateY(-4px)";
-                            e.currentTarget.style.boxShadow = "0 4px 20px rgba(200,168,78,0.08)";
-                            e.currentTarget.style.borderColor = `${tokens.accent}40`;
+                            e.currentTarget.style.boxShadow = "0 8px 28px rgba(200,168,78,0.10), 0 2px 8px rgba(0,0,0,0.06)";
+                            e.currentTarget.style.borderColor = `${tokens.accent}50`;
                           }}
                           onMouseLeave={e => {
                             e.currentTarget.style.transform = "translateY(0)";
@@ -1321,8 +1328,8 @@ export default function ContentEngineView({ tokens, dark }) {
                             e.currentTarget.style.borderColor = tokens.border;
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, flex: 1, lineHeight: 1.3 }}>{theme.title}</div>
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, flex: 1, lineHeight: 1.35 }}>{theme.title}</div>
                             <button onClick={(e) => { e.stopPropagation(); handleDeleteTheme(theme.id); }} style={{
                               background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
                               fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.4,
@@ -1334,14 +1341,16 @@ export default function ContentEngineView({ tokens, dark }) {
                           </div>
                           {theme.description && (
                             <div style={{
-                              fontSize: 13, color: tokens.textSub, marginBottom: 10, lineHeight: 1.4,
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              fontSize: 13, color: tokens.textSub, marginBottom: 12, lineHeight: 1.5,
+                              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
                             }}>{theme.description}</div>
                           )}
-                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <div style={{ flex: 1 }} />
+                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${tokens.border}` }}>
                             <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
                             <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
-                            <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto" }}>
+                            <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", fontWeight: 600 }}>
                               {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
                             </span>
                           </div>
