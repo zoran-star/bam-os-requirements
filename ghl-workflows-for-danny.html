@@ -874,24 +874,142 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
     </div>
   </div>
 
-  <!-- PRE-TRIAL: GHOSTED -->
+  <!-- PRE-TRIAL: GHOSTED (DETAILED) -->
   <h3 style="color: var(--red); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; GHOSTED</h3>
+  <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+  <!-- WORKFLOW: sms ghosted -->
+  <div class="wf-card" style="border-left: 3px solid var(--red);">
+    <h4>Workflow: "sms ghosted" <span class="tag published">Published</span> <span class="stat">(<strong>274</strong> enrolled, <strong>1</strong> active)</span></h4>
+    <div class="wf-meta">67 versions | Last updated Nov 10, 2025 | 6-day drip for leads who went silent</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <!-- TRIGGER -->
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Contact Tag Added — includes "smsghosted"<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Fed by: "contact form filled in", "trial form filled in", and "No Show" workflows when lead doesn't respond</span>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">STEP 1 — Reset pipeline stage</div>
+      <div class="flow-row">
+        <div class="flow-node action">Put back into "interested" stage in pipeline</div>
+      </div>
+    </div>
+
+    <!-- STEP 2 — Day 1 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 1</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--green);">
+          <strong>ghosted #1</strong> (SMS)<br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">First re-engagement attempt</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 — Day 2 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 2</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--green);">
+          <strong>ghosted #2</strong> (SMS)<br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Second attempt — different angle/copy</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 — Day 3 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 3</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">
+          <strong>Internal Notification</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Alerts staff that lead is still ghosting after 3 days</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 — Day 4 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 4</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--cyan);">
+          <strong>Email</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Switches channel from SMS to email</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 6 — Day 5 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 5</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--green);">
+          <strong>ghosted #3</strong> (SMS)<br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Final SMS attempt</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 7 — Day 6 -->
+    <div style="margin-top: 20px;">
+      <div class="flow-group-label">DAY 6 — Close out</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Create/Update Opportunity</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+    </div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>Key context:</strong> This is the catch-all re-engagement sequence. Any lead from any entry point (contact form, trial form, free trial booked, no-show) that stops responding gets tagged "smsghosted" and enters this 6-day drip. It alternates SMS → SMS → internal alert → email → SMS to vary the channel. If the lead replies at any point, the "replied to 'sms ghosted'" circuit breaker fires and pulls them out. After 6 days with no response, the opportunity is updated (likely to "lost" or similar stage). The lead would then enter the long-term "lead nurture (once lost)" workflow.
+    </div>
+  </div>
+
+  <!-- WORKFLOW: replied to 'sms ghosted' -->
+  <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+    <h4>Workflow: "replied to 'sms ghosted'" <span class="tag published">Published</span> <span class="stat">(<strong>108</strong> enrolled)</span></h4>
+    <div class="wf-meta">9 versions | Last updated Jul 21, 2025 | Circuit breaker workflow</div>
+  </div>
+
   <div class="flow-container">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
     <div class="flow-row">
-      <div class="flow-node escalation">Lead stops responding to any pre-trial sequence</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">sms ghosted <span class="stat">(<strong>274</strong> enrolled, <strong>1</strong> active)</span></div>
+      <div class="flow-node trigger">Customer Replied — filtered to replies to "sms ghosted" workflow</div>
     </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Long-tail SMS re-engagement sequence for leads who went silent. Spaced-out messages over days/weeks. ~67 versions — heavily tested copy variations.</p>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">ACTION</div>
+      <div class="flow-row">
+        <div class="flow-node action">
+          <strong>Send to "responded" in pipeline</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Takes them out of ghosted, puts them back in "responded" stage — signals human conversation is happening</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
     </div>
-    <div class="flow-row">
-      <div class="flow-node response">Lead finally replies</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">replied to 'sms ghosted' <span class="stat">(<strong>108</strong> enrolled)</span></div>
+
+    <div class="connection-note" style="margin-top: 12px;">
+      <strong>How these two connect:</strong> When a ghosted lead finally replies to any SMS from the "sms ghosted" drip, this workflow fires automatically. It moves the opportunity back to "responded" stage — pulling them out of the ghosted sequence and signaling to staff that a real conversation is now happening.
     </div>
-    <div class="connection-note">Connection: If still no reply after ghosted sequence &rarr; enters "lead nurture (once lost)"</div>
   </div>
 
   <!-- POST TRIAL -->
