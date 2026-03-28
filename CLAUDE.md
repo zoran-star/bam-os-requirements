@@ -41,6 +41,8 @@ bam-os-requirements/
 │   ├── fc-company/     ← Investor page
 │   ├── fc-landing/     ← Product landing page (reference)
 │   └── survey-data-map.html ← Interactive survey data visualization
+├── whiteboard/         ← Onboarding session whiteboard (Vite/React)
+│                         Needs Vercel project setup (see Whiteboard section)
 ├── prompts/            ← AI conversation prompt templates
 ├── onboarding-*.html   ← Interactive onboarding review pages (10 files)
 ├── ghl-workflows-for-danny.html ← GHL workflow documentation
@@ -65,6 +67,37 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 | Survey | `survey/` | https://full-control-survey.vercel.app |
 
 **Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
+
+## Onboarding Whiteboard
+
+The whiteboard app is a visual kanban board for managing onboarding review sessions. Located at `whiteboard/`.
+
+### How it works
+1. Team visits the whiteboard → sees session cards in To Do / In Progress / Complete columns
+2. Click a card → opens a review doc (checkboxes + feedback + export)
+3. Complete review → click "Export for AI" → copies markdown with session ID to clipboard
+4. Paste into Claude Code → Claude processes and proposes updates to Notion
+5. Claude updates: Onboarding Data Points DB, Business Requirements, session status, and creates backlog items for prototype changes
+
+### Notion databases
+- **Sessions DB:** `4e5492be5027427cbbc8994bcd73905c` — stores all session cards + SECTION data
+- **Backlog DB:** `39c1f40a005c4c9ba50b0c7fe47b45bd` — proposed changes not yet implemented
+- **Onboarding Data Points DB:** `49be4ce65ada4d45b736070e11452edb` — canonical list of all data collected during onboarding
+
+### Processing onboarding exports
+When a user pastes an onboarding session export (starts with `---\nsession: SES-XXX-slug`):
+1. Parse the YAML frontmatter to get the session ID
+2. For each approved item: confirm it's in the Onboarding Data Points DB (add if missing)
+3. For each feedback item: propose the change to the user, update Notion if approved
+4. For prototype changes: create a Backlog item (Status: Proposed, Change Type: Prototype)
+5. Update the session's Status to Complete in the Sessions DB
+6. If new topics surface: create new session cards (Status: To Do, Type: Follow-up)
+7. Always separate **data points** (→ Onboarding Data Points DB) from **features** (→ Business Requirements pages)
+
+### Environment variables (set in Vercel dashboard)
+- `NOTION_TOKEN` — Notion integration API key
+- `NOTION_SESSIONS_DB` — Sessions database ID
+- `NOTION_BACKLOG_DB` — Backlog database ID
 
 ## Desktop prototype app
 The interactive desktop prototype is a Vite/React app located at:

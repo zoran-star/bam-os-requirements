@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM OS — Onboarding Review v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F8F7F5;
+  --surf: #FFFFFF;
+  --surf2: #FAFAF8;
+  --surf3: #F0EFEC;
+  --border: rgba(0,0,0,0.07);
+  --borderm: rgba(0,0,0,0.12);
+  --gold: #C8A84E;
+  --goldl: #D4B65C;
+  --goldd: #A08030;
+  --gglow: rgba(200,168,78,0.10);
+  --gsheen: rgba(200,168,78,0.05);
+  --tp: #1C1B18;
+  --ts: #6E6B63;
+  --tm: #A5A19A;
+  --green: #3EAF5C;
+  --greenl: rgba(62,175,92,0.10);
+  --warn: #E09D24;
+  --warnl: rgba(224,157,36,0.10);
+  --red: #E05A42;
+  --redl: rgba(224,90,66,0.10);
+  --blue: #3B6FA0;
+  --bluel: rgba(59,111,160,0.10);
+  --ff: 'Plus Jakarta Sans', sans-serif;
+  --fm: 'DM Mono', monospace;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-full: 9999px;
+}
+[data-theme="dark"] {
+  --bg: #0F0E0C;
+  --surf: #1A1916;
+  --surf2: #222120;
+  --surf3: #2C2B28;
+  --border: rgba(255,255,255,0.08);
+  --borderm: rgba(255,255,255,0.12);
+  --gold: #D4B65C;
+  --goldl: #C8A84E;
+  --goldd: #E0C56A;
+  --gglow: rgba(212,182,92,0.12);
+  --gsheen: rgba(212,182,92,0.06);
+  --tp: #F0EDE8;
+  --ts: #A5A19A;
+  --tm: #6E6B63;
+  --green: #4CC76A;
+  --greenl: rgba(76,199,106,0.12);
+  --warn: #F0B84A;
+  --warnl: rgba(240,184,74,0.12);
+  --red: #F07060;
+  --redl: rgba(240,112,96,0.12);
+  --blue: #5A9FD4;
+  --bluel: rgba(90,159,212,0.12);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.15);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.2);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; }
+body {
+  font-family: var(--ff);
+  background: var(--bg);
+  color: var(--tp);
+  line-height: 1.5;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surf);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 32px;
+  box-shadow: var(--shadow-sm);
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--tp);
+  letter-spacing: -0.3px;
+}
+.header h1 span { color: var(--gold); }
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn {
+  font-family: var(--ff);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-gold {
+  background: var(--gold);
+  color: #fff;
+}
+.btn-gold:hover { background: var(--goldd); }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--borderm);
+  color: var(--ts);
+}
+.btn-outline:hover { background: var(--surf3); }
+.btn-red {
+  background: transparent;
+  border: 1px solid var(--borderm);
+  color: var(--red);
+}
+.btn-red:hover { background: var(--redl); }
+.btn-theme {
+  background: transparent;
+  border: 1px solid var(--borderm);
+  color: var(--ts);
+  padding: 8px 10px;
+  font-size: 15px;
+  line-height: 1;
+}
+.btn-theme:hover { background: var(--surf3); }
+
+/* Progress */
+.progress-bar {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surf3);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: var(--r-full);
+  transition: width 0.3s ease;
+}
+.progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ts);
+  white-space: nowrap;
+  font-family: var(--fm);
+}
+
+/* ── Container ── */
+.container {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 24px 32px 80px;
+}
+
+/* ── Section ── */
+.section {
+  margin-bottom: 32px;
+}
+.section-header {
+  position: sticky;
+  top: 83px;
+  z-index: 50;
+  background: var(--bg);
+  padding: 16px 0 8px;
+}
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tp);
+  letter-spacing: -0.2px;
+}
+.section-desc {
+  font-size: 13px;
+  color: var(--tm);
+  margin-top: 2px;
+}
+
+/* ── Subsection ── */
+.subsection {
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+.subsection-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--tm);
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+/* ── Row ── */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 6px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.row:hover {
+  border-color: var(--borderm);
+  box-shadow: var(--shadow-sm);
+}
+.row.approved {
+  border-color: rgba(62,175,92,0.25);
+  background: linear-gradient(135deg, var(--surf) 0%, var(--greenl) 100%);
+}
+.row-check {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.row-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+.row-content {
+  flex: 1;
+  min-width: 0;
+}
+.row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.row-id {
+  font-family: var(--fm);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gold);
+  background: var(--gglow);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.row-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tp);
+}
+.row-desc {
+  font-size: 13px;
+  color: var(--ts);
+  margin-top: 2px;
+}
+.row-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.pill-green { background: var(--greenl); color: var(--green); }
+.pill-gold { background: var(--warnl); color: var(--warn); }
+.pill-gray { background: var(--surf3); color: var(--tm); }
+.pill-blue { background: var(--bluel); color: var(--blue); }
+.pill-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--tm);
+}
+.row-feedback {
+  flex-shrink: 0;
+  width: 240px;
+}
+.row-feedback input {
+  width: 100%;
+  font-family: var(--ff);
+  font-size: 13px;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surf2);
+  color: var(--tp);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.row-feedback input::placeholder { color: var(--tm); }
+.row-feedback input:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gglow);
+}
+.row-feedback input.has-text {
+  border-color: var(--warn);
+  background: var(--warnl);
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--tp);
+  color: var(--bg);
+  font-family: var(--ff);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Footer note ── */
+.footer-note {
+  margin-top: 40px;
+  padding: 16px 20px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  color: var(--ts);
+  line-height: 1.6;
+}
+.footer-note strong { color: var(--tp); }
+
+/* ── Confirm modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surf);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: var(--shadow-md);
+}
+.modal h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.modal p {
+  font-size: 14px;
+  color: var(--ts);
+  margin-bottom: 20px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .header { padding: 16px 20px; }
+  .container { padding: 16px 20px 60px; }
+  .row { flex-wrap: wrap; }
+  .row-feedback { width: 100%; }
+  .section-header { top: 75px; }
+}
+
+/* ── Print ── */
+@media print {
+  .header { position: static; box-shadow: none; }
+  .header-actions { display: none; }
+  .progress-bar { display: none; }
+  .section-header { position: static; }
+  .row { break-inside: avoid; box-shadow: none; }
+  .row-feedback input { border: 1px solid #ccc; }
+  .toast, .modal-overlay, .btn-theme { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1>BAM <span>OS</span> — Onboarding Review v2</h1>
+    <div class="header-actions">
+      <button class="btn btn-theme" onclick="toggleTheme()" title="Toggle dark mode" id="themeBtn">&#9790;</button>
+      <button class="btn btn-red" onclick="showClearModal()">Clear All</button>
+      <button class="btn btn-gold" onclick="exportForAI()">Export for AI</button>
+    </div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 38 reviewed</div>
+  </div>
+</div>
+
+<div class="container" id="app"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all progress?</h3>
+    <p>This will uncheck all items and remove all feedback. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const REVIEW_DATA = [
+  // ── 1. Identity ──
+  {
+    section: "1",
+    sectionTitle: "Identity",
+    sectionDesc: "Who you are. Core business identity used across all modules.",
+    subsections: [
+      {
+        id: "1A",
+        title: "Business Profile",
+        items: [
+          { id: "1A-01", title: "Business Name", desc: "The name of the academy or business. Used everywhere.", phase: "Onboarding", source: "Manual", required: true },
+          { id: "1A-02", title: "Academy Profile", desc: "Logo, contact email, phone, timezone, address. (SET-001)", phase: "Onboarding", source: "Manual", required: true },
+          { id: "1A-03", title: "Connect Stripe", desc: "Link Stripe account for payments, subscriptions, and billing. (SET-006)", phase: "Onboarding", source: "Manual", required: true },
+        ]
+      }
+    ]
+  },
+  // ── 2. Strategy & Positioning ──
+  {
+    section: "2",
+    sectionTitle: "Strategy & Positioning",
+    sectionDesc: "Your problem, offer, differentiators, and how you qualify leads.",
+    subsections: [
+      {
+        id: "2A",
+        title: "Positioning",
+        items: [
+          { id: "2A-01", title: "Selling Points", desc: "Key differentiators that make the program unique. Part of a broader strategy understanding (problem, offer, positioning).", phase: "Onboarding", source: "AI-Suggested", required: true },
+          { id: "2A-02", title: "Qualification Dimensions", desc: "Which factors matter for qualifying leads (location, age, skill, interest).", phase: "First Week", source: "Manual", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 3. Locations ──
+  {
+    section: "3",
+    sectionTitle: "Locations",
+    sectionDesc: "Where you operate. Each location has its own schedule, coaches, and logistics.",
+    subsections: [
+      {
+        id: "3A",
+        title: "Location Setup",
+        items: [
+          { id: "3A-01", title: "Add Locations", desc: "Create locations with address, timezone, and coach assignments. (SET-002) \u2014 open question: what other data lives under a location?", phase: "Onboarding", source: "Manual", required: true },
+          { id: "3A-02", title: "Weekly Schedule", desc: "Full weekly schedule with days, times, and group breakdowns per location.", phase: "Onboarding", source: "Manual", required: true },
+          { id: "3A-03", title: "Location Directions", desc: "Specific instructions for finding the entrance, parking tips, etc.", phase: "First Week", source: "Manual", required: false },
+          { id: "3A-04", title: "What to Bring", desc: "Gear athletes should bring to their trial (ball, shoes, water, etc.).", phase: "First Week", source: "Manual", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 4. Staff ──
+  {
+    section: "4",
+    sectionTitle: "Staff",
+    sectionDesc: "Who works for you. Coach profiles, credentials, and capacity.",
+    subsections: [
+      {
+        id: "4A",
+        title: "Team Understanding",
+        items: [
+          { id: "4A-01", title: "Coach Credentials", desc: "Background, certifications, and playing experience of coaches.", phase: "First Week", source: "Manual", required: false },
+          { id: "4A-02", title: "Coach Ratio", desc: "Number of coaches per session or per group of athletes.", phase: "First Week", source: "Manual", required: false },
+          { id: "4A-03", title: "Skill Levels", desc: "What skill levels the program accepts (all levels, intermediate+, etc.).", phase: "First Week", source: "Manual", required: false },
+          { id: "4A-04", title: "Group Sizes", desc: "Typical number of athletes per group or session.", phase: "First Week", source: "Manual", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 5. Product & Pricing ──
+  {
+    section: "5",
+    sectionTitle: "Product & Pricing",
+    sectionDesc: "What you sell. Offers, plans, pricing, discounts, and scheduling options.",
+    subsections: [
+      {
+        id: "5A",
+        title: "Core Products",
+        items: [
+          { id: "5A-01", title: "Offer Builder", desc: "Define training offers: target age, skill, format, duration, frequency, inclusions, pricing model. (PRD-001)", phase: "Onboarding", source: "Manual", required: true },
+          { id: "5A-02", title: "Subscription Plans", desc: "Set up recurring billing: cadence, credits, commitments, trial periods, promo codes. (PRD-002)", phase: "Onboarding", source: "Manual", required: true },
+          { id: "5A-03", title: "Membership Plans", desc: "Create plans with pricing, session frequency, credits, and trial periods. (SET-003)", phase: "Onboarding", source: "Manual", required: true },
+          { id: "5A-04", title: "Session Packages", desc: "Pre-paid credit bundles with set expiry windows. (PRD-006)", phase: "Settings", source: "Manual", required: false },
+          { id: "5A-05", title: "Pay-Per-Session", desc: "Single-session drop-in pricing with optional expiry. (PRD-007)", phase: "Settings", source: "Manual", required: false },
+        ]
+      },
+      {
+        id: "5B",
+        title: "Pricing Details",
+        items: [
+          { id: "5B-01", title: "Pricing Transparency Mode", desc: "How the bot handles pricing questions: show a range, exact prices, or hide until trial.", phase: "Onboarding", source: "Manual", required: true },
+          { id: "5B-02", title: "Full Pricing Table", desc: "Complete pricing breakdown by plan, frequency, and prepayment tiers.", phase: "First Week", source: "Stripe Import", required: false },
+          { id: "5B-03", title: "Prepayment Options", desc: "Whether 3-month, 6-month, or annual prepayment plans are available.", phase: "Settings", source: "Stripe Import", required: false },
+          { id: "5B-04", title: "Age Range", desc: "Minimum and maximum age of athletes accepted. Determines product eligibility.", phase: "Onboarding", source: "Manual", required: true },
+          { id: "5B-05", title: "Private Training", desc: "Whether 1-on-1 private sessions are available and any restrictions.", phase: "Settings", source: "Manual", required: false },
+          { id: "5B-06", title: "Holiday Schedule", desc: "Whether the academy runs on holidays and any specific closures.", phase: "Settings", source: "Manual", required: false },
+        ]
+      },
+      {
+        id: "5C",
+        title: "Discounts & Incentives",
+        items: [
+          { id: "5C-01", title: "Referral Discount", desc: "What existing members get for referring new athletes.", phase: "Settings", source: "Manual", required: false },
+          { id: "5C-02", title: "Sibling Discount", desc: "Discount offered for families enrolling multiple athletes.", phase: "Settings", source: "Manual", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 6. Policy ──
+  {
+    section: "6",
+    sectionTitle: "Policy",
+    sectionDesc: "Your rules. Membership policies, flexibility, and payment terms.",
+    subsections: [
+      {
+        id: "6A",
+        title: "Membership Policies",
+        items: [
+          { id: "6A-01", title: "Policies Config", desc: "Pause rules, cancellation notice period, dunning retry settings. (SET-004)", phase: "Onboarding", source: "Manual", required: true },
+          { id: "6A-02", title: "Cancel/Pause Policy", desc: "Whether members can cancel or pause, and any conditions.", phase: "First Week", source: "Manual", required: false },
+          { id: "6A-03", title: "Policy Flexibility", desc: "Areas where staff can be flexible (e.g. offering a second free trial).", phase: "Settings", source: "Manual", required: false },
+          { id: "6A-04", title: "Payment Methods", desc: "Accepted payment methods (credit card, debit, e-transfer, cash).", phase: "Settings", source: "Stripe Import", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 7. Conversation AI ──
+  {
+    section: "7",
+    sectionTitle: "Conversation AI",
+    sectionDesc: "How your AI booking agent behaves. Tone, follow-up, and training.",
+    subsections: [
+      {
+        id: "7A",
+        title: "Behavior & Tone",
+        items: [
+          { id: "7A-01", title: "Tone Preference", desc: "How casual or professional the bot should sound.", phase: "Settings", source: "Manual", required: false },
+          { id: "7A-02", title: "Do Not Say List", desc: "Things the AI should never say. Owner can always add to this list to train the bot.", phase: "Settings", source: "Manual", required: false },
+          { id: "7A-03", title: "Trial Booking Link", desc: "URL where leads book their free trial. Core conversion action for the AI.", phase: "Onboarding", source: "Manual", required: true },
+        ]
+      },
+      {
+        id: "7B",
+        title: "Follow-Up Logic",
+        items: [
+          { id: "7B-01", title: "Ghosting Strategy", desc: "What happens when a lead stops responding: auto-sequence or notify owner.", phase: "Settings", source: "Manual", required: false },
+          { id: "7B-02", title: "Follow-Up Cadence", desc: "How often and how many times the bot follows up before closing a lead.", phase: "Settings", source: "Manual", required: false },
+        ]
+      }
+    ]
+  },
+  // ── 8. Integrations & Launch ──
+  {
+    section: "8",
+    sectionTitle: "Integrations & Launch",
+    sectionDesc: "Connections to external services and go-live steps.",
+    subsections: [
+      {
+        id: "8A",
+        title: "Integrations",
+        items: [
+          { id: "8A-01", title: "Meta Conversions API", desc: "Connect Meta Business Manager for ad tracking and CAPI events. (SET-010)", phase: "Settings", source: "Manual", required: false },
+          { id: "8A-02", title: "Notification Settings", desc: "SMS sender, email reply-to, default notification preferences. (SET-007)", phase: "First Week", source: "Manual", required: false },
+        ]
+      },
+      {
+        id: "8B",
+        title: "Launch",
+        items: [
+          { id: "8B-01", title: "Onboarding Links", desc: "Generate trackable member sign-up links per plan and location. Could live in scheduling app. (SET-005)", phase: "Onboarding", source: "Manual", required: true },
+        ]
+      }
+    ]
+  }
+];
+
+// ── State ──
+const STORAGE_KEY = 'bamos_onboarding_review_v2';
+let state = loadState();
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+}
+
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getAllItems() {
+  const items = [];
+  REVIEW_DATA.forEach(sec => {
+    sec.subsections.forEach(sub => {
+      sub.items.forEach(item => items.push(item));
+    });
+  });
+  return items;
+}
+
+// ── Render ──
+function render() {
+  const app = document.getElementById('app');
+  let html = '';
+
+  REVIEW_DATA.forEach(sec => {
+    html += `<div class="section">`;
+    html += `<div class="section-header">`;
+    html += `<div class="section-title">${sec.section}. ${sec.sectionTitle}</div>`;
+    html += `<div class="section-desc">${sec.sectionDesc}</div>`;
+    html += `</div>`;
+
+    sec.subsections.forEach(sub => {
+      html += `<div class="subsection">`;
+      html += `<div class="subsection-title">${sub.id}: ${sub.title}</div>`;
+
+      sub.items.forEach(item => {
+        const checked = state[item.id]?.checked || false;
+        const feedback = state[item.id]?.feedback || '';
+        const approvedClass = checked ? ' approved' : '';
+        const hasTextClass = feedback ? ' has-text' : '';
+
+        const phaseClass = item.phase === 'Onboarding' ? 'pill-green' :
+                           item.phase === 'First Week' ? 'pill-gold' : 'pill-gray';
+
+        const sourceClass = item.source === 'AI-Suggested' ? 'pill-gold' :
+                            item.source === 'Stripe Import' ? 'pill-blue' : 'pill-outline';
+
+        const reqBadge = item.required ? `<span class="pill pill-green" style="font-size:10px;">Required</span>` : '';
+
+        html += `<div class="row${approvedClass}" id="row-${item.id}">`;
+        html += `  <div class="row-check"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('${item.id}', this.checked)"></div>`;
+        html += `  <div class="row-content">`;
+        html += `    <div class="row-top">`;
+        html += `      <span class="row-id">${item.id}</span>`;
+        html += `      <span class="row-title">${item.title}</span>`;
+        html += `      ${reqBadge}`;
+        html += `    </div>`;
+        html += `    <div class="row-desc">${item.desc}</div>`;
+        html += `    <div class="row-tags">`;
+        html += `      <span class="pill ${phaseClass}">${item.phase}</span>`;
+        html += `      <span class="pill ${sourceClass}">${item.source}</span>`;
+        html += `    </div>`;
+        html += `  </div>`;
+        html += `  <div class="row-feedback">`;
+        html += `    <input type="text" placeholder="Feedback..." value="${escapeAttr(feedback)}" class="${hasTextClass}" oninput="updateFeedback('${item.id}', this.value, this)">`;
+        html += `  </div>`;
+        html += `</div>`;
+      });
+
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  // Footer note
+  html += `<div class="footer-note">`;
+  html += `<strong>Note:</strong> This document covers academy owner onboarding only \u2014 the data collected from business owners to configure BAM OS. `;
+  html += `Member onboarding (APP-005: the 7-step parent/athlete sign-up flow) is a separate concern and not included here.`;
+  html += `</div>`;
+
+  app.innerHTML = html;
+  updateProgress();
+}
+
+function escapeAttr(str) {
+  return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Interactions ──
+function toggleCheck(id, checked) {
+  if (!state[id]) state[id] = {};
+  state[id].checked = checked;
+  saveState();
+  const row = document.getElementById('row-' + id);
+  if (row) row.classList.toggle('approved', checked);
+  updateProgress();
+}
+
+function updateFeedback(id, value, el) {
+  if (!state[id]) state[id] = {};
+  state[id].feedback = value;
+  saveState();
+  el.classList.toggle('has-text', value.length > 0);
+  updateProgress();
+}
+
+function updateProgress() {
+  const allItems = getAllItems();
+  let reviewed = 0;
+  allItems.forEach(item => {
+    const s = state[item.id];
+    if (s && (s.checked || (s.feedback && s.feedback.trim()))) reviewed++;
+  });
+  const pct = Math.round((reviewed / allItems.length) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${reviewed} / ${allItems.length} reviewed`;
+}
+
+// ── Export ──
+function exportForAI() {
+  const allItems = getAllItems();
+  const date = new Date().toISOString().split('T')[0];
+  let approved = 0, withFeedback = 0, pending = 0;
+
+  allItems.forEach(item => {
+    const s = state[item.id];
+    if (s?.checked) approved++;
+    else if (s?.feedback?.trim()) withFeedback++;
+    else pending++;
+  });
+
+  let md = `# BAM OS Onboarding Review \u2014 Exported ${date}\n\n`;
+  md += `## Summary\n`;
+  md += `- **Total items:** ${allItems.length}\n`;
+  md += `- **Approved:** ${approved}\n`;
+  md += `- **Has feedback:** ${withFeedback}\n`;
+  md += `- **Pending review:** ${pending}\n\n`;
+
+  REVIEW_DATA.forEach(sec => {
+    md += `## ${sec.section}. ${sec.sectionTitle}\n`;
+
+    sec.subsections.forEach(sub => {
+      md += `\n### ${sub.id}: ${sub.title}\n`;
+
+      sub.items.forEach(item => {
+        const s = state[item.id];
+        const checked = s?.checked || false;
+        const fb = s?.feedback?.trim() || '';
+        const checkbox = checked ? '[x]' : '[ ]';
+        let line = `- ${checkbox} **${item.id} ${item.title}** \u2014 ${item.desc}`;
+
+        if (checked && !fb) {
+          line += ' \u2014 APPROVED';
+        } else if (fb) {
+          line += ` \u2014 FEEDBACK: "${fb}"`;
+        }
+
+        const tags = [];
+        if (item.required) tags.push('Required');
+        tags.push(item.phase);
+        tags.push(item.source);
+        line += ` [${tags.join(', ')}]`;
+
+        md += line + '\n';
+      });
+    });
+
+    md += '\n';
+  });
+
+  // Consolidated feedback
+  const feedbackItems = [];
+  allItems.forEach(item => {
+    const fb = state[item.id]?.feedback?.trim();
+    if (fb) feedbackItems.push({ id: item.id, title: item.title, feedback: fb });
+  });
+
+  if (feedbackItems.length > 0) {
+    md += `## All Feedback (Consolidated)\n\n`;
+    feedbackItems.forEach((fi, i) => {
+      md += `${i + 1}. **${fi.id} ${fi.title}:** "${fi.feedback}"\n`;
+    });
+  }
+
+  navigator.clipboard.writeText(md).then(() => {
+    showToast('Copied to clipboard');
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = md;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Copied to clipboard');
+  });
+}
+
+// ── Clear ──
+function showClearModal() { document.getElementById('clearModal').classList.add('show'); }
+function hideClearModal() { document.getElementById('clearModal').classList.remove('show'); }
+function clearAll() {
+  state = {};
+  saveState();
+  hideClearModal();
+  render();
+  showToast('All progress cleared');
+}
+
+// ── Theme ──
+function toggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('bamos_review_theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? '\u2600' : '\u263E';
+}
+
+// Restore theme
+(function() {
+  const saved = localStorage.getItem('bamos_review_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    if (saved === 'dark') document.getElementById('themeBtn').textContent = '\u2600';
+  }
+})();
+
+// ── Toast ──
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Init ──
+render();
+</script>
+
+</body>
+</html>

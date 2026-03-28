@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — Content & Ad Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F8F7F5;
+  --surf: #FFFFFF;
+  --surf2: #FAFAF8;
+  --surf3: #F0EFEC;
+  --border: rgba(0,0,0,0.07);
+  --borderm: rgba(0,0,0,0.12);
+  --gold: #C8A84E;
+  --goldl: #D4B65C;
+  --goldd: #A08030;
+  --gglow: rgba(200,168,78,0.10);
+  --tp: #1C1B18;
+  --ts: #6E6B63;
+  --tm: #A5A19A;
+  --green: #3EAF5C;
+  --greenl: rgba(62,175,92,0.10);
+  --warn: #E09D24;
+  --warnl: rgba(224,157,36,0.10);
+  --red: #E05A42;
+  --redl: rgba(224,90,66,0.10);
+  --blue: #3B6FA0;
+  --bluel: rgba(59,111,160,0.10);
+  --purple: #7C5CBF;
+  --purplel: rgba(124,92,191,0.10);
+  --orange: #D4873E;
+  --orangel: rgba(212,135,62,0.10);
+  --salmon: #D46B6B;
+  --salmonl: rgba(212,107,107,0.10);
+  --ff: 'Plus Jakarta Sans', sans-serif;
+  --fm: 'DM Mono', monospace;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-full: 9999px;
+}
+[data-theme="dark"] {
+  --bg: #0F0E0C;
+  --surf: #1A1916;
+  --surf2: #222120;
+  --surf3: #2C2B28;
+  --border: rgba(255,255,255,0.08);
+  --borderm: rgba(255,255,255,0.12);
+  --gold: #D4B65C;
+  --goldl: #C8A84E;
+  --goldd: #E0C56A;
+  --gglow: rgba(212,182,92,0.12);
+  --tp: #F0EDE8;
+  --ts: #A5A19A;
+  --tm: #6E6B63;
+  --green: #4CC76A;
+  --greenl: rgba(76,199,106,0.12);
+  --warn: #F0B84A;
+  --warnl: rgba(240,184,74,0.12);
+  --red: #F07060;
+  --redl: rgba(240,112,96,0.12);
+  --blue: #5A9FD4;
+  --bluel: rgba(90,159,212,0.12);
+  --purple: #9B7FD4;
+  --purplel: rgba(155,127,212,0.12);
+  --orange: #E09B52;
+  --orangel: rgba(224,155,82,0.12);
+  --salmon: #E08080;
+  --salmonl: rgba(224,128,128,0.12);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; scroll-behavior: smooth; }
+body {
+  font-family: var(--ff);
+  background: var(--bg);
+  color: var(--tp);
+  line-height: 1.5;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surf);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 32px;
+  box-shadow: var(--shadow-sm);
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--tp);
+  letter-spacing: -0.3px;
+}
+.header h1 span { color: var(--gold); }
+.header-sub {
+  font-size: 13px;
+  color: var(--tm);
+  margin-top: 2px;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn {
+  font-family: var(--ff);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: var(--r-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: var(--goldd); }
+.btn-outline { background: transparent; border: 1px solid var(--borderm); color: var(--ts); }
+.btn-outline:hover { background: var(--surf3); }
+.btn-red { background: transparent; border: 1px solid var(--borderm); color: var(--red); }
+.btn-red:hover { background: var(--redl); }
+.btn-theme { background: transparent; border: 1px solid var(--borderm); color: var(--ts); padding: 8px 10px; font-size: 15px; line-height: 1; }
+.btn-theme:hover { background: var(--surf3); }
+
+/* ── Stats bar ── */
+.stats-bar {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.stat {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ts);
+  font-family: var(--fm);
+}
+.stat b { color: var(--tp); }
+
+/* ── Progress sidebar ── */
+.progress-sidebar {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  box-shadow: var(--shadow-md);
+}
+.progress-sidebar .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surf3);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.progress-sidebar .dot.active { background: var(--gold); transform: scale(1.3); }
+.progress-sidebar .dot.done { background: var(--green); }
+.progress-sidebar .dot:hover { transform: scale(1.4); }
+.progress-sidebar .dot .tooltip {
+  display: none;
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--tp);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  font-family: var(--ff);
+}
+.progress-sidebar .dot:hover .tooltip { display: block; }
+
+/* ── Container ── */
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 24px 32px 80px;
+}
+
+/* ── Section ── */
+.section { margin-bottom: 40px; }
+.section-header {
+  position: sticky;
+  top: 83px;
+  z-index: 50;
+  background: var(--bg);
+  padding: 16px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.section-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+.section-text {}
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--tp);
+  letter-spacing: -0.2px;
+}
+.section-desc {
+  font-size: 13px;
+  color: var(--tm);
+  margin-top: 1px;
+}
+
+/* ── Card Grid ── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 280px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.card:hover {
+  border-color: var(--borderm);
+  box-shadow: var(--shadow-md);
+}
+.card.included {
+  box-shadow: var(--shadow-md);
+}
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card-category {
+  font-family: var(--fm);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.card-check {
+  flex-shrink: 0;
+}
+.card-check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tp);
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+.card-desc {
+  font-size: 13px;
+  color: var(--ts);
+  line-height: 1.5;
+  flex: 1;
+}
+.card-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.pill {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.pill-purple { background: var(--purplel); color: var(--purple); }
+.pill-orange { background: var(--orangel); color: var(--orange); }
+.pill-salmon { background: var(--salmonl); color: var(--salmon); }
+.pill-green { background: var(--greenl); color: var(--green); }
+.pill-blue { background: var(--bluel); color: var(--blue); }
+.pill-gold { background: var(--warnl); color: var(--warn); }
+.pill-gray { background: var(--surf3); color: var(--tm); }
+
+.card-feedback {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.card-feedback textarea {
+  width: 100%;
+  font-family: var(--ff);
+  font-size: 13px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surf2);
+  color: var(--tp);
+  outline: none;
+  resize: vertical;
+  min-height: 48px;
+  transition: border-color 0.15s ease;
+}
+.card-feedback textarea::placeholder { color: var(--tm); }
+.card-feedback textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gglow); }
+.card-feedback textarea.has-text { border-color: var(--warn); background: var(--warnl); }
+
+/* Section-specific card borders */
+.card.included[data-section="messaging"] { border-color: rgba(124,92,191,0.35); background: linear-gradient(135deg, var(--surf) 0%, var(--purplel) 100%); }
+.card.included[data-section="ads"] { border-color: rgba(212,135,62,0.35); background: linear-gradient(135deg, var(--surf) 0%, var(--orangel) 100%); }
+.card.included[data-section="content"] { border-color: rgba(212,107,107,0.35); background: linear-gradient(135deg, var(--surf) 0%, var(--salmonl) 100%); }
+.card.included[data-section="formats"] { border-color: rgba(59,111,160,0.35); background: linear-gradient(135deg, var(--surf) 0%, var(--bluel) 100%); }
+.card.included[data-section="andromeda"] { border-color: rgba(62,175,92,0.35); background: linear-gradient(135deg, var(--surf) 0%, var(--greenl) 100%); }
+
+/* ── Andromeda callout ── */
+.andromeda-callout {
+  background: linear-gradient(135deg, var(--surf) 0%, var(--greenl) 100%);
+  border: 1px solid rgba(62,175,92,0.2);
+  border-radius: var(--r-lg);
+  padding: 20px 24px;
+  margin-bottom: 32px;
+}
+.andromeda-callout h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--green);
+}
+.andromeda-callout ul {
+  list-style: none;
+  padding: 0;
+}
+.andromeda-callout li {
+  font-size: 13px;
+  color: var(--ts);
+  padding: 3px 0;
+  padding-left: 16px;
+  position: relative;
+}
+.andromeda-callout li::before {
+  content: "\2713";
+  position: absolute;
+  left: 0;
+  color: var(--green);
+  font-weight: 700;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--tp);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 200;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surf);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: var(--shadow-md);
+}
+.modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.modal p { font-size: 14px; color: var(--ts); margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .card-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .header { padding: 16px 20px; }
+  .container { padding: 16px 20px 60px; }
+  .card-grid { grid-template-columns: 1fr; }
+  .section-header { top: 75px; }
+  .progress-sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-top">
+    <div>
+      <h1>Full<span>Control</span> — Content & Ad Planner</h1>
+      <div class="header-sub">Select concepts to include, leave feedback, then export a prompt for deep-dive content creation</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-theme" onclick="toggleTheme()" title="Toggle dark mode" id="themeBtn">&#9790;</button>
+      <button class="btn btn-outline" onclick="selectAll()">Select All</button>
+      <button class="btn btn-red" onclick="showClearModal()">Clear All</button>
+      <button class="btn btn-gold" onclick="exportPrompt()">&#128203; Copy Prompt</button>
+    </div>
+  </div>
+  <div class="stats-bar">
+    <div class="stat"><b id="includedCount">0</b> included</div>
+    <div class="stat"><b id="feedbackCount">0</b> with feedback</div>
+    <div class="stat"><b id="totalCount">0</b> total concepts</div>
+  </div>
+</div>
+
+<div class="progress-sidebar" id="progressSidebar"></div>
+
+<div class="container" id="app"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all progress?</h3>
+    <p>This will uncheck all items and remove all feedback. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECTIONS = [
+  // ── 1. MESSAGING ANGLES ──
+  {
+    key: "messaging",
+    title: "Messaging Angles",
+    desc: "Core psychological angles \u2014 each should spawn multiple creatives across formats",
+    color: "var(--purple)",
+    pillClass: "pill-purple",
+    cards: [
+      {
+        id: "MSG-01",
+        title: "AI won\u2019t replace owners \u2014 but AI users will outperform those who don\u2019t",
+        desc: "Fear-of-missing-out angle. Positions FC as inevitable evolution, not optional upgrade. Speaks to competitive anxiety every owner feels.",
+        tags: ["AI Advantage", "FOMO"],
+      },
+      {
+        id: "MSG-02",
+        title: "Running an academy means doing 8 jobs at once",
+        desc: "Pain validation. Name all 8 roles (marketer, accountant, scheduler, coach, content creator, customer service, sales, strategist). Then reveal the solution.",
+        tags: ["AI Advantage", "Pain Point"],
+      },
+      {
+        id: "MSG-03",
+        title: "AI can now handle a huge portion of those jobs",
+        desc: "Relief angle. Follow the \u20188 jobs\u2019 pain with the release: most of those jobs can now run on autopilot. Transition from overwhelm to possibility.",
+        tags: ["AI Advantage", "Solution"],
+      },
+      {
+        id: "MSG-04",
+        title: "Academies using AI will outperform those that don\u2019t",
+        desc: "Competitive gap angle. Not about working harder \u2014 about working smarter. The gap is widening. Which side are you on?",
+        tags: ["AI Advantage", "Urgency"],
+      },
+      {
+        id: "MSG-05",
+        title: "AI isn\u2019t replacing coaches \u2014 it\u2019s giving them leverage",
+        desc: "Objection-handling angle. Addresses the \u2018AI is taking jobs\u2019 fear head-on. AI handles the backend so coaches can focus on what they do best: coaching.",
+        tags: ["AI Advantage", "Objection Handler"],
+      },
+      {
+        id: "MSG-06",
+        title: "Stuff you used to pay thousands for is now ___",
+        desc: "Value reframe. Compare cost of hiring a marketing agency, scheduler, bookkeeper vs. one platform. Fill in the blank with FC\u2019s price point.",
+        tags: ["AI Advantage", "Value"],
+      },
+      {
+        id: "MSG-07",
+        title: "Imagine a digital operator running your backend",
+        desc: "Vision-casting. Paint the picture of waking up to leads already booked, payments collected, follow-ups sent. What would you do with that time?",
+        tags: ["Command Center", "Aspiration"],
+      },
+      {
+        id: "MSG-08",
+        title: "One place to see everything in your business",
+        desc: "Simplification angle. No more switching between 6 tabs and 4 apps. One dashboard. One source of truth. Everything from leads to revenue.",
+        tags: ["Command Center", "Simplicity"],
+      },
+      {
+        id: "MSG-09",
+        title: "The AI command center for sports academies",
+        desc: "Category-defining statement. Not a tool, not a CRM \u2014 a command center. Positions FC as a new category entirely.",
+        tags: ["Command Center", "Positioning"],
+      },
+      {
+        id: "MSG-10",
+        title: "What if your entire academy ran from one dashboard?",
+        desc: "Curiosity hook. Question format draws people in. Great for scroll-stopping openers. Follow with a prototype walkthrough.",
+        tags: ["Command Center", "Curiosity"],
+      },
+      {
+        id: "MSG-11",
+        title: "Most owners are flying blind \u2014 FC turns data into direction",
+        desc: "Strategic intel angle. You don\u2019t know your real churn rate, your cost per lead, or which location is underperforming. FC does.",
+        tags: ["Strategic Intel", "Data"],
+      },
+      {
+        id: "MSG-12",
+        title: "Value content \u2192 how to run your academy \u2192 FC as strategy agent",
+        desc: "Content funnel angle. Lead with free value (how to run your academy), build trust, then reveal FC as the tool that does it all for you.",
+        tags: ["Strategic Intel", "Funnel"],
+      },
+    ]
+  },
+  // ── 2. AD IDEAS ──
+  {
+    key: "ads",
+    title: "Ad Ideas & Concepts",
+    desc: "Specific ad concepts \u2014 each is a distinct creative angle for Andromeda\u2019s diversification engine",
+    color: "var(--orange)",
+    pillClass: "pill-orange",
+    cards: [
+      {
+        id: "AD-01",
+        title: "This is insane \u2014 watch how I run my entire business (DITL)",
+        desc: "Day-in-the-life format. Coleman walks through his morning: opens FC, sees leads booked overnight, payments collected, content scheduled. Authentic \u2018this is real\u2019 energy.",
+        tags: ["Video Ad", "DITL", "Founder-Led"],
+      },
+      {
+        id: "AD-02",
+        title: "You probably just missed ANOTHER ___ \u2014 specific pain points",
+        desc: "Series format. Each ad names a specific pain: missed DM, forgotten follow-up, double-booked session, lost lead. Then: \u2018FC catches what you miss.\u2019",
+        tags: ["Video Ad", "Pain Series", "Scalable"],
+      },
+      {
+        id: "AD-03",
+        title: "AI literally turns annoying tasks into a game",
+        desc: "Reframe angle. The boring stuff (invoicing, scheduling, follow-ups) becomes satisfying when it runs itself. Show the gamification of automation.",
+        tags: ["Video Ad", "Reframe"],
+      },
+      {
+        id: "AD-04",
+        title: "Old school way vs FullControl way \u2014 price calculator format",
+        desc: "Side-by-side comparison. Left: manual process (hours, cost, stress). Right: FC way (automated, instant, peaceful). End with price comparison.",
+        tags: ["Static/Video", "Comparison", "Calculator"],
+      },
+      {
+        id: "AD-05",
+        title: "I\u2019ve fully automated my business... only the parts I don\u2019t enjoy",
+        desc: "Nuanced angle. Not \u2018replace everything\u2019 \u2014 just the parts that drain you. You still coach, still connect. FC handles the rest.",
+        tags: ["Video Ad", "Nuance", "Objection Handler"],
+      },
+    ]
+  },
+  // ── 3. VIDEO FORMATS ──
+  {
+    key: "formats",
+    title: "Video & Creative Formats",
+    desc: "Production formats to pair with messaging angles \u2014 Andromeda rewards format diversity as much as angle diversity",
+    color: "var(--blue)",
+    pillClass: "pill-blue",
+    cards: [
+      {
+        id: "FMT-01",
+        title: "Talking Head \u2014 Founder direct to camera",
+        desc: "Cole or Zoran speaking directly. High trust, low production cost. Best for authority-building, objection handling, and mission-driven messaging.",
+        tags: ["Video", "Low Cost", "High Trust"],
+      },
+      {
+        id: "FMT-02",
+        title: "UGC \u2014 User-generated style content",
+        desc: "Looks organic, not polished. Could be testimonial-style, \u2018discovered this app\u2019 format, or reaction video. Andromeda rewards authentic-looking content.",
+        tags: ["Video", "Scalable", "Authentic"],
+      },
+      {
+        id: "FMT-03",
+        title: "Screen Recording \u2014 Product vibes, mass produced",
+        desc: "Screen capture of the FC prototype in action. Show real features working. Can be mass-produced with different voiceovers, music, and hooks.",
+        tags: ["Video", "Mass Producible", "Product Demo"],
+      },
+      {
+        id: "FMT-04",
+        title: "Quick Graphics \u2014 Motion design, mass produced",
+        desc: "Animated stats, before/after graphics, quick-cut infographics. 5-10 second clips. Great for stories, reels, and feed. Easy to batch-produce.",
+        tags: ["Motion", "Mass Producible", "Stories"],
+      },
+      {
+        id: "FMT-05",
+        title: "Funny Vibes \u2014 Jarvis concept",
+        desc: "Comedic format: owner talking to FC like it\u2019s Jarvis. \u2018FC, how many leads came in today?\u2019 \u201842, sir.\u2019 Humor + product demo.",
+        tags: ["Video", "Comedy", "Viral Potential"],
+      },
+    ]
+  },
+  // ── 4. ORGANIC CONTENT ──
+  {
+    key: "content",
+    title: "Organic Content Strategy",
+    desc: "Pre-launch content cadence \u2014 5 organic pieces per campaign before any ad spend (Andromeda best practice)",
+    color: "var(--salmon)",
+    pillClass: "pill-salmon",
+    cards: [
+      {
+        id: "ORG-01",
+        title: "Build in Public \u2014 3x/week FC IG + Cole BAM pages",
+        desc: "Share the journey: product screenshots, team meetings, design decisions, wins, setbacks. Build audience investment before launch.",
+        tags: ["Organic", "3x/week", "IG"],
+      },
+      {
+        id: "ORG-02",
+        title: "FullControl IG \u2014 Brand identity, curiosity, product teasers",
+        desc: "Dedicated FC Instagram. Polished brand posts, feature reveals, \u2018coming soon\u2019 teasers. 3x/week cadence. Build the brand before the product.",
+        tags: ["Organic", "3x/week", "Brand"],
+      },
+      {
+        id: "ORG-03",
+        title: "AI Education \u2014 Build urgency before solution drops",
+        desc: "Content that teaches AI\u2019s impact on sports businesses WITHOUT mentioning FC. Build the problem awareness. When FC launches, they\u2019re primed.",
+        tags: ["Organic", "Education", "Pre-Launch"],
+      },
+      {
+        id: "ORG-04",
+        title: "Founder Narrative \u2014 Cole: why I built this (4x/week)",
+        desc: "Cole\u2019s personal story. 500K+ followers. The credibility of someone who actually runs 5 locations saying \u2018I needed this to exist.\u2019",
+        tags: ["Organic", "4x/week", "Founder Story"],
+      },
+      {
+        id: "ORG-05",
+        title: "Founder Talking Heads \u2014 Cole + Zoran",
+        desc: "Both founders on camera. Product vision, behind-the-scenes decisions, disagreements even. Humanizes the brand. Two perspectives, one mission.",
+        tags: ["Organic", "Video", "Dual Founder"],
+      },
+      {
+        id: "ORG-06",
+        title: "\u2018I can\u2019t believe what we built\u2019 teasers \u2014 no reveal yet",
+        desc: "Hype without showing the product. Reactions, excited faces, vague screen glimpses. Build curiosity that demands to be satisfied.",
+        tags: ["Organic", "Teaser", "Pre-Launch"],
+      },
+      {
+        id: "ORG-07",
+        title: "First curiosity post \u2014 mission + founder energy, no product reveal",
+        desc: "Day 1 post. No product. Just the mission: \u2018We\u2019re building something that changes how sports academies operate.\u2019 Pure founder energy.",
+        tags: ["Organic", "Launch", "Mission"],
+      },
+      {
+        id: "ORG-08",
+        title: "BAM Business IG \u2014 AI for sports business, pain points (3x/week)",
+        desc: "Business-focused account. Pain point content: missed DMs, churn problems, scheduling chaos. Position AI as the inevitable solution. 3x/week.",
+        tags: ["Organic", "3x/week", "Pain Points"],
+      },
+      {
+        id: "ORG-09",
+        title: "Pain Point Content \u2014 8 jobs problem, missed DM problem",
+        desc: "Specific pain content that names the exact problems. \u2018You\u2019re doing 8 jobs and none of them well.\u2019 \u2018You missed 3 DMs last week. Each one was $200/month.\u2019",
+        tags: ["Organic", "Pain Point", "Specific"],
+      },
+    ]
+  },
+  // ── 5. ANDROMEDA-INFORMED STRATEGY ──
+  {
+    key: "andromeda",
+    title: "Andromeda-Optimized Tactics",
+    desc: "Meta\u2019s Andromeda AI rewards creative diversity, volume, and concept variation \u2014 these tactics are designed for it",
+    color: "var(--green)",
+    pillClass: "pill-green",
+    cards: [
+      {
+        id: "AND-01",
+        title: "Hook Variation Matrix \u2014 Same concept, 5+ different hooks",
+        desc: "For each core ad concept, create 5+ versions with different opening hooks. Andromeda tests each against different user segments automatically. Question hook, stat hook, pain hook, story hook, bold claim hook.",
+        tags: ["Andromeda", "Hook Testing", "Scale"],
+      },
+      {
+        id: "AND-02",
+        title: "Format Diversification \u2014 Same angle, different formats",
+        desc: "Take one messaging angle and produce it as: talking head, UGC, screen recording, static image, carousel, story. Andromeda treats each format as a distinct creative and matches it to the right user.",
+        tags: ["Andromeda", "Format Diversity", "Required"],
+      },
+      {
+        id: "AND-03",
+        title: "Persona-Based Variants \u2014 Young hungry vs. established trainer",
+        desc: "FC has 2 archetypes: young trainers who want fame/growth and established trainers who want family time. Create parallel versions of every ad speaking to each persona differently.",
+        tags: ["Andromeda", "Persona", "PMF"],
+      },
+      {
+        id: "AND-04",
+        title: "Biweekly Creative Refresh Cycle",
+        desc: "Andromeda burns through creative novelty faster than old Meta. Commit to refreshing 3-5 creatives every 2 weeks. Swap hooks, thumbnails, and opening frames \u2014 not full concepts.",
+        tags: ["Andromeda", "Refresh", "Cadence"],
+      },
+      {
+        id: "AND-05",
+        title: "5 Organic \u2192 1 Ad Campaign Rule",
+        desc: "Before promoting any concept as a paid ad, post 5 organic pieces using that concept first. This builds social proof, tests engagement, and gives Andromeda initial signal when you promote.",
+        tags: ["Andromeda", "Organic-First", "Best Practice"],
+      },
+      {
+        id: "AND-06",
+        title: "Simplified Campaign Structure \u2014 Fewer campaigns, broader targeting",
+        desc: "Let Andromeda do the targeting. One campaign per objective. Broad audiences. Feed the system diverse creative and let it find the right people. Avoid over-segmenting.",
+        tags: ["Andromeda", "Structure", "Required"],
+      },
+      {
+        id: "AND-07",
+        title: "Creative Similarity Monitoring",
+        desc: "If Meta flags high Creative Similarity, CPMs spike. Ensure each creative has a different psychological lever: FOMO, aspiration, pain, humor, social proof, authority. Track the metric.",
+        tags: ["Andromeda", "Metric", "Optimization"],
+      },
+      {
+        id: "AND-08",
+        title: "Founding Members Waitlist \u2014 Warm audience for launch ads",
+        desc: "Build a waitlist of early believers through organic content. When ads launch, use this as a seed audience for lookalikes. Andromeda performs better with strong initial signal.",
+        tags: ["Andromeda", "Waitlist", "Launch"],
+      },
+    ]
+  },
+];
+
+// ── State ──
+const STORAGE_KEY = 'fc_content_planner_v1';
+let state = loadState();
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function getAllCards() {
+  const cards = [];
+  SECTIONS.forEach(sec => sec.cards.forEach(c => cards.push({ ...c, section: sec.key, sectionTitle: sec.title })));
+  return cards;
+}
+
+// ── Render ──
+function render() {
+  const app = document.getElementById('app');
+  let html = '';
+
+  // Andromeda callout
+  html += `<div class="andromeda-callout">`;
+  html += `<h2>\u26A1 Meta Andromeda \u2014 Why This Matters</h2>`;
+  html += `<ul>`;
+  html += `<li>Creative diversity is now the #1 performance lever \u2014 not targeting</li>`;
+  html += `<li>8\u201315 distinct creatives per ad set minimum; each with a different angle, format, or hook</li>`;
+  html += `<li>Andromeda matches individual users to individual ads \u2014 more variety = more matches</li>`;
+  html += `<li>High Creative Similarity = higher CPMs (penalty). Diversify psychological levers.</li>`;
+  html += `<li>Refresh creatives every 2 weeks. Andromeda burns through novelty faster than before.</li>`;
+  html += `<li>Simplified structure: 1 campaign per objective, broad targeting, let the AI work.</li>`;
+  html += `</ul>`;
+  html += `</div>`;
+
+  SECTIONS.forEach(sec => {
+    html += `<div class="section" id="section-${sec.key}">`;
+    html += `<div class="section-header">`;
+    html += `<div class="section-badge" style="background:${sec.color}">${sec.cards.length}</div>`;
+    html += `<div class="section-text">`;
+    html += `<div class="section-title">${sec.title}</div>`;
+    html += `<div class="section-desc">${sec.desc}</div>`;
+    html += `</div></div>`;
+
+    html += `<div class="card-grid">`;
+    sec.cards.forEach(card => {
+      const included = state[card.id]?.included || false;
+      const feedback = state[card.id]?.feedback || '';
+      const includedClass = included ? ' included' : '';
+      const hasTextClass = feedback ? ' has-text' : '';
+
+      html += `<div class="card${includedClass}" data-section="${sec.key}" id="card-${card.id}">`;
+      html += `<div class="card-top">`;
+      html += `<span class="card-category ${sec.pillClass}">${card.id}</span>`;
+      html += `<div class="card-check"><input type="checkbox" ${included ? 'checked' : ''} onchange="toggleInclude('${card.id}', this.checked)" title="Include in prompt"></div>`;
+      html += `</div>`;
+      html += `<div class="card-title">${card.title}</div>`;
+      html += `<div class="card-desc">${card.desc}</div>`;
+      html += `<div class="card-tags">`;
+      card.tags.forEach(t => {
+        html += `<span class="pill ${sec.pillClass}">${t}</span>`;
+      });
+      html += `</div>`;
+      html += `<div class="card-feedback">`;
+      html += `<textarea placeholder="Notes / feedback..." oninput="updateFeedback('${card.id}', this.value, this)" class="${hasTextClass}">${escHtml(feedback)}</textarea>`;
+      html += `</div>`;
+      html += `</div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  app.innerHTML = html;
+  renderSidebar();
+  updateStats();
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Sidebar ──
+function renderSidebar() {
+  const sb = document.getElementById('progressSidebar');
+  let html = '';
+  SECTIONS.forEach(sec => {
+    const total = sec.cards.length;
+    const done = sec.cards.filter(c => state[c.id]?.included).length;
+    const cls = done === total ? 'done' : (done > 0 ? 'active' : '');
+    html += `<div class="dot ${cls}" onclick="document.getElementById('section-${sec.key}').scrollIntoView({behavior:'smooth'})">`;
+    html += `<span class="tooltip">${sec.title} (${done}/${total})</span>`;
+    html += `</div>`;
+  });
+  sb.innerHTML = html;
+}
+
+// ── Interactions ──
+function toggleInclude(id, checked) {
+  if (!state[id]) state[id] = {};
+  state[id].included = checked;
+  saveState();
+  const card = document.getElementById('card-' + id);
+  if (card) card.classList.toggle('included', checked);
+  updateStats();
+  renderSidebar();
+}
+
+function updateFeedback(id, value, el) {
+  if (!state[id]) state[id] = {};
+  state[id].feedback = value;
+  saveState();
+  el.classList.toggle('has-text', value.length > 0);
+  updateStats();
+}
+
+function updateStats() {
+  const all = getAllCards();
+  let inc = 0, fb = 0;
+  all.forEach(c => {
+    if (state[c.id]?.included) inc++;
+    if (state[c.id]?.feedback?.trim()) fb++;
+  });
+  document.getElementById('includedCount').textContent = inc;
+  document.getElementById('feedbackCount').textContent = fb;
+  document.getElementById('totalCount').textContent = all.length;
+}
+
+function selectAll() {
+  getAllCards().forEach(c => {
+    if (!state[c.id]) state[c.id] = {};
+    state[c.id].included = true;
+  });
+  saveState();
+  render();
+  showToast('All concepts selected');
+}
+
+// ── Export Prompt ──
+function exportPrompt() {
+  const all = getAllCards();
+  const included = all.filter(c => state[c.id]?.included);
+  const withFeedback = all.filter(c => state[c.id]?.feedback?.trim());
+
+  if (included.length === 0 && withFeedback.length === 0) {
+    showToast('Select at least one concept first');
+    return;
+  }
+
+  let prompt = `# FullControl \u2014 Content & Ad Deep Dive Brief\n\n`;
+  prompt += `## Context\n`;
+  prompt += `FullControl (FC) is an AI-powered business automation platform for sports training academies. V1 targets basketball training. The product handles everything from lead gen to cancellation autonomously \u2014 plus strategic recommendations, business intelligence, and forecasting.\n\n`;
+  prompt += `**Target archetypes:** (1) Young hungry trainers who want fame/growth, (2) Established trainers who want family time back.\n`;
+  prompt += `**PMF thesis:** Hits time, knowledge, and capital simultaneously.\n`;
+  prompt += `**Brand:** Coleman Ayers (By Any Means Basketball) \u2014 500K+ followers, 5 locations, 10K+ athletes.\n\n`;
+
+  prompt += `## Meta Andromeda Requirements\n`;
+  prompt += `- Creative diversity is the #1 lever. Each concept needs multiple hooks, formats, and persona variants.\n`;
+  prompt += `- 8\u201315 distinct creatives per ad set. High Creative Similarity = CPM penalty.\n`;
+  prompt += `- Refresh every 2 weeks. Simplified campaign structure (1 per objective, broad targeting).\n`;
+  prompt += `- 5 organic posts per concept before promoting as paid ad.\n\n`;
+
+  prompt += `## Selected Concepts (${included.length})\n\n`;
+
+  // Group by section
+  const grouped = {};
+  included.forEach(c => {
+    if (!grouped[c.sectionTitle]) grouped[c.sectionTitle] = [];
+    grouped[c.sectionTitle].push(c);
+  });
+
+  Object.entries(grouped).forEach(([secTitle, cards]) => {
+    prompt += `### ${secTitle}\n\n`;
+    cards.forEach(c => {
+      const fb = state[c.id]?.feedback?.trim();
+      prompt += `**${c.id}: ${c.title}**\n`;
+      prompt += `${c.desc}\n`;
+      prompt += `Tags: ${c.tags.join(', ')}\n`;
+      if (fb) prompt += `\u2192 Owner feedback: "${fb}"\n`;
+      prompt += `\n`;
+    });
+  });
+
+  // Consolidated feedback
+  if (withFeedback.length > 0) {
+    prompt += `## All Feedback (Consolidated)\n\n`;
+    withFeedback.forEach((c, i) => {
+      const fb = state[c.id]?.feedback?.trim();
+      if (fb) prompt += `${i+1}. **${c.id} ${c.title}:** "${fb}"\n`;
+    });
+    prompt += `\n`;
+  }
+
+  prompt += `## Your Task\n\n`;
+  prompt += `For each selected concept above:\n`;
+  prompt += `1. Write 5 distinct hook variations (question, stat, pain, story, bold claim)\n`;
+  prompt += `2. Suggest which video/creative formats work best for this angle\n`;
+  prompt += `3. Write a short script or copy for the top 2 format+hook combinations\n`;
+  prompt += `4. Note which persona (young hungry vs. established) each version targets\n`;
+  prompt += `5. Flag any concepts that could be combined into a content series\n\n`;
+  prompt += `Prioritize concepts that have owner feedback attached \u2014 those are highest priority.\n`;
+
+  navigator.clipboard.writeText(prompt).then(() => {
+    showToast(`Prompt copied (${included.length} concepts)`);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = prompt;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast(`Prompt copied (${included.length} concepts)`);
+  });
+}
+
+// ── Clear ──
+function showClearModal() { document.getElementById('clearModal').classList.add('show'); }
+function hideClearModal() { document.getElementById('clearModal').classList.remove('show'); }
+function clearAll() {
+  state = {};
+  saveState();
+  hideClearModal();
+  render();
+  showToast('All progress cleared');
+}
+
+// ── Theme ──
+function toggleTheme() {
+  const html = document.documentElement;
+  const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('fc_planner_theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? '\u2600' : '\u263E';
+}
+(function() {
+  const saved = localStorage.getItem('fc_planner_theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    if (saved === 'dark') document.getElementById('themeBtn').textContent = '\u2600';
+  }
+})();
+
+// ── Toast ──
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Init ──
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM OS — Onboarding Review: Sales</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F8F7F5;--surf:#FFF;--surf2:#FAFAF8;--surf3:#F0EFEC;--border:rgba(0,0,0,.07);--borderm:rgba(0,0,0,.12);--gold:#C8A84E;--goldd:#A08030;--gglow:rgba(200,168,78,.10);--tp:#1C1B18;--ts:#6E6B63;--tm:#A5A19A;--green:#3EAF5C;--greenl:rgba(62,175,92,.10);--warn:#E09D24;--warnl:rgba(224,157,36,.10);--red:#E05A42;--redl:rgba(224,90,66,.10);--blue:#3B6FA0;--bluel:rgba(59,111,160,.10);--ff:'Plus Jakarta Sans',sans-serif;--fm:'DM Mono',monospace;--shadow-sm:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.03);--shadow-md:0 4px 14px rgba(0,0,0,.06),0 2px 6px rgba(0,0,0,.04);--r-sm:8px;--r-md:12px;--r-lg:16px;--r-full:9999px}
+[data-theme=dark]{--bg:#0F0E0C;--surf:#1A1916;--surf2:#222120;--surf3:#2C2B28;--border:rgba(255,255,255,.08);--borderm:rgba(255,255,255,.12);--gold:#D4B65C;--goldd:#E0C56A;--gglow:rgba(212,182,92,.12);--tp:#F0EDE8;--ts:#A5A19A;--tm:#6E6B63;--green:#4CC76A;--greenl:rgba(76,199,106,.12);--warn:#F0B84A;--warnl:rgba(240,184,74,.12);--red:#F07060;--redl:rgba(240,112,96,.12);--blue:#5A9FD4;--bluel:rgba(90,159,212,.12);--shadow-sm:0 1px 3px rgba(0,0,0,.2);--shadow-md:0 4px 14px rgba(0,0,0,.3)}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--ff);background:var(--bg);color:var(--tp);line-height:1.5;-webkit-font-smoothing:antialiased}
+.header{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--border);padding:20px 32px;box-shadow:var(--shadow-sm)}.header-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}.header h1 span{color:var(--gold)}.header-sub{font-size:13px;color:var(--tm);margin-top:2px}.header-actions{display:flex;gap:8px;align-items:center}.step-indicator{font-family:var(--fm);font-size:12px;color:var(--gold);background:var(--gglow);padding:4px 12px;border-radius:var(--r-full);font-weight:600}
+.btn{font-family:var(--ff);font-size:13px;font-weight:600;padding:8px 16px;border-radius:var(--r-sm);border:none;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:6px}.btn-gold{background:var(--gold);color:#fff}.btn-gold:hover{background:var(--goldd)}.btn-outline{background:transparent;border:1px solid var(--borderm);color:var(--ts)}.btn-outline:hover{background:var(--surf3)}.btn-red{background:transparent;border:1px solid var(--borderm);color:var(--red)}.btn-red:hover{background:var(--redl)}.btn-theme{background:transparent;border:1px solid var(--borderm);color:var(--ts);padding:8px 10px;font-size:15px;line-height:1}
+.progress-bar{margin-top:14px;display:flex;align-items:center;gap:12px}.progress-track{flex:1;height:6px;background:var(--surf3);border-radius:var(--r-full);overflow:hidden}.progress-fill{height:100%;background:var(--gold);border-radius:var(--r-full);transition:width .3s ease}.progress-label{font-size:13px;font-weight:600;color:var(--ts);white-space:nowrap;font-family:var(--fm)}
+.container{max-width:920px;margin:0 auto;padding:24px 32px 80px}.intro{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;margin-bottom:32px}.intro h2{font-size:18px;font-weight:700;margin-bottom:4px}.intro p{font-size:14px;color:var(--ts);line-height:1.6}
+.callout{background:var(--warnl);border:1px solid rgba(224,157,36,.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--ts)}.callout strong{color:var(--tp)}
+.subsection{margin-top:16px;margin-bottom:20px}.subsection-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--tm);margin-bottom:8px;padding-left:4px}
+.row{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:6px;transition:border-color .15s ease,box-shadow .15s ease}.row:hover{border-color:var(--borderm);box-shadow:var(--shadow-sm)}.row.approved{border-color:rgba(62,175,92,.25);background:linear-gradient(135deg,var(--surf) 0%,var(--greenl) 100%)}
+.row-check{flex-shrink:0;margin-top:2px}.row-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer}.row-content{flex:1;min-width:0}.row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.row-id{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--gold);background:var(--gglow);padding:2px 8px;border-radius:var(--r-full);white-space:nowrap}.row-title{font-size:14px;font-weight:600;color:var(--tp)}.row-desc{font-size:13px;color:var(--ts);margin-top:2px}.row-tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pill{font-size:11px;font-weight:600;padding:2px 10px;border-radius:var(--r-full);white-space:nowrap}.pill-green{background:var(--greenl);color:var(--green)}.pill-gold{background:var(--warnl);color:var(--warn)}.pill-gray{background:var(--surf3);color:var(--tm)}.pill-blue{background:var(--bluel);color:var(--blue)}.pill-outline{background:transparent;border:1px solid var(--border);color:var(--tm)}.pill-data{background:var(--greenl);color:var(--green);border:1px solid rgba(62,175,92,.3)}.pill-feature{background:var(--bluel);color:var(--blue);border:1px solid rgba(59,111,160,.3)}
+.row-feedback{flex-shrink:0;width:240px}.row-feedback input{width:100%;font-family:var(--ff);font-size:13px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surf2);color:var(--tp);outline:none;transition:border-color .15s ease}.row-feedback input::placeholder{color:var(--tm)}.row-feedback input:focus{border-color:var(--gold);box-shadow:0 0 0 2px var(--gglow)}.row-feedback input.has-text{border-color:var(--warn);background:var(--warnl)}
+.section-feedback{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);padding:16px 20px;margin-top:28px}.section-feedback label{font-size:13px;font-weight:600;color:var(--tp);display:block;margin-bottom:6px}.section-feedback textarea{width:100%;font-family:var(--ff);font-size:13px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surf2);color:var(--tp);outline:none;resize:vertical;min-height:60px;line-height:1.5}.section-feedback textarea:focus{border-color:var(--gold);box-shadow:0 0 0 2px var(--gglow)}
+.footer-actions{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border);margin-top:32px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--tp);color:var(--bg);font-family:var(--ff);font-size:14px;font-weight:600;padding:12px 24px;border-radius:var(--r-md);box-shadow:var(--shadow-md);opacity:0;transition:all .3s ease;z-index:200;pointer-events:none}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;align-items:center;justify-content:center}.modal-overlay.show{display:flex}.modal{background:var(--surf);border-radius:var(--r-lg);padding:24px;max-width:380px;width:90%;box-shadow:var(--shadow-md)}.modal h3{font-size:16px;font-weight:700;margin-bottom:8px}.modal p{font-size:14px;color:var(--ts);margin-bottom:20px}.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+@media(max-width:768px){.header{padding:16px 20px}.container{padding:16px 20px 60px}.row{flex-wrap:wrap}.row-feedback{width:100%}}
+@media print{.header{position:static;box-shadow:none}.header-actions{display:none}.progress-bar{display:none}.row{break-inside:avoid;box-shadow:none}.toast,.modal-overlay{display:none!important}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-top">
+    <div>
+      <h1>BAM <span>OS</span> \u2014 Sales</h1>
+      <div class="header-sub">Items moved from Strategy and Conversation AI</div>
+    </div>
+    <div class="header-actions">
+      <span class="step-indicator">Sales</span>
+      <button class="btn btn-theme" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+      <button class="btn btn-red" onclick="showClearModal()">Clear</button>
+      <button class="btn btn-gold" onclick="exportSection()">Export for AI</button>
+    </div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0 reviewed</div>
+  </div>
+</div>
+<div class="container" id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all progress?</h3>
+    <p>This will uncheck all items and remove all feedback. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+<script>
+const SECTION = {
+  id: "SAL",
+  title: "Sales",
+  desc: "How the academy converts leads into members. This section covers qualification, objection handling, and pipeline configuration. Items tagged as \u201CData Point\u201D are collected during onboarding. Items tagged as \u201CFeature\u201D are product specs to build \u2014 included here for context but tracked separately in business requirements.",
+  subsections: [
+    {
+      id: "SAL-A",
+      title: "Lead Qualification",
+      items: [
+        { id: "SAL-A01", title: "Qualification Dimensions", desc: "Which factors matter for qualifying a lead: location proximity, athlete age, skill level, commitment level, budget. Tells the AI what to screen for. Moved from Strategy.", phase: "Onboarding", source: "Manual", required: true, type: "data" },
+        { id: "SAL-A02", title: "Qualification Priority Order", desc: "In what order should the AI qualify? Recommended: interest \u2192 age \u2192 location \u2192 schedule fit \u2192 book trial. Owner can reorder.", phase: "First Week", source: "AI-Suggested", required: false, type: "data" },
+        { id: "SAL-A03", title: "Disqualification Logic", desc: "Anything outside the qualification dimensions = auto-disqualified. No separate config needed \u2014 derived from dimensions.", phase: "Settings", source: "AI-Suggested", required: false, type: "feature" },
+      ]
+    },
+    {
+      id: "SAL-B",
+      title: "Objection Handling",
+      items: [
+        { id: "SAL-B01", title: "Common Objections List", desc: "Preset list of objections parents typically have. Owner checks which ones apply and can add custom ones. Moved from Strategy.", phase: "First Week", source: "AI-Suggested", required: false, type: "data" },
+        { id: "SAL-B02", title: "Objection Responses", desc: "For each checked objection, a recommended response the AI uses. AI-suggested but owner can customize. Selectable list UI.", phase: "First Week", source: "AI-Suggested", required: false, type: "data" },
+      ]
+    },
+    {
+      id: "SAL-C",
+      title: "Pipeline Configuration",
+      items: [
+        { id: "SAL-C01", title: "Pipeline Stages", desc: "What stages does a lead go through? Default: New \u2192 Contacted \u2192 Qualified \u2192 Trial Booked \u2192 Trial Attended \u2192 Enrolled \u2192 Lost. Owner can customize.", phase: "Onboarding", source: "AI-Suggested", required: true, type: "data" },
+        { id: "SAL-C02", title: "Lead Source Tracking", desc: "Where do leads come from? Instagram, Facebook, Google, referral, walk-in, website, other. Tracked per lead for ROI analysis.", phase: "First Week", source: "Manual", required: false, type: "data" },
+        { id: "SAL-C03", title: "Auto-Stage Movement", desc: "Should the AI automatically move leads between stages based on actions? (e.g. trial booked \u2192 auto-move to Trial Booked stage).", phase: "Settings", source: "Manual", required: false, type: "feature" },
+        { id: "SAL-C04", title: "Lead Assignment Rules", desc: "For multi-coach academies: are leads assigned to a specific coach or handled by whoever responds first?", phase: "Settings", source: "Manual", required: false, type: "data" },
+      ]
+    },
+    {
+      id: "SAL-D",
+      title: "Trial Experience",
+      items: [
+        { id: "SAL-D01", title: "Trial Booking Link", desc: "URL where leads book their free trial. Already in Conversation AI \u2014 listed here as the sales conversion endpoint.", phase: "Onboarding", source: "Manual", required: true, type: "data" },
+        { id: "SAL-D02", title: "Pre-Trial Communication", desc: "What automated messages go out before the trial? Confirmation, reminder, what to bring, directions. Configurable sequence.", phase: "First Week", source: "AI-Suggested", required: false, type: "data" },
+        { id: "SAL-D03", title: "Post-Trial Follow-Up", desc: "What happens after the trial? Automated message sequence: thank you \u2192 how was it \u2192 enrollment offer \u2192 follow-up if no response.", phase: "First Week", source: "AI-Suggested", required: false, type: "data" },
+        { id: "SAL-D04", title: "Trial-to-Enrollment Conversion Flow", desc: "How does a trial member become a paying member? In-app enrollment, coach closes, or AI sends signup link?", phase: "Settings", source: "Manual", required: false, type: "feature" },
+      ]
+    },
+    {
+      id: "SAL-E",
+      title: "Entry Forms",
+      items: [
+        { id: "SAL-E01", title: "Lead Capture Form Fields", desc: "What info do you collect when a lead first reaches out? Name, email, phone, athlete age, how they heard about you. Configurable.", phase: "Onboarding", source: "Manual", required: true, type: "data" },
+        { id: "SAL-E02", title: "Form Placement", desc: "Where does the lead capture form live? Website, landing page, Instagram link-in-bio, QR code at events. Multiple placements possible.", phase: "First Week", source: "Manual", required: false, type: "data" },
+        { id: "SAL-E03", title: "Auto-Response on Form Submit", desc: "What happens immediately when someone fills out the form? AI starts a conversation, sends a booking link, or just confirms receipt.", phase: "First Week", source: "AI-Suggested", required: false, type: "feature" },
+      ]
+    },
+    {
+      id: "SAL-F",
+      title: "Open Questions",
+      items: [
+        { id: "SAL-F01", title: "Sales Reporting", desc: "What sales metrics does the owner need? Trial conversion rate, lead source ROI, pipeline velocity, AI vs human close rate. Feature, not onboarding data.", phase: "Settings", source: "Manual", required: false, type: "feature" },
+        { id: "SAL-F02", title: "Manual Lead Entry", desc: "Can the owner manually add a lead (e.g. from a phone call or walk-in)? Minimum fields: name + phone or email.", phase: "Settings", source: "Manual", required: false, type: "feature" },
+        { id: "SAL-F03", title: "Lost Lead Reasons", desc: "When a lead is marked as lost, should the system ask why? (too expensive, wrong location, chose competitor, no response). Useful for pattern analysis.", phase: "Settings", source: "AI-Suggested", required: false, type: "data" },
+      ]
+    }
+  ]
+};
+
+const STORAGE_KEY='bamos_review_sales';let state=loadState();
+function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{return{}}}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function getAllItems(){const items=[];SECTION.subsections.forEach(sub=>sub.items.forEach(item=>items.push(item)));return items}
+function render(){
+  const app=document.getElementById('app');let html='';
+  html+=`<div class="intro"><h2>${SECTION.title}</h2><p>${SECTION.desc}</p></div>`;
+  html+=`<div class="callout"><strong>Legend:</strong> Items tagged <span class="pill pill-data" style="display:inline;padding:1px 8px;">Data Point</span> are collected during onboarding. Items tagged <span class="pill pill-feature" style="display:inline;padding:1px 8px;">Feature</span> are product specs tracked in business requirements.</div>`;
+  SECTION.subsections.forEach(sub=>{
+    html+=`<div class="subsection"><div class="subsection-title">${sub.id}: ${sub.title}</div>`;
+    sub.items.forEach(item=>{
+      const checked=state[item.id]?.checked||false;const feedback=state[item.id]?.feedback||'';
+      const ac=checked?' approved':'';const ht=feedback?' has-text':'';
+      const pc=item.phase==='Onboarding'?'pill-green':item.phase==='First Week'?'pill-gold':'pill-gray';
+      const sc=item.source==='AI-Suggested'?'pill-gold':'pill-outline';
+      const rb=item.required?`<span class="pill pill-green" style="font-size:10px">Required</span>`:'';
+      const typePill=item.type==='data'?`<span class="pill pill-data" style="font-size:10px">Data Point</span>`:`<span class="pill pill-feature" style="font-size:10px">Feature</span>`;
+      html+=`<div class="row${ac}" id="row-${item.id}"><div class="row-check"><input type="checkbox" ${checked?'checked':''} onchange="toggleCheck('${item.id}',this.checked)"></div><div class="row-content"><div class="row-top"><span class="row-id">${item.id}</span><span class="row-title">${item.title}</span>${rb} ${typePill}</div><div class="row-desc">${item.desc}</div><div class="row-tags"><span class="pill ${pc}">${item.phase}</span><span class="pill ${sc}">${item.source}</span></div></div><div class="row-feedback"><input type="text" placeholder="Feedback..." value="${escapeAttr(feedback)}" class="${ht}" oninput="updateFeedback('${item.id}',this.value,this)"></div></div>`;
+    });html+=`</div>`;
+  });
+  html+=`<div class="section-feedback"><label>Overall feedback on this section</label><textarea id="sectionFeedback" placeholder="Anything missing, unclear, or that should be reorganized?" oninput="saveSectionFeedback(this.value)">${escapeHtml(state._sectionFeedback||'')}</textarea></div>`;
+  html+=`<div class="footer-actions"><button class="btn btn-outline" onclick="exportSection()">Export for AI</button><div style="font-size:13px;color:var(--tm)">Next: End-User Onboarding & Walkthrough</div></div>`;
+  app.innerHTML=html;updateProgress();
+}
+function escapeAttr(s){return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function toggleCheck(id,c){if(!state[id])state[id]={};state[id].checked=c;saveState();document.getElementById('row-'+id)?.classList.toggle('approved',c);updateProgress()}
+function updateFeedback(id,v,el){if(!state[id])state[id]={};state[id].feedback=v;saveState();el.classList.toggle('has-text',v.length>0);updateProgress()}
+function saveSectionFeedback(v){state._sectionFeedback=v;saveState()}
+function updateProgress(){const a=getAllItems();let r=0;a.forEach(i=>{const s=state[i.id];if(s&&(s.checked||(s.feedback&&s.feedback.trim())))r++});const p=Math.round(r/a.length*100);document.getElementById('progressFill').style.width=p+'%';document.getElementById('progressLabel').textContent=`${r} / ${a.length} reviewed`}
+function exportSection(){
+  const a=getAllItems();const d=new Date().toISOString().split('T')[0];let ap=0,wf=0,pe=0;
+  a.forEach(i=>{const s=state[i.id];if(s?.checked&&!s?.feedback?.trim())ap++;else if(s?.feedback?.trim())wf++;else pe++});
+  let md=`# BAM OS Onboarding \u2014 Sales\n**Exported:** ${d}\n**Approved:** ${ap} | **Has feedback:** ${wf} | **Pending:** ${pe}\n\n`;
+  SECTION.subsections.forEach(sub=>{md+=`## ${sub.id}: ${sub.title}\n`;sub.items.forEach(i=>{const s=state[i.id];const c=s?.checked||false;const fb=s?.feedback?.trim()||'';let l=`- ${c?'[x]':'[ ]'} **${i.id} ${i.title}** [${i.type==='data'?'DATA POINT':'FEATURE'}] \u2014 ${i.desc}`;if(c&&!fb)l+=' \u2014 APPROVED';else if(fb)l+=` \u2014 FEEDBACK: "${fb}"`;const t=[];if(i.required)t.push('Required');t.push(i.phase);t.push(i.source);l+=` [${t.join(', ')}]`;md+=l+'\n'});md+='\n'});
+  const fi=[];a.forEach(i=>{const fb=state[i.id]?.feedback?.trim();if(fb)fi.push({id:i.id,title:i.title,feedback:fb,type:i.type})});
+  if(fi.length>0){md+=`## All Feedback (Consolidated)\n`;fi.forEach((f,i)=>{md+=`${i+1}. **${f.id} ${f.title}** [${f.type}]: "${f.feedback}"\n`});md+='\n'}
+  if(state._sectionFeedback?.trim())md+=`## Overall Section Feedback\n${state._sectionFeedback.trim()}\n`;
+  navigator.clipboard.writeText(md).then(()=>showToast('Copied to clipboard')).catch(()=>{const ta=document.createElement('textarea');ta.value=md;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Copied to clipboard')});
+}
+function showClearModal(){document.getElementById('clearModal').classList.add('show')}
+function hideClearModal(){document.getElementById('clearModal').classList.remove('show')}
+function clearAll(){state={};saveState();hideClearModal();render();showToast('All progress cleared')}
+function toggleTheme(){const n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('bamos_theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u2600':'\u263E'}
+(function(){const t=localStorage.getItem('bamos_theme');if(t){document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.getElementById('themeBtn').textContent='\u2600'}})();
+function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+render();
+</script>
+</body>
+</html>

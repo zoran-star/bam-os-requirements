@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM OS — Onboarding Review: Identity</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F8F7F5; --surf: #FFFFFF; --surf2: #FAFAF8; --surf3: #F0EFEC;
+  --border: rgba(0,0,0,0.07); --borderm: rgba(0,0,0,0.12);
+  --gold: #C8A84E; --goldd: #A08030; --gglow: rgba(200,168,78,0.10);
+  --tp: #1C1B18; --ts: #6E6B63; --tm: #A5A19A;
+  --green: #3EAF5C; --greenl: rgba(62,175,92,0.10);
+  --warn: #E09D24; --warnl: rgba(224,157,36,0.10);
+  --red: #E05A42; --redl: rgba(224,90,66,0.10);
+  --blue: #3B6FA0; --bluel: rgba(59,111,160,0.10);
+  --ff: 'Plus Jakarta Sans', sans-serif; --fm: 'DM Mono', monospace;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-full: 9999px;
+}
+[data-theme="dark"] {
+  --bg: #0F0E0C; --surf: #1A1916; --surf2: #222120; --surf3: #2C2B28;
+  --border: rgba(255,255,255,0.08); --borderm: rgba(255,255,255,0.12);
+  --gold: #D4B65C; --goldd: #E0C56A; --gglow: rgba(212,182,92,0.12);
+  --tp: #F0EDE8; --ts: #A5A19A; --tm: #6E6B63;
+  --green: #4CC76A; --greenl: rgba(76,199,106,0.12);
+  --warn: #F0B84A; --warnl: rgba(240,184,74,0.12);
+  --red: #F07060; --redl: rgba(240,112,96,0.12);
+  --blue: #5A9FD4; --bluel: rgba(90,159,212,0.12);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2); --shadow-md: 0 4px 14px rgba(0,0,0,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--ff); background: var(--bg); color: var(--tp); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+.header {
+  position: sticky; top: 0; z-index: 100; background: var(--surf);
+  border-bottom: 1px solid var(--border); padding: 20px 32px; box-shadow: var(--shadow-sm);
+}
+.header-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.header h1 span { color: var(--gold); }
+.header-sub { font-size: 13px; color: var(--tm); margin-top: 2px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.step-indicator { font-family: var(--fm); font-size: 12px; color: var(--gold); background: var(--gglow); padding: 4px 12px; border-radius: var(--r-full); font-weight: 600; }
+
+.btn { font-family: var(--ff); font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: var(--r-sm); border: none; cursor: pointer; transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 6px; }
+.btn-gold { background: var(--gold); color: #fff; }
+.btn-gold:hover { background: var(--goldd); }
+.btn-outline { background: transparent; border: 1px solid var(--borderm); color: var(--ts); }
+.btn-outline:hover { background: var(--surf3); }
+.btn-red { background: transparent; border: 1px solid var(--borderm); color: var(--red); }
+.btn-red:hover { background: var(--redl); }
+.btn-theme { background: transparent; border: 1px solid var(--borderm); color: var(--ts); padding: 8px 10px; font-size: 15px; line-height: 1; }
+
+.progress-bar { margin-top: 14px; display: flex; align-items: center; gap: 12px; }
+.progress-track { flex: 1; height: 6px; background: var(--surf3); border-radius: var(--r-full); overflow: hidden; }
+.progress-fill { height: 100%; background: var(--gold); border-radius: var(--r-full); transition: width 0.3s ease; }
+.progress-label { font-size: 13px; font-weight: 600; color: var(--ts); white-space: nowrap; font-family: var(--fm); }
+
+.container { max-width: 920px; margin: 0 auto; padding: 24px 32px 80px; }
+
+.intro {
+  background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 24px; margin-bottom: 32px;
+}
+.intro h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.intro p { font-size: 14px; color: var(--ts); line-height: 1.6; }
+
+.subsection { margin-top: 16px; margin-bottom: 20px; }
+.subsection-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--tm); margin-bottom: 8px; padding-left: 4px;
+}
+
+.row {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+  background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-md);
+  margin-bottom: 6px; transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.row:hover { border-color: var(--borderm); box-shadow: var(--shadow-sm); }
+.row.approved { border-color: rgba(62,175,92,0.25); background: linear-gradient(135deg, var(--surf) 0%, var(--greenl) 100%); }
+.row-check { flex-shrink: 0; margin-top: 2px; }
+.row-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--green); cursor: pointer; }
+.row-content { flex: 1; min-width: 0; }
+.row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.row-id { font-family: var(--fm); font-size: 11px; font-weight: 500; color: var(--gold); background: var(--gglow); padding: 2px 8px; border-radius: var(--r-full); white-space: nowrap; }
+.row-title { font-size: 14px; font-weight: 600; color: var(--tp); }
+.row-desc { font-size: 13px; color: var(--ts); margin-top: 2px; }
+.row-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.pill { font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: var(--r-full); white-space: nowrap; }
+.pill-green { background: var(--greenl); color: var(--green); }
+.pill-gold { background: var(--warnl); color: var(--warn); }
+.pill-gray { background: var(--surf3); color: var(--tm); }
+.pill-blue { background: var(--bluel); color: var(--blue); }
+.pill-outline { background: transparent; border: 1px solid var(--border); color: var(--tm); }
+.row-feedback { flex-shrink: 0; width: 240px; }
+.row-feedback input {
+  width: 100%; font-family: var(--ff); font-size: 13px; padding: 7px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surf2);
+  color: var(--tp); outline: none; transition: border-color 0.15s ease;
+}
+.row-feedback input::placeholder { color: var(--tm); }
+.row-feedback input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gglow); }
+.row-feedback input.has-text { border-color: var(--warn); background: var(--warnl); }
+
+.section-feedback {
+  background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 16px 20px; margin-top: 28px;
+}
+.section-feedback label { font-size: 13px; font-weight: 600; color: var(--tp); display: block; margin-bottom: 6px; }
+.section-feedback textarea {
+  width: 100%; font-family: var(--ff); font-size: 13px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surf2);
+  color: var(--tp); outline: none; resize: vertical; min-height: 60px; line-height: 1.5;
+}
+.section-feedback textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gglow); }
+
+.footer-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 24px; border-top: 1px solid var(--border); margin-top: 32px;
+}
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--tp); color: var(--bg); font-family: var(--ff); font-size: 14px; font-weight: 600;
+  padding: 12px 24px; border-radius: var(--r-md); box-shadow: var(--shadow-md);
+  opacity: 0; transition: all 0.3s ease; z-index: 200; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 300; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal { background: var(--surf); border-radius: var(--r-lg); padding: 24px; max-width: 380px; width: 90%; box-shadow: var(--shadow-md); }
+.modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.modal p { font-size: 14px; color: var(--ts); margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 768px) {
+  .header { padding: 16px 20px; }
+  .container { padding: 16px 20px 60px; }
+  .row { flex-wrap: wrap; }
+  .row-feedback { width: 100%; }
+}
+@media print {
+  .header { position: static; box-shadow: none; }
+  .header-actions { display: none; }
+  .progress-bar { display: none; }
+  .row { break-inside: avoid; box-shadow: none; }
+  .toast, .modal-overlay { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <h1>BAM <span>OS</span> — Identity</h1>
+      <div class="header-sub">Section 1 of 8 — Review what data belongs here</div>
+    </div>
+    <div class="header-actions">
+      <span class="step-indicator">1 / 8</span>
+      <button class="btn btn-theme" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+      <button class="btn btn-red" onclick="showClearModal()">Clear</button>
+      <button class="btn btn-gold" onclick="exportSection()">Export for AI</button>
+    </div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0 reviewed</div>
+  </div>
+</div>
+
+<div class="container" id="app"></div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all progress?</h3>
+    <p>This will uncheck all items and remove all feedback. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SECTION = {
+  id: "1",
+  title: "Identity",
+  desc: "Core information about your academy. This is used everywhere \u2014 scheduling app, marketing, AI conversations, invoices, and member-facing pages. These are the foundational data points that every other section depends on.",
+  subsections: [
+    {
+      id: "1A",
+      title: "Business Info",
+      items: [
+        { id: "1A-01", title: "Business Name", desc: "The name of the academy or business. Used across all modules, communications, and member-facing surfaces.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "1A-02", title: "Logo", desc: "Academy logo displayed on scheduling app, invoices, marketing materials, and member portal.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "1A-03", title: "Business Description", desc: "1\u20132 sentence summary of what the business does. Used by AI for context and on public-facing pages.", phase: "Onboarding", source: "AI-Suggested", required: false },
+      ]
+    },
+    {
+      id: "1B",
+      title: "Contact Details",
+      items: [
+        { id: "1B-01", title: "Contact Email", desc: "Primary business email. Used as reply-to on automated emails and shown to members.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "1B-02", title: "Phone Number", desc: "Business phone. Shown to members and used as caller ID for SMS notifications.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "1B-03", title: "Website URL", desc: "Existing website. Used for backlinks, AI context, and auto-importing business info.", phase: "Onboarding", source: "Manual", required: false },
+        { id: "1B-04", title: "Social Media Links", desc: "Instagram, Facebook, TikTok, etc. Used for marketing integration and public profile.", phase: "First Week", source: "Manual", required: false },
+      ]
+    },
+    {
+      id: "1C",
+      title: "Address & Timezone",
+      items: [
+        { id: "1C-01", title: "Primary Address", desc: "Main business address. Multi-location academies add additional locations in Section 3.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "1C-02", title: "Timezone", desc: "All schedules, notifications, and billing cycles run on this timezone.", phase: "Onboarding", source: "Auto-Detected", required: true },
+      ]
+    },
+    {
+      id: "1D",
+      title: "Payments",
+      items: [
+        { id: "1D-01", title: "Stripe Account", desc: "Connected Stripe account for all payments, subscriptions, and billing. Revenue flows through Stripe.", phase: "Onboarding", source: "Manual", required: true },
+      ]
+    },
+    {
+      id: "1E",
+      title: "Open Questions",
+      items: [
+        { id: "1E-01", title: "Owner Profile", desc: "Should we collect the owner's personal name, role, and photo separately from the business profile?", phase: "Onboarding", source: "Manual", required: false },
+        { id: "1E-02", title: "Business Type", desc: "Should we ask what type of business (academy, private coach, skills trainer, AAU program)? Could tailor the onboarding flow.", phase: "Onboarding", source: "Manual", required: false },
+        { id: "1E-03", title: "Years in Operation", desc: "How long the business has been running. Useful for AI context and social proof. Worth collecting?", phase: "First Week", source: "Manual", required: false },
+      ]
+    }
+  ]
+};
+
+const STORAGE_KEY = 'bamos_review_identity';
+let state = loadState();
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function getAllItems() {
+  const items = [];
+  SECTION.subsections.forEach(sub => sub.items.forEach(item => items.push(item)));
+  return items;
+}
+
+function render() {
+  const app = document.getElementById('app');
+  let html = '';
+
+  html += `<div class="intro"><h2>${SECTION.title}</h2><p>${SECTION.desc}</p></div>`;
+
+  SECTION.subsections.forEach(sub => {
+    html += `<div class="subsection">`;
+    html += `<div class="subsection-title">${sub.id}: ${sub.title}</div>`;
+
+    sub.items.forEach(item => {
+      const checked = state[item.id]?.checked || false;
+      const feedback = state[item.id]?.feedback || '';
+      const approvedClass = checked ? ' approved' : '';
+      const hasTextClass = feedback ? ' has-text' : '';
+      const phaseClass = item.phase === 'Onboarding' ? 'pill-green' : item.phase === 'First Week' ? 'pill-gold' : 'pill-gray';
+      const sourceClass = item.source === 'AI-Suggested' ? 'pill-gold' : item.source === 'Auto-Detected' ? 'pill-blue' : item.source === 'Stripe Import' ? 'pill-blue' : 'pill-outline';
+      const reqBadge = item.required ? `<span class="pill pill-green" style="font-size:10px;">Required</span>` : '';
+
+      html += `<div class="row${approvedClass}" id="row-${item.id}">`;
+      html += `  <div class="row-check"><input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleCheck('${item.id}', this.checked)"></div>`;
+      html += `  <div class="row-content">`;
+      html += `    <div class="row-top"><span class="row-id">${item.id}</span><span class="row-title">${item.title}</span>${reqBadge}</div>`;
+      html += `    <div class="row-desc">${item.desc}</div>`;
+      html += `    <div class="row-tags"><span class="pill ${phaseClass}">${item.phase}</span><span class="pill ${sourceClass}">${item.source}</span></div>`;
+      html += `  </div>`;
+      html += `  <div class="row-feedback"><input type="text" placeholder="Feedback..." value="${escapeAttr(feedback)}" class="${hasTextClass}" oninput="updateFeedback('${item.id}', this.value, this)"></div>`;
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  // Section-level feedback
+  html += `<div class="section-feedback">`;
+  html += `<label>Overall feedback on this section</label>`;
+  html += `<textarea id="sectionFeedback" placeholder="Anything missing, unclear, or that should be reorganized?" oninput="saveSectionFeedback(this.value)">${escapeHtml(state._sectionFeedback || '')}</textarea>`;
+  html += `</div>`;
+
+  html += `<div class="footer-actions">`;
+  html += `<button class="btn btn-outline" onclick="exportSection()">Export for AI</button>`;
+  html += `<div style="font-size:13px;color:var(--tm);">Next: Strategy & Positioning</div>`;
+  html += `</div>`;
+
+  app.innerHTML = html;
+  updateProgress();
+}
+
+function escapeAttr(str) { return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function toggleCheck(id, checked) {
+  if (!state[id]) state[id] = {};
+  state[id].checked = checked;
+  saveState();
+  document.getElementById('row-' + id)?.classList.toggle('approved', checked);
+  updateProgress();
+}
+
+function updateFeedback(id, value, el) {
+  if (!state[id]) state[id] = {};
+  state[id].feedback = value;
+  saveState();
+  el.classList.toggle('has-text', value.length > 0);
+  updateProgress();
+}
+
+function saveSectionFeedback(value) {
+  state._sectionFeedback = value;
+  saveState();
+}
+
+function updateProgress() {
+  const allItems = getAllItems();
+  let reviewed = 0;
+  allItems.forEach(item => {
+    const s = state[item.id];
+    if (s && (s.checked || (s.feedback && s.feedback.trim()))) reviewed++;
+  });
+  const pct = Math.round((reviewed / allItems.length) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${reviewed} / ${allItems.length} reviewed`;
+}
+
+function exportSection() {
+  const allItems = getAllItems();
+  const date = new Date().toISOString().split('T')[0];
+  let approved = 0, withFeedback = 0, pending = 0;
+
+  allItems.forEach(item => {
+    const s = state[item.id];
+    if (s?.checked && !s?.feedback?.trim()) approved++;
+    else if (s?.checked && s?.feedback?.trim()) withFeedback++;
+    else if (s?.feedback?.trim()) withFeedback++;
+    else pending++;
+  });
+
+  let md = `# BAM OS Onboarding \u2014 Section 1: Identity\n`;
+  md += `**Exported:** ${date}\n`;
+  md += `**Approved:** ${approved} | **Has feedback:** ${withFeedback} | **Pending:** ${pending}\n\n`;
+
+  SECTION.subsections.forEach(sub => {
+    md += `## ${sub.id}: ${sub.title}\n`;
+    sub.items.forEach(item => {
+      const s = state[item.id];
+      const checked = s?.checked || false;
+      const fb = s?.feedback?.trim() || '';
+      const checkbox = checked ? '[x]' : '[ ]';
+      let line = `- ${checkbox} **${item.id} ${item.title}** \u2014 ${item.desc}`;
+      if (checked && !fb) line += ' \u2014 APPROVED';
+      else if (fb) line += ` \u2014 FEEDBACK: "${fb}"`;
+      const tags = [];
+      if (item.required) tags.push('Required');
+      tags.push(item.phase);
+      tags.push(item.source);
+      line += ` [${tags.join(', ')}]`;
+      md += line + '\n';
+    });
+    md += '\n';
+  });
+
+  const feedbackItems = [];
+  allItems.forEach(item => {
+    const fb = state[item.id]?.feedback?.trim();
+    if (fb) feedbackItems.push({ id: item.id, title: item.title, feedback: fb });
+  });
+
+  if (feedbackItems.length > 0) {
+    md += `## All Feedback (Consolidated)\n`;
+    feedbackItems.forEach((fi, i) => { md += `${i + 1}. **${fi.id} ${fi.title}:** "${fi.feedback}"\n`; });
+    md += '\n';
+  }
+
+  if (state._sectionFeedback?.trim()) {
+    md += `## Overall Section Feedback\n${state._sectionFeedback.trim()}\n`;
+  }
+
+  navigator.clipboard.writeText(md).then(() => showToast('Copied to clipboard')).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = md;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); showToast('Copied to clipboard');
+  });
+}
+
+function showClearModal() { document.getElementById('clearModal').classList.add('show'); }
+function hideClearModal() { document.getElementById('clearModal').classList.remove('show'); }
+function clearAll() { state = {}; saveState(); hideClearModal(); render(); showToast('All progress cleared'); }
+
+function toggleTheme() {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('bamos_theme', next);
+  document.getElementById('themeBtn').textContent = next === 'dark' ? '\u2600' : '\u263E';
+}
+(function() {
+  const t = localStorage.getItem('bamos_theme');
+  if (t) { document.documentElement.setAttribute('data-theme', t); if (t === 'dark') document.getElementById('themeBtn').textContent = '\u2600'; }
+})();
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+render();
+</script>
+</body>
+</html>

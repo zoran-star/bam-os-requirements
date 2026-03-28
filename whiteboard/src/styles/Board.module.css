@@ -1,0 +1,30 @@
+.board {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  padding: 24px;
+  min-height: calc(100vh - 80px);
+  align-items: start;
+}
+.column {
+  background: var(--surf2);
+  border-radius: 16px;
+  padding: 16px;
+  min-height: 200px;
+}
+.columnHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; padding: 0 4px;
+}
+.columnTitle { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--tm); }
+.columnCount {
+  font-family: var(--fm); font-size: 11px; font-weight: 600;
+  color: var(--ts); background: var(--surf3);
+  padding: 2px 8px; border-radius: 9999px;
+}
+.cards { display: flex; flex-direction: column; gap: 8px; }
+.empty { font-size: 13px; color: var(--tm); text-align: center; padding: 32px 0; }
+
+@media (max-width: 900px) {
+  .board { grid-template-columns: 1fr; }
+}

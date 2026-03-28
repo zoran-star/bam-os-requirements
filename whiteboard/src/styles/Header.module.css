@@ -1,0 +1,28 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--surf);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.left { display: flex; align-items: center; gap: 12px; }
+.title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.gold { color: var(--gold); }
+.subtitle { font-size: 13px; color: var(--tm); }
+.right { display: flex; align-items: center; gap: 8px; }
+.counts { font-family: var(--fm); font-size: 12px; color: var(--ts); }
+.btn {
+  font-family: var(--ff); font-size: 13px; font-weight: 600;
+  padding: 7px 14px; border-radius: 8px; border: none;
+  cursor: pointer; transition: all 0.15s ease;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btnOutline { background: transparent; border: 1px solid var(--borderm); color: var(--ts); }
+.btnOutline:hover { background: var(--surf3); }
+.btnTheme { background: transparent; border: 1px solid var(--borderm); color: var(--ts); padding: 7px 10px; font-size: 15px; line-height: 1; }

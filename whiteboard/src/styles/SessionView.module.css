@@ -1,0 +1,44 @@
+.header {
+  position: sticky; top: 0; z-index: 100; background: var(--surf);
+  border-bottom: 1px solid var(--border); padding: 14px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; box-shadow: var(--shadow-sm);
+}
+.left { display: flex; align-items: center; gap: 12px; }
+.back {
+  background: none; border: none; font-size: 18px; cursor: pointer;
+  color: var(--ts); padding: 4px 8px; border-radius: 6px;
+}
+.back:hover { background: var(--surf3); color: var(--tp); }
+.title { font-size: 18px; font-weight: 700; }
+.id { font-family: var(--fm); font-size: 11px; color: var(--gold); margin-left: 4px; }
+.status {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 9999px; margin-left: 8px;
+}
+.statusTodo { background: rgba(59,111,160,0.10); color: var(--blue); }
+.statusProgress { background: rgba(224,157,36,0.10); color: var(--warn); }
+.statusComplete { background: rgba(62,175,92,0.10); color: var(--green); }
+.right { display: flex; align-items: center; gap: 8px; }
+.progress { display: flex; align-items: center; gap: 10px; }
+.track { width: 120px; height: 5px; background: var(--surf3); border-radius: 9999px; overflow: hidden; }
+.fill { height: 100%; background: var(--gold); border-radius: 9999px; transition: width 0.3s ease; }
+.label { font-family: var(--fm); font-size: 11px; color: var(--ts); white-space: nowrap; }
+.btn {
+  font-family: var(--ff); font-size: 13px; font-weight: 600;
+  padding: 7px 14px; border-radius: 8px; border: none;
+  cursor: pointer; background: var(--gold); color: #fff;
+  transition: background 0.15s ease;
+}
+.btn:hover { background: #A08030; }
+.container { max-width: 920px; margin: 0 auto; padding: 24px 32px 80px; }
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--tp); color: var(--bg);
+  font-family: var(--ff); font-size: 14px; font-weight: 600;
+  padding: 12px 24px; border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+  opacity: 0; transition: all 0.3s ease; z-index: 200; pointer-events: none;
+}
+.toastShow { opacity: 1; transform: translateX(-50%) translateY(0); }

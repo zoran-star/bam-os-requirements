@@ -1,0 +1,32 @@
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  border-left: 3px solid var(--gold);
+}
+.card:hover {
+  border-color: var(--borderm);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.cardComplete { opacity: 0.7; border-left-color: var(--green); }
+.cardComplete:hover { opacity: 1; }
+.cardInProgress { border-left-color: var(--warn); }
+.top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.id {
+  font-family: var(--fm); font-size: 10px; font-weight: 500;
+  color: var(--gold); background: rgba(200,168,78,0.10);
+  padding: 2px 7px; border-radius: 9999px; white-space: nowrap;
+}
+.title { font-size: 14px; font-weight: 600; color: var(--tp); }
+.desc { font-size: 12px; color: var(--ts); line-height: 1.4; margin-bottom: 8px; }
+.bottom { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: 9999px; white-space: nowrap;
+}
+.pillType { background: rgba(59,111,160,0.10); color: var(--blue); }
+.pillAssigned { background: var(--surf3); color: var(--tm); }

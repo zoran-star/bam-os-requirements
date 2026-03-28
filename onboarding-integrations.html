@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM OS — Onboarding Review: Integrations & Launch</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F8F7F5;--surf:#FFF;--surf2:#FAFAF8;--surf3:#F0EFEC;--border:rgba(0,0,0,.07);--borderm:rgba(0,0,0,.12);--gold:#C8A84E;--goldd:#A08030;--gglow:rgba(200,168,78,.10);--tp:#1C1B18;--ts:#6E6B63;--tm:#A5A19A;--green:#3EAF5C;--greenl:rgba(62,175,92,.10);--warn:#E09D24;--warnl:rgba(224,157,36,.10);--red:#E05A42;--redl:rgba(224,90,66,.10);--blue:#3B6FA0;--bluel:rgba(59,111,160,.10);--ff:'Plus Jakarta Sans',sans-serif;--fm:'DM Mono',monospace;--shadow-sm:0 1px 3px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.03);--shadow-md:0 4px 14px rgba(0,0,0,.06),0 2px 6px rgba(0,0,0,.04);--r-sm:8px;--r-md:12px;--r-lg:16px;--r-full:9999px}
+[data-theme=dark]{--bg:#0F0E0C;--surf:#1A1916;--surf2:#222120;--surf3:#2C2B28;--border:rgba(255,255,255,.08);--borderm:rgba(255,255,255,.12);--gold:#D4B65C;--goldd:#E0C56A;--gglow:rgba(212,182,92,.12);--tp:#F0EDE8;--ts:#A5A19A;--tm:#6E6B63;--green:#4CC76A;--greenl:rgba(76,199,106,.12);--warn:#F0B84A;--warnl:rgba(240,184,74,.12);--red:#F07060;--redl:rgba(240,112,96,.12);--blue:#5A9FD4;--bluel:rgba(90,159,212,.12);--shadow-sm:0 1px 3px rgba(0,0,0,.2);--shadow-md:0 4px 14px rgba(0,0,0,.3)}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:var(--ff);background:var(--bg);color:var(--tp);line-height:1.5;-webkit-font-smoothing:antialiased}
+.header{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--border);padding:20px 32px;box-shadow:var(--shadow-sm)}.header-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}.header h1 span{color:var(--gold)}.header-sub{font-size:13px;color:var(--tm);margin-top:2px}.header-actions{display:flex;gap:8px;align-items:center}.step-indicator{font-family:var(--fm);font-size:12px;color:var(--gold);background:var(--gglow);padding:4px 12px;border-radius:var(--r-full);font-weight:600}
+.btn{font-family:var(--ff);font-size:13px;font-weight:600;padding:8px 16px;border-radius:var(--r-sm);border:none;cursor:pointer;transition:all .15s ease;display:inline-flex;align-items:center;gap:6px}.btn-gold{background:var(--gold);color:#fff}.btn-gold:hover{background:var(--goldd)}.btn-outline{background:transparent;border:1px solid var(--borderm);color:var(--ts)}.btn-outline:hover{background:var(--surf3)}.btn-red{background:transparent;border:1px solid var(--borderm);color:var(--red)}.btn-red:hover{background:var(--redl)}.btn-theme{background:transparent;border:1px solid var(--borderm);color:var(--ts);padding:8px 10px;font-size:15px;line-height:1}
+.progress-bar{margin-top:14px;display:flex;align-items:center;gap:12px}.progress-track{flex:1;height:6px;background:var(--surf3);border-radius:var(--r-full);overflow:hidden}.progress-fill{height:100%;background:var(--gold);border-radius:var(--r-full);transition:width .3s ease}.progress-label{font-size:13px;font-weight:600;color:var(--ts);white-space:nowrap;font-family:var(--fm)}
+.container{max-width:920px;margin:0 auto;padding:24px 32px 80px}.intro{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px;margin-bottom:32px}.intro h2{font-size:18px;font-weight:700;margin-bottom:4px}.intro p{font-size:14px;color:var(--ts);line-height:1.6}
+.subsection{margin-top:16px;margin-bottom:20px}.subsection-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--tm);margin-bottom:8px;padding-left:4px}
+.row{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:6px;transition:border-color .15s ease,box-shadow .15s ease}.row:hover{border-color:var(--borderm);box-shadow:var(--shadow-sm)}.row.approved{border-color:rgba(62,175,92,.25);background:linear-gradient(135deg,var(--surf) 0%,var(--greenl) 100%)}
+.row-check{flex-shrink:0;margin-top:2px}.row-check input[type=checkbox]{width:18px;height:18px;accent-color:var(--green);cursor:pointer}.row-content{flex:1;min-width:0}.row-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.row-id{font-family:var(--fm);font-size:11px;font-weight:500;color:var(--gold);background:var(--gglow);padding:2px 8px;border-radius:var(--r-full);white-space:nowrap}.row-title{font-size:14px;font-weight:600;color:var(--tp)}.row-desc{font-size:13px;color:var(--ts);margin-top:2px}.row-tags{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.pill{font-size:11px;font-weight:600;padding:2px 10px;border-radius:var(--r-full);white-space:nowrap}.pill-green{background:var(--greenl);color:var(--green)}.pill-gold{background:var(--warnl);color:var(--warn)}.pill-gray{background:var(--surf3);color:var(--tm)}.pill-blue{background:var(--bluel);color:var(--blue)}.pill-outline{background:transparent;border:1px solid var(--border);color:var(--tm)}
+.row-feedback{flex-shrink:0;width:240px}.row-feedback input{width:100%;font-family:var(--ff);font-size:13px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surf2);color:var(--tp);outline:none;transition:border-color .15s ease}.row-feedback input::placeholder{color:var(--tm)}.row-feedback input:focus{border-color:var(--gold);box-shadow:0 0 0 2px var(--gglow)}.row-feedback input.has-text{border-color:var(--warn);background:var(--warnl)}
+.section-feedback{background:var(--surf);border:1px solid var(--border);border-radius:var(--r-md);padding:16px 20px;margin-top:28px}.section-feedback label{font-size:13px;font-weight:600;color:var(--tp);display:block;margin-bottom:6px}.section-feedback textarea{width:100%;font-family:var(--ff);font-size:13px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surf2);color:var(--tp);outline:none;resize:vertical;min-height:60px;line-height:1.5}.section-feedback textarea:focus{border-color:var(--gold);box-shadow:0 0 0 2px var(--gglow)}
+.footer-actions{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border);margin-top:32px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--tp);color:var(--bg);font-family:var(--ff);font-size:14px;font-weight:600;padding:12px 24px;border-radius:var(--r-md);box-shadow:var(--shadow-md);opacity:0;transition:all .3s ease;z-index:200;pointer-events:none}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;align-items:center;justify-content:center}.modal-overlay.show{display:flex}.modal{background:var(--surf);border-radius:var(--r-lg);padding:24px;max-width:380px;width:90%;box-shadow:var(--shadow-md)}.modal h3{font-size:16px;font-weight:700;margin-bottom:8px}.modal p{font-size:14px;color:var(--ts);margin-bottom:20px}.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+@media(max-width:768px){.header{padding:16px 20px}.container{padding:16px 20px 60px}.row{flex-wrap:wrap}.row-feedback{width:100%}}
+@media print{.header{position:static;box-shadow:none}.header-actions{display:none}.progress-bar{display:none}.row{break-inside:avoid;box-shadow:none}.toast,.modal-overlay{display:none!important}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-top">
+    <div>
+      <h1>BAM <span>OS</span> — Integrations & Launch</h1>
+      <div class="header-sub">Section 8 of 8 — Review what data belongs here</div>
+    </div>
+    <div class="header-actions">
+      <span class="step-indicator">8 / 8</span>
+      <button class="btn btn-theme" onclick="toggleTheme()" id="themeBtn">&#9790;</button>
+      <button class="btn btn-red" onclick="showClearModal()">Clear</button>
+      <button class="btn btn-gold" onclick="exportSection()">Export for AI</button>
+    </div>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 0 reviewed</div>
+  </div>
+</div>
+<div class="container" id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all progress?</h3>
+    <p>This will uncheck all items and remove all feedback. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideClearModal()">Cancel</button>
+      <button class="btn btn-red" onclick="clearAll()">Clear All</button>
+    </div>
+  </div>
+</div>
+<script>
+const SECTION = {
+  id: "8",
+  title: "Integrations & Launch",
+  desc: "External services the academy connects to BAM OS, and the final steps before going live. From Section 1 feedback: Stripe moved here. From Section 7: multi-channel connections configured here. This is where the owner connects everything and generates their go-live assets.",
+  subsections: [
+    {
+      id: "8A",
+      title: "Payment Integration",
+      items: [
+        { id: "8A-01", title: "Stripe Account", desc: "Connect Stripe for all payments, subscriptions, and billing. Moved from Business Info. OAuth connect flow.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8A-02", title: "Stripe Plan Import", desc: "If the academy already has plans in Stripe, import them into BAM OS instead of recreating. Saves onboarding time.", phase: "Onboarding", source: "Stripe Import", required: false },
+      ]
+    },
+    {
+      id: "8B",
+      title: "CRM / Existing Tools",
+      items: [
+        { id: "8B-01", title: "GoHighLevel Account", desc: "Connect existing GHL account. For MVP, BAM OS integrates with GHL for CRM, pipeline, and automation workflows.", phase: "Onboarding", source: "Manual", required: false },
+        { id: "8B-02", title: "Existing Member Data Import", desc: "Does the academy have an existing member list (spreadsheet, other platform)? Import members to avoid re-signup.", phase: "Onboarding", source: "Manual", required: false },
+        { id: "8B-03", title: "Existing Lead Data Import", desc: "Import existing leads/prospects from a CRM or spreadsheet. Pre-populates the sales pipeline.", phase: "Onboarding", source: "Manual", required: false },
+      ]
+    },
+    {
+      id: "8C",
+      title: "Marketing Integrations",
+      items: [
+        { id: "8C-01", title: "Meta Business Manager", desc: "Connect Meta for ad management. Required for marketing module. Includes Pixel and Conversions API setup. (SET-010)", phase: "First Week", source: "Manual", required: false },
+        { id: "8C-02", title: "Google Business Profile", desc: "Connect Google Business for review management, local SEO, and business info sync.", phase: "First Week", source: "Manual", required: false },
+        { id: "8C-03", title: "Social Proof Sources", desc: "Where do reviews live? Google, Facebook, Yelp, Instagram. Links to review pages for AI and marketing to pull from. Moved from Strategy.", phase: "First Week", source: "Manual", required: false },
+      ]
+    },
+    {
+      id: "8D",
+      title: "Communication Channels",
+      items: [
+        { id: "8D-01", title: "SMS Provider", desc: "SMS sending for notifications, reminders, and AI conversations. Platform-provided or BYO Twilio account.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8D-02", title: "Email Provider", desc: "Email sending for automated emails, marketing, and transactional messages. Platform-provided or custom SMTP.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8D-03", title: "AI Conversation Channels", desc: "Which channels should the AI respond on? SMS, Instagram DM, Facebook Messenger, WhatsApp, website chat. Owner selects from connected integrations.", phase: "First Week", source: "Manual", required: false },
+        { id: "8D-04", title: "Notification Preferences", desc: "Default notification settings: which events trigger SMS vs email vs push. Owner configures, members can override. (SET-007)", phase: "First Week", source: "Manual", required: false },
+      ]
+    },
+    {
+      id: "8E",
+      title: "Launch Checklist",
+      items: [
+        { id: "8E-01", title: "Onboarding Links", desc: "Generate trackable member sign-up links per plan and location. Coach sends these to new members. If scheduling app exists, this is the app download link. (SET-005)", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8E-02", title: "Test Member Signup", desc: "Owner runs through the member onboarding flow (APP-005) as a test before going live. Validates everything works end-to-end.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8E-03", title: "First Class Setup", desc: "At least one class/session must be created in the schedule before members can book. Validates the schedule builder works.", phase: "Onboarding", source: "Manual", required: true },
+        { id: "8E-04", title: "Welcome Message Template", desc: "What automated message goes to the first member who signs up? Sets the tone. Can be AI-drafted from strategy data.", phase: "Onboarding", source: "AI-Suggested", required: false },
+      ]
+    },
+    {
+      id: "8F",
+      title: "Open Questions",
+      items: [
+        { id: "8F-01", title: "Website Builder", desc: "BAM OS goal is to make the website for the academy. Is this part of onboarding or a separate module? What data does it need beyond what we\u2019ve already collected?", phase: "Settings", source: "Manual", required: false },
+        { id: "8F-02", title: "Domain & Hosting", desc: "Does BAM OS provide hosting? Custom domain support? Or just a subdomain (academy.fullcontrol.app)?", phase: "Settings", source: "Manual", required: false },
+        { id: "8F-03", title: "Go-Live Validation", desc: "Should there be a system-level \u201Creadiness check\u201D that validates all required data is in before the academy can go live? Prevents incomplete setups.", phase: "Onboarding", source: "Manual", required: false },
+        { id: "8F-04", title: "Migration Support", desc: "For academies switching from another platform (Mindbody, Zen Planner, TeamSnap), what migration tooling or support do we need?", phase: "Settings", source: "Manual", required: false },
+      ]
+    }
+  ]
+};
+
+const STORAGE_KEY='bamos_review_integrations';let state=loadState();
+function loadState(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{}}catch{return{}}}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function getAllItems(){const items=[];SECTION.subsections.forEach(sub=>sub.items.forEach(item=>items.push(item)));return items}
+function render(){
+  const app=document.getElementById('app');let html='';
+  html+=`<div class="intro"><h2>${SECTION.title}</h2><p>${SECTION.desc}</p></div>`;
+  SECTION.subsections.forEach(sub=>{
+    html+=`<div class="subsection"><div class="subsection-title">${sub.id}: ${sub.title}</div>`;
+    sub.items.forEach(item=>{
+      const checked=state[item.id]?.checked||false;const feedback=state[item.id]?.feedback||'';
+      const ac=checked?' approved':'';const ht=feedback?' has-text':'';
+      const pc=item.phase==='Onboarding'?'pill-green':item.phase==='First Week'?'pill-gold':'pill-gray';
+      const sc=item.source==='AI-Suggested'?'pill-gold':item.source==='Stripe Import'?'pill-blue':'pill-outline';
+      const rb=item.required?`<span class="pill pill-green" style="font-size:10px">Required</span>`:'';
+      html+=`<div class="row${ac}" id="row-${item.id}"><div class="row-check"><input type="checkbox" ${checked?'checked':''} onchange="toggleCheck('${item.id}',this.checked)"></div><div class="row-content"><div class="row-top"><span class="row-id">${item.id}</span><span class="row-title">${item.title}</span>${rb}</div><div class="row-desc">${item.desc}</div><div class="row-tags"><span class="pill ${pc}">${item.phase}</span><span class="pill ${sc}">${item.source}</span></div></div><div class="row-feedback"><input type="text" placeholder="Feedback..." value="${escapeAttr(feedback)}" class="${ht}" oninput="updateFeedback('${item.id}',this.value,this)"></div></div>`;
+    });html+=`</div>`;
+  });
+  html+=`<div class="section-feedback"><label>Overall feedback on this section</label><textarea id="sectionFeedback" placeholder="Anything missing, unclear, or that should be reorganized?" oninput="saveSectionFeedback(this.value)">${escapeHtml(state._sectionFeedback||'')}</textarea></div>`;
+  html+=`<div class="footer-actions"><button class="btn btn-outline" onclick="exportSection()">Export for AI</button><div style="font-size:13px;color:var(--tm)">Prev: Conversation AI \u00A0\u00B7\u00A0 This is the final section!</div></div>`;
+  app.innerHTML=html;updateProgress();
+}
+function escapeAttr(s){return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function toggleCheck(id,c){if(!state[id])state[id]={};state[id].checked=c;saveState();document.getElementById('row-'+id)?.classList.toggle('approved',c);updateProgress()}
+function updateFeedback(id,v,el){if(!state[id])state[id]={};state[id].feedback=v;saveState();el.classList.toggle('has-text',v.length>0);updateProgress()}
+function saveSectionFeedback(v){state._sectionFeedback=v;saveState()}
+function updateProgress(){const a=getAllItems();let r=0;a.forEach(i=>{const s=state[i.id];if(s&&(s.checked||(s.feedback&&s.feedback.trim())))r++});const p=Math.round(r/a.length*100);document.getElementById('progressFill').style.width=p+'%';document.getElementById('progressLabel').textContent=`${r} / ${a.length} reviewed`}
+function exportSection(){
+  const a=getAllItems();const d=new Date().toISOString().split('T')[0];let ap=0,wf=0,pe=0;
+  a.forEach(i=>{const s=state[i.id];if(s?.checked&&!s?.feedback?.trim())ap++;else if(s?.feedback?.trim())wf++;else pe++});
+  let md=`# BAM OS Onboarding \u2014 Section 8: Integrations & Launch\n**Exported:** ${d}\n**Approved:** ${ap} | **Has feedback:** ${wf} | **Pending:** ${pe}\n\n`;
+  SECTION.subsections.forEach(sub=>{md+=`## ${sub.id}: ${sub.title}\n`;sub.items.forEach(i=>{const s=state[i.id];const c=s?.checked||false;const fb=s?.feedback?.trim()||'';let l=`- ${c?'[x]':'[ ]'} **${i.id} ${i.title}** \u2014 ${i.desc}`;if(c&&!fb)l+=' \u2014 APPROVED';else if(fb)l+=` \u2014 FEEDBACK: "${fb}"`;const t=[];if(i.required)t.push('Required');t.push(i.phase);t.push(i.source);l+=` [${t.join(', ')}]`;md+=l+'\n'});md+='\n'});
+  const fi=[];a.forEach(i=>{const fb=state[i.id]?.feedback?.trim();if(fb)fi.push({id:i.id,title:i.title,feedback:fb})});
+  if(fi.length>0){md+=`## All Feedback (Consolidated)\n`;fi.forEach((f,i)=>{md+=`${i+1}. **${f.id} ${f.title}:** "${f.feedback}"\n`});md+='\n'}
+  if(state._sectionFeedback?.trim())md+=`## Overall Section Feedback\n${state._sectionFeedback.trim()}\n`;
+  navigator.clipboard.writeText(md).then(()=>showToast('Copied to clipboard')).catch(()=>{const ta=document.createElement('textarea');ta.value=md;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Copied to clipboard')});
+}
+function showClearModal(){document.getElementById('clearModal').classList.add('show')}
+function hideClearModal(){document.getElementById('clearModal').classList.remove('show')}
+function clearAll(){state={};saveState();hideClearModal();render();showToast('All progress cleared')}
+function toggleTheme(){const n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('bamos_theme',n);document.getElementById('themeBtn').textContent=n==='dark'?'\u2600':'\u263E'}
+(function(){const t=localStorage.getItem('bamos_theme');if(t){document.documentElement.setAttribute('data-theme',t);if(t==='dark')document.getElementById('themeBtn').textContent='\u2600'}})();
+function showToast(m){const el=document.getElementById('toast');el.textContent=m;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2500)}
+render();
+</script>
+</body>
+</html>
