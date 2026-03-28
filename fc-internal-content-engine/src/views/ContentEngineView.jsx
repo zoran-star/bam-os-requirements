@@ -958,6 +958,119 @@ function ScriptPanel({ tokens, creative, onBack }) {
 
 // ─── Theme Notes Panel (collapsible) ───
 
+function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [titleVal, setTitleVal] = useState(theme.title);
+  const [descVal, setDescVal] = useState(theme.description || "");
+  const [hovered, setHovered] = useState(false);
+  const titleRef = useRef(null);
+  const descRef = useRef(null);
+  const creativeCount = theme.content_creatives?.[0]?.count || 0;
+
+  useEffect(() => { setTitleVal(theme.title); setDescVal(theme.description || ""); }, [theme.title, theme.description]);
+  useEffect(() => { if (editingTitle) titleRef.current?.focus(); }, [editingTitle]);
+  useEffect(() => { if (editingDesc) descRef.current?.focus(); }, [editingDesc]);
+
+  const saveTitle = () => {
+    setEditingTitle(false);
+    if (titleVal.trim() && titleVal.trim() !== theme.title) onUpdate(theme.id, { title: titleVal.trim() });
+    else setTitleVal(theme.title);
+  };
+  const saveDesc = () => {
+    setEditingDesc(false);
+    if (descVal.trim() !== (theme.description || "")) onUpdate(theme.id, { description: descVal.trim() });
+    else setDescVal(theme.description || "");
+  };
+
+  return (
+    <div style={{
+      padding: 24, borderRadius: 16, background: tokens.surface,
+      border: `1.5px solid ${hovered ? `${tokens.accent}50` : tokens.border}`,
+      cursor: "pointer",
+      transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
+      animation: `cardIn 0.3s ease ${index * 40}ms both`,
+      minHeight: 160, display: "flex", flexDirection: "column",
+      transform: hovered ? "translateY(-4px)" : "translateY(0)",
+      boxShadow: hovered ? "0 8px 28px rgba(200,168,78,0.10), 0 2px 8px rgba(0,0,0,0.06)" : "none",
+    }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => { if (!editingTitle && !editingDesc) onDrill(theme); }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+        {editingTitle ? (
+          <input ref={titleRef} value={titleVal} onChange={e => setTitleVal(e.target.value)}
+            onBlur={saveTitle} onKeyDown={e => { if (e.key === "Enter") saveTitle(); if (e.key === "Escape") { setTitleVal(theme.title); setEditingTitle(false); } }}
+            onClick={e => e.stopPropagation()}
+            style={{
+              fontSize: 16, fontWeight: 700, color: tokens.text, flex: 1, lineHeight: 1.35,
+              background: tokens.surfaceEl, border: `1px solid ${tokens.accent}`, borderRadius: 6,
+              padding: "4px 8px", fontFamily: "inherit", outline: "none",
+              boxShadow: `0 0 0 2px ${tokens.accentGhost}`,
+            }}
+          />
+        ) : (
+          <div style={{
+            fontSize: 16, fontWeight: 700, color: tokens.text, flex: 1, lineHeight: 1.35,
+            borderRadius: 6, padding: "4px 0", transition: "background 0.15s",
+          }}
+            onClick={e => { e.stopPropagation(); setEditingTitle(true); }}
+            title="Click to edit title"
+          >
+            {theme.title}
+            {hovered && <span style={{ fontSize: 11, color: tokens.textMute, marginLeft: 6, opacity: 0.6 }}>✎</span>}
+          </div>
+        )}
+        <button onClick={(e) => { e.stopPropagation(); onDelete(theme.id); }} style={{
+          background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
+          fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: hovered ? 0.5 : 0,
+          transition: "opacity 0.15s",
+        }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = hovered ? "0.5" : "0"; e.currentTarget.style.color = tokens.textMute; }}
+        >&times;</button>
+      </div>
+
+      {editingDesc ? (
+        <textarea ref={descRef} value={descVal} onChange={e => setDescVal(e.target.value)}
+          onBlur={saveDesc} onKeyDown={e => { if (e.key === "Escape") { setDescVal(theme.description || ""); setEditingDesc(false); } }}
+          onClick={e => e.stopPropagation()}
+          rows={3}
+          style={{
+            fontSize: 13, color: tokens.textSub, marginBottom: 12, lineHeight: 1.5,
+            background: tokens.surfaceEl, border: `1px solid ${tokens.accent}`, borderRadius: 6,
+            padding: "6px 8px", fontFamily: "inherit", outline: "none", resize: "vertical", width: "100%",
+            boxShadow: `0 0 0 2px ${tokens.accentGhost}`,
+          }}
+        />
+      ) : (
+        <div style={{
+          fontSize: 13, color: tokens.textSub, marginBottom: 12, lineHeight: 1.5,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+          overflow: "hidden", borderRadius: 6, padding: "2px 0", transition: "background 0.15s",
+          minHeight: 20,
+        }}
+          onClick={e => { e.stopPropagation(); setEditingDesc(true); }}
+          title="Click to edit description"
+        >
+          {theme.description || <span style={{ color: tokens.textMute, fontStyle: "italic" }}>Add a description...</span>}
+          {hovered && !theme.description && null}
+        </div>
+      )}
+
+      <div style={{ flex: 1 }} />
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${tokens.border}` }}>
+        <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
+        <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
+        <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", fontWeight: 600 }}>
+          {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ThemeNotes({ tokens, theme, onSave }) {
   const [notes, setNotes] = useState(theme.notes || "");
   const [saved, setSaved] = useState(true);
@@ -1306,63 +1419,15 @@ export default function ContentEngineView({ tokens, dark }) {
                     </span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                    {categoryThemes.map((theme, i) => {
-                      const creativeCount = theme.content_creatives?.[0]?.count || 0;
-                      return (
-                        <div key={theme.id} onClick={() => drillIntoTheme(theme)} style={{
-                          padding: 24, borderRadius: 16, background: tokens.surface,
-                          border: `1.5px solid ${tokens.border}`, cursor: "pointer",
-                          transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
-                          animation: `cardIn 0.3s ease ${i * 40}ms both`,
-                          minHeight: 160,
-                          display: "flex", flexDirection: "column",
+                    {categoryThemes.map((theme, i) => (
+                      <ThemeCard key={theme.id} theme={theme} index={i} tokens={tokens}
+                        onDrill={drillIntoTheme} onDelete={handleDeleteTheme}
+                        onUpdate={async (id, fields) => {
+                          const { data } = await updateTheme(id, fields);
+                          if (data) setThemes(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t));
                         }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.transform = "translateY(-4px)";
-                            e.currentTarget.style.boxShadow = "0 8px 28px rgba(200,168,78,0.10), 0 2px 8px rgba(0,0,0,0.06)";
-                            e.currentTarget.style.borderColor = `${tokens.accent}50`;
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow = "none";
-                            e.currentTarget.style.borderColor = tokens.border;
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, flex: 1, lineHeight: 1.35 }}>{theme.title}</div>
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteTheme(theme.id); }} style={{
-                              background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
-                              fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.4,
-                              transition: "opacity 0.15s",
-                            }}
-                              onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
-                              onMouseLeave={e => { e.currentTarget.style.opacity = "0.4"; e.currentTarget.style.color = tokens.textMute; }}
-                            >&times;</button>
-                          </div>
-                          {theme.description && (
-                            <div style={{
-                              fontSize: 13, color: tokens.textSub, marginBottom: 12, lineHeight: 1.5,
-                              display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                            }}>{theme.description}</div>
-                          )}
-                          <div style={{ flex: 1 }} />
-                          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${tokens.border}` }}>
-                            <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
-                            <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
-                            <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", fontWeight: 600 }}>
-                              {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
-                            </span>
-                          </div>
-                          {theme.notes && (
-                            <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                              Has notes
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}
