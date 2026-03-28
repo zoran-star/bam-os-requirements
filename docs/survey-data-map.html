@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Survey Data Map — FullControl</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .canvas {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .header h1 {
+    font-size: 42px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #c9a84c, #f0d078, #c9a84c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+    letter-spacing: -1px;
+  }
+  .header p {
+    font-size: 16px;
+    color: #888;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px 28px;
+    text-align: center;
+    min-width: 140px;
+    transition: transform 0.2s, border-color 0.3s;
+  }
+  .stat:hover {
+    transform: translateY(-2px);
+    border-color: rgba(201,168,76,0.3);
+  }
+  .stat-num {
+    font-size: 32px;
+    font-weight: 800;
+    color: #c9a84c;
+    display: block;
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+  }
+
+  /* Section grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 24px;
+  }
+
+  /* Cards */
+  .card {
+    border-radius: 20px;
+    padding: 28px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+
+  /* Card colors */
+  .card--nda        { background: rgba(239,83,80,0.08);  border: 1px solid rgba(239,83,80,0.2); }
+  .card--nda::before { background: #ef5350; }
+
+  .card--contact    { background: rgba(66,165,245,0.08); border: 1px solid rgba(66,165,245,0.2); }
+  .card--contact::before { background: #42a5f5; }
+
+  .card--demo       { background: rgba(171,71,188,0.08); border: 1px solid rgba(171,71,188,0.2); }
+  .card--demo::before { background: #ab47bc; }
+
+  .card--features   { background: rgba(102,187,106,0.08); border: 1px solid rgba(102,187,106,0.2); }
+  .card--features::before { background: #66bb6a; }
+
+  .card--walkthrough { background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.2); }
+  .card--walkthrough::before { background: #ffa726; }
+
+  .card--engagement { background: rgba(38,198,218,0.08); border: 1px solid rgba(38,198,218,0.2); }
+  .card--engagement::before { background: #26c6da; }
+
+  .card--pricing    { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); }
+  .card--pricing::before { background: #c9a84c; }
+
+  .card--signals    { background: rgba(236,64,122,0.08); border: 1px solid rgba(236,64,122,0.2); }
+  .card--signals::before { background: #ec407a; }
+
+  .card--session    { background: rgba(141,110,99,0.08); border: 1px solid rgba(141,110,99,0.2); }
+  .card--session::before { background: #8d6e63; }
+
+  /* Card header */
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .card-head-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .card-icon {
+    font-size: 28px;
+    line-height: 1;
+  }
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .card-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge--nda        { background: rgba(239,83,80,0.2);  color: #ef5350; }
+  .badge--contact    { background: rgba(66,165,245,0.2); color: #42a5f5; }
+  .badge--demo       { background: rgba(171,71,188,0.2); color: #ab47bc; }
+  .badge--features   { background: rgba(102,187,106,0.2); color: #66bb6a; }
+  .badge--walkthrough { background: rgba(255,167,38,0.2); color: #ffa726; }
+  .badge--engagement { background: rgba(38,198,218,0.2); color: #26c6da; }
+  .badge--pricing    { background: rgba(201,168,76,0.2); color: #c9a84c; }
+  .badge--signals    { background: rgba(236,64,122,0.2); color: #ec407a; }
+  .badge--session    { background: rgba(141,110,99,0.2); color: #8d6e63; }
+
+  .card-desc {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  /* Expand toggle */
+  .card-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #666;
+    margin-top: 12px;
+    transition: color 0.2s;
+  }
+  .card:hover .card-toggle { color: #aaa; }
+  .card-toggle svg {
+    width: 14px; height: 14px;
+    transition: transform 0.3s;
+  }
+  .card.open .card-toggle svg {
+    transform: rotate(180deg);
+  }
+
+  /* Field list */
+  .fields {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.3s;
+    opacity: 0;
+  }
+  .card.open .fields {
+    max-height: 800px;
+    opacity: 1;
+  }
+  .field {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .field:last-child { border-bottom: none; }
+  .field-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .dot--nda        { background: #ef5350; }
+  .dot--contact    { background: #42a5f5; }
+  .dot--demo       { background: #ab47bc; }
+  .dot--features   { background: #66bb6a; }
+  .dot--walkthrough { background: #ffa726; }
+  .dot--engagement { background: #26c6da; }
+  .dot--pricing    { background: #c9a84c; }
+  .dot--signals    { background: #ec407a; }
+  .dot--session    { background: #8d6e63; }
+
+  .field-info { flex: 1; }
+  .field-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ddd;
+  }
+  .field-type {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+  }
+  .field-example {
+    font-size: 11px;
+    color: #555;
+    font-style: italic;
+    margin-top: 2px;
+  }
+
+  /* Slide label */
+  .slide-label {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.06);
+    color: #777;
+    font-weight: 500;
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 56px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  .footer p {
+    font-size: 13px;
+    color: #555;
+  }
+
+  /* Responsive */
+  @media (max-width: 820px) {
+    .grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 32px; }
+    .canvas { padding: 32px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="canvas">
+
+  <div class="header">
+    <h1>Survey Data Map</h1>
+    <p>Everything we collect from the FullControl survey, organized by category. Click any card to see the fields.</p>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat">
+      <span class="stat-num">9</span>
+      <span class="stat-label">Categories</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">38</span>
+      <span class="stat-label">Data Fields</span>
+    </div>
+    <div class="stat">
+      <span class="stat-num">12</span>
+      <span class="stat-label">Survey Slides</span>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- NDA -->
+    <div class="card card--nda" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F512;</span>
+          <span class="card-title">NDA Agreement</span>
+        </div>
+        <span class="card-badge badge--nda">Slide 2</span>
+      </div>
+      <p class="card-desc">Legal consent before the survey begins. Captures name, drawn signature, and agreement timestamp.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--nda"></div>
+          <div class="field-info">
+            <div class="field-name">nda_name</div>
+            <div class="field-type">string — Full legal name</div>
+            <div class="field-example">e.g. "John Smith"</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--nda"></div>
+          <div class="field-info">
+            <div class="field-name">nda_signature</div>
+            <div class="field-type">base64 image — Drawn signature on canvas</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--nda"></div>
+          <div class="field-info">
+            <div class="field-name">nda_agreed</div>
+            <div class="field-type">boolean — Did they check the agreement box</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--nda"></div>
+          <div class="field-info">
+            <div class="field-name">nda_timestamp</div>
+            <div class="field-type">ISO datetime — When they signed</div>
+            <div class="field-example">e.g. "2026-03-28T01:10:55.057+00:00"</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>4 fields</span>
+      </div>
+    </div>
+
+    <!-- Contact Info -->
+    <div class="card card--contact" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F464;</span>
+          <span class="card-title">Contact Info</span>
+        </div>
+        <span class="card-badge badge--contact">Slide 3</span>
+      </div>
+      <p class="card-desc">Who they are and how to reach them. Name and email are required; rest is optional.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--contact"></div>
+          <div class="field-info">
+            <div class="field-name">user_name</div>
+            <div class="field-type">string — Their name</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--contact"></div>
+          <div class="field-info">
+            <div class="field-name">user_email</div>
+            <div class="field-type">string — Email address</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--contact"></div>
+          <div class="field-info">
+            <div class="field-name">user_phone</div>
+            <div class="field-type">string | null — Phone number (optional)</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--contact"></div>
+          <div class="field-info">
+            <div class="field-name">business_name</div>
+            <div class="field-type">string | null — Academy/gym name (optional)</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--contact"></div>
+          <div class="field-info">
+            <div class="field-name">business_website</div>
+            <div class="field-type">string | null — Website URL (optional)</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>5 fields</span>
+      </div>
+    </div>
+
+    <!-- Demographics -->
+    <div class="card card--demo" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F3E2;</span>
+          <span class="card-title">Demographics</span>
+        </div>
+        <span class="card-badge badge--demo">Slide 3</span>
+      </div>
+      <p class="card-desc">Business profile — stage, size, services, revenue, and how much time they spend on admin.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">business_stage</div>
+            <div class="field-type">string — "starting" | "growing" | "established"</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">biggest_challenge</div>
+            <div class="field-type">string — "time" | "money" | "retention" | etc.</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">services</div>
+            <div class="field-type">string[] — Multi-select of service types</div>
+            <div class="field-example">e.g. ["group-training", "house-league"]</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">services_other</div>
+            <div class="field-type">string | null — Free-text if they picked "other"</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">client_count</div>
+            <div class="field-type">string — "1-10" | "11-25" | "26-50" | "51-100" | "100+"</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">revenue_range</div>
+            <div class="field-type">string | null — Monthly revenue bracket</div>
+            <div class="field-example">e.g. "$5K–$10K"</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">location</div>
+            <div class="field-type">string | null — City/region</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--demo"></div>
+          <div class="field-info">
+            <div class="field-name">admin_hours</div>
+            <div class="field-type">integer | null — Weekly hours on admin work</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>8 fields</span>
+      </div>
+    </div>
+
+    <!-- Feature Selection -->
+    <div class="card card--features" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x2728;</span>
+          <span class="card-title">Feature Selection</span>
+        </div>
+        <span class="card-badge badge--features">Slide 4</span>
+      </div>
+      <p class="card-desc">What features they want in their dream tool. Pre-set chips they can pick plus custom ones they type in.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--features"></div>
+          <div class="field-info">
+            <div class="field-name">selected_chips</div>
+            <div class="field-type">string[] — All selected feature chips (pre-set + extra + custom)</div>
+            <div class="field-example">e.g. ["See exactly how much money is coming in next month", "AI writes your emails..."]</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--features"></div>
+          <div class="field-info">
+            <div class="field-name">custom_features</div>
+            <div class="field-type">string[] — Features they typed in themselves</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>2 fields</span>
+      </div>
+    </div>
+
+    <!-- Walkthrough Feedback -->
+    <div class="card card--walkthrough" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F5C2;</span>
+          <span class="card-title">Walkthrough Feedback</span>
+        </div>
+        <span class="card-badge badge--walkthrough">Slides 6–7</span>
+      </div>
+      <p class="card-desc">Their reaction to the prototype. Rating each page, leaving notes, pinning things, and picking favorites.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--walkthrough"></div>
+          <div class="field-info">
+            <div class="field-name">page_ratings</div>
+            <div class="field-type">object — Rating (1–5) per page</div>
+            <div class="field-example">e.g. { home: 4, sales: 5, marketing: 3, ... }</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--walkthrough"></div>
+          <div class="field-info">
+            <div class="field-name">page_notes</div>
+            <div class="field-type">object — Text feedback per page</div>
+            <div class="field-example">e.g. { home: "Love the dashboard layout", ... }</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--walkthrough"></div>
+          <div class="field-info">
+            <div class="field-name">pins</div>
+            <div class="field-type">array — Pinned locations on the prototype</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--walkthrough"></div>
+          <div class="field-info">
+            <div class="field-name">favorites</div>
+            <div class="field-type">string[] — Which pages they starred</div>
+            <div class="field-example">e.g. ["schedule", "members"]</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>4 fields</span>
+      </div>
+    </div>
+
+    <!-- Engagement Tracking -->
+    <div class="card card--engagement" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F4CA;</span>
+          <span class="card-title">Engagement Tracking</span>
+        </div>
+        <span class="card-badge badge--engagement">Passive</span>
+      </div>
+      <p class="card-desc">Behavioral data collected automatically — how long they spend on each page and where they click in the prototype.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--engagement"></div>
+          <div class="field-info">
+            <div class="field-name">page_timestamps</div>
+            <div class="field-type">object — Seconds spent per prototype page</div>
+            <div class="field-example">e.g. { home: 38, sales: 10, schedule: 5, ... }</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--engagement"></div>
+          <div class="field-info">
+            <div class="field-name">click_data</div>
+            <div class="field-type">array — Every click inside the prototype iframe</div>
+            <div class="field-example">e.g. [{ x: 12.31, y: 34.29, page: "home", target: "A", timestamp: ... }]</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--engagement"></div>
+          <div class="field-info">
+            <div class="field-name">engagement_data</div>
+            <div class="field-type">object — Reserved, not yet implemented</div>
+            <div class="field-example">Currently always {}</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>3 fields</span>
+      </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="card card--pricing" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F4B0;</span>
+          <span class="card-title">Pricing Signals</span>
+        </div>
+        <span class="card-badge badge--pricing">Slides 5, 8–10</span>
+      </div>
+      <p class="card-desc">Willingness to pay — blind price (before seeing product), smart price (after value calc), and final anchor price.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">blind_price</div>
+            <div class="field-type">integer | null — What they'd pay before seeing the product</div>
+            <div class="field-example">Slide 5 — "gut feeling" price</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">hours_saved</div>
+            <div class="field-type">integer | null — Hours/week they think the tool saves</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">hourly_rate</div>
+            <div class="field-type">integer | null — What they value their time at $/hr</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">smart_price</div>
+            <div class="field-type">integer | null — Auto-calculated from hours × rate</div>
+            <div class="field-example">Shows them the "value" of the tool before asking final price</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">final_price</div>
+            <div class="field-type">integer | null — What they'd actually pay monthly</div>
+            <div class="field-example">The real WTP signal — after seeing product + value calc</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--pricing"></div>
+          <div class="field-info">
+            <div class="field-name">added_features</div>
+            <div class="field-type">string | null — What features would make them pay more</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>6 fields</span>
+      </div>
+    </div>
+
+    <!-- PMF Signals -->
+    <div class="card card--signals" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x1F525;</span>
+          <span class="card-title">PMF Signals</span>
+        </div>
+        <span class="card-badge badge--signals">Slide 11</span>
+      </div>
+      <p class="card-desc">Product-market fit intent. Would they sign up for early access?</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--signals"></div>
+          <div class="field-info">
+            <div class="field-name">early_access</div>
+            <div class="field-type">boolean — Opted in for early access</div>
+            <div class="field-example">true = strong buying intent signal</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>1 field</span>
+      </div>
+    </div>
+
+    <!-- Session & Drop-off -->
+    <div class="card card--session" onclick="this.classList.toggle('open')">
+      <div class="card-head">
+        <div class="card-head-left">
+          <span class="card-icon">&#x23F1;</span>
+          <span class="card-title">Session & Drop-off</span>
+        </div>
+        <span class="card-badge badge--session">Auto</span>
+      </div>
+      <p class="card-desc">Meta data about the session itself — did they finish, how long did it take, and where did they leave if they didn't.</p>
+      <div class="fields">
+        <div class="field">
+          <div class="field-dot dot--session"></div>
+          <div class="field-info">
+            <div class="field-name">completed</div>
+            <div class="field-type">boolean — Did they submit the survey</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--session"></div>
+          <div class="field-info">
+            <div class="field-name">session_duration</div>
+            <div class="field-type">integer | null — Total seconds from start to submit</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--session"></div>
+          <div class="field-info">
+            <div class="field-name">drop_off_slide</div>
+            <div class="field-type">integer | null — Last slide reached before closing tab</div>
+            <div class="field-example">Only set for incomplete responses</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--session"></div>
+          <div class="field-info">
+            <div class="field-name">drop_off_time</div>
+            <div class="field-type">integer | null — Seconds before they left</div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-dot dot--session"></div>
+          <div class="field-info">
+            <div class="field-name">voice_transcript</div>
+            <div class="field-type">string | null — Speech-to-text transcript of voice feedback</div>
+          </div>
+        </div>
+      </div>
+      <div class="card-toggle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        <span>5 fields</span>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!--  INVESTOR ANALYTICS SECTION                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+
+  <div class="analytics-divider">
+    <div class="divider-line"></div>
+    <span class="divider-label">Investor Analytics</span>
+    <div class="divider-line"></div>
+  </div>
+
+  <div class="analytics-header">
+    <h2>What Investors See</h2>
+    <p>Key metrics derived from survey data. Click any chart to see how the data is collected and calculated.</p>
+    <div class="live-badge">Live from Supabase</div>
+  </div>
+
+  <div class="analytics-grid" id="analyticsGrid">
+    <!-- Charts rendered by JS -->
+  </div>
+
+  <!-- Modal overlay -->
+  <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+      <div class="modal-icon" id="modalIcon"></div>
+      <h3 id="modalTitle"></h3>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>FullControl Survey Data Map &mdash; Supabase table: <code style="background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;">survey_responses</code></p>
+  </div>
+
+</div><!-- /canvas -->
+
+<style>
+  /* ── Analytics Section ──────────────────────────────────────── */
+
+  .analytics-divider {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin: 72px 0 40px;
+  }
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(201,168,76,0.3), transparent);
+  }
+  .divider-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: #c9a84c;
+  }
+
+  .analytics-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .analytics-header h2 {
+    font-size: 36px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .analytics-header p {
+    font-size: 15px;
+    color: #888;
+    max-width: 480px;
+    margin: 0 auto 16px;
+    line-height: 1.6;
+  }
+  .live-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 100px;
+    background: rgba(102,187,106,0.12);
+    color: #66bb6a;
+    border: 1px solid rgba(102,187,106,0.25);
+  }
+  .live-badge::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: #66bb6a;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 24px;
+  }
+
+  /* Chart cards */
+  .chart-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    padding: 28px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+    position: relative;
+  }
+  .chart-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    border-color: rgba(201,168,76,0.25);
+  }
+  .chart-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .chart-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .chart-card-metric {
+    font-size: 24px;
+    font-weight: 800;
+    color: #c9a84c;
+  }
+  .chart-card-subtitle {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 20px;
+  }
+  .chart-area {
+    position: relative;
+  }
+  .chart-click-hint {
+    font-size: 11px;
+    color: #555;
+    text-align: right;
+    margin-top: 12px;
+  }
+
+  /* Bar chart */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 140px;
+    padding-top: 20px;
+  }
+  .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .bar {
+    width: 100%;
+    border-radius: 6px 6px 2px 2px;
+    transition: height 0.6s ease;
+    position: relative;
+    min-height: 4px;
+  }
+  .bar-value {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ccc;
+  }
+  .bar-label {
+    font-size: 10px;
+    color: #666;
+    text-align: center;
+    line-height: 1.2;
+    max-width: 60px;
+  }
+
+  /* Donut chart */
+  .donut-row {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  .donut-canvas-wrap {
+    position: relative;
+    width: 120px; height: 120px;
+    flex-shrink: 0;
+  }
+  .donut-center-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .donut-center-num {
+    font-size: 28px;
+    font-weight: 800;
+    color: #fff;
+    display: block;
+    line-height: 1;
+  }
+  .donut-center-label {
+    font-size: 10px;
+    color: #888;
+    margin-top: 2px;
+    display: block;
+  }
+  .donut-legend {
+    flex: 1;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-label {
+    font-size: 12px;
+    color: #aaa;
+    flex: 1;
+  }
+  .legend-val {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ddd;
+  }
+
+  /* Horizontal bars */
+  .h-bars { }
+  .h-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .h-bar-label {
+    font-size: 12px;
+    color: #aaa;
+    width: 120px;
+    text-align: right;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .h-bar-track {
+    flex: 1;
+    height: 24px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .h-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.8s ease;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+  }
+  .h-bar-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* Funnel */
+  .funnel { padding: 0 10px; }
+  .funnel-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 6px;
+  }
+  .funnel-bar-wrap {
+    flex: 1;
+    position: relative;
+  }
+  .funnel-bar {
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    transition: width 0.8s ease;
+    margin: 0 auto;
+  }
+  .funnel-bar-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .funnel-bar-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.8);
+  }
+  .funnel-drop {
+    font-size: 10px;
+    color: #ef5350;
+    width: 50px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Price comparison */
+  .price-compare {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 24px;
+    height: 160px;
+    padding-top: 20px;
+  }
+  .price-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 90px;
+  }
+  .price-bar {
+    width: 100%;
+    border-radius: 10px 10px 4px 4px;
+    transition: height 0.6s ease;
+    min-height: 4px;
+  }
+  .price-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .price-label {
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #1e1e38;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 20px;
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 28px;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .modal-close:hover { color: #fff; }
+  .modal-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+  .modal h3 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+  .modal-body {
+    font-size: 14px;
+    color: #bbb;
+    line-height: 1.7;
+  }
+  .modal-body h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #c9a84c;
+    margin: 20px 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .modal-body code {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #ddd;
+  }
+  .modal-body ul {
+    list-style: none;
+    padding: 0;
+  }
+  .modal-body li {
+    padding: 6px 0;
+    padding-left: 20px;
+    position: relative;
+  }
+  .modal-body li::before {
+    content: '';
+    position: absolute;
+    left: 4px; top: 14px;
+    width: 6px; height: 6px;
+    background: #c9a84c;
+    border-radius: 50%;
+  }
+  .modal-body .formula {
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    font-family: 'SF Mono', monospace;
+    font-size: 13px;
+    color: #c9a84c;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+  .modal-body .note {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-top: 12px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(255,255,255,0.06);
+  }
+
+  @media (max-width: 820px) {
+    .analytics-grid { grid-template-columns: 1fr; }
+    .analytics-header h2 { font-size: 28px; }
+    .donut-row { flex-direction: column; }
+    .price-compare { gap: 14px; }
+  }
+</style>
+
+<script>
+// ── Survey Data (fetched snapshot) ────────────────────────────
+const SURVEY_DATA = [{"completed":true,"business_stage":"growing","biggest_challenge":"time","services":["house-league"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["See exactly how much money is coming in next month","AI writes your emails, texts, and DMs in your voice"],"page_ratings":{"home":1,"sales":1,"content":1,"members":1,"schedule":1,"marketing":1},"favorites":["schedule"],"page_timestamps":{"home":38,"sales":1,"content":2,"members":1,"schedule":1,"marketing":1},"hours_saved":877,"hourly_rate":8,"blind_price":8,"smart_price":30379,"final_price":87,"early_access":true,"session_duration":87,"drop_off_slide":null,"admin_hours":8},{"completed":true,"business_stage":"growing","biggest_challenge":"time","services":["group-training"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["See exactly how much money is coming in next month"],"page_ratings":{"home":1,"sales":1,"content":1,"members":1,"schedule":1,"marketing":1},"favorites":["members"],"page_timestamps":{"home":33,"sales":10,"content":3,"members":3,"schedule":5,"marketing":3},"hours_saved":4,"hourly_rate":4,"blind_price":34,"smart_price":69,"final_price":23,"early_access":true,"session_duration":87,"drop_off_slide":null,"admin_hours":0},{"completed":true,"business_stage":"growing","biggest_challenge":"time","services":["group-training"],"client_count":"26-50","revenue_range":"$10K\u2013$25K","selected_chips":[],"page_ratings":{"home":1,"sales":1,"content":1,"members":1,"schedule":1,"marketing":1},"favorites":["members"],"page_timestamps":{"home":25,"sales":1,"content":2,"members":2,"schedule":3,"marketing":2},"hours_saved":4,"hourly_rate":4,"blind_price":4,"smart_price":69,"final_price":4,"early_access":true,"session_duration":68,"drop_off_slide":null,"admin_hours":3},{"completed":true,"business_stage":"early","biggest_challenge":"time","services":["group-training"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["Know instantly which clients are about to leave","A branded app your clients download and love"],"page_ratings":{"home":3,"sales":3,"content":3,"members":4,"schedule":1,"marketing":5},"favorites":["schedule"],"page_timestamps":{"home":84,"sales":2,"content":29,"members":4,"schedule":7,"marketing":4},"hours_saved":8,"hourly_rate":77,"blind_price":66,"smart_price":300,"final_price":88,"early_access":true,"session_duration":353,"drop_off_slide":null,"admin_hours":3},{"completed":true,"business_stage":"early","biggest_challenge":"both","services":["individual-training"],"client_count":"1-10","revenue_range":"Under $5K","selected_chips":["AI that talks to every lead and locks them in"],"page_ratings":{"home":3,"sales":3,"content":3,"members":3,"schedule":3,"marketing":3},"favorites":["schedule"],"page_timestamps":{"home":26,"sales":4,"content":6,"members":2,"schedule":7,"marketing":19},"hours_saved":2,"hourly_rate":50,"blind_price":10,"smart_price":20,"final_price":50,"early_access":false,"session_duration":247,"drop_off_slide":null,"admin_hours":20},{"completed":true,"business_stage":"early","biggest_challenge":"time","services":["group-training"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["AI that talks to every lead and locks them in","Auto-generate highlight reels from session footage"],"page_ratings":{"home":3,"sales":3,"content":3,"members":5,"schedule":3,"marketing":5},"favorites":["schedule"],"page_timestamps":{"home":4,"sales":2,"content":4,"members":2,"schedule":3,"marketing":3},"hours_saved":4,"hourly_rate":4,"blind_price":4,"smart_price":69,"final_price":4,"early_access":true,"session_duration":67,"drop_off_slide":null,"admin_hours":0},{"completed":true,"business_stage":"growing","biggest_challenge":"time","services":["house-league"],"client_count":"26-50","revenue_range":"$10K\u2013$25K","selected_chips":[],"page_ratings":{"home":2,"sales":4,"content":1,"members":5,"schedule":3,"marketing":2},"favorites":["home"],"page_timestamps":{"home":5,"sales":3,"content":3,"members":3,"schedule":7,"marketing":3},"hours_saved":55,"hourly_rate":5,"blind_price":23,"smart_price":1191,"final_price":44,"early_access":true,"session_duration":145,"drop_off_slide":null,"admin_hours":null},{"completed":true,"business_stage":"early","biggest_challenge":"both","services":["group-training"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["Auto follow-ups that close deals while you sleep","A branded app your clients download and love"],"page_ratings":{"home":3,"sales":3,"content":4,"members":4,"schedule":3,"marketing":3},"favorites":["sage","sales"],"page_timestamps":{"home":4,"sales":1,"content":201,"members":1,"schedule":2,"marketing":2},"hours_saved":67,"hourly_rate":60,"blind_price":900,"smart_price":900,"final_price":900,"early_access":true,"session_duration":289,"drop_off_slide":null,"admin_hours":3},{"completed":false,"business_stage":"early","biggest_challenge":"time","services":["group-training"],"client_count":"11-25","revenue_range":"$5K\u2013$10K","selected_chips":["See exactly how much money is coming in next month","Auto follow-ups that close deals while you sleep","See which marketing is actually bringing in money"],"page_ratings":{"home":5,"sales":3,"content":3,"members":5,"schedule":3,"marketing":3},"favorites":["schedule"],"page_timestamps":{"home":2,"sales":1,"content":146,"members":1,"schedule":1,"marketing":1},"hours_saved":77,"hourly_rate":999,"blind_price":33,"smart_price":400,"final_price":33,"early_access":true,"session_duration":null,"drop_off_slide":null,"admin_hours":22},{"completed":false,"business_stage":"growing","biggest_challenge":"both","services":[],"client_count":"26-50","revenue_range":"$5K\u2013$10K","selected_chips":["AI that talks to every lead and locks them in","Clients book themselves, zero back-and-forth","See exactly how much money is coming in next month","Auto follow-ups that close deals while you sleep","One inbox for every message across every platform","AI creates and posts your content for you","Know instantly which clients are about to leave","Staff schedules that manage themselves","AI tells you exactly what to charge and when to raise prices","Automated billing, never chase a payment again","AI writes your emails, texts, and DMs in your voice","See which marketing is actually bringing in money","A branded app your clients download and love"],"page_ratings":{"home":5,"sales":5,"content":5,"members":5,"schedule":5,"marketing":5},"favorites":["schedule","members","sage"],"page_timestamps":{"home":144,"sales":3,"content":42,"members":2,"schedule":25,"marketing":21},"hours_saved":12,"hourly_rate":30,"blind_price":500,"smart_price":1559,"final_price":1500,"early_access":true,"session_duration":null,"drop_off_slide":null,"admin_hours":15},{"completed":false,"business_stage":"established","biggest_challenge":"growth","services":["individual-training","group-training","gym-rentals","team-competition","house-league"],"client_count":"51-100","revenue_range":"$10K\u2013$25K","selected_chips":["Auto-generate highlight reels from session footage","Clients earn rewards for referrals automatically","AI tells you exactly what to charge and when to raise prices","One dashboard across all your locations","Automated billing, never chase a payment again","AI writes your emails, texts, and DMs in your voice"],"page_ratings":{"home":5,"sales":5,"content":5,"members":5,"schedule":5,"marketing":5},"favorites":["home","schedule","sage"],"page_timestamps":{"home":6,"sales":0,"content":31,"members":0,"schedule":2,"marketing":3},"hours_saved":6,"hourly_rate":1750,"blind_price":500,"smart_price":45465,"final_price":800,"early_access":false,"session_duration":null,"drop_off_slide":null,"admin_hours":6}];
+
+// Filter to responses with actual data (exclude empty mount rows)
+const withData = SURVEY_DATA.filter(r => r.business_stage !== null);
+const completed = withData.filter(r => r.completed);
+const all = withData;
+
+// ── Helper functions ──────────────────────────────────────────
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid-1] + s[mid]) / 2;
+}
+function avg(arr) {
+  if (!arr.length) return 0;
+  return arr.reduce((a,b) => a + b, 0) / arr.length;
+}
+
+// ── Modal content definitions ─────────────────────────────────
+const MODAL_DATA = {
+  wtp: {
+    icon: '\u{1F4B0}',
+    title: 'Willingness to Pay — Price Evolution',
+    body: `
+      <h4>What this shows</h4>
+      <p>How a respondent's willingness to pay changes as they learn more about the product. Three price points are captured at different stages of the survey.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li><strong>Blind Price</strong> (Slide 5) — Asked before seeing the product: "What would you pay monthly for a tool that does everything you just described?" Pure gut reaction.</li>
+        <li><strong>Smart Price</strong> (Slide 8) — Auto-calculated after they input hours saved and hourly rate. Shows them the value of the tool in their own numbers.</li>
+        <li><strong>Final Price</strong> (Slide 10) — Asked after seeing the full prototype and the value calculation: "What would you actually pay monthly?"</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Median of all respondents' prices at each stage</div>
+      <p class="note">We use median instead of average to prevent outliers (e.g. someone entering $30,000) from skewing the number. This gives investors a more realistic picture of what the market will bear.</p>
+      <h4>Why investors care</h4>
+      <p>The gap between blind and final price shows how much the product demo increases perceived value. A final price higher than the blind price = the product sells itself.</p>
+    `
+  },
+  completion: {
+    icon: '\u{1F3AF}',
+    title: 'Survey Completion Funnel',
+    body: `
+      <h4>What this shows</h4>
+      <p>How many people start the survey vs. complete it, and where drop-offs happen. High completion = strong engagement signal.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li><strong>Started</strong> — A row is created when someone begins filling in data (has a <code>business_stage</code> value)</li>
+        <li><strong>Reached Walkthrough</strong> — They have <code>page_ratings</code> data (got to slide 6+)</li>
+        <li><strong>Reached Pricing</strong> — They have a <code>final_price</code> value (got to slide 10)</li>
+        <li><strong>Completed</strong> — <code>completed = true</code> (hit submit on slide 11)</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Count of respondents at each stage / Total started</div>
+      <p class="note">Drop-off percentage shows the % lost between each stage. For incomplete responses, <code>drop_off_slide</code> tells us exactly which slide they were on when they closed the tab.</p>
+      <h4>Why investors care</h4>
+      <p>A high completion rate on a 12-slide survey (with NDA, walkthrough, and pricing) signals genuine interest. People don't finish long surveys for products they don't care about.</p>
+    `
+  },
+  features: {
+    icon: '\u{2728}',
+    title: 'Most Wanted Features',
+    body: `
+      <h4>What this shows</h4>
+      <p>Which features resonate most with the target market. Ranked by how many respondents selected each one.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li>Slide 4 presents pre-written feature chips that respondents can tap to select</li>
+        <li>They can also type in custom features which are stored separately in <code>custom_features</code></li>
+        <li>All selections are merged into <code>selected_chips</code> on submit</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Count occurrences of each chip across all respondents</div>
+      <p class="note">Respondents can select multiple chips, so this shows absolute demand rather than forced ranking. Features that nobody selects are equally informative — they tell us what NOT to build.</p>
+      <h4>Why investors care</h4>
+      <p>Feature demand data de-risks the roadmap. Investors want to see that you're building what the market actually wants, not guessing. This data directly informs prioritization.</p>
+    `
+  },
+  engagement: {
+    icon: '\u{23F1}',
+    title: 'Page Engagement — Time Spent',
+    body: `
+      <h4>What this shows</h4>
+      <p>Average seconds spent on each prototype page during the walkthrough. More time = more interest (or confusion — context matters).</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li>When the user navigates between pages in the prototype walkthrough (Slide 6), a timer tracks time on each page</li>
+        <li>The prototype iframe sends <code>fc-route-change</code> postMessage events to the survey</li>
+        <li>Time is calculated as the difference between route changes and stored in <code>page_timestamps</code></li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Average of page_timestamps[page] across all respondents who have data</div>
+      <p class="note">Outliers (e.g. someone left a tab open for 200s on Content) are included because they still represent genuine dwell time. The Home page consistently gets the most time as it's the first thing people see.</p>
+      <h4>Why investors care</h4>
+      <p>Engagement data shows which parts of the product capture attention. High dwell time on core pages (Home, Sales) validates the value proposition. Combined with page ratings, this paints a picture of product appeal.</p>
+    `
+  },
+  ratings: {
+    icon: '\u{2B50}',
+    title: 'Page Ratings — Product Appeal',
+    body: `
+      <h4>What this shows</h4>
+      <p>Average user rating (1–5) for each page of the prototype. This is direct product feedback.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li>During the walkthrough (Slide 6), after viewing each page, users rate it on a 1–5 scale</li>
+        <li>Ratings are stored as <code>page_ratings</code> object: { home: 4, sales: 5, ... }</li>
+        <li>Users also leave text feedback per page in <code>page_notes</code></li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Average of page_ratings[page] across all respondents</div>
+      <p class="note">Ratings combined with favorites data show which features to double down on. Pages that rate high AND get favorited are validated features.</p>
+      <h4>Why investors care</h4>
+      <p>Direct product validation from the target market. Ratings above 3.5 signal product-market fit for that feature area. Below 3 signals iteration needed.</p>
+    `
+  },
+  pmf: {
+    icon: '\u{1F525}',
+    title: 'Product-Market Fit Signals',
+    body: `
+      <h4>What this shows</h4>
+      <p>The percentage of respondents who opted in for early access. This is the strongest buying intent signal in the survey.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li>On the final slide (Slide 11), respondents are asked if they want early access</li>
+        <li>Stored as <code>early_access: true/false</code></li>
+        <li>This comes AFTER they've seen the product, done the pricing exercise, and understand what it is</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Count(early_access = true) / Total respondents with data</div>
+      <p class="note">This is an informed opt-in — they've already signed an NDA, spent 2+ minutes in the product, and committed a price. An 80%+ rate here is exceptional.</p>
+      <h4>Why investors care</h4>
+      <p>Early access opt-in rate is the closest thing to a pre-sale conversion. It shows demand beyond curiosity — these are people who want to use and pay for the product.</p>
+    `
+  },
+  market: {
+    icon: '\u{1F3E2}',
+    title: 'Target Market Profile',
+    body: `
+      <h4>What this shows</h4>
+      <p>Distribution of respondents by business stage, showing who the product resonates with most.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li>On Slide 3, respondents select their business stage: Early, Growing, or Established</li>
+        <li>Stored as <code>business_stage</code> — a single-select field</li>
+        <li>Combined with <code>revenue_range</code>, <code>client_count</code>, and <code>services</code> for full segmentation</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Count of each business_stage / Total respondents</div>
+      <p class="note">Cross-referencing stage with pricing data reveals which segment has the highest WTP. This informs go-to-market strategy — do you target early-stage owners who need it most, or growing businesses who can pay more?</p>
+      <h4>Why investors care</h4>
+      <p>Market composition data validates the TAM/SAM. Knowing exactly who responds (and who converts) proves the business model isn't built on assumptions.</p>
+    `
+  },
+  value: {
+    icon: '\u{1F4A1}',
+    title: 'Perceived Value vs. Willingness to Pay',
+    body: `
+      <h4>What this shows</h4>
+      <p>The gap between what respondents calculate the tool is worth (smart price) and what they'd actually pay (final price). The ratio reveals pricing power.</p>
+      <h4>Data collection</h4>
+      <ul>
+        <li><strong>Hours saved</strong> (Slide 8) — "How many hours per week would this save you?"</li>
+        <li><strong>Hourly rate</strong> (Slide 8) — "What do you value your time at per hour?"</li>
+        <li><strong>Smart price</strong> — Auto-calculated: <code>hours_saved × hourly_rate × 4.33 (weeks/month)</code></li>
+        <li><strong>Final price</strong> (Slide 10) — What they'd actually pay after seeing the value calc</li>
+      </ul>
+      <h4>Calculation</h4>
+      <div class="formula">Value Ratio = Median(smart_price) / Median(final_price)</div>
+      <p class="note">A ratio above 1 means the perceived value exceeds what they'd pay — there's room to charge more. A ratio of 5x means they see 5x ROI, which makes the purchase a no-brainer.</p>
+      <h4>Why investors care</h4>
+      <p>This is the ROI story. When users calculate 5–10x value versus what they'd pay, it proves the product has pricing power and room for ASP expansion over time.</p>
+    `
+  }
+};
+
+// ── Build charts ──────────────────────────────────────────────
+function buildCharts() {
+  const grid = document.getElementById('analyticsGrid');
+
+  // 1. WTP Price Evolution
+  const prices = all.filter(r => r.final_price != null);
+  const medBlind = median(prices.map(r => r.blind_price).filter(x => x != null));
+  const medSmart = median(prices.map(r => r.smart_price).filter(x => x != null));
+  const medFinal = median(prices.map(r => r.final_price).filter(x => x != null));
+  const maxPrice = Math.max(medBlind, medSmart, medFinal, 1);
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('wtp')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{1F4B0} Willingness to Pay</span>
+        <span class="chart-card-metric">$${Math.round(medFinal)}/mo</span>
+      </div>
+      <div class="chart-card-subtitle">Median price at each survey stage (n=${prices.length})</div>
+      <div class="price-compare">
+        <div class="price-col">
+          <span class="price-val">$${Math.round(medBlind)}</span>
+          <div class="price-bar" style="height:${Math.round(medBlind/maxPrice*120)}px;background:linear-gradient(180deg,#42a5f5,#1e88e5)"></div>
+          <span class="price-label">Blind<br>Price</span>
+        </div>
+        <div class="price-col">
+          <span class="price-val">$${Math.round(medSmart)}</span>
+          <div class="price-bar" style="height:${Math.min(120, Math.round(medSmart/maxPrice*120))}px;background:linear-gradient(180deg,#ab47bc,#8e24aa)"></div>
+          <span class="price-label">Value<br>Calc</span>
+        </div>
+        <div class="price-col">
+          <span class="price-val">$${Math.round(medFinal)}</span>
+          <div class="price-bar" style="height:${Math.round(medFinal/maxPrice*120)}px;background:linear-gradient(180deg,#c9a84c,#a68a3a)"></div>
+          <span class="price-label">Final<br>Price</span>
+        </div>
+      </div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // 2. Completion Funnel
+  const totalStarted = all.length;
+  const reachedWalkthrough = all.filter(r => Object.keys(r.page_ratings).length > 0).length;
+  const reachedPricing = all.filter(r => r.final_price != null).length;
+  const completedCount = completed.length;
+  const funnelSteps = [
+    { label: 'Started Survey', count: totalStarted, color: '#42a5f5' },
+    { label: 'Reached Walkthrough', count: reachedWalkthrough, color: '#ab47bc' },
+    { label: 'Reached Pricing', count: reachedPricing, color: '#ffa726' },
+    { label: 'Completed', count: completedCount, color: '#66bb6a' },
+  ];
+
+  let funnelHTML = funnelSteps.map((s, i) => {
+    const pct = Math.round(s.count / totalStarted * 100);
+    const drop = i > 0 ? `-${Math.round((1 - s.count / funnelSteps[i-1].count) * 100)}%` : '';
+    return `<div class="funnel-step">
+      <div class="funnel-bar-wrap">
+        <div class="funnel-bar" style="width:${pct}%;background:${s.color}">
+          <span class="funnel-bar-label">${s.label}</span>
+          <span class="funnel-bar-num">${s.count}</span>
+        </div>
+      </div>
+      <span class="funnel-drop">${drop}</span>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('completion')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{1F3AF} Completion Funnel</span>
+        <span class="chart-card-metric">${Math.round(completedCount/totalStarted*100)}%</span>
+      </div>
+      <div class="chart-card-subtitle">Survey completion rate across ${totalStarted} respondents</div>
+      <div class="funnel">${funnelHTML}</div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // 3. Most Wanted Features
+  const chipCounts = {};
+  all.forEach(r => {
+    (r.selected_chips || []).forEach(chip => {
+      // Shorten chip labels
+      const short = chip.length > 40 ? chip.substring(0, 38) + '...' : chip;
+      chipCounts[short] = (chipCounts[short] || 0) + 1;
+    });
+  });
+  const topChips = Object.entries(chipCounts).sort((a,b) => b[1] - a[1]).slice(0, 6);
+  const maxChip = topChips.length ? topChips[0][1] : 1;
+  const chipColors = ['#c9a84c','#ffa726','#42a5f5','#ab47bc','#66bb6a','#26c6da'];
+
+  let chipHTML = topChips.map(([label, count], i) => `
+    <div class="h-bar-row">
+      <span class="h-bar-label" title="${label}">${label}</span>
+      <div class="h-bar-track">
+        <div class="h-bar-fill" style="width:${Math.round(count/maxChip*100)}%;background:${chipColors[i % chipColors.length]}">
+          <span class="h-bar-val">${count}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('features')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{2728} Most Wanted Features</span>
+        <span class="chart-card-metric">${Object.keys(chipCounts).length}</span>
+      </div>
+      <div class="chart-card-subtitle">Unique features selected across all respondents</div>
+      <div class="h-bars">${chipHTML}</div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // 4. Page Engagement (avg time)
+  const pages = ['home','schedule','content','marketing','sales','members'];
+  const pageLabels = { home:'Home', schedule:'Schedule', content:'Content', marketing:'Marketing', sales:'Sales', members:'Members' };
+  const pageAvgs = {};
+  pages.forEach(p => {
+    const times = all.filter(r => r.page_timestamps[p] != null).map(r => r.page_timestamps[p]);
+    pageAvgs[p] = times.length ? Math.round(avg(times)) : 0;
+  });
+  const maxTime = Math.max(...Object.values(pageAvgs), 1);
+  const timeColors = ['#c9a84c','#ffa726','#42a5f5','#ab47bc','#66bb6a','#26c6da'];
+
+  let timeHTML = pages
+    .sort((a,b) => pageAvgs[b] - pageAvgs[a])
+    .map((p, i) => `
+    <div class="h-bar-row">
+      <span class="h-bar-label">${pageLabels[p]}</span>
+      <div class="h-bar-track">
+        <div class="h-bar-fill" style="width:${Math.round(pageAvgs[p]/maxTime*100)}%;background:${timeColors[i]}">
+          <span class="h-bar-val">${pageAvgs[p]}s</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('engagement')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{23F1} Page Engagement</span>
+        <span class="chart-card-metric">${Math.round(avg(Object.values(pageAvgs)))}s avg</span>
+      </div>
+      <div class="chart-card-subtitle">Average seconds spent per prototype page</div>
+      <div class="h-bars">${timeHTML}</div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // 5. Page Ratings
+  const ratingAvgs = {};
+  pages.forEach(p => {
+    const ratings = all.filter(r => r.page_ratings[p] != null).map(r => r.page_ratings[p]);
+    ratingAvgs[p] = ratings.length ? avg(ratings) : 0;
+  });
+  const maxRating = 5;
+
+  let ratingBarHTML = pages
+    .sort((a,b) => ratingAvgs[b] - ratingAvgs[a])
+    .map((p, i) => {
+    const v = ratingAvgs[p].toFixed(1);
+    return `
+    <div class="bar-col">
+      <span class="bar-value">${v}</span>
+      <div class="bar" style="height:${Math.round(ratingAvgs[p]/maxRating*110)}px;background:${ratingAvgs[p] >= 4 ? '#66bb6a' : ratingAvgs[p] >= 3 ? '#ffa726' : '#ef5350'}"></div>
+      <span class="bar-label">${pageLabels[p]}</span>
+    </div>`;
+  }).join('');
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('ratings')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{2B50} Page Ratings</span>
+        <span class="chart-card-metric">${avg(Object.values(ratingAvgs)).toFixed(1)}/5</span>
+      </div>
+      <div class="chart-card-subtitle">Average rating per prototype page (1–5 scale)</div>
+      <div class="bar-chart">${ratingBarHTML}</div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // 6. PMF — Early Access Rate (Donut)
+  const eaYes = all.filter(r => r.early_access).length;
+  const eaNo = all.length - eaYes;
+  const eaPct = Math.round(eaYes / all.length * 100);
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('pmf')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{1F525} Early Access Opt-in</span>
+        <span class="chart-card-metric">${eaPct}%</span>
+      </div>
+      <div class="chart-card-subtitle">Would sign up for early access</div>
+      <div class="donut-row">
+        <div class="donut-canvas-wrap">
+          <canvas id="donutPmf" width="240" height="240" style="width:120px;height:120px"></canvas>
+          <div class="donut-center-text">
+            <span class="donut-center-num">${eaPct}%</span>
+            <span class="donut-center-label">opt-in</span>
+          </div>
+        </div>
+        <div class="donut-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#66bb6a"></div><span class="legend-label">Yes, sign me up</span><span class="legend-val">${eaYes}</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#444"></div><span class="legend-label">No thanks</span><span class="legend-val">${eaNo}</span></div>
+        </div>
+      </div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // Draw donut
+  setTimeout(() => {
+    const c = document.getElementById('donutPmf');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const cx = 120, cy = 120, r = 90, lw = 24;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    // Background
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = '#333';
+    ctx.stroke();
+    // Fill
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + (eaPct/100) * Math.PI * 2);
+    ctx.strokeStyle = '#66bb6a';
+    ctx.stroke();
+  }, 100);
+
+  // 7. Market Composition (Donut)
+  const stages = {};
+  all.forEach(r => { if (r.business_stage) stages[r.business_stage] = (stages[r.business_stage] || 0) + 1; });
+  const stageColors = { early: '#42a5f5', growing: '#c9a84c', established: '#ab47bc' };
+  const stageLabels = { early: 'Early Stage', growing: 'Growing', established: 'Established' };
+  const stageEntries = Object.entries(stages).sort((a,b) => b[1] - a[1]);
+
+  let legendHTML = stageEntries.map(([k,v]) =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${stageColors[k]||'#666'}"></div><span class="legend-label">${stageLabels[k]||k}</span><span class="legend-val">${v} (${Math.round(v/all.length*100)}%)</span></div>`
+  ).join('');
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('market')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{1F3E2} Target Market</span>
+        <span class="chart-card-metric">${all.length} responses</span>
+      </div>
+      <div class="chart-card-subtitle">Business stage distribution</div>
+      <div class="donut-row">
+        <div class="donut-canvas-wrap">
+          <canvas id="donutMarket" width="240" height="240" style="width:120px;height:120px"></canvas>
+          <div class="donut-center-text">
+            <span class="donut-center-num">${all.length}</span>
+            <span class="donut-center-label">total</span>
+          </div>
+        </div>
+        <div class="donut-legend">${legendHTML}</div>
+      </div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+
+  // Draw market donut
+  setTimeout(() => {
+    const c = document.getElementById('donutMarket');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    const cx = 120, cy = 120, r = 90, lw = 24;
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'butt';
+    let startAngle = -Math.PI / 2;
+    stageEntries.forEach(([k, v]) => {
+      const sweep = (v / all.length) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, startAngle, startAngle + sweep);
+      ctx.strokeStyle = stageColors[k] || '#666';
+      ctx.stroke();
+      startAngle += sweep;
+    });
+  }, 100);
+
+  // 8. Value Ratio
+  const valRespondents = all.filter(r => r.smart_price && r.final_price);
+  const medSmartVal = median(valRespondents.map(r => r.smart_price));
+  const medFinalVal = median(valRespondents.map(r => r.final_price));
+  const ratio = medFinalVal > 0 ? (medSmartVal / medFinalVal).toFixed(1) : '?';
+
+  grid.innerHTML += `
+    <div class="chart-card" onclick="openModal('value')">
+      <div class="chart-card-head">
+        <span class="chart-card-title">\u{1F4A1} Value vs. Price</span>
+        <span class="chart-card-metric">${ratio}x ROI</span>
+      </div>
+      <div class="chart-card-subtitle">Perceived value is ${ratio}x what they'd pay</div>
+      <div class="price-compare">
+        <div class="price-col">
+          <span class="price-val">$${Math.round(medSmartVal)}</span>
+          <div class="price-bar" style="height:100px;background:linear-gradient(180deg,#66bb6a,#43a047)"></div>
+          <span class="price-label">Perceived<br>Value</span>
+        </div>
+        <div style="display:flex;align-items:center;font-size:28px;color:#555;padding-bottom:30px">vs</div>
+        <div class="price-col">
+          <span class="price-val">$${Math.round(medFinalVal)}</span>
+          <div class="price-bar" style="height:${Math.round(medFinalVal/medSmartVal*100)}px;background:linear-gradient(180deg,#c9a84c,#a68a3a)"></div>
+          <span class="price-label">Would<br>Pay</span>
+        </div>
+      </div>
+      <div class="chart-click-hint">Click to see how this is calculated \u2192</div>
+    </div>
+  `;
+}
+
+// ── Modal ─────────────────────────────────────────────────────
+function openModal(key) {
+  const data = MODAL_DATA[key];
+  if (!data) return;
+  document.getElementById('modalIcon').textContent = data.icon;
+  document.getElementById('modalTitle').textContent = data.title;
+  document.getElementById('modalBody').innerHTML = data.body;
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+// ── Init ──────────────────────────────────────────────────────
+buildCharts();
+</script>
+
+</body>
+</html>

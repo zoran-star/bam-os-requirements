@@ -523,6 +523,7 @@ export default function App() {
   const [userPhone, setUserPhone] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [businessWebsite, setBusinessWebsite] = useState('')
+  const [roleInBusiness, setRoleInBusiness] = useState('')
   const [revenueRange, setRevenueRange] = useState('')
   const [location, setLocation] = useState('')
   const [adminHours, setAdminHours] = useState('')
@@ -533,6 +534,7 @@ export default function App() {
   const sessionStartRef = useRef(Date.now())
   const lastSlideRef = useRef(0)
   const completedRef = useRef(false)
+  const droppedRef = useRef(false)
 
   // Voice transcript state (speech-to-text, no audio upload)
   const [voiceTranscript, setVoiceTranscript] = useState('')
@@ -609,15 +611,18 @@ export default function App() {
   // Drop-off beacon — fires when user closes tab without submitting
   useEffect(() => {
     const handleUnload = () => {
-      if (completedRef.current) return // already submitted, no drop-off
+      if (completedRef.current || droppedRef.current) return
+      droppedRef.current = true
       const payload = JSON.stringify({
+        completed: false,
         drop_off_slide: lastSlideRef.current,
         drop_off_time: Math.round((Date.now() - sessionStartRef.current) / 1000),
-        completed: false,
+        session_duration: Math.round((Date.now() - sessionStartRef.current) / 1000),
         user_name: userName || null,
         user_phone: userPhone || null,
+        role_in_business: roleInBusiness || null,
       })
-      fetch('https://raedfefzjudzlodtcxop.supabase.co/rest/v1/survey_dropoffs', {
+      fetch('https://raedfefzjudzlodtcxop.supabase.co/rest/v1/survey_responses', {
         method: 'POST',
         keepalive: true,
         headers: {
@@ -630,7 +635,7 @@ export default function App() {
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => window.removeEventListener('beforeunload', handleUnload)
-  }, [userName, userPhone])
+  }, [userName, userPhone, roleInBusiness])
 
   const toggleChip = (label, isExtra) => {
     if (isExtra) {
@@ -770,9 +775,9 @@ export default function App() {
 
     // Voice transcript (no audio upload needed)
 
-    // Submit to Supabase
+    // Submit to Supabase — update the row created at session start
     try {
-      const { error } = await supabase.from('survey_responses').insert({
+      const submitData = {
         // NDA
         nda_name: ndaName,
         nda_signature: ndaSignature,
@@ -784,6 +789,7 @@ export default function App() {
         user_phone: userPhone || null,
         business_name: businessName || null,
         business_website: businessWebsite || null,
+        role_in_business: roleInBusiness || null,
         // Demographics
         business_stage: businessStage,
         biggest_challenge: biggestChallenge,
@@ -821,7 +827,8 @@ export default function App() {
         drop_off_time: null,
         // Voice transcript
         voice_transcript: voiceTranscript || null,
-      })
+      }
+      const { error } = await supabase.from('survey_responses').insert(submitData)
       // #9 — Check for insert errors
       if (error) {
         console.error('Survey submit error:', error)
@@ -1054,6 +1061,7 @@ export default function App() {
                 <input type="email" placeholder="Email address *" value={userEmail} onChange={e => setUserEmail(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="tel" inputMode="tel" pattern="[0-9+\-\s]{7,}" placeholder="Phone number *" value={userPhone} onChange={e => setUserPhone(e.target.value)} style={{ textAlign: 'center' }} />
                 <input type="url" placeholder="Business website (optional)" value={businessWebsite} onChange={e => setBusinessWebsite(e.target.value)} style={{ textAlign: 'center' }} />
+                <input type="text" placeholder="Your role (e.g. Owner, Head Coach, Manager) *" value={roleInBusiness} onChange={e => setRoleInBusiness(e.target.value)} style={{ textAlign: 'center' }} />
               </motion.div>
 
               {/* Business stage */}
