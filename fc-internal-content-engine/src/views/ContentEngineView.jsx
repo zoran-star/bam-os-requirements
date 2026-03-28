@@ -368,12 +368,20 @@ function AddThemeForm({ tokens, mode, onSave, onCancel }) {
   const [category, setCategory] = useState("AI Advantage");
   const [creator, setCreator] = useState("Coleman");
   const [phase, setPhase] = useState(0);
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState([]);
   const ref = useRef(null);
   useEffect(() => { ref.current?.focus(); }, []);
 
+  const addTag = () => {
+    const t = tagInput.trim();
+    if (t && !tags.includes(t)) { setTags([...tags, t]); setTagInput(""); }
+  };
+  const removeTag = (tag) => setTags(tags.filter(t => t !== tag));
+
   const save = () => {
     if (!title.trim()) return;
-    onSave({ title: title.trim(), description: description.trim(), category, mode, creator, phase, sort_order: 0 });
+    onSave({ title: title.trim(), description: description.trim(), category, mode, creator, phase, sort_order: 0, tags });
   };
 
   const inputStyle = {
@@ -393,19 +401,24 @@ function AddThemeForm({ tokens, mode, onSave, onCancel }) {
       <input ref={ref} placeholder="Theme title..." value={title} onChange={e => setTitle(e.target.value)}
         onKeyDown={e => e.key === "Enter" && save()} style={{ ...inputStyle, marginBottom: 8 }} />
       <input placeholder="Description (optional)" value={description} onChange={e => setDescription(e.target.value)}
-        onKeyDown={e => e.key === "Enter" && save()} style={{ ...inputStyle, marginBottom: 12 }} />
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 4 }}>
-          {["AI Advantage", "Command Center", "Strategic Intel"].map(cat => (
-            <button key={cat} onClick={() => setCategory(cat)} style={{
-              fontSize: 12, fontWeight: category === cat ? 600 : 400, padding: "4px 12px",
-              borderRadius: 8, border: `1px solid ${category === cat ? tokens.accentBorder : tokens.border}`,
-              background: category === cat ? tokens.accentGhost : "transparent",
-              color: category === cat ? tokens.accent : tokens.textSub,
-              cursor: "pointer", fontFamily: "inherit",
-            }}>{cat}</button>
+        onKeyDown={e => e.key === "Enter" && save()} style={{ ...inputStyle, marginBottom: 8 }} />
+      {/* Tags */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: tags.length ? 6 : 0 }}>
+          {tags.map(tag => (
+            <span key={tag} onClick={() => removeTag(tag)} style={{
+              fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20,
+              background: tokens.accentGhost, color: tokens.accent, cursor: "pointer",
+              border: `1px solid ${tokens.accentBorder}`, display: "flex", alignItems: "center", gap: 4,
+            }}>{tag} <span style={{ fontSize: 13, lineHeight: 1 }}>&times;</span></span>
           ))}
         </div>
+        <input placeholder="Add a tag (optional) — press Enter" value={tagInput}
+          onChange={e => setTagInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag(); } if (e.key === "," && tagInput.trim()) { e.preventDefault(); addTag(); } }}
+          style={{ ...inputStyle, fontSize: 13 }} />
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: 4 }}>
           {["Coleman", "Zoran"].map(c => (
             <button key={c} onClick={() => setCreator(c)} style={{
@@ -958,6 +971,258 @@ function ScriptPanel({ tokens, creative, onBack }) {
 
 // ─── Theme Notes Panel (collapsible) ───
 
+// ─── Generate Creative Modal ───
+function GenerateCreativeModal({ tokens, themes, onSave, onClose, onCreateTheme }) {
+  const [prompt, setPrompt] = useState("");
+  const [videoStyle, setVideoStyle] = useState("");
+  const [tone, setTone] = useState("");
+  const [psychLever, setPsychLever] = useState("");
+  const [persona, setPersona] = useState("");
+  const [phase, setPhase] = useState(0);
+  const [suggestTheme, setSuggestTheme] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [selectedThemeId, setSelectedThemeId] = useState("");
+  const [error, setError] = useState("");
+
+  const generate = async () => {
+    setLoading(true); setError(""); setResult(null);
+    try {
+      const guardrails = {};
+      if (videoStyle) guardrails.video_style = videoStyle;
+      if (tone) guardrails.tone = tone;
+      if (psychLever) guardrails.psych_lever = psychLever;
+      if (persona) guardrails.persona = persona;
+      guardrails.phase = phase;
+
+      const res = await fetch("/api/content/generate-creative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, guardrails, themes, suggestTheme }),
+      });
+      const data = await res.json();
+      if (data.error) { setError(data.error); }
+      else {
+        setResult(data.creative);
+        setSelectedThemeId(data.creative.suggested_theme_id || "");
+      }
+    } catch (e) { setError(e.message); }
+    setLoading(false);
+  };
+
+  const saveCreative = async () => {
+    if (!result || !selectedThemeId) return;
+    await onSave({
+      theme_id: selectedThemeId,
+      title: result.title,
+      hook: result.hook || "",
+      cta: result.cta || "",
+      tone: result.tone || "Conversational",
+      video_style: result.video_style || "talking_head",
+      psych_lever: result.psych_lever || "",
+      persona: result.persona || "",
+      notes: result.notes || "",
+      phase,
+      mode: "paid",
+      creator: "AI",
+      sort_order: 0,
+    });
+    onClose();
+  };
+
+  const inputStyle = {
+    width: "100%", fontSize: 14, padding: "10px 14px", borderRadius: 8,
+    border: `1px solid ${tokens.border}`, background: tokens.surfaceEl,
+    color: tokens.text, fontFamily: "inherit", outline: "none",
+  };
+  const chipStyle = (active) => ({
+    fontSize: 12, fontWeight: active ? 600 : 400, padding: "5px 12px",
+    borderRadius: 8, border: `1px solid ${active ? tokens.accentBorder : tokens.border}`,
+    background: active ? tokens.accentGhost : "transparent",
+    color: active ? tokens.accent : tokens.textSub,
+    cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+  });
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+      animation: "cardIn 0.2s ease both",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: tokens.surface, borderRadius: 20, padding: 28,
+        width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto",
+        border: `1px solid ${tokens.border}`,
+        boxShadow: `0 24px 48px rgba(0,0,0,0.2), 0 0 0 1px ${tokens.border}`,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={tokens.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span style={{ fontSize: 18, fontWeight: 700, color: tokens.text }}>Generate Creative</span>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: tokens.textMute, cursor: "pointer", fontSize: 20 }}>&times;</button>
+        </div>
+
+        {!result ? (
+          <>
+            {/* Prompt */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
+                Direction <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional — or let AI surprise you)</span>
+              </label>
+              <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
+                placeholder="e.g., 'Something about how owners are drowning in admin' or 'A funny take on checking 6 different apps'..."
+                rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+            </div>
+
+            {/* Guardrails */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
+                Video Style <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional)</span>
+              </label>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {VIDEO_STYLES.map(s => (
+                  <button key={s.value} onClick={() => setVideoStyle(videoStyle === s.value ? "" : s.value)}
+                    style={chipStyle(videoStyle === s.value)}>{s.label.split(" — ")[0]}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
+                Tone <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional)</span>
+              </label>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {TONES.map(t => (
+                  <button key={t} onClick={() => setTone(tone === t ? "" : t)} style={chipStyle(tone === t)}>{t}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
+                Psych Lever <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional)</span>
+              </label>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {PSYCH_LEVERS.map(p => (
+                  <button key={p} onClick={() => setPsychLever(psychLever === p ? "" : p)} style={chipStyle(psychLever === p)}>{p}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
+                Persona <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional)</span>
+              </label>
+              <div style={{ display: "flex", gap: 4 }}>
+                {["Young Hungry", "Established"].map(p => (
+                  <button key={p} onClick={() => setPersona(persona === p ? "" : p)} style={chipStyle(persona === p)}>{p}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                onClick={() => setSuggestTheme(!suggestTheme)}>
+                <div style={{
+                  width: 18, height: 18, borderRadius: 4,
+                  border: `1.5px solid ${suggestTheme ? tokens.accent : tokens.border}`,
+                  background: suggestTheme ? tokens.accentGhost : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s",
+                }}>{suggestTheme && <span style={{ fontSize: 12, color: tokens.accent }}>&#10003;</span>}</div>
+                Can suggest new themes if nothing fits
+              </label>
+            </div>
+
+            {error && <div style={{ fontSize: 13, color: tokens.red, marginBottom: 12, padding: "8px 12px", background: tokens.redSoft, borderRadius: 8 }}>{error}</div>}
+
+            <button onClick={generate} disabled={loading} style={{
+              width: "100%", fontSize: 14, fontWeight: 600, padding: "12px 20px", borderRadius: 10,
+              border: "none", background: loading ? tokens.surfaceHov : `linear-gradient(135deg, ${tokens.accent}, ${tokens.accent}dd)`,
+              color: loading ? tokens.textMute : "#0E0D0B", cursor: loading ? "wait" : "pointer",
+              fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              transition: "all 0.2s",
+            }}>
+              {loading ? (
+                <><span style={{ display: "inline-block", width: 14, height: 14, border: `2px solid ${tokens.textMute}`, borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.6s linear infinite" }} /> Generating...</>
+              ) : (
+                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> Generate Creative</>
+              )}
+            </button>
+          </>
+        ) : (
+          /* ─── Result view ─── */
+          <>
+            <div style={{ padding: 16, borderRadius: 12, background: tokens.surfaceEl, border: `1px solid ${tokens.border}`, marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: tokens.text, marginBottom: 8 }}>{result.title}</div>
+              {result.hook && <div style={{ fontSize: 13, color: tokens.textSub, marginBottom: 6 }}><strong style={{ color: tokens.accent }}>Hook:</strong> {result.hook}</div>}
+              {result.cta && <div style={{ fontSize: 13, color: tokens.textSub, marginBottom: 6 }}><strong style={{ color: tokens.accent }}>CTA:</strong> {result.cta}</div>}
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
+                {result.tone && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: tokens.surfaceHov, color: tokens.textSub }}>{result.tone}</span>}
+                {result.video_style && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: tokens.surfaceHov, color: tokens.textSub }}>{result.video_style}</span>}
+                {result.psych_lever && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 6, background: tokens.surfaceHov, color: tokens.textSub }}>{result.psych_lever}</span>}
+              </div>
+              {result.notes && <div style={{ fontSize: 12, color: tokens.textMute, marginTop: 10, lineHeight: 1.5, fontStyle: "italic" }}>{result.notes}</div>}
+            </div>
+
+            {/* Theme selection */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 8, display: "block" }}>
+                Save under theme {result.suggested_theme_title && <span style={{ fontWeight: 400, color: tokens.textMute }}>— AI suggests: "{result.suggested_theme_title}"</span>}
+              </label>
+              <select value={selectedThemeId} onChange={e => setSelectedThemeId(e.target.value)}
+                style={{ ...inputStyle, cursor: "pointer" }}>
+                <option value="">Select a theme...</option>
+                {themes.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}{t.id === result.suggested_theme_id ? " ★" : ""}</option>
+                ))}
+              </select>
+              {result.also_fits?.length > 0 && (
+                <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 4 }}>
+                  Also fits: {result.also_fits.map(id => themes.find(t => t.id === id)?.title).filter(Boolean).join(", ")}
+                </div>
+              )}
+            </div>
+
+            {result.new_theme_suggestion && (
+              <div style={{
+                padding: 12, borderRadius: 10, background: tokens.accentGhost,
+                border: `1px solid ${tokens.accentBorder}`, marginBottom: 16,
+                fontSize: 13, color: tokens.accent, display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                AI suggests a new theme: <strong>"{result.new_theme_suggestion}"</strong>
+                <button onClick={async () => {
+                  const { data } = await onCreateTheme({ title: result.new_theme_suggestion, description: "", mode: "paid", creator: "AI", phase: 0, sort_order: 0 });
+                  if (data) setSelectedThemeId(data.id);
+                }} style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6,
+                  border: `1px solid ${tokens.accent}`, background: "transparent",
+                  color: tokens.accent, cursor: "pointer", fontFamily: "inherit", marginLeft: "auto",
+                }}>Create it</button>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setResult(null); setError(""); }} style={{
+                flex: 1, fontSize: 13, fontWeight: 500, padding: "10px 16px", borderRadius: 8,
+                border: `1px solid ${tokens.border}`, background: "transparent",
+                color: tokens.textSub, cursor: "pointer", fontFamily: "inherit",
+              }}>Regenerate</button>
+              <button onClick={saveCreative} disabled={!selectedThemeId} style={{
+                flex: 2, fontSize: 14, fontWeight: 600, padding: "10px 20px", borderRadius: 8,
+                border: "none", background: selectedThemeId ? `linear-gradient(135deg, ${tokens.accent}, ${tokens.accent}dd)` : tokens.surfaceHov,
+                color: selectedThemeId ? "#0E0D0B" : tokens.textMute,
+                cursor: selectedThemeId ? "pointer" : "not-allowed", fontFamily: "inherit",
+              }}>Save Creative</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
@@ -1060,6 +1325,18 @@ function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
       )}
 
       <div style={{ flex: 1 }} />
+      {/* Tags */}
+      {theme.tags && theme.tags.length > 0 && (
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 10 }}>
+          {theme.tags.map(tag => (
+            <span key={tag} style={{
+              fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 12,
+              background: tokens.accentGhost, color: tokens.accent,
+              border: `1px solid ${tokens.accentBorder}`,
+            }}>{tag}</span>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", paddingTop: 12, borderTop: `1px solid ${tokens.border}` }}>
         <Pill label={PHASE_LABELS[theme.phase] || "Pre-Launch"} color={PHASE_COLORS(tokens)[theme.phase]} bg={PHASE_BG(tokens)[theme.phase]} />
         <Pill label={theme.creator} color={tokens.textSub} bg={tokens.surfaceHov} />
@@ -1143,6 +1420,7 @@ export default function ContentEngineView({ tokens, dark }) {
 
   // UI state
   const [showAddTheme, setShowAddTheme] = useState(false);
+  const [showGenerate, setShowGenerate] = useState(false);
   const [showAddCreative, setShowAddCreative] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
@@ -1151,13 +1429,12 @@ export default function ContentEngineView({ tokens, dark }) {
   const loadThemes = useCallback(async () => {
     setLoading(true);
     const filters = { mode };
-    if (categoryFilter !== "all") filters.category = categoryFilter;
     if (creatorFilter !== "all") filters.creator = creatorFilter;
     if (phaseFilter !== null) filters.phase = phaseFilter;
     const { data } = await fetchThemes(filters);
     setThemes(data);
     setLoading(false);
-  }, [mode, categoryFilter, creatorFilter, phaseFilter]);
+  }, [mode, creatorFilter, phaseFilter]);
 
   useEffect(() => { loadThemes(); }, [loadThemes]);
 
@@ -1271,6 +1548,7 @@ export default function ContentEngineView({ tokens, dark }) {
       {/* CSS keyframes */}
       <style>{`
         @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         @keyframes dashPulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
         @keyframes gentlePulse{0%,100%{opacity:1}50%{opacity:0.7}}
       `}</style>
@@ -1281,11 +1559,6 @@ export default function ContentEngineView({ tokens, dark }) {
           options={[{ value: "paid", label: "Paid Ads" }, { value: "organic", label: "Organic" }]}
           value={mode} onChange={(v) => { setMode(v); setView("themes"); setSelectedTheme(null); }}
           tokens={tokens}
-        />
-        <div style={{ width: 1, height: 24, background: tokens.border }} />
-        <FilterPills
-          options={[{ value: "all", label: "All Categories" }, { value: "AI Advantage", label: "AI Advantage" }, { value: "Command Center", label: "Command Center" }, { value: "Strategic Intel", label: "Strategic Intel" }]}
-          value={categoryFilter} onChange={setCategoryFilter} tokens={tokens}
         />
         <div style={{ width: 1, height: 24, background: tokens.border }} />
         {/* Collapsible advanced filters toggle */}
@@ -1332,6 +1605,20 @@ export default function ContentEngineView({ tokens, dark }) {
               onMouseEnter={e => { e.currentTarget.style.background = tokens.accentGhost; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
             >+ Add Theme</button>
+            <button onClick={() => setShowGenerate(true)} style={{
+              fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
+              border: "none", background: `linear-gradient(135deg, ${tokens.accent}, ${tokens.accent}dd)`,
+              color: "#0E0D0B", cursor: "pointer", fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center", gap: 6,
+              transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+              boxShadow: `0 2px 8px ${tokens.accent}30`,
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 4px 16px ${tokens.accent}40`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 8px ${tokens.accent}30`; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              Generate
+            </button>
           </div>
         )}
         {view === "creatives" && (
@@ -1380,6 +1667,23 @@ export default function ContentEngineView({ tokens, dark }) {
         <MassImportPanel tokens={tokens} mode={mode} onImport={handleMassImport} onClose={() => setShowImport(false)} />
       )}
 
+      {showGenerate && (
+        <GenerateCreativeModal
+          tokens={tokens}
+          themes={themes}
+          onClose={() => setShowGenerate(false)}
+          onSave={async (creative) => {
+            const { data } = await createCreative(creative);
+            if (data) setThemes(prev => prev.map(t => t.id === creative.theme_id ? { ...t, content_creatives: [{ count: (t.content_creatives?.[0]?.count || 0) + 1 }] } : t));
+          }}
+          onCreateTheme={async (theme) => {
+            const { data } = await createTheme(theme);
+            if (data) setThemes(prev => [data, ...prev]);
+            return { data };
+          }}
+        />
+      )}
+
       {/* THEMES VIEW */}
       {view === "themes" && (
         <>
@@ -1402,34 +1706,15 @@ export default function ContentEngineView({ tokens, dark }) {
             <EmptyState tokens={tokens} icon={"\uD83C\uDFAC"} title="No themes yet"
               subtitle={`Create your first ${mode === "paid" ? "paid ads" : "organic"} theme to get started.`} />
           ) : (
-            <div>
-              {Object.entries(groupedThemes).map(([category, categoryThemes]) => (
-                <div key={category} style={{ marginBottom: 32 }}>
-                  {/* Category section header */}
-                  <div style={{
-                    fontSize: 11, fontWeight: 800, color: tokens.accent,
-                    letterSpacing: "0.08em", textTransform: "uppercase",
-                    marginBottom: 14, paddingLeft: 4,
-                    display: "flex", alignItems: "center", gap: 8,
-                  }}>
-                    <div style={{ width: 3, height: 14, borderRadius: 2, background: tokens.accent }} />
-                    {category}
-                    <span style={{ fontSize: 10, fontWeight: 500, color: tokens.textMute, letterSpacing: "0.02em", textTransform: "none" }}>
-                      {categoryThemes.length} theme{categoryThemes.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                    {categoryThemes.map((theme, i) => (
-                      <ThemeCard key={theme.id} theme={theme} index={i} tokens={tokens}
-                        onDrill={drillIntoTheme} onDelete={handleDeleteTheme}
-                        onUpdate={async (id, fields) => {
-                          const { data } = await updateTheme(id, fields);
-                          if (data) setThemes(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t));
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {themes.map((theme, i) => (
+                <ThemeCard key={theme.id} theme={theme} index={i} tokens={tokens}
+                  onDrill={drillIntoTheme} onDelete={handleDeleteTheme}
+                  onUpdate={async (id, fields) => {
+                    const { data } = await updateTheme(id, fields);
+                    if (data) setThemes(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t));
+                  }}
+                />
               ))}
             </div>
           )}
