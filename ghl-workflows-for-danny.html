@@ -1097,25 +1097,83 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
     </div>
   </div>
 
-  <!-- WORKFLOW: Missed Trial -->
+  <!-- WORKFLOW: Missed Trial (VERIFIED from user screenshot) -->
   <div class="wf-card" style="border-left: 3px solid var(--accent); margin-top: 24px;">
     <h4>Workflow: "Missed Trial" <span class="tag published">Published</span> <span class="stat">(<strong>54</strong> enrolled)</span></h4>
-    <div class="wf-meta">32 versions | Last updated Oct 3, 2025 | GHL was slow to load — details pending full verification</div>
+    <div class="wf-meta">32 versions | Last updated Oct 3, 2025 | Handles no-shows from free trial sessions</div>
   </div>
 
   <div class="flow-container" style="margin-bottom: 16px;">
-    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGERS (2 entry points)</div>
     <div class="flow-row">
-      <div class="flow-node trigger">Contact Tag Added — "missed trial"<br>
-        <span style="font-size: 0.7rem; color: var(--text-muted);">Fed by the "Done Trial" workflow Branch 3 (no-show)</span>
+      <div class="flow-node trigger">
+        <strong>1. Appointment Status</strong> → "no-show" from any Free Trial calendar<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Fires automatically when appointment status is updated to No-Show</span>
       </div>
     </div>
-    <div style="margin-top: 16px;">
-      <div class="flow-group-label">EXPECTED BEHAVIOR (based on workflow name + context)</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted);">Follow-up sequence for no-shows: SMS asking what happened, offers to rebook. More understanding tone than ghosted. If no response, eventually feeds into sms ghosted or lead nurture.</p>
+    <div class="flow-row" style="margin-top: 8px;">
+      <div class="flow-node trigger">
+        <strong>2. Contact Tag</strong> → "missed trial" tag added<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Also fed by "Done Trial" workflow Branch 3 (coach marks no-show on post-trial form)</span>
+      </div>
     </div>
-    <div class="connection-note" style="margin-top: 12px;">
-      <strong>Note:</strong> GHL builder was timing out when documenting this workflow. Steps above are inferred from context — need to verify actual steps when GHL is available.
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 1 — Route based on trigger source</div>
+    </div>
+
+    <div class="flow-group" style="border-left-color: var(--accent); margin-top: 8px;">
+      <div class="flow-group-label" style="color: var(--accent);">BRANCH: No-show appointment status</div>
+      <div class="flow-row">
+        <div class="flow-node action">Add 'missed trial' tag</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Add Tag</div>
+      </div>
+    </div>
+
+    <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+      <div class="flow-group-label">BRANCH: 'missed trial' tag added manually</div>
+      <div class="flow-row">
+        <div class="flow-node action">Update appointment status</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Go To (joins main branch)</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 2 — Notify + rebook (dual channel)</div>
+      <div class="flow-row">
+        <div class="flow-node action">Missed trial notification (glueguy) — internal alert</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action" style="border-color: var(--green);">
+          <strong>SMS rebooking link</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Sends lead an SMS with link to rebook their trial</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--cyan);">
+          <strong>email rebooking link</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Same rebooking link via email — dual channel</span>
+        </div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node action">Update opportunity: Interested</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 3 — Wait then follow up</div>
+      <div class="flow-row">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action" style="border-color: var(--text-muted);">
+          <em>Continues with additional follow-up (likely feeds into sms ghosted if no response)</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>Key context:</strong> Two entry points — either auto no-show status update or manual tag from Done Trial form. Both converge into: internal notification → SMS + email with rebooking link → pipeline reset to "Interested" → 1-day wait → further follow-up. Tone is understanding — "we missed you, rebook here."
     </div>
   </div>
 
