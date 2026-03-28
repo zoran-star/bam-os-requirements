@@ -1360,14 +1360,44 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
 
     <hr style="border-color: var(--border); margin: 16px 0;">
 
-    <div class="flow-row">
-      <div class="flow-node trigger">Coach IQ payment goes through</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">Coach IQ New payment submitted <span class="stat">(<strong>22</strong> enrolled)</span></div>
+    <div class="wf-card" style="border-left: 3px solid var(--green); margin-bottom: 12px;">
+      <h4>Workflow: "Coach IQ New payment submitted" <span class="tag published">Published</span> <span class="stat">(<strong>22</strong> enrolled)</span></h4>
+      <div class="wf-meta">10 versions | Verified from GHL builder | Full onboarding pipeline for new paying members</div>
     </div>
     <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Handles Coach IQ subscription payments. Sends confirmation, grants access, tags contact with membership tier.</p>
+      <div class="flow-group-label">TRIGGER: New payment submitted (Coach IQ)</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Sticky note: "When someone signs up, it: internal notifications for manual onboarding processes, puts the client in onboarding emails automation, puts the client in 2, and 32 day automations for reach outs"</p>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEP 1 — Find/Create Contact</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">Find Contact → if found, check if already active member (Tags includes "liveclient" → END). If not found → Create Contact.</p>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEP 2 — Condition: GHL Membership Plan (+18 segments)</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">Routes based on which membership plan was purchased. None → END.</p>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEP 3 — Clean up + Notify + Tag</div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        <p>1. Remove from Previous workflows (clears sales automations)</p>
+        <p>2. Remove Previous Tags (clears lead tags)</p>
+        <p>3. Notify Zoran to fill in client tracker</p>
+        <p>4. Notification for manual onboarding process</p>
+        <p>5. message Adrian (internal)</p>
+        <p>6. message Fil (internal)</p>
+        <p>7. Set to 'won' in pipeline</p>
+        <p>8. Add 'liveclient' tag</p>
+        <p>9. Add KPI tag</p>
+        <p>10. Turn off all bots</p>
+      </div>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEP 4 — Welcome messages to new member</div>
+      <div style="font-size: 0.8rem; color: var(--text-muted);">
+        <p>11. Wait 1 minute → Confirmation text (SMS)</p>
+        <p>12. Wait 3 minutes → Schedule + location (SMS)</p>
+        <p><em>Continues with additional onboarding emails/SMS sequence...</em></p>
+      </div>
     </div>
 
     <hr style="border-color: var(--border); margin: 16px 0;">
@@ -1440,26 +1470,39 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
   <div class="flow-container">
     <div class="wf-card" style="border-left: 3px solid #1877f2;">
       <h4>Workflow: "facebook analytics (extra)" <span class="tag published">Published</span></h4>
-      <div class="wf-meta">7 versions | GHL timed out — needs verification</div>
+      <div class="wf-meta">7 versions | Verified from GHL builder</div>
     </div>
     <div class="flow-group">
-      <div class="flow-group-label">Purpose</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Sends conversion events back to Facebook for ad optimization. Fires when key actions happen (form fills, bookings, payments) and sends data to Facebook Conversions API so ad campaigns can optimize toward real conversions.</p>
+      <div class="flow-group-label">TRIGGERS (2)</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">1. Form Submitted — "Lead Texting Form"</p>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">2. Customer Booked Appointment — Calendar Group "Book Your Free..."</p>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEPS</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Condition branches on which trigger fired:</p>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">• Form Submit → <strong>FB Conversion API</strong> → <strong>Add to Google Analytics</strong> → END</p>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">• Customer Booked → <strong>FB Conversion API</strong> → <strong>Add to Google Analytics</strong> → END</p>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">• None → END</p>
     </div>
 
     <hr style="border-color: var(--border); margin: 16px 0;">
 
     <div class="wf-card" style="border-left: 3px solid #1877f2;">
       <h4>Workflow: "FB tracking | Form Submit API" <span class="tag published">Published</span></h4>
-      <div class="wf-meta">3 versions | GHL timed out — needs verification</div>
+      <div class="wf-meta">3 versions | Verified from GHL builder</div>
     </div>
     <div class="flow-group">
-      <div class="flow-group-label">Purpose</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted);">Specifically tracks form submissions and sends them to Facebook's Conversions API. Likely fires an HTTP webhook to Facebook with contact data (hashed email/phone) so FB can attribute the lead to the correct ad campaign.</p>
+      <div class="flow-group-label">TRIGGER</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Form Submitted — Website Schedules, Form is any of "Free Trial Form"</p>
+    </div>
+    <div class="flow-group" style="margin-top: 8px;">
+      <div class="flow-group-label">STEPS</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">FB Conversion API → END</p>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Simple — just fires a single conversion event to Facebook when the free trial form is submitted.</p>
     </div>
 
     <div class="connection-note" style="margin-top: 12px;">
-      <strong>For Danny:</strong> These are integration/tracking workflows. In Full Control, this would likely be handled by direct API calls from the app rather than a GHL workflow. The key requirement is: when a lead takes a meaningful action, send a server-side event to Facebook Conversions API with the appropriate event name and user data.
+      <strong>For Danny:</strong> Both workflows are pure server-side tracking — no customer-facing actions. They send conversion events to Facebook Conversions API (and Google Analytics in the first one) so ad campaigns can optimize toward real conversions. In Full Control, this would be direct API calls from the backend: when a lead fills a form or books a trial, POST to Facebook's Conversions API endpoint with the event name and hashed user data.
     </div>
   </div>
 </div>
