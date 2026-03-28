@@ -1012,49 +1012,217 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
     </div>
   </div>
 
-  <!-- POST TRIAL -->
+  <!-- POST TRIAL (DETAILED) -->
   <h3 style="color: var(--pink); font-size: 1rem; margin: 24px 0 12px 0;">POST TRIAL</h3>
-  <div class="flow-container">
-    <div class="flow-row">
-      <div class="flow-node trigger">Trial session completed (trainer marks done)</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">Done Trial <span class="stat">(<strong>29</strong> enrolled)</span></div>
-    </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Post-trial follow-up: thank you message, asks about experience, pushes toward sign-up. Sends pricing/membership info. ~44 versions.</p>
-    </div>
+  <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
 
-    <hr style="border-color: var(--border); margin: 16px 0;">
-
-    <div class="flow-row">
-      <div class="flow-node trigger">Lead no-shows for trial</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">Missed Trial <span class="stat">(<strong>54</strong> enrolled)</span></div>
-    </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted);">Handles no-shows: follow-up SMS asking what happened, offers to rebook. Different tone than ghosted — more understanding, less urgency.</p>
-    </div>
-    <div class="connection-note">Connection: If they don't convert after post-trial &rarr; enters "lead nurture (once lost)"</div>
+  <!-- WORKFLOW: Done Trial -->
+  <div class="wf-card" style="border-left: 3px solid var(--pink);">
+    <h4>Workflow: "Done Trial" <span class="tag published">Published</span> <span class="stat">(<strong>29</strong> enrolled)</span></h4>
+    <div class="wf-meta">44 versions | Last updated Nov 5, 2025 | Routes leads based on coach's post-trial assessment</div>
   </div>
 
-  <!-- LEAD NURTURE -->
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Form Submitted: "Post Trial Form"<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Coach fills out assessment after trial session. Sticky note: "for KPI tracking purposes"</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 1 — Cleanup</div>
+      <div class="flow-row">
+        <div class="flow-node action">Remove from Workflow (clears any active pre-trial sequences)</div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 2 — Condition: 4-way branch based on form answers</div>
+    </div>
+
+    <!-- Branch 1: Good fit -->
+    <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+      <div class="flow-group-label" style="color: var(--green);">BRANCH 1: Coach Assessment of Fit = "Yes" (good fit)</div>
+      <div class="flow-row">
+        <div class="flow-node action">Create/Update Opportunity</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Add 'posttrial' Tag</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Add 'currentlyinposttrial' Tag</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead enters post-trial sales follow-up sequence</p>
+    </div>
+
+    <!-- Branch 2: Not a fit -->
+    <div class="flow-group" style="border-left-color: var(--red); margin-top: 8px;">
+      <div class="flow-group-label" style="color: var(--red);">BRANCH 2: Coach Assessment of Fit = "No" (not a fit)</div>
+      <div class="flow-row">
+        <div class="flow-node action">Create/Update Opportunity</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Update appointment status</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Add Tag "lostaftertrial"</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead marked as lost — enters lead nurture eventually</p>
+    </div>
+
+    <!-- Branch 3: No-show -->
+    <div class="flow-group" style="border-left-color: var(--accent); margin-top: 8px;">
+      <div class="flow-group-label" style="color: var(--accent);">BRANCH 3: "Did the Athlete show up?" = "No"</div>
+      <div class="flow-row">
+        <div class="flow-node action">Update appointment status</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node action">Add Tag "missed trial"</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Feeds into the "Missed Trial" workflow for no-show follow-up</p>
+    </div>
+
+    <!-- Branch 4: None -->
+    <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+      <div class="flow-group-label">BRANCH 4: None of the conditions met</div>
+      <div class="flow-row">
+        <div class="flow-node outcome">END</div>
+      </div>
+    </div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>Key context:</strong> This single workflow handles ALL post-trial outcomes. The coach fills out the "Post Trial Form" after each session. Based on their assessment, the lead gets routed: good fits enter the sales follow-up, bad fits get marked as lost, and no-shows get tagged for the Missed Trial rebook sequence. This is the main decision point that determines if a lead converts to the onboarding pipeline or falls into lead nurture.
+    </div>
+  </div>
+
+  <!-- WORKFLOW: Missed Trial -->
+  <div class="wf-card" style="border-left: 3px solid var(--accent); margin-top: 24px;">
+    <h4>Workflow: "Missed Trial" <span class="tag published">Published</span> <span class="stat">(<strong>54</strong> enrolled)</span></h4>
+    <div class="wf-meta">32 versions | Last updated Oct 3, 2025 | GHL was slow to load — details pending full verification</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Contact Tag Added — "missed trial"<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Fed by the "Done Trial" workflow Branch 3 (no-show)</span>
+      </div>
+    </div>
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">EXPECTED BEHAVIOR (based on workflow name + context)</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">Follow-up sequence for no-shows: SMS asking what happened, offers to rebook. More understanding tone than ghosted. If no response, eventually feeds into sms ghosted or lead nurture.</p>
+    </div>
+    <div class="connection-note" style="margin-top: 12px;">
+      <strong>Note:</strong> GHL builder was timing out when documenting this workflow. Steps above are inferred from context — need to verify actual steps when GHL is available.
+    </div>
+  </div>
+
+  <!-- LEAD NURTURE (DETAILED) -->
   <h3 style="color: var(--purple); font-size: 1rem; margin: 24px 0 12px 0;">LEAD NURTURE</h3>
+  <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+  <!-- WORKFLOW: lead nurture (once lost) -->
+  <div class="wf-card" style="border-left: 3px solid var(--purple);">
+    <h4>Workflow: "lead nurture (once lost)" <span class="tag published">Published</span> <span class="stat">(<strong>243</strong> enrolled, <strong style="color: var(--accent);">164 active</strong>)</span></h4>
+    <div class="wf-meta">26 versions | Last updated Oct 31, 2025 | Long-term email drip spanning months — biggest always-running automation</div>
+  </div>
+
+  <div class="flow-container" style="margin-bottom: 16px;">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER (inferred — trigger was above viewport)</div>
+    <div class="flow-row">
+      <div class="flow-node trigger">Contact enters "lost" stage or tagged accordingly<br>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">Fed by: Done Trial (lost after trial), sms ghosted (exhausted ghosted sequence), or manual tagging</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 1 — Cleanup + Check</div>
+      <div class="flow-row">
+        <div class="flow-node action">Remove 'currentlyinposttrial' Tag</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Condition: first trip through vs already lost</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">If Tags does NOT include "lost" → first trip (add lost tag, continue). If already lost → END (prevents re-entry)</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 2 — Check context</div>
+      <div class="flow-row">
+        <div class="flow-node action">Add lost tag</div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Condition: "glue guy" check</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Checks if contact has "glueguyrespondi..." tag — special routing for referral leads</span>
+        </div>
+      </div>
+      <div class="flow-row" style="margin-top: 8px;">
+        <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+          <strong>Condition: "if they were in a trial"</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">If Tags includes "posttrial" → Add 'lostaftertrial' tag (extra context for messaging)</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">STEP 3 — Long-term email drip (value-based content)</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+        <div class="flow-node action" style="border-color: var(--green); text-align: center;">
+          <strong>Week 1:</strong> email 1 — recognition
+        </div>
+        <div class="flow-node action" style="border-color: var(--green); text-align: center;">
+          <strong>Week 2:</strong> email 2 — development in the GTA
+        </div>
+        <div class="flow-node action" style="border-color: var(--green); text-align: center;">
+          <strong>Week 5:</strong> email 3 — testimonials
+        </div>
+        <div class="flow-node action" style="border-color: var(--green); text-align: center;">
+          <strong>Week 8:</strong> email 4 — turns
+        </div>
+      </div>
+      <div class="flow-row" style="margin-top: 12px;">
+        <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">
+          <strong>Wait 6 MONTHS</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Long pause — then the sequence likely loops or sends seasonal re-engagement</span>
+        </div>
+      </div>
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">The drip continues after the 6-month wait with additional SMS/email touchpoints (workflow extends further — too long to fully capture at 20% zoom)</p>
+    </div>
+
+    <div class="connection-note" style="margin-top: 16px;">
+      <strong>Key context:</strong> This is BY FAR the most active automation — 164 contacts currently in it. It's the long-tail nurture for everyone who didn't convert. The emails are value-based (recognition, development, testimonials, success stories) rather than hard sales. The 6-month wait between cycles means leads get periodic touchpoints over a very long period. If a lead replies at any point, the "responded to lead nurture" circuit breaker fires.
+    </div>
+  </div>
+
+  <!-- WORKFLOW: responded to lead nurture -->
+  <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+    <h4>Workflow: "responded to lead nurture" <span class="tag published">Published</span> <span class="stat">(<strong>6</strong> enrolled)</span></h4>
+    <div class="wf-meta">10 versions | Last updated Jul 1, 2025 | Circuit breaker — GHL timed out, follows standard pattern</div>
+  </div>
+
   <div class="flow-container">
+    <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
     <div class="flow-row">
-      <div class="flow-node trigger">Lead marked as lost / didn't convert</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">lead nurture (once lost) <span class="stat">(<strong>243</strong> enrolled, <strong>164</strong> active)</span></div>
+      <div class="flow-node trigger">Customer Replied — filtered to replies to "lead nurture (once lost)" workflow</div>
     </div>
-    <div class="flow-group">
-      <div class="flow-group-label">What it does</div>
-      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Long-term re-engagement for cold leads. <strong style="color: var(--accent);">164 currently active</strong> — this is the biggest always-running automation. Sends periodic value-based messages (success stories, program updates, seasonal offers) over weeks/months.</p>
+    <div style="margin-top: 16px;">
+      <div class="flow-group-label">EXPECTED ACTION (follows circuit breaker pattern)</div>
+      <div class="flow-row">
+        <div class="flow-node action">
+          <strong>Create/Update Opportunity</strong><br>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Moves opportunity to "responded" stage — pulls lead out of nurture and signals staff for human follow-up</span>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node outcome">END</div>
+      </div>
     </div>
-    <div class="flow-row">
-      <div class="flow-node response">Lead responds</div>
-      <div class="flow-arrow">&rarr;</div>
-      <div class="flow-node action">responded to lead nurture <span class="stat">(<strong>6</strong> enrolled)</span></div>
+    <div class="connection-note" style="margin-top: 12px;">
+      <strong>Note:</strong> GHL was timing out when loading this workflow. Action above follows the same circuit breaker pattern as all other "responded to" workflows. Needs verification.
     </div>
   </div>
 
@@ -1199,6 +1367,41 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
     <div class="flow-group">
       <div class="flow-group-label">What it does</div>
       <p style="font-size: 0.8rem; color: var(--text-muted);">Sends dunning messages: notifies member of failed payment, asks to update billing, escalates to staff if not resolved. Critical for retention.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FACEBOOK / TRACKING SECTION ===== -->
+<div class="section">
+  <div class="section-title">
+    <span class="badge" style="background: #1877f2; color: white;">FB</span>
+    Facebook Tracking Workflows
+  </div>
+  <p class="section-desc">Utility workflows for Facebook ad tracking and conversion API integration. Not customer-facing — purely data/analytics.</p>
+
+  <div class="flow-container">
+    <div class="wf-card" style="border-left: 3px solid #1877f2;">
+      <h4>Workflow: "facebook analytics (extra)" <span class="tag published">Published</span></h4>
+      <div class="wf-meta">7 versions | GHL timed out — needs verification</div>
+    </div>
+    <div class="flow-group">
+      <div class="flow-group-label">Purpose</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Sends conversion events back to Facebook for ad optimization. Fires when key actions happen (form fills, bookings, payments) and sends data to Facebook Conversions API so ad campaigns can optimize toward real conversions.</p>
+    </div>
+
+    <hr style="border-color: var(--border); margin: 16px 0;">
+
+    <div class="wf-card" style="border-left: 3px solid #1877f2;">
+      <h4>Workflow: "FB tracking | Form Submit API" <span class="tag published">Published</span></h4>
+      <div class="wf-meta">3 versions | GHL timed out — needs verification</div>
+    </div>
+    <div class="flow-group">
+      <div class="flow-group-label">Purpose</div>
+      <p style="font-size: 0.8rem; color: var(--text-muted);">Specifically tracks form submissions and sends them to Facebook's Conversions API. Likely fires an HTTP webhook to Facebook with contact data (hashed email/phone) so FB can attribute the lead to the correct ad campaign.</p>
+    </div>
+
+    <div class="connection-note" style="margin-top: 12px;">
+      <strong>For Danny:</strong> These are integration/tracking workflows. In Full Control, this would likely be handled by direct API calls from the app rather than a GHL workflow. The key requirement is: when a lead takes a meaningful action, send a server-side event to Facebook Conversions API with the appropriate event name and user data.
     </div>
   </div>
 </div>
