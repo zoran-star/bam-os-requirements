@@ -50,6 +50,12 @@ const PSYCH_LEVERS = ["FOMO", "Pain Point", "Solution", "Urgency", "Aspiration",
 
 const PERSONAS = ["", "Young Hungry", "Established"];
 
+const PSYCH_LEVER_COLORS = {
+  "FOMO": "#e74c3c", "Pain Point": "#e67e22", "Solution": "#27ae60", "Urgency": "#c0392b",
+  "Aspiration": "#8e44ad", "Simplicity": "#3498db", "Curiosity": "#f39c12", "Value": "#2ecc71",
+  "Authority": "#2c3e50", "Objection Handler": "#d35400", "Social Proof": "#16a085", "Humor": "#e91e63",
+};
+
 const STATUS_FLOW = ["draft", "approved", "recorded", "published"];
 const STATUS_COLORS = (tokens) => ({
   draft: tokens.textMute,
@@ -109,6 +115,7 @@ function FilterPills({ options, value, onChange, tokens }) {
           background: value === opt.value ? tokens.accentGhost : "transparent",
           color: value === opt.value ? tokens.accent : tokens.textSub,
           transition: "all 0.15s ease",
+          transform: value === opt.value ? "scale(1.05)" : "scale(1)",
         }}>{opt.label}</button>
       ))}
     </div>
@@ -117,10 +124,13 @@ function FilterPills({ options, value, onChange, tokens }) {
 
 function EmptyState({ tokens, icon, title, subtitle }) {
   return (
-    <div style={{ textAlign: "center", padding: "60px 20px" }}>
-      <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>{icon}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 14, color: tokens.textMute }}>{subtitle}</div>
+    <div style={{ textAlign: "center", padding: "60px 20px", animation: "cardIn 0.4s ease both" }}>
+      <div style={{
+        fontSize: 48, marginBottom: 16, opacity: 0.25,
+        filter: "grayscale(0.3)",
+      }}>{icon}</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: tokens.text, marginBottom: 6, letterSpacing: "-0.01em" }}>{title}</div>
+      <div style={{ fontSize: 14, color: tokens.textMute, maxWidth: 320, margin: "0 auto", lineHeight: 1.5 }}>{subtitle}</div>
     </div>
   );
 }
@@ -890,21 +900,41 @@ function ScriptPanel({ tokens, creative, onBack }) {
 
       {/* Script body */}
       {activeScript ? (
-        <div style={{
-          padding: 24, borderRadius: 14, background: tokens.surface,
-          border: `1px solid ${tokens.border}`, marginBottom: 20,
-          fontSize: 14, lineHeight: 1.8, color: tokens.text,
-          whiteSpace: "pre-wrap", fontFamily: "inherit",
-          minHeight: 200,
-        }}>
-          {activeScript.body}
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <div style={{
+            padding: 24, borderRadius: 14, background: tokens.surface,
+            border: `1px solid ${tokens.border}`,
+            fontSize: 14, lineHeight: 1.8, color: tokens.text,
+            whiteSpace: "pre-wrap", fontFamily: "inherit",
+            minHeight: 200,
+          }}>
+            {activeScript.body}
+          </div>
+          <button onClick={() => { navigator.clipboard.writeText(activeScript.body); }}
+            style={{
+              position: "absolute", top: 10, right: 10, fontSize: 11, fontWeight: 500,
+              padding: "4px 10px", borderRadius: 6, border: `1px solid ${tokens.border}`,
+              background: tokens.surfaceEl, color: tokens.textMute, cursor: "pointer",
+              fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 4,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = tokens.accent; e.currentTarget.style.color = tokens.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = tokens.border; e.currentTarget.style.color = tokens.textMute; }}
+            onClickCapture={e => { const btn = e.currentTarget; const orig = btn.textContent; btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = orig; }, 1500); }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy
+          </button>
         </div>
       ) : (
         <div style={{
-          padding: 40, borderRadius: 14, border: `1px dashed ${tokens.border}`,
+          padding: 48, borderRadius: 14, border: `1px dashed ${tokens.border}`,
           textAlign: "center", color: tokens.textMute, fontSize: 14, marginBottom: 20,
+          animation: "cardIn 0.3s ease both",
         }}>
-          No script yet. Click "Generate Script" to create one.
+          <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.3 }}>{"\uD83D\uDCDD"}</div>
+          <div style={{ fontWeight: 600, color: tokens.text, marginBottom: 4 }}>No script yet</div>
+          <div>Click "Generate Script" to create an AI-powered script for this creative.</div>
         </div>
       )}
 
@@ -984,6 +1014,18 @@ function GenerateCreativeModal({ tokens, themes, onSave, onClose, onCreateTheme 
   const [result, setResult] = useState(null);
   const [selectedThemeId, setSelectedThemeId] = useState("");
   const [error, setError] = useState("");
+  const [voiceRecording, setVoiceRecording] = useState(false);
+  const voiceRecRef = useRef(null);
+
+  const toggleVoiceDirection = () => {
+    if (voiceRecording) { voiceRecRef.current?.stop(); setVoiceRecording(false); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert("Speech recognition not supported. Try Chrome."); return; }
+    const r = new SR(); r.continuous = true; r.interimResults = true; r.lang = "en-US";
+    r.onresult = (e) => { let t = ""; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; setPrompt(prev => prev ? prev + " " + t : t); };
+    r.onerror = () => setVoiceRecording(false); r.onend = () => setVoiceRecording(false);
+    voiceRecRef.current = r; r.start(); setVoiceRecording(true);
+  };
 
   const generate = async () => {
     setLoading(true); setError(""); setResult(null);
@@ -1049,11 +1091,12 @@ function GenerateCreativeModal({ tokens, themes, onSave, onClose, onCreateTheme 
       display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
       animation: "cardIn 0.2s ease both",
     }}>
-      <div onClick={e => e.stopPropagation()} style={{
+      <div className="ce-generate-modal" onClick={e => e.stopPropagation()} style={{
         background: tokens.surface, borderRadius: 20, padding: 28,
         width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto",
         border: `1px solid ${tokens.border}`,
         boxShadow: `0 24px 48px rgba(0,0,0,0.2), 0 0 0 1px ${tokens.border}`,
+        animation: "modalSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1070,9 +1113,32 @@ function GenerateCreativeModal({ tokens, themes, onSave, onClose, onCreateTheme 
               <label style={{ fontSize: 12, fontWeight: 600, color: tokens.textSub, marginBottom: 6, display: "block" }}>
                 Direction <span style={{ fontWeight: 400, color: tokens.textMute }}>(optional — or let AI surprise you)</span>
               </label>
-              <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
-                placeholder="e.g., 'Something about how owners are drowning in admin' or 'A funny take on checking 6 different apps'..."
-                rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+              <div style={{ position: "relative" }}>
+                <textarea value={prompt} onChange={e => setPrompt(e.target.value)}
+                  placeholder="e.g., 'Something about how owners are drowning in admin' or 'A funny take on checking 6 different apps'..."
+                  rows={3} style={{ ...inputStyle, resize: "vertical", paddingRight: 48 }} />
+                <button onClick={toggleVoiceDirection} style={{
+                  position: "absolute", right: 8, top: 8, width: 34, height: 34, borderRadius: 8,
+                  border: `1px solid ${voiceRecording ? tokens.red : tokens.border}`,
+                  background: voiceRecording ? tokens.redSoft : tokens.surfaceEl,
+                  color: voiceRecording ? tokens.red : tokens.textMute,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s ease",
+                  animation: voiceRecording ? "gentlePulse 1s ease-in-out infinite" : "none",
+                }} title={voiceRecording ? "Stop recording" : "Speak your direction"}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                  </svg>
+                </button>
+                {voiceRecording && (
+                  <span style={{
+                    position: "absolute", right: 48, top: 14, fontSize: 11, fontWeight: 600,
+                    color: tokens.red, animation: "gentlePulse 1s ease-in-out infinite",
+                  }}>Listening...</span>
+                )}
+              </div>
             </div>
 
             {/* Guardrails */}
@@ -1223,7 +1289,7 @@ function GenerateCreativeModal({ tokens, themes, onSave, onClose, onCreateTheme 
   );
 }
 
-function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
+function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate, onCopy, currentMode }) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [titleVal, setTitleVal] = useState(theme.title);
@@ -1284,7 +1350,7 @@ function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
             title="Click to edit title"
           >
             {theme.title}
-            {hovered && <span style={{ fontSize: 11, color: tokens.textMute, marginLeft: 6, opacity: 0.6 }}>✎</span>}
+            <span style={{ fontSize: 11, color: tokens.textMute, marginLeft: 6, opacity: hovered ? 0.6 : 0, transition: "opacity 0.2s ease" }}>✎</span>
           </div>
         )}
         <button onClick={(e) => { e.stopPropagation(); onDelete(theme.id); }} style={{
@@ -1343,7 +1409,143 @@ function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate }) {
         <span style={{ fontSize: 12, color: tokens.textMute, marginLeft: "auto", fontWeight: 600 }}>
           {creativeCount} creative{creativeCount !== 1 ? "s" : ""}
         </span>
+        {hovered && onCopy && (
+          <button onClick={e => { e.stopPropagation(); onCopy(theme); }}
+            title={`Copy to ${currentMode === "paid" ? "Organic" : "Paid Ads"}`}
+            style={{
+              fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6,
+              border: `1px solid ${tokens.border}`, background: "transparent",
+              color: tokens.textMute, cursor: "pointer", fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              transition: "all 0.15s", marginLeft: 4,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = tokens.accent; e.currentTarget.style.color = tokens.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = tokens.border; e.currentTarget.style.color = tokens.textMute; }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            → {currentMode === "paid" ? "Organic" : "Paid"}
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+function CreativeCard({ creative, index, tokens, onDrill, onDelete, onUpdate }) {
+  const [editing, setEditing] = useState(false);
+  const [titleVal, setTitleVal] = useState(creative.title);
+  const [hookVal, setHookVal] = useState(creative.hook || "");
+  const [hovered, setHovered] = useState(false);
+  const titleRef = useRef(null);
+
+  useEffect(() => { setTitleVal(creative.title); setHookVal(creative.hook || ""); }, [creative.title, creative.hook]);
+  useEffect(() => { if (editing) titleRef.current?.focus(); }, [editing]);
+
+  const vsLabel = VIDEO_STYLES.find(s => s.value === creative.video_style)?.label || creative.video_style || "\u2014";
+  const isQueued = creative.is_active === false;
+
+  const save = () => {
+    setEditing(false);
+    const updates = {};
+    if (titleVal.trim() && titleVal.trim() !== creative.title) updates.title = titleVal.trim();
+    if (hookVal.trim() !== (creative.hook || "")) updates.hook = hookVal.trim();
+    if (Object.keys(updates).length > 0) onUpdate(creative.id, updates);
+    else { setTitleVal(creative.title); setHookVal(creative.hook || ""); }
+  };
+
+  if (editing) {
+    return (
+      <div style={{
+        padding: "14px 20px", borderRadius: 12, background: tokens.surfaceEl,
+        border: `1px solid ${tokens.accent}`, animation: `cardIn 0.2s ease both`,
+        borderLeft: `3px solid ${tokens.accent}`,
+        boxShadow: `0 0 0 2px ${tokens.accentGhost}`,
+      }} onClick={e => e.stopPropagation()}>
+        <input ref={titleRef} value={titleVal} onChange={e => setTitleVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setTitleVal(creative.title); setHookVal(creative.hook || ""); setEditing(false); } }}
+          placeholder="Creative title..."
+          style={{
+            width: "100%", fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 6,
+            background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0,
+          }}
+        />
+        <input value={hookVal} onChange={e => setHookVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") { setTitleVal(creative.title); setHookVal(creative.hook || ""); setEditing(false); } }}
+          placeholder="Hook / opening line..."
+          style={{
+            width: "100%", fontSize: 13, color: tokens.textSub, marginBottom: 8,
+            background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0,
+          }}
+        />
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button onClick={() => { setTitleVal(creative.title); setHookVal(creative.hook || ""); setEditing(false); }} style={{
+            fontSize: 12, fontWeight: 500, padding: "4px 12px", borderRadius: 6,
+            border: `1px solid ${tokens.border}`, background: "transparent",
+            color: tokens.textMute, cursor: "pointer", fontFamily: "inherit",
+          }}>Cancel</button>
+          <button onClick={save} style={{
+            fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 6,
+            border: "none", background: tokens.accent,
+            color: "#0E0D0B", cursor: "pointer", fontFamily: "inherit",
+          }}>Save</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ce-creative-row" style={{
+      display: "flex", alignItems: "center", gap: 16, padding: "14px 20px",
+      borderRadius: 12, background: tokens.surfaceEl,
+      border: `1px solid ${hovered ? tokens.borderStr : tokens.border}`, cursor: "pointer",
+      borderLeft: `3px solid ${isQueued ? tokens.textMute : (creative.psych_lever && PSYCH_LEVER_COLORS[creative.psych_lever] ? PSYCH_LEVER_COLORS[creative.psych_lever] : (PHASE_COLORS(tokens)[creative.phase] || tokens.accent))}`,
+      opacity: isQueued ? 0.5 : 1,
+      transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+      animation: `cardIn 0.3s ease ${index * 30}ms both`,
+      transform: hovered ? "translateY(-2px)" : "translateY(0)",
+      boxShadow: hovered ? tokens.cardHover : "none",
+    }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => onDrill(creative)}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+          {creative.title}
+          {creative.creator === "AI" && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4,
+              background: `linear-gradient(135deg, ${tokens.accent}25, ${tokens.accent}15)`,
+              color: tokens.accent, border: `1px solid ${tokens.accent}30`,
+              letterSpacing: "0.04em", lineHeight: "16px", flexShrink: 0,
+            }}>AI</span>
+          )}
+          <span onClick={e => { e.stopPropagation(); setEditing(true); }}
+            style={{ fontSize: 12, color: tokens.textMute, opacity: hovered ? 0.6 : 0, cursor: "pointer", transition: "opacity 0.2s ease" }}
+            title="Click to edit">✎</span>
+        </div>
+        {creative.hook && (
+          <div style={{ fontSize: 13, color: tokens.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {creative.hook}
+          </div>
+        )}
+      </div>
+      <div className="ce-creative-pills" style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {isQueued && <Pill label="Queued" color={tokens.textMute} bg={tokens.surfaceHov} />}
+        <Pill label={vsLabel} color={tokens.accent} bg={tokens.accentGhost} />
+        <Pill label={creative.tone || "\u2014"} color={tokens.textSub} bg={tokens.surfaceHov} />
+        <Pill label={PHASE_LABELS[creative.phase] || "\u2014"} color={PHASE_COLORS(tokens)[creative.phase]} bg={PHASE_BG(tokens)[creative.phase]} />
+        {creative.psych_lever && <Pill label={creative.psych_lever} color={tokens.blue} bg={`${tokens.blue}15`} />}
+        {creative.persona && <Pill label={creative.persona} color={tokens.amber} bg={tokens.amberSoft} />}
+      </div>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(creative.id); }} style={{
+        background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
+        fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: hovered ? 0.5 : 0,
+        transition: "opacity 0.15s",
+      }}
+        onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
+        onMouseLeave={e => { e.currentTarget.style.opacity = hovered ? "0.5" : "0"; e.currentTarget.style.color = tokens.textMute; }}
+      >&times;</button>
     </div>
   );
 }
@@ -1514,7 +1716,7 @@ export default function ContentEngineView({ tokens, dark }) {
   // ─── Breadcrumb ───
 
   const Breadcrumb = () => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13 }}>
+    <div className="ce-breadcrumb" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 20, fontSize: 13, animation: "cardIn 0.25s ease both" }}>
       <span onClick={goBackToThemes} style={{
         color: view === "themes" ? tokens.text : tokens.accent, fontWeight: view === "themes" ? 600 : 400,
         cursor: view === "themes" ? "default" : "pointer",
@@ -1549,12 +1751,33 @@ export default function ContentEngineView({ tokens, dark }) {
       <style>{`
         @keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @media(max-width:768px){
+          .ce-root{padding:16px 12px!important}
+          .ce-header{flex-direction:column!important;gap:10px!important;align-items:stretch!important}
+          .ce-header-title{font-size:20px!important}
+          .ce-filters{flex-wrap:wrap!important;gap:6px!important}
+          .ce-actions{flex-wrap:wrap!important;gap:6px!important;justify-content:stretch!important}
+          .ce-actions button{flex:1!important;min-width:0!important;text-align:center!important;justify-content:center!important}
+          .ce-theme-grid{grid-template-columns:1fr!important;gap:12px!important}
+          .ce-creative-row{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
+          .ce-creative-pills{justify-content:flex-start!important;flex-wrap:wrap!important}
+          .ce-breadcrumb{flex-wrap:wrap!important;font-size:12px!important}
+          .ce-generate-modal{padding:20px!important;max-width:100%!important;margin:8px!important;max-height:92vh!important}
+          .ce-andromeda{flex-direction:column!important}
+        }
+        @media(max-width:480px){
+          .ce-root{padding:12px 8px!important}
+          .ce-actions button{font-size:12px!important;padding:6px 10px!important}
+          .ce-creative-row{padding:12px 14px!important}
+        }
         @keyframes dashPulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
         @keyframes gentlePulse{0%,100%{opacity:1}50%{opacity:0.7}}
+        @keyframes modalSlideUp{from{opacity:0;transform:translateY(24px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes skeletonPulse{0%{opacity:0.3}50%{opacity:0.6}100%{opacity:0.3}}
       `}</style>
 
       {/* Header controls — simplified to 1 row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: showAdvancedFilters ? 8 : 24, flexWrap: "wrap" }}>
+      <div className="ce-header" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: showAdvancedFilters ? 8 : 24, flexWrap: "wrap" }}>
         <SegmentToggle
           options={[{ value: "paid", label: "Paid Ads" }, { value: "organic", label: "Organic" }]}
           value={mode} onChange={(v) => { setMode(v); setView("themes"); setSelectedTheme(null); }}
@@ -1585,7 +1808,7 @@ export default function ContentEngineView({ tokens, dark }) {
         </button>
         <div style={{ flex: 1 }} />
         {view === "themes" && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="ce-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button onClick={() => setShowImport(p => !p)} style={{
               fontSize: 13, fontWeight: 400, padding: "6px 12px", borderRadius: 8,
               border: "none", background: "transparent",
@@ -1692,24 +1915,34 @@ export default function ContentEngineView({ tokens, dark }) {
           )}
 
           {loading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="ce-theme-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {[0, 1, 2, 3].map(i => (
                 <div key={i} style={{
-                  height: 120, borderRadius: 14, background: tokens.surfaceEl,
+                  height: 160, borderRadius: 16, background: `linear-gradient(135deg, ${tokens.surfaceEl}, ${tokens.surfaceHov || tokens.surfaceEl})`,
                   border: `1px solid ${tokens.border}`,
-                  animation: "dashPulse 1.5s ease-in-out infinite",
-                  animationDelay: `${i * 100}ms`,
+                  animation: "skeletonPulse 1.8s ease-in-out infinite",
+                  animationDelay: `${i * 150}ms`,
                 }} />
               ))}
             </div>
           ) : themes.length === 0 ? (
-            <EmptyState tokens={tokens} icon={"\uD83C\uDFAC"} title="No themes yet"
-              subtitle={`Create your first ${mode === "paid" ? "paid ads" : "organic"} theme to get started.`} />
+            <EmptyState tokens={tokens} icon={"\uD83C\uDFA8"} title="Your canvas is empty"
+              subtitle={`Start building your ${mode === "paid" ? "paid ads" : "organic"} library. Add a theme or let AI generate one for you.`} />
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div className="ce-theme-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               {themes.map((theme, i) => (
                 <ThemeCard key={theme.id} theme={theme} index={i} tokens={tokens}
                   onDrill={drillIntoTheme} onDelete={handleDeleteTheme}
+                  currentMode={mode}
+                  onCopy={async (theme) => {
+                    const oppositeMode = mode === "paid" ? "organic" : "paid";
+                    const { data } = await createTheme({
+                      title: theme.title, description: theme.description || "",
+                      category: theme.category || "Uncategorized", mode: oppositeMode,
+                      creator: theme.creator, phase: theme.phase, sort_order: 0, tags: theme.tags || [],
+                    });
+                    if (data) setThemes(prev => [data, ...prev]);
+                  }}
                   onUpdate={async (id, fields) => {
                     const { data } = await updateTheme(id, fields);
                     if (data) setThemes(prev => prev.map(t => t.id === id ? { ...t, ...fields } : t));
@@ -1769,56 +2002,19 @@ export default function ContentEngineView({ tokens, dark }) {
           )}
 
           {creatives.length === 0 ? (
-            <EmptyState tokens={tokens} icon={"\uD83D\uDCAC"} title="No creatives yet"
-              subtitle="Add your first creative to this theme." />
+            <EmptyState tokens={tokens} icon={"\u2728"} title="Ready for creatives"
+              subtitle="This theme is waiting for its first creative. Add one manually or use the Generate button." />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {creatives.map((creative, i) => {
-                const vsLabel = VIDEO_STYLES.find(s => s.value === creative.video_style)?.label || creative.video_style || "\u2014";
-                const isQueued = creative.is_active === false;
-                return (
-                  <div key={creative.id} onClick={() => drillIntoCreative(creative)} style={{
-                    display: "flex", alignItems: "center", gap: 16, padding: "14px 20px",
-                    borderRadius: 12, background: tokens.surfaceEl,
-                    border: `1px solid ${tokens.border}`, cursor: "pointer",
-                    borderLeft: `3px solid ${isQueued ? tokens.textMute : (PHASE_COLORS(tokens)[creative.phase] || tokens.accent)}`,
-                    opacity: isQueued ? 0.5 : 1,
-                    transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
-                    animation: `cardIn 0.3s ease ${i * 30}ms both`,
+              {creatives.map((creative, i) => (
+                <CreativeCard key={creative.id} creative={creative} index={i} tokens={tokens}
+                  onDrill={drillIntoCreative} onDelete={handleDeleteCreative}
+                  onUpdate={async (id, fields) => {
+                    const { data } = await updateCreative(id, fields);
+                    if (data) setCreatives(prev => prev.map(c => c.id === id ? { ...c, ...fields } : c));
                   }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = tokens.cardHover; e.currentTarget.style.borderColor = tokens.borderStr; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = tokens.border; }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>{creative.title}</div>
-                      {creative.hook && (
-                        <div style={{ fontSize: 13, color: tokens.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {creative.hook}
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
-                      {isQueued && <Pill label="Queued" color={tokens.textMute} bg={tokens.surfaceHov} />}
-                      <Pill label={vsLabel} color={tokens.accent} bg={tokens.accentGhost} />
-                      <Pill label={creative.tone || "\u2014"} color={tokens.textSub} bg={tokens.surfaceHov} />
-                      <Pill label={PHASE_LABELS[creative.phase] || "\u2014"} color={PHASE_COLORS(tokens)[creative.phase]} bg={PHASE_BG(tokens)[creative.phase]} />
-                      {creative.psych_lever && (
-                        <Pill label={creative.psych_lever} color={tokens.blue} bg={`${tokens.blue}15`} />
-                      )}
-                      {creative.persona && (
-                        <Pill label={creative.persona} color={tokens.amber} bg={tokens.amberSoft} />
-                      )}
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteCreative(creative.id); }} style={{
-                      background: "none", border: "none", color: tokens.textMute, cursor: "pointer",
-                      fontSize: 16, lineHeight: 1, padding: "0 4px", opacity: 0.3,
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = tokens.red; }}
-                      onMouseLeave={e => { e.currentTarget.style.opacity = "0.3"; e.currentTarget.style.color = tokens.textMute; }}
-                    >&times;</button>
-                  </div>
-                );
-              })}
+                />
+              ))}
             </div>
           )}
         </>
