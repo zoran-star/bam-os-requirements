@@ -1,9 +1,9 @@
-import { Client } from '@notionhq/client'
+const { Client } = require('@notionhq/client')
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN })
 const DB_ID = process.env.NOTION_BACKLOG_DB
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
   try {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=30')
     return res.status(200).json(items)
   } catch (err) {
-    console.error('Failed to fetch backlog:', err)
-    return res.status(500).json({ error: 'Failed to fetch backlog' })
+    console.error('Failed to fetch backlog:', err.message)
+    return res.status(500).json({ error: 'Failed to fetch backlog', detail: err.message })
   }
 }
