@@ -1317,7 +1317,7 @@ function ThemeCard({ theme, index, tokens, onDrill, onDelete, onUpdate, onCopy, 
   return (
     <div style={{
       padding: 24, borderRadius: 16, background: tokens.surface,
-      border: `1.5px solid ${hovered ? `${tokens.accent}50` : tokens.border}`,
+      border: `1px solid ${hovered ? `${tokens.accent}40` : "transparent"}`,
       cursor: "pointer",
       transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
       animation: `cardIn 0.3s ease ${index * 40}ms both`,
@@ -1497,7 +1497,7 @@ function CreativeCard({ creative, index, tokens, onDrill, onDelete, onUpdate }) 
     <div className="ce-creative-row" style={{
       display: "flex", alignItems: "center", gap: 16, padding: "14px 20px",
       borderRadius: 12, background: tokens.surfaceEl,
-      border: `1px solid ${hovered ? tokens.borderStr : tokens.border}`, cursor: "pointer",
+      border: `1px solid ${hovered ? `${tokens.accent}30` : "transparent"}`, cursor: "pointer",
       borderLeft: `3px solid ${isQueued ? tokens.textMute : (creative.psych_lever && PSYCH_LEVER_COLORS[creative.psych_lever] ? PSYCH_LEVER_COLORS[creative.psych_lever] : (PHASE_COLORS(tokens)[creative.phase] || tokens.accent))}`,
       opacity: isQueued ? 0.5 : 1,
       transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
@@ -1600,6 +1600,180 @@ function ThemeNotes({ tokens, theme, onSave }) {
   );
 }
 
+// ─── Pipeline (Kanban) View ───
+
+function PipelineView({ creatives, tokens, onDrill, onDelete, onUpdate }) {
+  const [dragId, setDragId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
+
+  const columns = STATUS_FLOW.map(status => ({
+    status,
+    label: status.charAt(0).toUpperCase() + status.slice(1),
+    items: creatives.filter(c => (c.status || "draft") === status),
+  }));
+
+  const statusColors = STATUS_COLORS(tokens);
+
+  const handleDragStart = (e, id) => {
+    setDragId(id);
+    e.dataTransfer.effectAllowed = "move";
+    // Needed for Firefox
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOver = (e, status) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverCol !== status) setDragOverCol(status);
+  };
+
+  const handleDragLeave = (e, status) => {
+    // Only clear if actually leaving the column (not entering a child)
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      if (dragOverCol === status) setDragOverCol(null);
+    }
+  };
+
+  const handleDrop = (e, newStatus) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    if (!dragId) return;
+    const creative = creatives.find(c => c.id === dragId);
+    if (!creative) return;
+    const currentStatus = creative.status || "draft";
+    if (currentStatus !== newStatus) {
+      onUpdate(dragId, { status: newStatus });
+    }
+    setDragId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragId(null);
+    setDragOverCol(null);
+  };
+
+  return (
+    <div className="ce-pipeline" style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(4, 1fr)",
+      gap: 12,
+      minHeight: 200,
+      animation: "cardIn 0.3s ease both",
+    }}>
+      {columns.map(col => (
+        <div
+          key={col.status}
+          onDragOver={(e) => handleDragOver(e, col.status)}
+          onDragLeave={(e) => handleDragLeave(e, col.status)}
+          onDrop={(e) => handleDrop(e, col.status)}
+          style={{
+            borderRadius: 12,
+            background: dragOverCol === col.status
+              ? `${statusColors[col.status]}12`
+              : `${tokens.surfaceEl}80`,
+            border: `1px solid ${dragOverCol === col.status ? statusColors[col.status] + "50" : tokens.border}`,
+            padding: 10,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            transition: "all 0.2s ease",
+            minHeight: 120,
+          }}
+        >
+          {/* Column header */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "4px 6px", marginBottom: 2,
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: statusColors[col.status],
+              flexShrink: 0,
+            }} />
+            <span style={{
+              fontSize: 12, fontWeight: 700, color: tokens.text,
+              letterSpacing: "0.03em", textTransform: "uppercase",
+            }}>{col.label}</span>
+            <span style={{
+              fontSize: 11, fontWeight: 600, color: tokens.textMute,
+              marginLeft: "auto",
+            }}>{col.items.length}</span>
+          </div>
+
+          {/* Cards */}
+          {col.items.length === 0 && (
+            <div style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, color: tokens.textMute, opacity: 0.5,
+              border: `1px dashed ${tokens.border}`, borderRadius: 8, minHeight: 60,
+            }}>
+              Drop here
+            </div>
+          )}
+          {col.items.map(creative => {
+            const isDragging = dragId === creative.id;
+            return (
+              <div
+                key={creative.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, creative.id)}
+                onDragEnd={handleDragEnd}
+                onClick={() => onDrill(creative)}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  background: tokens.surfaceEl,
+                  border: `1px solid ${tokens.border}`,
+                  borderLeft: `3px solid ${creative.psych_lever && PSYCH_LEVER_COLORS[creative.psych_lever] ? PSYCH_LEVER_COLORS[creative.psych_lever] : tokens.accent}`,
+                  cursor: "grab",
+                  opacity: isDragging ? 0.4 : 1,
+                  transition: "all 0.15s ease",
+                  userSelect: "none",
+                }}
+                onMouseEnter={e => {
+                  if (!isDragging) {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = tokens.cardHover || `0 2px 8px ${tokens.accent}20`;
+                  }
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{
+                  fontSize: 13, fontWeight: 600, color: tokens.text,
+                  marginBottom: 4, lineHeight: 1.3,
+                  overflow: "hidden", textOverflow: "ellipsis",
+                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                }}>{creative.title}</div>
+                {creative.hook && (
+                  <div style={{
+                    fontSize: 11, color: tokens.textSub, marginBottom: 6,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>{creative.hook}</div>
+                )}
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {creative.psych_lever && (
+                    <Pill label={creative.psych_lever} color={tokens.blue} bg={`${tokens.blue}15`}
+                      style={{ fontSize: 10, padding: "1px 7px" }} />
+                  )}
+                  {creative.video_style && (
+                    <Pill
+                      label={VIDEO_STYLES.find(s => s.value === creative.video_style)?.label?.split(" — ")[0] || creative.video_style}
+                      color={tokens.accent} bg={tokens.accentGhost}
+                      style={{ fontSize: 10, padding: "1px 7px" }} />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════
 // ─── Main Content Engine View ───
 // ═══════════════════════════════════════════
@@ -1625,6 +1799,7 @@ export default function ContentEngineView({ tokens, dark }) {
   const [showGenerate, setShowGenerate] = useState(false);
   const [showAddCreative, setShowAddCreative] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [creativesViewMode, setCreativesViewMode] = useState("list"); // "list" | "pipeline"
 
   // ─── Data loading ───
 
@@ -1761,6 +1936,7 @@ export default function ContentEngineView({ tokens, dark }) {
           .ce-theme-grid{grid-template-columns:1fr!important;gap:12px!important}
           .ce-creative-row{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
           .ce-creative-pills{justify-content:flex-start!important;flex-wrap:wrap!important}
+          .ce-pipeline{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}
           .ce-breadcrumb{flex-wrap:wrap!important;font-size:12px!important}
           .ce-generate-modal{padding:20px!important;max-width:100%!important;margin:8px!important;max-height:92vh!important}
           .ce-andromeda{flex-direction:column!important}
@@ -1769,6 +1945,7 @@ export default function ContentEngineView({ tokens, dark }) {
           .ce-root{padding:12px 8px!important}
           .ce-actions button{font-size:12px!important;padding:6px 10px!important}
           .ce-creative-row{padding:12px 14px!important}
+          .ce-pipeline{grid-template-columns:1fr 1fr!important;gap:6px!important}
         }
         @keyframes dashPulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
         @keyframes gentlePulse{0%,100%{opacity:1}50%{opacity:0.7}}
@@ -1845,16 +2022,42 @@ export default function ContentEngineView({ tokens, dark }) {
           </div>
         )}
         {view === "creatives" && (
-          <button onClick={() => setShowAddCreative(p => !p)} style={{
-            fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
-            border: `1px solid ${tokens.accentBorder}`, background: "transparent",
-            color: tokens.accent, cursor: "pointer", fontFamily: "inherit",
-            display: "inline-flex", alignItems: "center", gap: 4,
-            transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
-            onMouseEnter={e => { e.currentTarget.style.background = tokens.accentGhost; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
-          >+ Add Creative</button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* List / Pipeline toggle */}
+            <div style={{
+              display: "inline-flex", borderRadius: 8, border: `1px solid ${tokens.border}`,
+              background: tokens.surfaceEl, padding: 2, gap: 1,
+            }}>
+              <button onClick={() => setCreativesViewMode("list")} title="List view" style={{
+                padding: "5px 8px", borderRadius: 6, border: "none", cursor: "pointer",
+                background: creativesViewMode === "list" ? tokens.accent : "transparent",
+                color: creativesViewMode === "list" ? "#0E0D0B" : tokens.textMute,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s ease",
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </button>
+              <button onClick={() => setCreativesViewMode("pipeline")} title="Pipeline view" style={{
+                padding: "5px 8px", borderRadius: 6, border: "none", cursor: "pointer",
+                background: creativesViewMode === "pipeline" ? tokens.accent : "transparent",
+                color: creativesViewMode === "pipeline" ? "#0E0D0B" : tokens.textMute,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s ease",
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="12" rx="1"/><rect x="16" y="3" width="6" height="15" rx="1"/></svg>
+              </button>
+            </div>
+            <button onClick={() => setShowAddCreative(p => !p)} style={{
+              fontSize: 13, fontWeight: 600, padding: "8px 16px", borderRadius: 8,
+              border: `1px solid ${tokens.accentBorder}`, background: "transparent",
+              color: tokens.accent, cursor: "pointer", fontFamily: "inherit",
+              display: "inline-flex", alignItems: "center", gap: 4,
+              transition: "all 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = tokens.accentGhost; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+            >+ Add Creative</button>
+          </div>
         )}
       </div>
 
@@ -2004,6 +2207,17 @@ export default function ContentEngineView({ tokens, dark }) {
           {creatives.length === 0 ? (
             <EmptyState tokens={tokens} icon={"\u2728"} title="Ready for creatives"
               subtitle="This theme is waiting for its first creative. Add one manually or use the Generate button." />
+          ) : creativesViewMode === "pipeline" ? (
+            <PipelineView
+              creatives={creatives}
+              tokens={tokens}
+              onDrill={drillIntoCreative}
+              onDelete={handleDeleteCreative}
+              onUpdate={async (id, fields) => {
+                const { data } = await updateCreative(id, fields);
+                if (data) setCreatives(prev => prev.map(c => c.id === id ? { ...c, ...fields } : c));
+              }}
+            />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {creatives.map((creative, i) => (
