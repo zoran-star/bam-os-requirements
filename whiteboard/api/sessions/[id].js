@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     }
 
     const page = response.results[0]
-    const sectionDataRaw = page.properties['SECTION Data']?.rich_text?.[0]?.plain_text || '{}'
+    const sectionDataRaw = (page.properties['SECTION Data']?.rich_text || []).map(r => r.plain_text).join('') || '{}'
 
     let sectionData = {}
     try { sectionData = JSON.parse(sectionDataRaw) } catch {}
