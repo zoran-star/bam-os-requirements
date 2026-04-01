@@ -993,6 +993,9 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
         <div class="wf-card" style="border-left: 3px solid var(--red);">
           <h4>Workflow: "sms ghosted" <span class="tag published">Published</span> <span class="stat">(<strong>274</strong> enrolled, <strong>1</strong> active)</span></h4>
           <div class="wf-meta">67 versions | Last updated Nov 10, 2025 | 6-day drip for leads who went silent</div>
+          <div style="font-size: 0.78rem; color: var(--cyan); padding: 6px 10px; background: rgba(34,211,238,0.06); border-left: 3px solid var(--cyan); border-radius: 0 6px 6px 0; margin-top: 6px;">
+            <strong>Sticky note:</strong> "This workflow will be used when a contact doesn't reply to 'Trial Form Filled In,' 'Contact Form,' and 'No Show' workflows."
+          </div>
         </div>
 
         <div class="flow-container" style="margin-bottom: 16px;">
@@ -1098,6 +1101,9 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
         <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
           <h4>Workflow: "replied to 'sms ghosted'" <span class="tag published">Published</span> <span class="stat">(<strong>108</strong> enrolled)</span></h4>
           <div class="wf-meta">9 versions | Last updated Jul 21, 2025 | Circuit breaker workflow</div>
+          <div style="font-size: 0.78rem; color: var(--cyan); padding: 6px 10px; background: rgba(34,211,238,0.06); border-left: 3px solid var(--cyan); border-radius: 0 6px 6px 0; margin-top: 6px;">
+            <strong>Sticky note:</strong> "Once a customer gets sent to 'sms ghosted', this will take them back out of it, and put them in the 'replied' stage in the opportunities."
+          </div>
         </div>
 
         <div class="flow-container">
@@ -1320,9 +1326,9 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
         </div>
 
         <div class="flow-container" style="margin-bottom: 16px;">
-          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER (inferred — trigger was above viewport)</div>
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
           <div class="flow-row">
-            <div class="flow-node trigger">Contact enters "lost" stage or tagged accordingly<br>
+            <div class="flow-node trigger">Contact Tag Added — tag "lost" or similar triggers entry<br>
               <span style="font-size: 0.7rem; color: var(--text-muted);">Fed by: Done Trial (lost after trial), sms ghosted (exhausted ghosted sequence), or manual tagging</span>
             </div>
           </div>
@@ -1361,27 +1367,59 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
 
           <div style="margin-top: 16px;">
             <div class="flow-group-label">STEP 3 — Long-term email drip (value-based content)</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
-              <div class="flow-node action" style="border-color: var(--green); text-align: center;">
-                <strong>Week 1:</strong> email 1 — recognition
-              </div>
-              <div class="flow-node action" style="border-color: var(--green); text-align: center;">
-                <strong>Week 2:</strong> email 2 — development in the GTA
-              </div>
-              <div class="flow-node action" style="border-color: var(--green); text-align: center;">
-                <strong>Week 5:</strong> email 3 — testimonials
-              </div>
-              <div class="flow-node action" style="border-color: var(--green); text-align: center;">
-                <strong>Week 8:</strong> email 4 — turns
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 1 — recognition</strong>
+                </div>
               </div>
             </div>
-            <div class="flow-row" style="margin-top: 12px;">
-              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">
-                <strong>Wait 6 MONTHS</strong><br>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Long pause — then the sequence likely loops or sends seasonal re-engagement</span>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 2 — development in the GTA</strong>
+                </div>
               </div>
             </div>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">The drip continues after the 6-month wait with additional SMS/email touchpoints (workflow extends further — too long to fully capture at 20% zoom)</p>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 3 weeks</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 3 — testimonials</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 3 weeks</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 4 — fomo</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">
+                  <strong>Wait 6 MONTHS</strong><br>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Long pause before next cycle</span>
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">The drip continues after the 6-month wait with additional email touchpoints — long drip sequence extends further with more value-based content</p>
           </div>
 
           <div class="connection-note" style="margin-top: 16px;">
@@ -1392,7 +1430,7 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
         <!-- WORKFLOW: responded to lead nurture -->
         <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
           <h4>Workflow: "responded to lead nurture" <span class="tag published">Published</span> <span class="stat">(<strong>6</strong> enrolled)</span></h4>
-          <div class="wf-meta">10 versions | Last updated Jul 1, 2025 | Circuit breaker — GHL timed out, follows standard pattern</div>
+          <div class="wf-meta">10 versions | Last updated Jul 1, 2025 | Circuit breaker — moves lead back to Training Pipeline Responded stage</div>
         </div>
 
         <div class="flow-container">
@@ -1401,18 +1439,18 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
             <div class="flow-node trigger">Customer Replied — filtered to replies to "lead nurture (once lost)" workflow</div>
           </div>
           <div style="margin-top: 16px;">
-            <div class="flow-group-label">EXPECTED ACTION (follows circuit breaker pattern)</div>
+            <div class="flow-group-label">ACTION</div>
             <div class="flow-row">
               <div class="flow-node action">
-                <strong>Create/Update Opportunity</strong><br>
-                <span style="font-size: 0.75rem; color: var(--text-muted);">Moves opportunity to "responded" stage — pulls lead out of nurture and signals staff for human follow-up</span>
+                <strong>Update to Training Pipeline — Responded Stage</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Moves opportunity back to "responded" in the Training Pipeline — pulls lead out of nurture and signals staff for human follow-up</span>
               </div>
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node outcome">END</div>
             </div>
           </div>
           <div class="connection-note" style="margin-top: 12px;">
-            <strong>Note:</strong> GHL was timing out when loading this workflow. Action above follows the same circuit breaker pattern as all other "responded to" workflows. Needs verification.
+            <strong>How these two connect:</strong> When a lost lead replies to any email from the "lead nurture (once lost)" drip, this workflow fires automatically. It moves the opportunity back to the "responded" stage in the Training Pipeline — pulling them out of the nurture sequence and signaling to staff that a real conversation is now happening.
           </div>
         </div>
 
