@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl Market Data Explainer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family:'Inter',system-ui,sans-serif;
+    background:#0a0a0a;
+    color:#e0e0e0;
+    line-height:1.6;
+    min-height:100vh;
+  }
+
+  .container {
+    max-width:860px;
+    margin:0 auto;
+    padding:40px 24px 80px;
+  }
+
+  h1 {
+    font-size:28px;
+    font-weight:800;
+    color:#fff;
+    margin-bottom:8px;
+  }
+
+  .subtitle {
+    color:#888;
+    font-size:15px;
+    margin-bottom:48px;
+  }
+
+  /* Hero stats */
+  .hero-stats {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:16px;
+    margin-bottom:48px;
+  }
+
+  .hero-stat {
+    background:#141414;
+    border:1px solid #222;
+    border-radius:12px;
+    padding:24px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:all .2s;
+    position:relative;
+  }
+
+  .hero-stat:hover, .hero-stat.active {
+    border-color:#b8962e;
+    background:#1a1708;
+  }
+
+  .hero-stat.active::after {
+    content:'';
+    position:absolute;
+    bottom:-12px;
+    left:50%;
+    transform:translateX(-50%);
+    width:0;
+    height:0;
+    border-left:8px solid transparent;
+    border-right:8px solid transparent;
+    border-top:8px solid #b8962e;
+  }
+
+  .hero-stat-num {
+    font-size:32px;
+    font-weight:800;
+    color:#b8962e;
+    margin-bottom:4px;
+  }
+
+  .hero-stat-label {
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#888;
+  }
+
+  /* Explainer panel */
+  .explainer {
+    display:none;
+    background:#141414;
+    border:1px solid #222;
+    border-radius:16px;
+    padding:32px;
+    margin-bottom:48px;
+    animation:fadeIn .3s ease;
+  }
+
+  .explainer.active { display:block; }
+
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(8px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  .explainer h2 {
+    font-size:20px;
+    font-weight:700;
+    color:#fff;
+    margin-bottom:20px;
+  }
+
+  .explainer h3 {
+    font-size:14px;
+    font-weight:700;
+    color:#b8962e;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    margin:24px 0 12px;
+  }
+
+  .explainer h3:first-of-type { margin-top:0; }
+
+  .explainer p {
+    font-size:15px;
+    color:#ccc;
+    margin-bottom:12px;
+  }
+
+  /* Steps */
+  .step {
+    display:flex;
+    gap:16px;
+    margin-bottom:20px;
+    align-items:flex-start;
+  }
+
+  .step-num {
+    flex-shrink:0;
+    width:32px;
+    height:32px;
+    background:#b8962e;
+    color:#0a0a0a;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:14px;
+  }
+
+  .step-content {
+    flex:1;
+  }
+
+  .step-content strong {
+    color:#fff;
+    display:block;
+    margin-bottom:4px;
+  }
+
+  .step-content span {
+    font-size:14px;
+    color:#999;
+  }
+
+  /* Source card */
+  .source-card {
+    background:#1a1a1a;
+    border:1px solid #2a2a2a;
+    border-radius:10px;
+    padding:16px 20px;
+    margin-bottom:12px;
+    transition:border-color .2s;
+  }
+
+  .source-card:hover { border-color:#b8962e; }
+
+  .source-name {
+    font-weight:600;
+    color:#fff;
+    font-size:14px;
+    margin-bottom:4px;
+  }
+
+  .source-detail {
+    font-size:13px;
+    color:#888;
+    margin-bottom:8px;
+  }
+
+  .source-link {
+    display:inline-block;
+    font-size:13px;
+    color:#b8962e;
+    text-decoration:none;
+    font-weight:500;
+  }
+
+  .source-link:hover { text-decoration:underline; }
+
+  .verified {
+    display:inline-block;
+    font-size:11px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:4px;
+    margin-left:8px;
+    vertical-align:middle;
+  }
+
+  .verified.yes { background:#0f2b0f; color:#4ade80; }
+  .verified.partial { background:#2b2a0f; color:#facc15; }
+
+  /* Derivation formula */
+  .formula {
+    background:#1a1a1a;
+    border:1px solid #2a2a2a;
+    border-radius:10px;
+    padding:20px;
+    margin:16px 0;
+    font-family:'SF Mono','Fira Code',monospace;
+    font-size:14px;
+    color:#b8962e;
+    text-align:center;
+    letter-spacing:.5px;
+  }
+
+  .formula .equals {
+    display:block;
+    margin:8px 0;
+    color:#555;
+  }
+
+  .note {
+    background:#1a170a;
+    border-left:3px solid #b8962e;
+    padding:12px 16px;
+    margin:16px 0;
+    border-radius:0 8px 8px 0;
+    font-size:13px;
+    color:#ccc;
+  }
+
+  /* Progress stepper at top */
+  .progress {
+    display:flex;
+    gap:8px;
+    margin-bottom:32px;
+  }
+
+  .progress-dot {
+    width:100%;
+    height:3px;
+    background:#222;
+    border-radius:2px;
+    cursor:pointer;
+    transition:background .2s;
+  }
+
+  .progress-dot.done { background:#b8962e; }
+
+  /* Navigation */
+  .nav-row {
+    display:flex;
+    justify-content:space-between;
+    margin-top:24px;
+  }
+
+  .nav-btn {
+    background:#222;
+    color:#fff;
+    border:none;
+    padding:10px 20px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .2s;
+    font-family:inherit;
+  }
+
+  .nav-btn:hover { background:#333; }
+  .nav-btn.primary { background:#b8962e; color:#0a0a0a; }
+  .nav-btn.primary:hover { background:#d4aa33; }
+  .nav-btn:disabled { opacity:.3; cursor:default; }
+
+  /* Responsive */
+  @media (max-width:600px) {
+    .hero-stats { grid-template-columns:1fr; }
+    .hero-stat-num { font-size:26px; }
+    h1 { font-size:22px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>How We Got These Numbers</h1>
+  <p class="subtitle">Click any stat to see where it comes from, how it was derived, and links to the original research.</p>
+
+  <!-- Progress bar -->
+  <div class="progress">
+    <div class="progress-dot" data-stat="market"></div>
+    <div class="progress-dot" data-stat="cagr"></div>
+    <div class="progress-dot" data-stat="sam"></div>
+  </div>
+
+  <!-- Hero stats (clickable) -->
+  <div class="hero-stats">
+    <div class="hero-stat" data-stat="market">
+      <div class="hero-stat-num">$27.8B</div>
+      <div class="hero-stat-label">Sports Training Market</div>
+    </div>
+    <div class="hero-stat" data-stat="cagr">
+      <div class="hero-stat-num">19.1%</div>
+      <div class="hero-stat-label">Software CAGR</div>
+    </div>
+    <div class="hero-stat" data-stat="sam">
+      <div class="hero-stat-num">$200M+</div>
+      <div class="hero-stat-label">SAM Opportunity</div>
+    </div>
+  </div>
+
+  <!-- EXPLAINER: $27.8B -->
+  <div class="explainer" id="ex-market">
+    <h2>$27.8B &mdash; Sports Training Market</h2>
+
+    <h3>What this number represents</h3>
+    <p>The total global market size for sports training services as of 2023. This includes all revenue from sports coaching, academies, camps, personal training, and youth development programs worldwide.</p>
+
+    <h3>Where it comes from</h3>
+    <div class="source-card">
+      <div class="source-name">Allied Market Research <span class="verified yes">Verified</span></div>
+      <div class="source-detail">Report: "Sports Training Market Size, Share, Trends | Growth 2035" (Published August 2024)</div>
+      <div class="source-detail">Key finding: $27.8B in 2023, projected to reach $50.7B by 2035, growing at 5.2% CAGR (2024-2035)</div>
+      <a class="source-link" href="https://www.alliedmarketresearch.com/sports-training-market-A16942" target="_blank">View report &rarr;</a>
+    </div>
+
+    <h3>How to read this</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>This is the TAM (Total Addressable Market)</strong>
+        <span>The entire global sports training industry. FullControl doesn't need to capture this whole market &mdash; it's the ocean we're swimming in.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>It's growing steadily at 5.2% per year</strong>
+        <span>The underlying market is expanding. More people are paying for organized sports training every year, which means more potential customers for software.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>This validates the market exists at scale</strong>
+        <span>For investors, this number answers "Is this market big enough?" A $27.8B market growing to $50.7B means there's real, growing demand for what these businesses do.</span>
+      </div>
+    </div>
+
+    <div class="note">This stat specifically covers the sports training services market (revenue from training), not sports management software (which is the 19.1% CAGR stat). Two different but connected markets.</div>
+
+    <div class="nav-row">
+      <button class="nav-btn" disabled>&larr; Previous</button>
+      <button class="nav-btn primary" onclick="showStat('cagr')">Next: Software CAGR &rarr;</button>
+    </div>
+  </div>
+
+  <!-- EXPLAINER: 19.1% CAGR -->
+  <div class="explainer" id="ex-cagr">
+    <h2>19.1% &mdash; Software CAGR</h2>
+
+    <h3>What this number represents</h3>
+    <p>The Compound Annual Growth Rate (CAGR) of the sports management software market. This means the software market is growing ~19% every year, roughly doubling every 4 years.</p>
+
+    <h3>What is CAGR?</h3>
+    <div class="formula">
+      CAGR = (End Value / Start Value)^(1/years) - 1
+      <span class="equals">=</span>
+      ($1.25B / $311M)^(1/8) - 1 = 19.1%
+    </div>
+    <p>Think of it as the smoothed-out annual growth rate. Even if some years grow faster than others, 19.1% is the average pace.</p>
+
+    <h3>Where it comes from</h3>
+    <div class="source-card">
+      <div class="source-name">Fortune Business Insights <span class="verified yes">Verified</span></div>
+      <div class="source-detail">Report: "Sports Management Software Market Size | Industry Report, 2032"</div>
+      <div class="source-detail">Key finding: Market valued at $311.5M in 2024, projected to reach $1.25B by 2032, at 19.1% CAGR. North America holds 42.6% market share.</div>
+      <a class="source-link" href="https://www.fortunebusinessinsights.com/sports-management-software-market-113121" target="_blank">View report &rarr;</a>
+    </div>
+
+    <div class="note"><strong>Note:</strong> Fortune Business Insights has since updated their report with a newer forecast window ($439.6M in 2026 to $1,777.3M by 2034), but the 19.1% CAGR remains consistent. The original $311M baseline figure is still accurate for the 2024 base year.</div>
+
+    <h3>Why this matters</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>This is about the software layer, not the training market</strong>
+        <span>The $27.8B stat shows demand for training. This stat shows that software for managing these businesses is growing nearly 4x faster than the underlying market.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>19.1% is exceptionally high</strong>
+        <span>For context, the overall SaaS market grows at ~12% CAGR. Sports management software at 19.1% signals a sector that's rapidly digitizing &mdash; operators who ran on spreadsheets are buying software.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>It signals timing</strong>
+        <span>High CAGR means the market is still early. Entering a 19% growth market means tailwinds &mdash; new customers are appearing faster than competitors can capture them.</span>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="nav-btn" onclick="showStat('market')">&larr; Previous: Market Size</button>
+      <button class="nav-btn primary" onclick="showStat('sam')">Next: SAM Opportunity &rarr;</button>
+    </div>
+  </div>
+
+  <!-- EXPLAINER: $200M+ SAM -->
+  <div class="explainer" id="ex-sam">
+    <h2>$200M+ &mdash; SAM Opportunity</h2>
+
+    <h3>What this number represents</h3>
+    <p>The Serviceable Addressable Market (SAM) in annual recurring revenue across FullControl's three expansion phases. This is the realistic revenue ceiling if FullControl captured every operator in its target segments.</p>
+
+    <h3>TAM vs SAM vs SOM</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>TAM = $27.8B (Total Addressable Market)</strong>
+        <span>Everyone in the world who does sports training. Way too broad.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>SAM = $200M+ (Serviceable Addressable Market)</strong>
+        <span>Operators in our target geographies (US, Canada, Australia) with 20+ clients, across all three phases. This is who we can actually sell to.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>SOM = what we actually capture</strong>
+        <span>A realistic slice of SAM. Not shown on the investor page &mdash; that's what the business plan details.</span>
+      </div>
+    </div>
+
+    <h3>How $200M+ is derived</h3>
+    <p>The SAM is built bottom-up across three expansion phases:</p>
+
+    <div class="source-card">
+      <div class="source-name">Phase 1: Basketball Training</div>
+      <div class="source-detail">3,500 - 4,500 operators (US + Canada + Australia, 20+ clients) x $300/mo = <strong>$13-16M ARR</strong></div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">Phase 2: All Sports Training</div>
+      <div class="source-detail">16,000 - 20,000 operators across all sports x $300/mo = <strong>$58-72M ARR</strong></div>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">Phase 3: Fitness & Gyms</div>
+      <div class="source-detail">37,000 - 45,000 independent gyms & fitness businesses (US + Canada) x $300/mo = <strong>$133-162M ARR</strong></div>
+    </div>
+
+    <div class="formula">
+      $13-16M + $58-72M + $133-162M
+      <span class="equals">=</span>
+      $204-250M total SAM ARR &rarr; "$200M+"
+    </div>
+
+    <h3>Key assumptions</h3>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <strong>$300/mo blended ARPU</strong>
+        <span>Average revenue per user. Blended across plans. This is the assumed price point per operator per month.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <strong>Operator counts are BAM OS internal estimates</strong>
+        <span>These aren't from third-party reports. They're bottom-up estimates based on industry association data, directory scraping, and market knowledge from running BAM Basketball.</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <strong>Same product, broader positioning</strong>
+        <span>The core product doesn't change between phases. Basketball trainers and gym owners have the same operational problems. Each phase widens the funnel.</span>
+      </div>
+    </div>
+
+    <h3>Sources behind each phase</h3>
+    <div class="source-card">
+      <div class="source-name">Verified Market Research <span class="verified yes">Verified</span></div>
+      <div class="source-detail">Basketball training services: $8.5B market, 8.6% CAGR, US holds ~40% market share (Phase 1 context)</div>
+      <a class="source-link" href="https://www.verifiedmarketresearch.com/product/basketball-training-service-market/" target="_blank">View report &rarr;</a>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">Allied Market Research <span class="verified yes">Verified</span></div>
+      <div class="source-detail">Global sports training: $27.8B market, 5.2% CAGR to $50.7B by 2035 (Phase 2 context)</div>
+      <a class="source-link" href="https://www.alliedmarketresearch.com/sports-training-market-A16942" target="_blank">View report &rarr;</a>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">Market Research Future <span class="verified yes">Verified</span></div>
+      <div class="source-detail">Gym management software: $9.75B (2024), projected $63.9B by 2035, 18.6% CAGR (Phase 3 context)</div>
+      <a class="source-link" href="https://www.marketresearchfuture.com/reports/gym-management-software-market-26474" target="_blank">View report &rarr;</a>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">Data Bridge Market Research <span class="verified partial">Unverifiable</span></div>
+      <div class="source-detail">Sports clubs as fastest-growing subsegment, 18.6% CAGR in North America. This claim could not be verified from publicly available sources &mdash; it may come from inside a paid report.</div>
+      <a class="source-link" href="https://www.databridgemarketresearch.com/reports/north-america-sports-management-software-market" target="_blank">View report page &rarr;</a>
+    </div>
+
+    <div class="source-card">
+      <div class="source-name">BAM OS Market Analysis (Internal)</div>
+      <div class="source-detail">Operator counts (3.5-4.5K basketball, 16-20K all sports, 37-45K fitness) and $300/mo ARPU assumption are internal estimates, not from third-party reports.</div>
+    </div>
+
+    <div class="note"><strong>Transparency:</strong> The $200M+ figure mixes third-party market research (for market context) with internal bottom-up estimates (for operator counts and pricing). The third-party reports validate market size and growth. The operator counts and revenue math are FullControl's own analysis.</div>
+
+    <div class="nav-row">
+      <button class="nav-btn" onclick="showStat('cagr')">&larr; Previous: Software CAGR</button>
+      <button class="nav-btn" disabled>Done</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const stats = document.querySelectorAll('.hero-stat');
+  const explainers = document.querySelectorAll('.explainer');
+  const dots = document.querySelectorAll('.progress-dot');
+  const visited = new Set();
+
+  function showStat(id) {
+    // Update active stat
+    stats.forEach(s => s.classList.toggle('active', s.dataset.stat === id));
+
+    // Show explainer
+    explainers.forEach(e => e.classList.remove('active'));
+    const el = document.getElementById('ex-' + id);
+    if (el) el.classList.add('active');
+
+    // Update progress
+    visited.add(id);
+    dots.forEach(d => d.classList.toggle('done', visited.has(d.dataset.stat)));
+
+    // Scroll to explainer
+    setTimeout(() => {
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }
+
+  // Click handlers
+  stats.forEach(s => s.addEventListener('click', () => showStat(s.dataset.stat)));
+  dots.forEach(d => d.addEventListener('click', () => showStat(d.dataset.stat)));
+</script>
+</body>
+</html>

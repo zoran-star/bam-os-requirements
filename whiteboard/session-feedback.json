@@ -1,0 +1,1057 @@
+{
+  "_metadata": {
+    "source": "Claude Code session c1ee06d7-7c51-4d23-b1a4-298c89c5f315",
+    "exportDate": "2026-03-28",
+    "extractedDate": "2026-03-29",
+    "totalSessions": 10,
+    "totalExports": 11,
+    "notes": [
+      "SES-001 was the initial flat review before reorganization into domain-based sections",
+      "SES-002 through SES-009 correspond to Sections 1-8 of the reorganized onboarding",
+      "SES-010 covered both Scheduling and Sales sections",
+      "Section 6 (Policy) was reviewed via HTML interactive tool, not pasted as markdown - reconstructed from assistant summary",
+      "Items marked 'pending' had no checkbox and no feedback text"
+    ]
+  },
+  "sessions": {
+    "SES-001-initial-review": {
+      "note": "Initial flat review before domain-based reorganization. Items here were later redistributed into sections 1-8.",
+      "items": {
+        "A1-01": {
+          "status": "approved"
+        },
+        "A1-02": {
+          "status": "approved"
+        },
+        "A1-03": {
+          "status": "approved"
+        },
+        "A1-04": {
+          "status": "approved"
+        },
+        "A1-05": {
+          "status": "approved"
+        },
+        "A1-06": {
+          "status": "feedback",
+          "feedback": "this should be a part of a bigger strategy section that would understand the problem, the offer, and more"
+        },
+        "A2-01": {
+          "status": "feedback",
+          "feedback": "this will be part of the staff understanding section"
+        },
+        "A2-02": {
+          "status": "approved"
+        },
+        "A2-03": {
+          "status": "approved"
+        },
+        "A2-04": {
+          "status": "approved"
+        },
+        "A2-05": {
+          "status": "approved"
+        },
+        "A2-06": {
+          "status": "approved"
+        },
+        "A2-07": {
+          "status": "feedback",
+          "feedback": "this will be part of the policy section"
+        },
+        "A2-08": {
+          "status": "feedback",
+          "feedback": "this will be in the product section"
+        },
+        "A3-01": {
+          "status": "approved"
+        },
+        "A3-02": {
+          "status": "pending",
+          "feedback": "no feedback given - only unapproved item"
+        },
+        "A3-03": {
+          "status": "feedback",
+          "feedback": "this will be part of the product section"
+        },
+        "A3-04": {
+          "status": "feedback",
+          "feedback": "this will be part of the product section"
+        },
+        "A3-05": {
+          "status": "feedback",
+          "feedback": "this will be part of the product section"
+        },
+        "A3-06": {
+          "status": "feedback",
+          "feedback": "part of the policy section"
+        },
+        "A3-07": {
+          "status": "feedback",
+          "feedback": "product sectino"
+        },
+        "A3-08": {
+          "status": "feedback",
+          "feedback": "policy section"
+        },
+        "A3-09": {
+          "status": "feedback",
+          "feedback": "conversation ai section"
+        },
+        "A3-10": {
+          "status": "feedback",
+          "feedback": "product section"
+        },
+        "A3-11": {
+          "status": "feedback",
+          "feedback": "conversation ai section"
+        },
+        "B1-01": {
+          "status": "approved"
+        },
+        "B1-02": {
+          "status": "approved"
+        },
+        "B1-03": {
+          "status": "feedback",
+          "feedback": "we have to figure out what data belongs under the umbrellas of the locations"
+        },
+        "B2-01": {
+          "status": "approved"
+        },
+        "B2-02": {
+          "status": "feedback",
+          "feedback": "policy is its own section"
+        },
+        "B2-03": {
+          "status": "approved"
+        },
+        "B3-01": {
+          "status": "feedback",
+          "feedback": "could be in the scheduling app if they have a scheduling app"
+        },
+        "B3-02": {
+          "status": "approved"
+        },
+        "B3-03": {
+          "status": "feedback",
+          "feedback": "the only thing i liked from htis is that the user should alwyas be able to train up the conversation ai by telling it what it can't say"
+        },
+        "C1-01": {
+          "status": "approved"
+        },
+        "C1-02": {
+          "status": "approved"
+        },
+        "C1-03": {
+          "status": "approved"
+        },
+        "C1-04": {
+          "status": "approved"
+        }
+      },
+      "sectionFeedback": null
+    },
+    "SES-002-identity": {
+      "items": {
+        "1A-01": {
+          "status": "approved"
+        },
+        "1A-02": {
+          "status": "approved"
+        },
+        "1A-03": {
+          "status": "feedback",
+          "feedback": "this should be part of the product section where we understand all of hte services they offer"
+        },
+        "1B-01": {
+          "status": "approved"
+        },
+        "1B-02": {
+          "status": "approved"
+        },
+        "1B-03": {
+          "status": "feedback",
+          "feedback": "if it already exists - our goal is to make the website for them"
+        },
+        "1B-04": {
+          "status": "approved"
+        },
+        "1C-01": {
+          "status": "approved"
+        },
+        "1C-02": {
+          "status": "approved"
+        },
+        "1D-01": {
+          "status": "feedback",
+          "feedback": "there should be an integration section - for now we are only integrating stripe and an existing go high level"
+        },
+        "1E-01": {
+          "status": "feedback",
+          "feedback": "in the staff or 'team' section"
+        },
+        "1E-02": {
+          "status": "approved"
+        },
+        "1E-03": {
+          "status": "approved"
+        }
+      },
+      "sectionFeedback": "User requested section name change from 'Identity' to 'Business Info' in Notion"
+    },
+    "SES-003-strategy": {
+      "items": {
+        "2A-01": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them optimize it"
+        },
+        "2A-02": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them optimize it"
+        },
+        "2A-03": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them optimize the impact of the story"
+        },
+        "2B-01": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them exaggerate the problem to the end client"
+        },
+        "2B-02": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them optimize it"
+        },
+        "2B-03": {
+          "status": "approved"
+        },
+        "2B-04": {
+          "status": "approved"
+        },
+        "2C-01": {
+          "status": "feedback",
+          "feedback": "this should be collected through a chat with an LLM module that helps them optimize it"
+        },
+        "2C-02": {
+          "status": "approved"
+        },
+        "2C-03": {
+          "status": "feedback",
+          "feedback": "part of the integrations section"
+        },
+        "2C-04": {
+          "status": "feedback",
+          "feedback": "collected through social proof sources"
+        },
+        "2D-01": {
+          "status": "feedback",
+          "feedback": "should be part of the sales section"
+        },
+        "2D-02": {
+          "status": "feedback",
+          "feedback": "the conversation ai should know this - update the conversation-ai-booking-agent prompt with your best guesses"
+        },
+        "2D-03": {
+          "status": "feedback",
+          "feedback": "anything that doesn't fit into the qualification dimensions should be disqualified logically"
+        },
+        "2E-01": {
+          "status": "feedback",
+          "feedback": "in the marketing section - to be created by full control"
+        },
+        "2E-02": {
+          "status": "feedback",
+          "feedback": "in the sales section - full control should display a list of common objections and the user should be able to select from the options and provide feedback and be able to add more"
+        },
+        "2E-03": {
+          "status": "feedback",
+          "feedback": "not sure which section this should be in - maybe the products section"
+        },
+        "2F-01": {
+          "status": "feedback",
+          "feedback": "in the conversation ai section"
+        },
+        "2F-02": {
+          "status": "feedback",
+          "feedback": "not enough detail here to understand"
+        },
+        "2F-03": {
+          "status": "feedback",
+          "feedback": "done by ai in the marketing section"
+        }
+      },
+      "sectionFeedback": null
+    },
+    "SES-004-locations": {
+      "items": {
+        "3A-01": {
+          "status": "approved"
+        },
+        "3A-02": {
+          "status": "approved"
+        },
+        "3A-03": {
+          "status": "feedback",
+          "feedback": "will be the same"
+        },
+        "3A-04": {
+          "status": "approved"
+        },
+        "3B-01": {
+          "status": "approved"
+        },
+        "3B-02": {
+          "status": "approved"
+        },
+        "3B-03": {
+          "status": "approved"
+        },
+        "3B-04": {
+          "status": "approved"
+        },
+        "3C-01": {
+          "status": "approved"
+        },
+        "3C-02": {
+          "status": "feedback",
+          "feedback": "should be the same per location"
+        },
+        "3C-03": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "3C-04": {
+          "status": "feedback",
+          "feedback": "should be number of slots in the schedule section"
+        },
+        "3C-05": {
+          "status": "approved"
+        },
+        "3D-01": {
+          "status": "feedback",
+          "feedback": "same as 3c-04"
+        },
+        "3D-02": {
+          "status": "feedback",
+          "feedback": "in the scheduling section (might be derived from the schedule that the owner puts in)"
+        },
+        "3D-03": {
+          "status": "feedback",
+          "feedback": "in the scheduling section (might be derived from the schedule that the owner puts in)"
+        },
+        "3E-01": {
+          "status": "approved"
+        },
+        "3E-02": {
+          "status": "approved"
+        },
+        "3E-03": {
+          "status": "approved"
+        },
+        "3F-01": {
+          "status": "feedback",
+          "feedback": "i need help figuring out all of the things that should be separated"
+        },
+        "3F-02": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "3F-03": {
+          "status": "feedback",
+          "feedback": "no online programs for now"
+        },
+        "3F-04": {
+          "status": "feedback",
+          "feedback": "yes"
+        }
+      },
+      "sectionFeedback": null
+    },
+    "SES-005-staff": {
+      "items": {
+        "4A-01": {
+          "status": "approved"
+        },
+        "4A-02": {
+          "status": "approved"
+        },
+        "4A-03": {
+          "status": "approved"
+        },
+        "4A-04": {
+          "status": "approved"
+        },
+        "4A-05": {
+          "status": "approved"
+        },
+        "4B-01": {
+          "status": "approved"
+        },
+        "4B-02": {
+          "status": "approved"
+        },
+        "4B-03": {
+          "status": "approved"
+        },
+        "4B-04": {
+          "status": "approved"
+        },
+        "4B-05": {
+          "status": "approved"
+        },
+        "4B-06": {
+          "status": "approved"
+        },
+        "4B-07": {
+          "status": "approved"
+        },
+        "4C-01": {
+          "status": "feedback",
+          "feedback": "this is in the schedule section"
+        },
+        "4C-02": {
+          "status": "feedback",
+          "feedback": "this is in the schedule section"
+        },
+        "4C-03": {
+          "status": "feedback",
+          "feedback": "in the product section"
+        },
+        "4C-04": {
+          "status": "feedback",
+          "feedback": "none just coaches"
+        },
+        "4D-01": {
+          "status": "feedback",
+          "feedback": "part of the scheduling section"
+        },
+        "4D-02": {
+          "status": "feedback",
+          "feedback": "part of the scheduling section"
+        },
+        "4E-01": {
+          "status": "feedback",
+          "feedback": "owner fills it in"
+        },
+        "4E-02": {
+          "status": "feedback",
+          "feedback": "not included - make an open loop talking about financials and the legalities around it"
+        },
+        "4E-03": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "4E-04": {
+          "status": "feedback",
+          "feedback": "everything is public"
+        }
+      },
+      "sectionFeedback": "each team member should have a conversation with an llm that should get their individual stories"
+    },
+    "SES-006-product": {
+      "items": {
+        "5A-01": {
+          "status": "feedback",
+          "feedback": "derived from services offered"
+        },
+        "5A-02": {
+          "status": "approved"
+        },
+        "5A-03": {
+          "status": "feedback",
+          "feedback": "this should be a preset list based off the products we can support - come up with that list and show me it after the prompt"
+        },
+        "5A-04": {
+          "status": "approved"
+        },
+        "5A-05": {
+          "status": "approved"
+        },
+        "5B-01": {
+          "status": "approved"
+        },
+        "5B-02": {
+          "status": "approved"
+        },
+        "5B-03": {
+          "status": "approved"
+        },
+        "5B-04": {
+          "status": "approved"
+        },
+        "5C-01": {
+          "status": "approved"
+        },
+        "5C-02": {
+          "status": "approved"
+        },
+        "5C-03": {
+          "status": "feedback",
+          "feedback": "these would be different offers, but there are the commitments and other varations (read the offer builder)"
+        },
+        "5C-04": {
+          "status": "approved"
+        },
+        "5C-05": {
+          "status": "feedback",
+          "feedback": "read the offer builder"
+        },
+        "5C-06": {
+          "status": "feedback",
+          "feedback": "read the offer builder"
+        },
+        "5C-07": {
+          "status": "feedback",
+          "feedback": "this isn't product specific - its more at the business level"
+        },
+        "5D-01": {
+          "status": "approved"
+        },
+        "5D-02": {
+          "status": "approved"
+        },
+        "5D-03": {
+          "status": "approved"
+        },
+        "5D-04": {
+          "status": "approved"
+        },
+        "5D-05": {
+          "status": "approved"
+        },
+        "5E-01": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "5E-02": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "5E-03": {
+          "status": "pending",
+          "feedback": "no checkbox marked, no feedback given"
+        },
+        "5E-04": {
+          "status": "feedback",
+          "feedback": "part of the products section"
+        },
+        "5F-01": {
+          "status": "feedback",
+          "feedback": "products section"
+        },
+        "5F-02": {
+          "status": "feedback",
+          "feedback": "products section"
+        },
+        "5G-01": {
+          "status": "feedback",
+          "feedback": "an offer is a product i see it as the same thing"
+        },
+        "5G-02": {
+          "status": "feedback",
+          "feedback": "in the scheduling section"
+        },
+        "5G-03": {
+          "status": "feedback",
+          "feedback": "in teh products section for the owner to decide"
+        },
+        "5G-04": {
+          "status": "feedback",
+          "feedback": "there should be an import function"
+        },
+        "5G-05": {
+          "status": "feedback",
+          "feedback": "add in the offer builder"
+        }
+      },
+      "sectionFeedback": "for the offer section - read the offer builder, and add to it. schedule part here is part of the scheduling section"
+    },
+    "SES-007-policy": {
+      "note": "Section 6 was reviewed via the interactive HTML review tool. The user did not paste a markdown export. Items reconstructed from assistant summary. Per assistant: 17 approved, 7 feedback.",
+      "items": {
+        "6A-01": {
+          "status": "approved"
+        },
+        "6A-02": {
+          "status": "approved"
+        },
+        "6A-03": {
+          "status": "approved"
+        },
+        "6A-04": {
+          "status": "approved"
+        },
+        "6B-01": {
+          "status": "approved"
+        },
+        "6B-02": {
+          "status": "approved"
+        },
+        "6B-03": {
+          "status": "approved"
+        },
+        "6B-04": {
+          "status": "approved"
+        },
+        "6B-05": {
+          "status": "approved",
+          "feedback": "pause billing always = credits frozen + delayed payment"
+        },
+        "6C-01": {
+          "status": "approved"
+        },
+        "6C-02": {
+          "status": "approved"
+        },
+        "6C-03": {
+          "status": "approved"
+        },
+        "6C-04": {
+          "status": "approved"
+        },
+        "6D-01": {
+          "status": "feedback",
+          "feedback": "moved to scheduling section"
+        },
+        "6D-02": {
+          "status": "feedback",
+          "feedback": "moved to scheduling section"
+        },
+        "6D-03": {
+          "status": "feedback",
+          "feedback": "moved to scheduling section"
+        },
+        "6D-04": {
+          "status": "feedback",
+          "feedback": "moved to scheduling section"
+        },
+        "6D-05": {
+          "status": "feedback",
+          "feedback": "moved to scheduling section"
+        },
+        "6E-01": {
+          "status": "approved"
+        },
+        "6E-02": {
+          "status": "approved"
+        },
+        "6E-03": {
+          "status": "feedback",
+          "feedback": "transfer never allowed"
+        },
+        "6F-01": {
+          "status": "approved"
+        },
+        "6F-02": {
+          "status": "approved"
+        },
+        "6F-03": {
+          "status": "approved"
+        },
+        "6F-04": {
+          "status": "approved",
+          "feedback": "under-18 consent always true"
+        },
+        "6F-05": {
+          "status": "feedback",
+          "feedback": "needs legal research - open loop created"
+        },
+        "6G-01": {
+          "status": "approved",
+          "feedback": "policy presets yes, with owner override"
+        },
+        "6G-02": {
+          "status": "approved",
+          "feedback": "policies always shown to members in app"
+        },
+        "6G-03": {
+          "status": "approved",
+          "feedback": "auto-enforce hard policies, alert owner for flexible ones"
+        }
+      },
+      "sectionFeedback": "Booking & Attendance (6D) moved entirely to Scheduling section. Policy presets: yes with owner override. Policies always shown to members in app. AI enforcement: auto-enforce hard policies, alert owner for flexible ones. Data retention needs legal research (open loop created)."
+    },
+    "SES-008-conversation-ai": {
+      "items": {
+        "7A-01": {
+          "status": "feedback",
+          "feedback": "this will be preprogrammed into the bot"
+        },
+        "7A-02": {
+          "status": "feedback",
+          "feedback": "this will be preprogrammed into the bot"
+        },
+        "7A-03": {
+          "status": "feedback",
+          "feedback": "not necessary - this will be preprogrammed into the bot"
+        },
+        "7B-01": {
+          "status": "feedback",
+          "feedback": "this should be a list in the settings that the user can check/uncheck and add to"
+        },
+        "7B-02": {
+          "status": "feedback",
+          "feedback": "this should be a list in the settings that the user can check/uncheck and add to"
+        },
+        "7B-03": {
+          "status": "feedback",
+          "feedback": "never name them"
+        },
+        "7B-04": {
+          "status": "approved"
+        },
+        "7C-01": {
+          "status": "feedback",
+          "feedback": "if they have the scheduling app, the link should be to download the app"
+        },
+        "7C-02": {
+          "status": "feedback",
+          "feedback": "this will be configured in the entry forms, but for random reach outs the bot should automatically ask"
+        },
+        "7C-03": {
+          "status": "feedback",
+          "feedback": "there should be a list that the owner should check off and add to"
+        },
+        "7C-04": {
+          "status": "feedback",
+          "feedback": "yea this should be automatic"
+        },
+        "7D-01": {
+          "status": "feedback",
+          "feedback": "yea the user can configure this"
+        },
+        "7D-02": {
+          "status": "approved"
+        },
+        "7D-03": {
+          "status": "approved"
+        },
+        "7E-01": {
+          "status": "approved"
+        },
+        "7E-02": {
+          "status": "approved"
+        },
+        "7E-03": {
+          "status": "feedback",
+          "feedback": "not really an onboarding datapoint but good to know - find a place to add this into the notion"
+        },
+        "7F-01": {
+          "status": "feedback",
+          "feedback": "we will make a separate conversation ai for other cases"
+        },
+        "7F-02": {
+          "status": "feedback",
+          "feedback": "user has to integraate all of the connections in the integration section and select where they want leads to be able to reach out from"
+        },
+        "7F-03": {
+          "status": "feedback",
+          "feedback": "that is viewable in the prototype"
+        },
+        "7F-04": {
+          "status": "feedback",
+          "feedback": "not figured out yet"
+        }
+      },
+      "sectionFeedback": null
+    },
+    "SES-009-integrations": {
+      "items": {
+        "8A-01": {
+          "status": "approved"
+        },
+        "8A-02": {
+          "status": "feedback",
+          "feedback": "there will be additional questions that need to be answered based on what people import"
+        },
+        "8B-01": {
+          "status": "feedback",
+          "feedback": "if they already have an existing one"
+        },
+        "8B-02": {
+          "status": "approved"
+        },
+        "8B-03": {
+          "status": "approved"
+        },
+        "8C-01": {
+          "status": "approved"
+        },
+        "8C-02": {
+          "status": "feedback",
+          "feedback": "also yelp"
+        },
+        "8C-03": {
+          "status": "approved"
+        },
+        "8D-01": {
+          "status": "feedback",
+          "feedback": "we will figure that part out"
+        },
+        "8D-02": {
+          "status": "feedback",
+          "feedback": "we will figure that part out"
+        },
+        "8D-03": {
+          "status": "approved"
+        },
+        "8D-04": {
+          "status": "feedback",
+          "feedback": "this should be its own setting page"
+        },
+        "8E-01": {
+          "status": "approved"
+        },
+        "8E-02": {
+          "status": "feedback",
+          "feedback": "there will be a whole walkthrough part that we have to talk about"
+        },
+        "8E-03": {
+          "status": "feedback",
+          "feedback": "definitely need to figure out the schedule before we set up"
+        },
+        "8E-04": {
+          "status": "feedback",
+          "feedback": "there will be a whole end-user onboarding section we have to figure out"
+        },
+        "8F-01": {
+          "status": "feedback",
+          "feedback": "this will be a human in the loop thing, all of the information collected will be able to inform the website build"
+        },
+        "8F-02": {
+          "status": "feedback",
+          "feedback": "will be in go high level"
+        },
+        "8F-03": {
+          "status": "feedback",
+          "feedback": "yes"
+        },
+        "8F-04": {
+          "status": "feedback",
+          "feedback": "yes we will need to figure out the integrations and migrations in a separate section"
+        }
+      },
+      "sectionFeedback": null
+    },
+    "SES-010-scheduling": {
+      "items": {
+        "SCH-A01": {
+          "status": "approved"
+        },
+        "SCH-A02": {
+          "status": "approved"
+        },
+        "SCH-A03": {
+          "status": "approved"
+        },
+        "SCH-A04": {
+          "status": "approved"
+        },
+        "SCH-A05": {
+          "status": "feedback",
+          "feedback": "this will be automatically derived"
+        },
+        "SCH-A06": {
+          "status": "approved"
+        },
+        "SCH-A07": {
+          "status": "approved"
+        },
+        "SCH-A08": {
+          "status": "approved"
+        },
+        "SCH-A09": {
+          "status": "approved"
+        },
+        "SCH-B01": {
+          "status": "approved"
+        },
+        "SCH-B02": {
+          "status": "approved"
+        },
+        "SCH-B03": {
+          "status": "feedback",
+          "feedback": "this should be an automatic feature"
+        },
+        "SCH-C01": {
+          "status": "approved"
+        },
+        "SCH-C02": {
+          "status": "approved"
+        },
+        "SCH-C03": {
+          "status": "feedback",
+          "feedback": "configurable by owner"
+        },
+        "SCH-C04": {
+          "status": "approved"
+        },
+        "SCH-D01": {
+          "status": "approved"
+        },
+        "SCH-D02": {
+          "status": "approved"
+        },
+        "SCH-D03": {
+          "status": "approved"
+        },
+        "SCH-D04": {
+          "status": "feedback",
+          "feedback": "there should be notifications if they are accepted into the session"
+        },
+        "SCH-D05": {
+          "status": "approved"
+        },
+        "SCH-D06": {
+          "status": "feedback",
+          "feedback": "make this more of a booking window where it asks the user until how soon they can book the session (including during the session too thats an option)"
+        },
+        "SCH-E01": {
+          "status": "feedback",
+          "feedback": "coach always marks attendance"
+        },
+        "SCH-E02": {
+          "status": "feedback",
+          "feedback": "that is a feature that is not in onboarding but will be included"
+        },
+        "SCH-E03": {
+          "status": "feedback",
+          "feedback": "the coach can just book them in the session"
+        },
+        "SCH-F01": {
+          "status": "feedback",
+          "feedback": "this is a feature, not a data point to collect"
+        },
+        "SCH-F02": {
+          "status": "feedback",
+          "feedback": "this is a feature"
+        },
+        "SCH-F03": {
+          "status": "feedback",
+          "feedback": "feature"
+        },
+        "SCH-G01": {
+          "status": "feedback",
+          "feedback": "feature - yes its a possibility"
+        },
+        "SCH-G02": {
+          "status": "feedback",
+          "feedback": "that is a feature"
+        },
+        "SCH-G03": {
+          "status": "feedback",
+          "feedback": "siblings can, members cannot"
+        },
+        "SCH-G04": {
+          "status": "feedback",
+          "feedback": "templae"
+        },
+        "SCH-G05": {
+          "status": "feedback",
+          "feedback": "that is a good feature to add"
+        }
+      },
+      "sectionFeedback": "i want you to be more organized as to what is a feature and what is something to collect during onboarding - its more than okay to do both, i just want to make sure the two are separated, because we will go back later and update the features and business requirements"
+    },
+    "SES-010-sales": {
+      "items": {
+        "SAL-A01": {
+          "status": "feedback",
+          "feedback": "its a list that the owner can choose from and change/add to",
+          "type": "DATA POINT"
+        },
+        "SAL-A02": {
+          "status": "feedback",
+          "feedback": "this is a feature baked into the conversation ai's and computes automatically",
+          "type": "DATA POINT"
+        },
+        "SAL-A03": {
+          "status": "feedback",
+          "feedback": "derived, not needed to ask the user",
+          "type": "FEATURE"
+        },
+        "SAL-B01": {
+          "status": "feedback",
+          "feedback": "its a list that the owner can choose from and change/add to",
+          "type": "DATA POINT"
+        },
+        "SAL-B02": {
+          "status": "feedback",
+          "feedback": "part of that list",
+          "type": "DATA POINT"
+        },
+        "SAL-C01": {
+          "status": "feedback",
+          "feedback": "we will have recommended pipelines (something to figure out in another session), and the user will be able to create and describe their own custom pipeline if they'd like to",
+          "type": "DATA POINT"
+        },
+        "SAL-C02": {
+          "status": "feedback",
+          "feedback": "i think that happens automatically in go high level, not needed to be asked",
+          "type": "DATA POINT"
+        },
+        "SAL-C03": {
+          "status": "feedback",
+          "feedback": "yes",
+          "type": "FEATURE"
+        },
+        "SAL-C04": {
+          "status": "feedback",
+          "feedback": "handled by whoever responds first",
+          "type": "DATA POINT"
+        },
+        "SAL-D01": {
+          "status": "feedback",
+          "feedback": "funnel is made in go high level",
+          "type": "DATA POINT"
+        },
+        "SAL-D02": {
+          "status": "feedback",
+          "feedback": "there is a template that users can choose from and edit / add to",
+          "type": "DATA POINT"
+        },
+        "SAL-D03": {
+          "status": "feedback",
+          "feedback": "that will be a separate session",
+          "type": "DATA POINT"
+        },
+        "SAL-D04": {
+          "status": "feedback",
+          "feedback": "either in app enrollment, or through the website",
+          "type": "FEATURE"
+        },
+        "SAL-E01": {
+          "status": "feedback",
+          "feedback": "there will be templates from what people can choose from and they can add/update the data collected - this will be another session",
+          "type": "DATA POINT"
+        },
+        "SAL-E02": {
+          "status": "feedback",
+          "feedback": "it will be a landing page that is created in go high level - can you create a separate notion page in the architecture that outlines what go high level actually does in this process",
+          "type": "DATA POINT"
+        },
+        "SAL-E03": {
+          "status": "feedback",
+          "feedback": "part of the automations list that users can edit/update",
+          "type": "FEATURE"
+        },
+        "SAL-F01": {
+          "status": "feedback",
+          "feedback": "thats already covered",
+          "type": "FEATURE"
+        },
+        "SAL-F02": {
+          "status": "feedback",
+          "feedback": "yes",
+          "type": "FEATURE"
+        },
+        "SAL-F03": {
+          "status": "feedback",
+          "feedback": "the reasons will be a list that the user can choose from/update/edit/add to",
+          "type": "DATA POINT"
+        }
+      },
+      "sectionFeedback": null
+    }
+  }
+}

@@ -22,6 +22,8 @@
 }
 .row:hover { border-color: var(--borderm); box-shadow: var(--shadow-sm); }
 .rowApproved { border-color: rgba(62,175,92,0.25); background: linear-gradient(135deg, var(--surf) 0%, rgba(62,175,92,0.06) 100%); }
+.rowFeedback { border-color: rgba(224,157,36,0.25); background: linear-gradient(135deg, var(--surf) 0%, rgba(224,157,36,0.06) 100%); }
+.rowChecked { opacity: 0.7; }
 .check { flex-shrink: 0; margin-top: 2px; }
 .check input { width: 17px; height: 17px; accent-color: var(--green); cursor: pointer; }
 .content { flex: 1; min-width: 0; }
@@ -42,6 +44,27 @@
 .pillOutline { background: transparent; border: 1px solid var(--border); color: var(--tm); }
 .pillData { background: rgba(62,175,92,0.10); color: var(--green); border: 1px solid rgba(62,175,92,0.2); }
 .pillFeature { background: rgba(59,111,160,0.10); color: var(--blue); border: 1px solid rgba(59,111,160,0.2); }
+.pillApproved { background: rgba(62,175,92,0.15); color: var(--green); border: 1px solid rgba(62,175,92,0.3); }
+.pillFeedbackBadge { background: rgba(224,157,36,0.15); color: var(--warn); border: 1px solid rgba(224,157,36,0.3); }
+.pillPending { background: var(--surf3); color: var(--tm); border: 1px solid var(--border); }
+.ownerFeedback {
+  margin-top: 8px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(224,157,36,0.08); border-left: 3px solid var(--warn);
+}
+.ownerFeedbackLabel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.3px; color: var(--warn); display: block; margin-bottom: 3px;
+}
+.ownerFeedbackText {
+  font-size: 12px; color: var(--tp); line-height: 1.5; display: block;
+}
+.statusSummary {
+  display: flex; gap: 12px; margin-top: 10px; font-size: 12px; font-weight: 600;
+}
+.summaryTotal { color: var(--tp); }
+.summaryApproved { color: var(--green); }
+.summaryFeedback { color: var(--warn); }
+.summaryPending { color: var(--tm); }
 .feedback { flex-shrink: 0; width: 220px; }
 .feedback input {
   width: 100%; font-family: var(--ff); font-size: 12px; padding: 6px 10px;
