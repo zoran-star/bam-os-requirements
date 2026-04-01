@@ -1143,33 +1143,33 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
 
         <div class="wf-card" style="border-left: 3px solid var(--pink);">
           <h4>Workflow: "Done Trial" <span class="tag published">Published</span> <span class="stat">(<strong>29</strong> enrolled)</span></h4>
-          <div class="wf-meta">44 versions | Last updated Nov 5, 2025 | Routes leads based on coach's post-trial assessment</div>
+          <div class="wf-meta">44 versions | Verified from GHL builder | Routes leads based on coach's post-trial assessment</div>
         </div>
 
         <div class="flow-container" style="margin-bottom: 16px;">
           <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
           <div class="flow-row">
-            <div class="flow-node trigger">Form Submitted: "Post Trial Form"<br>
-              <span style="font-size: 0.7rem; color: var(--text-muted);">Coach fills out assessment after trial session. Sticky note: "for KPI tracking purposes"</span>
+            <div class="flow-node trigger">Form Submitted — Post Trial Form Submitted<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Form is any of "Post Trial Form" (coach fills this out after the trial session). Sticky note: "for KPI tracking purposes"</span>
             </div>
           </div>
 
           <div style="margin-top: 16px;">
-            <div class="flow-group-label">STEP 1 — Cleanup</div>
+            <div class="flow-group-label">STEP 1 — Remove from Workflow</div>
             <div class="flow-row">
-              <div class="flow-node action">Remove from Workflow (clears any active pre-trial sequences)</div>
+              <div class="flow-node action">Remove from Workflow (clears previous automations)</div>
             </div>
           </div>
 
           <div style="margin-top: 16px;">
-            <div class="flow-group-label">STEP 2 — Condition: 4-way branch based on form answers</div>
+            <div class="flow-group-label">STEP 2 — Condition: 4 branches based on coach's post-trial assessment</div>
           </div>
 
           <!-- Branch 1: Good fit -->
           <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
-            <div class="flow-group-label" style="color: var(--green);">BRANCH 1: Coach Assessment of Fit = "Yes" (good fit)</div>
+            <div class="flow-group-label" style="color: var(--green);">BRANCH 1 &#x2705; Good fit: "Coach Assessment of Fit" is "&#x2705;Y..."</div>
             <div class="flow-row">
-              <div class="flow-node action">Create/Update Opportunity</div>
+              <div class="flow-node action">Create Or Update Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">TRAINING PIPELINE, stage: "done trial"</span></div>
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node action">Add 'posttrial' Tag</div>
               <div class="flow-arrow">&rarr;</div>
@@ -1177,14 +1177,14 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node outcome">END</div>
             </div>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead enters post-trial sales follow-up sequence</p>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead enters post-trial nurture sequence</p>
           </div>
 
           <!-- Branch 2: Not a fit -->
           <div class="flow-group" style="border-left-color: var(--red); margin-top: 8px;">
-            <div class="flow-group-label" style="color: var(--red);">BRANCH 2: Coach Assessment of Fit = "No" (not a fit)</div>
+            <div class="flow-group-label" style="color: var(--red);">BRANCH 2 &#x274C; Not a fit: "Coach Assessment of Fit" is "&#x274C;N..."</div>
             <div class="flow-row">
-              <div class="flow-node action">Create/Update Opportunity</div>
+              <div class="flow-node action">Create Or Update Opportunity</div>
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node action">Update appointment status</div>
               <div class="flow-arrow">&rarr;</div>
@@ -1192,12 +1192,12 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node outcome">END</div>
             </div>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead marked as lost — enters lead nurture eventually</p>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Lead tagged as lost — feeds into lead nurture</p>
           </div>
 
           <!-- Branch 3: No-show -->
           <div class="flow-group" style="border-left-color: var(--accent); margin-top: 8px;">
-            <div class="flow-group-label" style="color: var(--accent);">BRANCH 3: "Did the Athlete show up?" = "No"</div>
+            <div class="flow-group-label" style="color: var(--accent);">BRANCH 3 No-show: "Did the Athlete show up?" = "No"</div>
             <div class="flow-row">
               <div class="flow-node action">Update appointment status</div>
               <div class="flow-arrow">&rarr;</div>
@@ -1205,19 +1205,19 @@ This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> 
               <div class="flow-arrow">&rarr;</div>
               <div class="flow-node outcome">END</div>
             </div>
-            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Feeds into the "Missed Trial" workflow for no-show follow-up</p>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">This tag triggers the Missed Trial workflow for no-show follow-up</p>
           </div>
 
           <!-- Branch 4: None -->
           <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
-            <div class="flow-group-label">BRANCH 4: None of the conditions met</div>
+            <div class="flow-group-label">BRANCH 4 None: When none of the conditions are met</div>
             <div class="flow-row">
               <div class="flow-node outcome">END</div>
             </div>
           </div>
 
           <div class="connection-note" style="margin-top: 16px;">
-            <strong>Key context:</strong> This single workflow handles ALL post-trial outcomes. The coach fills out the "Post Trial Form" after each session. Based on their assessment, the lead gets routed: good fits enter the sales follow-up, bad fits get marked as lost, and no-shows get tagged for the Missed Trial rebook sequence. This is the main decision point that determines if a lead converts to the onboarding pipeline or falls into lead nurture.
+            <strong>Key context:</strong> This is where the coach's assessment drives the entire post-trial pipeline. Good fits go to posttrial nurture, bad fits get tagged as lost, and no-shows feed into the Missed Trial workflow via the "missed trial" tag.
           </div>
         </div>
 
