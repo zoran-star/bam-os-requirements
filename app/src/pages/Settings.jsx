@@ -147,8 +147,10 @@ function CoachForm({ coach, onSave, onClose }) {
   const [role, setRole] = useState(coach?.role || '');
   const [email, setEmail] = useState(coach?.email || '');
   const [phone, setPhone] = useState(coach?.phone || '');
-  const [location, setLocation] = useState(coach?.location || '');
+  const [locations, setLocations] = useState(coach?.locations || []);
   const [bio, setBio] = useState(coach?.bio || '');
+  const ALL_LOCATIONS = ['Downtown', 'Westside'];
+  const toggleLocation = (loc) => setLocations(prev => prev.includes(loc) ? prev.filter(l => l !== loc) : [...prev, loc]);
 
   const canSave = name.trim() && role.trim();
 
@@ -182,12 +184,14 @@ function CoachForm({ coach, onSave, onClose }) {
         </div>
       </div>
       <div className={s.formGroup}>
-        <label className={s.formLabel}>Primary Location</label>
-        <select className={s.formSelect} value={location} onChange={e => setLocation(e.target.value)}>
-          <option value="">Select location...</option>
-          <option value="Downtown">Downtown</option>
-          <option value="Westside">Westside</option>
-        </select>
+        <label className={s.formLabel}>Locations</label>
+        <div className={s.locationToggleRow}>
+          {ALL_LOCATIONS.map(loc => (
+            <button key={loc} type="button" className={`${s.locationToggleBtn} ${locations.includes(loc) ? s.locationToggleActive : ''}`} onClick={() => toggleLocation(loc)}>
+              {loc}
+            </button>
+          ))}
+        </div>
       </div>
       <div className={s.formGroup}>
         <label className={s.formLabel}>Bio / Background</label>
@@ -196,7 +200,7 @@ function CoachForm({ coach, onSave, onClose }) {
       <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>This bio is used in parent-facing communications — when the AI mentions a coach, it references their background. Keep it authentic.</span></div>
       <div className={s.modalFooter}>
         <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
-        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, location, bio })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
+        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, locations, bio })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
       </div>
     </>
   );
@@ -255,9 +259,9 @@ export default function Settings() {
 
   // Staff
   const [coaches, setCoaches] = useState([
-    { id: 'c1', name: 'Coach Marcus Rivera', role: 'Head Coach', email: 'marcus@bamacademy.com', phone: '(512) 555-0101', location: 'Downtown', sessions: 12, members: 28, status: 'Active', bio: 'D1 point guard, 8 years coaching experience. Specializes in elite skill development and game strategy.' },
-    { id: 'c2', name: 'Coach Adrian Simmons', role: 'Assistant Coach', email: 'adrian@bamacademy.com', phone: '(512) 555-0102', location: 'Westside', sessions: 8, members: 14, status: 'Active', bio: 'Former overseas pro. Focuses on fundamentals and building young athletes\' confidence.' },
-    { id: 'c3', name: 'Coach Filip Jovic', role: 'Youth Development', email: 'filip@bamacademy.com', phone: '(512) 555-0103', location: 'Downtown', sessions: 6, members: 18, status: 'Active', bio: 'Certified youth coach. Patient, energetic, great with beginners and shy kids.' },
+    { id: 'c1', name: 'Coach Marcus Rivera', role: 'Head Coach', email: 'marcus@bamacademy.com', phone: '(512) 555-0101', locations: ['Downtown', 'Westside'], sessions: 12, members: 28, status: 'Active', bio: 'D1 point guard, 8 years coaching experience. Specializes in elite skill development and game strategy.' },
+    { id: 'c2', name: 'Coach Adrian Simmons', role: 'Assistant Coach', email: 'adrian@bamacademy.com', phone: '(512) 555-0102', locations: ['Westside'], sessions: 8, members: 14, status: 'Active', bio: 'Former overseas pro. Focuses on fundamentals and building young athletes\' confidence.' },
+    { id: 'c3', name: 'Coach Filip Jovic', role: 'Youth Development', email: 'filip@bamacademy.com', phone: '(512) 555-0103', locations: ['Downtown'], sessions: 6, members: 18, status: 'Active', bio: 'Certified youth coach. Patient, energetic, great with beginners and shy kids.' },
   ]);
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [editingCoach, setEditingCoach] = useState(null);
@@ -743,6 +747,9 @@ export default function Settings() {
                     </div>
                   </div>
                   <div className={s.locationRight}>
+                    {c.locations?.map(loc => (
+                      <span key={loc} className={s.coachLocPill}>{loc}</span>
+                    ))}
                     <div className={s.locationStat}><span className={s.locationStatVal}>{c.sessions}</span><span className={s.locationStatLabel}>Sessions/wk</span></div>
                     <div className={s.locationStat}><span className={s.locationStatVal}>{c.members}</span><span className={s.locationStatLabel}>Athletes</span></div>
                     <span className={s.statusActive}>{c.status}</span>

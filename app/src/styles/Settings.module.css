@@ -299,3 +299,10 @@
 .objTitle{font-size:13px;font-weight:600;color:var(--tp)}
 .objResponse{margin-top:8px;padding-left:44px;font-size:12px;color:var(--ts);line-height:1.5}
 .objResponseLabel{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);display:block;margin-bottom:2px}
+
+/* ─── LOCATION TOGGLE BUTTONS ─── */
+.locationToggleRow{display:flex;gap:6px;flex-wrap:wrap}
+.locationToggleBtn{font-family:var(--ff);font-size:12px;font-weight:600;padding:7px 16px;border-radius:10px;cursor:pointer;background:var(--surf2);color:var(--tm);border:1px solid var(--border);transition:all 140ms}
+.locationToggleBtn:hover{border-color:var(--gold);color:var(--tp)}
+.locationToggleActive{background:rgba(200,168,78,0.12);color:var(--gold);border-color:rgba(200,168,78,0.3)}
+.coachLocPill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:9999px;background:rgba(59,111,160,0.10);color:var(--blue);white-space:nowrap}
