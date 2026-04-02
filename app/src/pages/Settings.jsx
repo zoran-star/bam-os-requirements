@@ -141,6 +141,102 @@ function useSaveToast() {
   return [visible, show];
 }
 
+/* ─── COACH FORM ─── */
+function CoachForm({ coach, onSave, onClose }) {
+  const [name, setName] = useState(coach?.name || '');
+  const [role, setRole] = useState(coach?.role || '');
+  const [email, setEmail] = useState(coach?.email || '');
+  const [phone, setPhone] = useState(coach?.phone || '');
+  const [location, setLocation] = useState(coach?.location || '');
+  const [bio, setBio] = useState(coach?.bio || '');
+
+  const canSave = name.trim() && role.trim();
+
+  return (
+    <>
+      <div className={s.formRow}>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Full Name</label>
+          <input className={s.formInput} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Coach Marcus Rivera" />
+        </div>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Role</label>
+          <select className={s.formSelect} value={role} onChange={e => setRole(e.target.value)}>
+            <option value="">Select role...</option>
+            <option value="Head Coach">Head Coach</option>
+            <option value="Assistant Coach">Assistant Coach</option>
+            <option value="Youth Development">Youth Development</option>
+            <option value="Skills Trainer">Skills Trainer</option>
+            <option value="Evaluation Coach">Evaluation Coach</option>
+          </select>
+        </div>
+      </div>
+      <div className={s.formRow}>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Email</label>
+          <input className={s.formInput} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="coach@bamacademy.com" />
+        </div>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Phone</label>
+          <input className={s.formInput} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(512) 555-0100" />
+        </div>
+      </div>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>Primary Location</label>
+        <select className={s.formSelect} value={location} onChange={e => setLocation(e.target.value)}>
+          <option value="">Select location...</option>
+          <option value="Downtown">Downtown</option>
+          <option value="Westside">Westside</option>
+        </select>
+      </div>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>Bio / Background</label>
+        <textarea className={s.formTextarea} rows={3} value={bio} onChange={e => setBio(e.target.value)} placeholder="Playing experience, certifications, coaching philosophy..." />
+      </div>
+      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>This bio is used in parent-facing communications — when the AI mentions a coach, it references their background. Keep it authentic.</span></div>
+      <div className={s.modalFooter}>
+        <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
+        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, location, bio })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
+      </div>
+    </>
+  );
+}
+
+/* ─── ADD OBJECTION FORM ─── */
+function AddObjectionForm({ onSave, onClose }) {
+  const [category, setCategory] = useState('');
+  const [objection, setObjection] = useState('');
+  const [response, setResponse] = useState('');
+
+  const categories = ['Price', 'Schedule', 'Child', 'Trust', 'Commitment', 'Timing', 'Other'];
+  const canSave = category && objection.trim() && response.trim();
+
+  return (
+    <>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>Category</label>
+        <select className={s.formSelect} value={category} onChange={e => setCategory(e.target.value)}>
+          <option value="">Select category...</option>
+          {categories.map(c => <option key={c} value={c}>{c === 'Child' ? 'Child Readiness' : c}</option>)}
+        </select>
+      </div>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>Objection</label>
+        <input className={s.formInput} value={objection} onChange={e => setObjection(e.target.value)} placeholder='e.g. "We already have a coach"' />
+      </div>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>AI Response Strategy</label>
+        <textarea className={s.formTextarea} rows={4} value={response} onChange={e => setResponse(e.target.value)} placeholder="How should the AI handle this objection? Be specific about tone, what to say, and what NOT to say." />
+      </div>
+      <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>The AI will use this strategy when it detects this objection in a conversation. Be specific — "acknowledge, then redirect to trial" works better than "handle it."</span></div>
+      <div className={s.modalFooter}>
+        <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
+        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ category, objection, response })}>Add Objection</button>
+      </div>
+    </>
+  );
+}
+
 /* ─── MAIN ─── */
 export default function Settings() {
   const [tab, setTab] = useState('academy');
@@ -152,6 +248,19 @@ export default function Settings() {
   const [sellingPoints, setSellingPoints] = useState('Small group sizes (max 8 athletes)\nFocused skill development, not just scrimmages\nSaturday sessions to fit busy family schedules');
   const [neverSay, setNeverSay] = useState('Never guarantee college scholarships\nNever trash-talk other programs');
   const [faqs, setFaqs] = useState(DEFAULT_FAQS);
+
+  // Objections
+  const [objections, setObjections] = useState(DEFAULT_OBJECTIONS);
+  const [showAddObjection, setShowAddObjection] = useState(false);
+
+  // Staff
+  const [coaches, setCoaches] = useState([
+    { id: 'c1', name: 'Coach Marcus Rivera', role: 'Head Coach', email: 'marcus@bamacademy.com', phone: '(512) 555-0101', location: 'Downtown', sessions: 12, members: 28, status: 'Active', bio: 'D1 point guard, 8 years coaching experience. Specializes in elite skill development and game strategy.' },
+    { id: 'c2', name: 'Coach Adrian Simmons', role: 'Assistant Coach', email: 'adrian@bamacademy.com', phone: '(512) 555-0102', location: 'Westside', sessions: 8, members: 14, status: 'Active', bio: 'Former overseas pro. Focuses on fundamentals and building young athletes\' confidence.' },
+    { id: 'c3', name: 'Coach Filip Jovic', role: 'Youth Development', email: 'filip@bamacademy.com', phone: '(512) 555-0103', location: 'Downtown', sessions: 6, members: 18, status: 'Active', bio: 'Certified youth coach. Patient, energetic, great with beginners and shy kids.' },
+  ]);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [editingCoach, setEditingCoach] = useState(null);
 
   // Offers
   const [offers] = useState(DEFAULT_OFFERS);
@@ -614,20 +723,16 @@ export default function Settings() {
             </>
           )}
 
-          {/* ═══ STAFF & COACHES (placeholder) ═══ */}
+          {/* ═══ STAFF & COACHES ═══ */}
           {tab === 'staff' && (
             <>
               <div className={s.sectionHead}>
                 <h3 className={s.sectionTitle}>Staff & Coaches</h3>
-                <div className={s.sectionActions}><button className={s.addBtn}>+ Add Coach</button></div>
+                <div className={s.sectionActions}><button className={s.addBtn} onClick={() => { setEditingCoach(null); setShowCoachModal(true); }}>+ Add Coach</button></div>
               </div>
               <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Staff profiles power coach assignment on the schedule, trial report attribution, and parent-facing coach bios.</span></div>
-              {[
-                { name: 'Coach Marcus Rivera', role: 'Head Coach', sessions: 12, members: 28, status: 'Active' },
-                { name: 'Coach Adrian Simmons', role: 'Assistant Coach', sessions: 8, members: 14, status: 'Active' },
-                { name: 'Coach Filip Jovic', role: 'Youth Development', sessions: 6, members: 18, status: 'Active' },
-              ].map((c, i) => (
-                <div key={i} className={s.locationCard}>
+              {coaches.map(c => (
+                <div key={c.id} className={s.locationCard}>
                   <div className={s.locationLeft}>
                     <div className={s.locationIcon} style={{ background: 'rgba(59,111,160,0.10)' }}>
                       <svg width="18" height="18" fill="none" stroke="var(--blue)" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -641,7 +746,7 @@ export default function Settings() {
                     <div className={s.locationStat}><span className={s.locationStatVal}>{c.sessions}</span><span className={s.locationStatLabel}>Sessions/wk</span></div>
                     <div className={s.locationStat}><span className={s.locationStatVal}>{c.members}</span><span className={s.locationStatLabel}>Athletes</span></div>
                     <span className={s.statusActive}>{c.status}</span>
-                    <button className={s.editBtn}>Edit</button>
+                    <button className={s.editBtn} onClick={() => { setEditingCoach(c); setShowCoachModal(true); }}>Edit</button>
                   </div>
                 </div>
               ))}
@@ -653,11 +758,11 @@ export default function Settings() {
             <>
               <div className={s.sectionHead}>
                 <h3 className={s.sectionTitle}>Objection Map</h3>
-                <div className={s.sectionActions}><button className={s.addBtn}>+ Add Objection</button><span className={s.sectionRef}>PROTO-015</span></div>
+                <div className={s.sectionActions}><button className={s.addBtn} onClick={() => setShowAddObjection(true)}>+ Add Objection</button><span className={s.sectionRef}>PROTO-015</span></div>
               </div>
               <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>When a parent raises one of these objections, the AI references your approved response strategy. Toggle off to skip, or edit to customize.</span></div>
               {['Price', 'Schedule', 'Child', 'Trust', 'Commitment', 'Timing'].map(cat => {
-                const items = DEFAULT_OBJECTIONS.filter(o => o.category === cat);
+                const items = objections.filter(o => o.category === cat);
                 if (!items.length) return null;
                 return (
                   <div key={cat} className={s.objCategory}>
@@ -665,7 +770,7 @@ export default function Settings() {
                     {items.map(obj => (
                       <div key={obj.id} className={s.objCard}>
                         <div className={s.objHeader}>
-                          <div className={s.objToggle}>
+                          <div className={s.objToggle} onClick={() => setObjections(prev => prev.map(o => o.id === obj.id ? { ...o, active: !o.active } : o))}>
                             <div className={`${s.objToggleTrack} ${obj.active ? s.objToggleActive : ''}`}>
                               <div className={s.objToggleThumb} />
                             </div>
@@ -791,6 +896,48 @@ export default function Settings() {
                 <button className={s.wizardSave} onClick={() => setShowOfferWizard(false)}>Save Offer</button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ COACH MODAL ═══ */}
+      {showCoachModal && (
+        <div className={s.wizardOverlay} onClick={() => setShowCoachModal(false)}>
+          <div className={s.modal} onClick={e => e.stopPropagation()}>
+            <div className={s.modalHead}>
+              <h3>{editingCoach ? 'Edit Coach' : 'Add Coach'}</h3>
+              <button className={s.modalClose} onClick={() => setShowCoachModal(false)}>✕</button>
+            </div>
+            <CoachForm
+              coach={editingCoach}
+              onSave={(data) => {
+                if (editingCoach) {
+                  setCoaches(prev => prev.map(c => c.id === editingCoach.id ? { ...c, ...data } : c));
+                } else {
+                  setCoaches(prev => [...prev, { ...data, id: `c${Date.now()}`, sessions: 0, members: 0, status: 'Active' }]);
+                }
+                setShowCoachModal(false);
+                showToast();
+              }}
+              onClose={() => setShowCoachModal(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ═══ ADD OBJECTION MODAL ═══ */}
+      {showAddObjection && (
+        <div className={s.wizardOverlay} onClick={() => setShowAddObjection(false)}>
+          <div className={s.modal} onClick={e => e.stopPropagation()}>
+            <div className={s.modalHead}>
+              <h3>Add Objection</h3>
+              <button className={s.modalClose} onClick={() => setShowAddObjection(false)}>✕</button>
+            </div>
+            <AddObjectionForm onSave={(obj) => {
+              setObjections(prev => [...prev, { ...obj, id: `obj${Date.now()}`, active: true }]);
+              setShowAddObjection(false);
+              showToast();
+            }} onClose={() => setShowAddObjection(false)} />
           </div>
         </div>
       )}
