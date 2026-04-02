@@ -15,7 +15,12 @@ const ADVISOR_PROMPTS = [
   "Which KPIs should I focus on this month?",
 ];
 
-const GREETING = 'Good evening';
+const GREETING = (() => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+})();
 
 const TODAY = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
