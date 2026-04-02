@@ -1,0 +1,1974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM OS — GHL Workflow Map for Danny</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #14141f;
+    --surface2: #1c1c2e;
+    --border: #2a2a3e;
+    --text: #e8e8f0;
+    --text-muted: #8888a0;
+    --accent: #f5a623;
+    --green: #34d399;
+    --blue: #60a5fa;
+    --purple: #a78bfa;
+    --red: #f87171;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 16px;
+  }
+  .intro-note {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.7;
+    padding: 16px 20px;
+    background: rgba(96,165,250,0.06);
+    border: 1px solid rgba(96,165,250,0.2);
+    border-radius: 10px;
+    margin-bottom: 32px;
+  }
+  .intro-note strong { color: var(--accent); }
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-desc {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+  }
+  .badge {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .badge-onboarding { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge-sales { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .badge-mgmt { background: rgba(167,139,250,0.15); color: var(--purple); }
+
+  /* Flow diagram styles */
+  .flow-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    overflow-x: auto;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .flow-row:last-child { margin-bottom: 0; }
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    position: relative;
+  }
+  .flow-node.trigger {
+    border-color: var(--accent);
+    background: rgba(245,166,35,0.08);
+  }
+  .flow-node.trigger::before {
+    content: 'TRIGGER';
+    position: absolute;
+    top: -8px;
+    left: 8px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--surface);
+    padding: 0 4px;
+    letter-spacing: 0.5px;
+  }
+  .flow-node.action {
+    border-color: var(--blue);
+    background: rgba(96,165,250,0.06);
+  }
+  .flow-node.response {
+    border-color: var(--green);
+    background: rgba(52,211,153,0.06);
+  }
+  .flow-node.response::before {
+    content: 'IF REPLY';
+    position: absolute;
+    top: -8px;
+    left: 8px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--green);
+    background: var(--surface);
+    padding: 0 4px;
+    letter-spacing: 0.5px;
+  }
+  .flow-node.escalation {
+    border-color: var(--red);
+    background: rgba(248,113,113,0.06);
+  }
+  .flow-node.escalation::before {
+    content: 'IF NO REPLY';
+    position: absolute;
+    top: -8px;
+    left: 8px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: var(--red);
+    background: var(--surface);
+    padding: 0 4px;
+    letter-spacing: 0.5px;
+  }
+  .flow-node.outcome {
+    border-color: var(--purple);
+    background: rgba(167,139,250,0.06);
+  }
+  .flow-arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .flow-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-left: 4px;
+  }
+  .flow-group {
+    border-left: 3px solid var(--border);
+    padding-left: 20px;
+    margin-left: 16px;
+    margin-top: 8px;
+    margin-bottom: 12px;
+  }
+  .flow-group-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  /* Stats */
+  .stat {
+    display: inline-block;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+  .stat strong { color: var(--accent); }
+
+  /* Key/Legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 2px solid;
+  }
+
+  /* Connections diagram */
+  .master-flow {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+  .master-flow h3 {
+    color: var(--accent);
+    margin-bottom: 16px;
+    font-size: 1.1rem;
+  }
+  .pipeline-stage {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 24px;
+  }
+  .stage-box {
+    flex: 1;
+    padding: 16px;
+    border: 1px solid var(--border);
+    text-align: center;
+    position: relative;
+  }
+  .stage-box:first-child { border-radius: 8px 0 0 8px; }
+  .stage-box:last-child { border-radius: 0 8px 8px 0; }
+  .stage-box h4 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .stage-box ul {
+    list-style: none;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .stage-box ul li {
+    margin-bottom: 4px;
+  }
+  .stage-box.s1 { background: rgba(245,166,35,0.06); border-color: rgba(245,166,35,0.3); }
+  .stage-box.s1 h4 { color: var(--accent); }
+  .stage-box.s2 { background: rgba(96,165,250,0.06); border-color: rgba(96,165,250,0.3); }
+  .stage-box.s2 h4 { color: var(--blue); }
+  .stage-box.s3 { background: rgba(244,114,182,0.06); border-color: rgba(244,114,182,0.3); }
+  .stage-box.s3 h4 { color: var(--pink); }
+  .stage-box.s4 { background: rgba(52,211,153,0.06); border-color: rgba(52,211,153,0.3); }
+  .stage-box.s4 h4 { color: var(--green); }
+  .stage-box.s5 { background: rgba(167,139,250,0.06); border-color: rgba(167,139,250,0.3); }
+  .stage-box.s5 h4 { color: var(--purple); }
+
+  .stage-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    padding: 0 2px;
+  }
+
+  /* Workflow detail cards */
+  .wf-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 12px;
+  }
+  .wf-card h4 {
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+  }
+  .wf-card .wf-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .wf-card .wf-desc {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .wf-card .wf-desc strong {
+    color: var(--accent);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-muted);
+  }
+  .tag.published { background: rgba(52,211,153,0.15); color: var(--green); }
+  .tag.draft { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+
+  .connection-note {
+    font-size: 0.78rem;
+    color: var(--cyan);
+    padding: 8px 12px;
+    background: rgba(34,211,238,0.06);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    margin: 8px 0 16px 0;
+  }
+
+  .purpose-note {
+    font-size: 0.85rem;
+    color: var(--text);
+    padding: 12px 16px;
+    background: rgba(245,166,35,0.06);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    margin: 0 0 16px 0;
+    line-height: 1.6;
+  }
+  .purpose-note strong { color: var(--accent); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 40px 0;
+  }
+
+  /* Expandable sections */
+  details {
+    margin-bottom: 12px;
+  }
+  details > summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  details > summary:hover {
+    background: var(--surface2);
+  }
+  details > summary::before {
+    content: '\25B6';
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  details[open] > summary::before {
+    transform: rotate(90deg);
+  }
+  details[open] > summary {
+    border-radius: 10px 10px 0 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  details > summary::-webkit-details-marker { display: none; }
+  details .detail-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    padding: 20px 24px;
+  }
+  .section-folder {
+    margin-bottom: 20px;
+  }
+  .section-folder > summary {
+    font-size: 1.15rem;
+    padding: 18px 24px;
+    background: var(--surface2);
+    border-color: var(--accent);
+  }
+  .section-folder > summary .badge {
+    margin-left: auto;
+  }
+  .section-folder > .detail-content {
+    background: transparent;
+    border: none;
+    padding: 16px 0 0 0;
+  }
+  .verified-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(52,211,153,0.15);
+    color: var(--green);
+    font-weight: 600;
+    margin-left: auto;
+  }
+  .pending-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-left: auto;
+  }
+
+  /* Build vs Buy table */
+  .decision-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 16px;
+  }
+  .decision-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .decision-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .decision-table tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+  }
+</style>
+</head>
+<body>
+
+<h1>GHL Workflow Map — For Danny</h1>
+<p class="subtitle">Active automations in GoHighLevel that BAM currently runs for By Any Means GTA.<br>
+This document covers the <strong>ONBOARDING</strong> and <strong>SALES</strong> folders — the two we actively use and need to decide on for Full Control.</p>
+
+<div class="intro-note">
+  Each automation below includes a <strong>plain-English explanation</strong> of its purpose and every single step. Click any row to expand the full breakdown. You do not need to know GHL to understand these — every piece of jargon is explained in context. The goal is for you to see exactly what the business needs the software to do, so you can decide what to build in Full Control and what to leave in GHL.
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="border-color: var(--accent);"></div> Trigger (the event that kicks off the automation)</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color: var(--blue);"></div> Action (something the system does: send a text, tag a person, etc.)</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color: var(--green);"></div> Response handler (if the lead texts back, stop the automated sequence)</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color: var(--red);"></div> Escalation (what happens if nobody responds)</div>
+  <div class="legend-item"><div class="legend-swatch" style="border-color: var(--purple);"></div> Outcome / pipeline move (where the lead ends up in the sales tracker)</div>
+</div>
+
+<!-- ===== MASTER FLOW ===== -->
+<div class="master-flow">
+  <h3>How It All Connects — The Full Lead-to-Member Journey</h3>
+  <div class="pipeline-stage">
+    <div class="stage-box s1">
+      <h4>1. Lead Capture</h4>
+      <ul>
+        <li>contact form filled in</li>
+        <li>trial form filled in</li>
+        <li>free trial booked</li>
+      </ul>
+    </div>
+    <div class="stage-arrow">&rarr;</div>
+    <div class="stage-box s2">
+      <h4>2. Pre-Trial Nurture</h4>
+      <ul>
+        <li>SMS/email sequences</li>
+        <li>sms ghosted (if no reply)</li>
+        <li>sales call prep</li>
+      </ul>
+    </div>
+    <div class="stage-arrow">&rarr;</div>
+    <div class="stage-box s3">
+      <h4>3. Post-Trial</h4>
+      <ul>
+        <li>Done Trial</li>
+        <li>Missed Trial</li>
+        <li>lead nurture (once lost)</li>
+      </ul>
+    </div>
+    <div class="stage-arrow">&rarr;</div>
+    <div class="stage-box s4">
+      <h4>4. Conversion</h4>
+      <ul>
+        <li>Coach IQ payment</li>
+        <li>pdp form submission</li>
+        <li>onboarding form started</li>
+      </ul>
+    </div>
+    <div class="stage-arrow">&rarr;</div>
+    <div class="stage-box s5">
+      <h4>5. Active Member</h4>
+      <ul>
+        <li>onboarding emails</li>
+        <li>failed payment</li>
+        <li>cancellation</li>
+      </ul>
+    </div>
+  </div>
+  <p style="font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-top: 8px;">
+    Every "responded to..." workflow acts as a <strong style="color: var(--green);">circuit breaker</strong> — think of it like a safety switch: when a lead texts back, the automated messages stop immediately and the team gets notified that a real human conversation is happening.
+  </p>
+</div>
+
+<hr class="divider">
+
+<!-- ===== SALES SECTION-FOLDER ===== -->
+<details class="section-folder" open>
+  <summary>
+    <span class="badge badge-sales">SALES</span>
+    SALES Folder
+  </summary>
+  <div class="detail-content">
+    <p class="section-desc">All pre-trial, post-trial, lead nurture, and maintenance workflows. This is the sales pipeline automation engine — it handles every lead from first contact through conversion or loss.</p>
+
+    <!-- PRE-TRIAL: CONTACT FORM (DETAILED — actual GHL steps) -->
+    <h3 style="color: var(--blue); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; CONTACT FORM</h3>
+    <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+    <!-- WORKFLOW 1: contact form filled in + circuit breaker -->
+    <details>
+      <summary>contact form filled in + circuit breaker <span class="tag published">Published</span> <span class="stat">(9 + 5 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <!-- WORKFLOW 1: contact form filled in -->
+        <div class="wf-card" style="border-left: 3px solid var(--accent);">
+          <h4>Workflow: "contact form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>9</strong> enrolled)</span></h4>
+          <div class="wf-meta">23 versions | Last updated Oct 20, 2025</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When someone fills out our general contact form (they are interested but have NOT booked a trial yet), this automation sends them a friendly text, alerts the coaches, and gives the lead 1 day to book a trial — if they do not, it moves them into the "ghosted" follow-up sequence so we do not lose them.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <!-- TRIGGERS -->
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGERS (either one starts the workflow)</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Form Submitted: "Lead Texting Form"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(a simple "text us" widget on the website)</span></div>
+            <div class="flow-label">OR</div>
+            <div class="flow-node trigger">Form Submitted: "Contact Form"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(the main "get in touch" form on the website)</span></div>
+          </div>
+
+          <!-- STEP 1 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 1 — Tag + Pipeline</div>
+            <div class="flow-row">
+              <div class="flow-node action">Add tags<br><span style="font-size: 0.7rem; color: var(--text-muted);">(labels this person in the system so we know they came from the contact form)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Put in "interested" pipeline stage<br><span style="font-size: 0.7rem; color: var(--text-muted);">(adds them to our sales tracker board in the "Interested" column — the very first stage)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 2 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 2 — Wait, then notify + text</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 2 minutes<br><span style="font-size: 0.7rem; color: var(--text-muted);">(small delay so the text does not arrive instantly — feels more human and less robotic)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Notify Sergio (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends Sergio an alert so he knows a new lead just came in)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Notify Zoran (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends Zoran the same alert)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-arrow" style="margin-left: 20px;">&darr;</div>
+            </div>
+            <div class="flow-row">
+              <div class="flow-node action" style="border-color: var(--green); max-width: 500px; white-space: normal;">
+                <strong>SMS to lead:</strong> "Hi {{first_name}}, It's coach from By Any Means Basketball. Just saw you filled in the form for extra info - is there anything I can help with?"<br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">(the first automated text to the lead — opens a friendly conversation to get them talking)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 3 — Wait 1 day, then check</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(give the lead a full day to respond before we do anything else)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Notify Zoran (reminder — lead hasn't responded)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(nudges Zoran: "hey, this person still has not replied to your text")</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 4 — WAIT/CONDITION -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 4 — Wait for booking (up to 1 day)</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Wait for condition:</strong> Tag "free trial booked" exists<br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">The system pauses here and watches: did this person book a free trial? It waits up to 1 day to find out.</span>
+              </div>
+            </div>
+
+            <!-- BRANCH: Condition met -->
+            <div class="flow-group" style="border-left-color: var(--green); margin-top: 12px;">
+              <div class="flow-group-label" style="color: var(--green);">IF THEY BOOKED A TRIAL (the "free trial booked" tag appeared within 1 day)</div>
+              <div class="flow-row">
+                <div class="flow-node outcome">END — great news, they booked! The "free trial booked" workflow takes over from here to handle confirmations and reminders.</div>
+              </div>
+            </div>
+
+            <!-- BRANCH: Timeout -->
+            <div class="flow-group" style="border-left-color: var(--red); margin-top: 12px;">
+              <div class="flow-group-label" style="color: var(--red);">IF THEY DID NOT BOOK (1 day passed with no booking)</div>
+              <div class="flow-row">
+                <div class="flow-node action">Notify staff: "being put in ghosted" (x2)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(tells the team: "this lead went quiet, we are moving them into the automated follow-up sequence")</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 8px;">
+                <div class="flow-arrow" style="margin-left: 20px;">&darr;</div>
+              </div>
+
+              <!-- SUB-CONDITION: Active member check -->
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                  <strong>Check:</strong> Has tag "liveclient"?<br>
+                  <span style="font-size: 0.7rem; color: var(--text-muted);">(safety check: is this person ALREADY a paying member who just happened to fill out the contact form? We do not want to put existing members into a sales follow-up sequence.)</span>
+                </div>
+              </div>
+
+              <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+                <div class="flow-group-label" style="color: var(--green);">YES — They are already a paying member</div>
+                <div class="flow-row">
+                  <div class="flow-node outcome">END — do not put existing members in the ghosted follow-up. They were probably just asking a question.</div>
+                </div>
+              </div>
+
+              <div class="flow-group" style="border-left-color: var(--red); margin-top: 8px;">
+                <div class="flow-group-label" style="color: var(--red);">NO — They are not a member, they are a lead who went quiet</div>
+                <div class="flow-row">
+                  <div class="flow-node escalation">Add to "sms ghosted" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(hands this person off to the "ghosted" sequence, which sends a series of follow-up texts over 6 days to try to re-engage them)</span></div>
+                  <div class="flow-arrow">&rarr;</div>
+                  <div class="flow-node outcome">END</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORKFLOW 2: replied to 'contact form filled in' -->
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+          <h4>Workflow: "replied to 'contact form filled in'" <span class="tag published">Published</span> <span class="stat">(<strong>5</strong> enrolled)</span></h4>
+          <div class="wf-meta">7 versions | Last updated Oct 20, 2025 | Circuit breaker workflow</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the "stop bugging them" safety switch for the contact form workflow above. When a lead replies to any of our automated texts, this workflow fires immediately — it stops the follow-up sequence and tells the sales team "this person is talking to us now, a real conversation is happening."
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Customer Replied — filtered to replies to "contact form filled in" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(GHL can detect when someone texts back in response to a specific automation's messages)</span></div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">ACTION</div>
+            <div class="flow-row">
+              <div class="flow-node action">
+                <strong>Create/Update Opportunity</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Move to "responded" stage in the Training Pipeline — (this updates the sales tracker board: moves the lead's card from "Interested" to "Responded", so the team can see at a glance that this person is now in a real conversation and needs personal attention)</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>How these two connect:</strong> When the lead replies to any SMS sent by "contact form filled in", this workflow fires automatically. It moves their sales tracker card to the "responded" stage — signaling to staff that a human conversation is happening. The original workflow's wait/condition steps will also detect the activity.
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- PRE-TRIAL: FREE TRIALS (DETAILED — actual GHL steps) -->
+    <h3 style="color: var(--blue); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; FREE TRIALS</h3>
+    <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+    <!-- WORKFLOW: trial form filled in + circuit breaker -->
+    <details>
+      <summary>trial form filled in + circuit breaker <span class="tag published">Published</span> <span class="stat">(349 + 39 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <!-- WORKFLOW: trial form filled in (DETAILED) -->
+        <div class="wf-card" style="border-left: 3px solid var(--blue);">
+          <h4>Workflow: "trial form filled in" <span class="tag published">Published</span> <span class="stat">(<strong>349</strong> enrolled, <strong>1</strong> active)</span></h4>
+          <div class="wf-meta">45 versions | Last updated Oct 7, 2025</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a lead starts filling out the free trial booking form (enters their name/info) but then ABANDONS it without actually picking a date and time, this automation reaches out to help them finish booking — because they clearly wanted to try us but something stopped them.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <!-- TRIGGER -->
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Form Submitted: "main free trial form"<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Fires when someone fills out the booking form but does NOT pick a date/time — they started but did not finish the booking process</span>
+            </div>
+          </div>
+
+          <!-- STEP 1 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 1 — Tag + Opportunity</div>
+            <div class="flow-row">
+              <div class="flow-node action">Add Tag "lead Free Session Form"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(labels them so we know they came from the trial form specifically)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Find Opportunity</strong><br><span style="font-size: 0.7rem; color: var(--text-muted);">(checks: does this person already have a card on our sales tracker board?)</span>
+              </div>
+            </div>
+            <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+              <div class="flow-group-label" style="color: var(--green);">THEY ALREADY HAVE A CARD — just update it</div>
+              <div class="flow-row"><div class="flow-node action">Update opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">(refreshes their existing sales card with the latest info)</span></div></div>
+            </div>
+            <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+              <div class="flow-group-label">THEY DO NOT HAVE A CARD YET — create one</div>
+              <div class="flow-row"><div class="flow-node action">Create Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">(creates a new card on the sales tracker board so the team can track this lead)</span></div></div>
+            </div>
+          </div>
+
+          <!-- STEP 2 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 2 — Wait, Notify, then SMS</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 40 minutes<br><span style="font-size: 0.7rem; color: var(--text-muted);">(gives them time to come back and finish booking on their own before we reach out — they might have just gotten distracted)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action">notify Sergio (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(alerts the coach that someone started but did not finish booking)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">notify Zoran (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same alert to Zoran)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action" style="border-color: var(--green); max-width: 500px; white-space: normal;">
+                <strong>SMS to lead:</strong> "Hi {{first_name}}, it's coach from By Any Means GTA. I saw you filled in the form to book a trial but didn't select a time. Do you need anything from me to help you book a trial? Here's the link to the calendar again: {{location.website}}/free-trial"<br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">(helpful nudge with the booking link again — makes it easy for them to go back and finish)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 3 — Wait 1 day, then move to ghosted</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(a full day to respond to our text or finish booking before we escalate)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action">notify Zoran<br><span style="font-size: 0.7rem; color: var(--text-muted);">(heads-up: "this person is about to go into the ghosted sequence")</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">notify Sergio<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same heads-up)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node escalation">Add to "sms ghosted" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(they did not book or reply, so hand them off to the 6-day follow-up drip to try to win them back)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>Key context:</strong> This workflow fires for leads who filled the pre-booking form (name, info) but abandoned before selecting a time. It auto-stops if: (1) the contact books a trial (handled by "free trial booked" workflow), or (2) the contact replies to any SMS (handled by "responded to 'trial form filled in'" workflow). If neither happens within 1 day, the lead goes into ghosted.
+          </div>
+        </div>
+
+        <!-- WORKFLOW: responded to 'trial form filled in' -->
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+          <h4>Workflow: "responded to 'trial form filled in'" <span class="tag published">Published</span> <span class="stat">(<strong>39</strong> enrolled)</span></h4>
+          <div class="wf-meta">3 versions | Last updated Jun 7, 2025 | Circuit breaker workflow</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> The "stop bugging them" safety switch for the trial form workflow above. When someone who abandoned the booking form texts us back, this fires immediately — it stops any automated follow-up and tells the team a real conversation is happening.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 24px;">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Customer Replied — filtered to replies to "trial form filled in" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(detects when someone texts back in response to the abandoned-form follow-up messages)</span></div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">ACTION</div>
+            <div class="flow-row">
+              <div class="flow-node action">
+                <strong>Create/Update Opportunity</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Move to "responded" stage — (updates the sales tracker: this person is now talking to us, stop the automated messages and let a human take over)</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <hr style="border-color: var(--border); margin: 24px 0;">
+
+    <!-- WORKFLOW: free trial booked + circuit breaker -->
+    <details>
+      <summary>free trial booked + circuit breaker <span class="tag published">Published</span> <span class="stat">(277 + 48 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <!-- WORKFLOW: free trial booked (DETAILED) -->
+        <div class="wf-card" style="border-left: 3px solid var(--accent);">
+          <h4>Workflow: "free trial booked" <span class="tag published">Published</span> <span class="stat">(<strong>277</strong> enrolled)</span></h4>
+          <div class="wf-meta">140 versions | Last updated Feb 11, 2026 | Highest-volume workflow — the core of the sales funnel</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the BIG one. When a lead actually books a free trial session, this automation handles EVERYTHING: sends them a confirmation text and email, alerts the coaching staff with the athlete's details so they can prepare, sends a reminder before the session, and then after the session sends the coach's post-trial evaluation form to all the right people. This is the backbone of the entire sales funnel.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <!-- TRIGGER -->
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Customer Booked Appointment — Calendar Group: "Book Your Free Trial"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(someone picked a date and time on the booking calendar — this is a REAL booking, not just a form fill)</span></div>
+          </div>
+
+          <!-- STEP 1: Cleanup + Pipeline -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 1 — Cleanup + Pipeline Setup</div>
+            <div class="flow-row">
+              <div class="flow-node action">Remove from Workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(stops any other automations running on this person — e.g., if they were in the "ghosted" sequence or "trial form" follow-up, pull them out because they just booked)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action">Create/Update Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">(creates or updates their card on the sales tracker board)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 2: Confirmations -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 2 — Send Confirmations to the Lead</div>
+            <div class="flow-row">
+              <div class="flow-node action" style="border-color: var(--green);">Confirmation text (SMS to lead)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(texts the lead: "Your trial is booked! Here are the details...")</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--green);">Confirmation email (to lead)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same info via email — dual channel so they definitely see it)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 3: Internal Notifications -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 3 — Notify Staff</div>
+            <div class="flow-row">
+              <div class="flow-node action">msg Zoran (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(alerts Zoran: "new trial booked — here is who and when")</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">msg Adrian (internal)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(alerts Adrian the same way)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 4: Referral Check -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 4 — Referral Source Check</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Condition:</strong> Has tag "glueguyresponsible"?<br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">(checks: was this lead referred by one of our referral partners, aka "glue guys"? We track referrals so we know who is sending us good leads.)</span>
+              </div>
+            </div>
+            <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+              <div class="flow-group-label" style="color: var(--green);">YES — this lead was referred by a partner</div>
+              <div class="flow-row">
+                <div class="flow-node action">Add Tag (referral tracking)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(tags them for referral attribution so we can credit the right partner)</span></div>
+              </div>
+            </div>
+            <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+              <div class="flow-group-label">NO — they found us on their own (organic, ads, etc.)</div>
+              <div class="flow-row">
+                <div class="flow-node action">Go To (skip to next step)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(no referral tagging needed, just continue)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 5: Tag + Pipeline Stage -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 5 — Tag + Pipeline + Contact Field</div>
+            <div class="flow-row">
+              <div class="flow-node action">Add "free trial booked" tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks this person as someone who has booked — other workflows watch for this tag to know when to stop)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Put in "scheduled trial" stage<br><span style="font-size: 0.7rem; color: var(--text-muted);">(moves their sales card to the "Scheduled Trial" column — tells the team this lead has a session coming up)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Update contact field<br><span style="font-size: 0.7rem; color: var(--text-muted);">(saves extra info to their contact record for future reference)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action">Add "sentfreetrialconfirmation" tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(tracks that we already sent them a confirmation — prevents sending duplicate confirmations if they re-enter this workflow)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 6: Pre-Session Reminder (Saturday logic) -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 6 — Pre-Session Reminder (timed before their appointment)</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait until 6 hours BEFORE appointment<br><span style="font-size: 0.7rem; color: var(--text-muted);">(the system calculates when their trial is and waits until 6 hours before to send a reminder)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Condition:</strong> Is it Saturday?<br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">(Saturday sessions run on a different schedule than weekdays, so the reminder timing is different)</span>
+              </div>
+            </div>
+
+            <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+              <div class="flow-group-label">NOT SATURDAY (weekday session) — send reminder 6 hours before</div>
+              <div class="flow-row">
+                <div class="flow-node action" style="border-color: var(--green);">Check-in text (SMS to lead)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(friendly reminder: "Hey, just checking in — still good for your trial today?")</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Internal text: key info on trial athlete<br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends the coaching staff a summary of the athlete coming in — name, age, experience, what they are looking for)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Internal text: key info (fit specific)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(additional details about what program would be the best fit for this athlete)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Internal text: key info (addon specific)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(info about any add-on services the athlete might be interested in)</span></div>
+              </div>
+            </div>
+
+            <div class="flow-group" style="border-left-color: var(--purple); margin-top: 8px;">
+              <div class="flow-group-label" style="color: var(--purple);">SATURDAY SESSION — shorter lead time for reminders</div>
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 2 hours before appointment<br><span style="font-size: 0.7rem; color: var(--text-muted);">(Saturday sessions get reminders only 2 hours before instead of 6 — people are in weekend mode and shorter notice works better)</span></div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action">Go To (joins the weekday flow)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends the same check-in text and staff briefings as weekdays, just with shorter timing)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 7: Wait for Reply -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 7 — Wait for Lead to Reply to the Reminder (70 min timeout)</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Wait for a reply</strong><br>
+                <span style="font-size: 0.7rem; color: var(--text-muted);">After sending the check-in text, the system waits up to 70 minutes for them to reply. This tells us if they saw the message and are still planning to come.</span>
+              </div>
+            </div>
+
+            <div class="flow-group" style="border-left-color: var(--green); margin-top: 12px;">
+              <div class="flow-group-label" style="color: var(--green);">THEY REPLIED (within 70 min) — great, they confirmed they are coming</div>
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait until after session<br><span style="font-size: 0.7rem; color: var(--text-muted);">(the system pauses until the trial session time has passed)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Post Trial Form to email — notify Zoran<br><span style="font-size: 0.7rem; color: var(--text-muted);">(reminds Zoran to fill out the coach evaluation form for this athlete)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Post Trial Form to email — notify Filip<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same reminder to Filip)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action" style="border-color: var(--green);">Post Trial Form via email (to lead)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends the lead the post-trial feedback form so they can share how the experience was)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node action">Post Trial Form via email — notify Adrian<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same reminder to Adrian)</span></div>
+              </div>
+              <div class="flow-row" style="margin-top: 6px;">
+                <div class="flow-node outcome">END</div>
+              </div>
+            </div>
+
+            <div class="flow-group" style="border-left-color: var(--red); margin-top: 12px;">
+              <div class="flow-group-label" style="color: var(--red);">THEY DID NOT REPLY (70 min passed — they might not show up)</div>
+              <div class="flow-row">
+                <div class="flow-node action">Notify Zoran<br><span style="font-size: 0.7rem; color: var(--text-muted);">(heads-up: "this person did not confirm, they might be a no-show")</span></div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action">Notify Sergio<br><span style="font-size: 0.7rem; color: var(--text-muted);">(same alert)</span></div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action">Go To (sends the post-trial form steps anyway)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(even if they did not reply, we still send the post-trial form after the session time — they might have shown up anyway)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORKFLOW 2: responded to 'free trial booked' -->
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+          <h4>Workflow: "responded to 'free trial booked'" <span class="tag published">Published</span> <span class="stat">(<strong>48</strong> enrolled)</span></h4>
+          <div class="wf-meta">8 versions | Last updated Jul 21, 2025 | Circuit breaker workflow</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> The safety switch for the free trial booked workflow. When a lead replies to our confirmation or reminder text, this removes the confirmation tag to prevent duplicate messages from being sent.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">
+              Customer Replied — filtered to replies to "free trial booked" workflow<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Additional filter: Has Tag includes "sentfreetrialconfirmation" — (only fires if we already sent them a confirmation, to avoid false triggers)</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">ACTION</div>
+            <div class="flow-row">
+              <div class="flow-node action">
+                <strong>Remove Tag</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Removes the "sentfreetrialconfirmation" tag — (this tells the system "we already talked to this person, do not send them the reminder text again")</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>How these connect:</strong> When a lead replies to any message from "free trial booked", this removes the confirmation tag to prevent duplicate messages. After the trial session, the main workflow sends the Post Trial Form to the lead and notifies staff (Zoran, Filip, Adrian) to follow up. If the lead does not reply within 70 minutes of the check-in text, staff are notified directly.
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- PRE-TRIAL: GHOSTED (DETAILED) -->
+    <h3 style="color: var(--red); font-size: 1rem; margin: 24px 0 12px 0;">PRE-TRIAL &rarr; GHOSTED</h3>
+    <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+    <!-- WORKFLOW: sms ghosted + circuit breaker -->
+    <details>
+      <summary>sms ghosted + circuit breaker <span class="tag published">Published</span> <span class="stat">(274 + 108 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <!-- WORKFLOW: sms ghosted -->
+        <div class="wf-card" style="border-left: 3px solid var(--red);">
+          <h4>Workflow: "sms ghosted" <span class="tag published">Published</span> <span class="stat">(<strong>274</strong> enrolled, <strong>1</strong> active)</span></h4>
+          <div class="wf-meta">67 versions | Last updated Nov 10, 2025 | 6-day drip for leads who went silent</div>
+          <div style="font-size: 0.78rem; color: var(--cyan); padding: 6px 10px; background: rgba(34,211,238,0.06); border-left: 3px solid var(--cyan); border-radius: 0 6px 6px 0; margin-top: 6px;">
+            <strong>Sticky note from GHL:</strong> "This workflow will be used when a contact doesn't reply to 'Trial Form Filled In,' 'Contact Form,' and 'No Show' workflows."
+          </div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the "do not give up on them" automation. When a lead stops replying to our messages (from ANY entry point — contact form, trial form, or no-show), this workflow sends a series of follow-up messages over 6 days across SMS and email, trying different angles to get them to re-engage. Think of it as the catch-all safety net that makes sure no lead falls through the cracks.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <!-- TRIGGER -->
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Contact Tag Added — includes "smsghosted"<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">This workflow does NOT start on its own — other workflows add the "smsghosted" tag when a lead goes quiet, which triggers this sequence. Fed by: "contact form filled in", "trial form filled in", and "No Show" workflows.</span>
+            </div>
+          </div>
+
+          <!-- STEP 1 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">STEP 1 — Reset pipeline stage</div>
+            <div class="flow-row">
+              <div class="flow-node action">Put back into "interested" stage in pipeline<br><span style="font-size: 0.7rem; color: var(--text-muted);">(resets their sales card back to "Interested" — they are a lead again, we are starting fresh with outreach)</span></div>
+            </div>
+          </div>
+
+          <!-- STEP 2 — Day 1 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 1 — First re-engagement attempt</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(give them a breather before the first follow-up — do not overwhelm them)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--green);">
+                <strong>ghosted #1</strong> (SMS)<br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">First attempt to re-engage — a casual, low-pressure text to restart the conversation</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3 — Day 2 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 2 — Second attempt, different angle</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(one message per day keeps it from feeling spammy)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--green);">
+                <strong>ghosted #2</strong> (SMS)<br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Second attempt — uses a different angle/message than the first one so it does not feel repetitive</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 4 — Day 3 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 3 — Internal heads-up to the team</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(another day passes with no reply)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">
+                <strong>Internal Notification</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Alerts the team: "this lead has been ghosting for 3 days now" — gives staff a chance to try a personal phone call or DM</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 5 — Day 4 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 4 — Switch channels: try email instead of text</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(they are clearly not responding to texts, so let us try a different channel)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--cyan);">
+                <strong>Email</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Switches from SMS to email — maybe they prefer email, or their texts are buried. Different channel = different chance to connect.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 6 — Day 5 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 5 — One last SMS push</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(back to SMS for one final attempt)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--green);">
+                <strong>ghosted #3</strong> (SMS)<br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Final SMS attempt — typically a softer message like "no worries if now isn't the right time, we are here when you are ready"</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 7 — Day 6 -->
+          <div style="margin-top: 20px;">
+            <div class="flow-group-label">DAY 6 — Close out and mark as lost</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(final day — if they still have not replied after 6 days, we accept they are not interested right now)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Create/Update Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">(updates their sales card to a "lost" or end-stage — clears them from the active pipeline so the team focuses on warmer leads)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END<br><span style="font-size: 0.7rem; color: var(--text-muted);">(from here, the lead enters the long-term "lead nurture (once lost)" workflow which sends occasional emails over months)</span></div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>Key context:</strong> This is the catch-all re-engagement sequence. The pattern is: SMS, SMS, internal alert, email, SMS — varying the channel and tone. If the lead replies at ANY point during the 6 days, the "replied to sms ghosted" circuit breaker fires and pulls them out immediately. After 6 days with no response, the lead moves to the long-term "lead nurture (once lost)" workflow that sends periodic emails over months.
+          </div>
+        </div>
+
+        <!-- WORKFLOW: replied to 'sms ghosted' -->
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+          <h4>Workflow: "replied to 'sms ghosted'" <span class="tag published">Published</span> <span class="stat">(<strong>108</strong> enrolled)</span></h4>
+          <div class="wf-meta">9 versions | Last updated Jul 21, 2025 | Circuit breaker workflow</div>
+          <div style="font-size: 0.78rem; color: var(--cyan); padding: 6px 10px; background: rgba(34,211,238,0.06); border-left: 3px solid var(--cyan); border-radius: 0 6px 6px 0; margin-top: 6px;">
+            <strong>Sticky note from GHL:</strong> "Once a customer gets sent to 'sms ghosted', this will take them back out of it, and put them in the 'replied' stage in the opportunities."
+          </div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the "stop bugging them" safety switch for the ghosted sequence. When someone who was being followed up on finally texts back, this workflow fires immediately — it stops the automated follow-up drip and moves them back to the "responded" stage so the sales team knows a real conversation is happening and can jump in personally.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Customer Replied — filtered to replies to "sms ghosted" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(detects when a ghosted lead finally texts back in response to one of the 6-day drip messages)</span></div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">ACTION</div>
+            <div class="flow-row">
+              <div class="flow-node action">
+                <strong>Move to "responded" stage in pipeline</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Pulls them out of ghosted and puts their sales card back in the "Responded" column — tells the team: "this person is talking to us again, someone needs to personally reply to them NOW"</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 12px;">
+            <strong>How these two connect:</strong> When a ghosted lead finally replies to any SMS from the 6-day drip, this workflow fires automatically. It moves them back to the "responded" stage — pulling them out of the automated ghosted sequence and signaling to staff that a real conversation is now happening and they need to take over personally.
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- POST TRIAL (DETAILED) -->
+    <h3 style="color: var(--pink); font-size: 1rem; margin: 24px 0 12px 0;">POST TRIAL</h3>
+    <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+    <!-- WORKFLOW: Done Trial -->
+    <details>
+      <summary>Done Trial <span class="tag published">Published</span> <span class="stat">(29 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <div class="wf-card" style="border-left: 3px solid var(--pink);">
+          <h4>Workflow: "Done Trial" <span class="tag published">Published</span> <span class="stat">(<strong>29</strong> enrolled)</span></h4>
+          <div class="wf-meta">44 versions | Verified from GHL builder</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> After a trial session happens, the coach fills out a post-trial evaluation form. This automation reads the coach's assessment and routes the lead down the right path: if the coach says "good fit" the lead enters the post-trial sales nurture, if "not a fit" they get tagged as lost, and if the athlete was a no-show they go into the missed trial follow-up. Think of it as the sorting hat after a trial session.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Form Submitted — Post Trial Form Submitted<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">The coach fills out a form after every trial session rating the athlete and their fit for the program. When this form is submitted, the automation kicks in.</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 1 — Remove from Workflow</div>
+            <div class="flow-row">
+              <div class="flow-node action">Remove from Workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(clears any previous automations running on this person — clean slate before routing them)</span></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 2 — Route based on the coach's assessment (4 possible paths)</div>
+          </div>
+
+          <!-- Branch 1: Good fit -->
+          <div class="flow-group" style="border-left-color: var(--green); margin-top: 8px;">
+            <div class="flow-group-label" style="color: var(--green);">BRANCH 1: Coach says YES, this athlete is a good fit for our program</div>
+            <div class="flow-row">
+              <div class="flow-node action">Create Or Update Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">Move to TRAINING PIPELINE, stage: "done trial" — (their sales card moves to "Done Trial" column, meaning they completed a trial and we want to convert them)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Add 'posttrial' Tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks this person as someone who completed a trial — so other automations know their status and history)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Add 'currentlyinposttrial' Tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks them as actively in the post-trial sales nurture — this prevents them from accidentally entering other sequences)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END — lead enters the post-trial nurture sequence to convert them to a paying member</div>
+            </div>
+          </div>
+
+          <!-- Branch 2: Not a fit -->
+          <div class="flow-group" style="border-left-color: var(--red); margin-top: 8px;">
+            <div class="flow-group-label" style="color: var(--red);">BRANCH 2: Coach says NO, this athlete is not a good fit for our program</div>
+            <div class="flow-row">
+              <div class="flow-node action">Create Or Update Opportunity<br><span style="font-size: 0.7rem; color: var(--text-muted);">(updates their sales card to reflect the coach's assessment)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Update appointment status<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks the appointment as completed in the calendar)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Add Tag "lostaftertrial"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(labels them as "lost after trial" — this feeds into the long-term lead nurture so we can stay in touch in case things change)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END — tagged as lost, will eventually enter the long-term lead nurture email drip</div>
+            </div>
+          </div>
+
+          <!-- Branch 3: No-show -->
+          <div class="flow-group" style="border-left-color: var(--accent); margin-top: 8px;">
+            <div class="flow-group-label" style="color: var(--accent);">BRANCH 3: The athlete did not show up to their trial session</div>
+            <div class="flow-row">
+              <div class="flow-node action">Update appointment status<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks the appointment as a no-show in the calendar)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Add Tag "missed trial"<br><span style="font-size: 0.7rem; color: var(--text-muted);">(adding this tag automatically triggers the "Missed Trial" workflow below, which tries to get them to rebook)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END — the "Missed Trial" workflow takes over from here</div>
+            </div>
+          </div>
+
+          <!-- Branch 4: None -->
+          <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+            <div class="flow-group-label">BRANCH 4: None of the above conditions were met (edge case / incomplete form)</div>
+            <div class="flow-row">
+              <div class="flow-node outcome">END — does nothing, likely an incomplete form submission</div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>Key context:</strong> This is where the coach's assessment drives the entire post-trial pipeline. Good fits go to post-trial nurture (convert them to paying members), bad fits get tagged as lost (enter long-term email nurture), and no-shows get handed off to the Missed Trial workflow (try to rebook them).
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- WORKFLOW: Missed Trial -->
+    <details>
+      <summary>Missed Trial <span class="tag published">Published</span> <span class="stat">(54 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <div class="wf-card" style="border-left: 3px solid var(--accent);">
+          <h4>Workflow: "Missed Trial" <span class="tag published">Published</span> <span class="stat">(<strong>54</strong> enrolled)</span></h4>
+          <div class="wf-meta">32 versions | Last updated Oct 3, 2025</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When an athlete books a trial session but does not show up, this automation sends them a friendly "we missed you" message with a link to rebook, alerts the team about the no-show, and resets them back to "Interested" in the sales pipeline so we can try again. The tone is understanding, not pushy — life happens.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGERS (2 entry points — same result either way)</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">
+              <strong>1. Appointment Status</strong> &rarr; "no-show" from any Free Trial calendar<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Fires automatically when someone manually marks the appointment as a no-show in the calendar</span>
+            </div>
+          </div>
+          <div class="flow-row" style="margin-top: 8px;">
+            <div class="flow-node trigger">
+              <strong>2. Contact Tag</strong> &rarr; "missed trial" tag added<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">Also triggered by the "Done Trial" workflow above (Branch 3) when the coach marks a no-show on the post-trial form</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 1 — Route based on which trigger fired (both paths end up in the same place)</div>
+          </div>
+
+          <div class="flow-group" style="border-left-color: var(--accent); margin-top: 8px;">
+            <div class="flow-group-label" style="color: var(--accent);">CAME IN VIA: appointment marked as no-show in calendar</div>
+            <div class="flow-row">
+              <div class="flow-node action">Add 'missed trial' tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(ensures the tag is added for tracking, even though it came from the calendar route)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Add Tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(additional tracking tag)</span></div>
+            </div>
+          </div>
+
+          <div class="flow-group" style="border-left-color: var(--text-muted); margin-top: 8px;">
+            <div class="flow-group-label">CAME IN VIA: "missed trial" tag was added by the Done Trial workflow</div>
+            <div class="flow-row">
+              <div class="flow-node action">Update appointment status<br><span style="font-size: 0.7rem; color: var(--text-muted);">(marks the appointment as no-show in the calendar, since it came from the form route instead)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action">Go To (joins main branch)<br><span style="font-size: 0.7rem; color: var(--text-muted);">(both paths merge here and continue with the same follow-up)</span></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 2 — Alert the team + send rebooking messages via text AND email</div>
+            <div class="flow-row">
+              <div class="flow-node action">Missed trial notification (glueguy) — internal alert<br><span style="font-size: 0.7rem; color: var(--text-muted);">(notifies the referral partner if this lead was a referral — so they know their referral did not show up)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action" style="border-color: var(--green);">
+                <strong>SMS rebooking link</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Sends the lead a text: "We missed you! No worries, here is a link to rebook your trial" — friendly tone, makes it easy to try again</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--cyan);">
+                <strong>email rebooking link</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Same rebooking link sent via email — dual channel so they definitely see it</span>
+              </div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node action">Update opportunity: Interested<br><span style="font-size: 0.7rem; color: var(--text-muted);">(resets their sales card back to the "Interested" stage — they are still a lead, just one who needs to rebook)</span></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 3 — Wait and follow up if they still do not respond</div>
+            <div class="flow-row">
+              <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 day<br><span style="font-size: 0.7rem; color: var(--text-muted);">(give them a day to rebook on their own before following up again)</span></div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node action" style="border-color: var(--text-muted);">
+                <em>Continues with additional follow-up — if they still do not respond, they will likely be tagged as ghosted and enter the "sms ghosted" sequence</em>
+              </div>
+            </div>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>Key context:</strong> Two entry points — either automatic no-show status update or manual tag from the Done Trial form. Both converge into: internal notification, SMS + email with rebooking link, pipeline reset to "Interested", 1-day wait, then further follow-up. Tone is understanding — "we missed you, rebook here." If they do not respond, they eventually enter the ghosted sequence.
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- LEAD NURTURE (DETAILED) -->
+    <h3 style="color: var(--purple); font-size: 1rem; margin: 24px 0 12px 0;">LEAD NURTURE</h3>
+    <p style="font-size: 0.78rem; color: var(--cyan); margin-bottom: 12px; font-style: italic;">Verified from GHL workflow builder — actual steps documented below</p>
+
+    <!-- WORKFLOW: lead nurture (once lost) + circuit breaker -->
+    <details>
+      <summary>lead nurture (once lost) + circuit breaker <span class="tag published">Published</span> <span class="stat">(243 + 6 enrolled, 164 active)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+
+        <div class="wf-card" style="border-left: 3px solid var(--purple);">
+          <h4>Workflow: "lead nurture (once lost)" <span class="tag published">Published</span> <span class="stat">(<strong>243</strong> enrolled, <strong style="color: var(--accent);">164 active</strong>)</span></h4>
+          <div class="wf-meta">26 versions | Last updated Oct 31, 2025 | Biggest always-running automation — 164 people are in it right now</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the long game. When a lead did not convert (they went through the ghosted sequence and never responded, OR the coach said they were not a fit after a trial), this automation sends them value-based emails over weeks and months — success stories, training tips, community highlights. The idea is to stay on their radar without being pushy, so when they ARE ready, we are the first program they think of. With 164 people actively in it, this is the biggest running automation by far.
+        </div>
+
+        <div class="flow-container" style="margin-bottom: 16px;">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Contact Tag Added — tag "lost" or similar triggers entry<br>
+              <span style="font-size: 0.7rem; color: var(--text-muted);">This fires when a lead is marked as "lost" — which happens after: (1) the ghosted sequence runs its full 6 days with no response, (2) the coach marks them as not a fit after a trial, or (3) someone manually tags them as lost</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 1 — Cleanup + prevent duplicates</div>
+            <div class="flow-row">
+              <div class="flow-node action">Remove 'currentlyinposttrial' Tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(if they were in a post-trial nurture, clear that label since they are now in the "lost" category)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Condition: Is this their first time entering this workflow?</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Checks if they already have the "lost" tag. If they do NOT have it yet, this is their first time through (add the tag and continue). If they already have it, they have been through this before — END to prevent them from getting the same emails twice.</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 2 — Check their history for context</div>
+            <div class="flow-row">
+              <div class="flow-node action">Add lost tag<br><span style="font-size: 0.7rem; color: var(--text-muted);">(officially marks them as a lost lead in the system)</span></div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Condition: Were they referred by a partner ("glue guy")?</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Checks for referral tags — if they were a referral, may route slightly differently for partner tracking</span>
+              </div>
+            </div>
+            <div class="flow-row" style="margin-top: 8px;">
+              <div class="flow-node" style="border-color: var(--cyan); background: rgba(34,211,238,0.06);">
+                <strong>Condition: Did they actually come to a trial session?</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Checks for "posttrial" tag. If they WERE at a trial, adds "lostaftertrial" tag — this gives the emails more context (they experienced the program but did not sign up, vs. never showing up at all)</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">STEP 3 — Long-term email drip (value-based content, NOT hard sales pitches)</div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week<br><span style="font-size: 0.7rem; color: var(--text-muted);">(give them space — they just went through the sales process and said no)</span></div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 1 — recognition</strong><br><span style="font-size: 0.7rem; color: var(--text-muted);">(highlights athlete achievements and recognition within the program — shows what they are missing)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 2 — development in the GTA</strong><br><span style="font-size: 0.7rem; color: var(--text-muted);">(content about basketball development in the Greater Toronto Area — positions BAM as the authority in the space)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 3 weeks<br><span style="font-size: 0.7rem; color: var(--text-muted);">(longer gap now — not every week, spreading it out so it does not feel like spam)</span></div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 3 — testimonials</strong><br><span style="font-size: 0.7rem; color: var(--text-muted);">(success stories from real athletes and parents — social proof that the program delivers results)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 3 weeks</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node action" style="border-color: var(--green);">
+                  <strong>email 4 — fomo</strong><br><span style="font-size: 0.7rem; color: var(--text-muted);">(fear of missing out — highlights events, limited spots, or exciting things happening in the program)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 8px;">
+              <div class="flow-row">
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">Wait 1 week</div>
+                <div class="flow-arrow">&rarr;</div>
+                <div class="flow-node" style="border-color: var(--purple); background: rgba(167,139,250,0.06);">
+                  <strong>Wait 6 MONTHS</strong><br>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">Huge pause before the next cycle — the idea is to give them a full season break, then start again. People's situations change over time.</span>
+                </div>
+              </div>
+            </div>
+
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">After the 6-month pause, the drip continues with more value-based content emails — this cycle repeats, keeping BAM on the lead's radar indefinitely.</p>
+          </div>
+
+          <div class="connection-note" style="margin-top: 16px;">
+            <strong>Key context:</strong> This is BY FAR the most active automation — 164 contacts currently in it. It is the long-tail nurture for everyone who did not convert. The emails are value-based (recognition, development tips, testimonials, success stories) rather than hard sales. The 6-month wait between cycles means leads get periodic touchpoints over a very long period. If a lead replies at any point, the "responded to lead nurture" circuit breaker fires and pulls them back into the active sales pipeline.
+          </div>
+        </div>
+
+        <!-- WORKFLOW: responded to lead nurture -->
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-top: 24px;">
+          <h4>Workflow: "responded to lead nurture" <span class="tag published">Published</span> <span class="stat">(<strong>6</strong> enrolled)</span></h4>
+          <div class="wf-meta">10 versions | Last updated Jul 1, 2025 | Circuit breaker workflow</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> The safety switch for the long-term nurture emails. If someone who has been "lost" for weeks or months suddenly replies to one of our nurture emails, this fires immediately — it stops the email drip and moves them back to the "responded" stage in the sales pipeline, telling the team: "this person is interested again, reach out to them personally."
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-group-label" style="margin-bottom: 12px;">TRIGGER</div>
+          <div class="flow-row">
+            <div class="flow-node trigger">Customer Replied — filtered to replies to "lead nurture (once lost)" workflow<br><span style="font-size: 0.7rem; color: var(--text-muted);">(detects when a lost lead replies to any of the long-term nurture emails)</span></div>
+          </div>
+          <div style="margin-top: 16px;">
+            <div class="flow-group-label">ACTION</div>
+            <div class="flow-row">
+              <div class="flow-node action">
+                <strong>Move to Training Pipeline — "Responded" Stage</strong><br>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Pulls them out of the long-term nurture and puts their card back in the "Responded" column on the sales tracker — this tells the team: "someone who was lost just came back to life, jump on this immediately"</span>
+              </div>
+              <div class="flow-arrow">&rarr;</div>
+              <div class="flow-node outcome">END</div>
+            </div>
+          </div>
+          <div class="connection-note" style="margin-top: 12px;">
+            <strong>How these two connect:</strong> When a lost lead replies to any email from the long-term nurture drip, this workflow fires automatically. It moves them back to the "responded" stage in the Training Pipeline — pulling them out of the nurture sequence and telling the team a real conversation is now happening.
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <!-- MAINTENANCE -->
+    <h3 style="color: var(--text-muted); font-size: 1rem; margin: 24px 0 12px 0;">MAINTENANCE</h3>
+
+    <details>
+      <summary>lead2 tagging <span class="tag published">Published</span> <span class="stat">(385 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is a behind-the-scenes utility. Every time a new lead enters the system, this workflow automatically labels (tags) them based on where they came from, what form they filled out, or what stage they are in. It is like an automatic filing system that keeps the database organized for reporting and makes sure other workflows can find the right people. Highest enrollment because it runs on almost every new contact.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">New lead enters system<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires on almost every new contact that comes in from any source)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">lead2 tagging <span class="stat">(<strong>385</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(auto-tags contacts based on their source, form data, and pipeline stage — keeps everything organized)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- OTHER -->
+    <h3 style="color: var(--text-muted); font-size: 1rem; margin: 24px 0 12px 0;">OTHER</h3>
+
+    <details>
+      <summary>sales call prep <span class="tag published">Published</span> <span class="stat">(1 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a sales call is booked (usually for a parent who wants to learn more before committing their kid to the program), this automation sends the sales team a prep brief — a summary of everything we know about the lead so the coach can walk into the call informed and ready.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">Sales call appointment booked<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires when someone books a sales call on the dedicated sales calendar)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">sales call prep <span class="stat">(<strong>1</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends the team an internal summary of the lead's info, history, and what they are looking for)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>cancellation <span class="tag published">Published</span> <span class="stat">(38 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a paying member wants to cancel their membership, this automation handles the process: sends them an acknowledgment, asks them WHY they want to leave (so we can learn), potentially offers a retention deal to keep them, and if they still want out, processes the cancellation and notifies the team. This is critical for reducing churn.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">Member requests cancellation<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires when a member initiates a cancellation — could be via form, tag, or manual trigger)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">cancellation <span class="stat">(<strong>38</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends acknowledgment, collects cancellation reason, may offer a retention deal, processes the cancellation, and notifies staff)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<hr class="divider">
+
+<!-- ===== ONBOARDING SECTION-FOLDER ===== -->
+<details class="section-folder">
+  <summary>
+    <span class="badge badge-onboarding">ONBOARDING</span>
+    CLIENT MANAGEMENT &rarr; ONBOARDING Folder
+  </summary>
+  <div class="detail-content">
+    <p class="section-desc">Everything that happens AFTER a lead converts to a paying member. Form collection, welcome emails, payment processing — turning a new signup into a fully onboarded athlete.</p>
+
+    <details>
+      <summary>onboarding form started <span class="tag published">Published</span> <span class="stat">(173 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a new paying member starts filling out their onboarding form (athlete details, medical info, emergency contacts, etc.), this automation tracks their progress and sends them a reminder if they do not finish. We need this form completed before they can start training.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">New member starts onboarding form<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires when a new paying member begins filling out their onboarding paperwork)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">onboarding form started <span class="stat">(<strong>173</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(tags the contact, updates their pipeline stage to "onboarding", and sends reminders if the form is not completed)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>pdp form submission <span class="tag published">Published</span> <span class="stat">(106 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a member submits their Player Development Plan (PDP) form — which captures the athlete's goals, experience level, position, and what they want to improve — this automation processes that data, tags the contact with relevant info, and sends the coaching staff the athlete's profile so they can design a personalized training plan.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">Member submits PDP (Player Development Plan) form<br><span style="font-size: 0.7rem; color: var(--text-muted);">(the PDP form is where athletes tell us their goals, experience, position, and what they want to work on)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">pdp form submission <span class="stat">(<strong>106</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(processes the form data, tags the contact with their sport details, and sends the coaching staff a new athlete profile summary)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Coach IQ New payment submitted <span class="tag published">Published</span> <span class="stat">(22 enrolled)</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+        <div class="wf-card" style="border-left: 3px solid var(--green); margin-bottom: 12px;">
+          <h4>Workflow: "Coach IQ New payment submitted" <span class="tag published">Published</span> <span class="stat">(<strong>22</strong> enrolled)</span></h4>
+          <div class="wf-meta">10 versions | Verified from GHL builder</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> This is the BIG conversion moment. When someone actually pays for a membership, this automation handles everything that needs to happen: verifies the contact, figures out which plan they bought, cleans up all the old sales automations (stops the ghosted texts, removes the lead tags), notifies the entire team, marks them as a "won" deal on the sales board, tags them as a live client, turns off all marketing bots, and starts the welcome message sequence. This is where a lead becomes a member.
+        </div>
+
+        <div class="flow-group">
+          <div class="flow-group-label">TRIGGER: New payment submitted (Coach IQ)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Fires when someone completes a membership payment through Coach IQ (the payment platform). The GHL sticky note says: "When someone signs up, it: internal notifications for manual onboarding processes, puts the client in onboarding emails automation, puts the client in 2, and 32 day automations for reach outs"</p>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEP 1 — Find or Create the Contact</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">Looks up the contact in the system. If found, checks if they are already a paying member (has "liveclient" tag). If already a member, END — no need to re-onboard them (they probably just renewed or upgraded). If the contact does not exist yet, creates a new one.</p>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEP 2 — Figure out which plan they bought (+18 plan options)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">Routes based on which specific membership plan was purchased — there are 18 different segments (different age groups, training frequencies, add-ons, etc.). Each plan may have slightly different onboarding steps. If no plan matches, END as a safety fallback.</p>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEP 3 — Clean up all old sales automations + Notify the team + Tag as member</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            <p>1. Remove from Previous workflows — (stops ALL sales automations: ghosted texts, lead nurture emails, any follow-up sequences. They are a paying member now, not a lead.)</p>
+            <p>2. Remove Previous Tags — (clears all the lead-related tags like "ghosted", "lost", "interested", etc. Clean slate.)</p>
+            <p>3. Notify Zoran to fill in client tracker — (tells Zoran to add this person to the master client spreadsheet with their plan details)</p>
+            <p>4. Notification for manual onboarding process — (alerts the team about any manual onboarding steps that need to happen, like setting up their schedule)</p>
+            <p>5. message Adrian (internal) — (tells Adrian a new member signed up)</p>
+            <p>6. message Fil (internal) — (tells Fil the same)</p>
+            <p>7. Set to 'won' in pipeline — (moves their sales card to the "Won" column — this is the money moment, it shows up in revenue reports)</p>
+            <p>8. Add 'liveclient' tag — (officially marks them as an active paying member — this tag is used everywhere to identify members vs. leads)</p>
+            <p>9. Add KPI tag — (tags them for key performance indicator tracking — which plan, when they signed up, source, etc.)</p>
+            <p>10. Turn off all bots — (disables any AI chatbot or auto-reply features for this contact — they are a member now, they should talk to real humans)</p>
+          </div>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEP 4 — Send welcome messages to the new member</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">
+            <p>11. Wait 1 minute, then send Confirmation text (SMS) — (a quick "Welcome to BAM! You are officially in." message)</p>
+            <p>12. Wait 3 minutes, then send Schedule + location (SMS) — (practical info: "Here is when and where your sessions are" with address and times)</p>
+            <p><em>Continues with additional onboarding SMS and email sequence over the following days and weeks...</em></p>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>sub test <span class="tag published">Published</span> <span class="stat">(100 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> Handles recurring subscription payments. When a member's monthly payment processes successfully, this workflow confirms it went through and updates their membership status. Think of it as the "your payment went through, you are good for another month" automation.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">Subscription payment processed<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires every time a recurring monthly payment goes through successfully)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">sub test <span class="stat">(<strong>100</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(confirms the payment, updates membership status, keeps their "liveclient" tag active)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>onboarding emails <span class="tag published">Published</span> <span class="stat">(94 enrolled, 13 active)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> A multi-step email drip that walks new members through everything they need to know in their first weeks: welcome message, what to expect at their first session, the training schedule, facility info, how to set up the app, coach introductions, and more. Currently 13 members are actively receiving these emails. This is critical for reducing early-stage dropout — the better the onboarding experience, the more likely they stick around.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">New member is onboarded<br><span style="font-size: 0.7rem; color: var(--text-muted);">(triggered by the "Coach IQ New payment submitted" workflow after all the setup steps are done)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">onboarding emails <span class="stat">(<strong>94</strong> enrolled, <strong>13</strong> active)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends a series of emails over weeks: welcome, expectations, schedule, facility guide, app setup, coach intro, training tips, etc.)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- ===== CLIENT MANAGEMENT (other) — merged into ONBOARDING folder for display ===== -->
+<details class="section-folder">
+  <summary>
+    <span class="badge badge-mgmt">MGMT</span>
+    CLIENT MANAGEMENT (top level, outside ONBOARDING)
+  </summary>
+  <div class="detail-content">
+    <p class="section-desc">Workflows at the client management root — AI suggestions and payment failure handling. These run on active members, not leads.</p>
+
+    <details>
+      <summary>AI Agent Suggestions <span class="tag published">Published</span> <span class="stat">(140 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When the GHL AI agent (a built-in chatbot feature) interacts with a contact or generates a suggestion, this workflow handles what happens next — it can send notifications to staff or trigger actions based on what the AI recommended. Think of it as the bridge between the AI chatbot and the human team.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">AI agent interaction / suggestion event<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires when GHL's built-in AI agent makes a suggestion about a contact)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">AI Agent Suggestions <span class="stat">(<strong>140</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(processes the AI's recommendation and notifies the right staff member or triggers an action)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>failed payment <span class="tag published">Published</span> <span class="stat">(1 enrolled)</span></summary>
+      <div class="detail-content">
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a member's credit card gets declined or their recurring payment fails, this automation jumps in to recover the revenue: it sends the member a "your payment failed, please update your billing" message, follows up if they do not fix it, and alerts the team if the issue is not resolved. This is a direct revenue-protection workflow — every failed payment that gets recovered is money saved.
+        </div>
+
+        <div class="flow-container">
+          <div class="flow-row">
+            <div class="flow-node trigger">Subscription payment fails<br><span style="font-size: 0.7rem; color: var(--text-muted);">(fires when a recurring payment is declined, expired card, insufficient funds, etc.)</span></div>
+            <div class="flow-arrow">&rarr;</div>
+            <div class="flow-node action">failed payment <span class="stat">(<strong>1</strong> enrolled)</span><br><span style="font-size: 0.7rem; color: var(--text-muted);">(sends the member a "please update your payment" message, follows up with reminders, and alerts staff if not resolved — this is called "dunning" in the payments world)</span></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- ===== FACEBOOK / TRACKING SECTION-FOLDER ===== -->
+<details class="section-folder">
+  <summary>
+    <span class="badge" style="background: #1877f2; color: white;">FB</span>
+    Facebook Tracking Workflows
+  </summary>
+  <div class="detail-content">
+    <p class="section-desc">Utility workflows for Facebook ad tracking and conversion API integration. These are NOT customer-facing — purely behind-the-scenes data/analytics plumbing that tells Facebook and Google "hey, this person just took an action" so the ad algorithms can optimize.</p>
+
+    <details>
+      <summary>facebook analytics (extra) <span class="tag published">Published</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+        <div class="wf-card" style="border-left: 3px solid #1877f2;">
+          <h4>Workflow: "facebook analytics (extra)" <span class="tag published">Published</span></h4>
+          <div class="wf-meta">7 versions | Verified from GHL builder</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> When a lead fills out a form or books a trial, this sends a "conversion event" to Facebook's ad platform and Google Analytics. This tells the ad algorithms "this person from your ad actually did something valuable" — which makes the ads smarter at finding similar people. No messages are sent to the lead. Purely data.
+        </div>
+
+        <div class="flow-group">
+          <div class="flow-group-label">TRIGGERS (2)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">1. Form Submitted — "Lead Texting Form" (someone used the text-us widget)</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">2. Customer Booked Appointment — Calendar Group "Book Your Free..." (someone booked a trial)</p>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEPS</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Figures out which trigger fired, then sends the right event:</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Form Submit &rarr; <strong>FB Conversion API</strong> (tells Facebook "a lead filled out a form") &rarr; <strong>Add to Google Analytics</strong> (same event to GA) &rarr; END</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px;">Customer Booked &rarr; <strong>FB Conversion API</strong> (tells Facebook "a lead booked a trial — higher value event") &rarr; <strong>Add to Google Analytics</strong> &rarr; END</p>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">Neither &rarr; END (safety fallback)</p>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>FB tracking | Form Submit API <span class="tag published">Published</span> <span class="verified-badge">VERIFIED</span></summary>
+      <div class="detail-content">
+        <div class="wf-card" style="border-left: 3px solid #1877f2;">
+          <h4>Workflow: "FB tracking | Form Submit API" <span class="tag published">Published</span></h4>
+          <div class="wf-meta">3 versions | Verified from GHL builder</div>
+        </div>
+
+        <div class="purpose-note">
+          <strong>PURPOSE:</strong> The simplest workflow in the system. When someone submits the Free Trial Form on the website, this sends a single conversion event to Facebook so the ad platform knows "this person converted." That is it — one trigger, one API call, done.
+        </div>
+
+        <div class="flow-group">
+          <div class="flow-group-label">TRIGGER</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Form Submitted — Website Schedules, Form is any of "Free Trial Form" (fires when someone submits the booking form on the website)</p>
+        </div>
+        <div class="flow-group" style="margin-top: 8px;">
+          <div class="flow-group-label">STEPS</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">FB Conversion API &rarr; END</p>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">One step: fires a "Lead" conversion event to Facebook's server-side Conversions API with the hashed user data (email, phone) so Facebook can match it to the ad click.</p>
+        </div>
+      </div>
+    </details>
+
+    <div class="connection-note" style="margin-top: 12px;">
+      <strong>For Danny:</strong> Both of these workflows are pure server-side tracking — no customer-facing actions at all. They send conversion events to Facebook's Conversions API (and Google Analytics in the first one) so ad campaigns can optimize toward real conversions. In Full Control, this would be direct API calls from the backend: when a lead fills a form or books a trial, POST to Facebook's Conversions API endpoint with the event name and hashed user data. Standard stuff for any app with ad attribution.
+    </div>
+
+  </div>
+</details>
+
+<hr class="divider">
+
+<!-- ===== BUILD VS KEEP SECTION-FOLDER ===== -->
+<details class="section-folder">
+  <summary>
+    <span style="color: var(--cyan);">Build vs. Keep in GHL — Key Considerations</span>
+  </summary>
+  <div class="detail-content">
+    <p class="section-desc">For Danny to evaluate which automations make sense to rebuild in Full Control vs. keep running in GHL.</p>
+
+    <table class="decision-table">
+      <thead>
+        <tr>
+          <th>Workflow</th>
+          <th>Complexity</th>
+          <th>GHL-Specific Features Used</th>
+          <th>Build Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>free trial booked</strong></td>
+          <td>High (140 versions)</td>
+          <td>Calendar triggers, SMS, email, pipeline stage moves, appointment reminders, tagging</td>
+          <td style="color: var(--accent);">HIGH — core of the funnel</td>
+        </tr>
+        <tr>
+          <td><strong>trial form filled in</strong></td>
+          <td>Medium (45 versions)</td>
+          <td>Form submission trigger, SMS, email, tagging, pipeline move</td>
+          <td style="color: var(--accent);">HIGH — lead intake</td>
+        </tr>
+        <tr>
+          <td><strong>sms ghosted</strong></td>
+          <td>High (67 versions)</td>
+          <td>Tag-based trigger, multi-step SMS with delays, conditional logic</td>
+          <td style="color: var(--accent);">HIGH — re-engagement</td>
+        </tr>
+        <tr>
+          <td><strong>lead nurture (once lost)</strong></td>
+          <td>Medium (26 versions)</td>
+          <td>Tag trigger, long-delay SMS sequences, conditional branching</td>
+          <td style="color: var(--blue);">MEDIUM — long-tail</td>
+        </tr>
+        <tr>
+          <td><strong>onboarding emails</strong></td>
+          <td>Medium (34 versions)</td>
+          <td>Multi-step email drip with delays, tagging</td>
+          <td style="color: var(--blue);">MEDIUM — post-conversion</td>
+        </tr>
+        <tr>
+          <td><strong>Done Trial / Missed Trial</strong></td>
+          <td>Medium-High</td>
+          <td>Appointment status trigger, SMS, email, pipeline move</td>
+          <td style="color: var(--accent);">HIGH — conversion point</td>
+        </tr>
+        <tr>
+          <td><strong>contact form filled in</strong></td>
+          <td>Medium (23 versions)</td>
+          <td>Form trigger, SMS, email, tagging</td>
+          <td style="color: var(--blue);">MEDIUM</td>
+        </tr>
+        <tr>
+          <td><strong>All "responded to..." workflows</strong></td>
+          <td>Low</td>
+          <td>Reply detection trigger, remove from workflow, notify staff</td>
+          <td style="color: var(--green);">LOW — simple circuit breakers</td>
+        </tr>
+        <tr>
+          <td><strong>lead2 tagging</strong></td>
+          <td>Low</td>
+          <td>Auto-tagging based on contact properties</td>
+          <td style="color: var(--green);">LOW — utility</td>
+        </tr>
+        <tr>
+          <td><strong>pdp form submission</strong></td>
+          <td>Medium</td>
+          <td>Form trigger, data processing, tagging, staff notification</td>
+          <td style="color: var(--blue);">MEDIUM</td>
+        </tr>
+        <tr>
+          <td><strong>cancellation</strong></td>
+          <td>Medium</td>
+          <td>Tag/status trigger, SMS, retention offer logic</td>
+          <td style="color: var(--blue);">MEDIUM</td>
+        </tr>
+        <tr>
+          <td><strong>failed payment</strong></td>
+          <td>Medium</td>
+          <td>Payment failure trigger, dunning SMS/email, staff alert</td>
+          <td style="color: var(--accent);">HIGH — revenue protection</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top: 24px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;">
+      <h4 style="color: var(--accent); margin-bottom: 8px;">Key GHL Primitives These Workflows Depend On</h4>
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">These are the building blocks that GHL provides out of the box. To replace GHL, Full Control would need to implement all of these:</p>
+      <ul style="font-size: 0.82rem; color: var(--text-muted); padding-left: 20px; line-height: 2;">
+        <li><strong style="color: var(--text);">SMS sending</strong> — most workflows send text messages as the primary outreach channel (via Twilio or similar under the hood)</li>
+        <li><strong style="color: var(--text);">Email sending</strong> — secondary channel, used heavily in onboarding and long-term nurture</li>
+        <li><strong style="color: var(--text);">Reply detection</strong> — all "responded to..." circuit breakers need to detect when someone texts/emails back in response to a specific workflow's messages</li>
+        <li><strong style="color: var(--text);">Delay/wait steps</strong> — timed pauses between messages (2 minutes, 1 day, 3 weeks, 6 months — huge range)</li>
+        <li><strong style="color: var(--text);">Contact tagging</strong> — add/remove labels on contacts to categorize them and trigger other workflows (the glue that connects everything)</li>
+        <li><strong style="color: var(--text);">Pipeline stage moves</strong> — move contacts through sales pipeline stages (Interested, Responded, Scheduled Trial, Done Trial, Won, Lost)</li>
+        <li><strong style="color: var(--text);">Calendar/appointment triggers</strong> — fire when someone books, completes, or no-shows an appointment</li>
+        <li><strong style="color: var(--text);">Form submission triggers</strong> — fire when specific forms are filled out on the website</li>
+        <li><strong style="color: var(--text);">Payment event triggers</strong> — fire on successful or failed payments</li>
+        <li><strong style="color: var(--text);">Conditional branching</strong> — if/else logic based on tags, contact fields, day of week, or time</li>
+        <li><strong style="color: var(--text);">Remove from workflow</strong> — stop a contact's position in another running automation (critical for the circuit breaker pattern)</li>
+        <li><strong style="color: var(--text);">Internal notifications</strong> — send staff alerts via SMS, email, or in-app notification</li>
+      </ul>
+    </div>
+
+  </div>
+</details>
+
+<hr class="divider">
+<p style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+  Generated March 27, 2026 — BAM OS / Full Control project<br>
+  Source: GoHighLevel automations for By Any Means GTA (location: Le9phlhqKyjLyd0JTECv)
+</p>
+
+</body>
+</html>
