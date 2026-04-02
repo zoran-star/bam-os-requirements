@@ -2,8 +2,8 @@ import Card from './Card'
 import s from '../styles/Board.module.css'
 
 const COLUMNS = [
-  { key: 'To Do', label: 'To Do' },
-  { key: 'In Progress', label: 'In Progress' },
+  { key: 'To Do', label: 'Not Ready' },
+  { key: 'In Progress', label: 'Ready' },
   { key: 'Complete', label: 'Complete' },
 ]
 

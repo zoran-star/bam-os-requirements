@@ -68,7 +68,7 @@ export default function SessionPage() {
           <button className={s.back} onClick={() => navigate('/')}>&larr;</button>
           <span className={s.title}>{session.title}</span>
           <span className={s.id}>{session.sessionId}</span>
-          <span className={`${s.status} ${statusClass}`}>{session.status}</span>
+          <span className={`${s.status} ${statusClass}`}>{session.status === 'To Do' ? 'Not Ready' : session.status === 'In Progress' ? 'Ready' : session.status}</span>
         </div>
         <div className={s.right}>
           <div className={s.progress}>

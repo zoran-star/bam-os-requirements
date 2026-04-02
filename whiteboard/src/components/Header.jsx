@@ -22,7 +22,7 @@ export default function Header({ sessions = [], onBacklogClick }) {
         </div>
       </div>
       <div className={s.right}>
-        <span className={s.counts}>{todo} to do / {inProgress} active / {complete} done</span>
+        <span className={s.counts}>{todo} not ready / {inProgress} ready / {complete} done</span>
         <button className={`${s.btn} ${s.btnOutline}`} onClick={onBacklogClick}>Backlog</button>
         <button className={`${s.btn} ${s.btnTheme}`} onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
           {theme === 'dark' ? '\u2600' : '\u263E'}

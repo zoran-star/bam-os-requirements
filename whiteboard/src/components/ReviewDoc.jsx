@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import s from '../styles/ReviewDoc.module.css'
 
 function getPhaseClass(phase) {
@@ -13,7 +13,81 @@ function getSourceClass(source) {
   return s.pillOutline
 }
 
+function DecidedItem({ item }) {
+  const isApproved = item.status === 'approved'
+  return (
+    <div className={`${s.decidedRow} ${isApproved ? s.decidedApproved : s.decidedFeedback}`}>
+      <div className={s.decidedIcon}>
+        {isApproved ? '✓' : '✎'}
+      </div>
+      <div className={s.decidedContent}>
+        <div className={s.decidedTop}>
+          <span className={s.id}>{item.id}</span>
+          <span className={s.itemTitle}>{item.title}</span>
+          <span className={`${s.pill} ${isApproved ? s.pillApproved : s.pillFeedbackBadge}`}>
+            {isApproved ? 'Approved' : 'Feedback Given'}
+          </span>
+        </div>
+        <div className={s.decidedDesc}>{item.description || item.desc}</div>
+        {item.feedback && (
+          <div className={s.ownerFeedback}>
+            <span className={s.ownerFeedbackLabel}>Your decision:</span>
+            <span className={s.ownerFeedbackText}>{item.feedback}</span>
+          </div>
+        )}
+        {isApproved && !item.feedback && (
+          <div className={s.ownerFeedbackApproved}>
+            <span className={s.ownerFeedbackLabel}>Your decision:</span>
+            <span className={s.ownerFeedbackText}>Approved as-is</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function PendingItem({ item, checked, feedback, onCheck, onFeedback }) {
+  return (
+    <div className={`${s.row} ${checked ? s.rowChecked : ''}`}>
+      <div className={s.pendingActions}>
+        <button
+          className={`${s.actionBtn} ${s.approveBtn} ${checked ? s.activatedBtn : ''}`}
+          onClick={() => onCheck(item.id, !checked)}
+          title="Approve"
+        >
+          ✓
+        </button>
+      </div>
+      <div className={s.content}>
+        <div className={s.top}>
+          <span className={s.id}>{item.id}</span>
+          <span className={s.itemTitle}>{item.title}</span>
+          {item.required && <span className={`${s.pill} ${s.pillGreen}`} style={{ fontSize: 9 }}>Required</span>}
+          {item.type === 'data' && <span className={`${s.pill} ${s.pillData}`} style={{ fontSize: 9 }}>Data Point</span>}
+          {item.type === 'feature' && <span className={`${s.pill} ${s.pillFeature}`} style={{ fontSize: 9 }}>Feature</span>}
+        </div>
+        <div className={s.desc}>{item.description || item.desc}</div>
+        <div className={s.tags}>
+          <span className={`${s.pill} ${getPhaseClass(item.phase)}`}>{item.phase}</span>
+          <span className={`${s.pill} ${getSourceClass(item.source)}`}>{item.source}</span>
+        </div>
+      </div>
+      <div className={s.feedback}>
+        <input
+          type="text"
+          placeholder="Give feedback..."
+          value={feedback}
+          className={feedback ? s.hasText : ''}
+          onChange={e => onFeedback(item.id, e.target.value)}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function ReviewDoc({ sectionData, sessionId, state, onStateChange }) {
+  const [collapsedSections, setCollapsedSections] = useState({})
+
   const handleCheck = useCallback((itemId, checked) => {
     onStateChange(prev => ({ ...prev, [itemId]: { ...prev[itemId], checked } }))
   }, [onStateChange])
@@ -26,13 +100,19 @@ export default function ReviewDoc({ sectionData, sessionId, state, onStateChange
     onStateChange(prev => ({ ...prev, _sectionFeedback: value }))
   }, [onStateChange])
 
-  const hasTypes = sectionData.subsections.some(sub => sub.items.some(i => i.type))
+  const toggleCollapse = useCallback((key) => {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }, [])
 
-  // Count statuses for summary
-  const allItems = sectionData.subsections.flatMap(sub => sub.items)
-  const approved = allItems.filter(i => i.status === 'approved').length
-  const withFeedback = allItems.filter(i => i.status === 'feedback').length
-  const pending = allItems.filter(i => i.status === 'pending' || !i.status).length
+  const hasTypes = sectionData.subsections?.some(sub => sub.items?.some(i => i.type))
+
+  // Separate decided vs pending across all items
+  const allItems = useMemo(() => {
+    return (sectionData.subsections || []).flatMap(sub => sub.items || [])
+  }, [sectionData])
+
+  const decidedCount = allItems.filter(i => i.status === 'approved' || i.status === 'feedback').length
+  const pendingCount = allItems.filter(i => !i.status || i.status === 'pending').length
 
   return (
     <div>
@@ -43,9 +123,8 @@ export default function ReviewDoc({ sectionData, sessionId, state, onStateChange
           {allItems.length > 0 && (
             <div className={s.statusSummary}>
               <span className={s.summaryTotal}>{allItems.length} items</span>
-              {approved > 0 && <span className={s.summaryApproved}>{approved} approved</span>}
-              {withFeedback > 0 && <span className={s.summaryFeedback}>{withFeedback} with feedback</span>}
-              {pending > 0 && <span className={s.summaryPending}>{pending} pending</span>}
+              {decidedCount > 0 && <span className={s.summaryDecided}>{decidedCount} decided</span>}
+              {pendingCount > 0 && <span className={s.summaryPending}>{pendingCount} needs review</span>}
             </div>
           )}
         </div>
@@ -53,61 +132,75 @@ export default function ReviewDoc({ sectionData, sessionId, state, onStateChange
 
       {hasTypes && (
         <div className={s.legend}>
-          <strong>Legend:</strong> <span className={s.pillData} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 9999, display: 'inline' }}>Data Point</span> = collected during onboarding. <span className={s.pillFeature} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 9999, display: 'inline' }}>Feature</span> = product spec.
+          <strong>Legend:</strong>{' '}
+          <span className={s.pillData} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 9999, display: 'inline' }}>Data Point</span> = collected during onboarding.{' '}
+          <span className={s.pillFeature} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 9999, display: 'inline' }}>Feature</span> = product spec.
         </div>
       )}
 
-      {sectionData.subsections.map(sub => (
-        <div key={sub.title || sub.id} className={s.subsection}>
-          <div className={s.subTitle}>{sub.title || `${sub.id}: ${sub.title}`}</div>
-          {sub.items.map(item => {
-            const checked = state[item.id]?.checked || false
-            const userFeedback = state[item.id]?.feedback || ''
-            const statusClass = item.status === 'approved' ? s.rowApproved
-              : item.status === 'feedback' ? s.rowFeedback
-              : ''
-            return (
-              <div key={item.id} className={`${s.row} ${statusClass} ${checked ? s.rowChecked : ''}`}>
-                <div className={s.check}>
-                  <input type="checkbox" checked={checked} onChange={e => handleCheck(item.id, e.target.checked)} />
-                </div>
-                <div className={s.content}>
-                  <div className={s.top}>
-                    <span className={s.id}>{item.id}</span>
-                    <span className={s.itemTitle}>{item.title}</span>
-                    {item.status === 'approved' && <span className={`${s.pill} ${s.pillApproved}`} style={{ fontSize: 9 }}>Approved</span>}
-                    {item.status === 'feedback' && <span className={`${s.pill} ${s.pillFeedbackBadge}`} style={{ fontSize: 9 }}>Has Feedback</span>}
-                    {item.status === 'pending' && <span className={`${s.pill} ${s.pillPending}`} style={{ fontSize: 9 }}>Pending</span>}
-                    {item.required && <span className={`${s.pill} ${s.pillGreen}`} style={{ fontSize: 9 }}>Required</span>}
-                    {item.type === 'data' && <span className={`${s.pill} ${s.pillData}`} style={{ fontSize: 9 }}>Data Point</span>}
-                    {item.type === 'feature' && <span className={`${s.pill} ${s.pillFeature}`} style={{ fontSize: 9 }}>Feature</span>}
+      {(sectionData.subsections || []).map(sub => {
+        const subItems = sub.items || []
+        const decided = subItems.filter(i => i.status === 'approved' || i.status === 'feedback')
+        const pending = subItems.filter(i => !i.status || i.status === 'pending')
+        const decidedKey = `decided_${sub.title}`
+        const decidedCollapsed = collapsedSections[decidedKey] !== false && decided.length > 0 // collapsed by default if has decided items
+
+        return (
+          <div key={sub.title || sub.id} className={s.subsection}>
+            <div className={s.subTitle}>{sub.title || `${sub.id}: ${sub.title}`}</div>
+
+            {/* Decided items — collapsible */}
+            {decided.length > 0 && (
+              <div className={s.decidedSection}>
+                <button
+                  className={s.decidedToggle}
+                  onClick={() => toggleCollapse(decidedKey)}
+                >
+                  <span className={s.decidedToggleIcon}>{decidedCollapsed ? '▸' : '▾'}</span>
+                  <span className={s.decidedToggleLabel}>
+                    {decided.length} decided
+                    <span className={s.decidedToggleSub}>
+                      {decided.filter(i => i.status === 'approved').length} approved, {decided.filter(i => i.status === 'feedback').length} with feedback
+                    </span>
+                  </span>
+                </button>
+                {!decidedCollapsed && (
+                  <div className={s.decidedList}>
+                    {decided.map(item => (
+                      <DecidedItem key={item.id} item={item} />
+                    ))}
                   </div>
-                  <div className={s.desc}>{item.description || item.desc}</div>
-                  <div className={s.tags}>
-                    <span className={`${s.pill} ${getPhaseClass(item.phase)}`}>{item.phase}</span>
-                    <span className={`${s.pill} ${getSourceClass(item.source)}`}>{item.source}</span>
-                  </div>
-                  {item.feedback && (
-                    <div className={s.ownerFeedback}>
-                      <span className={s.ownerFeedbackLabel}>Zoran's feedback:</span>
-                      <span className={s.ownerFeedbackText}>{item.feedback}</span>
-                    </div>
-                  )}
-                </div>
-                <div className={s.feedback}>
-                  <input
-                    type="text"
-                    placeholder="Add note..."
-                    value={userFeedback}
-                    className={userFeedback ? s.hasText : ''}
-                    onChange={e => handleFeedback(item.id, e.target.value)}
-                  />
-                </div>
+                )}
               </div>
-            )
-          })}
-        </div>
-      ))}
+            )}
+
+            {/* Pending items — always visible */}
+            {pending.length > 0 && (
+              <div className={s.pendingSection}>
+                {decided.length > 0 && (
+                  <div className={s.pendingHeader}>
+                    {pending.length} need{pending.length === 1 ? 's' : ''} your review
+                  </div>
+                )}
+                {pending.map(item => {
+                  const checked = state[item.id]?.checked || false
+                  const fb = state[item.id]?.feedback || ''
+                  return (
+                    <PendingItem
+                      key={item.id}
+                      item={item}
+                      checked={checked}
+                      feedback={fb}
+                      onCheck={handleCheck}
+                      onFeedback={handleFeedback}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       <div className={s.sectionFeedback}>
         <label>Overall feedback on this section</label>

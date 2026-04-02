@@ -73,26 +73,59 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 The whiteboard app is a visual kanban board for managing onboarding review sessions. Located at `whiteboard/`.
 
 ### How it works
-1. Team visits the whiteboard → sees session cards in To Do / In Progress / Complete columns
-2. Click a card → opens a review doc (checkboxes + feedback + export)
-3. Complete review → click "Export for AI" → copies markdown with session ID to clipboard
-4. Paste into Claude Code → Claude processes and proposes updates to Notion
-5. Claude updates: Onboarding Data Points DB, Business Requirements, session status, and creates backlog items for prototype changes
+1. Team visits the whiteboard → sees session cards in Not Ready / Ready / Complete columns
+2. Click a session card → opens a review doc showing all items with their status
+3. Decided items (approved/feedback) are collapsed at the top — expand to see past decisions
+4. Pending items are open for review — approve (✓) or type feedback for each
+5. When done → click "Export for AI" → copies markdown with session ID to clipboard
+6. Paste into Claude Code → Claude walks through the feedback with you, agrees on actions, then executes (see "Processing whiteboard session exports" below)
 
 ### Notion databases
 - **Sessions DB:** `4e5492be5027427cbbc8994bcd73905c` — stores all session cards + SECTION data
 - **Backlog DB:** `39c1f40a005c4c9ba50b0c7fe47b45bd` — proposed changes not yet implemented
 - **Onboarding Data Points DB:** `49be4ce65ada4d45b736070e11452edb` — canonical list of all data collected during onboarding
 
-### Processing onboarding exports
-When a user pastes an onboarding session export (starts with `---\nsession: SES-XXX-slug`):
-1. Parse the YAML frontmatter to get the session ID
-2. For each approved item: confirm it's in the Onboarding Data Points DB (add if missing)
-3. For each feedback item: propose the change to the user, update Notion if approved
-4. For prototype changes: create a Backlog item (Status: Proposed, Change Type: Prototype)
-5. Update the session's Status to Complete in the Sessions DB
-6. If new topics surface: create new session cards (Status: To Do, Type: Follow-up)
-7. Always separate **data points** (→ Onboarding Data Points DB) from **features** (→ Business Requirements pages)
+### Processing whiteboard session exports
+
+When a user pastes a session export from the whiteboard (starts with `---\nsession: SES-XXX-slug`), this is a **blocking trigger** — process it immediately using the steps below.
+
+**Step 1: Parse and summarize**
+- Parse the YAML frontmatter to get the session ID and title
+- Count items by status: approved, feedback, pending/skipped
+- Present a brief summary to the user: "SES-020: 15 approved, 8 with feedback, 6 skipped"
+
+**Step 2: Walk through feedback items with the user**
+- For each item with feedback, show the item title and the user's feedback
+- Discuss what the feedback means — ask clarifying questions if needed
+- Agree on the concrete action: update a requirement, create a new session, modify the prototype, or no action
+- This is a conversation — don't just process silently. The user wants to talk through their decisions.
+
+**Step 3: Execute agreed actions**
+Actions fall into these categories (do whichever apply):
+
+- **Update Notion Business Requirements** — Add or modify job IDs on the relevant domain page (Marketing, Sales, Member Management, etc.). For large pages that timeout via MCP, use the Node script approach: `whiteboard/push-requirements.mjs` pattern with `@notionhq/client` and the token from `whiteboard/.env.production`.
+- **Update Onboarding Data Points DB** (`49be4ce65ada4d45b736070e11452edb`) — For approved data collection items, ensure they exist in the Data Points DB with correct Category, Collection Phase, Input Type, etc.
+- **Create Backlog items** (`39c1f40a005c4c9ba50b0c7fe47b45bd`) — For prototype changes, create a Backlog entry with Status: Proposed and a description of what to build.
+- **Update the prototype** (`app/src/`) — If the user wants to build something now, make the changes to the Vite/React prototype.
+- **Create follow-up sessions** — If new topics surfaced during discussion, create new session cards in the Sessions DB (`4e5492be5027427cbbc8994bcd73905c`) with Status: "To Do", Type: "Follow-up", and populated SECTION Data. Use the Node script approach for writing SECTION Data (JSON chunked into 1900-char rich_text segments).
+- **Update Working Memory** — If significant decisions were made, update the Working Memory page in Notion.
+
+**Step 4: Mark session complete**
+- Update the session's Status to "Complete" in the Sessions DB
+- Set Completed Date to today
+- Confirm with the user: "SES-020 marked complete. Here's what was done: [summary]"
+
+**Step 5: Suggest next steps**
+- Are there related sessions to create?
+- Are there prototype updates to make based on the decisions?
+- Are there Notion pages that need updating?
+- Present these as options, don't just do them.
+
+**Important rules:**
+- Always separate **data points** (→ Onboarding Data Points DB) from **features** (→ Business Requirements pages)
+- Never skip the conversation step (#2) — the user wants to discuss, not just have things auto-processed
+- If Notion MCP times out on large pages, use the direct API via Node script (see `whiteboard/.env.production` for credentials)
+- Commit and push changes after making edits so collaborators get them immediately
 
 ### Environment variables (set in Vercel dashboard)
 - `NOTION_TOKEN` — Notion integration API key
