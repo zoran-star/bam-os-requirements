@@ -129,6 +129,7 @@ export default function SessionPage() {
         <ReviewDoc
           sectionData={session.sectionData}
           sessionId={sessionId}
+          sessionDescription={session.description}
           state={state}
           onStateChange={setState}
         />

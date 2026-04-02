@@ -85,7 +85,7 @@ function PendingItem({ item, checked, feedback, onCheck, onFeedback }) {
   )
 }
 
-export default function ReviewDoc({ sectionData, sessionId, state, onStateChange }) {
+export default function ReviewDoc({ sectionData, sessionId, sessionDescription, state, onStateChange }) {
   const [collapsedSections, setCollapsedSections] = useState({})
 
   const handleCheck = useCallback((itemId, checked) => {
@@ -116,15 +116,14 @@ export default function ReviewDoc({ sectionData, sessionId, state, onStateChange
 
   return (
     <div>
-      {(sectionData.title || sectionData.desc || allItems.length > 0) && (
+      {sessionDescription && (
         <div className={s.intro}>
-          {sectionData.title && <div className={s.introTitle}>{sectionData.title}</div>}
-          {sectionData.desc && <div className={s.introDesc}>{sectionData.desc}</div>}
+          <div className={s.introTitle}>Why this session matters</div>
+          <div className={s.introDesc}>{sessionDescription}</div>
           {allItems.length > 0 && (
             <div className={s.statusSummary}>
               <span className={s.summaryTotal}>{allItems.length} items</span>
               {decidedCount > 0 && <span className={s.summaryDecided}>{decidedCount} decided</span>}
-              {pendingCount > 0 && <span className={s.summaryPending}>{pendingCount} needs review</span>}
             </div>
           )}
         </div>
@@ -177,11 +176,6 @@ export default function ReviewDoc({ sectionData, sessionId, state, onStateChange
             {/* Pending items — always visible */}
             {pending.length > 0 && (
               <div className={s.pendingSection}>
-                {decided.length > 0 && (
-                  <div className={s.pendingHeader}>
-                    {pending.length} need{pending.length === 1 ? 's' : ''} your review
-                  </div>
-                )}
                 {pending.map(item => {
                   const checked = state[item.id]?.checked || false
                   const fb = state[item.id]?.feedback || ''
