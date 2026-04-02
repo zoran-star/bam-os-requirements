@@ -54,6 +54,12 @@
 .decidedFeedback {
   background: rgba(224,157,36,0.04); border-color: rgba(224,157,36,0.12);
 }
+.decidedRejected {
+  background: rgba(220,60,60,0.04); border-color: rgba(220,60,60,0.12); opacity: 0.6;
+}
+.decidedRejected .decidedIcon {
+  background: rgba(220,60,60,0.15); color: var(--red);
+}
 .decidedIcon {
   flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -119,6 +125,10 @@
 .approveBtn:hover { border-color: var(--green); color: var(--green); background: rgba(62,175,92,0.08); }
 .activatedBtn { border-color: var(--green); color: #fff; background: var(--green); }
 .activatedBtn:hover { background: rgba(62,175,92,0.8); }
+.rejectBtn:hover { border-color: var(--red); color: var(--red); background: rgba(220,60,60,0.08); }
+.rejectedBtn { border-color: var(--red); color: #fff; background: var(--red); }
+.rejectedBtn:hover { background: rgba(220,60,60,0.8); }
+.rowRejected { opacity: 0.5; border-color: rgba(220,60,60,0.2); background: rgba(220,60,60,0.03); }
 
 .content { flex: 1; min-width: 0; }
 .top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
@@ -141,6 +151,7 @@
 .pillApproved { background: rgba(62,175,92,0.15); color: var(--green); border: 1px solid rgba(62,175,92,0.3); }
 .pillFeedbackBadge { background: rgba(224,157,36,0.15); color: var(--warn); border: 1px solid rgba(224,157,36,0.3); }
 .pillPending { background: var(--surf3); color: var(--tm); border: 1px solid var(--border); }
+.pillRejected { background: rgba(220,60,60,0.15); color: var(--red); border: 1px solid rgba(220,60,60,0.3); }
 
 .feedback { flex-shrink: 0; width: 220px; }
 .feedback input {

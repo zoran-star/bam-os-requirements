@@ -15,17 +15,22 @@ function getSourceClass(source) {
 
 function DecidedItem({ item }) {
   const isApproved = item.status === 'approved'
+  const isRejected = item.status === 'rejected'
+  const rowClass = isApproved ? s.decidedApproved : isRejected ? s.decidedRejected : s.decidedFeedback
+  const icon = isApproved ? '✓' : isRejected ? '✕' : '✎'
+  const badge = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Feedback Given'
+  const badgeClass = isApproved ? s.pillApproved : isRejected ? s.pillRejected : s.pillFeedbackBadge
   return (
-    <div className={`${s.decidedRow} ${isApproved ? s.decidedApproved : s.decidedFeedback}`}>
+    <div className={`${s.decidedRow} ${rowClass}`}>
       <div className={s.decidedIcon}>
-        {isApproved ? '✓' : '✎'}
+        {icon}
       </div>
       <div className={s.decidedContent}>
         <div className={s.decidedTop}>
           <span className={s.id}>{item.id}</span>
           <span className={s.itemTitle}>{item.title}</span>
-          <span className={`${s.pill} ${isApproved ? s.pillApproved : s.pillFeedbackBadge}`}>
-            {isApproved ? 'Approved' : 'Feedback Given'}
+          <span className={`${s.pill} ${badgeClass}`}>
+            {badge}
           </span>
         </div>
         <div className={s.decidedDesc}>{item.description || item.desc}</div>
@@ -46,16 +51,23 @@ function DecidedItem({ item }) {
   )
 }
 
-function PendingItem({ item, checked, feedback, onCheck, onFeedback }) {
+function PendingItem({ item, checked, rejected, feedback, onCheck, onReject, onFeedback }) {
   return (
-    <div className={`${s.row} ${checked ? s.rowChecked : ''}`}>
+    <div className={`${s.row} ${checked ? s.rowChecked : ''} ${rejected ? s.rowRejected : ''}`}>
       <div className={s.pendingActions}>
         <button
           className={`${s.actionBtn} ${s.approveBtn} ${checked ? s.activatedBtn : ''}`}
-          onClick={() => onCheck(item.id, !checked)}
+          onClick={() => { onCheck(item.id, !checked); if (!checked) onReject(item.id, false); }}
           title="Approve"
         >
           ✓
+        </button>
+        <button
+          className={`${s.actionBtn} ${s.rejectBtn} ${rejected ? s.rejectedBtn : ''}`}
+          onClick={() => { onReject(item.id, !rejected); if (!rejected) onCheck(item.id, false); }}
+          title="Reject"
+        >
+          ✕
         </button>
       </div>
       <div className={s.content}>
@@ -92,6 +104,10 @@ export default function ReviewDoc({ sectionData, sessionId, sessionDescription, 
     onStateChange(prev => ({ ...prev, [itemId]: { ...prev[itemId], checked } }))
   }, [onStateChange])
 
+  const handleReject = useCallback((itemId, rejected) => {
+    onStateChange(prev => ({ ...prev, [itemId]: { ...prev[itemId], rejected } }))
+  }, [onStateChange])
+
   const handleFeedback = useCallback((itemId, feedback) => {
     onStateChange(prev => ({ ...prev, [itemId]: { ...prev[itemId], feedback } }))
   }, [onStateChange])
@@ -111,7 +127,7 @@ export default function ReviewDoc({ sectionData, sessionId, sessionDescription, 
     return (sectionData.subsections || []).flatMap(sub => sub.items || [])
   }, [sectionData])
 
-  const decidedCount = allItems.filter(i => i.status === 'approved' || i.status === 'feedback').length
+  const decidedCount = allItems.filter(i => i.status === 'approved' || i.status === 'feedback' || i.status === 'rejected').length
   const pendingCount = allItems.filter(i => !i.status || i.status === 'pending').length
 
   return (
@@ -139,7 +155,7 @@ export default function ReviewDoc({ sectionData, sessionId, sessionDescription, 
 
       {(sectionData.subsections || []).map(sub => {
         const subItems = sub.items || []
-        const decided = subItems.filter(i => i.status === 'approved' || i.status === 'feedback')
+        const decided = subItems.filter(i => i.status === 'approved' || i.status === 'feedback' || i.status === 'rejected')
         const pending = subItems.filter(i => !i.status || i.status === 'pending')
         const decidedKey = `decided_${sub.title}`
         const decidedCollapsed = collapsedSections[decidedKey] !== false && decided.length > 0 // collapsed by default if has decided items
@@ -178,14 +194,17 @@ export default function ReviewDoc({ sectionData, sessionId, sessionDescription, 
               <div className={s.pendingSection}>
                 {pending.map(item => {
                   const checked = state[item.id]?.checked || false
+                  const rej = state[item.id]?.rejected || false
                   const fb = state[item.id]?.feedback || ''
                   return (
                     <PendingItem
                       key={item.id}
                       item={item}
                       checked={checked}
+                      rejected={rej}
                       feedback={fb}
                       onCheck={handleCheck}
+                      onReject={handleReject}
                       onFeedback={handleFeedback}
                     />
                   )
