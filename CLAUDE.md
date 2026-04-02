@@ -100,8 +100,19 @@ When a user pastes a session export from the whiteboard (starts with `---\nsessi
 - Agree on the concrete action: update a requirement, create a new session, modify the prototype, or no action
 - This is a conversation — don't just process silently. The user wants to talk through their decisions.
 
-**Step 3: Execute agreed actions**
-Actions fall into these categories (do whichever apply):
+**Step 3: Confirm before executing**
+After discussing all feedback items, present a clear summary of every action you plan to take. List them all out:
+
+- What will be updated in Notion (which pages, what changes)
+- What Backlog items will be created
+- What prototype changes will be made
+- What follow-up sessions will be created
+- Whether the session will be marked complete
+
+**Wait for the user to confirm before executing anything.** Do not start updating Notion, writing code, or creating sessions until the user says go. They may want to adjust, add, or remove actions from the list.
+
+**Step 4: Execute confirmed actions**
+Only after user confirmation, execute the agreed actions. Categories:
 
 - **Update Notion Business Requirements** — Add or modify job IDs on the relevant domain page (Marketing, Sales, Member Management, etc.). For large pages that timeout via MCP, use the Node script approach: `whiteboard/push-requirements.mjs` pattern with `@notionhq/client` and the token from `whiteboard/.env.production`.
 - **Update Onboarding Data Points DB** (`49be4ce65ada4d45b736070e11452edb`) — For approved data collection items, ensure they exist in the Data Points DB with correct Category, Collection Phase, Input Type, etc.
@@ -110,12 +121,12 @@ Actions fall into these categories (do whichever apply):
 - **Create follow-up sessions** — If new topics surfaced during discussion, create new session cards in the Sessions DB (`4e5492be5027427cbbc8994bcd73905c`) with Status: "To Do", Type: "Follow-up", and populated SECTION Data. Use the Node script approach for writing SECTION Data (JSON chunked into 1900-char rich_text segments).
 - **Update Working Memory** — If significant decisions were made, update the Working Memory page in Notion.
 
-**Step 4: Mark session complete**
+**Step 5: Mark session complete**
 - Update the session's Status to "Complete" in the Sessions DB
 - Set Completed Date to today
 - Confirm with the user: "SES-020 marked complete. Here's what was done: [summary]"
 
-**Step 5: Suggest next steps**
+**Step 6: Suggest next steps**
 - Are there related sessions to create?
 - Are there prototype updates to make based on the decisions?
 - Are there Notion pages that need updating?
