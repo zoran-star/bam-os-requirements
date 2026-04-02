@@ -30,6 +30,9 @@
 }
 .pillType { background: rgba(59,111,160,0.10); color: var(--blue); }
 .pillAssigned { background: var(--surf3); color: var(--tm); }
+.dates { display: flex; gap: 10px; margin-bottom: 6px; }
+.date { font-size: 10px; color: var(--tm); font-family: var(--fm); }
+.dateCompleted { font-size: 10px; color: var(--green); font-family: var(--fm); }
 .ownerBtn {
   font-family: var(--ff); font-size: 10px; font-weight: 600;
   padding: 2px 8px; border-radius: 9999px; cursor: pointer;

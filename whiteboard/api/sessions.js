@@ -22,6 +22,7 @@ export default async function handler(req, res) {
       sectionNumber: page.properties['Section Number']?.number || 0,
       sessionType: page.properties['Session Type']?.select?.name || '',
       completedDate: page.properties['Completed Date']?.date?.start || null,
+      createdDate: page.created_time?.substring(0, 10) || null,
     }))
 
     res.setHeader('Cache-Control', 's-maxage=10, stale-while-revalidate=30')

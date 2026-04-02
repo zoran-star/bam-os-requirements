@@ -30,6 +30,12 @@ export default function Card({ session, onUpdate }) {
       </div>
       <div className={s.title}>{session.title}</div>
       <div className={s.desc}>{session.description}</div>
+      {(session.createdDate || session.completedDate) && (
+        <div className={s.dates}>
+          {session.createdDate && <span className={s.date}>Created {session.createdDate}</span>}
+          {session.completedDate && <span className={s.dateCompleted}>Completed {session.completedDate}</span>}
+        </div>
+      )}
       <div className={s.bottom}>
         <span className={`${s.pill} ${s.pillType}`}>{session.sessionType}</span>
         {OWNERS.map(name => {
