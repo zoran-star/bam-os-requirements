@@ -32,6 +32,49 @@
 }
 .btn:hover { background: #A08030; }
 .container { max-width: 920px; margin: 0 auto; padding: 24px 32px 80px; }
+/* User guide */
+.guide {
+  position: relative; background: linear-gradient(135deg, rgba(200,168,78,0.06) 0%, rgba(62,175,92,0.04) 100%);
+  border: 1px solid rgba(200,168,78,0.2); border-radius: 14px;
+  padding: 20px 24px; margin-bottom: 24px;
+}
+.guideClose {
+  position: absolute; top: 10px; right: 14px; background: none; border: none;
+  font-size: 20px; color: var(--tm); cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  line-height: 1;
+}
+.guideClose:hover { color: var(--tp); background: var(--surf3); }
+.guideTitle {
+  font-size: 14px; font-weight: 700; color: var(--tp); margin-bottom: 14px;
+}
+.guideSteps { display: flex; flex-direction: column; gap: 12px; }
+.guideStep {
+  display: flex; align-items: flex-start; gap: 12px; font-size: 13px;
+  color: var(--ts); line-height: 1.5;
+}
+.guideStep strong { color: var(--tp); }
+.guideStep code {
+  font-family: var(--fm); font-size: 11px; background: var(--surf3);
+  padding: 1px 6px; border-radius: 4px; color: var(--tp);
+}
+.guideNum {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--gold); color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.guideCheck {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--green);
+  font-size: 10px; font-weight: 700; color: var(--green); vertical-align: middle;
+}
+.guideReopen {
+  font-family: var(--ff); font-size: 11px; font-weight: 600;
+  color: var(--tm); background: var(--surf3); border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 16px;
+  transition: all 0.15s ease;
+}
+.guideReopen:hover { color: var(--tp); border-color: var(--borderm); }
+
 .toast {
   position: fixed; bottom: 24px; left: 50%;
   transform: translateX(-50%) translateY(80px);

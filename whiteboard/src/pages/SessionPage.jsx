@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import useSession from '../hooks/useSession'
 import ReviewDoc from '../components/ReviewDoc'
@@ -55,6 +55,16 @@ export default function SessionPage() {
     })
   }, [session, allItems, state])
 
+  const [guideOpen, setGuideOpen] = useState(() => {
+    try { return !localStorage.getItem('bamos_wb_guide_dismissed') }
+    catch { return true }
+  })
+
+  const dismissGuide = useCallback(() => {
+    setGuideOpen(false)
+    localStorage.setItem('bamos_wb_guide_dismissed', '1')
+  }, [])
+
   if (loading) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--tm)' }}>Loading session...</div>
   if (error || !session) return <div style={{ textAlign: 'center', padding: 60, color: 'var(--red)' }}>Session not found</div>
 
@@ -80,6 +90,42 @@ export default function SessionPage() {
       </div>
 
       <div className={s.container}>
+        {guideOpen && (
+          <div className={s.guide}>
+            <button className={s.guideClose} onClick={dismissGuide}>&times;</button>
+            <div className={s.guideTitle}>How to review this session</div>
+            <div className={s.guideSteps}>
+              <div className={s.guideStep}>
+                <span className={s.guideNum}>1</span>
+                <div>
+                  <strong>Review each item.</strong> Approve items you agree with by clicking the <span className={s.guideCheck}>✓</span> button. For items you want to change, type your feedback in the input field on the right.
+                </div>
+              </div>
+              <div className={s.guideStep}>
+                <span className={s.guideNum}>2</span>
+                <div>
+                  <strong>Already decided items</strong> are collapsed in a green bar at the top of each section. Expand to review past decisions. Pending items are always visible below.
+                </div>
+              </div>
+              <div className={s.guideStep}>
+                <span className={s.guideNum}>3</span>
+                <div>
+                  <strong>When you're done,</strong> click <strong>Export for AI</strong> in the top right. This copies your decisions to the clipboard.
+                </div>
+              </div>
+              <div className={s.guideStep}>
+                <span className={s.guideNum}>4</span>
+                <div>
+                  <strong>Paste into Claude Code</strong> (in the <code>bam-os-requirements</code> repo). Claude will walk through your feedback with you, confirm what actions to take, then update Notion, the prototype, and create any follow-up sessions.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {!guideOpen && (
+          <button className={s.guideReopen} onClick={() => setGuideOpen(true)}>? How to review</button>
+        )}
+
         <ReviewDoc
           sectionData={session.sectionData}
           sessionId={sessionId}
