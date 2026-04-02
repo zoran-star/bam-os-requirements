@@ -46,16 +46,92 @@ const CHECKLIST_ITEMS = [
   { id: 'ck10', label: 'Connect Meta Conversions API', ref: 'SET-010', done: false },
 ];
 
+const ICON = {
+  home: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  strategy: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
+  pin: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  users: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  dollar: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  shield: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  bot: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>,
+  link: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+  code: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+  card: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+  sun: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  check: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+};
+
 const NAV_SECTIONS = [
-  { id: 'academy', label: 'Academy Profile', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-  { id: 'locations', label: 'Locations', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> },
-  { id: 'plans', label: 'Plans & Pricing', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
-  { id: 'policies', label: 'Policies', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> },
-  { id: 'brand', label: 'AI Brand Voice', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
-  { id: 'links', label: 'Onboarding Links', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> },
-  { id: 'integrations', label: 'Integrations', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> },
-  { id: 'billing', label: 'FullControl Billing', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
-  { id: 'appearance', label: 'Appearance', icon: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> },
+  { group: 'Identity', items: [
+    { id: 'academy', label: 'Academy Profile', icon: ICON.home },
+    { id: 'locations', label: 'Locations', icon: ICON.pin },
+  ]},
+  { group: 'Strategy', items: [
+    { id: 'strategy', label: 'Strategy Chat', icon: ICON.strategy },
+  ]},
+  { group: 'Staff', items: [
+    { id: 'staff', label: 'Staff & Coaches', icon: ICON.users },
+  ]},
+  { group: 'Product', items: [
+    { id: 'plans', label: 'Plans & Pricing', icon: ICON.dollar },
+  ]},
+  { group: 'Policy', items: [
+    { id: 'policies', label: 'Policies', icon: ICON.shield },
+  ]},
+  { group: 'Conversation AI', items: [
+    { id: 'brand', label: 'Brand Voice & FAQ', icon: ICON.bot },
+    { id: 'objections', label: 'Objection Map', icon: ICON.shield },
+  ]},
+  { group: 'Integrations', items: [
+    { id: 'links', label: 'Onboarding Links', icon: ICON.link },
+    { id: 'integrations', label: 'Integrations', icon: ICON.code },
+  ]},
+];
+
+const NAV_BOTTOM = [
+  { id: 'billing', label: 'FullControl Billing', icon: ICON.card },
+  { id: 'appearance', label: 'Appearance', icon: ICON.sun },
+];
+
+/* ─── STRATEGY CHAT DATA ─── */
+const STRATEGY_TOPICS = [
+  { id: 'mission', label: 'Mission Statement', done: true },
+  { id: 'values', label: 'Core Values', done: true },
+  { id: 'origin', label: 'Origin Story', done: false },
+  { id: 'problem', label: 'Problem You Solve', done: true },
+  { id: 'customer', label: 'Target Customer', done: false },
+  { id: 'selling', label: 'Selling Points', done: true },
+];
+
+const STRATEGY_MESSAGES = [
+  { from: 'ai', text: "Let's define your academy's mission. Why does BAM Academy exist — beyond just basketball training?" },
+  { from: 'user', text: "We want to develop the whole athlete. Not just skills, but discipline, confidence, and leadership." },
+  { from: 'ai', text: "That's strong. Here's a refined version: \"BAM Academy develops complete athletes — building discipline, confidence, and leadership through elite basketball training.\" Does that capture it, or should we adjust?" },
+  { from: 'user', text: "Yeah that's good. Maybe add something about the community aspect." },
+  { from: 'ai', text: "How about: \"BAM Academy builds complete athletes and a tight-knit community — developing discipline, confidence, and leadership through elite basketball training.\" ✓ Saved. Let's move to Core Values — what 3-5 values define how you operate?" },
+  { from: 'user', text: "Player development over winning, positive coaching, accountability, and family atmosphere." },
+  { from: 'ai', text: "Those are clear and authentic. I'll format them:\n\n1. Player development over winning\n2. Positive, encouraging coaching\n3. Personal accountability\n4. Family atmosphere\n\n✓ Saved. Now let's work on your Origin Story — how and why did you start BAM?" },
+];
+
+/* ─── DEFAULT OBJECTIONS ─── */
+const DEFAULT_OBJECTIONS = [
+  { id: 'obj1', category: 'Price', objection: 'Too expensive', response: 'Acknowledge the concern, reframe as investment in development. Mention coaching quality, small groups, individual attention. Do NOT offer a discount immediately.', active: true },
+  { id: 'obj2', category: 'Price', objection: "Can't afford it right now", response: 'Empathize with timing. Mention flexible start dates. Offer to send a reminder when ready. Keep the door open.', active: true },
+  { id: 'obj3', category: 'Price', objection: 'Cheaper options elsewhere', response: 'Differentiate on coaching credentials, small group sizes, development tracking. Never trash competitors.', active: true },
+  { id: 'obj4', category: 'Schedule', objection: "Schedule doesn't work", response: 'Ask what times DO work. Check alternative sessions. Mention makeup sessions and open gym flexibility.', active: true },
+  { id: 'obj5', category: 'Schedule', objection: 'Too much time commitment', response: 'Suggest starting with lower frequency plan. Sessions are only 60-90 min. Consistency matters more than volume.', active: true },
+  { id: 'obj6', category: 'Schedule', objection: 'Too far to drive', response: 'Acknowledge the commute. Mention what parents do during sessions. If multi-location, suggest the closer one.', active: true },
+  { id: 'obj7', category: 'Child', objection: 'My kid is shy / not confident', response: 'Normalize it — many kids feel this way. Small groups, supportive coaches. Building confidence IS the outcome. Trial is low-pressure.', active: true },
+  { id: 'obj8', category: 'Child', objection: 'Too young / not ready', response: 'Explain age-appropriate programming. Fundamentals programs for younger kids. Starting early builds habits.', active: true },
+  { id: 'obj9', category: 'Child', objection: 'Not sure my kid will like it', response: "That's exactly what the free trial is for. No commitment, just come try. Many unsure kids end up loving it.", active: true },
+  { id: 'obj10', category: 'Child', objection: 'Bad experience at another program', response: 'Take it seriously. Ask what happened. Explain how this program is different. Offer coach to personally welcome them.', active: true },
+  { id: 'obj11', category: 'Trust', objection: 'Never heard of you', response: 'Share proof points: years in business, athletes trained, locations. Offer the trial to experience it firsthand.', active: true },
+  { id: 'obj12', category: 'Trust', objection: 'What are the coaches\' qualifications?', response: 'Share credentials, playing experience, certifications. Personalize to the specific coach they would train with.', active: true },
+  { id: 'obj13', category: 'Commitment', objection: "Don't want to sign a contract", response: 'Clarify actual terms — month-to-month if applicable. Mention cancellation policy. No long-term lock-in.', active: true },
+  { id: 'obj14', category: 'Commitment', objection: 'What if we need to pause?', response: 'Explain pause policy: up to 30 days, 2 per year. Flexibility is a feature. We want you here because you love it.', active: true },
+  { id: 'obj15', category: 'Timing', objection: 'Need to talk to my spouse', response: 'Completely respect this. Offer to send an info summary to share. Ask when to follow up.', active: true },
+  { id: 'obj16', category: 'Timing', objection: 'Let me think about it', response: 'Respect it. Ask if there\'s a specific concern. Offer to answer questions. Follow up in 2-3 days.', active: true },
+  { id: 'obj17', category: 'Timing', objection: 'Maybe next season', response: 'Note that starting earlier = more development. Offer to add to reminder list for preferred start date.', active: true },
 ];
 
 /* ─── SAVE TOAST HELPER ─── */
@@ -127,7 +203,19 @@ export default function Settings() {
       {/* ═══ SIDEBAR + CONTENT LAYOUT ═══ */}
       <div className={s.settingsBody}>
         <nav className={s.settingsNav}>
-          {NAV_SECTIONS.map(n => (
+          {NAV_SECTIONS.map(group => (
+            <div key={group.group}>
+              <div className={s.navGroupLabel}>{group.group}</div>
+              {group.items.map(n => (
+                <button key={n.id} className={`${s.navItem} ${tab === n.id ? s.navItemActive : ''}`} onClick={() => setTab(n.id)}>
+                  <span className={s.navIcon}>{n.icon}</span>
+                  {n.label}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div className={s.navDivider} />
+          {NAV_BOTTOM.map(n => (
             <button key={n.id} className={`${s.navItem} ${tab === n.id ? s.navItemActive : ''}`} onClick={() => setTab(n.id)}>
               <span className={s.navIcon}>{n.icon}</span>
               {n.label}
@@ -135,7 +223,7 @@ export default function Settings() {
           ))}
           <div className={s.navDivider} />
           <button className={`${s.navItem} ${tab === 'checklist' ? s.navItemActive : ''}`} onClick={() => setTab('checklist')}>
-            <span className={s.navIcon}><svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+            <span className={s.navIcon}>{ICON.check}</span>
             Setup Checklist
             {doneCount < checklist.length && <span className={s.navBadge}>{checklist.length - doneCount}</span>}
           </button>
@@ -481,6 +569,118 @@ export default function Settings() {
                 </div>
               </div>
               <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Theme preference is saved per user and persists across sessions. Dark mode uses an alternate design token set.</span></div>
+            </>
+          )}
+
+          {/* ═══ STRATEGY CHAT (PROTO-002) ═══ */}
+          {tab === 'strategy' && (
+            <>
+              <div className={s.sectionHead}>
+                <h3 className={s.sectionTitle}>Strategy & Positioning</h3>
+                <span className={s.sectionRef}>PROTO-002</span>
+              </div>
+              <div className={s.strategyLayout}>
+                <div className={s.strategyTopics}>
+                  <div className={s.strategyTopicsTitle}>Topics</div>
+                  {STRATEGY_TOPICS.map(t => (
+                    <div key={t.id} className={`${s.strategyTopic} ${t.done ? s.strategyTopicDone : ''}`}>
+                      <div className={`${s.strategyTopicCheck} ${t.done ? s.strategyTopicCheckDone : ''}`}>
+                        {t.done && <svg width="10" height="10" fill="none" stroke="#fff" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      <span>{t.label}</span>
+                    </div>
+                  ))}
+                  <div className={s.strategyProgress}>
+                    {STRATEGY_TOPICS.filter(t => t.done).length} / {STRATEGY_TOPICS.length} complete
+                  </div>
+                </div>
+                <div className={s.strategyChat}>
+                  <div className={s.strategyChatMessages}>
+                    {STRATEGY_MESSAGES.map((msg, i) => (
+                      <div key={i} className={`${s.strategyChatMsg} ${msg.from === 'ai' ? s.strategyChatMsgAi : s.strategyChatMsgUser}`}>
+                        {msg.from === 'ai' && <div className={s.strategyChatAvatar}>S</div>}
+                        <div className={s.strategyChatBubble}>{msg.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className={s.strategyChatInput}>
+                    <input type="text" placeholder="Type your response..." className={s.strategyChatField} />
+                    <button className={s.strategyChatSend}>
+                      <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ═══ STAFF & COACHES (placeholder) ═══ */}
+          {tab === 'staff' && (
+            <>
+              <div className={s.sectionHead}>
+                <h3 className={s.sectionTitle}>Staff & Coaches</h3>
+                <div className={s.sectionActions}><button className={s.addBtn}>+ Add Coach</button></div>
+              </div>
+              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Staff profiles power coach assignment on the schedule, trial report attribution, and parent-facing coach bios.</span></div>
+              {[
+                { name: 'Coach Marcus Rivera', role: 'Head Coach', sessions: 12, members: 28, status: 'Active' },
+                { name: 'Coach Adrian Simmons', role: 'Assistant Coach', sessions: 8, members: 14, status: 'Active' },
+                { name: 'Coach Filip Jovic', role: 'Youth Development', sessions: 6, members: 18, status: 'Active' },
+              ].map((c, i) => (
+                <div key={i} className={s.locationCard}>
+                  <div className={s.locationLeft}>
+                    <div className={s.locationIcon} style={{ background: 'rgba(59,111,160,0.10)' }}>
+                      <svg width="18" height="18" fill="none" stroke="var(--blue)" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div>
+                      <div className={s.locationName}>{c.name}</div>
+                      <div className={s.locationAddr}>{c.role}</div>
+                    </div>
+                  </div>
+                  <div className={s.locationRight}>
+                    <div className={s.locationStat}><span className={s.locationStatVal}>{c.sessions}</span><span className={s.locationStatLabel}>Sessions/wk</span></div>
+                    <div className={s.locationStat}><span className={s.locationStatVal}>{c.members}</span><span className={s.locationStatLabel}>Athletes</span></div>
+                    <span className={s.statusActive}>{c.status}</span>
+                    <button className={s.editBtn}>Edit</button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* ═══ OBJECTION MAP (PROTO-015) ═══ */}
+          {tab === 'objections' && (
+            <>
+              <div className={s.sectionHead}>
+                <h3 className={s.sectionTitle}>Objection Map</h3>
+                <div className={s.sectionActions}><button className={s.addBtn}>+ Add Objection</button><span className={s.sectionRef}>PROTO-015</span></div>
+              </div>
+              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>When a parent raises one of these objections, the AI references your approved response strategy. Toggle off to skip, or edit to customize.</span></div>
+              {['Price', 'Schedule', 'Child', 'Trust', 'Commitment', 'Timing'].map(cat => {
+                const items = DEFAULT_OBJECTIONS.filter(o => o.category === cat);
+                if (!items.length) return null;
+                return (
+                  <div key={cat} className={s.objCategory}>
+                    <div className={s.objCategoryTitle}>{cat === 'Child' ? 'Child Readiness' : cat} Objections</div>
+                    {items.map(obj => (
+                      <div key={obj.id} className={s.objCard}>
+                        <div className={s.objHeader}>
+                          <div className={s.objToggle}>
+                            <div className={`${s.objToggleTrack} ${obj.active ? s.objToggleActive : ''}`}>
+                              <div className={s.objToggleThumb} />
+                            </div>
+                          </div>
+                          <div className={s.objTitle}>"{obj.objection}"</div>
+                        </div>
+                        <div className={s.objResponse}>
+                          <span className={s.objResponseLabel}>AI Response Strategy:</span>
+                          <span>{obj.response}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </>
           )}
 
