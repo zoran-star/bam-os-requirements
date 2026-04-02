@@ -1,7 +1,19 @@
 // Content Engine Service — all Supabase CRUD for themes, creatives, scripts, feedback
+// Auto-syncs to Notion on every write operation
 //
 // SETUP: Update the import path below to match your project's supabase client location
 import { supabase } from "../lib/supabase";
+
+// ─── Notion Sync (fire-and-forget) ───
+const SYNC_API = "/api/sync-notion";
+
+function syncNotion(action, type, data, parentThemeName) {
+  fetch(SYNC_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, type, data, parentThemeName }),
+  }).catch(err => console.warn("Notion sync failed (non-blocking):", err.message));
+}
 
 // ─── Themes ───
 
@@ -23,6 +35,7 @@ export async function createTheme(theme) {
   try {
     const { data, error } = await supabase.from("content_themes").insert(theme).select().single();
     if (error) throw error;
+    if (data) syncNotion("upsert", "theme", data);
     return { data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
@@ -33,6 +46,7 @@ export async function updateTheme(id, fields) {
   try {
     const { data, error } = await supabase.from("content_themes").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id).select().single();
     if (error) throw error;
+    if (data) syncNotion("upsert", "theme", data);
     return { data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
@@ -43,6 +57,7 @@ export async function deleteTheme(id) {
   try {
     const { error } = await supabase.from("content_themes").delete().eq("id", id);
     if (error) throw error;
+    syncNotion("delete", "theme", { id });
     return { error: null };
   } catch (err) {
     return { error: err.message };
@@ -63,20 +78,22 @@ export async function fetchCreatives(themeId) {
   }
 }
 
-export async function createCreative(creative) {
+export async function createCreative(creative, parentThemeName) {
   try {
     const { data, error } = await supabase.from("content_creatives").insert(creative).select().single();
     if (error) throw error;
+    if (data) syncNotion("upsert", "creative", data, parentThemeName);
     return { data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
   }
 }
 
-export async function updateCreative(id, fields) {
+export async function updateCreative(id, fields, parentThemeName) {
   try {
     const { data, error } = await supabase.from("content_creatives").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", id).select().single();
     if (error) throw error;
+    if (data) syncNotion("upsert", "creative", data, parentThemeName);
     return { data, error: null };
   } catch (err) {
     return { data: null, error: err.message };
@@ -87,6 +104,7 @@ export async function deleteCreative(id) {
   try {
     const { error } = await supabase.from("content_creatives").delete().eq("id", id);
     if (error) throw error;
+    syncNotion("delete", "creative", { id });
     return { error: null };
   } catch (err) {
     return { error: err.message };
