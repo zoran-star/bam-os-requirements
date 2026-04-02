@@ -7,7 +7,7 @@ const COLUMNS = [
   { key: 'Complete', label: 'Complete' },
 ]
 
-export default function Board({ sessions }) {
+export default function Board({ sessions, onRefresh }) {
   return (
     <div className={s.board}>
       {COLUMNS.map(col => {
@@ -22,7 +22,7 @@ export default function Board({ sessions }) {
             </div>
             <div className={s.cards}>
               {cards.length === 0 && <div className={s.empty}>No sessions</div>}
-              {cards.map(ses => <Card key={ses.sessionId} session={ses} />)}
+              {cards.map(ses => <Card key={ses.sessionId} session={ses} onUpdate={onRefresh} />)}
             </div>
           </div>
         )

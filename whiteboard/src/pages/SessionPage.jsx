@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import useSession from '../hooks/useSession'
 import ReviewDoc from '../components/ReviewDoc'
 import { buildExport } from '../lib/exportBuilder'
+import { updateSession } from '../lib/api'
 import s from '../styles/SessionView.module.css'
 
 export default function SessionPage() {
@@ -10,6 +11,26 @@ export default function SessionPage() {
   const navigate = useNavigate()
   const { session, loading, error } = useSession(sessionId)
   const [toast, setToast] = useState(false)
+  const [owners, setOwners] = useState([])
+
+  useEffect(() => {
+    if (session?.assignedTo) setOwners(session.assignedTo)
+  }, [session])
+
+  const OWNER_OPTIONS = ['Zoran', 'Cole']
+
+  const handleOwnerToggle = async (name) => {
+    const next = owners.includes(name)
+      ? owners.filter(n => n !== name)
+      : [...owners, name]
+    setOwners(next)
+    try {
+      await updateSession(sessionId, { assignedTo: next })
+    } catch (err) {
+      console.error('Failed to update owner:', err)
+      setOwners(owners) // revert on error
+    }
+  }
 
   const storageKey = `bamos_wb_${sessionId}`
   const [state, setState] = useState(() => {
@@ -79,6 +100,17 @@ export default function SessionPage() {
           <span className={s.title}>{session.title}</span>
           <span className={s.id}>{session.sessionId}</span>
           <span className={`${s.status} ${statusClass}`}>{session.status === 'To Do' ? 'Not Ready' : session.status === 'In Progress' ? 'Ready' : session.status}</span>
+          <div className={s.ownerGroup}>
+            {OWNER_OPTIONS.map(name => (
+              <button
+                key={name}
+                className={`${s.ownerBtn} ${owners.includes(name) ? s.ownerActive : ''}`}
+                onClick={() => handleOwnerToggle(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
         </div>
         <div className={s.right}>
           <div className={s.progress}>

@@ -30,3 +30,14 @@
 }
 .pillType { background: rgba(59,111,160,0.10); color: var(--blue); }
 .pillAssigned { background: var(--surf3); color: var(--tm); }
+.ownerBtn {
+  font-family: var(--ff); font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 9999px; cursor: pointer;
+  background: var(--surf3); color: var(--tm); border: 1px solid var(--border);
+  transition: all 0.15s ease; white-space: nowrap;
+}
+.ownerBtn:hover { border-color: var(--gold); color: var(--tp); }
+.ownerActive {
+  background: rgba(200,168,78,0.12); color: var(--gold);
+  border-color: rgba(200,168,78,0.3);
+}
