@@ -81,9 +81,9 @@ The whiteboard app is a visual kanban board for managing onboarding review sessi
 6. Paste into Claude Code → Claude walks through the feedback with you, agrees on actions, then executes (see "Processing whiteboard session exports" below)
 
 ### Notion databases
-- **Sessions DB:** `4e5492be5027427cbbc8994bcd73905c` — stores all session cards + SECTION data
-- **Backlog DB:** `39c1f40a005c4c9ba50b0c7fe47b45bd` — proposed changes not yet implemented
-- **Onboarding Data Points DB:** `49be4ce65ada4d45b736070e11452edb` — canonical list of all data collected during onboarding
+- **Sessions DB:** `4e5492be5027427cbbc8994bcd73905c` — stores all session cards. Each session has: Title, Session ID, Status (To Do/In Progress/Complete), Description, Assigned To (Zoran/Cole), Section Number, Session Type (Onboarding Review/Follow-up/Ad Hoc), Completed Date, and **SECTION Data** (a rich_text field containing JSON with all the items, their statuses, and feedback). The SECTION Data is what the whiteboard app renders.
+- **Backlog DB:** `39c1f40a005c4c9ba50b0c7fe47b45bd` — proposed changes not yet implemented. Used for prototype changes that come out of session reviews but aren't built immediately.
+- **Onboarding Data Points DB:** `49be4ce65ada4d45b736070e11452edb` — canonical list of all data collected or configured during academy owner onboarding. Each entry has: Field Name, Description, Category, Collection Phase (Onboarding/First Week/Settings), Input Type, Required, Source, Placeholder Variable, BAM GTA Example, Blocks (what breaks without it), FC Modules (which modules use it). See "What counts as onboarding data" below for what belongs here.
 
 ### Processing whiteboard session exports
 
@@ -138,6 +138,18 @@ Only after user confirmation, execute the agreed actions. Categories:
 - If Notion MCP times out on large pages, use the direct API via Node script (see `whiteboard/.env.production` for credentials)
 - Commit and push changes after making edits so collaborators get them immediately
 
+### What counts as onboarding data
+
+The Onboarding Data Points DB tracks everything an academy owner needs to provide or configure for FullControl to work. This is broader than it sounds. There are three types:
+
+1. **Owner-typed business data** — Things the owner tells us about their business: Business Name, Selling Points, Coach Credentials, Mission Statement, etc. These are descriptive fields that describe who they are.
+
+2. **Configuration settings** — Operational defaults that power automated workflows: the 15-minute post-trial escalation timer, notification channel preferences (SMS vs email), follow-up cadence (Day 0, Day 2), pause policy limits (30 days, 2x/year), dunning retry count. These feel like "feature config" but they ARE onboarding data because they need to be set before the system works, they have defaults that may need customizing, and features break or behave incorrectly without them.
+
+3. **Integration credentials** — Stripe account, Meta CAPI connection, GHL sub-account. These are set once during onboarding and rarely changed.
+
+**The test:** After every session, ask: "For the features we just discussed, what settings/defaults/thresholds need to exist for them to work? Would an academy owner need to set or confirm these during onboarding?" If yes → Onboarding Data Points DB.
+
 ### Environment variables (set in Vercel dashboard)
 - `NOTION_TOKEN` — Notion integration API key
 - `NOTION_SESSIONS_DB` — Sessions database ID
@@ -160,8 +172,10 @@ app/src/
 
 ## Sources of truth
 
-1. **Prototype** (`app/src/`) — the reference implementation showing what's been built. This is the living spec for UI, features, and interactions.
-2. **Notion** — structured requirement tables under the [Business Requirements](https://www.notion.so/31b5aca8ac0f81dca970c023294b24de) parent page:
+There are two sources of truth — they serve different purposes and must stay in sync:
+
+1. **Prototype** (`app/src/`) — the reference implementation showing what's been built. This is the living spec for UI, features, and interactions. When someone asks "what does the Sales page look like?" — the prototype is the answer. It deploys to https://fullcontrol-prototype-six.vercel.app on every push to `main`.
+2. **Notion** — structured requirement tables under the [Business Requirements](https://www.notion.so/31b5aca8ac0f81dca970c023294b24de) parent page. When someone asks "what are the requirements for the Sales domain?" — Notion is the answer. Each domain page has a table of job IDs with full specs. Domains:
    - [Marketing](https://www.notion.so/31b5aca8ac0f81d3bffdc79932d118c9)
    - [Content](https://www.notion.so/31f5aca8ac0f81229933dab1be576bf1)
    - [Sales](https://www.notion.so/31b5aca8ac0f81638750d27bc0598d19)
@@ -209,7 +223,7 @@ When showing requirements in a table, always include the one-liner column alongs
 The [Working Memory page](https://www.notion.so/31b5aca8ac0f81b59fd9e8b84aecffc9) in Notion has a Detail Pages table linking to all key Notion pages. **If a detail page is added, removed, or renamed, update the Detail Pages table in Working Memory immediately.**
 
 ## Open Loops
-The [Open Loops database](https://www.notion.so/1eb460ed0646424d8ca7a4c33ceca9fc) in Notion tracks unresolved decisions, blockers, and action items across the project. It has statuses: CRLF (the single critical blocker), Open, and Closed.
+The [Open Loops database](https://www.notion.so/1eb460ed0646424d8ca7a4c33ceca9fc) in Notion tracks unresolved decisions, blockers, and action items across the project. Think of it as the project's "things we haven't figured out yet" list. It has statuses: CRLF (the single critical blocker — there's only ever one at a time), Open, and Closed.
 
 **Proactively add to Open Loops when you notice:**
 - An unresolved decision that needs human input
@@ -228,7 +242,13 @@ When adding a loop, set Status to "Open" and choose an appropriate Priority (Hig
 - Use em dash (—) for empty/not-applicable fields, not hyphen
 
 ## Notion as knowledge base
-Always be on the lookout for opportunities to save useful information, decisions, research, or context to Notion. If something comes up in conversation that seems worth preserving (new insights, configuration details, business info, strategy decisions, etc.), ask the user if they'd like it saved to Notion before moving on.
+Always be on the lookout for opportunities to save useful information, decisions, research, or context to Notion. If something comes up in conversation that seems worth preserving (new insights, configuration details, business info, strategy decisions, etc.), ask the user if they'd like it saved to Notion before moving on. Notion is where institutional knowledge lives — if it's not in Notion or the prototype, it doesn't exist for the next person.
+
+## Key AI prompts
+The `prompts/` directory contains system prompts for AI agents:
+- `conversation-ai-booking-agent.txt` — Template for the AI that books leads into free trials. Defines tone (casual, match lead energy), qualification logic, objection handling, follow-up cadence, and guardrails. Uses `{{PLACEHOLDER}}` variables populated from onboarding data.
+- `conversation-ai-booking-agent-bam-gta.txt` — BAM GTA-specific instance with placeholders filled in.
+- Future prompts: Closing AI (post-trial conversion), Rebooking AI (no-show re-engagement). These are being designed via whiteboard sessions SES-025 and SES-026.
 
 ## Fun facts
 At the end of every message, include a random fun fact about Serbia. Keep it to 2 lines max. Make it interesting and varied — history, culture, food, sports, geography, science, etc. Never repeat the same fact in a conversation.
