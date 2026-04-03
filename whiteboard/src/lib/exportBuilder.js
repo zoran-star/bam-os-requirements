@@ -1,10 +1,11 @@
 export function buildExport(session, items, state) {
   const date = new Date().toISOString().split('T')[0]
-  let approved = 0, withFeedback = 0, pending = 0
+  let approved = 0, withFeedback = 0, rejected = 0, pending = 0
 
   items.forEach(item => {
     const s = state[item.id]
-    if (s?.checked && !s?.feedback?.trim()) approved++
+    if (s?.rejected) rejected++
+    else if (s?.checked && !s?.feedback?.trim()) approved++
     else if (s?.feedback?.trim()) withFeedback++
     else pending++
   })
@@ -12,19 +13,21 @@ export function buildExport(session, items, state) {
   let md = `---\nsession: ${session.sessionId}\nexported: ${date}\n---\n\n`
   md += `# Full Control Planning — ${session.title}\n`
   md += `**Exported:** ${date}\n`
-  md += `**Approved:** ${approved} | **Has feedback:** ${withFeedback} | **Pending:** ${pending}\n\n`
+  md += `**Approved:** ${approved} | **Has feedback:** ${withFeedback} | **Rejected:** ${rejected} | **Pending:** ${pending}\n\n`
 
   session.sectionData.subsections.forEach(sub => {
     md += `## ${sub.id}: ${sub.title}\n`
     sub.items.forEach(item => {
       const s = state[item.id]
       const checked = s?.checked || false
+      const isRejected = s?.rejected || false
       const fb = s?.feedback?.trim() || ''
-      const checkbox = checked ? '[x]' : '[ ]'
+      const checkbox = isRejected ? '[✕]' : checked ? '[x]' : '[ ]'
       const typeTag = item.type ? ` [${item.type === 'data' ? 'DATA POINT' : 'FEATURE'}]` : ''
-      let line = `- ${checkbox} **${item.id} ${item.title}**${typeTag} — ${item.desc}`
+      let line = `- ${checkbox} **${item.id} ${item.title}**${typeTag} — ${item.description || item.desc}`
 
-      if (checked && !fb) line += ' — APPROVED'
+      if (isRejected) line += ' — REJECTED'
+      else if (checked && !fb) line += ' — APPROVED'
       else if (fb) line += ` — FEEDBACK: "${fb}"`
 
       const tags = []
@@ -34,6 +37,12 @@ export function buildExport(session, items, state) {
       line += ` [${tags.join(', ')}]`
       md += line + '\n'
     })
+
+    // Include per-subsection notes if any
+    const subNote = state[`_sub_${sub.title}`]?.trim()
+    if (subNote) {
+      md += `> **Section notes:** ${subNote}\n`
+    }
     md += '\n'
   })
 
@@ -53,7 +62,7 @@ export function buildExport(session, items, state) {
   }
 
   if (state._sectionFeedback?.trim()) {
-    md += `## Overall Section Feedback\n${state._sectionFeedback.trim()}\n`
+    md += `## Overall Session Feedback\n${state._sectionFeedback.trim()}\n`
   }
 
   return md

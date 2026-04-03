@@ -136,6 +136,17 @@ Always show completed steps with ✅, current step with ⬅️ YOU ARE HERE, and
 - Parse the YAML frontmatter to get the session ID and title
 - Count items by status: approved, feedback, rejected, pending/skipped
 - Present a brief summary: "SES-020: 15 approved, 8 with feedback, 5 rejected, 2 skipped"
+
+**How to read the export format:**
+- `[x]` + "APPROVED" = user approved as-is
+- `[x]` + "FEEDBACK: ..." = user approved with modifications
+- `[✕]` + "REJECTED" = user explicitly rejected — this item will NOT be included
+- `[ ]` with no status = user didn't review (pending) — ask about these
+- Items with feedback but no `[x]` = user gave feedback but didn't approve — treat as feedback items to discuss
+- Subsection notes appear as `> **Section notes:** ...`
+
+**Rejected items are final.** Do not re-propose them, include them in Notion updates, or create follow-up work for them. They're out.
+
 - TO MOVE FORWARD: Automatic — proceed to Step 2 immediately.
 
 **Step 2: Walk through feedback items with the user**
