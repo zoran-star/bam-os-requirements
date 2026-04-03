@@ -72,13 +72,35 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 
 The whiteboard app is a visual kanban board for managing onboarding review sessions. Located at `whiteboard/`.
 
-### How it works
-1. Team visits the whiteboard → sees session cards in Not Ready / Ready / Complete columns
-2. Click a session card → opens a review doc showing all items with their status
-3. Decided items (approved/feedback) are collapsed at the top — expand to see past decisions
-4. Pending items are open for review — approve (✓) or type feedback for each
-5. When done → click "Export for AI" → copies markdown with session ID to clipboard
-6. Paste into Claude Code → Claude walks through the feedback with you, agrees on actions, then executes (see "Processing whiteboard session exports" below)
+### How it works — the full 6-step cycle
+
+**Step 1: Visit the whiteboard**
+Go to https://whiteboard-beta-indol.vercel.app. Sessions are organized in three columns: Not Ready (still being scoped), Ready (ready for review), Complete (reviewed and processed). Each card shows title, description, owner (Zoran/Cole), dates, and session type.
+
+**Step 2: Review a session**
+Click a session card. You'll see a user guide at the top explaining the controls. Items are split into two groups:
+- **Decided items** — previously approved/rejected/given feedback. Collapsed in a green bar. Expand to see past decisions.
+- **Pending items** — need your review. Each has three controls: approve (✓), reject (✕), or type feedback in the text field on the right.
+
+**Step 3: Make your decisions**
+For each pending item: approve if you agree as-is, reject if you don't want it, or type feedback to modify/redirect it. You can do a mix — approve some, reject some, give feedback on others.
+
+**Step 4: Export**
+Click "Export for AI" in the top right. This copies a markdown summary of all your decisions to the clipboard — what you approved, rejected, and your feedback text for each item.
+
+**Step 5: Paste into Claude Code**
+Open Claude Code in the `bam-os-requirements` repo. Paste the export. Claude will:
+1. Parse and summarize your decisions
+2. Walk through each feedback item with you — discuss, clarify, agree on actions
+3. Present a 5-category confirmation checklist (sessions, onboarding data, Notion, prototype, other)
+4. Wait for your confirmation before executing anything
+5. Execute the confirmed actions
+6. Mark the session complete and suggest next steps
+
+See "Processing whiteboard session exports" below for the detailed instructions Claude follows.
+
+**Step 6: Verify**
+After Claude executes, check that: Notion pages were updated, prototype changes deployed, new sessions appeared on the whiteboard, onboarding data points were added. Claude should confirm each action, but always spot-check.
 
 ### Notion databases
 - **Sessions DB:** `4e5492be5027427cbbc8994bcd73905c` — stores all session cards. Each session has: Title, Session ID, Status (To Do/In Progress/Complete), Description, Assigned To (Zoran/Cole), Section Number, Session Type (Onboarding Review/Follow-up/Ad Hoc), Completed Date, and **SECTION Data** (a rich_text field containing JSON with all the items, their statuses, and feedback). The SECTION Data is what the whiteboard app renders.
@@ -186,7 +208,7 @@ There are two sources of truth — they serve different purposes and must stay i
    - [AI Advisor](https://www.notion.so/3245aca8ac0f81978b4ef0972967611c)
    - [Settings & Configuration](https://www.notion.so/3315aca8ac0f81749b78f52144f369ba)
 
-**When adding or updating requirements, update Notion.** The prototype serves as the visual reference for what's been built. Notion is the authoritative spec for requirement details, job IDs, release targets, and field-level documentation.
+**These two must stay in sync. Never update one without updating the other.** When you add a feature to the prototype, add or update the corresponding Notion requirement. When you add a requirement to Notion, check if the prototype needs updating. After every session export processing, actively nudge the user: "The prototype was updated — should we also update the Notion requirements?" or "Notion was updated — does the prototype need to reflect this?" If the user only asks for one, remind them about the other. Drift between these two sources causes confusion and wasted work.
 
 ## Domain structure
 
