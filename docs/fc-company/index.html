@@ -157,12 +157,23 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .hero-stat[data-modal]{cursor:pointer;transition:opacity 0.2s}.hero-stat[data-modal]:hover{opacity:0.8}
 .hero-stat[data-modal] .hero-stat-label::after{content:' ⓘ';font-size:9px;opacity:0.4}
 .nitty-gritty{margin-top:64px;padding-top:48px;border-top:1px solid var(--divider)}
-.ng-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:32px}
-@media(max-width:700px){.ng-grid{grid-template-columns:1fr}}
-.ng-category{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px}
+.ng-accordion{display:flex;flex-direction:column;gap:6px}
+.ng-section{border:1px solid rgba(200,168,78,0.15);border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.02)}
+.ng-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(200,168,78,0.06);border:none;cursor:pointer;font-family:inherit;transition:background 0.2s}
+.ng-toggle:hover{background:rgba(200,168,78,0.1)}
+.ng-toggle-left{display:flex;align-items:center;gap:8px}
+.ng-toggle-name{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:-0.01em}
+.ng-toggle-count{font-size:11px;color:rgba(200,168,78,0.5);font-weight:500}
+.ng-toggle-arrow{font-size:12px;color:rgba(200,168,78,0.4);transition:transform 0.25s ease}
+.ng-section.open .ng-toggle-arrow{transform:rotate(90deg)}
+.ng-body{max-height:0;overflow:hidden;transition:max-height 0.35s ease}
+.ng-section.open .ng-body{max-height:1000px}
+.ng-body-inner{padding:8px 18px 14px}
 .ng-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--g300);line-height:1.5;margin-bottom:8px;cursor:default}
+.ng-item:last-child{margin-bottom:0}
 .ng-item input[type="checkbox"]{accent-color:var(--accent);margin-top:3px;pointer-events:none;flex-shrink:0}
 .ng-item span{flex:1}
+.ng-total{text-align:center;margin-top:16px;font-size:12px;color:var(--g500);font-weight:600;letter-spacing:0.02em}
 .stat-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity 0.25s var(--ease)}
 .stat-modal-overlay.open{opacity:1;pointer-events:auto}
 .stat-modal{background:var(--bg);border:1px solid var(--card-border);border-radius:16px;max-width:420px;width:90%;padding:32px;position:relative;transform:translateY(12px) scale(0.97);transition:transform 0.3s var(--ease);box-shadow:0 24px 64px rgba(0,0,0,0.4)}
@@ -748,46 +759,144 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       <div class="sec-label" style="margin-bottom:8px">What FullControl handles</div>
       <h3 style="font-size:18px;font-weight:700;color:var(--white);margin-bottom:6px">The nitty gritty &mdash; so operators don't have to</h3>
       <p style="font-size:13px;color:var(--g400);margin-bottom:24px;max-width:520px">Every task below is something academy owners currently do by hand, forget about, or pay someone else to manage. FullControl handles all of it.</p>
-      <div class="ng-grid">
-        <div class="ng-col">
-          <div class="ng-category">Sales & Leads</div>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Responding to new leads with optimized booking messages</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Following up with leads who ghost</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Nurturing leads over days/weeks until they book</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Managing lead status and pipeline stages</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Setting up funnels for camps and events</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking ad performance and cost per lead</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Understanding which ads are actually converting</span></label>
+      <div class="ng-accordion">
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Scheduling</span><span class="ng-toggle-count">6 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing sessions &amp; schedules &mdash; creating, editing, and canceling sessions, notifying athletes when things change</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Planning staffing schedules &mdash; figuring out which coaches cover which sessions across locations and time slots</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing credits &mdash; issuing makeup credits when sessions get canceled, adjusting balances, tracking what&rsquo;s owed</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Taking attendance &mdash; checking athletes in one by one, marking everyone present at once, adding walk-ins on the fly</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking capacity &amp; waitlists &mdash; knowing how full each session is, managing waitlists when spots open up</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Keeping session notes &mdash; writing notes after each session so coaches have history on every athlete</span></label>
+          </div></div>
         </div>
-        <div class="ng-col">
-          <div class="ng-category">Automations & Messaging</div>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Sending reminders before sessions</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Following up after no-shows</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Requesting reviews after milestones</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Triggering referral asks at the right time</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Sending payment reminders and failed-payment nudges</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Birthday and anniversary messages</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Re-engagement campaigns for inactive members</span></label>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Member Communications</span><span class="ng-toggle-count">4 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Sending mass communications &mdash; blasting messages to filtered groups, posting location announcements, scheduling sends</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing at-risk members &mdash; catching members who stopped showing up, following up after missed sessions, re-engaging after pauses</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Closing leads after trials &mdash; following up with people who finished their trial but haven&rsquo;t signed up yet</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Encouraging members &mdash; recognizing attendance streaks, celebrating achievements, keeping members motivated</span></label>
+          </div></div>
         </div>
-        <div class="ng-col">
-          <div class="ng-category">Member Management</div>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Client onboarding &mdash; contracts, payments, scheduling, education</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Updating member trackers and attendance logs</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Keeping member info and contact details current</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Auto-tagging and categorizing contacts</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Handling cancellations, pauses, and plan changes</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Trial-to-member conversion tracking</span></label>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Billing &amp; Payments</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing payments &mdash; chasing failed payments, processing refunds, applying discounts, keeping track of who owes what</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing credits &amp; extensions &mdash; issuing store credits for cancellations or weather, extending subscriptions, giving extra sessions</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Pausing &amp; resuming members &mdash; handling pause requests, enforcing limits, resuming when they&rsquo;re ready</span></label>
+          </div></div>
         </div>
-        <div class="ng-col">
-          <div class="ng-category">Content & Strategy</div>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Planning and scheduling social media content</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Generating content briefs and post ideas</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking KPIs across the business</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Surfacing data-driven decisions instead of gut calls</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Weekly business health reports</span></label>
-          <label class="ng-item"><input type="checkbox" checked disabled><span>Identifying churn risk before it happens</span></label>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Member Health &amp; Engagement</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Monitoring member health &mdash; tracking attendance patterns, flagging who&rsquo;s slipping, color-coding risk levels</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Understanding member value &mdash; knowing each member&rsquo;s lifetime revenue, session count, and whether they&rsquo;re trending up or down</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Running attendance reports &mdash; pulling monthly numbers by location, who&rsquo;s showing up, who&rsquo;s not, how full sessions are</span></label>
+          </div></div>
         </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Sales &amp; Leads</span><span class="ng-toggle-count">4 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Capturing and organizing leads &mdash; getting leads from Instagram, Google, Facebook, referrals and tracking where they are in the funnel</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Qualifying and scoring leads &mdash; figuring out which leads are most likely to close based on engagement, demographics, and momentum</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing trials &mdash; booking trial sessions, tracking who showed up, following up based on how long ago they trialed</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Re-engaging cold leads &mdash; reaching back out to leads who went silent with AI-drafted messages that match your tone</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Marketing &amp; Ads</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Running ad campaigns &mdash; setting up and managing campaigns across Meta, Google, TikTok, budgeting and pausing as needed</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking ad performance &mdash; monitoring cost per lead, click-through rates, conversions, knowing which channels actually work</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Spotting what&rsquo;s underperforming &mdash; catching ads that are burning budget, comparing channels, staying on pace with spend</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Content</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Planning and creating content &mdash; building content plans, writing briefs, pulling angles across Reels, Carousels, Threads, Newsletters</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Moving content through production &mdash; routing from draft to review to approved to scheduled to posted, approvals and revisions</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking content performance &mdash; seeing which content types land, approval rates, what&rsquo;s working and what&rsquo;s not</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Member App</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Letting members book sessions &mdash; members pick classes, credits get deducted, waitlists fill automatically when spots open</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Handling member payments &mdash; auto-billing on schedule, sending reminders before charges, showing payment history</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Letting members manage their account &mdash; updating profiles, requesting pauses or cancellations, seeing trial status and upgrade options</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Reporting &amp; Insights</span><span class="ng-toggle-count">2 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Tracking KPIs &mdash; MRR, churn, trials booked, conversion rate, fill rate, targets vs. actual, month over month</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Getting AI-powered insights &mdash; growth opportunity spotting, coach performance, attendance trends, forecasting what&rsquo;s coming</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">Configuration &amp; Setup</span><span class="ng-toggle-count">3 items</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Setting up your academy &mdash; name, logo, timezone, multiple locations with their own settings</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Configuring plans &amp; billing &mdash; creating membership tiers, setting pricing, syncing with Stripe</span></label>
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Managing staff &amp; integrations &mdash; coach directory, bios for parent-facing comms, connecting Meta CAPI, onboarding links</span></label>
+          </div></div>
+        </div>
+
+        <div class="ng-section">
+          <button class="ng-toggle" onclick="this.parentElement.classList.toggle('open')">
+            <div class="ng-toggle-left"><span class="ng-toggle-name">AI / Sage</span><span class="ng-toggle-count">1 item</span></div>
+            <span class="ng-toggle-arrow">&#9654;</span>
+          </button>
+          <div class="ng-body"><div class="ng-body-inner">
+            <label class="ng-item"><input type="checkbox" checked disabled><span>Getting strategic recommendations &mdash; sales predictions, growth opportunities, engagement trends, content ideas, ad optimization, all surfaced automatically</span></label>
+          </div></div>
+        </div>
+
       </div>
+      <div class="ng-total">35 operational tasks across 11 categories &mdash; all handled by FullControl</div>
     </div>
 
     <!-- BEFORE / AFTER COMPARISON -->

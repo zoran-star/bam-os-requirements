@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nitty Gritty — Confirmed Items</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#08080a;color:#e4e4e7;line-height:1.6;padding:40px 24px 120px}
+.container{max-width:960px;margin:0 auto}
+h1{font-size:28px;font-weight:800;letter-spacing:-0.03em;margin-bottom:4px}
+.subtitle{font-size:14px;color:#71717a;margin-bottom:8px}
+.instructions{font-size:13px;color:#52525b;margin-bottom:32px;padding:12px 16px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.12);border-radius:8px}
+.instructions strong{color:#c8a84e}
+
+/* Accordion */
+.category{margin-bottom:8px;border-radius:10px;overflow:hidden}
+.cat-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:rgba(200,168,78,0.08);border:1px solid rgba(200,168,78,0.18);border-radius:10px;cursor:pointer;color:#e4e4e7;font-family:inherit;transition:background 0.2s}
+.category.open .cat-toggle{border-radius:10px 10px 0 0}
+.cat-toggle:hover{background:rgba(200,168,78,0.12)}
+.cat-left{display:flex;align-items:center;gap:10px}
+.cat-name{font-size:14px;font-weight:700;letter-spacing:-0.01em;color:#c8a84e}
+.cat-count{font-size:11px;color:#8a7a4a;font-weight:500}
+.cat-arrow{font-size:14px;color:#8a7a4a;transition:transform 0.25s ease}
+.category.open .cat-arrow{transform:rotate(90deg)}
+.cat-body{max-height:0;overflow:hidden;transition:max-height 0.35s ease}
+.category.open .cat-body{max-height:2000px}
+.cat-body-inner{padding:0 20px 16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-top:none;border-radius:0 0 10px 10px}
+
+/* Items */
+.item{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.item:last-child{border-bottom:none}
+.item-id{font-size:10px;color:#52525b;font-weight:700;letter-spacing:0.05em}
+.item-label{font-size:13px;font-weight:600;color:#e4e4e7;margin-top:1px}
+.item-detail{font-size:11px;color:#71717a;margin-top:2px;line-height:1.4}
+.item-note{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;font-size:12px;color:#a1a1aa;font-family:inherit;resize:none;height:32px;width:100%;transition:border-color 0.2s,height 0.2s}
+.item-note:focus{outline:none;border-color:rgba(200,168,78,0.3);height:64px;color:#e4e4e7}
+.item-note::placeholder{color:#3f3f46}
+
+/* Expand/collapse all */
+.select-btns{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.select-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;color:#71717a;cursor:pointer;transition:all 0.2s}
+.select-btn:hover{border-color:rgba(200,168,78,0.2);color:#c8a84e}
+
+/* Bottom bar */
+.stats{position:fixed;bottom:0;left:0;right:0;background:rgba(8,8,10,0.95);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.06);padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:24px;z-index:100}
+.stat-pill{font-size:13px;color:#71717a}
+.stat-pill strong{color:#e4e4e7;font-weight:700}
+.export-btn{background:linear-gradient(135deg,#c8a84e,#a8882e);color:#08080a;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;transition:transform 0.2s,opacity 0.2s}
+.export-btn:hover{transform:translateY(-1px);opacity:0.9}
+.export-btn:active{transform:translateY(0)}
+.export-btn.copied{background:#22c55e}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>The Nitty Gritty</h1>
+  <p class="subtitle">40 things academy owners deal with every day. FullControl handles all of them.</p>
+  <div class="instructions">
+    <strong>Add context:</strong> Click a category to expand. Use the notes field on the right to add color or context to any item. Export when done — notes are included.
+  </div>
+
+  <div class="select-btns">
+    <button class="select-btn" onclick="expandAll()">Expand All</button>
+    <button class="select-btn" onclick="collapseAll()">Collapse All</button>
+  </div>
+
+  <div id="items"></div>
+</div>
+
+<div class="stats">
+  <div class="stat-pill"><strong>40</strong> confirmed items across <strong>11</strong> categories</div>
+  <button class="export-btn" id="exportBtn" onclick="exportForAI()">Export for AI</button>
+</div>
+
+<script>
+const data = [
+  { cat: "Scheduling", items: [
+    { id: "SCH-1", label: "Managing sessions & schedules", detail: "Creating, editing, and canceling sessions — notifying athletes when things change" },
+    { id: "SCH-2", label: "Planning staffing schedules", detail: "Figuring out which coaches cover which sessions across locations and time slots" },
+    { id: "SCH-3", label: "Managing credits", detail: "Issuing makeup credits when sessions get canceled, adjusting balances, tracking what's owed" },
+    { id: "SCH-4", label: "Taking attendance", detail: "Checking athletes in one by one, marking everyone present at once, adding walk-ins on the fly" },
+    { id: "SCH-5", label: "Tracking capacity & waitlists", detail: "Knowing how full each session is, managing waitlists when spots open up" },
+    { id: "SCH-6", label: "Keeping session notes", detail: "Writing notes after each session so coaches have history on every athlete" }
+  ]},
+  { cat: "Member Communications", items: [
+    { id: "COM-1", label: "Sending mass communications", detail: "Blasting messages to filtered groups, posting location announcements, scheduling sends ahead of time" },
+    { id: "COM-2", label: "Managing at-risk members", detail: "Catching members who stopped showing up, following up after missed sessions, re-engaging after pauses" },
+    { id: "COM-3", label: "Closing leads after trials", detail: "Following up with people who finished their trial but haven't signed up yet" },
+    { id: "COM-4", label: "Encouraging members", detail: "Recognizing attendance streaks, celebrating achievements, keeping members motivated" }
+  ]},
+  { cat: "Billing & Payments", items: [
+    { id: "BIL-1", label: "Managing payments", detail: "Chasing failed payments, processing refunds, applying discounts, keeping track of who owes what" },
+    { id: "BIL-2", label: "Managing credits & extensions", detail: "Issuing store credits for cancellations or weather, extending subscriptions, giving extra sessions" },
+    { id: "BIL-3", label: "Pausing & resuming members", detail: "Handling pause requests, enforcing limits (30-day max, 2x/year), resuming when they're ready" }
+  ]},
+  { cat: "Member Health & Engagement", items: [
+    { id: "HLT-1", label: "Monitoring member health", detail: "Tracking attendance patterns, flagging who's slipping, color-coding risk levels so nothing falls through the cracks" },
+    { id: "HLT-2", label: "Understanding member value", detail: "Knowing each member's lifetime revenue, session count, and whether they're trending up or down" },
+    { id: "HLT-3", label: "Running attendance reports", detail: "Pulling monthly numbers by location — who's showing up, who's not, and how full sessions are" }
+  ]},
+  { cat: "Sales & Leads", items: [
+    { id: "SAL-1", label: "Capturing and organizing leads", detail: "Getting leads from Instagram, Google, Facebook, referrals — tracking where they are in the funnel" },
+    { id: "SAL-2", label: "Qualifying and scoring leads", detail: "Figuring out which leads are most likely to close based on engagement, demographics, and momentum" },
+    { id: "SAL-3", label: "Managing trials", detail: "Booking trial sessions, tracking who showed up, following up based on how long ago they trialed" },
+    { id: "SAL-4", label: "Re-engaging cold leads", detail: "Reaching back out to leads who went silent — AI-drafted messages that match your tone" }
+  ]},
+  { cat: "Marketing & Ads", items: [
+    { id: "MKT-1", label: "Running ad campaigns", detail: "Setting up and managing campaigns across Meta, Google, TikTok — budgeting and pausing as needed" },
+    { id: "MKT-2", label: "Tracking ad performance", detail: "Monitoring cost per lead, click-through rates, conversions — knowing which channels actually work" },
+    { id: "MKT-3", label: "Spotting what's underperforming", detail: "Catching ads that are burning budget, comparing channels, staying on pace with spend" }
+  ]},
+  { cat: "Content", items: [
+    { id: "CNT-1", label: "Planning and creating content", detail: "Building content plans, writing briefs, pulling angles — across Reels, Carousels, Threads, Newsletters" },
+    { id: "CNT-2", label: "Moving content through production", detail: "Routing content from draft to review to approved to scheduled to posted — approvals and revisions" },
+    { id: "CNT-3", label: "Tracking content performance", detail: "Seeing which content types land, approval rates, what's working and what's not" }
+  ]},
+  { cat: "Member App", items: [
+    { id: "APP-1", label: "Letting members book sessions", detail: "Members pick classes, credits get deducted, waitlists fill automatically when spots open" },
+    { id: "APP-2", label: "Handling member payments", detail: "Auto-billing on schedule, sending reminders before charges, showing payment history" },
+    { id: "APP-3", label: "Showing progress & engagement", detail: "Monthly progress reports, attendance streaks, badges, coach messages — keeping members invested" },
+    { id: "APP-4", label: "Keeping members informed", detail: "Session reminders, announcements, notification preferences — one inbox for everything" },
+    { id: "APP-5", label: "Letting members manage their account", detail: "Updating profiles, requesting pauses or cancellations, seeing trial status and upgrade options" }
+  ]},
+  { cat: "Reporting & Insights", items: [
+    { id: "RPT-1", label: "Tracking KPIs", detail: "MRR, churn, trials booked, conversion rate, fill rate — targets vs. actual, month over month" },
+    { id: "RPT-3", label: "Getting AI-powered insights", detail: "Growth opportunity spotting, coach performance, attendance trends, forecasting what's coming" }
+  ]},
+  { cat: "Configuration & Setup", items: [
+    { id: "CFG-1", label: "Setting up your academy", detail: "Name, logo, timezone, multiple locations with their own settings" },
+    { id: "CFG-2", label: "Configuring plans & billing", detail: "Creating membership tiers, setting pricing, syncing with Stripe" },
+    { id: "CFG-3", label: "Training your AI", detail: "Setting brand voice, inputting selling points, teaching it objection handling, building FAQ" },
+    { id: "CFG-4", label: "Managing staff & integrations", detail: "Coach directory, bios for parent-facing comms, connecting Meta CAPI, setting up onboarding links" }
+  ]},
+  { cat: "AI / Sage", items: [
+    { id: "AI-1", label: "Talking to your business", detail: "Voice commands like 'Create a Saturday Elite class at 10am' — speak it, it happens" },
+    { id: "AI-2", label: "Letting AI handle messaging", detail: "Auto-drafted objection responses, follow-ups, lead re-engagement — in your tone, on your schedule" },
+    { id: "AI-3", label: "Getting strategic recommendations", detail: "Sales predictions, growth opportunities, engagement trends, content ideas, ad optimization — all surfaced automatically" }
+  ]}
+];
+
+const container = document.getElementById('items');
+
+data.forEach(section => {
+  const cat = document.createElement('div');
+  cat.className = 'category';
+  cat.innerHTML = `
+    <button class="cat-toggle" onclick="this.parentElement.classList.toggle('open')">
+      <div class="cat-left">
+        <span class="cat-name">${section.cat}</span>
+        <span class="cat-count">${section.items.length} items</span>
+      </div>
+      <span class="cat-arrow">&#9654;</span>
+    </button>
+    <div class="cat-body"><div class="cat-body-inner" id="cat-${section.cat.replace(/[^a-zA-Z]/g,'')}"></div></div>
+  `;
+  container.appendChild(cat);
+
+  const body = cat.querySelector('.cat-body-inner');
+  section.items.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <div>
+        <div class="item-id">${item.id}</div>
+        <div class="item-label">${item.label}</div>
+        <div class="item-detail">${item.detail}</div>
+      </div>
+      <textarea class="item-note" placeholder="Add context or notes..." data-id="${item.id}"></textarea>
+    `;
+    body.appendChild(div);
+  });
+});
+
+function expandAll() {
+  document.querySelectorAll('.category').forEach(c => c.classList.add('open'));
+}
+
+function collapseAll() {
+  document.querySelectorAll('.category').forEach(c => c.classList.remove('open'));
+}
+
+function exportForAI() {
+  const lines = ['---','export: nitty-gritty-final','date: ' + new Date().toISOString().split('T')[0],'---',''];
+
+  data.forEach(section => {
+    const catLines = [];
+    section.items.forEach(item => {
+      const note = document.querySelector(`textarea[data-id="${item.id}"]`).value.trim();
+      let line = `- ${item.id}: ${item.label} — ${item.detail}`;
+      if (note) line += ` | NOTE: ${note}`;
+      catLines.push(line);
+    });
+    lines.push(`## ${section.cat}`);
+    catLines.forEach(l => lines.push(l));
+    lines.push('');
+  });
+
+  lines.push(`**Total: ${data.reduce((s,c) => s + c.items.length, 0)} items across ${data.length} categories**`);
+
+  const output = lines.join('\n');
+  navigator.clipboard.writeText(output).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Export for AI'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

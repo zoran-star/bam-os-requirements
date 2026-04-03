@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nitty Gritty Workshop v2 — FullControl</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#08080a;color:#e4e4e7;line-height:1.6;padding:40px 24px 120px}
+.container{max-width:900px;margin:0 auto}
+h1{font-size:28px;font-weight:800;letter-spacing:-0.03em;margin-bottom:4px}
+.subtitle{font-size:14px;color:#71717a;margin-bottom:8px}
+.instructions{font-size:13px;color:#52525b;margin-bottom:32px;padding:12px 16px;background:rgba(200,168,78,0.06);border:1px solid rgba(200,168,78,0.12);border-radius:8px}
+.instructions strong{color:#c8a84e}
+.badge{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.badge-done{background:rgba(34,197,94,0.15);color:#22c55e}
+.badge-new{background:rgba(200,168,78,0.15);color:#c8a84e}
+.category{margin-bottom:32px}
+.cat-header{font-size:11px;font-weight:700;color:#c8a84e;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(200,168,78,0.15);display:flex;align-items:center;gap:8px}
+.cat-count{font-size:10px;color:#52525b;font-weight:500}
+.item{display:grid;grid-template-columns:28px 1fr 1fr;gap:8px;align-items:start;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.item:last-child{border-bottom:none}
+.item input[type="checkbox"]{width:18px;height:18px;accent-color:#c8a84e;margin-top:2px;cursor:pointer}
+.item-label{font-size:13px;color:#a1a1aa;cursor:pointer;transition:color 0.2s}
+.item.checked .item-label{color:#e4e4e7}
+.item-detail{font-size:11px;color:#3f3f46;margin-top:2px;font-style:italic}
+.item.checked .item-detail{color:#52525b}
+.item-note{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 10px;font-size:12px;color:#a1a1aa;font-family:inherit;resize:none;height:28px;width:100%;transition:border-color 0.2s,height 0.2s}
+.item-note:focus{outline:none;border-color:rgba(200,168,78,0.3);height:56px;color:#e4e4e7}
+.item-note::placeholder{color:#3f3f46}
+.item-note.has-note{border-color:rgba(200,168,78,0.2);color:#e4e4e7}
+.stats{position:fixed;bottom:0;left:0;right:0;background:rgba(8,8,10,0.95);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.06);padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:24px;z-index:100}
+.stat-pill{font-size:13px;color:#71717a}
+.stat-pill strong{color:#e4e4e7;font-weight:700}
+.export-btn{background:linear-gradient(135deg,#c8a84e,#a8882e);color:#08080a;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;transition:transform 0.2s,opacity 0.2s}
+.export-btn:hover{transform:translateY(-1px);opacity:0.9}
+.export-btn:active{transform:translateY(0)}
+.export-btn.copied{background:#22c55e}
+.select-btns{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.select-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;color:#71717a;cursor:pointer;transition:all 0.2s}
+.select-btn:hover{border-color:rgba(200,168,78,0.2);color:#c8a84e}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Nitty Gritty Workshop <span style="color:#c8a84e">v2</span></h1>
+  <p class="subtitle">Condensed from 159 items down to broad capability buckets for the investor page.</p>
+  <div class="instructions">
+    <strong>How this works:</strong> Green-tagged categories are your confirmed picks from last round. Gold-tagged categories are new — condensed from the remaining items. Review, check what belongs on the investor page, and add notes. Export when done.
+  </div>
+
+  <div class="select-btns">
+    <button class="select-btn" onclick="selectAll()">Select All</button>
+    <button class="select-btn" onclick="deselectAll()">Deselect All</button>
+  </div>
+
+  <div id="items"></div>
+</div>
+
+<div class="stats">
+  <div class="stat-pill"><strong id="checkedCount">0</strong> / <span id="totalCount">0</span> selected</div>
+  <button class="export-btn" id="exportBtn" onclick="exportForAI()">Export for AI</button>
+</div>
+
+<script>
+const data = [
+  { cat: "Scheduling", status: "done", items: [
+    { id: "SCH-1", label: "Managing sessions & schedules", detail: "Create, edit, cancel sessions — auto-notify athletes on changes", checked: true },
+    { id: "SCH-2", label: "Planning staffing schedules", detail: "Assign coaches, plan coverage across locations and time slots", checked: true },
+    { id: "SCH-3", label: "Managing credits", detail: "Auto-issue makeup credits, update balances, track remaining", checked: true },
+    { id: "SCH-4", label: "Taking attendance", detail: "Individual check-in, bulk mark present, add athletes on the fly", checked: true },
+    { id: "SCH-5", label: "Tracking capacity & waitlists", detail: "Real-time fill %, waitlist management", checked: true },
+    { id: "SCH-6", label: "Session notes & history", detail: "Coach notes per session, searchable history", checked: true }
+  ]},
+  { cat: "Member Communications", status: "done", items: [
+    { id: "COM-1", label: "Mass communications", detail: "Bulk broadcasts, location announcements, scheduled sends", checked: true },
+    { id: "COM-2", label: "Managing at-risk members", detail: "Flag inactivity, missed sessions, pause reminders, re-engagement", checked: true },
+    { id: "COM-3", label: "Closing leads", detail: "Post-trial follow-ups, AI-drafted messages with configurable tone", checked: true },
+    { id: "COM-4", label: "Encouraging members", detail: "Attendance streak recognition, achievement kudos", checked: true }
+  ]},
+  { cat: "Billing & Payments", status: "done", items: [
+    { id: "BIL-1", label: "Managing payments", detail: "Auto-retries, failure tracking, refunds, discounts, status monitoring", checked: true },
+    { id: "BIL-2", label: "Managing credits", detail: "Store credits, subscription extensions, extra session credits", checked: true },
+    { id: "BIL-3", label: "Pausing members", detail: "Pause/resume memberships with policy enforcement", checked: true }
+  ]},
+  { cat: "Member Health & Engagement", status: "new", items: [
+    { id: "HLT-1", label: "Member health scoring", detail: "Attendance streaks, days since last session, color-coded health (Green/Yellow/Red)" },
+    { id: "HLT-2", label: "Member analytics", detail: "Lifetime value, session count, top performers, at-risk identification" },
+    { id: "HLT-3", label: "Attendance reporting", detail: "Monthly reports by location, avg per session, fill rate trends" }
+  ]},
+  { cat: "Sales & Leads", status: "new", items: [
+    { id: "SAL-1", label: "Lead capture & pipeline", detail: "Multi-channel capture (IG, Google, FB, referral), funnel stages, drag-and-drop" },
+    { id: "SAL-2", label: "Lead qualification & scoring", detail: "Demographics, momentum scoring, referral source, probability to close" },
+    { id: "SAL-3", label: "Trial management", detail: "Booking, attendance tracking, outcomes, post-trial follow-up urgency" },
+    { id: "SAL-4", label: "AI-powered lead engagement", detail: "Auto-responses to inquiries, cold lead re-engagement, AI follow-ups" }
+  ]},
+  { cat: "Marketing & Ads", status: "new", items: [
+    { id: "MKT-1", label: "Campaign management", detail: "Create, budget, pause campaigns across Meta, Google, TikTok" },
+    { id: "MKT-2", label: "Performance tracking", detail: "CPL, CTR, conversion rate, lead source attribution" },
+    { id: "MKT-3", label: "Optimization insights", detail: "Underperforming ad alerts, channel comparison, budget pacing" }
+  ]},
+  { cat: "Content", status: "new", items: [
+    { id: "CNT-1", label: "Content planning & creation", detail: "Plans, briefs, angle extraction, calendar, multi-format (Reels, Carousels, Threads)" },
+    { id: "CNT-2", label: "Production pipeline", detail: "Review → Approved → Production → Scheduled → Posted, approval workflows" },
+    { id: "CNT-3", label: "Content analytics", detail: "Performance tracking, approval rates, best-performing content types" }
+  ]},
+  { cat: "Member App", status: "new", items: [
+    { id: "APP-1", label: "Session booking & credits", detail: "Book classes, cancel, waitlist notifications, credit management" },
+    { id: "APP-2", label: "Payments & billing", detail: "Auto-billing, reminders, payment history" },
+    { id: "APP-3", label: "Progress & engagement", detail: "Monthly progress reports, streaks, badges, coach messages" },
+    { id: "APP-4", label: "Notifications & announcements", detail: "Session reminders, announcements, notification preferences, inbox" },
+    { id: "APP-5", label: "Account management", detail: "Profile, pause, cancel, trial experience with upgrade prompts" }
+  ]},
+  { cat: "Reporting & Insights", status: "new", items: [
+    { id: "RPT-1", label: "KPI dashboard", detail: "MRR, churn, trials booked, conversion %, fill rate — targets vs. actual" },
+    { id: "RPT-2", label: "Financial reporting", detail: "Monthly MRR, revenue per session, member lifetime value" },
+    { id: "RPT-3", label: "AI-powered insights", detail: "Growth opportunities, top coaches, attendance trends, forecasting" }
+  ]},
+  { cat: "Configuration & Setup", status: "new", items: [
+    { id: "CFG-1", label: "Academy profile & locations", detail: "Name, logo, timezone, multi-location with separate settings" },
+    { id: "CFG-2", label: "Plans & billing setup", detail: "Membership plans, pricing, Stripe sync" },
+    { id: "CFG-3", label: "AI configuration", detail: "Brand voice, selling points, objection handling, FAQ database" },
+    { id: "CFG-4", label: "Staff & integrations", detail: "Coach directory, bios, Meta CAPI, onboarding links" }
+  ]},
+  { cat: "AI / Sage", status: "new", items: [
+    { id: "AI-1", label: "Voice commands & input", detail: "Natural language commands, voice-to-text transcription" },
+    { id: "AI-2", label: "AI-powered messaging", detail: "Objection responses, follow-ups, lead re-engagement — all auto-drafted" },
+    { id: "AI-3", label: "AI insights & strategy", detail: "Sales predictions, growth recommendations, engagement trends, content generation, ad optimization" }
+  ]}
+];
+
+const container = document.getElementById('items');
+let totalItems = 0;
+
+data.forEach(section => {
+  const cat = document.createElement('div');
+  cat.className = 'category';
+  const badgeClass = section.status === 'done' ? 'badge-done' : 'badge-new';
+  const badgeText = section.status === 'done' ? 'Confirmed' : 'New — Review';
+  cat.innerHTML = `<div class="cat-header">
+    ${section.cat} <span class="cat-count">(${section.items.length})</span>
+    <span class="badge ${badgeClass}">${badgeText}</span>
+  </div>`;
+
+  section.items.forEach(item => {
+    totalItems++;
+    const isChecked = item.checked || false;
+    const note = item.note || '';
+    const div = document.createElement('div');
+    div.className = 'item' + (isChecked ? ' checked' : '');
+    div.innerHTML = `
+      <input type="checkbox" id="item-${item.id}" data-id="${item.id}" ${isChecked ? 'checked' : ''} onchange="toggleItem(this)">
+      <label class="item-label" for="item-${item.id}">
+        <strong>${item.label}</strong>
+        <div class="item-detail">${item.detail}</div>
+      </label>
+      <textarea class="item-note" placeholder="Notes..." data-id="${item.id}">${note}</textarea>
+    `;
+    cat.appendChild(div);
+  });
+
+  container.appendChild(cat);
+});
+
+document.getElementById('totalCount').textContent = totalItems;
+updateCount();
+
+function toggleItem(cb) {
+  cb.closest('.item').classList.toggle('checked', cb.checked);
+  updateCount();
+}
+
+function updateCount() {
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+  document.getElementById('checkedCount').textContent = checked;
+}
+
+function selectAll() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; cb.closest('.item').classList.add('checked'); });
+  updateCount();
+}
+
+function deselectAll() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.closest('.item').classList.remove('checked'); });
+  updateCount();
+}
+
+function exportForAI() {
+  const lines = ['---','export: nitty-gritty-workshop-v2','date: ' + new Date().toISOString().split('T')[0],'---',''];
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked');
+
+  if (checked.length === 0) {
+    alert('No items selected!');
+    return;
+  }
+
+  data.forEach(section => {
+    const catItems = [];
+    section.items.forEach(item => {
+      const cb = document.getElementById(`item-${item.id}`);
+      if (cb && cb.checked) {
+        const note = document.querySelector(`textarea[data-id="${item.id}"]`).value.trim();
+        catItems.push({ id: item.id, label: item.label, detail: item.detail, note });
+      }
+    });
+
+    if (catItems.length > 0) {
+      lines.push(`## ${section.cat}`);
+      catItems.forEach(item => {
+        let line = `- [x] ${item.id}: ${item.label}`;
+        if (item.note) line += ` | NOTE: ${item.note}`;
+        lines.push(line);
+      });
+      lines.push('');
+    }
+  });
+
+  lines.push(`**Total selected: ${checked.length} / ${totalItems}**`);
+
+  const output = lines.join('\n');
+  navigator.clipboard.writeText(output).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Export for AI'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
