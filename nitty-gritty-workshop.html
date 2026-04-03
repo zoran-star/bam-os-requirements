@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nitty Gritty Workshop — FullControl</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#08080a;color:#e4e4e7;line-height:1.6;padding:40px 24px 120px}
+.container{max-width:900px;margin:0 auto}
+h1{font-size:28px;font-weight:800;letter-spacing:-0.03em;margin-bottom:4px}
+.subtitle{font-size:14px;color:#71717a;margin-bottom:32px}
+.category{margin-bottom:32px}
+.cat-header{font-size:11px;font-weight:700;color:#c8a84e;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(200,168,78,0.15)}
+.item{display:grid;grid-template-columns:28px 1fr 1fr;gap:8px;align-items:start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.item:last-child{border-bottom:none}
+.item input[type="checkbox"]{width:18px;height:18px;accent-color:#c8a84e;margin-top:2px;cursor:pointer}
+.item-label{font-size:13px;color:#a1a1aa;cursor:pointer;transition:color 0.2s}
+.item.checked .item-label{color:#e4e4e7}
+.item-num{font-size:11px;color:#52525b;font-weight:600;min-width:28px}
+.item-note{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:6px 10px;font-size:12px;color:#a1a1aa;font-family:inherit;resize:none;height:28px;width:100%;transition:border-color 0.2s,height 0.2s}
+.item-note:focus{outline:none;border-color:rgba(200,168,78,0.3);height:56px;color:#e4e4e7}
+.item-note::placeholder{color:#3f3f46}
+.stats{position:fixed;bottom:0;left:0;right:0;background:rgba(8,8,10,0.95);backdrop-filter:blur(8px);border-top:1px solid rgba(255,255,255,0.06);padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:24px;z-index:100}
+.stat-pill{font-size:13px;color:#71717a}
+.stat-pill strong{color:#e4e4e7;font-weight:700}
+.export-btn{background:linear-gradient(135deg,#c8a84e,#a8882e);color:#08080a;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer;transition:transform 0.2s,opacity 0.2s}
+.export-btn:hover{transform:translateY(-1px);opacity:0.9}
+.export-btn:active{transform:translateY(0)}
+.export-btn.copied{background:#22c55e}
+.select-btns{display:flex;gap:8px;margin-bottom:24px}
+.select-btn{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;color:#71717a;cursor:pointer;transition:all 0.2s}
+.select-btn:hover{border-color:rgba(200,168,78,0.2);color:#c8a84e}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Nitty Gritty Workshop</h1>
+  <p class="subtitle">Check items to include on the investor page. Add notes on the right. Export when done.</p>
+
+  <div class="select-btns">
+    <button class="select-btn" onclick="selectAll()">Select All</button>
+    <button class="select-btn" onclick="deselectAll()">Deselect All</button>
+    <button class="select-btn" onclick="selectCategory(this)" data-cat="all">Toggle by Category</button>
+  </div>
+
+  <div id="items"></div>
+</div>
+
+<div class="stats">
+  <div class="stat-pill"><strong id="checkedCount">0</strong> / <span id="totalCount">0</span> selected</div>
+  <button class="export-btn" id="exportBtn" onclick="exportForAI()">Export for AI</button>
+</div>
+
+<script>
+const data = [
+  { cat: "Scheduling", items: [
+    [1,"Creating sessions with class type, date, time, location, coach, capacity"],
+    [2,"Canceling sessions and auto-notifying all booked athletes"],
+    [3,"Selecting cancellation reasons (Weather, Coach unavailable, Facility, Holiday)"],
+    [4,"Issuing automatic makeup credits for canceled sessions"],
+    [5,"Assigning coaches to sessions"],
+    [6,"Editing session times, locations, details"],
+    [7,"Managing recurring sessions (Weekly, Biweekly)"],
+    [8,"Taking attendance by checking in individual athletes"],
+    [9,"Bulk marking all athletes present"],
+    [10,"Adding athletes to rosters on the fly"],
+    [11,"Tracking real-time capacity (% filled, waitlist)"],
+    [12,"Adding session notes for coaches"]
+  ]},
+  { cat: "Member Communications", items: [
+    [13,"Sending direct one-on-one messages"],
+    [14,"Broadcasting bulk messages to filtered groups (by status, plan)"],
+    [15,"Creating and publishing announcements by location"],
+    [16,"Scheduling announcements for future dates"],
+    [17,"Flagging members who haven't attended in 2+ weeks"],
+    [18,"Sending reminders to members who missed sessions"],
+    [19,"Sending welcome-back messages after pause ends"],
+    [20,"Following up with members who just finished trial"],
+    [21,"Sending encouragement for attendance streaks"],
+    [22,"Notifying members about pause ending soon"],
+    [23,"Flagging 'needs attention' leads based on inactivity"],
+    [24,"Sending kudos for member achievements"],
+    [25,"AI-drafted follow-up messages with configurable tone"],
+    [26,"Archiving old conversations"]
+  ]},
+  { cat: "Billing & Payments", items: [
+    [27,"Retrying failed payments automatically"],
+    [28,"Tracking payment failure retry attempts"],
+    [29,"Monitoring which members have failed payments"],
+    [30,"Issuing refunds with reason tracking"],
+    [31,"Issuing store credits (class canceled, weather, coach request)"],
+    [32,"Creating and applying discount codes (one-time or recurring)"],
+    [33,"Tracking Stripe coupon redemptions"],
+    [34,"Extending member subscriptions by adding days"],
+    [35,"Issuing additional session credits beyond plan"],
+    [36,"Pausing memberships temporarily (30-day max, 2x/year)"],
+    [37,"Resuming paused memberships"],
+    [38,"Tracking payment status per member"],
+    [39,"Processing cancellations with notice requirements"],
+    [40,"Monitoring churn rate and at-risk members (health indicators)"],
+    [41,"Generating renewal reminders before auto-billing"]
+  ]},
+  { cat: "Member Health & Engagement", items: [
+    [42,"Calculating attendance streaks per member"],
+    [43,"Identifying top 10% members by attendance"],
+    [44,"Monitoring 'days since last session' to flag inactive members"],
+    [45,"Tracking lifetime session count and revenue per member"],
+    [46,"Generating monthly attendance reports by location"],
+    [47,"Identifying members at risk of cancellation from declining attendance"],
+    [48,"Color-coding member health (Green/Yellow/Red)"],
+    [49,"Alerting when members exceed no-show limits"],
+    [50,"Tracking makeup credits remaining"]
+  ]},
+  { cat: "Sales & Leads", items: [
+    [51,"Capturing leads from multiple channels (IG, Google, FB, SMS, referral, website)"],
+    [52,"Organizing leads through funnel stages (Interested → Booked Trial → Done Trial → Won)"],
+    [53,"Recording parent/athlete demographics (age, goals, budget, availability)"],
+    [54,"Booking trial sessions and sending confirmation details"],
+    [55,"Flagging leads going cold (no response in 3+ days)"],
+    [56,"Moving leads between pipeline stages (drag-and-drop)"],
+    [57,"Auto-generating AI responses to lead inquiries"],
+    [58,"Following up with trials who completed but haven't converted"],
+    [59,"Sending payment options after trial completion"],
+    [60,"Identifying highest-probability-to-close leads (momentum scoring)"],
+    [61,"Tracking days since trial completion for follow-up urgency"],
+    [62,"Collecting sales notes on each lead"],
+    [63,"Recording message conversations with each lead"],
+    [64,"Queuing AI re-engagement for cold leads"],
+    [65,"Tracking trial attendance and outcome"],
+    [66,"Sending win/loss notifications on conversion"],
+    [67,"Identifying high-value trials (competitive track, premium pricing)"],
+    [68,"Recording referral source (how they found you)"]
+  ]},
+  { cat: "Marketing & Ads", items: [
+    [69,"Creating ad campaigns across channels (Meta, Google, TikTok, Remarketing)"],
+    [70,"Setting monthly ad budgets and monitoring daily spend pacing"],
+    [71,"Identifying underperforming ads that need refreshing"],
+    [72,"Pausing ads automatically or manually"],
+    [73,"Tracking CPL, CTR, conversion rate, impressions"],
+    [74,"Generating reports on which channels drive most leads"],
+    [75,"Creating content briefs with audience targeting"],
+    [76,"Tracking lead source attribution to campaigns"],
+    [77,"Monitoring daily pacing against budget"]
+  ]},
+  { cat: "Content", items: [
+    [78,"Creating content plans with multiple pieces by date"],
+    [79,"Generating social content (Reels, Carousels, Threads, Blog, Newsletters)"],
+    [80,"Routing content through production pipeline (Review → Approved → Production → Scheduled → Posted)"],
+    [81,"Approval workflows for content"],
+    [82,"Extracting content angles from brief text"],
+    [83,"Scheduling content for auto-publishing at optimal times"],
+    [84,"Researching trending topics relevant to your niche"],
+    [85,"Tracking pending approvals"],
+    [86,"Collecting member testimonials and transformation stories"],
+    [87,"Publishing scheduled content across platforms"],
+    [88,"Tracking approval rate over time"],
+    [89,"Managing content calendar (day/week view)"],
+    [90,"Assigning content to campaigns"],
+    [91,"Handling rejections and requesting revisions"],
+    [92,"Tracking which content types perform best"]
+  ]},
+  { cat: "Member App", items: [
+    [93,"Booking classes and deducting session credits"],
+    [94,"Canceling bookings and refunding credits"],
+    [95,"Managing waitlists and notifying when spots open"],
+    [96,"Displaying session rosters with real-time capacity"],
+    [97,"Tracking individual attendance history"],
+    [98,"QR code check-in at sessions"],
+    [99,"Sending session reminders 1 hour before"],
+    [100,"Preventing cancellations within 24 hours of session"],
+    [101,"Processing payment billing on scheduled dates"],
+    [102,"Sending payment reminders before billing"],
+    [103,"Displaying payment history per member"],
+    [104,"Generating monthly progress reports (shooting splits, attendance, coach notes)"],
+    [105,"Notifying when progress reports are available"],
+    [106,"Managing session credit balance and monthly resets"],
+    [107,"Tracking credit usage and makeup credits separately"],
+    [108,"Notifying members of expiring credits"],
+    [109,"Displaying announcements in carousel format"],
+    [110,"Sending announcement notifications"],
+    [111,"Managing notification preferences (locked: payments; unlocked: reminders, messages, reports)"],
+    [112,"Storing coaching messages from coaches to members"],
+    [113,"Managing member profile and settings"],
+    [114,"Allowing members to pause membership"],
+    [115,"Allowing members to cancel with reason recording"],
+    [116,"Sending trial countdown banners (3 days remaining)"],
+    [117,"Generating upgrade prompts when trial is ending"],
+    [118,"Tracking trial session usage (2 sessions remaining)"],
+    [119,"Tracking member streaks and top-performer badges"],
+    [120,"Inbox/notification center with unread tracking"]
+  ]},
+  { cat: "Reporting & Insights", items: [
+    [121,"Calculating KPIs: New Members, MRR Growth, Classes Filled, Trials Booked, Churn Rate, Avg Attendance, Trial Conversion %, Revenue Per Member, Referral Rate, Fill Rate"],
+    [122,"Tracking target vs. current performance per KPI"],
+    [123,"Generating monthly financial reports with MRR"],
+    [124,"Calculating revenue per session"],
+    [125,"Identifying biggest growth opportunity via AI"],
+    [126,"Calculating trial conversion percentage"],
+    [127,"Tracking new member acquisition rate"],
+    [128,"Attendance insights (avg athletes/session, fill rate)"],
+    [129,"Identifying top-performing coaches"],
+    [130,"Calculating member lifetime value"],
+    [131,"Month-over-month dashboard comparisons"],
+    [132,"Exporting reports for offline review"]
+  ]},
+  { cat: "Configuration & Setup", items: [
+    [133,"Setting up academy profile (name, logo, contact, timezone)"],
+    [134,"Configuring multiple locations with separate settings"],
+    [135,"Creating membership plans with pricing and billing"],
+    [136,"Syncing plans with Stripe"],
+    [137,"Configuring policies (pause limits, cancellation notice, dunning retries)"],
+    [138,"Setting up AI brand voice and tone"],
+    [139,"Recording selling points for AI to reference"],
+    [140,"Documenting objection handling strategies by category"],
+    [141,"Creating FAQ database for prospects and members"],
+    [142,"Uploading academy media"],
+    [143,"Setting up trial booking links"],
+    [144,"Generating onboarding links for new signups"],
+    [145,"Managing staff/coach directory"],
+    [146,"Recording coach bios for parent-facing comms"],
+    [147,"Configuring Stripe integration"],
+    [148,"Configuring Meta Conversions API"]
+  ]},
+  { cat: "AI / Sage", items: [
+    [149,"Voice commands ('Create a Saturday Elite class at 10am')"],
+    [150,"Voice-to-text transcription"],
+    [151,"AI-generated objection responses"],
+    [152,"AI-drafted follow-up messages"],
+    [153,"AI sales insights ('Which lead is most likely to close?')"],
+    [154,"AI growth strategy recommendations"],
+    [155,"AI engagement insights (attendance trends, churn risks)"],
+    [156,"AI content generation (3 reels + 2 carousels per request)"],
+    [157,"AI swipe review for content approval"],
+    [158,"Smart lead re-engagement when leads go cold"],
+    [159,"AI insights on underperforming ads"]
+  ]}
+];
+
+const container = document.getElementById('items');
+let totalItems = 0;
+
+data.forEach(section => {
+  const cat = document.createElement('div');
+  cat.className = 'category';
+  cat.innerHTML = `<div class="cat-header" data-cat-name="${section.cat}">${section.cat} (${section.items.length})</div>`;
+
+  section.items.forEach(([num, text]) => {
+    totalItems++;
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `
+      <input type="checkbox" id="item-${num}" data-num="${num}" onchange="toggleItem(this)">
+      <label class="item-label" for="item-${num}"><span class="item-num">#${num}</span> ${text}</label>
+      <textarea class="item-note" placeholder="Notes..." data-num="${num}"></textarea>
+    `;
+    cat.appendChild(div);
+  });
+
+  container.appendChild(cat);
+});
+
+document.getElementById('totalCount').textContent = totalItems;
+
+function toggleItem(cb) {
+  cb.closest('.item').classList.toggle('checked', cb.checked);
+  updateCount();
+}
+
+function updateCount() {
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+  document.getElementById('checkedCount').textContent = checked;
+}
+
+function selectAll() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; cb.closest('.item').classList.add('checked'); });
+  updateCount();
+}
+
+function deselectAll() {
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; cb.closest('.item').classList.remove('checked'); });
+  updateCount();
+}
+
+function selectCategory(btn) {
+  const cats = data.map(d => d.cat);
+  const current = btn.dataset.currentCat || 0;
+  const idx = parseInt(current);
+  const catName = cats[idx % cats.length];
+
+  // Toggle all in this category
+  const header = document.querySelector(`[data-cat-name="${catName}"]`);
+  if (header) {
+    const category = header.closest('.category');
+    const cbs = category.querySelectorAll('input[type="checkbox"]');
+    const allChecked = Array.from(cbs).every(cb => cb.checked);
+    cbs.forEach(cb => { cb.checked = !allChecked; cb.closest('.item').classList.toggle('checked', !allChecked); });
+  }
+
+  btn.textContent = `Toggle: ${cats[(idx + 1) % cats.length]}`;
+  btn.dataset.currentCat = (idx + 1) % cats.length;
+  updateCount();
+}
+
+function exportForAI() {
+  const lines = ['---','export: nitty-gritty-workshop','date: ' + new Date().toISOString().split('T')[0],'---',''];
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked');
+
+  if (checked.length === 0) {
+    alert('No items selected!');
+    return;
+  }
+
+  let currentCat = '';
+
+  // Group by category
+  data.forEach(section => {
+    const catItems = [];
+    section.items.forEach(([num, text]) => {
+      const cb = document.getElementById(`item-${num}`);
+      if (cb && cb.checked) {
+        const note = document.querySelector(`textarea[data-num="${num}"]`).value.trim();
+        catItems.push({ num, text, note });
+      }
+    });
+
+    if (catItems.length > 0) {
+      lines.push(`## ${section.cat}`);
+      catItems.forEach(item => {
+        lines.push(`- [x] #${item.num}: ${item.text}${item.note ? ` | NOTE: ${item.note}` : ''}`);
+      });
+      lines.push('');
+    }
+  });
+
+  lines.push(`**Total selected: ${checked.length} / ${totalItems}**`);
+
+  const output = lines.join('\n');
+  navigator.clipboard.writeText(output).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Export for AI'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
