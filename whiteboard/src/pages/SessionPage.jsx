@@ -153,6 +153,17 @@ export default function SessionPage() {
                 </div>
               </div>
             </div>
+            <div className={s.guideChecklist}>
+              <div className={s.guideChecklistTitle}>After you paste, Claude will:</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Summarize your approvals, rejections, and feedback</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Discuss each feedback item with you</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> List all planned actions for your confirmation</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Update Notion requirements</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Add onboarding data points if needed</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Update the prototype if needed</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Create follow-up sessions</div>
+              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Mark this session complete</div>
+            </div>
           </div>
         )}
         {!guideOpen && (
