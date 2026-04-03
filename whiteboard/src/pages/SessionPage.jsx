@@ -150,19 +150,19 @@ export default function SessionPage() {
                 <span className={s.guideNum}>4</span>
                 <div>
                   <strong>Paste into Claude Code</strong> (in the <code>bam-os-requirements</code> repo). Claude will walk through your feedback with you, confirm what actions to take, then update Notion, the prototype, and create any follow-up sessions.
+                  <div className={s.guideChecklist}>
+                    <div className={s.guideChecklistTitle}>After you paste, Claude will:</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>1</span> Summarize your approvals, rejections, and feedback</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>2</span> Discuss each feedback item with you</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>3</span> List all planned actions for your confirmation</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>4</span> Update Notion requirements</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>5</span> Add onboarding data points if needed</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>6</span> Update the prototype if needed</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>7</span> Create follow-up sessions</div>
+                    <div className={s.guideCheckItem}><span className={s.guideCheckNum}>8</span> Mark this session complete</div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className={s.guideChecklist}>
-              <div className={s.guideChecklistTitle}>After you paste, Claude will:</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Summarize your approvals, rejections, and feedback</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Discuss each feedback item with you</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> List all planned actions for your confirmation</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Update Notion requirements</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Add onboarding data points if needed</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Update the prototype if needed</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Create follow-up sessions</div>
-              <div className={s.guideCheckItem}><span className={s.guideCheckBox} /> Mark this session complete</div>
             </div>
           </div>
         )}
