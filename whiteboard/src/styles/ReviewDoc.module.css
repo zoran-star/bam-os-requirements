@@ -163,6 +163,15 @@
 .feedback input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(200,168,78,0.10); }
 .hasText { border-color: var(--warn) !important; background: rgba(224,157,36,0.06) !important; }
 
+.subFeedback { margin-top: 8px; }
+.subFeedback input {
+  width: 100%; font-family: var(--ff); font-size: 12px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surf2);
+  color: var(--tp); outline: none; transition: border-color 0.15s ease;
+}
+.subFeedback input::placeholder { color: var(--tm); font-style: italic; }
+.subFeedback input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(200,168,78,0.10); }
+
 .sectionFeedback {
   background: var(--surf); border: 1px solid var(--border); border-radius: 10px;
   padding: 14px 18px; margin-top: 24px;

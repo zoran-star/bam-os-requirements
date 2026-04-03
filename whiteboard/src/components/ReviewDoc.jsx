@@ -211,12 +211,23 @@ export default function ReviewDoc({ sectionData, sessionId, sessionDescription, 
                 })}
               </div>
             )}
+
+            {/* Per-subsection notes */}
+            <div className={s.subFeedback}>
+              <input
+                type="text"
+                placeholder={`Notes on ${sub.title || 'this section'}...`}
+                value={state[`_sub_${sub.title}`] || ''}
+                onChange={e => onStateChange(prev => ({ ...prev, [`_sub_${sub.title}`]: e.target.value }))}
+                className={state[`_sub_${sub.title}`] ? s.hasText : ''}
+              />
+            </div>
           </div>
         )
       })}
 
       <div className={s.sectionFeedback}>
-        <label>Overall feedback on this section</label>
+        <label>Overall feedback on this session</label>
         <textarea
           placeholder="Anything missing, unclear, or that should be reorganized?"
           value={state._sectionFeedback || ''}
