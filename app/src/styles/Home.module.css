@@ -51,6 +51,15 @@
 .cmdBell:hover{border-color:var(--gold);color:var(--gold);background:var(--gglow)}
 .cmdBellBadge{position:absolute;top:-4px;right:-4px;background:var(--red);color:#fff;font-family:var(--fm);font-size:9px;font-weight:700;width:16px;height:16px;border-radius:9999px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
 
+/* ═══ MILESTONE CELEBRATION ═══ */
+.milestone{position:relative;display:flex;align-items:center;gap:16px;padding:16px 20px;background:linear-gradient(135deg,rgba(62,175,92,0.08),rgba(200,168,78,0.06));border:1px solid rgba(62,175,92,0.2);border-radius:16px;margin-bottom:14px;animation:fadeIn 0.4s ease}
+.milestoneClose{position:absolute;top:8px;right:12px;background:none;border:none;font-size:18px;color:var(--tm);cursor:pointer;line-height:1}
+.milestoneClose:hover{color:var(--tp)}
+.milestoneIcon{font-size:28px;flex-shrink:0}
+.milestoneBody{flex:1}
+.milestoneTitle{font-size:15px;font-weight:800;color:var(--green)}
+.milestoneSub{font-size:12px;color:var(--ts);margin-top:2px;line-height:1.5}
+
 /* ═══ HERO ROW ═══ */
 .heroRow{display:grid;grid-template-columns:1fr 1fr;gap:14px;animation:fadeIn 0.5s ease 0.05s backwards}
 

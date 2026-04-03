@@ -255,7 +255,7 @@ export default function Home() {
   const [loaded, setLoaded] = useState(false);
   const [introText, setIntroText] = useState('');
   const [introFading, setIntroFading] = useState(false);
-  const [milestoneVisible, setMilestoneVisible] = useState(false);
+  const [milestoneVisible, setMilestoneVisible] = useState(true);
   const [milestonePhase, setMilestonePhase] = useState('ring');
   const [challengeDismissed, setChallengeDismissed] = useState(false);
   const [sageExpanded, setSageExpanded] = useState(false);
@@ -277,6 +277,9 @@ export default function Home() {
   const locationLabel = activeLocation === 'all' ? '' : ` · ${activeLocation.charAt(0).toUpperCase() + activeLocation.slice(1)}`;
   const typewriterText = useTypewriter(ADVISOR_PROMPTS);
   const actionCount = useCountUp(7);
+  const aiActionCount = useCountUp(47);
+  const streakCount = 12;
+  const avgActions = 5.2;
   const sageInputRef = useRef(null);
   const canvasRef = useRef(null);
   useBannerCanvas(canvasRef);
@@ -440,9 +443,19 @@ export default function Home() {
             </select>
           </div>
           <div className={s.cmdChip} onClick={() => setSageExpanded(true)}>
-            <span className={s.cmdChipDot} style={{ background: 'var(--green)' }} />
+            <span className={s.cmdChipDot} style={{ background: actionCount >= avgActions ? 'var(--green)' : 'var(--warn)' }} />
             <span className={s.cmdChipValue}>{actionCount}</span>
-            <span className={s.cmdChipLabel}>actions today</span>
+            <span className={s.cmdChipLabel}>actions <span style={{ color: 'var(--tm)', fontWeight: 400 }}>vs {avgActions} avg</span></span>
+          </div>
+          <div className={s.cmdChip}>
+            <span className={s.cmdChipDot} style={{ background: 'var(--blue)' }} />
+            <span className={s.cmdChipValue}>{aiActionCount}</span>
+            <span className={s.cmdChipLabel}>AI actions</span>
+          </div>
+          <div className={s.cmdChip}>
+            <span className={s.cmdChipDot} style={{ background: '#f59e0b' }} />
+            <span className={s.cmdChipValue}>{streakCount}d</span>
+            <span className={s.cmdChipLabel}>streak</span>
           </div>
           <div className={s.cmdChip}>
             <span className={s.cmdChipDot} style={{ background: 'var(--gold)' }} />
