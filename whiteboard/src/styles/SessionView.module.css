@@ -31,6 +31,7 @@
   background: rgba(200,168,78,0.12); color: var(--gold);
   border-color: rgba(200,168,78,0.3);
 }
+.lastUpdated { font-size: 10px; color: var(--tm); font-family: var(--fm); margin-left: 4px; }
 .right { display: flex; align-items: center; gap: 8px; }
 .progress { display: flex; align-items: center; gap: 10px; }
 .track { width: 120px; height: 5px; background: var(--surf3); border-radius: 9999px; overflow: hidden; }

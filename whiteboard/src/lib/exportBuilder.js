@@ -10,7 +10,7 @@ export function buildExport(session, items, state) {
   })
 
   let md = `---\nsession: ${session.sessionId}\nexported: ${date}\n---\n\n`
-  md += `# BAM OS Onboarding — ${session.title}\n`
+  md += `# Full Control Planning — ${session.title}\n`
   md += `**Exported:** ${date}\n`
   md += `**Approved:** ${approved} | **Has feedback:** ${withFeedback} | **Pending:** ${pending}\n\n`
 

@@ -36,6 +36,7 @@ export default async function handler(req, res) {
         sectionNumber: page.properties['Section Number']?.number || 0,
         sessionType: page.properties['Session Type']?.select?.name || '',
         completedDate: page.properties['Completed Date']?.date?.start || null,
+        lastUpdated: page.last_edited_time?.substring(0, 10) || null,
         sectionData,
       }
 

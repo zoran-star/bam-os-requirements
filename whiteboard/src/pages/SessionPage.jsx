@@ -111,6 +111,7 @@ export default function SessionPage() {
               </button>
             ))}
           </div>
+          {session.lastUpdated && <span className={s.lastUpdated}>Updated {session.lastUpdated}</span>}
         </div>
         <div className={s.right}>
           <div className={s.progress}>

@@ -17,7 +17,7 @@ export default function Header({ sessions = [], onBacklogClick }) {
     <header className={s.header}>
       <div className={s.left}>
         <div>
-          <div className={s.title}>BAM <span className={s.gold}>OS</span> Onboarding</div>
+          <div className={s.title}>Full <span className={s.gold}>Control</span> Planning</div>
           <div className={s.subtitle}>Session Whiteboard</div>
         </div>
       </div>
