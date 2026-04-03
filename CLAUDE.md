@@ -109,29 +109,54 @@ After Claude executes, check that: Notion pages were updated, prototype changes 
 
 ### Processing whiteboard session exports
 
-When a user pastes a session export from the whiteboard (starts with `---\nsession: SES-XXX-slug`), this is a **blocking trigger** — process it immediately using the steps below.
+When a user pastes a session export from the whiteboard (starts with `---\nsession: SES-XXX-slug`), this is a **blocking trigger** — process it immediately using the 6-step process below.
+
+**At the end of EVERY message during this process, display a progress tracker like this:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 SESSION PROCESSING — SES-XXX-title
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1: Parse & Summarize    ✅
+Step 2: Discuss Feedback      ✅ 
+Step 3: Confirm Actions       ⬅️ YOU ARE HERE
+Step 4: Execute               ⬜
+Step 5: Mark Complete         ⬜
+Step 6: Next Steps            ⬜
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👉 TO MOVE FORWARD: [specific action needed from user]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Always show completed steps with ✅, current step with ⬅️ YOU ARE HERE, and remaining steps with ⬜. The "TO MOVE FORWARD" line tells the user exactly what they need to do next.
+
+---
 
 **Step 1: Parse and summarize**
 - Parse the YAML frontmatter to get the session ID and title
-- Count items by status: approved, feedback, pending/skipped
-- Present a brief summary to the user: "SES-020: 15 approved, 8 with feedback, 6 skipped"
+- Count items by status: approved, feedback, rejected, pending/skipped
+- Present a brief summary: "SES-020: 15 approved, 8 with feedback, 5 rejected, 2 skipped"
+- TO MOVE FORWARD: Automatic — proceed to Step 2 immediately.
 
 **Step 2: Walk through feedback items with the user**
 - For each item with feedback, show the item title and the user's feedback
 - Discuss what the feedback means — ask clarifying questions if needed
 - Agree on the concrete action: update a requirement, create a new session, modify the prototype, or no action
+- Ask about pending/skipped items — are they rejected or just unreviewed?
 - This is a conversation — don't just process silently. The user wants to talk through their decisions.
+- TO MOVE FORWARD: User confirms all feedback items are discussed and all open questions are answered.
 
 **Step 3: Confirm before executing**
 After discussing all feedback items, present a confirmation checklist with ALL 5 categories below. Do not skip any category — if nothing applies, explicitly say "Nothing here."
 
 1. **Sessions to create** — List every new session to be created from feedback. Include title and what it covers.
 2. **Onboarding Data** — What data points need to be added to the Onboarding Data Points DB? This includes not just owner-typed fields (Business Name, Selling Points) but also **configuration settings that power automated workflows** — timers, thresholds, channel preferences, cadence settings, defaults. Ask yourself: "Are there any settings, defaults, thresholds, or config values that need to be set during onboarding for this feature to work?" If nothing, say "Nothing to add here."
-3. **Notion updates** — What changes to Business Requirements pages, Working Memory, or other Notion pages? Be specific: which page, which job IDs added/changed.
-4. **Prototype updates** — What changes to the prototype (app/src/)? Which page/component, what's being added/changed. If nothing, say "Nothing to change here."
+3. **Notion updates** — What changes to Business Requirements pages, Working Memory, or other Notion pages? Be specific: which page, which job IDs added/changed. Remember: if the prototype was updated, nudge about updating Notion too (and vice versa).
+4. **Prototype updates** — What changes to the prototype (app/src/)? Which page/component, what's being added/changed. If nothing, say "Nothing to change here." Remember: if Notion was updated, nudge about updating the prototype too (and vice versa).
 5. **Other actions** — Git commits, deployments, backlog items, marking session complete, etc.
 
 **Wait for the user to confirm before executing anything.** Do not start updating Notion, writing code, or creating sessions until the user says go. They may want to adjust, add, or remove actions from the list.
+- TO MOVE FORWARD: User confirms the checklist ("go ahead", "confirmed", "execute", etc.)
 
 **Step 4: Execute confirmed actions**
 Only after user confirmation, execute the agreed actions. Categories:
@@ -142,23 +167,29 @@ Only after user confirmation, execute the agreed actions. Categories:
 - **Update the prototype** (`app/src/`) — If the user wants to build something now, make the changes to the Vite/React prototype.
 - **Create follow-up sessions** — If new topics surfaced during discussion, create new session cards in the Sessions DB (`4e5492be5027427cbbc8994bcd73905c`) with Status: "To Do", Type: "Follow-up", and populated SECTION Data. Use the Node script approach for writing SECTION Data (JSON chunked into 1900-char rich_text segments).
 - **Update Working Memory** — If significant decisions were made, update the Working Memory page in Notion.
+- TO MOVE FORWARD: Automatic — proceed to Step 5 after all actions complete.
 
 **Step 5: Mark session complete**
 - Update the session's Status to "Complete" in the Sessions DB
 - Set Completed Date to today
+- Update SECTION Data with final decisions (approved/rejected/feedback statuses and feedback text)
 - Confirm with the user: "SES-020 marked complete. Here's what was done: [summary]"
+- TO MOVE FORWARD: Automatic — proceed to Step 6.
 
 **Step 6: Suggest next steps**
 - Are there related sessions to create?
 - Are there prototype updates to make based on the decisions?
 - Are there Notion pages that need updating?
+- Does the prototype and Notion still need to be synced on anything?
 - Present these as options, don't just do them.
+- TO MOVE FORWARD: User chooses what to work on next, or ends the session.
 
 **Important rules:**
 - Always separate **data points** (→ Onboarding Data Points DB) from **features** (→ Business Requirements pages)
 - Never skip the conversation step (#2) — the user wants to discuss, not just have things auto-processed
 - If Notion MCP times out on large pages, use the direct API via Node script (see `whiteboard/.env.production` for credentials)
 - Commit and push changes after making edits so collaborators get them immediately
+- The progress tracker MUST appear at the end of every message during session processing — no exceptions
 
 ### What counts as onboarding data
 
