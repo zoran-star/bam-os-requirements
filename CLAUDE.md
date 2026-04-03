@@ -101,13 +101,13 @@ When a user pastes a session export from the whiteboard (starts with `---\nsessi
 - This is a conversation — don't just process silently. The user wants to talk through their decisions.
 
 **Step 3: Confirm before executing**
-After discussing all feedback items, present a clear summary of every action you plan to take. List them all out:
+After discussing all feedback items, present a confirmation checklist with ALL 5 categories below. Do not skip any category — if nothing applies, explicitly say "Nothing here."
 
-- What will be updated in Notion (which pages, what changes)
-- What Backlog items will be created
-- What prototype changes will be made
-- What follow-up sessions will be created
-- Whether the session will be marked complete
+1. **Sessions to create** — List every new session to be created from feedback. Include title and what it covers.
+2. **Onboarding Data** — What data points need to be added to the Onboarding Data Points DB? This includes not just owner-typed fields (Business Name, Selling Points) but also **configuration settings that power automated workflows** — timers, thresholds, channel preferences, cadence settings, defaults. Ask yourself: "Are there any settings, defaults, thresholds, or config values that need to be set during onboarding for this feature to work?" If nothing, say "Nothing to add here."
+3. **Notion updates** — What changes to Business Requirements pages, Working Memory, or other Notion pages? Be specific: which page, which job IDs added/changed.
+4. **Prototype updates** — What changes to the prototype (app/src/)? Which page/component, what's being added/changed. If nothing, say "Nothing to change here."
+5. **Other actions** — Git commits, deployments, backlog items, marking session complete, etc.
 
 **Wait for the user to confirm before executing anything.** Do not start updating Notion, writing code, or creating sessions until the user says go. They may want to adjust, add, or remove actions from the list.
 
