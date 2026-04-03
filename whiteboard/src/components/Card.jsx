@@ -30,10 +30,11 @@ export default function Card({ session, onUpdate }) {
       </div>
       <div className={s.title}>{session.title}</div>
       <div className={s.desc}>{session.description}</div>
-      <div className={s.dates}>
-        {session.lastUpdated && <span className={s.date}>Updated {session.lastUpdated}</span>}
-        {session.completedDate && <span className={s.dateCompleted}>Completed {session.completedDate}</span>}
-      </div>
+      {session.status === 'Complete' && session.completedDate && (
+        <div className={s.dates}>
+          <span className={s.dateCompleted}>Completed {session.completedDate}</span>
+        </div>
+      )}
       <div className={s.bottom}>
         <span className={`${s.pill} ${s.pillType}`}>{session.sessionType}</span>
         {OWNERS.map(name => {

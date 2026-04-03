@@ -52,7 +52,7 @@ export default function SessionPage() {
   const reviewed = useMemo(() => {
     return allItems.filter(item => {
       const s = state[item.id]
-      return s && (s.checked || (s.feedback && s.feedback.trim()))
+      return s && (s.checked || s.rejected || (s.feedback && s.feedback.trim()))
     }).length
   }, [allItems, state])
 
