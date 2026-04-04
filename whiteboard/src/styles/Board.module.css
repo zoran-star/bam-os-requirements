@@ -29,7 +29,14 @@
   .board { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
-  .board { padding: 12px; gap: 12px; }
-  .column { padding: 12px; border-radius: 12px; }
+  .board {
+    display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px; gap: 12px;
+  }
+  .column {
+    flex: 0 0 85vw; scroll-snap-align: start;
+    padding: 12px; border-radius: 12px; min-height: 60vh;
+  }
   .columnTitle { font-size: 12px; }
 }
