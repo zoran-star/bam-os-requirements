@@ -398,16 +398,25 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
 .scale-note{font-size:14px;color:var(--g400);margin-top:24px;line-height:1.6;max-width:540px}
 
 /* ═══════════════════════════════════════════
-   TEAM
+   TEAM (expandable cards)
    ═══════════════════════════════════════════ */
 .team-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:48px}
 @media(max-width:600px){.team-grid{grid-template-columns:1fr}}
-.team-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease)}
-.team-card:hover{border-color:var(--card-hover-border);transform:translateY(-2px)}
-.team-card-header{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.team-card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;padding:28px 24px;transition:all .3s var(--ease);cursor:pointer}
+.team-card:hover{border-color:var(--card-hover-border)}
+.team-card.expanded{border-color:rgba(200,168,78,0.25);grid-column:1/-1}
+.team-card-header{display:flex;align-items:center;gap:14px;margin-bottom:0}
+.team-card.expanded .team-card-header{margin-bottom:12px}
 .team-avatar{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-l));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#111;flex-shrink:0}
 .team-card-header h3{font-size:16px;font-weight:700;color:var(--white);line-height:1.2}
 .team-card-header span{font-size:12px;font-weight:500;color:var(--accent);display:block;margin-top:2px}
+.team-card-oneliner{font-size:13px;color:var(--g500);margin-top:8px;line-height:1.4;display:block}
+.team-card.expanded .team-card-oneliner{display:none}
+.team-card-toggle{font-size:11px;color:rgba(200,168,78,0.5);margin-left:auto;transition:transform 0.25s ease;flex-shrink:0}
+.team-card.expanded .team-card-toggle{transform:rotate(90deg)}
+.team-card-body{max-height:0;overflow:hidden;transition:max-height 0.4s ease}
+.team-card.expanded .team-card-body{max-height:2000px}
+.team-card-body p{font-size:13px;color:var(--g400);line-height:1.55}
 .team-card p{font-size:13px;color:var(--g400);line-height:1.55}
 
 /* ═══════════════════════════════════════════
@@ -1159,53 +1168,124 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
-     FOUNDER STORY — THE PERSONAL NARRATIVE
+     THE TEAM
      ═══════════════════════════════════════════ -->
-<section class="founder-story" id="founderStory">
+<section class="founder-story" id="teamSection">
   <div class="w">
-    <div class="sec-label rv">Our story</div>
+    <div class="sec-label rv">The team</div>
     <h2 class="sec-title rv rv-d1">Built from experience,<br>not assumptions</h2>
 
-    <div class="founder-intro rv rv-d2">
-      <div class="founder-avatar-lg">Z</div>
-      <div>
-        <div class="founder-name-lg">Zoran Savic</div>
-        <div class="founder-role-lg">Co-Founder &middot; Product & Technology</div>
-        <p class="founder-bio">I've been obsessed with systems my entire life &mdash; Legos, Minecraft, chess, robotics, programming. I studied <strong>math at Waterloo</strong> and <strong>business at Laurier</strong>, played varsity basketball for both, then saw how enterprise systems work at scale at <strong>Deloitte's Payments practice</strong>. When I started my own academy, Eastern European parents meant quitting my corporate job wasn't an option &mdash; so I was forced to systemize everything. Within a year, it ran without me. That's when I realized: every operator wants this. They don't have the time, and they'd rather put every dollar toward paying the people on the ground. So I built FullControl.</p>
-      </div>
-    </div>
+    <div class="team-grid">
 
-    <div class="f-timeline rv rv-d3">
-      <div class="f-tl-item">
-        <div class="f-tl-dot"></div>
-        <div class="f-tl-year">University</div>
-        <div class="f-tl-title">Waterloo + Laurier Double Degree & Varsity Basketball</div>
-        <div class="f-tl-desc">Waterloo is one of the top math schools in the world &mdash; half my program didn't make it to the end, but quitting wasn't an option. Balancing a math degree, a business degree, and varsity basketball at two universities forced me to manage multiple high-stakes priorities at a level most people never have to. That's where the discipline came from.</div>
+      <!-- ZORAN -->
+      <div class="team-card rv rv-d1" onclick="this.classList.toggle('expanded')">
+        <div class="team-card-header">
+          <div class="team-avatar">ZS</div>
+          <div><h3>Zoran Savic</h3><span>Co-Founder &middot; Product &amp; Technology</span></div>
+          <div class="team-card-toggle">&#9654;</div>
+        </div>
+        <div class="team-card-oneliner">Waterloo &amp; Laurier &rarr; Deloitte &rarr; Academy founder &rarr; FullControl architect</div>
+        <div class="team-card-body">
+          <p style="margin-top:12px">I've been obsessed with systems my entire life &mdash; Legos, Minecraft, chess, robotics, programming. I studied <strong style="color:var(--white)">math at Waterloo</strong> and <strong style="color:var(--white)">business at Laurier</strong>, played varsity basketball for both, then saw how enterprise systems work at scale at <strong style="color:var(--white)">Deloitte's Payments practice</strong>. When I started my own academy, Eastern European parents meant quitting my corporate job wasn't an option &mdash; so I was forced to systemize everything. Within a year, it ran without me. That's when I realized: every operator wants this.</p>
+          <div class="f-timeline" style="margin-top:24px">
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
+              <div class="f-tl-year">University</div>
+              <div class="f-tl-title">Waterloo + Laurier Double Degree &amp; Varsity Basketball</div>
+              <div class="f-tl-desc">Waterloo is one of the top math schools in the world &mdash; half my program didn't make it to the end, but quitting wasn't an option. Balancing a math degree, a business degree, and varsity basketball at two universities forced me to manage multiple high-stakes priorities at a level most people never have to.</div>
+            </div>
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
+              <div class="f-tl-year">Deloitte</div>
+              <div class="f-tl-title">Consultant &mdash; Payments Practice, Toronto</div>
+              <div class="f-tl-desc">Worked alongside leaders of a major enterprise project, seeing how high-functioning teams across major financial institutions planned, collaborated, and built country-wide software platforms.</div>
+            </div>
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
+              <div class="f-tl-year">Operator</div>
+              <div class="f-tl-title">Founded &amp; Ran a Basketball Training Business</div>
+              <div class="f-tl-desc">Built it from scratch &mdash; scheduling, billing, member management, marketing, coaching. Used 6+ fragmented tools. The gap between what existed and what I needed is where FullControl was born.</div>
+            </div>
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
+              <div class="f-tl-year">BAM Business</div>
+              <div class="f-tl-title">Co-Founded By Any Means Business</div>
+              <div class="f-tl-desc">In 6 months, worked with 30+ academies to help them grow across marketing, social media, strategy, and operations. Learned that every academy owner's goal is the same &mdash; focus on the human side and stop drowning in admin.</div>
+            </div>
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
+              <div class="f-tl-year">Now</div>
+              <div class="f-tl-title">Building FullControl &mdash; The AI Command Center</div>
+              <div class="f-tl-desc">Combining everything &mdash; analytical training from Waterloo, enterprise systems thinking from Deloitte, and the raw operator pain from running a real business.</div>
+            </div>
+          </div>
+          <div class="credential-tags" style="margin-top:16px">
+            <span class="credential-tag">&#127891; Waterloo + Laurier</span>
+            <span class="credential-tag">&#127970; Deloitte</span>
+            <span class="credential-tag">&#127936; D1 Athlete</span>
+            <span class="credential-tag">&#127947;&#65039; Academy Founder</span>
+          </div>
+        </div>
       </div>
-      <div class="f-tl-item">
-        <div class="f-tl-dot"></div>
-        <div class="f-tl-year">Deloitte</div>
-        <div class="f-tl-title">Consultant &mdash; Payments Practice, Toronto</div>
-        <div class="f-tl-desc">Worked alongside leaders of a major enterprise project, seeing how high-functioning, high-responsibility teams across major financial institutions and quasi-governmental organizations planned, collaborated, and built country-wide software platforms. I use the same project management strategies to lead FullControl today.</div>
+
+      <!-- COLEMAN -->
+      <div class="team-card rv rv-d2" onclick="this.classList.toggle('expanded')">
+        <div class="team-card-header">
+          <div class="team-avatar">CA</div>
+          <div><h3>Coleman Ayers</h3><span>Co-Founder &middot; Brand, Operations &amp; Strategy</span></div>
+          <div class="team-card-toggle">&#9654;</div>
+        </div>
+        <div class="team-card-oneliner">CEO of By Any Means Basketball &mdash; 500K+ followers, 5 locations, 10K+ athletes</div>
+        <div class="team-card-body">
+          <p style="margin-top:12px">CEO of <strong style="color:var(--white)">By Any Means Basketball</strong> &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
+          <div class="credential-tags" style="margin-top:16px">
+            <span class="credential-tag">&#128241; 500K+ Followers</span>
+            <span class="credential-tag">&#127936; 7 Years Operating</span>
+            <span class="credential-tag">&#127970; Own Gym</span>
+            <span class="credential-tag">&#127760; National Network</span>
+          </div>
+        </div>
       </div>
-      <div class="f-tl-item">
-        <div class="f-tl-dot"></div>
-        <div class="f-tl-year">Operator</div>
-        <div class="f-tl-title">Founded & Ran a Basketball Training Business</div>
-        <div class="f-tl-desc">Built it from scratch &mdash; scheduling, billing, member management, marketing, coaching. Became obsessed with systemizing every part of the operation so I could have the freedom to just show up to training and not touch anything else. Used 6+ fragmented tools trying to make that happen. The gap between what existed and what I needed is where FullControl was born.</div>
+
+      <!-- MIKE -->
+      <div class="team-card rv rv-d3" onclick="this.classList.toggle('expanded')">
+        <div class="team-card-header">
+          <div class="team-avatar">M</div>
+          <div><h3>Mike</h3><span>Sales</span></div>
+          <div class="team-card-toggle">&#9654;</div>
+        </div>
+        <div class="team-card-oneliner">Driving sales strategy and academy owner relationships</div>
+        <div class="team-card-body">
+          <p style="margin-top:12px;color:var(--g500);font-style:italic">Bio coming soon &mdash; ask Mike the team questions.</p>
+        </div>
       </div>
-      <div class="f-tl-item">
-        <div class="f-tl-dot"></div>
-        <div class="f-tl-year">BAM Business</div>
-        <div class="f-tl-title">Co-Founded By Any Means Business</div>
-        <div class="f-tl-desc">In 6 months, we worked with 30+ basketball academies to help them grow across marketing, social media, strategy, and operations. My focus was designing and leading a team to implement systems for each business. It's where I learned that every academy owner's goal is the same as mine &mdash; to focus on the human side of the business and stop drowning in admin. I helped them get one step closer to that. FullControl is the missing overarching piece.</div>
+
+      <!-- CAM -->
+      <div class="team-card rv rv-d4" onclick="this.classList.toggle('expanded')">
+        <div class="team-card-header">
+          <div class="team-avatar">C</div>
+          <div><h3>Cam</h3><span>Content &amp; Branding</span></div>
+          <div class="team-card-toggle">&#9654;</div>
+        </div>
+        <div class="team-card-oneliner">Shaping the FullControl brand and content strategy</div>
+        <div class="team-card-body">
+          <p style="margin-top:12px;color:var(--g500);font-style:italic">Bio coming soon &mdash; ask Cam the team questions.</p>
+        </div>
       </div>
-      <div class="f-tl-item">
-        <div class="f-tl-dot"></div>
-        <div class="f-tl-year">Now</div>
-        <div class="f-tl-title">Building FullControl &mdash; The AI Command Center</div>
-        <div class="f-tl-desc">Combining everything &mdash; analytical training from Waterloo, enterprise systems thinking from Deloitte, and the raw operator pain from running a real business. Building the tool I wish existed.</div>
+
+      <!-- DANNY -->
+      <div class="team-card rv rv-d5" onclick="this.classList.toggle('expanded')">
+        <div class="team-card-header">
+          <div class="team-avatar">D</div>
+          <div><h3>Danny</h3><span>Developer</span></div>
+          <div class="team-card-toggle">&#9654;</div>
+        </div>
+        <div class="team-card-oneliner">Building the FullControl platform</div>
+        <div class="team-card-body">
+          <p style="margin-top:12px;color:var(--g500);font-style:italic">Bio coming soon &mdash; ask Danny the team questions.</p>
+        </div>
       </div>
+
     </div>
   </div>
 </section>
@@ -1231,21 +1311,11 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   <div class="w">
     <div class="sec-label rv">Why us</div>
     <h2 class="sec-title rv rv-d1">Built from the field,<br>not from a whiteboard</h2>
-    <p class="sec-sub rv rv-d2">We don't just build software for this industry &mdash; we operate in it. We've helped businesses scale from 2x to 10x in ARR and systemize their operations to cut 30&ndash;40 hours a week of manual work.</p>
-    <ul class="why-list rv rv-d2" style="max-width:640px;margin-top:24px">
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Running academies ourselves and consulting for 20+ others across all stages</li>
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Proven systems that have already helped these businesses grow</li>
-      <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Direct access to early users and real operator feedback</li>
-    </ul>
-    <div class="result-pills rv rv-d3">
-      <div class="result-pill">2x&ndash;10x ARR growth</div>
-      <div class="result-pill">30&ndash;40 hrs/week saved</div>
-      <div class="result-pill">20+ academies consulted</div>
-      <div class="result-pill">Live prototype tested with operators</div>
-    </div>
+    <p class="sec-sub rv rv-d2">We don&rsquo;t just build software for this industry &mdash; we operate in it. We co-founded By Any Means Business and in just 6 months &mdash; during a typical down period for the industry &mdash; worked with 30+ academies across marketing, social media, strategy, and operations, helping them scale from 2x to 10x in ARR and cut 30&ndash;40 hours a week of manual work.</p>
+    <p class="sec-sub rv rv-d3" style="max-width:640px;margin-top:20px">Across every engagement, we heard the same thing: owners wanted to focus on the human side of their business and stop drowning in admin. We helped them get closer with custom systems &mdash; but every academy needed the same things built from scratch. FullControl is the product that replaces all of that.</p>
     <div class="testimonial-grid rv rv-d4">
       <div class="testimonial-card">
-        <p class="testimonial-quote">In just 18 months of being with By Any Means, business has been awesome&hellip; They've become the backbone of what I do&hellip; it frees me up to do what I do: coach basketball, and I've taken a $2,000/month side hustle to $20k a month.</p>
+        <p class="testimonial-quote">In just 18 months of working with By Any Means Business, things have been awesome&hellip; They've become the backbone of what I do&hellip; it frees me up to do what I do: coach basketball, and I've taken a $2,000/month side hustle to $20k a month.</p>
         <div class="testimonial-author">Brantley Osborne</div>
         <div class="testimonial-role">By Any Means West Virginia Academy</div>
       </div>
@@ -1260,45 +1330,6 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 
 <div class="div-line"></div>
 
-<!-- ═══════════════════════════════════════════
-     TEAM
-     ═══════════════════════════════════════════ -->
-<section id="teamSection">
-  <div class="w">
-    <div class="sec-label rv">Team</div>
-    <h2 class="sec-title rv rv-d1">Founders with experience</h2>
-    <div class="team-grid">
-      <div class="team-card rv rv-d1">
-        <div class="team-card-header">
-          <div class="team-avatar">ZS</div>
-          <div><h3>Zoran Savic</h3><span>Co-Founder &middot; Product & Technology</span></div>
-        </div>
-        <p>Math/BBA double degree from <strong style="color:var(--white)">Waterloo &amp; Laurier</strong>. Former consultant in <strong style="color:var(--white)">Deloitte's Payments practice</strong> in Toronto. D1 university basketball player. Founded and ran a basketball academy &mdash; experienced every pain point firsthand. Designed the full FullControl product vision, UX system, and technical architecture.</p>
-        <div class="credential-tags" style="margin-top:14px">
-          <span class="credential-tag">🎓 Waterloo + Laurier</span>
-          <span class="credential-tag">🏢 Deloitte</span>
-          <span class="credential-tag">🏀 D1 Athlete</span>
-          <span class="credential-tag">🏋️ Academy Founder</span>
-        </div>
-      </div>
-      <div class="team-card rv rv-d2">
-        <div class="team-card-header">
-          <div class="team-avatar">CA</div>
-          <div><h3>Coleman Ayers</h3><span>Co-Founder &middot; Brand, Operations & Strategy</span></div>
-        </div>
-        <p>CEO of <strong style="color:var(--white)">By Any Means Basketball</strong> &mdash; 500K+ followers, one of the most recognized brands in basketball training. Opened his own gym in 2021 and has been running academies across the country for 7 years. Deep operator network and direct distribution to day-one users.</p>
-        <div class="credential-tags" style="margin-top:14px">
-          <span class="credential-tag">📱 500K+ Followers</span>
-          <span class="credential-tag">🏀 7 Years Operating</span>
-          <span class="credential-tag">🏢 Own Gym</span>
-          <span class="credential-tag">🌐 National Network</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
      MOAT
@@ -1460,11 +1491,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 <!-- FLOATING DOT NAV -->
 <div class="dot-nav" id="dotNav">
   <div class="dot-nav-item" data-section="mission"><span class="dot-nav-label">Mission</span></div>
-  <div class="dot-nav-item" data-section="founderStory"><span class="dot-nav-label">Our Story</span></div>
+  <div class="dot-nav-item" data-section="teamSection"><span class="dot-nav-label">The Team</span></div>
   <div class="dot-nav-item" data-section="problem"><span class="dot-nav-label">Problem</span></div>
   <div class="dot-nav-item" data-section="solution"><span class="dot-nav-label">Solution</span></div>
   <div class="dot-nav-item" data-section="market"><span class="dot-nav-label">Market</span></div>
-  <div class="dot-nav-item" data-section="teamSection"><span class="dot-nav-label">Team</span></div>
   <div class="dot-nav-item" data-section="moatSection"><span class="dot-nav-label">Moat</span></div>
   <div class="dot-nav-item" data-section="objectionsSection"><span class="dot-nav-label">Q&A</span></div>
   <div class="dot-nav-item" data-section="vision"><span class="dot-nav-label">Vision</span></div>
