@@ -26,3 +26,13 @@
 .btnOutline { background: transparent; border: 1px solid var(--borderm); color: var(--ts); }
 .btnOutline:hover { background: var(--surf3); }
 .btnTheme { background: transparent; border: 1px solid var(--borderm); color: var(--ts); padding: 7px 10px; font-size: 15px; line-height: 1; }
+
+@media (max-width: 600px) {
+  .header { flex-wrap: wrap; padding: 12px 16px; gap: 8px; }
+  .title { font-size: 16px; }
+  .subtitle { font-size: 11px; }
+  .right { width: 100%; justify-content: space-between; }
+  .counts { font-size: 11px; }
+  .btn { font-size: 12px; padding: 6px 10px; }
+  .btnTheme { padding: 6px 8px; font-size: 14px; }
+}

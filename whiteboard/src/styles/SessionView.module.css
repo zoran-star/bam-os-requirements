@@ -115,3 +115,25 @@
   opacity: 0; transition: all 0.3s ease; z-index: 200; pointer-events: none;
 }
 .toastShow { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 600px) {
+  .header { flex-wrap: wrap; padding: 12px 16px; gap: 8px; }
+  .left { flex-wrap: wrap; gap: 8px; }
+  .title { font-size: 15px; }
+  .id { font-size: 10px; }
+  .status { font-size: 10px; padding: 2px 8px; margin-left: 0; }
+  .ownerGroup { margin-left: 0; }
+  .lastUpdated { margin-left: 0; }
+  .right { width: 100%; justify-content: space-between; }
+  .progress { flex: 1; }
+  .track { width: 80px; }
+  .label { font-size: 10px; }
+  .btn { font-size: 12px; padding: 6px 10px; }
+  .container { padding: 16px 12px 60px; }
+  .guide { padding: 16px 18px; }
+  .guideStep { font-size: 12px; gap: 10px; }
+  .guideNum { width: 20px; height: 20px; font-size: 10px; }
+  .guideChecklist { padding: 10px 12px; }
+  .guideCheckItem { font-size: 11px; gap: 8px; }
+  .toast { font-size: 13px; padding: 10px 18px; }
+}

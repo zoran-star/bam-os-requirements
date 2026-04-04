@@ -44,3 +44,9 @@
   background: rgba(200,168,78,0.12); color: var(--gold);
   border-color: rgba(200,168,78,0.3);
 }
+
+@media (max-width: 600px) {
+  .card { padding: 12px 14px; border-radius: 10px; }
+  .title { font-size: 13px; }
+  .desc { font-size: 11px; }
+}

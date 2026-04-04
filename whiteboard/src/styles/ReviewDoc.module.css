@@ -189,3 +189,21 @@
   .feedback { width: 100%; }
   .decidedRow { flex-wrap: wrap; }
 }
+@media (max-width: 600px) {
+  .intro { padding: 16px; border-radius: 12px; }
+  .introTitle { font-size: 16px; }
+  .introDesc { font-size: 13px; }
+  .statusSummary { gap: 8px; font-size: 11px; }
+  .legend { padding: 8px 12px; font-size: 11px; }
+  .row { padding: 10px 12px; gap: 10px; }
+  .itemTitle { font-size: 12px; }
+  .desc { font-size: 11px; }
+  .feedback input { font-size: 12px; padding: 8px 10px; }
+  .decidedRow { padding: 8px 12px; gap: 8px; }
+  .decidedIcon { width: 22px; height: 22px; font-size: 11px; }
+  .ownerFeedback, .ownerFeedbackApproved { padding: 6px 8px; }
+  .ownerFeedbackText { font-size: 11px; }
+  .sectionFeedback { padding: 12px 14px; }
+  .sectionFeedback textarea { font-size: 12px; }
+  .subFeedback input { font-size: 12px; padding: 6px 10px; }
+}
