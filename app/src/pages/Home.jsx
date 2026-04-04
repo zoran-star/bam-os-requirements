@@ -659,6 +659,31 @@ export default function Home() {
           </div>
         </div>
 
+        {/* ═══ MEMBER MILESTONES — GAM-E02 ═══ */}
+        <div style={{ background: 'var(--surf)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--tp)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg width="16" height="16" fill="none" stroke="#C8A84E" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22c-4.97 0-9-2.69-9-6 0-4 5-11 9-14 4 3 9 10 9 14 0 3.31-4.03 6-9 6z"/></svg>
+            Member Milestones & Streaks
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { name: 'Jaylen Brooks', event: 'Hit 50 sessions', icon: '🏆', time: '2 days ago', type: 'milestone' },
+              { name: 'Carlos Martinez', event: '4-week streak', icon: '🔥', time: '3 days ago', type: 'streak' },
+              { name: 'Mia Thompson', event: '3-week streak', icon: '🔥', time: '5 days ago', type: 'streak' },
+              { name: 'Ava Chen', event: 'Hit 10 sessions', icon: '🏆', time: '1 week ago', type: 'milestone' },
+            ].map((item, i) => (
+              <div key={i} onClick={() => navigate('/members')} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: item.type === 'milestone' ? 'linear-gradient(135deg, rgba(200,168,78,0.08), rgba(200,168,78,0.02))' : 'var(--surf2)', cursor: 'pointer', transition: 'all 0.15s ease' }}>
+                <span style={{ fontSize: 20 }}>{item.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tp)' }}>{item.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ts)' }}>{item.event}</div>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--tm)', whiteSpace: 'nowrap' }}>{item.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* ═══ SAGE CHALLENGE + ACTIVITY ═══ */}
         <div className={s.sectionLabel}>Activity</div>
 

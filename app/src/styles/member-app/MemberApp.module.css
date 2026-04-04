@@ -70,11 +70,27 @@
 .upcomingMeta{font-size:11px;font-weight:500;color:var(--ts)}
 .upcomingTime{font-size:12px;font-weight:700;color:var(--gold);font-family:var(--fm);flex-shrink:0}
 
-.streakWidget{margin:0 20px;background:linear-gradient(135deg,var(--gold),var(--goldl));border-radius:18px;padding:18px 20px;display:flex;align-items:center;gap:14px;color:#fff}
-.streakFire{font-size:28px}
+.streakWidget{margin:0 20px;background:linear-gradient(135deg,var(--gold),var(--goldl));border-radius:18px;padding:18px 20px;display:flex;align-items:center;gap:14px;color:#fff;transition:all 180ms}
+.streakWidget:hover{box-shadow:var(--shadow-gold);transform:translateY(-1px)}
 .streakInfo{display:flex;flex-direction:column;gap:2px}
-.streakCount{font-size:18px;font-weight:800;letter-spacing:-0.02em}
+.streakCount{font-size:16px;font-weight:800;letter-spacing:-0.02em;display:flex;align-items:center;gap:6px}
 .streakSub{font-size:11px;font-weight:500;opacity:0.85}
+.progressRingWrap{position:relative;width:64px;height:64px;flex-shrink:0}
+.progressRingSvg{width:100%;height:100%;transform:rotate(-90deg)}
+.progressRingCircle{transition:stroke-dashoffset 1s ease}
+.progressRingInner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.progressRingCount{font-size:20px;font-weight:900;color:#fff;line-height:1}
+
+/* GAM-002 / GAM-002a: Milestone celebration modal */
+.milestoneOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:24px;animation:cmdFadeIn 0.3s ease}
+.milestoneCard{background:var(--bg);border-radius:28px;padding:36px 28px;display:flex;flex-direction:column;align-items:center;gap:12px;max-width:320px;width:100%;text-align:center;box-shadow:0 25px 80px rgba(200,168,78,0.25);animation:milestonePopIn 0.4s var(--espring)}
+@keyframes milestonePopIn{from{opacity:0;transform:scale(0.8)}to{opacity:1;transform:scale(1)}}
+.milestoneIcon{font-size:56px;line-height:1}
+.milestoneTitle{font-size:22px;font-weight:900;color:var(--tp);letter-spacing:-0.02em}
+.milestoneSub{font-size:14px;font-weight:600;color:var(--ts)}
+.milestoneEncourage{font-size:13px;font-weight:500;color:var(--tm);margin-top:4px}
+.milestoneBtn{font-family:var(--ff);font-size:15px;font-weight:800;color:#fff;background:var(--gold);border:none;border-radius:16px;padding:14px 48px;cursor:pointer;transition:all 180ms;margin-top:8px}
+.milestoneBtn:hover{background:var(--goldl);transform:translateY(-1px);box-shadow:var(--shadow-gold)}
 
 .creditWidget{margin:0 20px;background:var(--surf);border:1px solid var(--border);border-radius:18px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-sm)}
 .creditLeft{display:flex;flex-direction:column;gap:2px}

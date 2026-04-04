@@ -63,6 +63,7 @@ const NOTIF_TYPES = [
   { label: 'Coach messages', key: 'messages', locked: false },
   { label: 'Report published', key: 'reports', locked: false },
   { label: 'Announcements', key: 'announce', locked: false },
+  { label: 'Milestones & achievements', key: 'gamification', locked: false },
 ];
 
 const CAL_DAYS_WITH_CLASSES = [16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31];
@@ -140,7 +141,10 @@ export default function MemberApp({ onClose }) {
   const [accountView, setAccountView] = useState('main');
   const [pauseDuration, setPauseDuration] = useState('2');
   const [calSelected, setCalSelected] = useState(16);
-  const [notifs, setNotifs] = useState({ session: true, payment: true, messages: true, reports: true, announce: false });
+  const [notifs, setNotifs] = useState({ session: true, payment: true, messages: true, reports: true, announce: false, gamification: true });
+
+  /* GAM-002: Milestone celebration modal */
+  const [milestoneModal, setMilestoneModal] = useState(false);
 
   /* P0: Inbox + Notification center */
   const [inboxOpen, setInboxOpen] = useState(false);
@@ -278,12 +282,20 @@ export default function MemberApp({ onClose }) {
         </div>
       ))}
 
-      {/* Streak Widget — MEM-035 / APP-006 */}
-      <div className={s.streakWidget}>
-        <div className={s.streakFire}>{ICON.flame}</div>
+      {/* Streak Widget — GAM-001 / GAM-003: Progress ring + milestone tracker */}
+      <div className={s.streakWidget} onClick={() => setMilestoneModal(true)} style={{ cursor: 'pointer' }}>
+        <div className={s.progressRingWrap}>
+          <svg className={s.progressRingSvg} viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#e5e2dc" strokeWidth="8" />
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#C8A84E" strokeWidth="8" strokeLinecap="round" strokeDasharray="263.89" strokeDashoffset={263.89 * (1 - 0.76)} className={s.progressRingCircle} />
+          </svg>
+          <div className={s.progressRingInner}>
+            <div className={s.progressRingCount}>38</div>
+          </div>
+        </div>
         <div className={s.streakInfo}>
-          <div className={s.streakCount}>4 Week Streak!</div>
-          <div className={s.streakSub}>Keep it going — you're in the top 10%</div>
+          <div className={s.streakCount}>{ICON.flame} Session Streak</div>
+          <div className={s.streakSub}>12 sessions to next milestone (50)</div>
         </div>
       </div>
 
@@ -1177,6 +1189,19 @@ export default function MemberApp({ onClose }) {
 
       {/* P0: Cancel class dialog — APP-019a/b */}
       {cancelConfirm && <CancelClassDialog />}
+
+      {/* GAM-002 / GAM-002a: Milestone celebration modal */}
+      {milestoneModal && (
+        <div className={s.milestoneOverlay} onClick={() => setMilestoneModal(false)}>
+          <div className={s.milestoneCard} onClick={e => e.stopPropagation()}>
+            <div className={s.milestoneIcon}>&#127942;</div>
+            <div className={s.milestoneTitle}>Milestone Reached!</div>
+            <div className={s.milestoneSub}>Carlos completed 25 sessions!</div>
+            <div className={s.milestoneEncourage}>Keep pushing toward 50!</div>
+            <button className={s.milestoneBtn} onClick={() => setMilestoneModal(false)}>Awesome!</button>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

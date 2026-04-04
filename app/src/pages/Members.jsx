@@ -41,14 +41,14 @@ const HEALTH_TOOLTIPS = {
 };
 
 const MEMBERS = [
-  { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050, location: 'Downtown' },
-  { id: 2, name: 'Mia Thompson', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 15', joined: 'Nov 2025', health: 'green', photo: 'MT', payStatus: 'Current', email: 'mia.t@email.com', sessions: 24, streak: 3, revenue: 625, location: 'Downtown' },
-  { id: 3, name: 'Jaylen Brooks', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 12', joined: 'Jun 2025', health: 'yellow', photo: 'JB', payStatus: 'Current', email: 'jaylen.b@email.com', sessions: 52, streak: 1, revenue: 1575, location: 'Downtown' },
-  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: '—', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0, location: 'Downtown' },
-  { id: 5, name: 'Ethan Nguyen', status: 'Paused', plan: 'Beginner', price: 95, lastSession: 'Feb 22', joined: 'Aug 2025', health: 'yellow', photo: 'EN', payStatus: 'Paused', email: 'ethan.n@email.com', sessions: 18, streak: 0, revenue: 665, location: 'Westside' },
-  { id: 6, name: 'Ava Chen', status: 'Active', plan: 'Beginner', price: 95, lastSession: 'Mar 13', joined: 'Jan 2026', health: 'green', photo: 'AC', payStatus: 'Current', email: 'ava.c@email.com', sessions: 12, streak: 3, revenue: 285, location: 'Westside' },
-  { id: 7, name: 'Marcus Davis', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 11', joined: 'Apr 2025', health: 'red', photo: 'MD', payStatus: 'Failed', email: 'marcus.d@email.com', sessions: 44, streak: 0, revenue: 1375, location: 'Westside' },
-  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: '—', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: '—', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475, location: 'Westside' },
+  { id: 1, name: 'Carlos Martinez', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 14', joined: 'Sep 2025', health: 'green', photo: 'CM', payStatus: 'Current', email: 'carlos.m@email.com', sessions: 38, streak: 4, revenue: 1050, location: 'Downtown', milestones: [10, 25] },
+  { id: 2, name: 'Mia Thompson', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 15', joined: 'Nov 2025', health: 'green', photo: 'MT', payStatus: 'Current', email: 'mia.t@email.com', sessions: 24, streak: 3, revenue: 625, location: 'Downtown', milestones: [10] },
+  { id: 3, name: 'Jaylen Brooks', status: 'Active', plan: 'Elite', price: 175, lastSession: 'Mar 12', joined: 'Jun 2025', health: 'yellow', photo: 'JB', payStatus: 'Current', email: 'jaylen.b@email.com', sessions: 52, streak: 1, revenue: 1575, location: 'Downtown', milestones: [10, 25, 50] },
+  { id: 4, name: 'Sofia Reyes', status: 'Trial', plan: 'Free Trial', price: 0, lastSession: 'Mar 16', joined: 'Mar 2026', health: 'green', photo: 'SR', payStatus: '—', email: 'sofia.r@email.com', sessions: 2, streak: 2, revenue: 0, location: 'Downtown', milestones: [] },
+  { id: 5, name: 'Ethan Nguyen', status: 'Paused', plan: 'Beginner', price: 95, lastSession: 'Feb 22', joined: 'Aug 2025', health: 'yellow', photo: 'EN', payStatus: 'Paused', email: 'ethan.n@email.com', sessions: 18, streak: 0, revenue: 665, location: 'Westside', milestones: [10] },
+  { id: 6, name: 'Ava Chen', status: 'Active', plan: 'Beginner', price: 95, lastSession: 'Mar 13', joined: 'Jan 2026', health: 'green', photo: 'AC', payStatus: 'Current', email: 'ava.c@email.com', sessions: 12, streak: 3, revenue: 285, location: 'Westside', milestones: [10] },
+  { id: 7, name: 'Marcus Davis', status: 'Active', plan: 'Intermediate', price: 125, lastSession: 'Mar 11', joined: 'Apr 2025', health: 'red', photo: 'MD', payStatus: 'Failed', email: 'marcus.d@email.com', sessions: 44, streak: 0, revenue: 1375, location: 'Westside', milestones: [10, 25] },
+  { id: 8, name: 'Lily Park', status: 'Cancelled', plan: '—', price: 0, lastSession: 'Feb 10', joined: 'Oct 2025', health: 'red', photo: 'LP', payStatus: '—', email: 'lily.p@email.com', sessions: 16, streak: 0, revenue: 475, location: 'Westside', milestones: [10] },
 ];
 
 const PAUSES = [
@@ -1377,10 +1377,47 @@ export default function Members() {
             </div>
 
             <div className={s.drawerSection}>
-              <div className={s.drawerSectionTitle}>Attendance</div>
+              <div className={s.drawerSectionTitle}>Attendance & Progress</div>
               <div className={s.drawerRow}><span>Last session</span><span>{drawerMember.lastSession}</span></div>
               <div className={s.drawerRow}><span>Total sessions</span><span>{drawerMember.sessions}</span></div>
-              <div className={s.drawerRow}><span>Current streak</span><span>{drawerMember.streak} weeks</span></div>
+              <div className={s.drawerRow}>
+                <span>Current streak</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {drawerMember.streak > 0 && <svg width="14" height="14" fill="none" stroke="#C8A84E" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22c-4.97 0-9-2.69-9-6 0-4 5-11 9-14 4 3 9 10 9 14 0 3.31-4.03 6-9 6z"/></svg>}
+                  {drawerMember.streak} weeks
+                </span>
+              </div>
+              <div className={s.drawerRow}>
+                <span>Next milestone</span>
+                <span>{(() => { const next = [10,25,50,100].find(m => m > drawerMember.sessions); return next ? `${next} sessions (${next - drawerMember.sessions} to go)` : 'All reached! 🏆'; })()}</span>
+              </div>
+              {drawerMember.milestones && drawerMember.milestones.length > 0 && (
+                <div className={s.drawerMilestones}>
+                  {drawerMember.milestones.map(m => (
+                    <span key={m} className={s.drawerMilestoneBadge}>🏆 {m}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Streak Management — GAM-001b */}
+            <div className={s.drawerSection}>
+              <div className={s.drawerSectionTitle}>Streak Management</div>
+              {drawerMember.streak > 0 ? (
+                <div className={s.drawerNote} style={{ fontSize: 12, color: 'var(--ts)' }}>
+                  {drawerMember.name.split(' ')[0]} has a {drawerMember.streak}-week active streak.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div className={s.drawerNote} style={{ fontSize: 12, color: 'var(--ts)' }}>
+                    Streak ended. If this was due to illness, vacation, or other valid reason, you can restore it.
+                  </div>
+                  <button className={s.drawerRestoreBtn} onClick={() => alert('Streak restored! (prototype)')}>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 22c-4.97 0-9-2.69-9-6 0-4 5-11 9-14 4 3 9 10 9 14 0 3.31-4.03 6-9 6z"/></svg>
+                    Restore Streak
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className={s.drawerSection}>

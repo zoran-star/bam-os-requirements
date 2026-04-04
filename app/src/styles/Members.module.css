@@ -417,3 +417,9 @@
 .fpDetailValue{font-size:13px;font-weight:600;color:var(--tp)}
 .fpReason{font-size:11px;font-weight:600;color:var(--red);background:var(--redl);padding:3px 10px;border-radius:6px;white-space:nowrap}
 .fpActions{display:flex;gap:6px}
+
+/* ─── GAMIFICATION (GAM-001) ─── */
+.drawerMilestones{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding:0 2px}
+.drawerMilestoneBadge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:linear-gradient(135deg,rgba(200,168,78,0.12),rgba(200,168,78,0.06));color:#C8A84E;border:1px solid rgba(200,168,78,0.2)}
+.drawerRestoreBtn{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid rgba(200,168,78,0.3);background:linear-gradient(135deg,rgba(200,168,78,0.1),rgba(200,168,78,0.05));color:#C8A84E;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s ease}
+.drawerRestoreBtn:hover{background:linear-gradient(135deg,rgba(200,168,78,0.2),rgba(200,168,78,0.1));border-color:rgba(200,168,78,0.5)}
