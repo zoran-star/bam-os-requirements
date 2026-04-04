@@ -324,7 +324,7 @@ export default function Home() {
   }, [loaded, sageExpanded]);
 
   useEffect(() => {
-    const greeting = `${GREETING}, Coleman`;
+    const greeting = `${GREETING}, User`;
     let i = 0;
     const typeTimer = setInterval(() => {
       i++;
@@ -398,7 +398,7 @@ export default function Home() {
           <canvas ref={canvasRef} />
         </div>
         <div className={s.cmdLeft}>
-          <div className={s.cmdGreeting}>{GREETING}, Coleman</div>
+          <div className={s.cmdGreeting}>{GREETING}, User</div>
           <div className={s.cmdDate}>{TODAY}{locationLabel}</div>
         </div>
         <div className={s.cmdCenter}>
@@ -512,7 +512,7 @@ export default function Home() {
                 <div className={s.sagePillOrbPulse} />
               </div>
               <div className={s.sagePillText}>
-                <span className={s.sagePillGreeting}>Hey Coleman</span>
+                <span className={s.sagePillGreeting}>Hey User</span>
                 <span className={s.sagePillPrompt}> — {pillText}<span className={s.sagePillCursor} /></span>
               </div>
               <div className={s.sagePillWaveform}>
@@ -528,7 +528,7 @@ export default function Home() {
                   <span className={s.sagePillOrbLetter}>S</span>
                 </div>
                 <div className={s.sageExpandedGreeting}>
-                  <div className={s.sageExpandedName}>{GREETING}, Coleman</div>
+                  <div className={s.sageExpandedName}>{GREETING}, User</div>
                   <div className={s.sageExpandedSub}>What can I help you with?</div>
                 </div>
                 <button className={s.sageCollapse} onClick={() => setSageExpanded(false)}>
