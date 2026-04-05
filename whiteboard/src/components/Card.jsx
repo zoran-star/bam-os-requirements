@@ -2,19 +2,17 @@ import { useNavigate } from 'react-router-dom'
 import { updateSession } from '../lib/api'
 import s from '../styles/Card.module.css'
 
-const OWNERS = ['Zoran', 'Cole']
+const OWNERS = ['Zoran', 'Cole', 'Mike', 'Anyone']
 
 export default function Card({ session, onUpdate }) {
   const navigate = useNavigate()
   const statusClass = session.status === 'Complete' ? s.cardComplete
     : session.status === 'In Progress' ? s.cardInProgress : ''
 
-  const handleOwnerClick = async (e, name) => {
+  const handleOwnerChange = async (e) => {
     e.stopPropagation()
-    const current = session.assignedTo || []
-    const next = current.includes(name)
-      ? current.filter(n => n !== name)
-      : [...current, name]
+    const val = e.target.value
+    const next = val ? [val] : []
     try {
       await updateSession(session.sessionId, { assignedTo: next })
       if (onUpdate) onUpdate()
@@ -37,19 +35,17 @@ export default function Card({ session, onUpdate }) {
       )}
       <div className={s.bottom}>
         <span className={`${s.pill} ${s.pillType}`}>{session.sessionType}</span>
-        {OWNERS.map(name => {
-          const active = (session.assignedTo || []).includes(name)
-          return (
-            <button
-              key={name}
-              className={`${s.ownerBtn} ${active ? s.ownerActive : ''}`}
-              onClick={(e) => handleOwnerClick(e, name)}
-              title={active ? `Remove ${name}` : `Assign ${name}`}
-            >
-              {name}
-            </button>
-          )
-        })}
+        <select
+          className={s.ownerSelect}
+          value={(session.assignedTo || [])[0] || ''}
+          onClick={(e) => e.stopPropagation()}
+          onChange={handleOwnerChange}
+        >
+          <option value="">Unassigned</option>
+          {OWNERS.map(name => (
+            <option key={name} value={name}>{name}</option>
+          ))}
+        </select>
       </div>
     </div>
   )

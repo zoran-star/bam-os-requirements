@@ -17,12 +17,11 @@ export default function SessionPage() {
     if (session?.assignedTo) setOwners(session.assignedTo)
   }, [session])
 
-  const OWNER_OPTIONS = ['Zoran', 'Cole']
+  const OWNER_OPTIONS = ['Zoran', 'Cole', 'Mike', 'Anyone']
 
-  const handleOwnerToggle = async (name) => {
-    const next = owners.includes(name)
-      ? owners.filter(n => n !== name)
-      : [...owners, name]
+  const handleOwnerChange = async (e) => {
+    const val = e.target.value
+    const next = val ? [val] : []
     setOwners(next)
     try {
       await updateSession(sessionId, { assignedTo: next })
@@ -100,17 +99,16 @@ export default function SessionPage() {
           <span className={s.title}>{session.title}</span>
           <span className={s.id}>{session.sessionId}</span>
           <span className={`${s.status} ${statusClass}`}>{session.status === 'To Do' ? 'Not Ready' : session.status === 'In Progress' ? 'Ready' : session.status}</span>
-          <div className={s.ownerGroup}>
+          <select
+            className={s.ownerSelect}
+            value={owners[0] || ''}
+            onChange={handleOwnerChange}
+          >
+            <option value="">Unassigned</option>
             {OWNER_OPTIONS.map(name => (
-              <button
-                key={name}
-                className={`${s.ownerBtn} ${owners.includes(name) ? s.ownerActive : ''}`}
-                onClick={() => handleOwnerToggle(name)}
-              >
-                {name}
-              </button>
+              <option key={name} value={name}>{name}</option>
             ))}
-          </div>
+          </select>
           {session.lastUpdated && <span className={s.lastUpdated}>Updated {session.lastUpdated}</span>}
         </div>
         <div className={s.right}>

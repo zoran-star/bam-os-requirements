@@ -33,17 +33,18 @@
 .dates { display: flex; gap: 10px; margin-bottom: 6px; }
 .date { font-size: 10px; color: var(--tm); font-family: var(--fm); }
 .dateCompleted { font-size: 10px; color: var(--green); font-family: var(--fm); }
-.ownerBtn {
+.ownerSelect {
   font-family: var(--ff); font-size: 10px; font-weight: 600;
-  padding: 2px 8px; border-radius: 9999px; cursor: pointer;
-  background: var(--surf3); color: var(--tm); border: 1px solid var(--border);
-  transition: all 0.15s ease; white-space: nowrap;
+  padding: 2px 6px; border-radius: 6px; cursor: pointer;
+  background: var(--surf3); color: var(--gold); border: 1px solid var(--border);
+  transition: all 0.15s ease; outline: none;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23999' stroke-width='1.2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 6px center;
+  padding-right: 18px;
 }
-.ownerBtn:hover { border-color: var(--gold); color: var(--tp); }
-.ownerActive {
-  background: rgba(200,168,78,0.12); color: var(--gold);
-  border-color: rgba(200,168,78,0.3);
-}
+.ownerSelect:hover { border-color: var(--gold); }
+.ownerSelect:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(200,168,78,0.15); }
 
 @media (max-width: 600px) {
   .card { padding: 12px 14px; border-radius: 10px; }
