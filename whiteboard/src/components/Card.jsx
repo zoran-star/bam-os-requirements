@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateSession } from '../lib/api'
 import s from '../styles/Card.module.css'
@@ -6,18 +7,26 @@ const OWNERS = ['Zoran', 'Cole', 'Mike', 'Anyone']
 
 export default function Card({ session, onUpdate }) {
   const navigate = useNavigate()
+  const [owner, setOwner] = useState((session.assignedTo || [])[0] || '')
+
+  useEffect(() => {
+    setOwner((session.assignedTo || [])[0] || '')
+  }, [session.assignedTo])
+
   const statusClass = session.status === 'Complete' ? s.cardComplete
     : session.status === 'In Progress' ? s.cardInProgress : ''
 
   const handleOwnerChange = async (e) => {
     e.stopPropagation()
     const val = e.target.value
+    setOwner(val)
     const next = val ? [val] : []
     try {
       await updateSession(session.sessionId, { assignedTo: next })
       if (onUpdate) onUpdate()
     } catch (err) {
       console.error('Failed to update owner:', err)
+      setOwner((session.assignedTo || [])[0] || '')
     }
   }
 
@@ -37,7 +46,7 @@ export default function Card({ session, onUpdate }) {
         <span className={`${s.pill} ${s.pillType}`}>{session.sessionType}</span>
         <select
           className={s.ownerSelect}
-          value={(session.assignedTo || [])[0] || ''}
+          value={owner}
           onClick={(e) => e.stopPropagation()}
           onChange={handleOwnerChange}
         >
