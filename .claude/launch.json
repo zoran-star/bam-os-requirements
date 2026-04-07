@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "app",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/usr/local/bin/node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js"],
       "port": 5173,
+      "autoPort": true,
       "cwd": "app"
     },
     {
@@ -14,6 +15,13 @@
       "runtimeArgs": ["run", "dev"],
       "port": 5180,
       "cwd": "survey"
+    },
+    {
+      "name": "content-engine",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5181,
+      "cwd": "fc-internal-content-engine"
     }
   ]
 }

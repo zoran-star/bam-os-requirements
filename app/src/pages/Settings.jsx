@@ -141,7 +141,7 @@ function useSaveToast() {
   return [visible, show];
 }
 
-/* ─── COACH FORM ─── */
+/* ─── COACH FORM (STF-003 / STF-008) ─── */
 function CoachForm({ coach, onSave, onClose }) {
   const [name, setName] = useState(coach?.name || '');
   const [role, setRole] = useState(coach?.role || '');
@@ -149,6 +149,8 @@ function CoachForm({ coach, onSave, onClose }) {
   const [phone, setPhone] = useState(coach?.phone || '');
   const [locations, setLocations] = useState(coach?.locations || []);
   const [bio, setBio] = useState(coach?.bio || '');
+  const [permission, setPermission] = useState(coach?.permission || 'Coach');
+  const [availability, setAvailability] = useState(coach?.availability || '');
   const ALL_LOCATIONS = ['Downtown', 'Westside'];
   const toggleLocation = (loc) => setLocations(prev => prev.includes(loc) ? prev.filter(l => l !== loc) : [...prev, loc]);
 
@@ -159,7 +161,7 @@ function CoachForm({ coach, onSave, onClose }) {
       <div className={s.formRow}>
         <div className={s.formGroup}>
           <label className={s.formLabel}>Full Name</label>
-          <input className={s.formInput} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Coach Marcus Rivera" />
+          <input className={s.formInput} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Coach Marcus" />
         </div>
         <div className={s.formGroup}>
           <label className={s.formLabel}>Role</label>
@@ -167,7 +169,7 @@ function CoachForm({ coach, onSave, onClose }) {
             <option value="">Select role...</option>
             <option value="Head Coach">Head Coach</option>
             <option value="Assistant Coach">Assistant Coach</option>
-            <option value="Youth Development">Youth Development</option>
+            <option value="Youth Coach">Youth Coach</option>
             <option value="Skills Trainer">Skills Trainer</option>
             <option value="Evaluation Coach">Evaluation Coach</option>
           </select>
@@ -183,15 +185,28 @@ function CoachForm({ coach, onSave, onClose }) {
           <input className={s.formInput} type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(512) 555-0100" />
         </div>
       </div>
-      <div className={s.formGroup}>
-        <label className={s.formLabel}>Locations</label>
-        <div className={s.locationToggleRow}>
-          {ALL_LOCATIONS.map(loc => (
-            <button key={loc} type="button" className={`${s.locationToggleBtn} ${locations.includes(loc) ? s.locationToggleActive : ''}`} onClick={() => toggleLocation(loc)}>
-              {loc}
-            </button>
-          ))}
+      <div className={s.formRow}>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Permission Tier</label>
+          <select className={s.formSelect} value={permission} onChange={e => setPermission(e.target.value)}>
+            <option value="Coach">Coach</option>
+            <option value="Owner">Owner</option>
+          </select>
         </div>
+        <div className={s.formGroup}>
+          <label className={s.formLabel}>Locations</label>
+          <div className={s.locationToggleRow}>
+            {ALL_LOCATIONS.map(loc => (
+              <button key={loc} type="button" className={`${s.locationToggleBtn} ${locations.includes(loc) ? s.locationToggleActive : ''}`} onClick={() => toggleLocation(loc)}>
+                {loc}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className={s.formGroup}>
+        <label className={s.formLabel}>Availability</label>
+        <input className={s.formInput} value={availability} onChange={e => setAvailability(e.target.value)} placeholder="e.g. Mon-Fri 3pm-8pm, Sat 9am-2pm" />
       </div>
       <div className={s.formGroup}>
         <label className={s.formLabel}>Bio / Background</label>
@@ -200,7 +215,7 @@ function CoachForm({ coach, onSave, onClose }) {
       <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>This bio is used in parent-facing communications — when the AI mentions a coach, it references their background. Keep it authentic.</span></div>
       <div className={s.modalFooter}>
         <button className={s.btnSecondary} onClick={onClose}>Cancel</button>
-        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, locations, bio })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
+        <button className={s.btnPrimary} disabled={!canSave} onClick={() => onSave({ name, role, email, phone, locations, bio, permission, availability })}>{coach ? 'Save Changes' : 'Add Coach'}</button>
       </div>
     </>
   );
@@ -259,9 +274,9 @@ export default function Settings() {
 
   // Staff
   const [coaches, setCoaches] = useState([
-    { id: 'c1', name: 'Coach Marcus Rivera', role: 'Head Coach', email: 'marcus@bamacademy.com', phone: '(512) 555-0101', locations: ['Downtown', 'Westside'], sessions: 12, members: 28, status: 'Active', bio: 'D1 point guard, 8 years coaching experience. Specializes in elite skill development and game strategy.' },
-    { id: 'c2', name: 'Coach Adrian Simmons', role: 'Assistant Coach', email: 'adrian@bamacademy.com', phone: '(512) 555-0102', locations: ['Westside'], sessions: 8, members: 14, status: 'Active', bio: 'Former overseas pro. Focuses on fundamentals and building young athletes\' confidence.' },
-    { id: 'c3', name: 'Coach Filip Jovic', role: 'Youth Development', email: 'filip@bamacademy.com', phone: '(512) 555-0103', locations: ['Downtown'], sessions: 6, members: 18, status: 'Active', bio: 'Certified youth coach. Patient, energetic, great with beginners and shy kids.' },
+    { id: 'c1', name: 'Coach Zoran', role: 'Head Coach', email: 'zoran@bamacademy.com', phone: '(512) 555-0101', locations: ['Downtown', 'Westside'], sessions: 8, members: 28, status: 'Active', bio: 'D1 point guard, 8 years coaching experience. Specializes in elite skill development and game strategy.', availability: 'Mon-Fri 3pm-8pm, Sat 9am-2pm', permission: 'Owner' },
+    { id: 'c2', name: 'Coach Marcus', role: 'Assistant Coach', email: 'marcus@bamacademy.com', phone: '(512) 555-0102', locations: ['Downtown', 'Westside'], sessions: 5, members: 14, status: 'Active', bio: 'Former overseas pro. Focuses on fundamentals and building young athletes\' confidence.', availability: 'Mon-Thu 4pm-8pm', permission: 'Coach' },
+    { id: 'c3', name: 'Coach Ava', role: 'Youth Coach', email: 'ava@bamacademy.com', phone: '(512) 555-0103', locations: ['Downtown'], sessions: 4, members: 18, status: 'Active', bio: 'Certified youth coach. Patient, energetic, great with beginners and shy kids.', availability: 'Tue-Sat 10am-6pm', permission: 'Coach' },
   ]);
   const [showCoachModal, setShowCoachModal] = useState(false);
   const [editingCoach, setEditingCoach] = useState(null);
@@ -727,36 +742,52 @@ export default function Settings() {
             </>
           )}
 
-          {/* ═══ STAFF & COACHES ═══ */}
+          {/* ═══ STAFF & COACHES (STF-003 / STF-008) ═══ */}
           {tab === 'staff' && (
             <>
               <div className={s.sectionHead}>
                 <h3 className={s.sectionTitle}>Staff & Coaches</h3>
-                <div className={s.sectionActions}><button className={s.addBtn} onClick={() => { setEditingCoach(null); setShowCoachModal(true); }}>+ Add Coach</button></div>
+                <div className={s.sectionActions}><button className={s.addBtn} onClick={() => { setEditingCoach(null); setShowCoachModal(true); }}>+ Add Coach</button><span className={s.sectionRef}>STF-003</span></div>
               </div>
-              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Staff profiles power coach assignment on the schedule, trial report attribution, and parent-facing coach bios.</span></div>
-              {coaches.map(c => (
-                <div key={c.id} className={s.locationCard}>
-                  <div className={s.locationLeft}>
-                    <div className={s.locationIcon} style={{ background: 'rgba(59,111,160,0.10)' }}>
-                      <svg width="18" height="18" fill="none" stroke="var(--blue)" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <div className={s.sageTip}><span className={s.sageTipLabel}>Sage</span><span>Staff profiles power coach assignment on the schedule, trial report attribution, and parent-facing coach bios. Permissions control what each coach can access.</span></div>
+              <div className={s.staffGrid}>
+                {coaches.map(c => (
+                  <div key={c.id} className={s.staffCard}>
+                    <div className={s.staffCardHead}>
+                      <div className={s.staffAvatar}>
+                        {c.name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                      </div>
+                      <div className={s.staffInfo}>
+                        <div className={s.staffName}>{c.name} <span className={s.staffRoleBadge}>{c.role}</span></div>
+                        <div className={s.staffEmail}>{c.email}</div>
+                      </div>
+                      <span className={c.permission === 'Owner' ? s.permBadgeOwner : s.permBadgeCoach}>{c.permission}</span>
                     </div>
-                    <div>
-                      <div className={s.locationName}>{c.name}</div>
-                      <div className={s.locationAddr}>{c.role}</div>
+                    <div className={s.staffDetails}>
+                      <div className={s.staffDetailRow}>
+                        <span className={s.staffDetailLabel}>Availability</span>
+                        <span className={s.staffDetailValue}>{c.availability || '—'}</span>
+                      </div>
+                      <div className={s.staffDetailRow}>
+                        <span className={s.staffDetailLabel}>Sessions this week</span>
+                        <span className={s.staffDetailValue}>{c.sessions}</span>
+                      </div>
+                      <div className={s.staffDetailRow}>
+                        <span className={s.staffDetailLabel}>Locations</span>
+                        <span className={s.staffDetailValue}>
+                          {c.locations?.map(loc => (
+                            <span key={loc} className={s.coachLocPill}>{loc}</span>
+                          ))}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={s.staffCardActions}>
+                      <button className={s.editBtn} onClick={() => { setEditingCoach(c); setShowCoachModal(true); }}>Edit</button>
+                      <button className={s.archiveBtn} onClick={() => setCoaches(prev => prev.filter(x => x.id !== c.id))}>Remove</button>
                     </div>
                   </div>
-                  <div className={s.locationRight}>
-                    {c.locations?.map(loc => (
-                      <span key={loc} className={s.coachLocPill}>{loc}</span>
-                    ))}
-                    <div className={s.locationStat}><span className={s.locationStatVal}>{c.sessions}</span><span className={s.locationStatLabel}>Sessions/wk</span></div>
-                    <div className={s.locationStat}><span className={s.locationStatVal}>{c.members}</span><span className={s.locationStatLabel}>Athletes</span></div>
-                    <span className={s.statusActive}>{c.status}</span>
-                    <button className={s.editBtn} onClick={() => { setEditingCoach(c); setShowCoachModal(true); }}>Edit</button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </>
           )}
 

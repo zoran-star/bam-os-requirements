@@ -306,3 +306,21 @@
 .locationToggleBtn:hover{border-color:var(--gold);color:var(--tp)}
 .locationToggleActive{background:rgba(200,168,78,0.12);color:var(--gold);border-color:rgba(200,168,78,0.3)}
 .coachLocPill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:9999px;background:rgba(59,111,160,0.10);color:var(--blue);white-space:nowrap}
+
+/* ─── STAFF CARDS (STF-003 / STF-008) ─── */
+.staffGrid{display:flex;flex-direction:column;gap:12px}
+.staffCard{background:var(--surf);border:1px solid var(--border);border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-sm);transition:all 180ms}
+.staffCard:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.staffCardHead{display:flex;align-items:center;gap:12px}
+.staffAvatar{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--gold),var(--goldl));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
+.staffInfo{flex:1;display:flex;flex-direction:column;gap:2px}
+.staffName{font-size:14px;font-weight:700;color:var(--tp);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.staffRoleBadge{font-size:11px;font-weight:600;color:var(--tm);background:var(--surf2);padding:2px 8px;border-radius:6px}
+.staffEmail{font-size:12px;font-weight:500;color:var(--tm)}
+.permBadgeOwner{font-size:10px;font-weight:700;color:var(--gold);background:rgba(200,168,78,0.12);padding:4px 10px;border-radius:8px;white-space:nowrap;flex-shrink:0}
+.permBadgeCoach{font-size:10px;font-weight:700;color:var(--ts);background:var(--surf2);padding:4px 10px;border-radius:8px;white-space:nowrap;flex-shrink:0}
+.staffDetails{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.staffDetailRow{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+.staffDetailLabel{font-weight:500;color:var(--tm)}
+.staffDetailValue{font-weight:600;color:var(--tp);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.staffCardActions{display:flex;gap:6px}

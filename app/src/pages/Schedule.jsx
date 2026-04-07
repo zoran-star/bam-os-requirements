@@ -66,18 +66,51 @@ const DAY_DATES = DAYS.map((_, i) => {
 });
 
 const SESSIONS = [
-  { id: 1, day: 0, hour: 18, minutes: 0, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 12, capacity: 15, location: 'Downtown', notes: 'Focus on agility drills this week.' },
-  { id: 2, day: 1, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 8, capacity: 12, location: 'Westside', notes: '' },
-  { id: 3, day: 1, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 14, capacity: 15, location: 'Downtown', notes: 'Last group session before spring break adjustments.' },
-  { id: 4, day: 2, hour: 17, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'One-on-one with Carlos.' },
-  { id: 5, day: 2, hour: 18, minutes: 30, duration: 60, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 10, capacity: 15, location: 'Downtown', notes: '' },
-  { id: 6, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 6, capacity: 12, location: 'Westside', notes: '' },
-  { id: 7, day: 3, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 15, capacity: 15, location: 'Downtown', notes: 'Session is full. Waitlist enabled.' },
-  { id: 8, day: 4, hour: 17, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 2, capacity: 4, location: 'Downtown', notes: 'New athlete evaluations.' },
-  { id: 9, day: 5, hour: 9, minutes: 0, duration: 90, type: 'Elite Training', coach: 'Coach Rivera', coachInitials: 'CR', coachName: 'Coach Rodriguez', booked: 13, capacity: 15, location: 'Downtown', notes: 'Extended Saturday session.' },
-  { id: 10, day: 5, hour: 11, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 11, capacity: 15, location: 'Downtown', notes: '' },
-  { id: 11, day: 5, hour: 13, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Z', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 9, capacity: 12, location: 'Westside', notes: '' },
+  { id: 1, day: 0, hour: 18, minutes: 0, duration: 60, type: 'Elite Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 12, capacity: 15, location: 'Downtown', notes: 'Focus on agility drills this week.' },
+  { id: 2, day: 1, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 8, capacity: 12, location: 'Westside', notes: '' },
+  { id: 3, day: 1, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 14, capacity: 15, location: 'Downtown', notes: 'Last group session before spring break adjustments.' },
+  { id: 4, day: 2, hour: 17, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'One-on-one with Carlos.' },
+  { id: 5, day: 2, hour: 18, minutes: 30, duration: 60, type: 'Elite Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 10, capacity: 15, location: 'Downtown', notes: '' },
+  { id: 6, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 6, capacity: 12, location: 'Westside', notes: '' },
+  /* STF-004a: Coach Zoran conflict — overlapping session at same time on Thursday */
+  { id: 12, day: 3, hour: 16, minutes: 0, duration: 60, type: 'Individual', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 1, capacity: 1, location: 'Downtown', notes: 'CONFLICT: overlaps with Beginner session.' },
+  { id: 7, day: 3, hour: 18, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 15, capacity: 15, location: 'Downtown', notes: 'Session is full. Waitlist enabled.' },
+  { id: 8, day: 4, hour: 17, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Ava', coachInitials: 'CA', coachName: 'Coach Ava', booked: 2, capacity: 4, location: 'Downtown', notes: 'New athlete evaluations.' },
+  { id: 9, day: 5, hour: 9, minutes: 0, duration: 90, type: 'Elite Training', coach: 'Coach Marcus', coachInitials: 'CM', coachName: 'Coach Marcus', booked: 13, capacity: 15, location: 'Downtown', notes: 'Extended Saturday session.' },
+  { id: 10, day: 5, hour: 11, minutes: 0, duration: 60, type: 'Group Training', coach: 'Coach Zoran', coachInitials: 'CZ', coachName: 'Coach Zoran', booked: 11, capacity: 15, location: 'Downtown', notes: '' },
+  { id: 11, day: 5, hour: 13, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Ava', coachInitials: 'CA', coachName: 'Coach Ava', booked: 9, capacity: 12, location: 'Westside', notes: '' },
+  { id: 13, day: 1, hour: 14, minutes: 0, duration: 60, type: 'Evaluation', coach: 'Coach Ava', coachInitials: 'CA', coachName: 'Coach Ava', booked: 3, capacity: 4, location: 'Downtown', notes: 'Youth evaluations.' },
+  { id: 14, day: 4, hour: 15, minutes: 0, duration: 60, type: 'Beginner', coach: 'Coach Ava', coachInitials: 'CA', coachName: 'Coach Ava', booked: 7, capacity: 12, location: 'Westside', notes: '' },
 ];
+
+const COACHES = ['Coach Zoran', 'Coach Marcus', 'Coach Ava'];
+
+/* STF-004a: Detect overlapping sessions for a coach on the same day */
+const getConflicts = (sessions) => {
+  const conflicts = new Set();
+  const byCoachDay = {};
+  sessions.forEach(se => {
+    const key = `${se.coachName}__${se.day}`;
+    if (!byCoachDay[key]) byCoachDay[key] = [];
+    byCoachDay[key].push(se);
+  });
+  Object.values(byCoachDay).forEach(group => {
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const a = group[i], b = group[j];
+        const aStart = a.hour * 60 + a.minutes;
+        const aEnd = aStart + a.duration;
+        const bStart = b.hour * 60 + b.minutes;
+        const bEnd = bStart + b.duration;
+        if (aStart < bEnd && bStart < aEnd) {
+          conflicts.add(a.id);
+          conflicts.add(b.id);
+        }
+      }
+    }
+  });
+  return conflicts;
+};
 
 const SAMPLE_ROSTER = [
   { id: 1, name: 'Carlos Martinez', initials: 'CM', checkedIn: true },
@@ -301,8 +334,9 @@ function CreateSessionModal({ onClose }) {
             <label className={s.formLabel}>Coach</label>
             <select className={s.formSelect} value={coach} onChange={e => setCoach(e.target.value)}>
               <option value="">Select coach...</option>
-              <option value="Coach Rivera">Coach Rivera</option>
-              <option value="Coach Z">Coach Z</option>
+              <option value="Coach Zoran">Coach Zoran</option>
+              <option value="Coach Marcus">Coach Marcus</option>
+              <option value="Coach Ava">Coach Ava</option>
             </select>
           </div>
         </div>
@@ -394,12 +428,83 @@ function CancelSessionModal({ session, onClose, onParentClose }) {
   );
 }
 
+/* ─── COACH VIEW GRID (STF-003a) ─── */
+function CoachViewGrid({ sessions, onSelectSession }) {
+  const conflicts = useMemo(() => getConflicts(sessions), [sessions]);
+
+  /* Group sessions by coach and day */
+  const grid = useMemo(() => {
+    const map = {};
+    COACHES.forEach(coach => {
+      map[coach] = {};
+      DAYS.forEach((_, dayIdx) => { map[coach][dayIdx] = []; });
+    });
+    sessions.forEach(se => {
+      if (map[se.coachName] && map[se.coachName][se.day]) {
+        map[se.coachName][se.day].push(se);
+      }
+    });
+    return map;
+  }, [sessions]);
+
+  return (
+    <div className={s.coachGrid}>
+      {/* Header row */}
+      <div className={s.coachGridHeader}>
+        <div className={s.coachGridCorner}>Coach</div>
+        {DAYS.map(day => (
+          <div key={day} className={s.coachGridDayHeader}>{day}</div>
+        ))}
+      </div>
+
+      {/* Coach rows */}
+      {COACHES.map(coach => (
+        <div key={coach} className={s.coachGridRow}>
+          <div className={s.coachGridLabel}>
+            <div className={s.coachGridAvatar}>
+              {coach.split(' ')[1]?.[0] || coach[0]}
+            </div>
+            <span className={s.coachGridName}>{coach}</span>
+          </div>
+          {DAYS.map((_, dayIdx) => {
+            const daySessions = grid[coach][dayIdx];
+            const hasConflict = daySessions.some(se => conflicts.has(se.id));
+            return (
+              <div key={dayIdx} className={`${s.coachGridCell} ${hasConflict ? s.coachGridCellConflict : ''}`}>
+                {hasConflict && (
+                  <div className={s.conflictBadge} title="Schedule conflict: overlapping sessions">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  </div>
+                )}
+                {daySessions.map(se => (
+                  <div
+                    key={se.id}
+                    className={`${s.coachGridSession} ${typeClass(se.type)} ${conflicts.has(se.id) ? s.coachGridSessionConflict : ''}`}
+                    onClick={() => onSelectSession(se)}
+                    title={`${se.type} — ${formatTime(se.hour, se.minutes)} (${se.duration}min)`}
+                  >
+                    <span className={s.coachGridSessionName}>{se.type}</span>
+                    <span className={s.coachGridSessionTime}>{formatTime(se.hour, se.minutes)}</span>
+                    <span className={s.coachGridSessionCount}>{se.booked}/{se.capacity}</span>
+                  </div>
+                ))}
+                {daySessions.length === 0 && <span className={s.coachGridEmpty}>&mdash;</span>}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ─── MAIN COMPONENT ─── */
 export default function Schedule() {
   const [cmdInput, setCmdInput] = useState('');
   const [cmdResponse, setCmdResponse] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [calView, setCalView] = useState('week');
+  const [scheduleMode, setScheduleMode] = useState('session'); /* 'session' | 'coach' */
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedSession, setSelectedSession] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -546,6 +651,14 @@ export default function Schedule() {
           </div>
         </div>
 
+        {/* Schedule mode toggle (STF-003) */}
+        <div className={s.modeToggleBar}>
+          <div className={s.viewToggle}>
+            <button className={`${s.viewBtn} ${scheduleMode === 'session' ? s.viewBtnActive : ''}`} onClick={() => setScheduleMode('session')}>Session View</button>
+            <button className={`${s.viewBtn} ${scheduleMode === 'coach' ? s.viewBtnActive : ''}`} onClick={() => setScheduleMode('coach')}>Coach View</button>
+          </div>
+        </div>
+
         {/* Calendar toolbar */}
         <div className={s.calToolbar}>
           <div className={s.weekNav}>
@@ -558,10 +671,12 @@ export default function Schedule() {
               <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           </div>
-          <div className={s.viewToggle}>
-            <button className={`${s.viewBtn} ${calView === 'week' ? s.viewBtnActive : ''}`} onClick={() => setCalView('week')}>Week</button>
-            <button className={`${s.viewBtn} ${calView === 'month' ? s.viewBtnActive : ''}`} onClick={() => setCalView('month')}>Month</button>
-          </div>
+          {scheduleMode === 'session' && (
+            <div className={s.viewToggle}>
+              <button className={`${s.viewBtn} ${calView === 'week' ? s.viewBtnActive : ''}`} onClick={() => setCalView('week')}>Week</button>
+              <button className={`${s.viewBtn} ${calView === 'month' ? s.viewBtnActive : ''}`} onClick={() => setCalView('month')}>Month</button>
+            </div>
+          )}
         </div>
 
         {/* Session color legend */}
@@ -574,8 +689,16 @@ export default function Schedule() {
           ))}
         </div>
 
-        {/* Calendar */}
-        {calView === 'week' ? (
+        {/* Coach View (STF-003a) */}
+        {scheduleMode === 'coach' && weekOffset === 0 && (
+          <CoachViewGrid sessions={filteredSessions} onSelectSession={setSelectedSession} />
+        )}
+        {scheduleMode === 'coach' && weekOffset !== 0 && (
+          <div className={s.monthPlaceholder}>Navigate to current week to see coach assignments</div>
+        )}
+
+        {/* Calendar — Session View */}
+        {scheduleMode === 'session' && calView === 'week' ? (
           <div className={s.calendarWrap}>
             {/* Day headers */}
             <div className={s.calendarHeader}>
@@ -634,9 +757,9 @@ export default function Schedule() {
               ))}
             </div>
           </div>
-        ) : (
+        ) : scheduleMode === 'session' ? (
           <div className={s.monthPlaceholder}>Month view coming soon</div>
-        )}
+        ) : null}
       </div>
 
       {/* Session detail drawer */}
