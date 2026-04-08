@@ -25,7 +25,10 @@ const DEFAULT_ITEMS = [
 ];
 
 const PRIORITY_DOT = { high: "#ef4444", medium: "#f59e0b", low: "#6b7280" };
-const STATUS_DOT = { active: "#22c55e", blocked: "#ef4444", done: "#6b7280", paused: "#f59e0b" };
+const STATUS_DOT = {
+  active: "#22c55e", blocked: "#ef4444", done: "#6b7280", paused: "#f59e0b",
+  constrained: "#f97316", rate_limiter: "#dc2626", in_progress: "#22c55e",
+};
 
 /* ─── Dashboard Helpers (kept from original) ─── */
 const STATUS_COLORS = {
@@ -253,13 +256,30 @@ function AskSageModal({ tokens, onClose, context }) {
         body: JSON.stringify({
           creative: {
             title: "Sage Advisor Query",
-            notes: `CONTEXT: The user is asking Sage (the AI advisor) a strategic question about their FullControl business. Here is the current state:\n\n` +
-              `Open Loops: ${context.openLoops?.length || 0} items\n` +
-              `Sessions: ${context.sessions?.length || 0} recent\n` +
-              `Content: ${context.content?.themes || 0} themes, ${context.content?.creatives || 0} creatives\n\n` +
-              `Open Loop titles: ${(context.openLoops || []).map(l => `- ${l.title} (${l.status}, ${l.priority})`).join("\n")}\n\n` +
-              `Recent Session titles: ${(context.sessions || []).map(s => `- ${s.title} (${s.status})`).join("\n")}\n\n` +
-              `USER QUESTION: ${question}\n\nProvide a strategic, actionable answer. Be specific and reference the actual items above where relevant. Keep it concise but thorough.`,
+            notes: `CONTEXT: You are Sage, the AI strategic advisor for FullControl (FC) — an AI-powered command center for sports academy owners. FC handles marketing, sales, member management, scheduling, content creation, and strategy for basketball/sports academies.
+
+FOUNDERS: Cole (CEO of BAM Basketball, 500K+ social followers, gym owner since 2021, 7yr academy operator) and Zoran (ex-Deloitte consultant, technical co-founder).
+
+PRODUCT: FC is pre-launch. The prototype is live at fullcontrol-prototype-six.vercel.app. Domains: Marketing (MKT), Sales (SAL), Member Management (MEM), Scheduling App (APP), Content (CNT), Strategy (STR), AI Advisor (AI), Profiles (PRF), Settings (SET).
+
+CHESSBOARD (current board state):
+${(context.boardItems || []).map(i => `- [${i.status.toUpperCase()}${i.pulse ? " ⭐FOCUS" : ""}] ${i.title} (${i.column_name}, owner: ${i.owner || "unassigned"}, priority: ${i.priority})${i.description ? ": " + i.description : ""}`).join("\n")}
+
+Rate limiters: ${(context.boardItems || []).filter(i => i.status === "rate_limiter").map(i => i.title).join(", ") || "None"}
+Constrained: ${(context.boardItems || []).filter(i => i.status === "constrained").map(i => i.title).join(", ") || "None"}
+In Progress: ${(context.boardItems || []).filter(i => i.status === "in_progress").map(i => i.title).join(", ") || "None"}
+
+OPEN LOOPS (from Notion):
+${(context.openLoops || []).map(l => `- ${l.title} (${l.status}, ${l.priority})`).join("\n") || "None loaded"}
+
+SESSIONS:
+${(context.sessions || []).map(s => `- ${s.title} (${s.status})`).join("\n") || "None loaded"}
+
+CONTENT: ${context.content?.themes || 0} themes, ${context.content?.creatives || 0} creatives, ${context.content?.published || 0} published
+
+USER QUESTION: ${question}
+
+Provide a strategic, actionable answer. Reference specific items from the chessboard and open loops. Identify bottlenecks, rate limiters, and suggest concrete next moves. Think like a startup advisor who understands both the product and go-to-market sides.`,
             psych_lever: "",
             video_style: "talking_head",
             phase: 0,
@@ -598,6 +618,8 @@ export default function ChessboardView({ tokens, dark }) {
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 8px rgba(200,168,78,0.2); } 50% { box-shadow: 0 0 24px rgba(200,168,78,0.5); } }
         @keyframes blocked-pulse { 0%, 100% { box-shadow: 0 0 8px rgba(239,68,68,0.2); } 50% { box-shadow: 0 0 20px rgba(239,68,68,0.4); } }
+        @keyframes inprogress-pulse { 0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.15), 0 2px 8px rgba(0,0,0,0.15); background: rgba(34,197,94,0.06); } 50% { box-shadow: 0 0 20px rgba(34,197,94,0.3), 0 2px 8px rgba(0,0,0,0.15); background: rgba(34,197,94,0.12); } }
+        @keyframes ratelimiter-pulse { 0%, 100% { box-shadow: 0 0 12px rgba(220,38,38,0.25), 0 2px 8px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px rgba(220,38,38,0.5), 0 2px 8px rgba(0,0,0,0.15); } }
       `}</style>
 
       {/* ─── Toolbar ─── */}
@@ -756,24 +778,39 @@ export default function ChessboardView({ tokens, dark }) {
             const statusColor = STATUS_DOT[item.status] || "#6b7280";
             const isDone = item.status === "done";
             const isFiltered = filter !== "All" && item.owner !== filter;
-            const isPulse = item.pulse && !isDone;
+            const isInProgress = item.status === "in_progress";
+            const isRateLimiter = item.status === "rate_limiter";
+            const isConstrained = item.status === "constrained";
             const isBlocked = item.status === "blocked";
+            const isPulse = (item.pulse && !isDone) || isInProgress;
 
             return (
               <div
                 key={item.id}
                 style={{
                   position: "absolute", left: item.x, top: item.y, width: CARD_WIDTH,
-                  background: dark !== false ? "#1a1916" : "#ffffff",
-                  border: `1px solid ${dark !== false ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"}`,
+                  background: isInProgress ? (dark !== false ? "rgba(34,197,94,0.08)" : "rgba(34,197,94,0.06)")
+                    : isRateLimiter ? (dark !== false ? "rgba(220,38,38,0.1)" : "rgba(220,38,38,0.06)")
+                    : isConstrained ? (dark !== false ? "rgba(249,115,22,0.06)" : "rgba(249,115,22,0.04)")
+                    : dark !== false ? "#1a1916" : "#ffffff",
+                  border: isRateLimiter ? "1.5px solid rgba(220,38,38,0.5)"
+                    : isInProgress ? "1.5px solid rgba(34,197,94,0.3)"
+                    : isConstrained ? "1.5px solid rgba(249,115,22,0.3)"
+                    : `1px solid ${dark !== false ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"}`,
                   borderLeft: `4px solid ${cardColor}`,
                   borderRadius: 10, padding: 12,
                   cursor: connectMode ? "crosshair" : dragging?.id === item.id ? "grabbing" : "grab",
                   userSelect: "none",
-                  opacity: isFiltered ? 0.3 : 1,
+                  opacity: isFiltered ? 0.3 : isDone ? 0.5 : 1,
                   transition: dragging?.id === item.id ? "none" : "opacity 0.2s",
-                  animation: isPulse ? "pulse-glow 2s ease-in-out infinite" : isBlocked ? "blocked-pulse 1.5s ease-in-out infinite" : "none",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  animation: isInProgress ? "inprogress-pulse 2.5s ease-in-out infinite"
+                    : isRateLimiter ? "ratelimiter-pulse 1.2s ease-in-out infinite"
+                    : isPulse ? "pulse-glow 2s ease-in-out infinite"
+                    : isBlocked ? "blocked-pulse 1.5s ease-in-out infinite"
+                    : "none",
+                  boxShadow: isRateLimiter ? "0 0 16px rgba(220,38,38,0.3), 0 2px 8px rgba(0,0,0,0.15)"
+                    : isInProgress ? "0 0 12px rgba(34,197,94,0.15), 0 2px 8px rgba(0,0,0,0.15)"
+                    : "0 2px 8px rgba(0,0,0,0.15)",
                 }}
                 onMouseDown={e => startDrag(e, item)}
                 onContextMenu={e => handleContextMenu(e, item)}
@@ -978,18 +1015,26 @@ export default function ChessboardView({ tokens, dark }) {
                 background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 8,
                 boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden",
               }}>
-                {["active", "blocked", "done", "paused"].map(s => (
-                  <div key={s} onClick={() => {
-                    localUpdate(contextMenu.id, { status: s });
-                    debouncedSave(contextMenu.id, { status: s });
+                {[
+                  { key: "active", label: "Active", icon: "🟢" },
+                  { key: "in_progress", label: "In Progress", icon: "💚" },
+                  { key: "constrained", label: "Constrained", icon: "🟠" },
+                  { key: "rate_limiter", label: "Rate Limiter", icon: "🔴" },
+                  { key: "blocked", label: "Blocked", icon: "⛔" },
+                  { key: "paused", label: "Paused", icon: "⏸" },
+                  { key: "done", label: "Done", icon: "✅" },
+                ].map(s => (
+                  <div key={s.key} onClick={() => {
+                    localUpdate(contextMenu.id, { status: s.key });
+                    debouncedSave(contextMenu.id, { status: s.key });
                     setContextMenu(null);
                   }} style={{
                     padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    color: STATUS_DOT[s], textTransform: "capitalize",
+                    color: STATUS_DOT[s.key], display: "flex", alignItems: "center", gap: 6,
                   }}
                     onMouseEnter={e => e.currentTarget.style.background = tokens.surfaceHov}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >{s}</div>
+                  >{s.icon} {s.label}</div>
                 ))}
               </div>
             )}
@@ -1111,7 +1156,7 @@ export default function ChessboardView({ tokens, dark }) {
       )}
 
       {/* Sage Modal */}
-      {showSage && <AskSageModal tokens={tokens} onClose={() => setShowSage(false)} context={{ openLoops, sessions, content }} />}
+      {showSage && <AskSageModal tokens={tokens} onClose={() => setShowSage(false)} context={{ openLoops, sessions, content, boardItems: items }} />}
     </div>
   );
 }
