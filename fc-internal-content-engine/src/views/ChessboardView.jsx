@@ -512,19 +512,24 @@ export default function ChessboardView({ tokens, dark }) {
 
   const handleWheel = useCallback((e) => {
     e.preventDefault();
-    const rect = viewportRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const factor = e.deltaY > 0 ? 0.93 : 1.07;
-    const oldZoom = zoomRef.current;
-    const newZoom = Math.min(3, Math.max(0.25, oldZoom * factor));
-    const scale = newZoom / oldZoom;
-    const newPanX = mouseX - scale * (mouseX - panXRef.current);
-    const newPanY = mouseY - scale * (mouseY - panYRef.current);
-    setZoom(newZoom);
-    setPanX(newPanX);
-    setPanY(newPanY);
+    // Pinch-to-zoom on trackpad: ctrlKey is true
+    if (e.ctrlKey || e.metaKey) {
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const factor = e.deltaY > 0 ? 0.93 : 1.07;
+      const oldZoom = zoomRef.current;
+      const newZoom = Math.min(3, Math.max(0.25, oldZoom * factor));
+      const scale = newZoom / oldZoom;
+      setPanX(mouseX - scale * (mouseX - panXRef.current));
+      setPanY(mouseY - scale * (mouseY - panYRef.current));
+      setZoom(newZoom);
+    } else {
+      // Two-finger scroll on trackpad = pan
+      setPanX(prev => prev - e.deltaX);
+      setPanY(prev => prev - e.deltaY);
+    }
   }, []);
 
   /* ── Pan handlers ── */
@@ -899,7 +904,9 @@ export default function ChessboardView({ tokens, dark }) {
                     : isPulse ? "pulse-glow 2s ease-in-out infinite"
                     : isBlocked ? "blocked-pulse 1.5s ease-in-out infinite"
                     : "none",
-                  boxShadow: isRateLimiter ? "0 0 16px rgba(220,38,38,0.3), 0 2px 8px rgba(0,0,0,0.15)"
+                  boxShadow: connectMode === item.id ? "0 0 20px rgba(200,168,78,0.5), 0 0 4px rgba(200,168,78,0.8), 0 2px 8px rgba(0,0,0,0.15)"
+                    : connectMode && connectMode !== item.id ? "0 0 0 2px rgba(200,168,78,0.3), 0 2px 8px rgba(0,0,0,0.15)"
+                    : isRateLimiter ? "0 0 16px rgba(220,38,38,0.3), 0 2px 8px rgba(0,0,0,0.15)"
                     : isInProgress ? "0 0 12px rgba(34,197,94,0.15), 0 2px 8px rgba(0,0,0,0.15)"
                     : "0 2px 8px rgba(0,0,0,0.15)",
                 }}
@@ -908,7 +915,7 @@ export default function ChessboardView({ tokens, dark }) {
                 onMouseLeave={() => { window._hoverTimeout = setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 200); }}
                 onClick={e => {
                   // Only expand if click is on card body area and no drag occurred
-                  if (!connectMode && !didDragRef.current) setExpandedCard(item.id);
+                  if (!connectMode && !didDragRef.current && !dragging) setExpandedCard(item.id);
                 }}
               >
                 {/* Hover toolbar */}
