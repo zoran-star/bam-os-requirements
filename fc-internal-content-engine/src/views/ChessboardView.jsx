@@ -503,20 +503,28 @@ export default function ChessboardView({ tokens, dark }) {
   }, []);
 
   /* ── Zoom handler (centers on cursor) ── */
+  const zoomRef = useRef(zoom);
+  const panXRef = useRef(panX);
+  const panYRef = useRef(panY);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panXRef.current = panX; }, [panX]);
+  useEffect(() => { panYRef.current = panY; }, [panY]);
+
   const handleWheel = useCallback((e) => {
     e.preventDefault();
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const delta = e.deltaY > 0 ? 0.92 : 1.08;
-    setZoom(prevZoom => {
-      const newZoom = Math.min(3, Math.max(0.3, prevZoom * delta));
-      const scale = newZoom / prevZoom;
-      setPanX(prev => mouseX - scale * (mouseX - prev));
-      setPanY(prev => mouseY - scale * (mouseY - prev));
-      return newZoom;
-    });
+    const factor = e.deltaY > 0 ? 0.93 : 1.07;
+    const oldZoom = zoomRef.current;
+    const newZoom = Math.min(3, Math.max(0.25, oldZoom * factor));
+    const scale = newZoom / oldZoom;
+    const newPanX = mouseX - scale * (mouseX - panXRef.current);
+    const newPanY = mouseY - scale * (mouseY - panYRef.current);
+    setZoom(newZoom);
+    setPanX(newPanX);
+    setPanY(newPanY);
   }, []);
 
   /* ── Pan handlers ── */
@@ -795,7 +803,7 @@ export default function ChessboardView({ tokens, dark }) {
           cursor: connectMode ? "crosshair" : panning ? "grabbing" : "grab",
           background: dark !== false ? "#0c0b09" : "#f5f5f0",
         }}
-        onWheel={handleWheel}
+        ref={el => { viewportRef.current = el; if (el && !el._wheelAttached) { el.addEventListener('wheel', handleWheel, { passive: false }); el._wheelAttached = true; } }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -896,8 +904,8 @@ export default function ChessboardView({ tokens, dark }) {
                     : "0 2px 8px rgba(0,0,0,0.15)",
                 }}
                 onMouseDown={e => startDrag(e, item)}
-                onMouseEnter={() => setHoveredCard(item.id)}
-                onMouseLeave={() => { setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 100); }}
+                onMouseEnter={() => { clearTimeout(window._hoverTimeout); setHoveredCard(item.id); }}
+                onMouseLeave={() => { window._hoverTimeout = setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 200); }}
                 onClick={e => {
                   // Only expand if click is on card body area and no drag occurred
                   if (!connectMode && !didDragRef.current) setExpandedCard(item.id);
@@ -907,13 +915,14 @@ export default function ChessboardView({ tokens, dark }) {
                 {hoveredCard === item.id && !dragging && (
                   <div
                     style={{
-                      position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
-                      marginBottom: 6, display: "flex", gap: 4, padding: "4px 8px",
-                      background: "rgba(0,0,0,0.75)", borderRadius: 8, zIndex: 10,
+                      position: "absolute", bottom: "calc(100% + 2px)", left: "50%", transform: "translateX(-50%)",
+                      display: "flex", gap: 2, padding: "5px 10px",
+                      background: "rgba(0,0,0,0.85)", borderRadius: 10, zIndex: 10,
                       animation: "toolbar-fade 0.15s ease",
+                      backdropFilter: "blur(8px)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      pointerEvents: "auto",
                     }}
-                    onMouseEnter={() => setHoveredCard(item.id)}
-                    onMouseLeave={() => { setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 100); }}
                     onMouseDown={e => e.stopPropagation()}
                     onClick={e => e.stopPropagation()}
                   >
