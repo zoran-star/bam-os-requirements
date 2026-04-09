@@ -12,16 +12,34 @@ const CARD_COLORS = {
 };
 
 const DEFAULT_ITEMS = [
-  { title: "Investor deck v2", column_name: "Investors", x: 30, y: 80, color: "gold", status: "active", owner: "Zoran", priority: "high", description: "", connections: [], pulse: false },
-  { title: "Term sheet review", column_name: "Legal", x: 330, y: 80, color: "red", status: "active", owner: "Zoran", priority: "high", description: "", connections: [], pulse: false },
-  { title: "Prototype polish", column_name: "Devs", x: 630, y: 80, color: "blue", status: "active", owner: "Cole", priority: "high", description: "", connections: [], pulse: true },
-  { title: "Onboarding flow", column_name: "Product", x: 930, y: 80, color: "purple", status: "active", owner: "Cole", priority: "medium", description: "", connections: [], pulse: false },
-  { title: "Content engine", column_name: "GTM", x: 1230, y: 80, color: "green", status: "active", owner: "Cole", priority: "medium", description: "", connections: [], pulse: false },
-  { title: "Survey analysis", column_name: "Product", x: 930, y: 220, color: "purple", status: "done", owner: "Cole", priority: "low", description: "", connections: [], pulse: false },
-  { title: "GHL workflows", column_name: "Devs", x: 630, y: 220, color: "blue", status: "active", owner: "Zoran", priority: "medium", description: "", connections: [], pulse: false },
-  { title: "Landing page", column_name: "GTM", x: 1230, y: 220, color: "green", status: "paused", owner: "Cole", priority: "low", description: "", connections: [], pulse: false },
-  { title: "Ad creative library", column_name: "GTM", x: 1230, y: 360, color: "orange", status: "active", owner: "Cole", priority: "high", description: "", connections: [], pulse: true },
-  { title: "NDA + legal review", column_name: "Legal", x: 330, y: 220, color: "red", status: "done", owner: "Zoran", priority: "medium", description: "", connections: [], pulse: false },
+  // INVESTORS column
+  { title: "Investor deck v3", column_name: "Investors", x: 30, y: 80, color: "gold", status: "in_progress", owner: "Zoran", priority: "high", pulse: true, description: "Final version of pitch deck for seed round", connections: [] },
+  { title: "Financial projections", column_name: "Investors", x: 30, y: 230, color: "gold", status: "active", owner: "Zoran", priority: "high", description: "3-year revenue model, unit economics", connections: [] },
+  { title: "Cap table setup", column_name: "Investors", x: 30, y: 380, color: "gold", status: "active", owner: "Zoran", priority: "medium", description: "SAFE notes, equity structure", connections: [] },
+
+  // LEGAL column
+  { title: "Terms of service", column_name: "Legal", x: 330, y: 80, color: "red", status: "active", owner: "Zoran", priority: "high", description: "TOS for FC platform users", connections: [] },
+  { title: "Privacy policy", column_name: "Legal", x: 330, y: 230, color: "red", status: "active", owner: "Zoran", priority: "high", description: "GDPR/CCPA compliant privacy policy", connections: [] },
+  { title: "NDA template", column_name: "Legal", x: 330, y: 380, color: "red", status: "done", owner: "Zoran", priority: "low", description: "Standard NDA for partners and reviewers", connections: [] },
+
+  // DEVS column
+  { title: "Prototype polish", column_name: "Devs", x: 630, y: 80, color: "blue", status: "in_progress", owner: "Cole", priority: "high", pulse: true, description: "UX audit, mobile optimization, final polish before launch", connections: [] },
+  { title: "GHL workflows", column_name: "Devs", x: 630, y: 230, color: "blue", status: "in_progress", owner: "Zoran", priority: "high", description: "GoHighLevel automation setup — funnels, pipelines, triggers", connections: [] },
+  { title: "Supabase backend", column_name: "Devs", x: 630, y: 380, color: "blue", status: "active", owner: "Cole", priority: "medium", description: "Database schema, RLS policies, API routes", connections: [] },
+  { title: "AI booking agent", column_name: "Devs", x: 630, y: 530, color: "blue", status: "active", owner: "Zoran", priority: "high", description: "Conversational AI for lead qualification and trial booking", connections: [] },
+
+  // PRODUCT column
+  { title: "Onboarding flow", column_name: "Product", x: 930, y: 80, color: "purple", status: "in_progress", owner: "Cole", priority: "high", pulse: true, description: "8-section onboarding via whiteboard sessions", connections: [] },
+  { title: "Survey analysis", column_name: "Product", x: 930, y: 230, color: "purple", status: "done", owner: "Cole", priority: "low", description: "12-slide survey complete, data in Supabase", connections: [] },
+  { title: "Business requirements", column_name: "Product", x: 930, y: 380, color: "purple", status: "in_progress", owner: "Cole", priority: "high", description: "Notion-based requirements across all domains", connections: [] },
+  { title: "Scheduling app spec", column_name: "Product", x: 930, y: 530, color: "purple", status: "rate_limiter", owner: "Cole", priority: "high", pulse: false, description: "Credit-based scheduling system — rate limiting other features", connections: [] },
+
+  // GTM column
+  { title: "Content engine", column_name: "GTM", x: 1230, y: 80, color: "green", status: "in_progress", owner: "Cole", priority: "high", pulse: true, description: "Internal tool for managing ad themes, creatives, and Andromeda strategy", connections: [] },
+  { title: "Ad creative library", column_name: "GTM", x: 1230, y: 230, color: "orange", status: "in_progress", owner: "Cole", priority: "high", description: "15 themes, 9 creatives, Andromeda-optimized", connections: [] },
+  { title: "Landing page", column_name: "GTM", x: 1230, y: 380, color: "green", status: "constrained", owner: "Cole", priority: "medium", description: "Product landing page — blocked by final prototype", connections: [] },
+  { title: "Waitlist setup", column_name: "GTM", x: 1230, y: 530, color: "green", status: "active", owner: "Zoran", priority: "medium", description: "Email capture, early access signups", connections: [] },
+  { title: "Launch strategy", column_name: "GTM", x: 1230, y: 680, color: "orange", status: "active", owner: "Cole", priority: "high", description: "Phase 0 → Phase 1 → Phase 2 rollout plan", connections: [] },
 ];
 
 const PRIORITY_DOT = { high: "#ef4444", medium: "#f59e0b", low: "#6b7280" };
@@ -416,6 +434,9 @@ export default function ChessboardView({ tokens, dark }) {
   const [showOpenLoops, setShowOpenLoops] = useState(false);
   const [filter, setFilter] = useState("All");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [expandedCard, setExpandedCard] = useState(null);
+  const [hoverToolbarColor, setHoverToolbarColor] = useState(false);
 
   /* ── Dashboard state ── */
   const [dashboardOpen, setDashboardOpen] = useState(false);
@@ -603,7 +624,7 @@ export default function ChessboardView({ tokens, dark }) {
 
   /* ── Close menus on outside click ── */
   useEffect(() => {
-    const close = () => { setContextMenu(null); setOwnerDropdown(null); setFilterOpen(false); };
+    const close = () => { setContextMenu(null); setOwnerDropdown(null); setFilterOpen(false); setStatusDropdown(null); };
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
@@ -658,7 +679,8 @@ export default function ChessboardView({ tokens, dark }) {
         @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 8px rgba(200,168,78,0.2); } 50% { box-shadow: 0 0 24px rgba(200,168,78,0.5); } }
         @keyframes blocked-pulse { 0%, 100% { box-shadow: 0 0 8px rgba(239,68,68,0.2); } 50% { box-shadow: 0 0 20px rgba(239,68,68,0.4); } }
         @keyframes inprogress-pulse { 0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.15), 0 2px 8px rgba(0,0,0,0.15); background: rgba(34,197,94,0.06); } 50% { box-shadow: 0 0 20px rgba(34,197,94,0.3), 0 2px 8px rgba(0,0,0,0.15); background: rgba(34,197,94,0.12); } }
-        @keyframes ratelimiter-pulse { 0%, 100% { box-shadow: 0 0 12px rgba(220,38,38,0.25), 0 2px 8px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 28px rgba(220,38,38,0.5), 0 2px 8px rgba(0,0,0,0.15); } }
+        @keyframes ratelimiter-pulse { 0%, 100% { box-shadow: 0 0 15px rgba(220,38,38,0.3), 0 0 4px rgba(220,38,38,0.6), 0 2px 8px rgba(0,0,0,0.15); } 50% { box-shadow: 0 0 35px rgba(220,38,38,0.6), 0 0 12px rgba(220,38,38,0.8), 0 2px 8px rgba(0,0,0,0.15); } }
+        @keyframes toolbar-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       {/* ─── Toolbar ─── */}
@@ -837,10 +859,11 @@ export default function ChessboardView({ tokens, dark }) {
                 style={{
                   position: "absolute", left: item.x, top: item.y, width: CARD_WIDTH,
                   background: isInProgress ? (dark !== false ? "rgba(34,197,94,0.08)" : "rgba(34,197,94,0.06)")
-                    : isRateLimiter ? (dark !== false ? "rgba(220,38,38,0.1)" : "rgba(220,38,38,0.06)")
+                    : isRateLimiter ? (dark !== false ? "rgba(220,38,38,0.15)" : "rgba(220,38,38,0.08)")
                     : isConstrained ? (dark !== false ? "rgba(249,115,22,0.06)" : "rgba(249,115,22,0.04)")
                     : dark !== false ? "#1a1916" : "#ffffff",
-                  border: isRateLimiter ? "1.5px solid rgba(220,38,38,0.5)"
+                  backgroundImage: isRateLimiter ? "radial-gradient(ellipse at 50% 0%, rgba(220,38,38,0.12), transparent 70%)" : "none",
+                  border: isRateLimiter ? "2px solid rgba(220,38,38,0.6)"
                     : isInProgress ? "1.5px solid rgba(34,197,94,0.3)"
                     : isConstrained ? "1.5px solid rgba(249,115,22,0.3)"
                     : `1px solid ${dark !== false ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"}`,
@@ -861,7 +884,74 @@ export default function ChessboardView({ tokens, dark }) {
                 }}
                 onMouseDown={e => startDrag(e, item)}
                 onContextMenu={e => handleContextMenu(e, item)}
+                onMouseEnter={() => setHoveredCard(item.id)}
+                onMouseLeave={() => { setHoveredCard(null); setHoverToolbarColor(false); }}
+                onClick={e => {
+                  // Only expand if click is on card body area (not title/desc/pills which stopPropagation)
+                  if (!connectMode && !dragging) setExpandedCard(item.id);
+                }}
               >
+                {/* Hover toolbar */}
+                {hoveredCard === item.id && !dragging && (
+                  <div
+                    style={{
+                      position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
+                      marginBottom: 6, display: "flex", gap: 4, padding: "4px 8px",
+                      background: "rgba(0,0,0,0.75)", borderRadius: 8, zIndex: 10,
+                      animation: "toolbar-fade 0.15s ease",
+                    }}
+                    onMouseEnter={() => setHoveredCard(item.id)}
+                    onMouseLeave={() => { setHoveredCard(null); setHoverToolbarColor(false); }}
+                    onMouseDown={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* Color picker */}
+                    <div style={{ position: "relative" }}>
+                      <button onClick={() => setHoverToolbarColor(hoverToolbarColor === item.id ? false : item.id)} style={{
+                        width: 24, height: 24, fontSize: 14, background: "none", border: "none",
+                        cursor: "pointer", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                      }} title="Color">🎨</button>
+                      {hoverToolbarColor === item.id && (
+                        <div style={{
+                          position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)",
+                          marginBottom: 4, display: "flex", gap: 4, padding: 6,
+                          background: "rgba(0,0,0,0.85)", borderRadius: 8,
+                        }}>
+                          {Object.entries(CARD_COLORS).map(([name, hex]) => (
+                            <div key={name} onClick={() => {
+                              localUpdate(item.id, { color: name });
+                              debouncedSave(item.id, { color: name });
+                              setHoverToolbarColor(false);
+                            }} style={{
+                              width: 16, height: 16, borderRadius: "50%", background: hex, cursor: "pointer",
+                              border: item.color === name ? "2px solid #fff" : "2px solid transparent",
+                            }} title={name} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {/* Connect */}
+                    <button onClick={() => { setConnectMode(item.id); setHoveredCard(null); }} style={{
+                      width: 24, height: 24, fontSize: 14, background: "none", border: "none",
+                      cursor: "pointer", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                    }} title="Connect">🔗</button>
+                    {/* Pulse */}
+                    <button onClick={() => {
+                      localUpdate(item.id, { pulse: !item.pulse });
+                      debouncedSave(item.id, { pulse: !item.pulse });
+                    }} style={{
+                      width: 24, height: 24, fontSize: 14, background: item.pulse ? "rgba(200,168,78,0.3)" : "none",
+                      border: "none", cursor: "pointer", borderRadius: 4,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }} title="Toggle pulse">⭐</button>
+                    {/* Delete */}
+                    <button onClick={() => deleteItem(item.id)} style={{
+                      width: 24, height: 24, fontSize: 14, background: "none", border: "none",
+                      cursor: "pointer", borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                    }} title="Delete">🗑</button>
+                  </div>
+                )}
+
                 {/* Status dot */}
                 <div style={{
                   position: "absolute", top: 8, right: 8,
@@ -1289,6 +1379,216 @@ export default function ChessboardView({ tokens, dark }) {
           ref={el => el?.focus()}
         />
       )}
+
+      {/* ─── Detail Panel (slide-out) ─── */}
+      {expandedCard && (() => {
+        const item = items.find(i => i.id === expandedCard);
+        if (!item) return null;
+        return (
+          <div style={{
+            position: "absolute", top: 0, right: 0, bottom: 0, width: 320,
+            background: tokens.surface, borderLeft: `1px solid ${tokens.border}`,
+            zIndex: 25, overflowY: "auto", padding: 20,
+            boxShadow: "-4px 0 24px rgba(0,0,0,0.3)",
+            animation: "fadeSlideUp 0.2s ease",
+          }}>
+            {/* Close */}
+            <button onClick={() => setExpandedCard(null)} style={{
+              position: "absolute", top: 12, right: 12, background: "none", border: "none",
+              fontSize: 20, color: tokens.textMute, cursor: "pointer",
+            }}>×</button>
+
+            {/* Title */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, display: "block" }}>Title</label>
+              <input
+                value={item.title}
+                onChange={e => {
+                  localUpdate(item.id, { title: e.target.value });
+                  debouncedSave(item.id, { title: e.target.value });
+                }}
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8, fontSize: 14, fontWeight: 700,
+                  background: tokens.surfaceEl, color: tokens.text, border: `1px solid ${tokens.border}`,
+                  outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Description */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, display: "block" }}>Description</label>
+              <textarea
+                value={item.description || ""}
+                onChange={e => {
+                  localUpdate(item.id, { description: e.target.value });
+                  debouncedSave(item.id, { description: e.target.value });
+                }}
+                rows={4}
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8, fontSize: 13,
+                  background: tokens.surfaceEl, color: tokens.text, border: `1px solid ${tokens.border}`,
+                  outline: "none", fontFamily: "inherit", resize: "vertical", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Status */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Status</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {[
+                  { key: "active", label: "Active" }, { key: "in_progress", label: "In Progress" },
+                  { key: "constrained", label: "Constrained" }, { key: "rate_limiter", label: "Rate Limiter" },
+                  { key: "blocked", label: "Blocked" }, { key: "paused", label: "Paused" }, { key: "done", label: "Done" },
+                ].map(s => (
+                  <span key={s.key} onClick={() => {
+                    localUpdate(item.id, { status: s.key });
+                    debouncedSave(item.id, { status: s.key });
+                  }} style={{
+                    fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 99, cursor: "pointer",
+                    background: item.status === s.key ? (STATUS_DOT[s.key] || "#6b7280") + "30" : tokens.surfaceEl,
+                    color: item.status === s.key ? (STATUS_DOT[s.key] || "#6b7280") : tokens.textMute,
+                    border: item.status === s.key ? `1px solid ${STATUS_DOT[s.key] || "#6b7280"}50` : `1px solid ${tokens.border}`,
+                  }}>{s.label}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Color */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Color</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {Object.entries(CARD_COLORS).map(([name, hex]) => (
+                  <div key={name} onClick={() => {
+                    localUpdate(item.id, { color: name });
+                    debouncedSave(item.id, { color: name });
+                  }} style={{
+                    width: 22, height: 22, borderRadius: "50%", background: hex, cursor: "pointer",
+                    border: item.color === name ? "2.5px solid #fff" : "2.5px solid transparent",
+                    boxShadow: item.color === name ? `0 0 0 1px ${hex}` : "none",
+                  }} title={name} />
+                ))}
+              </div>
+            </div>
+
+            {/* Owner */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Owner</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ val: "Cole", color: "#C8A84E" }, { val: "Zoran", color: "#818cf8" }, { val: null, color: tokens.textMute, label: "Unassigned" }].map(o => (
+                  <button key={o.val || "none"} onClick={() => {
+                    localUpdate(item.id, { owner: o.val });
+                    debouncedSave(item.id, { owner: o.val });
+                  }} style={{
+                    padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    fontFamily: "inherit",
+                    background: item.owner === o.val ? o.color + "20" : tokens.surfaceEl,
+                    color: item.owner === o.val ? o.color : tokens.textMute,
+                    border: item.owner === o.val ? `1px solid ${o.color}50` : `1px solid ${tokens.border}`,
+                  }}>{o.label || o.val}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Priority</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                {[{ val: "high", color: "#ef4444" }, { val: "medium", color: "#f59e0b" }, { val: "low", color: "#6b7280" }].map(p => (
+                  <button key={p.val} onClick={() => {
+                    localUpdate(item.id, { priority: p.val });
+                    debouncedSave(item.id, { priority: p.val });
+                  }} style={{
+                    padding: "4px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                    fontFamily: "inherit", textTransform: "capitalize",
+                    background: item.priority === p.val ? p.color + "20" : tokens.surfaceEl,
+                    color: item.priority === p.val ? p.color : tokens.textMute,
+                    border: item.priority === p.val ? `1px solid ${p.color}50` : `1px solid ${tokens.border}`,
+                  }}>{p.val}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Column name */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, display: "block" }}>Column</label>
+              <input
+                value={item.column_name || ""}
+                onChange={e => {
+                  localUpdate(item.id, { column_name: e.target.value });
+                  debouncedSave(item.id, { column_name: e.target.value });
+                }}
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8, fontSize: 13,
+                  background: tokens.surfaceEl, color: tokens.text, border: `1px solid ${tokens.border}`,
+                  outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Pulse toggle */}
+            <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="checkbox" checked={!!item.pulse} onChange={e => {
+                localUpdate(item.id, { pulse: e.target.checked });
+                debouncedSave(item.id, { pulse: e.target.checked });
+              }} style={{ accentColor: tokens.accent }} />
+              <label style={{ fontSize: 12, fontWeight: 600, color: tokens.text }}>Pulse (focus glow)</label>
+            </div>
+
+            {/* Connections */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6, display: "block" }}>Connections</label>
+              {(item.connections || []).length === 0 && (
+                <div style={{ fontSize: 12, color: tokens.textMute, fontStyle: "italic" }}>No connections</div>
+              )}
+              {(item.connections || []).map((conn, ci) => {
+                const tgt = items.find(i => i.id === conn.targetId);
+                return (
+                  <div key={ci} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "4px 8px", borderRadius: 6, background: tokens.surfaceEl, marginBottom: 4,
+                  }}>
+                    <span style={{ fontSize: 12, color: tokens.text }}>{tgt ? tgt.title : conn.targetId}</span>
+                    <button onClick={() => {
+                      const newConns = item.connections.filter((_, i) => i !== ci);
+                      localUpdate(item.id, { connections: newConns });
+                      debouncedSave(item.id, { connections: newConns });
+                    }} style={{
+                      background: "none", border: "none", fontSize: 14, color: "#ef4444", cursor: "pointer",
+                    }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Notion URL */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4, display: "block" }}>Notion URL</label>
+              <input
+                value={item.notion_url || ""}
+                onChange={e => {
+                  localUpdate(item.id, { notion_url: e.target.value });
+                  debouncedSave(item.id, { notion_url: e.target.value });
+                }}
+                placeholder="https://notion.so/..."
+                style={{
+                  width: "100%", padding: "8px 10px", borderRadius: 8, fontSize: 12,
+                  background: tokens.surfaceEl, color: tokens.text, border: `1px solid ${tokens.border}`,
+                  outline: "none", fontFamily: "inherit", boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Delete */}
+            <button onClick={() => { deleteItem(item.id); setExpandedCard(null); }} style={{
+              width: "100%", padding: "10px 16px", borderRadius: 10,
+              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+              color: "#ef4444", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}>Delete Item</button>
+          </div>
+        );
+      })()}
 
       {/* Sage Modal */}
       {showSage && <AskSageModal tokens={tokens} onClose={() => setShowSage(false)} context={{ openLoops, sessions, content, boardItems: items }} />}
