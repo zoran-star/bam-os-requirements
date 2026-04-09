@@ -94,6 +94,43 @@ function SkeletonCard({ tokens }) {
   );
 }
 
+/* ─── Open Loop Card (expandable) ─── */
+function OpenLoopCard({ item, tokens }) {
+  const [expanded, setExpanded] = useState(false);
+  const priorityColor = PRIORITY_DOT[item.priority?.toLowerCase()] || "#6b7280";
+  return (
+    <div style={{
+      padding: 14, borderRadius: 12, background: tokens.surface,
+      border: `1px solid transparent`, cursor: "pointer",
+      transition: "all 0.2s",
+    }}
+      onClick={() => setExpanded(!expanded)}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = `${tokens.accent}30`; e.currentTarget.style.transform = "translateY(-2px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.transform = ""; }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: priorityColor, marginTop: 6, flexShrink: 0 }} />
+        <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text, lineHeight: 1.35, flex: 1 }}>{item.title}</div>
+        <span style={{ fontSize: 10, color: expanded ? tokens.accent : tokens.textMute, transition: "transform 0.2s", transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }}>▼</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, paddingLeft: 14 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 99, background: (STATUS_DOT_DASH[item.status] || "#f59e0b") + "20", color: STATUS_DOT_DASH[item.status] || "#f59e0b", textTransform: "uppercase" }}>{item.status}</span>
+        {item.priority && <span style={{ fontSize: 9, fontWeight: 600, color: priorityColor }}>{item.priority}</span>}
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 14, marginTop: 10, paddingTop: 10, borderTop: `1px solid ${tokens.border}` }}>
+          {item.description && <div style={{ fontSize: 12, color: tokens.textSub, lineHeight: 1.6, marginBottom: 8 }}>{item.description}</div>}
+          <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: tokens.accent, textDecoration: "none" }} onClick={e => e.stopPropagation()}>
+            Open in Notion →
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const STATUS_DOT_DASH = { CRLF: "#ef4444", Open: "#f59e0b", Closed: "#22c55e" };
+
 /* ─── CRLF Card ─── */
 function CRLFCard({ item, tokens }) {
   if (!item) return null;
@@ -375,6 +412,8 @@ export default function ChessboardView({ tokens, dark }) {
   const [statusSubmenu, setStatusSubmenu] = useState(false);
   const [connectMode, setConnectMode] = useState(null); // sourceId
   const [ownerDropdown, setOwnerDropdown] = useState(null); // itemId
+  const [statusDropdown, setStatusDropdown] = useState(null); // itemId
+  const [showOpenLoops, setShowOpenLoops] = useState(false);
   const [filter, setFilter] = useState("All");
   const [filterOpen, setFilterOpen] = useState(false);
 
@@ -696,6 +735,14 @@ export default function ChessboardView({ tokens, dark }) {
           fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
         }}>✨ Sage</button>
 
+        <button onClick={() => { setShowOpenLoops(o => !o); if (!dashData) loadDashboard(); }} style={{
+          padding: "5px 14px", borderRadius: 8,
+          background: showOpenLoops ? tokens.amber + "20" : tokens.surfaceEl,
+          border: `1px solid ${showOpenLoops ? tokens.amber + "40" : tokens.border}`,
+          color: showOpenLoops ? tokens.amber : tokens.text, fontSize: 12, fontWeight: 700,
+          cursor: "pointer", fontFamily: "inherit",
+        }}>🔓 Open Loops</button>
+
         <button onClick={() => { setDashboardOpen(d => !d); if (!dashData) loadDashboard(); }} style={{
           padding: "5px 14px", borderRadius: 8,
           background: dashboardOpen ? tokens.accent + "20" : tokens.surfaceEl,
@@ -929,6 +976,50 @@ export default function ChessboardView({ tokens, dark }) {
                     )}
                   </div>
 
+                  {/* Status pill (clickable dropdown) */}
+                  <div style={{ position: "relative" }}>
+                    <span
+                      onClick={e => { e.stopPropagation(); setStatusDropdown(statusDropdown === item.id ? null : item.id); setOwnerDropdown(null); }}
+                      onMouseDown={e => e.stopPropagation()}
+                      style={{
+                        fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 99, cursor: "pointer",
+                        background: (STATUS_DOT[item.status] || "#6b7280") + "20",
+                        color: STATUS_DOT[item.status] || "#6b7280",
+                        textTransform: "uppercase", letterSpacing: "0.03em",
+                      }}
+                    >{(item.status || "active").replace("_", " ")}</span>
+                    {statusDropdown === item.id && (
+                      <div style={{
+                        position: "absolute", bottom: "100%", left: 0, marginBottom: 4, zIndex: 100,
+                        background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 8,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden", minWidth: 130,
+                      }} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                        {[
+                          { key: "active", label: "Active", icon: "🟢" },
+                          { key: "in_progress", label: "In Progress", icon: "💚" },
+                          { key: "constrained", label: "Constrained", icon: "🟠" },
+                          { key: "rate_limiter", label: "Rate Limiter", icon: "🔴" },
+                          { key: "blocked", label: "Blocked", icon: "⛔" },
+                          { key: "paused", label: "Paused", icon: "⏸" },
+                          { key: "done", label: "Done", icon: "✅" },
+                        ].map(s => (
+                          <div key={s.key} onClick={() => {
+                            localUpdate(item.id, { status: s.key });
+                            debouncedSave(item.id, { status: s.key });
+                            setStatusDropdown(null);
+                          }} style={{
+                            padding: "6px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                            color: STATUS_DOT[s.key], display: "flex", alignItems: "center", gap: 6,
+                            background: item.status === s.key ? `${STATUS_DOT[s.key]}15` : "transparent",
+                          }}
+                            onMouseEnter={e => e.currentTarget.style.background = tokens.surfaceHov}
+                            onMouseLeave={e => e.currentTarget.style.background = item.status === s.key ? `${STATUS_DOT[s.key]}15` : "transparent"}
+                          >{s.icon} {s.label}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   {/* Priority dot */}
                   <div style={{
                     width: 6, height: 6, borderRadius: "50%",
@@ -1072,6 +1163,50 @@ export default function ChessboardView({ tokens, dark }) {
           >🗑 Delete</div>
         </div>
       )}
+
+      {/* ─── Open Loops Panel ─── */}
+      <div style={{
+        position: "absolute", bottom: 0, left: 0, right: 0,
+        height: showOpenLoops ? "40vh" : 0,
+        background: dark !== false ? "rgba(14,13,11,0.96)" : "rgba(255,255,255,0.96)",
+        backdropFilter: "blur(12px)",
+        borderTop: showOpenLoops ? `1px solid ${tokens.border}` : "none",
+        transition: "height 0.3s ease",
+        overflow: "hidden",
+        zIndex: 16,
+      }}>
+        <div style={{ height: "100%", overflow: "auto", padding: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🔓</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: tokens.text }}>Open Loops</span>
+              {openLoops.length > 0 && <span style={{ fontSize: 12, color: tokens.textMute }}>({openLoops.length})</span>}
+            </div>
+            <button onClick={() => setShowOpenLoops(false)} style={{
+              background: "none", border: "none", fontSize: 18, color: tokens.textMute, cursor: "pointer",
+            }}>×</button>
+          </div>
+          {dashLoading && <div style={{ color: tokens.textMute, fontSize: 13 }}>Loading from Notion...</div>}
+          {!dashLoading && openLoops.length === 0 && <div style={{ color: tokens.textMute, fontSize: 13 }}>No open loops found.</div>}
+          {crlf && (
+            <div style={{
+              padding: 16, borderRadius: 12, marginBottom: 12,
+              background: "linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%)",
+              border: "1px solid #ef444460",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#ef4444", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>🔴 CRLF — Critical Blocker</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fca5a5", marginBottom: 4 }}>{crlf.title}</div>
+              {crlf.description && <div style={{ fontSize: 12, color: "#fca5a580", lineHeight: 1.5 }}>{crlf.description}</div>}
+              {crlf.url && <a href={crlf.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#ef4444", marginTop: 6, display: "inline-block" }}>Open in Notion →</a>}
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 10 }}>
+            {openLoops.map(loop => (
+              <OpenLoopCard key={loop.id} item={loop} tokens={tokens} />
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ─── Dashboard Panel ─── */}
       <div style={{
