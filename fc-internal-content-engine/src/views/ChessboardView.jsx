@@ -447,6 +447,7 @@ export default function ChessboardView({ tokens, dark }) {
 
   const viewportRef = useRef(null);
   const saveTimers = useRef({});
+  const didDragRef = useRef(false);
 
   /* ── Load board items ── */
   useEffect(() => {
@@ -501,11 +502,21 @@ export default function ChessboardView({ tokens, dark }) {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...fields } : it));
   }, []);
 
-  /* ── Zoom handler ── */
+  /* ── Zoom handler (centers on cursor) ── */
   const handleWheel = useCallback((e) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    setZoom(z => Math.min(3, Math.max(0.3, z + delta)));
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const delta = e.deltaY > 0 ? 0.92 : 1.08;
+    setZoom(prevZoom => {
+      const newZoom = Math.min(3, Math.max(0.3, prevZoom * delta));
+      const scale = newZoom / prevZoom;
+      setPanX(prev => mouseX - scale * (mouseX - prev));
+      setPanY(prev => mouseY - scale * (mouseY - prev));
+      return newZoom;
+    });
   }, []);
 
   /* ── Pan handlers ── */
@@ -520,6 +531,7 @@ export default function ChessboardView({ tokens, dark }) {
 
   const handleMouseMove = useCallback((e) => {
     if (dragging) {
+      didDragRef.current = true;
       const dx = (e.clientX - dragging.startX) / zoom;
       const dy = (e.clientY - dragging.startY) / zoom;
       localUpdate(dragging.id, { x: dragging.origX + dx, y: dragging.origY + dy });
@@ -555,6 +567,7 @@ export default function ChessboardView({ tokens, dark }) {
       setConnectMode(null);
       return;
     }
+    didDragRef.current = false;
     setDragging({ id: item.id, startX: e.clientX, startY: e.clientY, origX: item.x, origY: item.y });
   }, [connectMode, items, localUpdate, debouncedSave]);
 
@@ -883,12 +896,11 @@ export default function ChessboardView({ tokens, dark }) {
                     : "0 2px 8px rgba(0,0,0,0.15)",
                 }}
                 onMouseDown={e => startDrag(e, item)}
-                onContextMenu={e => handleContextMenu(e, item)}
                 onMouseEnter={() => setHoveredCard(item.id)}
-                onMouseLeave={() => { setHoveredCard(null); setHoverToolbarColor(false); }}
+                onMouseLeave={() => { setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 100); }}
                 onClick={e => {
-                  // Only expand if click is on card body area (not title/desc/pills which stopPropagation)
-                  if (!connectMode && !dragging) setExpandedCard(item.id);
+                  // Only expand if click is on card body area and no drag occurred
+                  if (!connectMode && !didDragRef.current) setExpandedCard(item.id);
                 }}
               >
                 {/* Hover toolbar */}
@@ -901,7 +913,7 @@ export default function ChessboardView({ tokens, dark }) {
                       animation: "toolbar-fade 0.15s ease",
                     }}
                     onMouseEnter={() => setHoveredCard(item.id)}
-                    onMouseLeave={() => { setHoveredCard(null); setHoverToolbarColor(false); }}
+                    onMouseLeave={() => { setTimeout(() => { setHoveredCard(h => h === item.id ? null : h); setHoverToolbarColor(false); }, 100); }}
                     onMouseDown={e => e.stopPropagation()}
                     onClick={e => e.stopPropagation()}
                   >
@@ -1080,7 +1092,7 @@ export default function ChessboardView({ tokens, dark }) {
                     >{(item.status || "active").replace("_", " ")}</span>
                     {statusDropdown === item.id && (
                       <div style={{
-                        position: "absolute", bottom: "100%", left: 0, marginBottom: 4, zIndex: 100,
+                        position: "absolute", bottom: "100%", left: 0, marginBottom: 4, zIndex: 200,
                         background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 8,
                         boxShadow: "0 8px 24px rgba(0,0,0,0.3)", overflow: "hidden", minWidth: 130,
                       }} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
@@ -1133,10 +1145,19 @@ export default function ChessboardView({ tokens, dark }) {
         {/* Connect mode indicator */}
         {connectMode && (
           <div style={{
-            position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 30,
-            padding: "6px 16px", borderRadius: 8, background: tokens.accent, color: "#0E0D0B",
-            fontSize: 12, fontWeight: 700,
-          }}>Click a card to connect &bull; ESC to cancel</div>
+            position: "absolute", top: 50, left: "50%", transform: "translateX(-50%)",
+            padding: "8px 20px", borderRadius: 10,
+            background: "rgba(200,168,78,0.15)", border: "1px solid rgba(200,168,78,0.4)",
+            color: "#C8A84E", fontSize: 13, fontWeight: 600, zIndex: 30,
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            Click a card to connect
+            <button onClick={() => setConnectMode(null)} style={{
+              background: "none", border: "1px solid rgba(200,168,78,0.4)", borderRadius: 6,
+              color: "#C8A84E", padding: "2px 10px", fontSize: 11, fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit",
+            }}>Cancel</button>
+          </div>
         )}
       </div>
 
