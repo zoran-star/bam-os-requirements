@@ -1,0 +1,80 @@
+/* Mobile shell */
+.shell { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+.content { flex: 1; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+
+/* Bottom Tab Bar */
+.tabBar { display: flex; border-top: 1px solid var(--border); background: var(--surf); padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); }
+.tabItem { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 0; cursor: pointer; text-decoration: none; color: var(--tm); transition: color 120ms; background: none; border: none; font-family: var(--ff); }
+.tabItem:hover, .tabActive { color: var(--gold); }
+.tabLabel { font-size: 10px; font-weight: 600; }
+.tabDot { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); position: absolute; top: -2px; right: -6px; }
+.tabIconWrap { position: relative; display: flex; align-items: center; justify-content: center; }
+
+/* Header */
+.header { padding: 16px 20px 12px; background: var(--surf); border-bottom: 1px solid var(--border); }
+.headerTitle { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.headerSub { font-size: 13px; color: var(--ts); margin-top: 2px; }
+
+/* Child Switcher */
+.childSwitcher { display: flex; gap: 8px; padding: 12px 20px; background: var(--surf); border-bottom: 1px solid var(--border); }
+.childTab { padding: 8px 16px; border-radius: var(--r-full); font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--surf); color: var(--ts); cursor: pointer; transition: all 120ms; }
+.childTabActive { background: var(--gold); color: #fff; border-color: var(--gold); }
+
+/* Cards */
+.card { background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-md); margin: 12px 16px; padding: 16px; box-shadow: var(--shadow-sm); }
+.cardTitle { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.cardGold { border-color: rgba(200,168,78,0.2); background: linear-gradient(135deg, rgba(200,168,78,0.04), var(--surf)); }
+
+/* Session Card */
+.sessionCard { background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; margin-bottom: 8px; cursor: pointer; transition: all 140ms; }
+.sessionCard:hover { border-color: var(--borderm); }
+.sessionName { font-size: 14px; font-weight: 700; }
+.sessionMeta { font-size: 12px; color: var(--ts); margin-top: 4px; }
+.sessionSpots { font-size: 11px; font-weight: 600; margin-top: 4px; }
+.spotsFew { color: var(--warn); }
+.spotsFull { color: var(--red); }
+.spotsOk { color: var(--green); }
+.archBadge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: rgba(200,168,78,0.1); color: var(--gold); }
+
+/* Buttons */
+.btn { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 20px; border-radius: var(--r-sm); font-size: 14px; font-weight: 600; border: 1px solid var(--border); background: var(--surf); color: var(--tp); width: 100%; transition: all 120ms; }
+.btnGold { background: var(--gold); color: #fff; border-color: var(--gold); }
+.btnGold:hover { background: var(--goldl); }
+.btnDanger { color: var(--red); border-color: rgba(224,90,66,0.3); }
+.btnSmall { padding: 8px 14px; font-size: 12px; width: auto; }
+
+/* Status badges */
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; }
+.badgeGreen { background: var(--greenl); color: var(--green); }
+.badgeYellow { background: var(--warnl); color: var(--warn); }
+.badgeRed { background: var(--redl); color: var(--red); }
+
+/* Info rows */
+.infoRow { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.infoLabel { color: var(--ts); }
+.infoValue { font-weight: 600; }
+
+/* Credit bar */
+.creditBar { height: 8px; background: var(--surf3); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.creditFill { height: 100%; background: var(--gold); border-radius: 4px; transition: width 300ms var(--es); }
+
+/* Message bubble */
+.msgBubble { padding: 12px; border-radius: var(--r-sm); margin-bottom: 8px; max-width: 85%; font-size: 14px; }
+.msgIn { background: var(--surf); border: 1px solid var(--border); align-self: flex-start; }
+.msgOut { background: rgba(200,168,78,0.08); border: 1px solid rgba(200,168,78,0.15); align-self: flex-end; }
+.msgAnnouncement { background: var(--bluel); border: 1px solid rgba(59,111,160,0.15); align-self: flex-start; width: 100%; max-width: 100%; }
+.msgSender { font-size: 11px; font-weight: 700; color: var(--ts); margin-bottom: 4px; }
+.msgTime { font-size: 10px; color: var(--tm); margin-top: 4px; }
+
+/* Section */
+.section { padding: 0 16px 16px; }
+.sectionTitle { font-size: 13px; font-weight: 700; color: var(--tm); text-transform: uppercase; letter-spacing: 0.08em; padding: 16px 16px 8px; }
+
+/* Modal overlay */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: flex; align-items: flex-end; }
+.modalContent { background: var(--surf); border-radius: 20px 20px 0 0; width: 100%; max-height: 85vh; overflow-y: auto; padding: 24px 20px calc(24px + env(safe-area-inset-bottom)); }
+.modalHandle { width: 36px; height: 4px; background: var(--surf3); border-radius: 2px; margin: 0 auto 16px; }
+.modalTitle { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
+
+/* Empty */
+.empty { text-align: center; padding: 32px 16px; color: var(--tm); font-size: 14px; }

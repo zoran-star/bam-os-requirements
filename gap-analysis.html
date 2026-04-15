@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM GTA — PRD vs Prototype Gap Analysis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: #0a0a0f;
+    color: #e8e6e3;
+    line-height: 1.5;
+    padding: 24px;
+  }
+
+  .header {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #C8A84E;
+  }
+
+  .header p {
+    font-size: 14px;
+    color: #8a8a8a;
+    margin-top: 4px;
+  }
+
+  .stats-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stat-pill {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid #222;
+    background: #111;
+  }
+
+  .stat-pill .num { font-size: 18px; margin-right: 4px; }
+  .stat-pill.pending .num { color: #C8A84E; }
+  .stat-pill.agreed .num { color: #3EAF5C; }
+  .stat-pill.changed .num { color: #e06040; }
+
+  .filter-bar {
+    max-width: 1100px;
+    margin: 0 auto 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    padding: 6px 14px;
+    border-radius: 16px;
+    border: 1px solid #333;
+    background: #111;
+    color: #aaa;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 120ms;
+  }
+
+  .filter-btn:hover { border-color: #C8A84E; color: #C8A84E; }
+  .filter-btn.active { background: #C8A84E; color: #000; border-color: #C8A84E; }
+
+  .sections { max-width: 1100px; margin: 0 auto; }
+
+  .section {
+    margin-bottom: 28px;
+    border: 1px solid #1a1a1a;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0f0f14;
+  }
+
+  .section-header {
+    padding: 16px 20px;
+    background: #111118;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-header:hover { background: #161620; }
+
+  .section-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .section-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: rgba(200,168,78,0.1);
+    color: #C8A84E;
+  }
+
+  .section-body { padding: 0; }
+  .section-body.collapsed { display: none; }
+
+  .item {
+    padding: 14px 20px;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    transition: background 120ms;
+  }
+
+  .item:last-child { border-bottom: none; }
+  .item:hover { background: rgba(200,168,78,0.02); }
+
+  .item-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
+
+  .item-status.yes { background: #3EAF5C; }
+  .item-status.partial { background: #C8A84E; }
+  .item-status.no { background: #e06040; }
+  .item-status.backend { background: #555; }
+
+  .item-content { flex: 1; min-width: 0; }
+
+  .item-req {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .item-note {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 8px;
+  }
+
+  .item-rec {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 8px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+
+  .rec-add { background: rgba(200,168,78,0.12); color: #C8A84E; }
+  .rec-p1 { background: rgba(100,100,255,0.1); color: #8888ff; }
+  .rec-backend { background: rgba(100,100,100,0.15); color: #888; }
+  .rec-update { background: rgba(62,175,92,0.1); color: #3EAF5C; }
+  .rec-done { background: rgba(62,175,92,0.1); color: #3EAF5C; }
+
+  .feedback-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .fb-btn {
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid #333;
+    background: #111;
+    color: #aaa;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 100ms;
+  }
+
+  .fb-btn:hover { border-color: #C8A84E; color: #C8A84E; }
+  .fb-btn.selected-agree { background: #3EAF5C; color: #000; border-color: #3EAF5C; }
+  .fb-btn.selected-p0 { background: #C8A84E; color: #000; border-color: #C8A84E; }
+  .fb-btn.selected-p1 { background: #6666dd; color: #fff; border-color: #6666dd; }
+  .fb-btn.selected-remove { background: #e06040; color: #fff; border-color: #e06040; }
+  .fb-btn.selected-backend { background: #555; color: #fff; border-color: #555; }
+
+  .fb-note {
+    margin-top: 6px;
+    width: 100%;
+  }
+
+  .fb-note input {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #222;
+    background: #0a0a0f;
+    color: #e8e6e3;
+    font-family: inherit;
+    font-size: 12px;
+  }
+
+  .fb-note input::placeholder { color: #444; }
+  .fb-note input:focus { outline: none; border-color: #C8A84E; }
+
+  .export-bar {
+    max-width: 1100px;
+    margin: 32px auto;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .export-btn {
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 120ms;
+  }
+
+  .export-btn.primary {
+    background: #C8A84E;
+    color: #000;
+  }
+
+  .export-btn.primary:hover { background: #d4b85e; }
+
+  .export-btn.secondary {
+    background: #1a1a1a;
+    color: #aaa;
+    border: 1px solid #333;
+  }
+
+  .export-btn.secondary:hover { border-color: #C8A84E; color: #C8A84E; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #3EAF5C;
+    color: #000;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 14px;
+    transition: transform 300ms ease;
+    z-index: 100;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .legend {
+    max-width: 1100px;
+    margin: 0 auto 20px;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>BAM GTA — Gap Analysis</h1>
+    <p>PRD P0 requirements vs. prototype — review each recommendation</p>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-pill pending"><span class="num" id="stat-pending">0</span> pending</div>
+    <div class="stat-pill agreed"><span class="num" id="stat-agreed">0</span> agreed</div>
+    <div class="stat-pill changed"><span class="num" id="stat-changed">0</span> changed</div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#3EAF5C"></div> In prototype</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#C8A84E"></div> Partial</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e06040"></div> Missing</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#555"></div> Backend only</div>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="filterItems('all')">All</button>
+  <button class="filter-btn" onclick="filterItems('add')">Add to Prototype</button>
+  <button class="filter-btn" onclick="filterItems('p1')">Move to P1</button>
+  <button class="filter-btn" onclick="filterItems('backend')">Backend</button>
+  <button class="filter-btn" onclick="filterItems('update')">Update PRD</button>
+  <button class="filter-btn" onclick="filterItems('done')">Already Done</button>
+  <button class="filter-btn" onclick="filterItems('gaps-only')">Gaps Only</button>
+</div>
+
+<div class="sections" id="sections"></div>
+
+<div class="export-bar">
+  <button class="export-btn primary" onclick="exportFeedback()">Copy Feedback Summary</button>
+  <button class="export-btn secondary" onclick="resetAll()">Reset All</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = [
+  {
+    section: "PRD #1 — Lead Pipeline",
+    items: [
+      { req: "Pipeline view with 4 stages (Interested → Responded → Booked Trial → Done Trial)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "All staff can see all leads in all stages", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Lead card: kid name, parent name, phone", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Done Trial cards show assigned owner", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Booked Trial cards show trial time", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Move leads via drag-and-drop or action buttons", status: "partial", rec: "update", recLabel: "Update PRD — action buttons only, no drag-drop needed", note: "Drag-drop adds complexity without value at this scale" },
+      { req: "Auto-move to Interested on form fill", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Auto-move back to Interested on missed trial", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Auto-move to Responded on lead reply", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Auto-move to Booked Trial on booking", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Done Trial only via completed post-trial form", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Assign lead ownership at Done Trial stage", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Add/edit notes on any lead with timestamps", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Tap to message from lead card", status: "no", rec: "update", recLabel: "Update PRD — use Inbox instead", note: "Intentionally removed; messaging consolidates in the Inbox tab" },
+      { req: "Mark as Ghosting → enroll in ghosted sequence", status: "yes", rec: "done", recLabel: "Done", note: "Action available in Responded stage" },
+      { req: "Auto-Won on payment success", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Manually mark Won from Done Trial", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Won → card removed, member record created, conversation carries over", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Mark Lost with loss reason", status: "yes", rec: "done", recLabel: "Done", note: "Lost reason popup on Done Trial only" },
+      { req: "Filter pipeline by assigned owner, stage", status: "no", rec: "p1", recLabel: "Move to P1", note: "Pipeline is small enough to scan visually for MVP" },
+      { req: "Duplicate detection on form submit", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+    ]
+  },
+  {
+    section: "PRD #3 — Post-Trial & Closing",
+    items: [
+      { req: "Post-trial push notification to trainer", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Missed form state: red card + alert badge in Booked Trial", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Post-trial form on Booked Trial lead card (Attended, Good Fit, Lead Sales Person, Notes)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Attended + Good Fit → moves to Done Trial with ownership", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "No Show → back to Interested, missed trial automation fires", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Attended + Not Fit → marked Lost (unqualified)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Done Trial stage only reached via completed form", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Follow-up log: staff logs each follow-up attempt with notes", status: "no", rec: "p1", recLabel: "Move to P1", note: "Notes field on lead card covers this for MVP; structured log is polish" },
+      { req: "Tap to message lead from card (via business number)", status: "no", rec: "update", recLabel: "Update PRD — use Inbox instead", note: "Same as PRD #1 — messaging consolidates in Inbox" },
+      { req: "Auto-Won on payment success from Onboarding", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Mark as Lost with reason from Done Trial", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Done Trial queue sorted by days since trial (oldest first)", status: "no", rec: "add", recLabel: "Add to prototype", note: "Simple sort, high value — staff need oldest leads surfaced first" },
+    ]
+  },
+  {
+    section: "PRD #6 — Session Publishing & Management",
+    items: [
+      { req: "Create recurring session template", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Create single one-off session", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Edit/cancel individual session instance", status: "yes", rec: "done", recLabel: "Done", note: "Editable fields + Remove This Class button" },
+      { req: "Edit/cancel recurring template (all future instances)", status: "no", rec: "p1", recLabel: "Move to P1", note: "Individual edit covers MVP; bulk recurring is an edge case" },
+      { req: "Sessions visible to members in parent app", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Member booking deducts 1 credit", status: "yes", rec: "done", recLabel: "Done", note: "Mock in parent app" },
+      { req: "Cancel booking up to 1hr before session, credit returned", status: "no", rec: "add", recLabel: "Add to prototype", note: "Parents NEED to cancel bookings — critical P0 gap in parent app" },
+      { req: "Late cancel (<1hr): credit returned + staff notified", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Staff sees booked members in session roster", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Mark attendance: Showed", status: "yes", rec: "done", recLabel: "Done", note: "Mark Present button" },
+      { req: "Mark attendance: No-Show (separate from not marking present)", status: "no", rec: "add", recLabel: "Add to prototype", note: "Need explicit No-Show button — 'not marked' isn't the same as confirmed no-show" },
+      { req: "No-Show → credit returned", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "No-Show → notification to all staff", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Walk-in attendance (didn't book)", status: "yes", rec: "update", recLabel: "Update PRD — add to P0", note: "Prototype addition: staff can add members who attended without booking" },
+      { req: "Waitlist: members join when session full", status: "no", rec: "p1", recLabel: "Move to P1", note: "Classes rarely hit capacity at current BAM GTA scale" },
+    ]
+  },
+  {
+    section: "PRD #7 — Failed Payments",
+    items: [
+      { req: "Stripe webhook listener for payment failures", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Auto SMS + in-app notification to parent (Day 0)", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "In-app notification to all staff on failure", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "2-week grace period with full access", status: "yes", rec: "done", recLabel: "Done", note: "Grace period countdown shown in UI" },
+      { req: "payment_status → 'failing' on failure", status: "yes", rec: "done", recLabel: "Done", note: "Mock data has this" },
+      { req: "Dedicated Failed Payments view in nav", status: "partial", rec: "update", recLabel: "Update PRD — inline on Home + Members instead", note: "No separate page; failed members shown red+top in tracker + Home page. Better UX." },
+      { req: "Each entry: name, parent, phone, failure reason, days, grace countdown, trainer", status: "yes", rec: "done", recLabel: "Done", note: "Shown on Home page cards" },
+      { req: "Credit freeze at day 14 if unresolved", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Auto-resolve on Stripe payment success", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Manual resolve with required note", status: "no", rec: "add", recLabel: "Add to prototype", note: "Staff needs 'Mark Resolved' button for cash payments or alternate arrangements" },
+      { req: "Failure reason from Stripe displayed", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Self-serve payment method update (parent, Stripe hosted)", status: "partial", rec: "backend", recLabel: "Backend — Stripe hosted page, just needs link", note: "" },
+      { req: "Failed payments summary on Home dashboard", status: "yes", rec: "done", recLabel: "Done", note: "" },
+    ]
+  },
+  {
+    section: "PRD #8 — Membership Actions & Credits",
+    items: [
+      { req: "Pause from member profile: start date + end date", status: "yes", rec: "done", recLabel: "Done", note: "Full modal with date pickers" },
+      { req: "Pause enforces min 2wk / max 8wk", status: "yes", rec: "done", recLabel: "Done", note: "Real-time validation in modal" },
+      { req: "Parent can request pause via app", status: "yes", rec: "done", recLabel: "Done", note: "Parent app has pause modal" },
+      { req: "Parent can request cancel via app", status: "yes", rec: "done", recLabel: "Done", note: "Parent app has cancel modal" },
+      { req: "Parent self-serve upgrade (pay + credits immediately)", status: "partial", rec: "done", recLabel: "Done", note: "Change Plan modal shows upgrade options" },
+      { req: "Parent self-serve downgrade (next cycle)", status: "no", rec: "add", recLabel: "Add to prototype", note: "Change Plan only shows upgrades — need to add lower-tier options" },
+      { req: "Cancel with reason + Admin approval", status: "yes", rec: "done", recLabel: "Done", note: "Full modal with reason dropdown + Admin queue" },
+      { req: "Upgrade from staff member profile", status: "partial", rec: "p1", recLabel: "Move to P1 for staff-side", note: "Button exists, no modal. Parent self-serves upgrades; staff rarely initiates." },
+      { req: "Downgrade from staff member profile", status: "partial", rec: "p1", recLabel: "Move to P1 for staff-side", note: "Same reasoning — parent self-serves" },
+      { req: "Refund with Admin approval", status: "yes", rec: "done", recLabel: "Done", note: "Full modal with free text reason" },
+      { req: "Billing cycle credit refresh (automated)", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Credits don't roll over", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Credits deducted on booking", status: "backend", rec: "backend", recLabel: "Backend", note: "Mock in parent app" },
+      { req: "Credits returned on cancel / no-show", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Manual credit adjustment from profile", status: "yes", rec: "done", recLabel: "Done", note: "Simple +/- buttons" },
+      { req: "Full audit trail for all actions", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "All actions auto-sync to Stripe", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Parent notification on membership action", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+    ]
+  },
+  {
+    section: "PRD #10 — Member Profiles & Tracker",
+    items: [
+      { req: "Table view of all members", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Columns: Kid, Parent, Trainer, Status, Plan", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Column: Parent Phone", status: "no", rec: "add", recLabel: "Add to prototype", note: "Needed for when parents call — quick glance at phone number" },
+      { req: "Columns: Kid Archetype, Parent Archetype", status: "no", rec: "p1", recLabel: "Move to P1", note: "Archetypes rarely referenced day-to-day at current scale" },
+      { req: "Column: Engagement Status", status: "no", rec: "update", recLabel: "Update PRD — replaced by Health field", note: "Health (Consistent/At Risk) replaces engagement status" },
+      { req: "Column: Group", status: "no", rec: "p1", recLabel: "Move to P1", note: "Available in member profile; doesn't need a table column" },
+      { req: "Summary bar: Total, Active, Paused + trainer breakdown", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Search by kid name, parent name, or phone", status: "partial", rec: "add", recLabel: "Add phone search", note: "Currently name-only. Phone search critical when parents call in." },
+      { req: "Filter by: status, plan, group, trainer, engagement", status: "partial", rec: "add", recLabel: "Add plan + trainer filters", note: "Only status filter exists. Plan + trainer are useful. Group + engagement → P1." },
+      { req: "Tap row to open full member profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "All member fields on profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Failed payment flag on profile", status: "yes", rec: "done", recLabel: "Done", note: "Red alert banner" },
+      { req: "Editable profile fields (parent, phone, email, trainer, group, etc.)", status: "yes", rec: "done", recLabel: "Done", note: "With pencil icons + inline editing" },
+      { req: "Non-editable billing/membership fields", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Membership actions from profile (pause, cancel, refund, etc.)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Manual credit adjustment from profile", status: "yes", rec: "done", recLabel: "Done", note: "+/- buttons" },
+      { req: "Trainer assignment from profile", status: "yes", rec: "done", recLabel: "Done", note: "Dropdown" },
+      { req: "Notes log with timestamps and author", status: "partial", rec: "p1", recLabel: "Move timestamps to P1", note: "Notes textarea exists; structured timestamps/author tracking is polish" },
+      { req: "Credit event history on profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Attendance history on profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Booking history: upcoming and past bookings", status: "no", rec: "p1", recLabel: "Move to P1", note: "Attendance history covers the same ground for MVP" },
+      { req: "Membership action history (pauses, upgrades, cancels, refunds)", status: "no", rec: "p1", recLabel: "Move to P1", note: "Not critical for launch — admin can check Approvals page" },
+      { req: "Failed payment history (past events + resolutions)", status: "no", rec: "p1", recLabel: "Move to P1", note: "" },
+      { req: "Active automations display", status: "no", rec: "p1", recLabel: "Move to P1", note: "Only onboarding automation exists in Phase 1" },
+      { req: "Message history on profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Payment history on profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+    ]
+  },
+  {
+    section: "PRD #14 — Business Number Inbox",
+    items: [
+      { req: "Unified inbox showing SMS + in-app conversations", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Separate threads per channel per contact", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Thread header: name, channel indicator, member/lead tag", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Thread header: pipeline stage (leads) or membership status (members)", status: "no", rec: "p1", recLabel: "Move to P1", note: "Member/lead type badge is sufficient for MVP" },
+      { req: "Filter by channel", status: "yes", rec: "done", recLabel: "Done", note: "All/SMS/In-App/Instagram/Email" },
+      { req: "Filter by contact type (member/lead), stage, status", status: "no", rec: "add", recLabel: "Add member/lead filter", note: "Contact type filter useful; stage/status → P1" },
+      { req: "Read/unread status per staff", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Reply to SMS from business number", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Reply to in-app conversations", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Automation messages appear in threads in real time", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Compose outbound SMS, Instagram DMs, email from inbox", status: "yes", rec: "done", recLabel: "Done", note: "Channel selector on reply composer; email has subject + body" },
+      { req: "Lead→member conversation history carryover on Won", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Internal notes (yellow, staff-only) on conversations", status: "no", rec: "update", recLabel: "Update PRD — notes on member profile instead", note: "Notes moved to member profile popup; more useful & accessible there" },
+      { req: "Full message history per conversation", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Click contact name → open profile", status: "yes", rec: "done", recLabel: "Done", note: "View Profile opens full MemberDrawer inline" },
+      { req: "Announcement composer: title + body to all active members", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Announcements delivered via SMS + in-app", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "STOP opt-out respected", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Outbound automation/notification messages logged in threads", status: "backend", rec: "backend", recLabel: "Backend", note: "" },
+      { req: "Announcement targeting by class/session", status: "yes", rec: "done", recLabel: "Done", note: "Available from Sessions tab drawer only" },
+    ]
+  },
+  {
+    section: "PRD #15 — Class Booking (Parent App)",
+    items: [
+      { req: "Class list with title, description, location", status: "yes", rec: "done", recLabel: "Done", note: "Day-first approach instead of class-first" },
+      { req: "Weekly calendar of sessions per class", status: "yes", rec: "done", recLabel: "Done", note: "Day selector shows all classes for that day" },
+      { req: "Session: date, time, spots remaining", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Full sessions visually marked, not bookable", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Waitlist signup when session full", status: "no", rec: "p1", recLabel: "Move to P1", note: "Classes rarely hit capacity at current scale" },
+      { req: "Book with 1 tap + confirmation", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Booking deducts 1 credit", status: "yes", rec: "done", recLabel: "Done", note: "Mock" },
+      { req: "0 credits → blocked with message", status: "yes", rec: "done", recLabel: "Done", note: "Red blocking message" },
+      { req: "Book multiple sessions up to credit limit", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Booking confirmation + Book Again option", status: "yes", rec: "done", recLabel: "Done", note: "Book Another Class closes modal, returns to list" },
+      { req: "Upcoming bookings list (sorted by date)", status: "yes", rec: "done", recLabel: "Done", note: "Per-child on Profile page" },
+      { req: "Cancel booking from upcoming list (1hr rule)", status: "partial", rec: "add", recLabel: "Add cancel confirmation modal", note: "Cancel button exists on Profile but has no handler — needs confirmation + logic" },
+      { req: "Sibling: child picker on booking confirmation", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Sibling: independent credit balances", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Sibling: separated upcoming bookings", status: "yes", rec: "done", recLabel: "Done", note: "Per-child sections on Profile" },
+    ]
+  },
+  {
+    section: "PRD #17 — View Profile (Parent App)",
+    items: [
+      { req: "Parent info: name, email, phone, emergency contact", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Payment method: card brand + last 4 digits", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Per child: name, plan, status, billing date, credits", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Child switcher / tab picker for siblings", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Past sessions on child profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Billing history on child profile", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Pause/Cancel/Upgrade/Downgrade buttons on child profile", status: "yes", rec: "done", recLabel: "Done", note: "As Change Plan, Pause, Cancel with child's name" },
+      { req: "Notification toggle (on/off for push notifications)", status: "no", rec: "p1", recLabel: "Move to P1", note: "Nice polish, not critical for launch" },
+      { req: "Profile as dedicated tab (not home screen)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+    ]
+  },
+  {
+    section: "PRD #18 — Edit Membership (Parent App)",
+    items: [
+      { req: "Pause request: select start + end date", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Pause enforces min 2wk / max 8wk", status: "partial", rec: "add", recLabel: "Add validation to parent app", note: "Submit button exists but no error shown if outside 2-8 week range" },
+      { req: "Pause confirmation: impact summary (credits frozen, billing extended)", status: "no", rec: "add", recLabel: "Add impact text to parent pause modal", note: "Staff modal has this; parent modal should too" },
+      { req: "Cancel request with required reason", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Cancel confirmation: takes effect end of billing period", status: "yes", rec: "done", recLabel: "Done", note: "" },
+      { req: "Upgrade: see tiers above current + prorated charge + credits gained", status: "partial", rec: "p1", recLabel: "Move prorated calc to P1", note: "Plans + prices shown; prorated calculation requires Stripe integration" },
+      { req: "Downgrade: see tiers below current + effective date + next price", status: "no", rec: "add", recLabel: "Add lower-tier options to Change Plan", note: "Currently only shows higher tiers — need to add downgrade options" },
+      { req: "Pending request visible on child profile", status: "no", rec: "p1", recLabel: "Move to P1", note: "Requires backend state tracking" },
+      { req: "Per-child requests (via child tab switcher)", status: "yes", rec: "done", recLabel: "Done", note: "" },
+    ]
+  },
+];
+
+let feedbackState = {};
+
+function render() {
+  const container = document.getElementById('sections');
+  container.innerHTML = '';
+
+  DATA.forEach((section, si) => {
+    const gaps = section.items.filter(i => i.rec !== 'done').length;
+    const div = document.createElement('div');
+    div.className = 'section';
+    div.setAttribute('data-section', si);
+
+    div.innerHTML = `
+      <div class="section-header" onclick="toggleSection(${si})">
+        <h2>${section.section}</h2>
+        <span class="section-badge">${gaps} gap${gaps !== 1 ? 's' : ''} · ${section.items.length} total</span>
+      </div>
+      <div class="section-body" id="body-${si}">
+        ${section.items.map((item, ii) => renderItem(si, ii, item)).join('')}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  updateStats();
+}
+
+function renderItem(si, ii, item) {
+  const key = `${si}-${ii}`;
+  const fb = feedbackState[key] || {};
+  const recClass = item.rec === 'add' ? 'rec-add' : item.rec === 'p1' ? 'rec-p1' : item.rec === 'backend' ? 'rec-backend' : item.rec === 'update' ? 'rec-update' : 'rec-done';
+
+  const choices = item.rec === 'done' ? [] : ['agree', 'p0', 'p1', 'remove', 'backend'];
+
+  return `
+    <div class="item" data-rec="${item.rec}" data-status="${item.status}" data-key="${key}">
+      <div class="item-status ${item.status}"></div>
+      <div class="item-content">
+        <div class="item-req">${item.req}</div>
+        ${item.note ? `<div class="item-note">${item.note}</div>` : ''}
+        <div class="item-rec ${recClass}">${item.recLabel}</div>
+        ${choices.length > 0 ? `
+          <div class="feedback-row">
+            ${choices.map(c => {
+              const labels = { agree: '👍 Agree', p0: 'Keep P0', p1: 'Move to P1', remove: 'Remove', backend: 'Backend' };
+              const sel = fb.choice === c ? `selected-${c}` : '';
+              return `<button class="fb-btn ${sel}" onclick="setFeedback('${key}','${c}')">${labels[c]}</button>`;
+            }).join('')}
+          </div>
+          <div class="fb-note">
+            <input placeholder="Optional note..." value="${fb.note || ''}" onchange="setNote('${key}', this.value)" />
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function toggleSection(si) {
+  const body = document.getElementById(`body-${si}`);
+  body.classList.toggle('collapsed');
+}
+
+function setFeedback(key, choice) {
+  if (!feedbackState[key]) feedbackState[key] = {};
+  feedbackState[key].choice = feedbackState[key].choice === choice ? null : choice;
+  render();
+}
+
+function setNote(key, note) {
+  if (!feedbackState[key]) feedbackState[key] = {};
+  feedbackState[key].note = note;
+  updateStats();
+}
+
+function updateStats() {
+  let pending = 0, agreed = 0, changed = 0;
+  DATA.forEach((section, si) => {
+    section.items.forEach((item, ii) => {
+      if (item.rec === 'done') return;
+      const key = `${si}-${ii}`;
+      const fb = feedbackState[key];
+      if (!fb || !fb.choice) pending++;
+      else if (fb.choice === 'agree') agreed++;
+      else changed++;
+    });
+  });
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-agreed').textContent = agreed;
+  document.getElementById('stat-changed').textContent = changed;
+}
+
+function filterItems(type) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  document.querySelectorAll('.item').forEach(el => {
+    const rec = el.getAttribute('data-rec');
+    const status = el.getAttribute('data-status');
+    if (type === 'all') el.style.display = '';
+    else if (type === 'gaps-only') el.style.display = (rec === 'done') ? 'none' : '';
+    else if (type === 'add') el.style.display = (rec === 'add') ? '' : 'none';
+    else if (type === 'p1') el.style.display = (rec === 'p1') ? '' : 'none';
+    else if (type === 'backend') el.style.display = (rec === 'backend') ? '' : 'none';
+    else if (type === 'update') el.style.display = (rec === 'update') ? '' : 'none';
+    else if (type === 'done') el.style.display = (rec === 'done') ? '' : 'none';
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function exportFeedback() {
+  let lines = ['BAM GTA GAP ANALYSIS — FEEDBACK SUMMARY', '='.repeat(50), ''];
+
+  DATA.forEach((section, si) => {
+    let sectionLines = [];
+    section.items.forEach((item, ii) => {
+      if (item.rec === 'done') return;
+      const key = `${si}-${ii}`;
+      const fb = feedbackState[key];
+      const choice = fb?.choice || 'NO RESPONSE';
+      const note = fb?.note ? ` — "${fb.note}"` : '';
+      const labels = { agree: 'AGREED', p0: 'KEEP P0', p1: 'MOVE TO P1', remove: 'REMOVE', backend: 'BACKEND' };
+      sectionLines.push(`  [${labels[choice] || choice}] ${item.req}${note}`);
+    });
+    if (sectionLines.length > 0) {
+      lines.push(section.section);
+      lines.push('-'.repeat(40));
+      lines = lines.concat(sectionLines);
+      lines.push('');
+    }
+  });
+
+  navigator.clipboard.writeText(lines.join('\n')).then(() => {
+    showToast('Copied to clipboard!');
+  });
+}
+
+function resetAll() {
+  feedbackState = {};
+  render();
+  showToast('Reset all feedback');
+}
+
+render();
+</script>
+</body>
+</html>

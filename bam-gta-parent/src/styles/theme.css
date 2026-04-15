@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #F8F7F5;
+  --surf: #FFFFFF;
+  --surf2: #FAFAF8;
+  --surf3: #F0EFEC;
+  --border: rgba(0,0,0,0.07);
+  --borderm: rgba(0,0,0,0.12);
+  --gold: #C8A84E;
+  --goldl: #D4B65C;
+  --gglow: rgba(200,168,78,0.10);
+  --tp: #1C1B18;
+  --ts: #6E6B63;
+  --tm: #A5A19A;
+  --green: #3EAF5C;
+  --greenl: rgba(62,175,92,0.10);
+  --warn: #E09D24;
+  --warnl: rgba(224,157,36,0.10);
+  --red: #E05A42;
+  --redl: rgba(224,90,66,0.10);
+  --blue: #3B6FA0;
+  --bluel: rgba(59,111,160,0.10);
+  --ff: 'Plus Jakarta Sans', sans-serif;
+  --es: cubic-bezier(0.4,0,0.2,1);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-full: 9999px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: var(--ff);
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--tp);
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  height: 100vh;
+}
+
+button { font-family: var(--ff); cursor: pointer; }
+input, textarea, select { font-family: var(--ff); }
+:focus-visible { outline: none; }
