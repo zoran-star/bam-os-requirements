@@ -1399,7 +1399,7 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
           <div>
             <div class="m-label" style="margin-bottom:6px;">ARR Target</div>
             <div class="arr-target-val" id="lm-lbl-target">$500k</div>
-            <input type="range" style="width:100%;margin-top:12px;" id="lm-sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="lmSyncTarget(this.value)" />
+            <input type="range" style="width:100%;margin-top:12px;" id="lm-sl-target" min="1000000" max="15000000" step="100000" value="1000000" oninput="lmSyncTarget(this.value)" />
           </div>
           <div class="timeline-display visible" id="lm-timeline-display" style="margin:0;">
             <div class="tl-label" id="lm-tl-label">Projected timeline</div>
@@ -1705,7 +1705,7 @@ function renderPricingUI() { buildSnapshotSection(); buildPricingCards(); update
 
 // ═══ LAUNCH MODEL TAB ═══
 let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn: 3, price: 499 };
-let lmTargetArr = 500000;
+let lmTargetArr = 1000000;
 let lmActiveTab = 'clients';
 let lmChart = null;
 let lmSelectedSnapId = null; // which pricing scenario drives the per-client price
