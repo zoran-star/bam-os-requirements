@@ -1975,32 +1975,27 @@ function lmRenderTarget(rows) {
     val.classList.remove('unreachable');
     const { baseGrowth, churn, price } = lmVals;
     const churnRate = churn / 100;
-    // If churn > 0, clients plateau at baseGrowth/churnRate — check if target is reachable
-    if (churnRate > 0) {
-      const equilibriumClients = baseGrowth / churnRate;
-      if (clientsNeeded && equilibriumClients < clientsNeeded) {
-        val.textContent = 'Not reachable — increase growth or reduce churn';
-        return;
-      }
-    }
-    let clients = rows[rows.length - 1].clients;
-    let found = null;
-    for (let m = 25; m <= 240; m++) {
-      const churned = Math.round(clients * churnRate * 10) / 10;
-      clients = Math.max(0, clients + baseGrowth - churned);
-      const arr = clients * price * 12;
-      if (arr >= lmTargetArr) { found = m; break; }
-    }
-    if (found) {
-      const yrs = Math.floor(found / 12), mos = found % 12;
-      let timeStr = '';
-      if (yrs > 0) timeStr += yrs + (yrs === 1 ? ' year' : ' years');
-      if (yrs > 0 && mos > 0) timeStr += ', ';
-      if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
-      val.textContent = `Month ${found} — ${timeStr}`;
-    } else {
+    // Equilibrium = baseGrowth / churnRate — if churn > 0, clients can never exceed this
+    const eq = churnRate > 0 ? baseGrowth / churnRate : Infinity;
+    if (churnRate > 0 && clientsNeeded && clientsNeeded > eq) {
       val.textContent = 'Not reachable — increase growth or reduce churn';
+      return;
     }
+    // Closed-form: clients(n) = eq + (c24 - eq) * (1 - churnRate)^n  →  solve for n
+    const c24 = rows[rows.length - 1].clients;
+    let found;
+    if (churnRate === 0) {
+      found = 24 + Math.max(0, Math.ceil((clientsNeeded - c24) / baseGrowth));
+    } else {
+      const n = Math.ceil(Math.log((clientsNeeded - eq) / (c24 - eq)) / Math.log(1 - churnRate));
+      found = 24 + Math.max(0, n);
+    }
+    const yrs = Math.floor(found / 12), mos = found % 12;
+    let timeStr = '';
+    if (yrs > 0) timeStr += yrs + (yrs === 1 ? ' year' : ' years');
+    if (yrs > 0 && mos > 0) timeStr += ', ';
+    if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
+    val.textContent = `Month ${found} — ${timeStr || 'at launch'}`;
   }
 }
 
