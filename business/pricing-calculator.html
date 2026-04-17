@@ -430,8 +430,8 @@
 
 <script>
   const MODELS = [
-    { id: 'training-sched',  name: 'Training Classes (with Scheduling App)', icon: '🏀', isTrainingType: true,  defaultMrr: 15000, defaultMin: 249, defaultMax: 599, defaultSel: 399, defaultClients: 75, defaultArpu: 200 },
-    { id: 'training-basic',  name: 'Training Classes (no Scheduling App)',   icon: '🏀', isTrainingType: true,  defaultMrr: 15000, defaultMin: 149, defaultMax: 349, defaultSel: 249, defaultClients: 75, defaultArpu: 200 },
+    { id: 'training-sched',  name: 'Training Classes (with Scheduling App)', icon: '🏀', isTrainingType: true,  clientsMax: 250, defaultMrr: 15000, defaultMin: 249, defaultMax: 599, defaultSel: 399, defaultClients: 75, defaultArpu: 200 },
+    { id: 'training-basic',  name: 'Training Classes (no Scheduling App)',   icon: '🏀', isTrainingType: true,  clientsMax: 50,  defaultMrr: 15000, defaultMin: 149, defaultMax: 349, defaultSel: 249, defaultClients: 25, defaultArpu: 200 },
     { id: 'club',            name: 'Club Teams',                              icon: '🏆', isTrainingType: false, defaultMrr: 6000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
     { id: 'gym',             name: 'Gym Rental',                              icon: '🏗️', isTrainingType: false, defaultMrr: 4000,  defaultMin: 99,  defaultMax: 249, defaultSel: 149 },
     { id: 'internal',        name: 'Internal Leagues',                        icon: '📋', isTrainingType: false, defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199, defaultSel: 129 },
@@ -527,7 +527,7 @@
     const modelCfg = MODELS.find(m => m.id === id);
     if (modelCfg.isTrainingType) {
       document.getElementById(`clients-slider-${id}`).value = s.clients;
-      document.getElementById(`clients-fill-${id}`).style.width = (s.clients / CLIENTS_MAX * 100) + '%';
+      document.getElementById(`clients-fill-${id}`).style.width = (s.clients / modelCfg.clientsMax * 100) + '%';
       document.getElementById(`clients-val-${id}`).textContent = s.clients + ' members';
 
       document.getElementById(`arpu-slider-${id}`).value = s.arpu;
@@ -614,9 +614,9 @@
             <div class="slider-row-label">Clients</div>
             <div class="slider-row-track">
               <div class="track-bg"></div>
-              <div class="track-fill gold-fill" id="clients-fill-${m.id}" style="left:0;width:${s.clients/CLIENTS_MAX*100}%"></div>
+              <div class="track-fill gold-fill" id="clients-fill-${m.id}" style="left:0;width:${s.clients/m.clientsMax*100}%"></div>
               <input type="range" class="single" id="clients-slider-${m.id}"
-                min="0" max="${CLIENTS_MAX}" step="1" value="${s.clients}">
+                min="0" max="${m.clientsMax}" step="1" value="${s.clients}">
             </div>
             <div class="slider-row-value" id="clients-val-${m.id}">${s.clients} members</div>
           </div>
