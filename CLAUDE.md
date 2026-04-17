@@ -33,29 +33,31 @@ This repository holds the FullControl product prototype, survey, onboarding flow
 
 ```
 bam-os-requirements/
-├── app/                ← FullControl prototype (Vite/React)
-│                         Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
-├── survey/             ← User survey (Vite/React)
-│                         Auto-deploys to: https://full-control-survey.vercel.app
-├── docs/
-│   ├── fc-company/     ← Investor page
-│   ├── fc-landing/     ← Product landing page (reference)
-│   └── survey-data-map.html ← Interactive survey data visualization
-├── whiteboard/         ← Onboarding session whiteboard (Vite/React)
-│                         Needs Vercel project setup (see Whiteboard section)
-├── prompts/            ← AI conversation prompt templates
-├── onboarding-*.html   ← Interactive onboarding review pages (10 files)
-├── ghl-workflows-for-danny.html ← GHL workflow documentation
-├── fullcontrol-investor-playbook.html
+├── app/                        ← FullControl prototype (Vite/React)
+│                                 Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
+├── survey/                     ← User survey (Vite/React)
+│                                 Auto-deploys to: https://full-control-survey.vercel.app
+├── business/                   ← All business planning materials
+│   ├── business/               ← Investor deck, pitch docs, planning files
+│   ├── fc-company/             ← Investor page
+│   ├── fc-landing/             ← Product landing page (reference)
+│   └── survey-data-map.html    ← Interactive survey data visualization
+├── whiteboard/                 ← Onboarding session whiteboard (Vite/React)
+│                                 Needs Vercel project setup (see Whiteboard section)
+├── sales-conversation-agents/  ← Sales conversation AI system prompts
+├── bam-gta-phase1/             ← Phase 1 live deployment (BAM GTA)
+│   ├── bam-gta-staff/          ← Staff dashboard app
+│   ├── bam-gta-parent/         ← Parent/athlete app
+│   └── info/                   ← GHL workflows + overview docs
 └── CLAUDE.md
 ```
 
 ### Key files
 - `app/src/` — the prototype (reference implementation of all features)
-- `docs/fc-company/index.html` — investor-facing page (active)
-- `docs/fc-landing/index.html` — product landing page (reference, not active)
-- `prompts/conversation-ai-booking-agent.txt` — AI booking agent system prompt template
-- `prompts/conversation-ai-booking-agent-bam-gta.txt` — BAM GTA-specific instance
+- `business/fc-company/index.html` — investor-facing page (active)
+- `business/fc-landing/index.html` — product landing page (reference, not active)
+- `sales-conversation-agents/conversation-ai-booking-agent.txt` — AI booking agent system prompt template
+- `sales-conversation-agents/conversation-ai-booking-agent-bam-gta.txt` — BAM GTA-specific instance
 
 ## Deployments
 
@@ -308,11 +310,11 @@ When adding a loop, set Status to "Open" and choose an appropriate Priority (Hig
 ## Notion as knowledge base
 Always be on the lookout for opportunities to save useful information, decisions, research, or context to Notion. If something comes up in conversation that seems worth preserving (new insights, configuration details, business info, strategy decisions, etc.), ask the user if they'd like it saved to Notion before moving on. Notion is where institutional knowledge lives — if it's not in Notion or the prototype, it doesn't exist for the next person.
 
-## Key AI prompts
-The `prompts/` directory contains system prompts for AI agents:
+## Sales Conversation Agents
+The `sales-conversation-agents/` directory contains system prompts for AI sales agents:
 - `conversation-ai-booking-agent.txt` — Template for the AI that books leads into free trials. Defines tone (casual, match lead energy), qualification logic, objection handling, follow-up cadence, and guardrails. Uses `{{PLACEHOLDER}}` variables populated from onboarding data.
 - `conversation-ai-booking-agent-bam-gta.txt` — BAM GTA-specific instance with placeholders filled in.
-- Future prompts: Closing AI (post-trial conversion), Rebooking AI (no-show re-engagement). These are being designed via whiteboard sessions SES-025 and SES-026.
+- Future agents: Closing AI (post-trial conversion), Rebooking AI (no-show re-engagement). These are being designed via whiteboard sessions SES-025 and SES-026.
 
 ## Fun facts
 At the end of every message, include a random fun fact about Serbia. Keep it to 2 lines max. Make it interesting and varied — history, culture, food, sports, geography, science, etc. Never repeat the same fact in a conversation.

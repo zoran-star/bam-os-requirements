@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Problem Dissector — FullControl</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#fafafa;color:#27272a;line-height:1.7;-webkit-font-smoothing:antialiased}
+
+.wrap{max-width:800px;margin:0 auto;padding:0 28px 80px}
+
+/* Header */
+header{padding:32px 0;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:40px}
+.header-top{display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:800;color:#18181b}
+.logo-mark{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#c8a84e,#d4b65c);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#111}
+.badge{font-size:11px;font-weight:700;color:#a0882e;background:rgba(160,136,46,0.1);padding:4px 12px;border-radius:6px;letter-spacing:0.05em}
+
+/* Intro */
+.intro{margin-bottom:48px}
+.intro h1{font-size:32px;font-weight:900;letter-spacing:-0.04em;line-height:1.15;color:#18181b;margin-bottom:12px}
+.intro p{font-size:15px;color:#52525b;max-width:600px}
+
+/* Progress bar */
+.progress-wrap{display:flex;gap:6px;margin-bottom:40px;position:sticky;top:0;background:#fafafa;padding:16px 0;z-index:10;border-bottom:1px solid rgba(0,0,0,0.04)}
+.progress-step{flex:1;height:6px;border-radius:3px;background:rgba(0,0,0,0.06);cursor:pointer;transition:all 0.3s}
+.progress-step.active{background:#a0882e}
+.progress-step.complete{background:#c8a84e}
+.progress-labels{display:flex;justify-content:space-between;margin-top:6px}
+.progress-labels span{font-size:10px;color:#a1a1aa;font-weight:600;letter-spacing:0.04em;text-transform:uppercase}
+.progress-labels span.active{color:#a0882e}
+
+/* Section cards */
+.section{display:none;animation:fadeIn 0.4s ease}
+.section.visible{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.section-header{margin-bottom:24px}
+.section-num{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#a0882e;margin-bottom:6px}
+.section-title{font-size:24px;font-weight:800;letter-spacing:-0.03em;color:#18181b;margin-bottom:8px}
+.section-desc{font-size:14px;color:#71717a;line-height:1.6}
+
+/* Education cards */
+.edu-card{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.edu-card h4{font-size:13px;font-weight:700;color:#18181b;margin-bottom:6px}
+.edu-card p{font-size:13px;color:#52525b;line-height:1.6}
+.edu-card .example{margin-top:10px;padding:10px 14px;background:rgba(160,136,46,0.04);border-left:3px solid #c8a84e;border-radius:0 8px 8px 0;font-size:12px;color:#71717a;line-height:1.6}
+.edu-card .example strong{color:#a0882e}
+.edu-card .bad{margin-top:8px;padding:10px 14px;background:rgba(224,90,66,0.04);border-left:3px solid rgba(224,90,66,0.3);border-radius:0 8px 8px 0;font-size:12px;color:#71717a;line-height:1.6}
+.edu-card .bad strong{color:#e05a42}
+
+/* Input areas */
+.input-group{margin-top:20px}
+.input-group label{display:block;font-size:12px;font-weight:700;color:#18181b;margin-bottom:6px;letter-spacing:0.02em}
+.input-group .hint{font-size:11px;color:#a1a1aa;margin-bottom:8px;line-height:1.5}
+textarea{width:100%;border:1.5px solid rgba(0,0,0,0.1);border-radius:10px;padding:14px 16px;font-family:inherit;font-size:14px;color:#27272a;line-height:1.6;resize:vertical;min-height:80px;transition:border-color 0.2s;background:#fff}
+textarea:focus{outline:none;border-color:#c8a84e;box-shadow:0 0 0 3px rgba(200,168,78,0.15)}
+textarea::placeholder{color:#c4c4c8}
+
+/* Prompts / questions */
+.prompt-list{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.prompt-btn{background:#fff;border:1.5px solid rgba(0,0,0,0.08);border-radius:10px;padding:12px 16px;font-family:inherit;font-size:13px;color:#52525b;text-align:left;cursor:pointer;transition:all 0.2s;line-height:1.5}
+.prompt-btn:hover{border-color:#c8a84e;background:rgba(200,168,78,0.03);color:#18181b}
+.prompt-btn.selected{border-color:#a0882e;background:rgba(200,168,78,0.06);color:#18181b;font-weight:600}
+.prompt-btn .prompt-icon{margin-right:8px}
+
+/* Score indicator */
+.score-bar{display:flex;align-items:center;gap:12px;margin-top:16px;padding:14px 18px;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:10px}
+.score-track{flex:1;height:8px;background:rgba(0,0,0,0.06);border-radius:4px;overflow:hidden}
+.score-fill{height:100%;border-radius:4px;transition:width 0.5s ease,background 0.5s ease}
+.score-label{font-size:12px;font-weight:700;min-width:60px;text-align:right}
+
+/* Nav buttons */
+.nav{display:flex;justify-content:space-between;margin-top:32px;padding-top:24px;border-top:1px solid rgba(0,0,0,0.06)}
+.btn{padding:10px 24px;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;border:none}
+.btn-back{background:transparent;color:#71717a;border:1.5px solid rgba(0,0,0,0.1)}
+.btn-back:hover{border-color:#71717a;color:#18181b}
+.btn-next{background:#18181b;color:#fff}
+.btn-next:hover{background:#27272a}
+.btn-next:disabled{opacity:0.3;cursor:not-allowed}
+.btn-gold{background:linear-gradient(135deg,#c8a84e,#b89a3e);color:#111}
+.btn-gold:hover{background:linear-gradient(135deg,#d4b65c,#c8a84e)}
+
+/* Current statement */
+.current-stmt{margin:20px 0;padding:20px 24px;background:rgba(224,90,66,0.03);border:1px solid rgba(224,90,66,0.12);border-radius:12px}
+.current-stmt .tag{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#e05a42;margin-bottom:8px}
+.current-stmt p{font-size:14px;color:#52525b;line-height:1.65}
+
+/* Refined statement */
+.refined-stmt{margin:20px 0;padding:20px 24px;background:rgba(160,136,46,0.04);border:1px solid rgba(160,136,46,0.15);border-radius:12px}
+.refined-stmt .tag{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#a0882e;margin-bottom:8px}
+.refined-stmt p{font-size:14px;color:#27272a;line-height:1.65;font-weight:500}
+
+/* Comparison */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+@media(max-width:600px){.compare{grid-template-columns:1fr}}
+
+/* Checklist */
+.checklist{margin:16px 0}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.04)}
+.check-item:last-child{border-bottom:none}
+.check-dot{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}
+.check-dot.yes{background:rgba(66,224,90,0.12);color:#22c55e}
+.check-dot.no{background:rgba(224,90,66,0.1);color:#e05a42}
+.check-dot.partial{background:rgba(224,168,66,0.12);color:#e0a842}
+.check-text{font-size:13px;color:#52525b;line-height:1.5}
+.check-text strong{color:#18181b}
+
+/* Tags */
+.dimension-tags{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.dim-tag{font-size:11px;font-weight:600;padding:5px 12px;border-radius:6px;letter-spacing:0.03em}
+.dim-tag.filled{background:rgba(160,136,46,0.1);color:#a0882e}
+.dim-tag.empty{background:rgba(0,0,0,0.04);color:#a1a1aa;border:1px dashed rgba(0,0,0,0.12)}
+
+/* Live preview */
+.live-preview{margin-top:24px;padding:24px;background:#fff;border:1.5px solid rgba(160,136,46,0.2);border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,0.06)}
+.live-preview .lp-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#a0882e;margin-bottom:10px}
+.live-preview h3{font-size:20px;font-weight:800;letter-spacing:-0.03em;color:#18181b;margin-bottom:8px}
+.live-preview p{font-size:14px;color:#52525b;line-height:1.65}
+.live-preview .empty-state{font-size:13px;color:#c4c4c8;font-style:italic}
+
+/* Tooltip */
+.tip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#a0882e;background:rgba(160,136,46,0.08);padding:3px 10px;border-radius:5px;margin-top:8px}
+
+footer{padding:32px 0;text-align:center;font-size:11px;color:#a1a1aa;border-top:1px solid rgba(0,0,0,0.06);margin-top:48px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<header>
+  <div class="header-top">
+    <div class="logo"><div class="logo-mark">FC</div>Problem Dissector</div>
+    <div class="badge">Interactive Workshop</div>
+  </div>
+</header>
+
+<div class="intro">
+  <h1>Dissect your problem statement until it's undeniable.</h1>
+  <p>Great investor pitches don't just describe a problem — they make the listener <em>feel</em> it. This tool walks you through 6 dimensions that separate forgettable problem slides from ones that make investors lean forward.</p>
+</div>
+
+<!-- Progress -->
+<div>
+  <div class="progress-wrap" id="progressBar"></div>
+  <div class="progress-labels" id="progressLabels"></div>
+</div>
+
+<!-- All sections rendered by JS -->
+<div id="sections"></div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button class="btn btn-back" id="btnBack" onclick="navigate(-1)">← Back</button>
+  <button class="btn btn-next" id="btnNext" onclick="navigate(1)">Next →</button>
+</div>
+
+</div>
+
+<footer>Problem Dissector — a FullControl internal tool</footer>
+
+<script>
+const SECTIONS = [
+  {
+    id: 'who',
+    num: 'Dimension 1 of 6',
+    title: 'Who has this problem?',
+    desc: 'Investors need to picture a real person. "Small businesses" is too vague. "A basketball academy owner running 5 locations with 200+ athletes and 3 part-time coaches" — now they see someone.',
+    education: [
+      {
+        title: 'Specificity creates credibility',
+        body: 'The more precisely you define who has the problem, the more investors believe you actually understand the market. Vague = guessing. Specific = lived experience.',
+        good: '<strong>Good:</strong> "Independent sports academy owners running 1–5 locations with 50–500 athletes, doing $100K–$1M ARR, and managing it with a patchwork of tools and spreadsheets."',
+        bad: '<strong>Weak:</strong> "Trainers and coaches who need better software."'
+      },
+      {
+        title: 'Name the persona, not the market',
+        body: 'Investors hear "fitness market" all day. They remember the owner who\'s up at midnight sending payment reminders on their phone. Paint the human, not the TAM.',
+        good: '<strong>Good:</strong> "An academy owner who personally coaches 15 sessions/week, manages a team of 3 trainers, handles billing disputes in their DMs, and still tries to post content to grow."',
+        bad: null
+      }
+    ],
+    currentText: 'Trainers run their business on 5–8 disconnected tools',
+    prompts: [
+      { icon: '🎯', text: 'What is this person\'s job title and daily reality?' },
+      { icon: '📏', text: 'How big is their operation? (locations, athletes, revenue, staff)' },
+      { icon: '😤', text: 'What does a typical frustrating day look like for them?' },
+      { icon: '🧩', text: 'What makes them different from a gym owner or personal trainer?' }
+    ],
+    placeholder: 'Describe the specific person who has this problem. Not the market — the human. What\'s their day like? What keeps them up at night?',
+    field: 'who'
+  },
+  {
+    id: 'what',
+    num: 'Dimension 2 of 6',
+    title: 'What exactly is the problem?',
+    desc: 'State the core problem in one sentence that anyone could understand. No jargon. No solution hints. Just the pain.',
+    education: [
+      {
+        title: 'One problem, stated simply',
+        body: 'Resist listing 10 problems. Find the root cause that creates all the downstream pain. "They use too many tools" is a symptom. What\'s the actual problem underneath?',
+        good: '<strong>Good:</strong> "Academy owners have no single system that connects their operations, so they spend more time on admin than coaching — and they\'re flying blind on what\'s actually working."',
+        bad: '<strong>Weak:</strong> "CRM, scheduling, payments, marketing, analytics, and member management are all separate tools."'
+      },
+      {
+        title: 'Problem ≠ missing solution',
+        body: '"There\'s no all-in-one platform" is not a problem — it\'s an absence of your product. The problem is what happens because of that absence: lost revenue, burned-out owners, athletes churning silently.',
+        good: '<strong>Good:</strong> "Operators lose 30–40 hours/week to manual admin, miss at-risk members until they\'re gone, and can\'t tell which marketing actually drives revenue."',
+        bad: '<strong>Weak:</strong> "No single platform covers everything an academy needs."'
+      }
+    ],
+    currentText: 'CRM, scheduling, payments, marketing, analytics, member management — each one solves part of the problem. None of them work together.',
+    prompts: [
+      { icon: '🔍', text: 'If you had to explain this problem to a 12-year-old, what would you say?' },
+      { icon: '🌳', text: 'What\'s the root cause? (Not the symptoms — the thing that creates the symptoms)' },
+      { icon: '💀', text: 'What\'s the worst thing that happens when this problem goes unsolved?' },
+      { icon: '🔗', text: 'How does this one problem cascade into other problems?' }
+    ],
+    placeholder: 'State the core problem in plain language. What is fundamentally broken or missing? Don\'t describe your solution\'s absence — describe the pain.',
+    field: 'what'
+  },
+  {
+    id: 'severity',
+    num: 'Dimension 3 of 6',
+    title: 'How severe is the pain?',
+    desc: 'Numbers make problems real. "It\'s frustrating" means nothing. "They lose $2,000/month in silent churn they can\'t detect" — that\'s a checkbook problem investors respect.',
+    education: [
+      {
+        title: 'Quantify in time, money, or both',
+        body: 'Every problem costs someone time, money, or opportunity. Find the number. If you don\'t know the exact number, use a defensible range based on your operator experience.',
+        good: '<strong>Good:</strong> "30–40 hours/week on manual admin. At a $50K salary equivalent, that\'s $36K–$48K/year spent on work software should do — per location."',
+        bad: '<strong>Weak:</strong> "Owners spend a lot of time on busywork."'
+      },
+      {
+        title: 'Show the compounding cost',
+        body: 'The best problem statements show that the pain gets worse over time, not better. If the cost compounds as they grow, investors see urgency.',
+        good: '<strong>Good:</strong> "Every new location multiplies the admin burden. A 3-location academy doesn\'t have 3x the admin — it has 5–8x, because nothing is centralized."',
+        bad: null
+      }
+    ],
+    currentText: 'Operators spend 30–40 hours a week on manual admin instead of coaching.',
+    prompts: [
+      { icon: '💰', text: 'How much money does this problem cost per month/year?' },
+      { icon: '⏱️', text: 'How many hours per week are wasted? What else could that time go toward?' },
+      { icon: '📉', text: 'How much revenue is lost from churn, missed leads, or inefficiency?' },
+      { icon: '📈', text: 'Does the pain get worse as they grow? How?' }
+    ],
+    placeholder: 'Quantify the severity. Hours lost, dollars wasted, revenue leaked, opportunities missed. Use real numbers from your experience running BAM.',
+    field: 'severity'
+  },
+  {
+    id: 'frequency',
+    num: 'Dimension 4 of 6',
+    title: 'How often do they feel it?',
+    desc: 'A problem that hurts once a year is a nuisance. A problem that hurts every single day before lunch is a market. Investors fund daily pain.',
+    education: [
+      {
+        title: 'Daily > weekly > monthly > yearly',
+        body: 'The more frequently the problem occurs, the more urgent the solution feels. Daily pain means high willingness to pay and fast adoption — they\'ll try anything that promises relief.',
+        good: '<strong>Good:</strong> "Every morning starts with the same scramble: check 3 apps for today\'s schedule, chase down payments in Stripe, reply to DMs asking about session times, and manually update the spreadsheet. Before they\'ve coached a single session, 2 hours are gone."',
+        bad: '<strong>Weak:</strong> "They deal with operational headaches regularly."'
+      },
+      {
+        title: 'Map it to moments',
+        body: 'Don\'t say "frequently." Walk through an actual day or week and show where the problem shows up. Investors should be able to count the pain points on their fingers.',
+        good: '<strong>Good:</strong> "Monday: manually send weekly schedule to 200 parents. Tuesday: chase 15 failed payments. Wednesday: a member quietly stops showing up — nobody notices for 2 weeks. Thursday: spend 3 hours building a social post that gets 12 likes. Friday: try to figure out which marketing channel actually brought in this month\'s new trials."',
+        bad: null
+      }
+    ],
+    currentText: null,
+    prompts: [
+      { icon: '📅', text: 'Walk through a typical Monday for an academy owner — where does the pain show up?' },
+      { icon: '🔁', text: 'Which tasks are repeated daily that should be automated?' },
+      { icon: '🚨', text: 'What fires come up every week that pull them away from coaching?' },
+      { icon: '📊', text: 'How many times per day do they context-switch between different tools?' }
+    ],
+    placeholder: 'Describe how often this problem hits. Walk through a real day or week. Make the investor feel the repetition and grind.',
+    field: 'frequency'
+  },
+  {
+    id: 'alternatives',
+    num: 'Dimension 5 of 6',
+    title: 'What do they do today?',
+    desc: 'Nobody has "no solution." They have bad solutions — duct-taped together from 5 tools, spreadsheets, and memory. Show the current stack and why it fails.',
+    education: [
+      {
+        title: 'Map the current workaround stack',
+        body: 'List every tool and hack they currently use. This proves the demand exists (they\'re paying for partial solutions) and shows the gap (no single tool covers everything).',
+        good: '<strong>Good:</strong> "A typical academy runs GHL or Mindbody for scheduling ($100–300/mo), Stripe for payments, Google Sheets for member tracking, Instagram DMs for lead follow-up, Canva for content, and WhatsApp groups for parent communication. That\'s 6+ tools, $300–700/mo, and none of them talk to each other."',
+        bad: '<strong>Weak:</strong> "They use various tools that don\'t integrate well."'
+      },
+      {
+        title: 'Show why switching to another existing tool doesn\'t work',
+        body: 'Investors will ask: "Why not just use Mindbody?" or "Why not GHL?" You need to preempt this. Show that every alternative covers 2–3 domains but misses the rest.',
+        good: '<strong>Good:</strong> "Mindbody covers scheduling and payments but costs $139–699/mo, has no AI, no marketing automation, and was built for yoga studios — not the multi-session, multi-location academy model. GHL covers marketing and CRM but requires a $500–2K/mo agency to configure and has zero sports-specific features."',
+        bad: null
+      }
+    ],
+    currentText: 'No single platform covers everything an academy actually needs.',
+    prompts: [
+      { icon: '🧰', text: 'List every tool a typical academy uses today and what it costs' },
+      { icon: '🔌', text: 'Where do these tools fail to connect? What falls through the cracks?' },
+      { icon: '🤷', text: 'What tasks still require manual work even with all these tools?' },
+      { icon: '❌', text: 'Why can\'t they just use Mindbody, GHL, or CoachIQ and be done?' }
+    ],
+    placeholder: 'Describe the current tool stack and workarounds. What are they paying? Where are the gaps? Why can\'t any single existing tool solve this?',
+    field: 'alternatives'
+  },
+  {
+    id: 'whynow',
+    num: 'Dimension 6 of 6',
+    title: 'Why now?',
+    desc: 'This is the dimension most founders skip — and it\'s the one investors care about most. Why is this problem solvable NOW in a way it wasn\'t 3 years ago?',
+    education: [
+      {
+        title: 'Tailwinds > willpower',
+        body: 'Investors don\'t fund hard work. They fund timing. What structural shift — technology, regulation, market behavior, cost curve — makes this the right moment? The best "why now" is a tailwind you\'re riding, not a headwind you\'re fighting.',
+        good: '<strong>Good:</strong> "Three converging shifts: (1) AI can now actually take action — not just report, but book trials, follow up on leads, predict churn, and draft content. This was science fiction 3 years ago. (2) Private sports academies are the fastest-growing segment in youth sports — 40% growth since 2020. (3) Operators have been forced onto tool stacks that cost $300–700/mo but still leave gaps. They\'re primed to consolidate."',
+        bad: '<strong>Weak:</strong> "AI is changing everything and the market is growing."'
+      },
+      {
+        title: 'Connect the tailwind to your unfair advantage',
+        body: 'The "why now" should naturally lead to "why us." If AI is the tailwind, show that you\'re uniquely positioned to apply it to this vertical because you\'ve been operating in it.',
+        good: '<strong>Good:</strong> "We\'re not retrofitting AI onto an old platform (Mindbody) or building generic tools for everyone (GHL). We\'ve spent 3 years operating academies and know exactly which decisions AI should make, which ones it shouldn\'t, and what data it needs — because we\'ve made those decisions manually 10,000 times."',
+        bad: null
+      }
+    ],
+    currentText: null,
+    prompts: [
+      { icon: '🤖', text: 'What can AI do today that it couldn\'t do 2–3 years ago that\'s relevant here?' },
+      { icon: '📈', text: 'Is the market growing? What\'s driving that growth?' },
+      { icon: '💸', text: 'Are operators spending more on tools than before? Why?' },
+      { icon: '🏁', text: 'What happens if you wait another 2 years — does someone else fill this gap?' }
+    ],
+    placeholder: 'Explain why this problem is solvable now in a way it wasn\'t before. What changed in AI, the market, or operator behavior that creates this window?',
+    field: 'whynow'
+  }
+];
+
+// State
+let currentStep = 0;
+const answers = {};
+SECTIONS.forEach(s => { answers[s.field] = ''; });
+
+// Render progress bar
+function renderProgress() {
+  const bar = document.getElementById('progressBar');
+  const labels = document.getElementById('progressLabels');
+  bar.innerHTML = SECTIONS.map((s, i) => {
+    const cls = i < currentStep ? 'complete' : i === currentStep ? 'active' : '';
+    return `<div class="progress-step ${cls}" onclick="goTo(${i})"></div>`;
+  }).join('');
+  labels.innerHTML = SECTIONS.map((s, i) => {
+    const cls = i === currentStep ? 'active' : '';
+    const short = s.id === 'who' ? 'Who' : s.id === 'what' ? 'What' : s.id === 'severity' ? 'Severity' : s.id === 'frequency' ? 'Frequency' : s.id === 'alternatives' ? 'Alternatives' : 'Why Now';
+    return `<span class="${cls}">${short}</span>`;
+  }).join('');
+}
+
+// Render current section
+function renderSection() {
+  const container = document.getElementById('sections');
+  const s = SECTIONS[currentStep];
+  const isLast = currentStep === SECTIONS.length - 1;
+
+  let html = `<div class="section visible">`;
+  html += `<div class="section-header">
+    <div class="section-num">${s.num}</div>
+    <h2 class="section-title">${s.title}</h2>
+    <p class="section-desc">${s.desc}</p>
+  </div>`;
+
+  // Education cards
+  s.education.forEach(e => {
+    html += `<div class="edu-card">
+      <h4>${e.title}</h4>
+      <p>${e.body}</p>
+      <div class="example">${e.good}</div>
+      ${e.bad ? `<div class="bad">${e.bad}</div>` : ''}
+    </div>`;
+  });
+
+  // Current statement if exists
+  if (s.currentText) {
+    html += `<div class="current-stmt">
+      <div class="tag">Your current investor summary says</div>
+      <p>"${s.currentText}"</p>
+    </div>`;
+  }
+
+  // Thought prompts
+  html += `<div style="margin-top:24px">
+    <label style="font-size:12px;font-weight:700;color:#18181b;letter-spacing:0.02em">Thought prompts <span style="font-weight:400;color:#a1a1aa">(click to copy into your answer)</span></label>
+    <div class="prompt-list">`;
+  s.prompts.forEach((p, i) => {
+    html += `<button class="prompt-btn" onclick="usePrompt(${currentStep}, ${i})">
+      <span class="prompt-icon">${p.icon}</span>${p.text}
+    </button>`;
+  });
+  html += `</div></div>`;
+
+  // Input area
+  html += `<div class="input-group">
+    <label>Your answer</label>
+    <div class="hint">Write freely — you'll synthesize everything at the end. Focus on substance, not polish.</div>
+    <textarea id="answer-${s.field}" placeholder="${s.placeholder}" oninput="saveAnswer('${s.field}')">${answers[s.field]}</textarea>
+  </div>`;
+
+  // Live preview
+  html += `<div class="live-preview">
+    <div class="lp-label">Live problem preview</div>
+    ${buildPreview()}
+  </div>`;
+
+  html += `</div>`;
+  container.innerHTML = html;
+
+  // Update nav
+  document.getElementById('btnBack').style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+  const nextBtn = document.getElementById('btnNext');
+  if (isLast) {
+    nextBtn.textContent = 'Generate Final Statement →';
+    nextBtn.className = 'btn btn-gold';
+    nextBtn.onclick = () => showFinal();
+  } else {
+    nextBtn.textContent = 'Next →';
+    nextBtn.className = 'btn btn-next';
+    nextBtn.onclick = () => navigate(1);
+  }
+
+  renderProgress();
+}
+
+function buildPreview() {
+  const filled = SECTIONS.filter(s => answers[s.field].trim().length > 0);
+  if (filled.length === 0) {
+    return `<p class="empty-state">Your refined problem statement will build here as you fill in each dimension...</p>`;
+  }
+
+  let parts = [];
+  if (answers.who) parts.push(`<strong>Who:</strong> ${truncate(answers.who, 120)}`);
+  if (answers.what) parts.push(`<strong>Problem:</strong> ${truncate(answers.what, 120)}`);
+  if (answers.severity) parts.push(`<strong>Impact:</strong> ${truncate(answers.severity, 120)}`);
+  if (answers.frequency) parts.push(`<strong>Frequency:</strong> ${truncate(answers.frequency, 120)}`);
+  if (answers.alternatives) parts.push(`<strong>Current solutions:</strong> ${truncate(answers.alternatives, 120)}`);
+  if (answers.whynow) parts.push(`<strong>Why now:</strong> ${truncate(answers.whynow, 120)}`);
+
+  let tags = SECTIONS.map(s =>
+    `<span class="dim-tag ${answers[s.field].trim() ? 'filled' : 'empty'}">${s.id === 'who' ? 'Who' : s.id === 'what' ? 'What' : s.id === 'severity' ? 'Severity' : s.id === 'frequency' ? 'Frequency' : s.id === 'alternatives' ? 'Alternatives' : 'Why Now'}</span>`
+  ).join('');
+
+  return `<div class="dimension-tags">${tags}</div>` + parts.map(p => `<p style="margin-bottom:8px;font-size:13px">${p}</p>`).join('');
+}
+
+function truncate(str, len) {
+  return str.length > len ? str.substring(0, len) + '...' : str;
+}
+
+function saveAnswer(field) {
+  const el = document.getElementById('answer-' + field);
+  if (el) answers[field] = el.value;
+}
+
+function usePrompt(step, promptIdx) {
+  const s = SECTIONS[step];
+  const ta = document.getElementById('answer-' + s.field);
+  const prompt = s.prompts[promptIdx].text;
+  if (ta) {
+    ta.value += (ta.value ? '\n\n' : '') + prompt + '\n';
+    answers[s.field] = ta.value;
+    ta.focus();
+  }
+}
+
+function navigate(dir) {
+  // Save current answer
+  const s = SECTIONS[currentStep];
+  const ta = document.getElementById('answer-' + s.field);
+  if (ta) answers[s.field] = ta.value;
+
+  currentStep = Math.max(0, Math.min(SECTIONS.length - 1, currentStep + dir));
+  renderSection();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goTo(step) {
+  const s = SECTIONS[currentStep];
+  const ta = document.getElementById('answer-' + s.field);
+  if (ta) answers[s.field] = ta.value;
+
+  currentStep = step;
+  renderSection();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showFinal() {
+  // Save last answer
+  const s = SECTIONS[currentStep];
+  const ta = document.getElementById('answer-' + s.field);
+  if (ta) answers[s.field] = ta.value;
+
+  const filled = SECTIONS.filter(s => answers[s.field].trim().length > 0).length;
+  const container = document.getElementById('sections');
+
+  // Score
+  const scorePercent = Math.round((filled / 6) * 100);
+  const scoreColor = scorePercent >= 80 ? '#22c55e' : scorePercent >= 50 ? '#e0a842' : '#e05a42';
+  const scoreLabel = scorePercent >= 80 ? 'Strong' : scorePercent >= 50 ? 'Getting there' : 'Needs work';
+
+  // Checklist
+  const checks = SECTIONS.map(s => {
+    const has = answers[s.field].trim().length > 0;
+    const label = s.id === 'who' ? 'Specific person defined' : s.id === 'what' ? 'Core problem stated (not solution absence)' : s.id === 'severity' ? 'Pain quantified in time/money' : s.id === 'frequency' ? 'Frequency mapped to real moments' : s.id === 'alternatives' ? 'Current stack and gaps documented' : 'Structural tailwinds identified';
+    return `<div class="check-item">
+      <div class="check-dot ${has ? 'yes' : 'no'}">${has ? '✓' : '—'}</div>
+      <div class="check-text"><strong>${s.title}</strong> — ${label}</div>
+    </div>`;
+  }).join('');
+
+  // Build the synthesized text
+  let synthesis = '';
+  if (answers.who) synthesis += answers.who.trim() + '\n\n';
+  if (answers.what) synthesis += answers.what.trim() + '\n\n';
+  if (answers.severity) synthesis += answers.severity.trim() + '\n\n';
+  if (answers.frequency) synthesis += answers.frequency.trim() + '\n\n';
+  if (answers.alternatives) synthesis += answers.alternatives.trim() + '\n\n';
+  if (answers.whynow) synthesis += answers.whynow.trim();
+
+  let html = `<div class="section visible">
+    <div class="section-header">
+      <div class="section-num">Results</div>
+      <h2 class="section-title">Your problem dissection</h2>
+      <p class="section-desc">Here's how your problem statement scores across all 6 dimensions, plus your raw material ready to synthesize.</p>
+    </div>
+
+    <div class="score-bar">
+      <div style="font-size:13px;font-weight:700;color:#18181b">Completeness</div>
+      <div class="score-track"><div class="score-fill" style="width:${scorePercent}%;background:${scoreColor}"></div></div>
+      <div class="score-label" style="color:${scoreColor}">${filled}/6 · ${scoreLabel}</div>
+    </div>
+
+    <div class="checklist">${checks}</div>
+
+    <div style="margin-top:32px">
+      <h3 style="font-size:18px;font-weight:800;color:#18181b;margin-bottom:4px">Your raw material</h3>
+      <p style="font-size:13px;color:#71717a;margin-bottom:16px">Everything you wrote across all 6 dimensions. Copy this and bring it to Claude Code to synthesize into your final investor summary problem section.</p>
+      <textarea id="finalOutput" style="min-height:300px;font-size:13px" readonly>${synthesis.trim()}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-gold" onclick="copyFinal()" id="copyBtn">📋 Copy to clipboard</button>
+        <button class="btn btn-back" onclick="currentStep=0;renderSection();window.scrollTo({top:0,behavior:'smooth'})">← Edit answers</button>
+      </div>
+    </div>
+
+    <div style="margin-top:32px">
+      <div class="compare">
+        <div class="current-stmt">
+          <div class="tag">Before — Current investor summary</div>
+          <p>"Trainers run their business on 5–8 disconnected tools. CRM, scheduling, payments, marketing, analytics, member management — each one solves part of the problem. None of them work together. Operators spend 30–40 hours a week on manual admin instead of coaching."</p>
+        </div>
+        <div class="refined-stmt">
+          <div class="tag">After — Your dissected material</div>
+          <p>${synthesis.trim() ? truncate(synthesis.trim().replace(/\n/g, ' '), 300) : '<em style="color:#a1a1aa">Fill in all 6 dimensions to see the comparison</em>'}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="edu-card" style="margin-top:24px;border-color:rgba(160,136,46,0.2);background:rgba(200,168,78,0.03)">
+      <h4>💡 What to do next</h4>
+      <p>Copy your raw material and paste it into Claude Code with something like: <em>"Here's my dissected problem material from the problem dissector. Synthesize this into a tight 3–4 sentence problem section for my investor summary page."</em></p>
+      <p style="margin-top:8px">Claude will turn your raw thinking into polished copy that hits all 6 dimensions, ready to drop into <code>summary.html</code>.</p>
+    </div>
+  </div>`;
+
+  container.innerHTML = html;
+
+  // Update nav
+  document.getElementById('btnBack').style.visibility = 'visible';
+  const nextBtn = document.getElementById('btnNext');
+  nextBtn.style.visibility = 'hidden';
+
+  // Update progress
+  currentStep = SECTIONS.length; // past the end
+  const bar = document.getElementById('progressBar');
+  bar.innerHTML = SECTIONS.map(() => `<div class="progress-step complete"></div>`).join('');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function copyFinal() {
+  const ta = document.getElementById('finalOutput');
+  navigator.clipboard.writeText(ta.value).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = '📋 Copy to clipboard'; }, 2000);
+  });
+}
+
+// Init
+renderSection();
+</script>
+</body>
+</html>

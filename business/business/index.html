@@ -21,8 +21,49 @@
    RESET
    ═══════════════════════════════════════════ */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;transition:background .4s ease,color .4s ease}
+html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow:hidden;height:100%}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow:hidden;height:100%;transition:background .4s ease,color .4s ease}
+/* HORIZONTAL SLIDE LAYOUT */
+.slide-wrapper{overflow:hidden;height:100vh;width:100vw;position:relative}
+.slide-container{display:flex;height:100vh;width:max-content;will-change:transform;transition:transform 0.5s cubic-bezier(0.4,0,0.2,1)}
+.slide{min-width:100vw;width:100vw;height:100vh;overflow:hidden;flex-shrink:0;scroll-snap-align:start;display:flex;flex-direction:column;justify-content:center;padding:70px 0 44px}
+.slide-nav-btn{position:fixed;top:0;width:80px;height:100vh;z-index:1000;background:transparent;border:none;color:var(--g500);font-size:32px;cursor:pointer;transition:all .25s ease;display:flex;align-items:center;justify-content:center}
+.slide-nav-btn:hover{background:rgba(200,168,78,0.06);color:var(--accent)}
+.slide-nav-btn.prev{left:0}
+.slide-nav-btn.next{right:0}
+.slide-nav-btn:disabled{opacity:0;pointer-events:none}
+.slide-agenda{position:fixed;bottom:0;left:0;right:0;z-index:1001;display:flex;align-items:stretch;height:36px;background:var(--bg);border-top:1px solid var(--divider)}
+.slide-agenda-item{flex:1;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--g600);cursor:pointer;transition:all .25s ease;position:relative;white-space:nowrap;overflow:hidden}
+.slide-agenda-item:hover{color:var(--g300)}
+.slide-agenda-item.active{color:var(--accent)}
+.slide-agenda-item.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent)}
+.slide-agenda-item.visited{color:var(--g400)}
+.slide-agenda-item.visited::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--g600)}
+@media(max-width:900px){.slide-agenda-item{font-size:7px;letter-spacing:0.02em}}
+/* Force all slide content to fit vertically */
+.slide section{padding-top:16px;padding-bottom:16px}
+.slide .sec-title{font-size:clamp(20px,3vw,32px);margin-bottom:10px}
+.slide .sec-sub{font-size:13px;line-height:1.45}
+.slide .sec-label{margin-bottom:4px;font-size:11px}
+.slide .div-line{margin:12px auto}
+/* Compact spacing for slide mode */
+.slide .moat-list{gap:8px;margin-top:20px}
+.slide .moat-item{padding:12px 16px}
+.slide .moat-item h3{font-size:13px}
+.slide .moat-item p{font-size:11px;line-height:1.4}
+.slide .team-grid{margin-top:20px;gap:10px}
+.slide .team-card{padding:16px}
+.slide .market-stats{gap:10px;margin-top:20px}
+.slide .market-stat-card{padding:16px}
+.slide .tl-step{padding:12px 0 12px 48px}
+.slide .tl-step h3{font-size:14px}
+.slide .tl-step p{font-size:11px}
+.slide .testimonial-grid{gap:10px;margin-top:16px}
+.slide .testimonial-card{padding:16px}
+.slide .testimonial-quote{font-size:12px}
+/* Hero slide special */
+.slide:first-child{padding:0}
+.slide:first-child section{padding-top:0;padding-bottom:0}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none}
 
@@ -126,7 +167,7 @@ section{padding:140px 0;position:relative}
 /* ═══════════════════════════════════════════
    NAV
    ═══════════════════════════════════════════ */
-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 0;transition:all .3s var(--ease)}
+nav{position:fixed;top:0;left:0;right:0;z-index:1002;padding:18px 0;transition:all .3s var(--ease)}
 nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--nav-border)}
 .nav-in{max-width:var(--max);margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between}
 .nav-logo{font-size:17px;font-weight:800;letter-spacing:-0.03em;display:flex;align-items:center;gap:9px;color:var(--white)}
@@ -290,15 +331,15 @@ nav.scrolled{background:var(--nav-scrolled);backdrop-filter:blur(24px);-webkit-b
    PROTOTYPE EMBED
    ═══════════════════════════════════════════ */
 .demo{background:var(--bg-alt)}
-.demo-frame-wrap{margin-top:48px;position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--card-border);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.demo-frame-wrap{margin-top:16px;position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--card-border);box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 .demo-topbar{background:var(--card-bg);border-bottom:1px solid var(--card-border);padding:10px 16px;display:flex;align-items:center;gap:8px}
 .demo-dot{width:10px;height:10px;border-radius:50%;background:var(--g600)}
 .demo-dot:first-child{background:#e05a42}
 .demo-dot:nth-child(2){background:#e0a842}
 .demo-dot:nth-child(3){background:#42e05a}
 .demo-url{flex:1;text-align:center;font-size:11px;font-weight:500;color:var(--g500);font-family:'DM Mono',monospace}
-.demo-iframe{width:100%;height:680px;border:none;background:var(--bg)}
-@media(max-width:768px){.demo-iframe{height:480px}}
+.demo-iframe{width:100%;height:calc(100vh - 220px);border:none;background:var(--bg)}
+@media(max-width:768px){.demo-iframe{height:calc(100vh - 200px)}}
 
 /* ═══════════════════════════════════════════
    HOW IT WORKS — TIMELINE
@@ -539,7 +580,7 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 /* ═══════════════════════════════════════════
    FLOATING DOT NAV
    ═══════════════════════════════════════════ */
-.dot-nav{position:fixed;right:24px;top:50%;transform:translateY(-50%);z-index:90;display:flex;flex-direction:column;gap:12px}
+.dot-nav{display:none}
 .dot-nav-item{width:8px;height:8px;border-radius:50%;background:var(--g600);transition:all .3s var(--ease);cursor:pointer;position:relative}
 .dot-nav-item:hover{background:var(--g400);transform:scale(1.3)}
 .dot-nav-item.active{background:var(--accent);box-shadow:0 0 8px rgba(200,168,78,0.3)}
@@ -557,11 +598,13 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 .glass-glow{position:absolute;inset:-50px;background:radial-gradient(ellipse at center,rgba(200,168,78,0.22) 0%,rgba(200,168,78,0.06) 35%,transparent 65%);opacity:0;transition:opacity 1.4s var(--ease);pointer-events:none;z-index:0}
 .glass-wrap.assembled .glass-glow{opacity:1}
 .glass-wrap.assembled{filter:drop-shadow(0 12px 40px rgba(200,168,78,0.12)) drop-shadow(0 4px 16px rgba(0,0,0,0.25));border-radius:14px}
-.glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;opacity:0;transition:opacity 0.8s var(--ease) 0.6s;z-index:10;pointer-events:none}
-.glass-label-name{font-size:16px;font-weight:800;color:var(--accent);letter-spacing:0.1em;text-transform:uppercase}
-.glass-label-tag{font-size:10px;font-weight:500;color:var(--g300);letter-spacing:0.04em}
-@media(max-width:600px){.glass-label-name{font-size:12px}.glass-label-tag{font-size:8px}}
-.glass-wrap.assembled .glass-label{opacity:1}
+.glass-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;opacity:0;transform:scale(0.85);transition:opacity 0.5s var(--ease) 0.8s,transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.8s;z-index:10;pointer-events:none}
+.glass-label-box{background:var(--bg);border:1.5px solid rgba(200,168,78,0.3);border-radius:10px;width:40%;height:40%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 12px 40px rgba(0,0,0,0.35),0 0 0 1px rgba(200,168,78,0.1);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+[data-theme="light"] .glass-label-box{background:rgba(255,255,255,0.92);border-color:rgba(168,136,46,0.25);box-shadow:0 12px 40px rgba(0,0,0,0.1),0 0 0 1px rgba(168,136,46,0.08)}
+.glass-label-name{font-size:18px;font-weight:900;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;line-height:1.2}
+.glass-label-tag{font-size:11px;font-weight:500;color:var(--g300);letter-spacing:0.03em;margin-top:2px}
+@media(max-width:600px){.glass-label-box{padding:14px 24px}.glass-label-name{font-size:14px}.glass-label-tag{font-size:9px}}
+.glass-wrap.assembled .glass-label{opacity:1;transform:scale(1)}
 .shard{position:absolute;background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02));border:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:var(--g500);letter-spacing:0.02em;transition:transform 1.2s var(--ease),opacity 1.2s var(--ease),border-color 0.8s var(--ease),box-shadow 0.8s var(--ease),border-radius 0.4s var(--ease);pointer-events:none;z-index:1;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08),0 4px 12px rgba(0,0,0,0.25);backdrop-filter:blur(2px);border-radius:3px;transform-style:preserve-3d}
 .glass-wrap.assembled .shard{transform:translate(0,0) rotate(0deg) rotateX(0deg) rotateY(0deg)!important;opacity:1;border-color:rgba(200,168,78,0.06);box-shadow:none;border-radius:0}
 .glass-wrap.assembled .shard::after{content:'';position:absolute;inset:0;background:rgba(200,168,78,0.025)}
@@ -590,6 +633,12 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   </div>
 </nav>
 
+<!-- HORIZONTAL SLIDE WRAPPER -->
+<div class="slide-wrapper" id="slideWrapper">
+<div class="slide-container" id="slideContainer">
+
+<!-- SLIDE 1: HERO -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      HERO — TITLE CARD
      ═══════════════════════════════════════════ -->
@@ -602,8 +651,8 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
         <div class="hero-top-sub">Company Overview &mdash; 2026</div>
       </div>
     </div>
-    <h1 class="rv rv-d1">We Ran the Business.<br>We Felt the Pain.<br>So We Built <em>the Fix.</em></h1>
-    <p class="hero-desc rv rv-d2">FullControl is the AI-powered command center for sports &amp; fitness businesses. One system that helps operators understand what's happening, decide what matters, and take action, built by people who've done the job.</p>
+    <h1 class="rv rv-d1">All-in-one command center<br>for <em>trainers.</em></h1>
+    <p class="hero-desc rv rv-d2">FullControl is the all-in-one AI-powered command center for sports, fitness, and potentially more service scheduling-based businesses. One system that helps operators understand what&rsquo;s happening, decide what matters, and take action &mdash; being built by people who need it.</p>
     <div class="hero-stats rv rv-d3">
       <div class="hero-stat" data-modal="market">
         <div class="hero-stat-num count-up" data-target="27.8" data-prefix="$" data-suffix="B" data-decimals="1">$0</div>
@@ -621,115 +670,59 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 1: HERO -->
 
-<div class="div-line"></div>
-
-<!-- ═══════════════════════════════════════════
-     MISSION
-     ═══════════════════════════════════════════ -->
-<section class="mission" id="mission">
-  <div class="w">
-    <div class="sec-center">
-      <div class="sec-label rv">Mission</div>
-    </div>
-    <div class="sec-center rv rv-d1" style="margin-bottom:12px">
-      <h2 class="sec-title" style="font-size:clamp(26px,3.5vw,38px)">Our belief is simple</h2>
-    </div>
-    <div class="bq rv rv-d2" style="max-width:640px;margin:24px auto 28px;padding:24px 0 24px 24px">
-      <p style="font-size:clamp(15px,2vw,18px);font-weight:500;line-height:1.65;letter-spacing:-0.005em">The people who master&nbsp;<em style="font-style:normal;color:var(--accent);font-weight:700">relationships, communication, and culture</em> will be the most successful, once they learn to use AI the right way. Soon, <em style="font-style:normal;color:var(--accent);font-weight:700">quality humans and connectors</em> will trump tech savvy.</p>
-    </div>
-    <div class="sec-center rv rv-d3">
-      <p style="font-size:clamp(14px,1.8vw,17px);font-weight:500;color:var(--g300);max-width:580px;margin:0 auto;line-height:1.65"><strong style="color:var(--white)">FullControl</strong> exists to facilitate this shift and empower the coaches and operators who got into this industry to make an impact &mdash; not to manage software.</p>
-    </div>
-  </div>
-</section>
-
-<div class="div-line"></div>
-
-<!-- ═══════════════════════════════════════════
-     WHAT IT IS
-     ═══════════════════════════════════════════ -->
-<section>
-  <div class="w">
-    <div class="sec-center">
-      <div class="sec-label rv">What it is</div>
-      <h2 class="sec-title rv rv-d1">The operating system for<br>sports & fitness businesses</h2>
-      <p class="sec-sub rv rv-d2">A single intelligent system that helps operators understand their business, decide what matters, and take action.</p>
-    </div>
-    <div class="bq rv rv-d3">
-      <p>Operators won't just use their software. They'll talk to it, and it'll execute with power, speed, and precision that's exponentially better than their best employee.</p>
-    </div>
-  </div>
-</section>
-
-<div class="div-line"></div>
-
-<!-- ═══════════════════════════════════════════
-     PROBLEM
-     ═══════════════════════════════════════════ -->
+<!-- SLIDE 2: THE PROBLEM -->
+<div class="slide" id="problemSlide">
 <section id="problem">
   <div class="w">
-    <div class="sec-label rv">The problem</div>
-    <h2 class="sec-title rv rv-d1">Today's business software<br>is like shattered glass</h2>
-    <!-- GLASS ASSEMBLE ANIMATION — rigid shards converge into control center -->
-    <div class="glass-wrap" id="glassAssemble">
+    <div class="sec-center">
+      <div class="sec-label rv">The problem</div>
+      <h2 class="sec-title rv rv-d1">Trainers are forced to piece together<br>a dozen disconnected tools</h2>
+    </div>
+
+    <!-- GLASS ANIMATION — shards scattered, assemble into one system -->
+    <div class="glass-wrap" id="glassAssemble" style="margin:24px auto 20px">
       <div class="glass-glow"></div>
       <div class="glass-label">
-        <span class="glass-label-name">FullControl</span>
-        <span class="glass-label-tag">Hundreds of tools. One place. Full control.</span>
+        <div class="glass-label-box">
+          <span class="glass-label-name">FullControl</span>
+          <span class="glass-label-tag">One system. Full control.</span>
+        </div>
       </div>
       <!-- Row 1 -->
-      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-160px;--sy:-100px;--sr:-22deg;--rx:15deg;--ry:-20deg">CRM</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:30px;--sy:-120px;--sr:15deg;--rx:-12deg;--ry:18deg">Schedule</div>
-      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:170px;--sy:-90px;--sr:-18deg;--rx:10deg;--ry:22deg">Payments</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:0;--sx:-220px;--sy:-140px;--sr:-25deg;--rx:18deg;--ry:-22deg">CRM</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:140px;--sx:40px;--sy:-180px;--sr:18deg;--rx:-15deg;--ry:20deg">Schedule</div>
+      <div class="shard" style="width:140px;height:94px;top:0;left:280px;--sx:230px;--sy:-120px;--sr:-20deg;--rx:12deg;--ry:25deg">Payments</div>
       <!-- Row 2 -->
-      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-180px;--sy:40px;--sr:25deg;--rx:-18deg;--ry:-15deg">Marketing</div>
-      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:130px;--sr:-10deg;--rx:8deg;--ry:-8deg">Analytics</div>
-      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:190px;--sy:30px;--sr:-24deg;--rx:-14deg;--ry:20deg">Members</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:0;--sx:-240px;--sy:50px;--sr:28deg;--rx:-20deg;--ry:-18deg">Marketing</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:140px;--sx:0px;--sy:180px;--sr:-12deg;--rx:10deg;--ry:-10deg">Analytics</div>
+      <div class="shard" style="width:140px;height:94px;top:94px;left:280px;--sx:250px;--sy:40px;--sr:-28deg;--rx:-16deg;--ry:22deg">Members</div>
       <!-- Row 3 -->
-      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-130px;--sy:140px;--sr:18deg;--rx:12deg;--ry:-18deg">Leads</div>
-      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:140px;--sy:130px;--sr:-16deg;--rx:-10deg;--ry:15deg">Content</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:0;--sx:-180px;--sy:180px;--sr:22deg;--rx:14deg;--ry:-20deg">Leads</div>
+      <div class="shard" style="width:210px;height:94px;top:188px;left:210px;--sx:190px;--sy:170px;--sr:-20deg;--rx:-12deg;--ry:18deg">Content</div>
     </div>
 
-    <div class="problem-grid">
-      <div class="rv rv-d2">
-        <div class="problem-text">
-          <p style="margin-bottom:4px">Operators are forced to piece together:</p>
-        </div>
-        <div class="problem-tools">
-          <div class="problem-tool rv rv-d1"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div><h4>CRM</h4><p>Track leads &amp; contacts</p></div>
-          <div class="problem-tool rv rv-d2"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><h4>Scheduling</h4><p>Manage sessions &amp; classes</p></div>
-          <div class="problem-tool rv rv-d3"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><h4>Payments</h4><p>Collect &amp; reconcile revenue</p></div>
-          <div class="problem-tool rv rv-d4"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><h4>Marketing</h4><p>Run campaigns &amp; outreach</p></div>
-          <div class="problem-tool rv rv-d5"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><h4>Analytics</h4><p>Measure what matters</p></div>
-          <div class="problem-tool rv" style="transition-delay:0.48s"><div class="problem-tool-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h4>Members</h4><p>Manage rosters &amp; retention</p></div>
-        </div>
-        <div class="problem-text">
-          <p>Each one solves part of the problem. <strong>None of them truly work together.</strong> Moreover, all of them require hours weekly of manual labor. And none of them have all the features that academy owners actually need &mdash; operators are always compromising, patching gaps, or going without.</p>
-        </div>
-        <ul class="problem-list rv rv-d3" style="margin-top:16px">
-          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Constant switching between tools</li>
-          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Manual workflows</li>
-          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Unclear priorities</li>
-          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Lost opportunities</li>
-          <li><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>No single platform covers everything an academy actually needs</li>
-        </ul>
-      </div>
+    <!-- Pain points — compact two-column layout -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 32px;max-width:640px;margin:0 auto;font-size:12px;color:var(--g400);line-height:1.5" class="rv rv-d2">
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Constant switching between tools</div>
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Manual workflows that eat 30&ndash;40 hrs/week</div>
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>No single platform covers everything</div>
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Leads and follow-ups slip through</div>
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Unclear priorities and blind spots</div>
+      <div><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align:-1px;margin-right:6px;color:var(--accent)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Always compromising or going without</div>
+    </div>
+
+    <!-- Shift statement -->
+    <div class="sec-center rv rv-d3" style="margin-top:24px">
+      <p style="font-size:15px;font-weight:600;color:var(--g200);max-width:560px;margin:0 auto;line-height:1.55">Software shouldn&rsquo;t be something operators struggle to manage.<br><em style="color:var(--accent)">It should run the business for them, all in one place.</em></p>
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 2: PROBLEM -->
 
-<!-- ═══════════════════════════════════════════
-     SHIFT
-     ═══════════════════════════════════════════ -->
-<section class="shift">
-  <div class="w">
-    <div class="div-line" style="margin-bottom:100px"></div>
-    <p class="shift-text rv">Software shouldn't be something operators struggle to manage.<br><em>It should run the business for them, all in one place.</em></p>
-    <div class="div-line" style="margin-top:100px"></div>
-  </div>
-</section>
-
+<!-- SLIDE 3: SOLUTION -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      SOLUTION
      ═══════════════════════════════════════════ -->
@@ -763,8 +756,16 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       </div>
     </div>
 
+  </div>
+</section>
+</div><!-- /SLIDE 4a -->
+
+<!-- SLIDE 4b: SOLUTION — NITTY GRITTY -->
+<div class="slide">
+<section>
+  <div class="w">
     <!-- What FC handles checklist -->
-    <div class="nitty-gritty rv rv-d4">
+    <div class="nitty-gritty rv rv-d4" style="margin-top:0;padding-top:0;border-top:none">
       <div class="sec-label" style="margin-bottom:8px">What FullControl handles</div>
       <h3 style="font-size:18px;font-weight:700;color:var(--white);margin-bottom:6px">The nitty gritty &mdash; so operators don't have to</h3>
       <p style="font-size:13px;color:var(--g400);margin-bottom:24px;max-width:520px">Every task below is something academy owners currently do by hand, forget about, or pay someone else to manage. FullControl handles all of it.</p>
@@ -899,6 +900,14 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
       <div class="ng-total">35 operational tasks across 10 categories &mdash; all handled by FullControl</div>
     </div>
 
+  </div>
+</section>
+</div><!-- /SLIDE 4b -->
+
+<!-- SLIDE 4c: BEFORE / AFTER -->
+<div class="slide">
+<section>
+  <div class="w">
     <!-- BEFORE / AFTER COMPARISON -->
     <div class="comparison rv rv-d5">
       <div class="comparison-wrap" id="comparisonSlider">
@@ -935,7 +944,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 4 -->
 
+<!-- SLIDE 5: DEMO + HOW IT WORKS -->
+<div class="slide">
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
@@ -959,9 +971,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 5: DEMO -->
 
-<div class="div-line"></div>
-
+<!-- SLIDE 6: HOW IT WORKS -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      HOW IT WORKS — TIMELINE
      ═══════════════════════════════════════════ -->
@@ -1001,7 +1014,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
 
   </div>
 </section>
+</div><!-- /SLIDE 5 -->
 
+<!-- SLIDE 6: MARKET -->
+<div class="slide">
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
@@ -1164,7 +1180,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 6 -->
 
+<!-- SLIDE 7: WHY US + TESTIMONIALS -->
+<div class="slide">
 <div class="div-line"></div>
 
 <!-- ═══════════════════════════════════════════
@@ -1214,9 +1233,15 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
             </div>
             <div class="f-tl-item">
               <div class="f-tl-dot"></div>
+              <div class="f-tl-year">BAM OS</div>
+              <div class="f-tl-title">Built the Core System</div>
+              <div class="f-tl-desc">Started building the operational backbone &mdash; automating scheduling, billing, follow-ups, and member management into one system. While implementing these workflows, realized that every process followed the same pattern: trigger, decision, action. That&rsquo;s when it clicked &mdash; agentic AI could run these workflows end to end, not just assist with them. That insight reshaped the entire architecture.</div>
+            </div>
+            <div class="f-tl-item">
+              <div class="f-tl-dot"></div>
               <div class="f-tl-year">Now</div>
               <div class="f-tl-title">Building FullControl &mdash; The AI Command Center</div>
-              <div class="f-tl-desc">Combining everything &mdash; analytical training from Waterloo, enterprise systems thinking from Deloitte, and the raw operator pain from running a real business.</div>
+              <div class="f-tl-desc">Combining everything &mdash; analytical training from Waterloo, enterprise systems thinking from Deloitte, raw operator pain, and the realization that agentic workflows can replace entire operational roles. Not just dashboards. Not just automation. A system that thinks, decides, and acts.</div>
             </div>
           </div>
           <div class="credential-tags" style="margin-top:16px">
@@ -1289,12 +1314,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE: TEAM -->
 
-<div class="div-line"></div>
-
-<!-- ═══════════════════════════════════════════
-     BIG QUOTE — EMOTIONAL ANCHOR
-     ═══════════════════════════════════════════ -->
+<!-- SLIDE: QUOTE + WHY US -->
+<div class="slide">
 <section class="big-quote-section">
   <div class="w">
     <p class="big-quote-text rv">&ldquo;I don't need investors who get <em>AI</em>. I need investors who get that <em>running a small business is chaos</em> &mdash; and that an intelligent system can fix it.&rdquo;</p>
@@ -1302,11 +1325,6 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   </div>
 </section>
 
-<div class="div-line"></div>
-
-<!-- ═══════════════════════════════════════════
-     WHY US
-     ═══════════════════════════════════════════ -->
 <section>
   <div class="w">
     <div class="sec-label rv">Why us</div>
@@ -1328,9 +1346,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
   </div>
 </section>
 
-<div class="div-line"></div>
+</div><!-- /SLIDE 7 -->
 
-
+<!-- SLIDE 8: MOAT -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      MOAT
      ═══════════════════════════════════════════ -->
@@ -1384,9 +1403,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 8 -->
 
-<div class="div-line"></div>
-
+<!-- SLIDE 9: SCALE + Q&A -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      SCALE
      ═══════════════════════════════════════════ -->
@@ -1422,9 +1442,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     <p class="scale-note rv rv-d5">This reflects only a core subscription model. As the system becomes more embedded in operations, revenue per customer can increase through deeper workflow ownership, expanded functionality, and higher-value tiers.</p>
   </div>
 </section>
+</div><!-- /SLIDE: SCALE -->
 
-<div class="div-line"></div>
-
+<!-- SLIDE: Q&A -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      OBJECTION HANDLING — SHOWS SELF-AWARENESS
      ═══════════════════════════════════════════ -->
@@ -1458,9 +1479,10 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </section>
+</div><!-- /SLIDE 9 -->
 
-<div class="div-line"></div>
-
+<!-- SLIDE 10: VISION -->
+<div class="slide">
 <!-- ═══════════════════════════════════════════
      VISION
      ═══════════════════════════════════════════ -->
@@ -1487,6 +1509,16 @@ footer{border-top:1px solid var(--card-border);padding:36px 0}
     </div>
   </div>
 </footer>
+</div><!-- /SLIDE 10 -->
+</div><!-- /SLIDE CONTAINER -->
+</div><!-- /SLIDE WRAPPER -->
+
+<!-- SLIDE NAVIGATION BUTTONS -->
+<button class="slide-nav-btn prev" id="slidePrev" aria-label="Previous slide">&#8249;</button>
+<button class="slide-nav-btn next" id="slideNext" aria-label="Next slide">&#8250;</button>
+
+<!-- SLIDE AGENDA BAR -->
+<div class="slide-agenda" id="slideAgenda"></div>
 
 <!-- FLOATING DOT NAV -->
 <div class="dot-nav" id="dotNav">
@@ -1527,10 +1559,101 @@ themeBtn.addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════
-// NAV SCROLL
+// HORIZONTAL SLIDE NAVIGATION
+// ═══════════════════════════════════════════
+const slideContainer = document.getElementById('slideContainer');
+const slides = slideContainer.querySelectorAll('.slide');
+const prevBtn = document.getElementById('slidePrev');
+const nextBtn = document.getElementById('slideNext');
+const agendaEl = document.getElementById('slideAgenda');
+let currentSlide = 0;
+const visitedSlides = new Set([0]);
+
+// Slide labels for the agenda
+const slideLabels = [
+  'Hero', 'Problem', 'Solution', 'Nitty Gritty', 'Before / After',
+  'Demo', 'How It Works', 'Market', 'The Team',
+  'Why Us', 'Moat', 'Scale', 'Q&A', 'Vision'
+];
+
+// Build agenda bar
+slides.forEach((_, i) => {
+  const item = document.createElement('div');
+  item.className = 'slide-agenda-item' + (i === 0 ? ' active' : '');
+  item.textContent = slideLabels[i] || 'Slide ' + (i + 1);
+  item.addEventListener('click', () => goToSlide(i));
+  agendaEl.appendChild(item);
+});
+
+function goToSlide(idx) {
+  if (idx < 0 || idx >= slides.length) return;
+  currentSlide = idx;
+  slideContainer.style.transform = 'translateX(-' + (idx * 100) + 'vw)';
+  updateSlideUI();
+}
+
+function updateSlideUI() {
+  prevBtn.disabled = currentSlide === 0;
+  nextBtn.disabled = currentSlide === slides.length - 1;
+  visitedSlides.add(currentSlide);
+  agendaEl.querySelectorAll('.slide-agenda-item').forEach((d, i) => {
+    d.classList.toggle('active', i === currentSlide);
+    d.classList.toggle('visited', visitedSlides.has(i) && i !== currentSlide);
+  });
+  // Trigger reveal animations
+  slides[currentSlide].querySelectorAll('.rv:not(.vis)').forEach(el => obs.observe(el));
+  slides[currentSlide].querySelectorAll('.count-up').forEach(el => {
+    if (!el.dataset.counted) countObs.observe(el);
+  });
+}
+
+prevBtn.addEventListener('click', () => goToSlide(currentSlide - 1));
+nextBtn.addEventListener('click', () => goToSlide(currentSlide + 1));
+prevBtn.disabled = true;
+
+// Convert scroll to horizontal navigation — one page per gesture
+// Fire instantly, lock only after a successful page change
+let wheelLocked = false;
+let wheelSilenceTimer;
+
+document.addEventListener('wheel', (e) => {
+  e.preventDefault();
+
+  if (wheelLocked) {
+    clearTimeout(wheelSilenceTimer);
+    wheelSilenceTimer = setTimeout(() => { wheelLocked = false; }, 80);
+    return;
+  }
+
+  const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (delta === 0) return;
+
+  const prev = currentSlide;
+  if (delta > 0) goToSlide(currentSlide + 1);
+  else goToSlide(currentSlide - 1);
+
+  // Only lock if the slide actually changed
+  if (currentSlide !== prev) {
+    wheelLocked = true;
+    wheelSilenceTimer = setTimeout(() => { wheelLocked = false; }, 80);
+  }
+}, { passive: false });
+
+// (No native scroll tracking needed — transform-based navigation)
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); goToSlide(currentSlide + 1); }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); goToSlide(currentSlide - 1); }
+});
+
+// ═══════════════════════════════════════════
+// NAV SCROLL (per-slide internal scroll)
 // ═══════════════════════════════════════════
 const nav = document.getElementById('nav');
-window.addEventListener('scroll', () => { nav.classList.toggle('scrolled', window.scrollY > 40) });
+// Nav always shows as scrolled in horizontal mode
+nav.classList.add('scrolled');
 
 // ═══════════════════════════════════════════
 // REVEAL ON SCROLL
@@ -1547,7 +1670,12 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
     const t = document.querySelector(a.getAttribute('href'));
-    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!t) return;
+    const slide = t.closest('.slide');
+    if (slide) {
+      const idx = Array.from(slides).indexOf(slide);
+      if (idx >= 0) goToSlide(idx);
+    }
   });
 });
 
@@ -1628,19 +1756,20 @@ function updateTimeline() {
   });
 }
 
-window.addEventListener('scroll', updateTimeline, { passive: true });
+// Timeline progress is static in horizontal mode — just activate all steps when visible
+setTimeout(() => { if (tlSteps) tlSteps.forEach(s => s.classList.add('tl-active')); if (tlProgress) tlProgress.style.height = '100%'; }, 2000);
 updateTimeline();
 
 // ═══════════════════════════════════════════
-// GLASS ASSEMBLE ANIMATION — triggers when visible
+// GLASS ASSEMBLE ANIMATION — triggers on slide entry
 // ═══════════════════════════════════════════
 (function() {
   var gw = document.getElementById('glassAssemble');
   if (!gw) return;
   var shards = gw.querySelectorAll('.shard');
-  var done = false;
+  var assembled = false;
   var mobile = window.innerWidth <= 600;
-  var scale = mobile ? 0.667 : 1; // 280/420 ratio for mobile
+  var scale = mobile ? 0.667 : 1;
 
   // Scale shard positions on mobile
   if (mobile) {
@@ -1653,39 +1782,46 @@ updateTimeline();
     }
   }
 
-  // Set initial scattered positions (reduce scatter on mobile)
   var scatterScale = mobile ? 0.5 : 1;
-  for (var i = 0; i < shards.length; i++) {
-    var s = shards[i];
-    var sx = parseFloat(s.style.getPropertyValue('--sx')) || 0;
-    var sy = parseFloat(s.style.getPropertyValue('--sy')) || 0;
-    var sr = s.style.getPropertyValue('--sr') || '0deg';
-    var rx = s.style.getPropertyValue('--rx') || '0deg';
-    var ry = s.style.getPropertyValue('--ry') || '0deg';
-    s.style.transform = 'translate(' + (sx * scatterScale) + 'px,' + (sy * scatterScale) + 'px) rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
-  }
 
-  function doAssemble() {
-    if (done) return;
-    var r = gw.getBoundingClientRect();
-    if (r.top < window.innerHeight && r.bottom > 0) {
-      done = true;
-      window.removeEventListener('scroll', doAssemble);
-      setTimeout(function() {
-        gw.classList.add('assembled');
-        for (var j = 0; j < shards.length; j++) {
-          shards[j].style.transform = '';
-          shards[j].style.opacity = '';
-        }
-      }, 800);
+  function scatter() {
+    gw.classList.remove('assembled');
+    for (var i = 0; i < shards.length; i++) {
+      var s = shards[i];
+      var sx = parseFloat(s.style.getPropertyValue('--sx')) || 0;
+      var sy = parseFloat(s.style.getPropertyValue('--sy')) || 0;
+      var sr = s.style.getPropertyValue('--sr') || '0deg';
+      var rx = s.style.getPropertyValue('--rx') || '0deg';
+      var ry = s.style.getPropertyValue('--ry') || '0deg';
+      s.style.transform = 'translate(' + (sx * scatterScale) + 'px,' + (sy * scatterScale) + 'px) rotate(' + sr + ') rotateX(' + rx + ') rotateY(' + ry + ')';
     }
+    assembled = false;
   }
 
-  window.addEventListener('scroll', doAssemble, false);
-  doAssemble();
-  setTimeout(doAssemble, 200);
-  setTimeout(doAssemble, 1000);
-  setTimeout(doAssemble, 3000);
+  function assemble() {
+    if (assembled) return;
+    assembled = true;
+    setTimeout(function() {
+      gw.classList.add('assembled');
+      for (var j = 0; j < shards.length; j++) {
+        shards[j].style.transform = '';
+        shards[j].style.opacity = '';
+      }
+    }, 400);
+  }
+
+  // Initial state: scattered
+  scatter();
+
+  // Hook into goToSlide — assemble when entering this slide, scatter when leaving
+  var problemSlide = document.getElementById('problemSlide');
+  var slideIdx = Array.from(slides).indexOf(problemSlide);
+  var origGoToSlide = goToSlide;
+  goToSlide = function(idx) {
+    origGoToSlide(idx);
+    if (idx === slideIdx) assemble();
+    else if (assembled) scatter();
+  };
 })();
 
 // ═══════════════════════════════════════════
@@ -1732,25 +1868,30 @@ if (dotNav) {
   const dots = dotNav.querySelectorAll('.dot-nav-item');
   const sections = Array.from(dots).map(d => document.getElementById(d.dataset.section)).filter(Boolean);
 
-  // Click to scroll
+  // Click to navigate to correct slide
   dots.forEach(dot => {
     dot.addEventListener('click', () => {
       const sec = document.getElementById(dot.dataset.section);
-      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!sec) return;
+      const slide = sec.closest('.slide');
+      if (slide) {
+        const idx = Array.from(slides).indexOf(slide);
+        if (idx >= 0) goToSlide(idx);
+      }
     });
   });
 
-  // Update active dot on scroll
+  // Update active dot based on current slide
   function updateDotNav() {
-    const scrollY = window.scrollY + window.innerHeight * 0.4;
+    const currentSlideEl = slides[currentSlide];
     let activeIdx = 0;
     sections.forEach((sec, i) => {
-      if (sec && sec.offsetTop <= scrollY) activeIdx = i;
+      if (sec && currentSlideEl && currentSlideEl.contains(sec)) activeIdx = i;
     });
     dots.forEach((d, i) => d.classList.toggle('active', i === activeIdx));
   }
-  window.addEventListener('scroll', updateDotNav, { passive: true });
-  updateDotNav();
+  // Re-run on slide change via interval (simpler than event)
+  setInterval(updateDotNav, 300);
 }
 
 // ═══════════════════════════════════════════

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM GTA — Sales Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#111;color:#fff;min-height:100vh;padding:60px 40px;-webkit-font-smoothing:antialiased}
+
+h1{font-size:28px;font-weight:900;letter-spacing:-0.03em;text-align:center;margin-bottom:8px}
+.subtitle{text-align:center;font-size:13px;color:#71717a;margin-bottom:48px}
+
+.pipeline{display:flex;gap:20px;justify-content:center;align-items:stretch}
+
+/* Arrow between cards */
+.arrow{display:flex;align-items:center;font-size:24px;color:#3f3f46;flex-shrink:0;margin-top:-40px}
+
+/* Card */
+.card{width:260px;background:#18181b;border:1px solid #27272a;border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+
+.card-header{padding:20px 20px 16px;border-bottom:1px solid #27272a;text-align:center}
+.stage-num{font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#71717a;margin-bottom:6px}
+.stage-title{font-size:18px;font-weight:800;letter-spacing:-0.02em}
+.auto-badge{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:6px;background:rgba(74,222,128,0.12);color:#4ade80;border:1px solid rgba(74,222,128,0.2)}
+.manual-badge{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:3px 10px;border-radius:6px;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid rgba(251,191,36,0.2)}
+
+.card-body{flex:1;display:flex;flex-direction:column;gap:0}
+
+.section{padding:16px 20px;border-bottom:1px solid #27272a}
+.section:last-child{border-bottom:none}
+.section-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px}
+.section-label.entry{color:#60a5fa}
+.section-label.active{color:#a78bfa}
+.section-label.automations{color:#f472b6}
+.section-label.human{color:#fbbf24}
+.section-label.exit{color:#4ade80}
+.section p{font-size:12.5px;color:#a1a1aa;line-height:1.55}
+.section p strong{color:#d4d4d8;font-weight:600}
+
+/* Responsive */
+@media(max-width:1100px){
+  .pipeline{flex-direction:column;align-items:center}
+  .arrow{transform:rotate(90deg);margin:0}
+}
+</style>
+</head>
+<body>
+
+<div style="position:fixed;top:16px;right:20px;z-index:100">
+  <button onclick="saveHTML()" style="font-family:inherit;font-size:12px;font-weight:700;padding:8px 20px;border-radius:8px;border:none;background:#4ade80;color:#111;cursor:pointer">Save HTML</button>
+</div>
+
+<h1 contenteditable="true" spellcheck="false">BAM GTA Sales Pipeline</h1>
+<p class="subtitle" contenteditable="true" spellcheck="false">GoHighLevel — 4 stages from form fill to trial completion</p>
+
+<div class="pipeline">
+
+  <!-- STAGE 1: INTERESTED -->
+  <div class="card">
+    <div class="card-header">
+      <div class="stage-num" contenteditable="true" spellcheck="false">Stage 1</div>
+      <div class="stage-title" contenteditable="true" spellcheck="false">Interested</div>
+      <div class="auto-badge">Auto-Entry</div>
+    </div>
+    <div class="card-body">
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label entry">How They Get Here</div>
+        <p>Auto-moved on form fill: <strong>Free Trial Form</strong>, <strong>Contact Form</strong>, or <strong>Post Trial Form</strong> (missed trial trigger).</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label active">What's Happening</div>
+        <p>Every lead is placed into an <strong>automation sequence</strong>. Automated outreach is running — no lead sits idle in this stage.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label automations">Automations Active</div>
+        <p><strong>New lead nurture sequence</strong> — multi-step SMS/email outreach to get a reply. <strong>Missed trial re-engagement</strong> — triggers for leads who came via post-trial form. All leads are in at least one active workflow.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label human">Human Action</div>
+        <p><strong>None.</strong> Fully automated. Automations handle all outreach until the lead responds.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label exit">How They Exit</div>
+        <p><strong>Auto-moves to Responded</strong> when the lead replies to any message from this stage.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- STAGE 2: RESPONDED -->
+  <div class="card">
+    <div class="card-header">
+      <div class="stage-num" contenteditable="true" spellcheck="false">Stage 2</div>
+      <div class="stage-title" contenteditable="true" spellcheck="false">Responded</div>
+      <div class="auto-badge">Auto-Entry</div>
+    </div>
+    <div class="card-body">
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label entry">How They Get Here</div>
+        <p><strong>Auto-moved</strong> when a lead replies from the Interested stage.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label active">What's Happening</div>
+        <p>Live conversation is underway. Goal is to <strong>qualify the lead and book a free trial</strong> through one of the Free Trial Calendars.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label automations">Automations Active</div>
+        <p><strong>Speed-to-lead notification</strong> — alerts staff when a lead responds. <strong>Stale conversation follow-up</strong> — re-engages if no reply after X hours. Conversation AI may be handling initial booking attempts.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label human">Human Action</div>
+        <p><strong>Engage in conversation.</strong> Answer questions, handle objections, and guide the lead toward booking a trial.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label exit">How They Exit</div>
+        <p><strong>Auto-moves to Scheduled Trial</strong> when someone books through any of the Free Trial Calendars.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- STAGE 3: SCHEDULED TRIAL -->
+  <div class="card">
+    <div class="card-header">
+      <div class="stage-num" contenteditable="true" spellcheck="false">Stage 3</div>
+      <div class="stage-title" contenteditable="true" spellcheck="false">Scheduled Trial</div>
+      <div class="auto-badge">Auto-Entry</div>
+    </div>
+    <div class="card-body">
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label entry">How They Get Here</div>
+        <p><strong>Auto-moved</strong> when a trial is booked through any Free Trial Calendar.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label active">What's Happening</div>
+        <p>Trial is on the calendar. Lead is <strong>waiting for their scheduled session</strong>. Reminders and confirmations may be running.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label automations">Automations Active</div>
+        <p><strong>Appointment reminders</strong> — confirmation + reminder SMS/email before the trial. <strong>No-show follow-up</strong> — triggers if the lead doesn't attend, attempts to rebook.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label human">Human Action</div>
+        <p><strong>Conduct the trial session.</strong> Deliver a great experience. After the trial, move the lead forward.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label exit">How They Exit</div>
+        <p><strong>Manual move to Done Trial</strong> by staff after the trial session is completed.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow">→</div>
+
+  <!-- STAGE 4: DONE TRIAL -->
+  <div class="card">
+    <div class="card-header">
+      <div class="stage-num" contenteditable="true" spellcheck="false">Stage 4</div>
+      <div class="stage-title" contenteditable="true" spellcheck="false">Done Trial</div>
+      <div class="manual-badge">Manual Entry</div>
+    </div>
+    <div class="card-body">
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label entry">How They Get Here</div>
+        <p><strong>Manually moved</strong> by staff from Scheduled Trial after the trial session happens.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label active">What's Happening</div>
+        <p>Trial is complete. Lead is in <strong>decision mode</strong> — follow-up and closing efforts are active to convert them to a paying member.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label automations">Automations Active</div>
+        <p><strong>Post-trial follow-up sequence</strong> — timed outreach to close the sale (pricing, testimonials, urgency). <strong>Closing AI</strong> — handles objections and nudges toward sign-up.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label human">Human Action</div>
+        <p><strong>Follow up and close.</strong> Send pricing, answer questions, handle objections, get them signed up.</p>
+      </div>
+      <div class="section" contenteditable="true" spellcheck="false">
+        <div class="section-label exit">How They Exit</div>
+        <p><strong>Converts to member</strong> (payment collected, moved to member management) or <strong>marked lost</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function saveHTML() {
+  const clone = document.documentElement.cloneNode(true);
+  // Remove the save button from the saved version
+  const btn = clone.querySelector('div[style*="position:fixed"]');
+  if (btn) btn.remove();
+  const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pipeline-diagram.html';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+
+</body>
+</html>
