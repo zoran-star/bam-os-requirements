@@ -1978,7 +1978,8 @@ function lmRenderTarget(rows) {
     // Equilibrium = baseGrowth / churnRate — if churn > 0, clients can never exceed this
     const eq = churnRate > 0 ? baseGrowth / churnRate : Infinity;
     if (churnRate > 0 && clientsNeeded && clientsNeeded > eq) {
-      val.textContent = 'Not reachable — increase growth or reduce churn';
+      const ceilArr = Math.floor(eq) * price * 12;
+      val.textContent = `Ceiling: ${lmFmt(ceilArr)} ARR (${Math.floor(eq)} clients at equilibrium)`;
       return;
     }
     // Closed-form: clients(n) = eq + (c24 - eq) * (1 - churnRate)^n  →  solve for n
