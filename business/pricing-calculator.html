@@ -430,11 +430,12 @@
 
 <script>
   const MODELS = [
-    { id: 'training', name: 'Training Classes', icon: '🏀', defaultMrr: 8000,  defaultMin: 199, defaultMax: 499, defaultSel: 299 },
-    { id: 'club',     name: 'Club Teams',        icon: '🏆', defaultMrr: 6000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
-    { id: 'gym',      name: 'Gym Rental',         icon: '🏗️', defaultMrr: 4000,  defaultMin: 99,  defaultMax: 249, defaultSel: 149 },
-    { id: 'internal', name: 'Internal Leagues',   icon: '📋', defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199, defaultSel: 129 },
-    { id: 'external', name: 'External Leagues',   icon: '🌐', defaultMrr: 5000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
+    { id: 'training-sched',  name: 'Training Classes (with Scheduling App)', icon: '🏀', isTrainingType: true,  defaultMrr: 15000, defaultMin: 249, defaultMax: 599, defaultSel: 399, defaultClients: 75, defaultArpu: 200 },
+    { id: 'training-basic',  name: 'Training Classes (no Scheduling App)',   icon: '🏀', isTrainingType: true,  defaultMrr: 15000, defaultMin: 149, defaultMax: 349, defaultSel: 249, defaultClients: 75, defaultArpu: 200 },
+    { id: 'club',            name: 'Club Teams',                              icon: '🏆', isTrainingType: false, defaultMrr: 6000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
+    { id: 'gym',             name: 'Gym Rental',                              icon: '🏗️', isTrainingType: false, defaultMrr: 4000,  defaultMin: 99,  defaultMax: 249, defaultSel: 149 },
+    { id: 'internal',        name: 'Internal Leagues',                        icon: '📋', isTrainingType: false, defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199, defaultSel: 129 },
+    { id: 'external',        name: 'External Leagues',                        icon: '🌐', isTrainingType: false, defaultMrr: 5000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
   ];
 
   const MRR_MAX  = 40000;
@@ -454,12 +455,12 @@
       rangeMax: m.defaultMax,
       selected: m.defaultSel,
     };
+    if (m.isTrainingType) {
+      state[m.id].clients = m.defaultClients;
+      state[m.id].arpu    = m.defaultArpu;
+      state[m.id].mrr     = m.defaultClients * m.defaultArpu;
+    }
   });
-
-  // Training-specific derived state
-  state.training.clients = 75;
-  state.training.arpu    = 200;
-  state.training.mrr     = state.training.clients * state.training.arpu;
 
   function fmt(n) {
     if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
@@ -522,22 +523,23 @@
     pctEl.textContent = s.enabled ? pStr + ' of MRR' : '—';
     pctEl.className = 'badge-pct ' + (s.enabled ? pctColor(p) : '');
 
-    // MRR — training uses computed value; others use slider
-    if (id === 'training') {
-      document.getElementById('clients-slider').value = s.clients;
-      document.getElementById('clients-fill').style.width = (s.clients / CLIENTS_MAX * 100) + '%';
-      document.getElementById('clients-val').textContent = s.clients + ' members';
+    // MRR — training-type uses computed value; others use slider
+    const modelCfg = MODELS.find(m => m.id === id);
+    if (modelCfg.isTrainingType) {
+      document.getElementById(`clients-slider-${id}`).value = s.clients;
+      document.getElementById(`clients-fill-${id}`).style.width = (s.clients / CLIENTS_MAX * 100) + '%';
+      document.getElementById(`clients-val-${id}`).textContent = s.clients + ' members';
 
-      document.getElementById('arpu-slider').value = s.arpu;
-      document.getElementById('arpu-fill').style.width = ((s.arpu - ARPU_MIN) / (ARPU_MAX - ARPU_MIN) * 100) + '%';
-      document.getElementById('arpu-val').textContent = fmtFull(s.arpu) + '/mo';
+      document.getElementById(`arpu-slider-${id}`).value = s.arpu;
+      document.getElementById(`arpu-fill-${id}`).style.width = ((s.arpu - ARPU_MIN) / (ARPU_MAX - ARPU_MIN) * 100) + '%';
+      document.getElementById(`arpu-val-${id}`).textContent = fmtFull(s.arpu) + '/mo';
 
-      document.getElementById('training-mrr-clients').textContent = s.clients;
-      document.getElementById('training-mrr-arpu').textContent = fmtFull(s.arpu);
-      document.getElementById('mrr-val-training').textContent = fmtFull(s.mrr) + '/mo';
+      document.getElementById(`mrr-clients-${id}`).textContent = s.clients;
+      document.getElementById(`mrr-arpu-${id}`).textContent = fmtFull(s.arpu);
+      document.getElementById(`mrr-val-${id}`).textContent = fmtFull(s.mrr) + '/mo';
 
-      document.getElementById('clients-slider').disabled = !s.enabled;
-      document.getElementById('arpu-slider').disabled    = !s.enabled;
+      document.getElementById(`clients-slider-${id}`).disabled = !s.enabled;
+      document.getElementById(`arpu-slider-${id}`).disabled    = !s.enabled;
     } else {
       const mrrEl = document.getElementById(`mrr-slider-${id}`);
       mrrEl.value = s.mrr;
@@ -606,19 +608,17 @@
       card.id = `card-${m.id}`;
       card.className = 'model-card active';
 
-      const isTraining = m.id === 'training';
-
-      const mrrSliderRow = isTraining ? `
+      const mrrSliderRow = m.isTrainingType ? `
           <!-- Clients -->
           <div class="slider-row">
             <div class="slider-row-label">Clients</div>
             <div class="slider-row-track">
               <div class="track-bg"></div>
-              <div class="track-fill gold-fill" id="clients-fill" style="left:0;width:${s.clients/CLIENTS_MAX*100}%"></div>
-              <input type="range" class="single" id="clients-slider"
+              <div class="track-fill gold-fill" id="clients-fill-${m.id}" style="left:0;width:${s.clients/CLIENTS_MAX*100}%"></div>
+              <input type="range" class="single" id="clients-slider-${m.id}"
                 min="0" max="${CLIENTS_MAX}" step="1" value="${s.clients}">
             </div>
-            <div class="slider-row-value" id="clients-val">${s.clients} members</div>
+            <div class="slider-row-value" id="clients-val-${m.id}">${s.clients} members</div>
           </div>
 
           <!-- ARPU -->
@@ -626,23 +626,23 @@
             <div class="slider-row-label">ARPU</div>
             <div class="slider-row-track">
               <div class="track-bg"></div>
-              <div class="track-fill gold-fill" id="arpu-fill" style="left:0;width:${(s.arpu-ARPU_MIN)/(ARPU_MAX-ARPU_MIN)*100}%"></div>
-              <input type="range" class="single" id="arpu-slider"
+              <div class="track-fill gold-fill" id="arpu-fill-${m.id}" style="left:0;width:${(s.arpu-ARPU_MIN)/(ARPU_MAX-ARPU_MIN)*100}%"></div>
+              <input type="range" class="single" id="arpu-slider-${m.id}"
                 min="${ARPU_MIN}" max="${ARPU_MAX}" step="5" value="${s.arpu}">
             </div>
-            <div class="slider-row-value" id="arpu-val">${fmtFull(s.arpu)}/mo</div>
+            <div class="slider-row-value" id="arpu-val-${m.id}">${fmtFull(s.arpu)}/mo</div>
           </div>
 
           <!-- Computed MRR -->
           <div class="slider-row computed-row">
             <div class="slider-row-label">Academy MRR</div>
             <div class="computed-formula">
-              <span class="formula-num" id="training-mrr-clients">${s.clients}</span>
+              <span class="formula-num" id="mrr-clients-${m.id}">${s.clients}</span>
               <span class="formula-op">members ×</span>
-              <span class="formula-num" id="training-mrr-arpu">${fmtFull(s.arpu)}</span>
+              <span class="formula-num" id="mrr-arpu-${m.id}">${fmtFull(s.arpu)}</span>
               <span class="formula-op">=</span>
             </div>
-            <div class="slider-row-value gold" id="mrr-val-training">${fmtFull(s.mrr)}/mo</div>
+            <div class="slider-row-value gold" id="mrr-val-${m.id}">${fmtFull(s.mrr)}/mo</div>
           </div>
       ` : `
           <!-- MRR -->
@@ -712,17 +712,16 @@
         updateModelUI(m.id);
       });
 
-      // MRR slider (non-training only)
-      if (m.id === 'training') {
-        document.getElementById('clients-slider').addEventListener('input', e => {
-          state.training.clients = parseInt(e.target.value);
-          state.training.mrr = state.training.clients * state.training.arpu;
-          updateModelUI('training');
+      if (m.isTrainingType) {
+        document.getElementById(`clients-slider-${m.id}`).addEventListener('input', e => {
+          state[m.id].clients = parseInt(e.target.value);
+          state[m.id].mrr = state[m.id].clients * state[m.id].arpu;
+          updateModelUI(m.id);
         });
-        document.getElementById('arpu-slider').addEventListener('input', e => {
-          state.training.arpu = parseInt(e.target.value);
-          state.training.mrr = state.training.clients * state.training.arpu;
-          updateModelUI('training');
+        document.getElementById(`arpu-slider-${m.id}`).addEventListener('input', e => {
+          state[m.id].arpu = parseInt(e.target.value);
+          state[m.id].mrr = state[m.id].clients * state[m.id].arpu;
+          updateModelUI(m.id);
         });
       } else {
         document.getElementById(`mrr-slider-${m.id}`).addEventListener('input', e => {
