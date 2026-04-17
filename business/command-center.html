@@ -999,6 +999,8 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 .tl-value { font-size: 17px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
 .tl-value.unreachable { color: #ff5c7a; }
 .val.lm-red { color: #ff5c7a; }
+.arr-target-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
+.arr-target-val { font-size: 28px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; margin: 4px 0; }
 .lm-scenario-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; text-align: center; flex: 1; min-width: 100px; }
 .lm-scenario-btn.active { background: rgba(91,159,255,0.1); border-color: rgba(91,159,255,0.4); color: var(--text); }
 .lm-scenario-btn:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
@@ -1387,53 +1389,20 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
           e.g. $499 ÷ 3% = <span id="lm-ltv-explain" style="color: var(--accent4); font-weight: 700;">$16,633</span>
         </div>
 
-        <hr class="divider" />
-
-        <div class="target-section">
-          <div class="toggle-row">
-            <span class="toggle-label">ARR Target</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="lm-target-toggle" onchange="lmToggleTarget()" />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <div class="target-inputs" id="lm-target-inputs">
-            <div class="input-label" style="margin-top:16px;">
-              <span>Target ARR</span>
-              <span class="val" style="color:var(--accent2)" id="lm-lbl-target">$500k</span>
-            </div>
-            <input type="range" style="width:100%" id="lm-sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="lmSyncTarget(this.value)" />
-          </div>
-          <div class="timeline-display" id="lm-timeline-display">
-            <div class="tl-label" id="lm-tl-label">Expected timeline to target ARR of —</div>
-            <div class="tl-value" id="lm-tl-value">—</div>
-          </div>
-        </div>
       </div>
 
       <!-- RIGHT -->
       <div class="lm-right">
-        <!-- Metric cards -->
-        <div class="metrics-grid">
-          <div class="metric-card mc-blue">
-            <div class="m-label">Clients (Month 12)</div>
-            <div class="m-value" id="lm-mc-clients">—</div>
-            <div class="m-sub">active</div>
+        <!-- ARR Target -->
+        <div class="arr-target-panel">
+          <div>
+            <div class="m-label" style="margin-bottom:6px;">ARR Target</div>
+            <div class="arr-target-val" id="lm-lbl-target">$500k</div>
+            <input type="range" style="width:100%;margin-top:12px;" id="lm-sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="lmSyncTarget(this.value)" />
           </div>
-          <div class="metric-card mc-green">
-            <div class="m-label">MRR (Month 12)</div>
-            <div class="m-value" id="lm-mc-mrr">—</div>
-            <div class="m-sub">monthly recurring</div>
-          </div>
-          <div class="metric-card mc-orange">
-            <div class="m-label">ARR (Month 12)</div>
-            <div class="m-value" id="lm-mc-arr">—</div>
-            <div class="m-sub">annualised run rate</div>
-          </div>
-          <div class="metric-card mc-purple">
-            <div class="m-label">Avg LTV / Client</div>
-            <div class="m-value" id="lm-mc-ltv">—</div>
-            <div class="m-sub">at current churn</div>
+          <div class="timeline-display visible" id="lm-timeline-display" style="margin:0;">
+            <div class="tl-label" id="lm-tl-label">Projected timeline</div>
+            <div class="tl-value" id="lm-tl-value">—</div>
           </div>
         </div>
 
@@ -1735,7 +1704,6 @@ function renderPricingUI() { buildSnapshotSection(); buildPricingCards(); update
 // ═══ LAUNCH MODEL TAB ═══
 let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn: 3, price: 499 };
 let lmTargetArr = 500000;
-let lmTargetOn = false;
 let lmActiveTab = 'clients';
 let lmChart = null;
 let lmSelectedSnapId = null; // which pricing scenario drives the per-client price
@@ -1856,12 +1824,6 @@ function lmRender() {
   const ltvEl = document.getElementById('lm-ltv-explain');
   if (ltvEl) ltvEl.textContent = churnRate > 0 ? lmFmtFull(ltv) : '∞';
 
-  const r12 = rows[11];
-  document.getElementById('lm-mc-clients').textContent = r12.clients;
-  document.getElementById('lm-mc-mrr').textContent = lmFmt(r12.mrr);
-  document.getElementById('lm-mc-arr').textContent = lmFmt(r12.arr);
-  document.getElementById('lm-mc-ltv').textContent = churnRate > 0 ? lmFmt(ltv) : '∞';
-
   lmUpdateChart(rows);
 
   const d0El = document.getElementById('lm-day0-mrr-val');
@@ -1937,13 +1899,6 @@ function lmSwitchChartTab(tab) {
   lmRender();
 }
 
-function lmToggleTarget() {
-  lmTargetOn = document.getElementById('lm-target-toggle').checked;
-  document.getElementById('lm-target-inputs').classList.toggle('visible', lmTargetOn);
-  document.getElementById('lm-timeline-display').classList.toggle('visible', lmTargetOn);
-  lmRender();
-  lmSaveState();
-}
 
 function lmSyncTarget(raw) {
   const v = parseFloat(raw) || 0;
@@ -1957,7 +1912,6 @@ function lmSyncTarget(raw) {
 }
 
 function lmRenderTarget(rows) {
-  if (!lmTargetOn) return;
   const display = document.getElementById('lm-timeline-display');
   const lbl = document.getElementById('lm-tl-label');
   const val = document.getElementById('lm-tl-value');
@@ -1981,7 +1935,7 @@ function lmRenderTarget(rows) {
 
 
 function lmSaveState() {
-  localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, targetOn: lmTargetOn, selectedSnapId: lmSelectedSnapId }));
+  localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, selectedSnapId: lmSelectedSnapId }));
 }
 
 function lmLoadState() {
@@ -2007,13 +1961,6 @@ function lmLoadState() {
       if (sl) sl.value = Math.min(s.targetArr, 5000000);
       const lbl = document.getElementById('lm-lbl-target');
       if (lbl) lbl.textContent = lmFmt(s.targetArr);
-    }
-    if (s.targetOn) {
-      lmTargetOn = true;
-      const tog = document.getElementById('lm-target-toggle');
-      if (tog) tog.checked = true;
-      document.getElementById('lm-target-inputs')?.classList.add('visible');
-      document.getElementById('lm-timeline-display')?.classList.add('visible');
     }
     if (s.selectedSnapId) lmSelectedSnapId = s.selectedSnapId;
   } catch(e) {}
