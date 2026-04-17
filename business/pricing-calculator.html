@@ -331,6 +331,26 @@
     flex-wrap: wrap;
   }
   .acad-label { font-size: 14px; color: #666; flex-shrink: 0; }
+
+  /* Copy link button */
+  .copy-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 16px;
+    padding: 9px 20px;
+    background: rgba(201,168,76,0.12);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 10px;
+    color: #c9a84c;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .copy-link-btn:hover { background: rgba(201,168,76,0.2); border-color: rgba(201,168,76,0.5); }
+  .copy-link-btn.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
   .acad-input {
     width: 80px;
     padding: 7px 12px;
@@ -366,6 +386,7 @@
   <div class="header">
     <h1>Pricing Calculator</h1>
     <p>Model FullControl's revenue across business verticals. Adjust MRR and price ranges per model.</p>
+    <button class="copy-link-btn" id="copy-link-btn" onclick="copyLink()">🔗 Copy shareable link</button>
   </div>
 
   <div class="summary">
@@ -756,6 +777,50 @@
 
   document.getElementById('acad-count').addEventListener('input', updateSummary);
 
+  function serializeState() {
+    const data = { acad: parseInt(document.getElementById('acad-count').value) || 50 };
+    MODELS.forEach(m => {
+      const s = state[m.id];
+      const entry = { on: s.enabled ? 1 : 0, rMin: s.rangeMin, rMax: s.rangeMax, sel: s.selected };
+      if (m.isTrainingType) { entry.cl = s.clients; entry.ar = s.arpu; }
+      else { entry.mrr = s.mrr; }
+      data[m.id] = entry;
+    });
+    return btoa(JSON.stringify(data));
+  }
+
+  function restoreFromUrl() {
+    const hash = location.hash.slice(1);
+    if (!hash) return;
+    try {
+      const data = JSON.parse(atob(hash));
+      if (data.acad) document.getElementById('acad-count').value = data.acad;
+      MODELS.forEach(m => {
+        const e = data[m.id];
+        if (!e) return;
+        const s = state[m.id];
+        s.enabled  = e.on !== 0;
+        s.rangeMin = e.rMin;
+        s.rangeMax = e.rMax;
+        s.selected = e.sel;
+        if (m.isTrainingType) { s.clients = e.cl; s.arpu = e.ar; s.mrr = e.cl * e.ar; }
+        else { s.mrr = e.mrr; }
+      });
+    } catch (err) { /* ignore malformed hash */ }
+  }
+
+  function copyLink() {
+    const hash = serializeState();
+    const url = location.href.split('#')[0] + '#' + hash;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('copy-link-btn');
+      btn.textContent = '✓ Link copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = '🔗 Copy shareable link'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  restoreFromUrl();
   buildCards();
   updateSummary();
 </script>
