@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FullControl — Repo Map</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0a0f;
+    color: #e8e8f0;
+    min-height: 100vh;
+    padding: 40px 32px 80px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .header h1 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #6b6b8a;
+    margin-bottom: 12px;
+  }
+  .header .title {
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .header .subtitle {
+    font-size: 15px;
+    color: #6b6b8a;
+  }
+
+  .sections {
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #444460;
+    margin-bottom: 16px;
+    padding-left: 2px;
+  }
+
+  .cards {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+  .cards.single { grid-template-columns: 1fr; }
+  .cards.two { grid-template-columns: 1fr 1fr; }
+
+  .card {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 14px;
+    padding: 24px;
+    position: relative;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .card:hover {
+    border-color: #2e2e48;
+    transform: translateY(-1px);
+  }
+
+  .card-accent {
+    position: absolute;
+    top: 0; left: 24px;
+    height: 2px;
+    width: 40px;
+    border-radius: 0 0 4px 4px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 12px;
+  }
+
+  .card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #f0f0ff;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    flex: 1;
+    margin-top: 2px;
+  }
+
+  .card-path {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: #3a3a58;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: #7070a0;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+  }
+
+  .tag-live    { background: #0f2e1a; color: #3dba6a; border: 1px solid #1a4a2a; }
+  .tag-react   { background: #0d1e30; color: #4a9edd; border: 1px solid #163050; }
+  .tag-notion  { background: #1e1a10; color: #c8982a; border: 1px solid #362c14; }
+  .tag-ghl     { background: #1e1018; color: #cc5599; border: 1px solid #361828; }
+  .tag-stripe  { background: #10102a; color: #7070dd; border: 1px solid #1a1a40; }
+  .tag-supabase{ background: #0d1e18; color: #3dba8a; border: 1px solid #163028; }
+  .tag-vercel  { background: #1a1a1a; color: #999; border: 1px solid #2a2a2a; }
+  .tag-ai      { background: #1a0d2a; color: #aa66ee; border: 1px solid #2e1a48; }
+  .tag-txt     { background: #1a1a10; color: #aaaa44; border: 1px solid #2e2e18; }
+  .tag-html    { background: #1a1010; color: #cc6644; border: 1px solid #2e1e18; }
+  .tag-phase1  { background: #1a1000; color: #dd8833; border: 1px solid #302010; }
+
+  .sub-items {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sub-item {
+    background: #0d0d14;
+    border: 1px solid #181826;
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  .sub-item-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #c0c0e0;
+    margin-bottom: 3px;
+  }
+
+  .sub-item-desc {
+    font-size: 11px;
+    color: #505075;
+    line-height: 1.5;
+  }
+
+  /* Color themes */
+  .theme-blue  .card-accent { background: #4a9edd; }
+  .theme-blue  .card-icon   { background: #0d1e30; }
+
+  .theme-green .card-accent { background: #3dba6a; }
+  .theme-green .card-icon   { background: #0f2e1a; }
+
+  .theme-orange .card-accent { background: #dd8833; }
+  .theme-orange .card-icon   { background: #1a1000; }
+
+  .theme-purple .card-accent { background: #aa66ee; }
+  .theme-purple .card-icon   { background: #1a0d2a; }
+
+  .theme-pink .card-accent { background: #cc5599; }
+  .theme-pink .card-icon   { background: #1e1018; }
+
+  .theme-yellow .card-accent { background: #ccaa33; }
+  .theme-yellow .card-icon   { background: #1a1800; }
+
+  .theme-teal .card-accent { background: #3dbaba; }
+  .theme-teal .card-icon   { background: #0d1e1e; }
+
+  .theme-gray .card-accent { background: #666; }
+  .theme-gray .card-icon   { background: #181818; }
+
+  .live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #3dba6a;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: #0f2e1a;
+    border: 1px solid #1a4a2a;
+    border-radius: 20px;
+    padding: 2px 8px;
+    margin-top: 2px;
+  }
+  .live-badge::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #3dba6a;
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #1e1e2e 30%, #1e1e2e 70%, transparent);
+  }
+
+  @media (max-width: 700px) {
+    .cards.two { grid-template-columns: 1fr; }
+    body { padding: 24px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="h1">bam-os-requirements</div>
+  <div class="title">FullControl — Repo Map</div>
+  <div class="subtitle">All sub-projects, folders, and what they're for</div>
+</div>
+
+<div class="sections">
+
+  <!-- LIVE APPS -->
+  <div>
+    <div class="section-label">Live Apps — Auto-Deploy on Push to Main</div>
+    <div class="cards">
+
+      <div class="card theme-blue">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">🖥</div>
+          <div>
+            <div class="card-title">FullControl Prototype</div>
+            <div class="live-badge">Live</div>
+          </div>
+        </div>
+        <div class="card-path">app/</div>
+        <div class="card-desc">The core product. Desktop web app showing every FullControl feature — Sales pipeline, Members, Marketing, Content, Schedule, Settings, and the embedded member app view. This is the reference implementation everything else is built toward.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-vercel">fullcontrol-prototype-six.vercel.app</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Home</div><div class="sub-item-desc">Operator dashboard — stats, Sage AI bar, global inbox</div></div>
+          <div class="sub-item"><div class="sub-item-title">Sales</div><div class="sub-item-desc">Lead pipeline, trial management, post-trial conversion</div></div>
+          <div class="sub-item"><div class="sub-item-title">Marketing</div><div class="sub-item-desc">Campaign manager, ad performance, audience angles</div></div>
+          <div class="sub-item"><div class="sub-item-title">Content</div><div class="sub-item-desc">AI content pipeline, swipe review, calendar scheduling</div></div>
+          <div class="sub-item"><div class="sub-item-title">Members</div><div class="sub-item-desc">Profiles, retention tracking, billing status</div></div>
+          <div class="sub-item"><div class="sub-item-title">Schedule</div><div class="sub-item-desc">Class management, capacity, attendance marking</div></div>
+        </div>
+      </div>
+
+      <div class="card theme-green">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">📋</div>
+          <div>
+            <div class="card-title">Onboarding Survey</div>
+            <div class="live-badge">Live</div>
+          </div>
+        </div>
+        <div class="card-path">survey/</div>
+        <div class="card-desc">Academy owner onboarding flow. Collects business data, config settings, and preferences needed to set up FullControl. Embeds the prototype so owners see what they're configuring. Saves responses to Supabase.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-supabase">Supabase</span>
+          <span class="tag tag-vercel">full-control-survey.vercel.app</span>
+        </div>
+      </div>
+
+      <div class="card theme-purple">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">🗂</div>
+          <div>
+            <div class="card-title">Requirements Whiteboard</div>
+            <div class="live-badge">Live</div>
+          </div>
+        </div>
+        <div class="card-path">whiteboard/</div>
+        <div class="card-desc">Kanban-style requirements review tool for Zoran and Cole. Sessions have items that get approved, rejected, or given feedback. Exports decisions to Claude Code for execution. Reads and writes session data from Notion.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-notion">Notion API</span>
+          <span class="tag tag-vercel">whiteboard-beta-indol.vercel.app</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">whiteboard/sessions/</div><div class="sub-item-desc">15 HTML review session files — all 10 onboarding sections + nitty-gritty workshops</div></div>
+          <div class="sub-item"><div class="sub-item-title">whiteboard/api/</div><div class="sub-item-desc">Serverless endpoints — sessions.js (read/write Notion sessions), backlog.js (write backlog items)</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- BAM GTA PHASE 1 -->
+  <div>
+    <div class="section-label">BAM GTA Phase 1 — First Live Deployment</div>
+    <div class="cards">
+
+      <div class="card theme-orange">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">🏀</div>
+          <div>
+            <div class="card-title">BAM GTA — Staff Dashboard</div>
+            <span class="tag tag-phase1">Phase 1</span>
+          </div>
+        </div>
+        <div class="card-path">bam-gta-phase1/bam-gta-staff/</div>
+        <div class="card-desc">Internal web app for BAM coaches and admin at the Greater Toronto Area location. Implements the full FullControl OS feature set in a real academy environment. This is where the product proves itself with real operators.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-ghl">GoHighLevel</span>
+          <span class="tag tag-stripe">Stripe</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Pipeline → Trials → PostTrial</div><div class="sub-item-desc">Lead flow from inquiry through trial to paid membership</div></div>
+          <div class="sub-item"><div class="sub-item-title">Sessions + Inbox</div><div class="sub-item-desc">Class management, attendance, and staff ↔ parent messaging via GHL</div></div>
+          <div class="sub-item"><div class="sub-item-title">FailedPayments + Analysis</div><div class="sub-item-desc">Dunning recovery, business metrics, retention reporting</div></div>
+        </div>
+      </div>
+
+      <div class="card theme-orange">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">📱</div>
+          <div>
+            <div class="card-title">BAM GTA — Parent App</div>
+            <span class="tag tag-phase1">Phase 1</span>
+          </div>
+        </div>
+        <div class="card-path">bam-gta-phase1/bam-gta-parent/</div>
+        <div class="card-desc">Mobile-first web app for parents and athletes. Self-serve class booking, schedule view, direct messaging with staff, and athlete profile. Completes the loop — operators manage via staff dashboard, members self-serve here.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-ghl">GoHighLevel</span>
+          <span class="tag tag-stripe">Stripe</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Schedule + Book Classes</div><div class="sub-item-desc">View upcoming sessions, self-serve booking that surfaces in staff Sessions</div></div>
+          <div class="sub-item"><div class="sub-item-title">Messages + Profile</div><div class="sub-item-desc">Messaging via GHL, athlete history and billing status</div></div>
+        </div>
+      </div>
+
+      <div class="card theme-pink">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">⚡</div>
+          <div>
+            <div class="card-title">GHL Workflows + Info</div>
+            <span class="tag tag-phase1">Phase 1</span>
+          </div>
+        </div>
+        <div class="card-path">bam-gta-phase1/info/</div>
+        <div class="card-desc">Reference documentation for the GoHighLevel automation workflows powering BAM GTA. Every trigger, action, timing, and condition is documented here. Danny's operating manual for the automation layer.</div>
+        <div class="card-tags">
+          <span class="tag tag-ghl">GoHighLevel</span>
+          <span class="tag tag-html">HTML docs</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">ghl-workflows-for-danny-v2.html</div><div class="sub-item-desc">Latest workflow docs — trial confirmations, follow-ups, dunning, conversion sequences</div></div>
+          <div class="sub-item"><div class="sub-item-title">overview.md</div><div class="sub-item-desc">How staff app, parent app, and GHL connect and pass data</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- SUPPORTING SYSTEMS -->
+  <div>
+    <div class="section-label">Supporting Systems</div>
+    <div class="cards two">
+
+      <div class="card theme-teal">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">✍️</div>
+          <div>
+            <div class="card-title">Content Engine</div>
+          </div>
+        </div>
+        <div class="card-path">fc-internal-content-engine/</div>
+        <div class="card-desc">AI-powered content generation pipeline. Academy owners brief content through Notion, the engine generates reels, carousels, and threads, then syncs them back. Powers the Content page in the main prototype.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+          <span class="tag tag-supabase">Supabase</span>
+          <span class="tag tag-notion">Notion API</span>
+          <span class="tag tag-ai">AI generation</span>
+        </div>
+      </div>
+
+      <div class="card theme-ai" style="--accent: #aa66ee;">
+        <div class="card-accent" style="background: #aa66ee;"></div>
+        <div class="card-header">
+          <div class="card-icon" style="background: #1a0d2a;">🤖</div>
+          <div>
+            <div class="card-title">Sales Conversation Agents</div>
+          </div>
+        </div>
+        <div class="card-path">sales-conversation-agents/</div>
+        <div class="card-desc">System prompts for the AI agents that run inside GHL automations. The booking agent texts leads, qualifies them, and schedules free trials without human involvement. Future agents: Closing AI, Rebooking AI.</div>
+        <div class="card-tags">
+          <span class="tag tag-ghl">GoHighLevel</span>
+          <span class="tag tag-ai">AI agents</span>
+          <span class="tag tag-txt">Prompt templates</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">conversation-ai-booking-agent.txt</div><div class="sub-item-desc">Master template with {{PLACEHOLDER}} variables — tone, qualification logic, objection handling</div></div>
+          <div class="sub-item"><div class="sub-item-title">conversation-ai-booking-agent-bam-gta.txt</div><div class="sub-item-desc">BAM GTA instance with all placeholders filled in</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- BUSINESS -->
+  <div>
+    <div class="section-label">Business Planning</div>
+    <div class="cards">
+
+      <div class="card theme-yellow">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">📊</div>
+          <div>
+            <div class="card-title">Business Materials</div>
+          </div>
+        </div>
+        <div class="card-path">business/business/</div>
+        <div class="card-desc">All investor-facing and business planning documents. Investor playbook, one-pager pitch, business plan, gap analysis, market data, and problem validation. Used for acquisition conversations and investor outreach.</div>
+        <div class="card-tags">
+          <span class="tag tag-html">HTML docs</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">fullcontrol-investor-playbook.html</div><div class="sub-item-desc">Main investor deck — exit strategy, ARR multiples, acquisition targets</div></div>
+          <div class="sub-item"><div class="sub-item-title">summary.html + plan.html</div><div class="sub-item-desc">One-page pitch and full business plan</div></div>
+          <div class="sub-item"><div class="sub-item-title">gap-analysis + market-data-explainer</div><div class="sub-item-desc">Feature gap analysis vs competitors, market size data</div></div>
+          <div class="sub-item"><div class="sub-item-title">problem-dissector + problem-review</div><div class="sub-item-desc">Problem validation and structured problem breakdown</div></div>
+        </div>
+      </div>
+
+      <div class="card theme-yellow">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon">🌐</div>
+          <div>
+            <div class="card-title">Product Landing + Other Docs</div>
+          </div>
+        </div>
+        <div class="card-path">business/fc-landing/ · business/*.html</div>
+        <div class="card-desc">Product landing page (reference design, not active), pipeline architecture diagram, survey data visualization, requirements sync report, and content planner reference. Supporting artifacts for the build.</div>
+        <div class="card-tags">
+          <span class="tag tag-html">HTML docs</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ARCHIVE -->
+  <div>
+    <div class="section-label">Archive</div>
+    <div class="cards two">
+
+      <div class="card theme-gray">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-icon" style="background:#181818;">📦</div>
+          <div>
+            <div class="card-title">Old Prototypes</div>
+          </div>
+        </div>
+        <div class="card-path">prototypes/</div>
+        <div class="card-desc">Earlier prototype builds — sales-desktop and an older survey version. Superseded by the current app/ and survey/ folders. Kept for reference.</div>
+        <div class="card-tags">
+          <span class="tag tag-react">React / Vite</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
