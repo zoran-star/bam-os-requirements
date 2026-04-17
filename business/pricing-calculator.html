@@ -1000,7 +1000,7 @@
               min="0" max="${SNAP_ALLOC_MAX}" step="1" value="${n}"
               oninput="updateSnapAlloc('${mod.id}', this.value)">
           </div>
-          <div class="snap-alloc-val" id="sv-${mod.id}">${n} acad.</div>
+          <div class="snap-alloc-val" id="sv-${mod.id}">${n}%</div>
         </div>`;
     }).join('');
 
@@ -1129,7 +1129,7 @@
       const n = snap.alloc[mod.id] || 0;
       if (n === 0) return;
       const rev = n * state[mod.id].selected;
-      lines.push(`${mod.name}: ${n} acad. @ ${fmtFull(state[mod.id].selected)}/mo = ${fmtFull(rev)}/mo`);
+      lines.push(`${mod.name}: ${n}% @ ${fmtFull(state[mod.id].selected)}/mo`);
     });
     lines.push('─'.repeat(40));
     lines.push(`Total academies:  ${m.totalAcad}`);
