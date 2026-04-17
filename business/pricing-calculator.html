@@ -957,7 +957,7 @@
 
   let snapshots = [
     { id: 's1', name: 'Scenario A', alloc: { 'training-sched': 30, 'training-basic': 20, 'club': 15, 'gym': 10, 'internal': 10, 'external': 15 } },
-    { id: 's2', name: 'Scenario B', alloc: { 'training-sched': 50, 'training-basic': 10, 'club': 10, 'gym': 5,  'internal': 5,  'external': 10 } },
+    { id: 's2', name: 'Scenario B', alloc: { 'training-sched': 50, 'training-basic': 10, 'club': 10, 'gym': 10, 'internal': 10, 'external': 10 } },
   ];
   let activeSnapId = 's1';
   let nextSnapNum  = 3;
@@ -1056,10 +1056,38 @@
   }
 
   function updateSnapAlloc(modelId, rawVal) {
-    const n = parseInt(rawVal) || 0;
-    activeSnap().alloc[modelId] = n;
-    document.getElementById(`sf-${modelId}`).style.width = (n / SNAP_ALLOC_MAX * 100) + '%';
-    document.getElementById(`sv-${modelId}`).textContent = n + '%';
+    const snap   = activeSnap();
+    const newVal = clamp(parseInt(rawVal) || 0, 0, 100);
+    snap.alloc[modelId] = newVal;
+
+    const others   = MODELS.filter(m => m.id !== modelId);
+    const remaining = 100 - newVal;
+    const otherSum  = others.reduce((s, m) => s + (snap.alloc[m.id] || 0), 0);
+
+    if (otherSum === 0) {
+      const each = Math.floor(remaining / others.length);
+      others.forEach(m => { snap.alloc[m.id] = each; });
+      if (others.length > 0) snap.alloc[others[0].id] += remaining - each * others.length;
+    } else {
+      others.forEach(m => {
+        snap.alloc[m.id] = Math.round((snap.alloc[m.id] / otherSum) * remaining);
+      });
+      // fix rounding drift
+      const total = MODELS.reduce((s, m) => s + (snap.alloc[m.id] || 0), 0);
+      if (total !== 100) snap.alloc[others[0].id] += 100 - total;
+    }
+
+    // sync all slider UIs
+    MODELS.forEach(m => {
+      const v = snap.alloc[m.id] || 0;
+      const sr = document.getElementById(`sr-${m.id}`);
+      if (sr) sr.value = v;
+      const sf = document.getElementById(`sf-${m.id}`);
+      if (sf) sf.style.width = v + '%';
+      const sv = document.getElementById(`sv-${m.id}`);
+      if (sv) sv.textContent = v + '%';
+    });
+
     updateSnapResults();
   }
 
