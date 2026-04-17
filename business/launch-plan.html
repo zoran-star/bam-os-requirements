@@ -531,7 +531,6 @@
         <span class="val" id="lbl-launch">23</span>
       </div>
       <input type="range" id="sl-launch" min="1" max="100" step="1" value="23" oninput="sync('launch', this.value)" />
-      <input type="number" class="number-input" id="num-launch" min="1" max="500" value="23" oninput="sync('launch', this.value)" />
     </div>
 
     <div class="input-group">
@@ -541,7 +540,6 @@
       </div>
       <div class="sub-label">What each existing academy pays on day 0</div>
       <input type="range" id="sl-launchArpu" min="50" max="2000" step="25" value="499" oninput="sync('launchArpu', this.value)" />
-      <input type="number" class="number-input" id="num-launchArpu" min="1" step="1" value="499" oninput="sync('launchArpu', this.value)" />
     </div>
 
     <div class="day0-mrr">
@@ -556,7 +554,6 @@
       </div>
       <div class="sub-label">New clients added in month 1 post-launch</div>
       <input type="range" id="sl-baseGrowth" min="0" max="30" step="1" value="3" oninput="sync('baseGrowth', this.value)" />
-      <input type="number" class="number-input" id="num-baseGrowth" min="0" max="200" value="3" oninput="sync('baseGrowth', this.value)" />
     </div>
 
     <div class="input-group">
@@ -566,7 +563,6 @@
       </div>
       <div class="sub-label">New academy additions compound each month</div>
       <input type="range" id="sl-growthRate" min="0" max="50" step="1" value="10" oninput="sync('growthRate', this.value)" />
-      <input type="number" class="number-input" id="num-growthRate" min="0" max="200" step="1" value="10" oninput="sync('growthRate', this.value)" />
     </div>
 
     <div class="input-group">
@@ -576,7 +572,6 @@
       </div>
       <div class="sub-label">% of clients lost each month</div>
       <input type="range" id="sl-churn" min="0" max="20" step="0.5" value="3" oninput="sync('churn', this.value)" />
-      <input type="number" class="number-input" id="num-churn" min="0" max="100" step="0.5" value="3" oninput="sync('churn', this.value)" />
     </div>
 
     <div class="input-group">
@@ -584,9 +579,8 @@
         <span>Avg Monthly Price</span>
         <span class="val purple" id="lbl-price">$499</span>
       </div>
-      <div class="sub-label">Per client, per month (USD)</div>
+      <div class="sub-label">Per new client, per month (USD)</div>
       <input type="range" id="sl-price" min="50" max="2000" step="25" value="499" oninput="sync('price', this.value)" />
-      <input type="number" class="number-input" id="num-price" min="1" step="1" value="499" oninput="sync('price', this.value)" />
     </div>
 
     <hr class="divider" />
@@ -614,7 +608,6 @@
           <span class="val green" id="lbl-target">$500k</span>
         </div>
         <input type="range" id="sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="syncTarget(this.value)" />
-        <input type="number" class="number-input" id="num-target" min="1" step="1000" value="500000" oninput="syncTarget(this.value)" />
       </div>
 
       <div class="timeline-display" id="timeline-display">
