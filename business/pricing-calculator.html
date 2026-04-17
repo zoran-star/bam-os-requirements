@@ -371,12 +371,179 @@
   .acad-result .big { font-size: 26px; font-weight: 800; color: #4caf82; }
   .acad-result .small { font-size: 12px; color: #444; margin-top: 3px; }
 
+  /* ── Snapshot section ── */
+  .snapshot-section {
+    background: rgba(91,156,246,0.04);
+    border: 1px solid rgba(91,156,246,0.15);
+    border-radius: 20px;
+    padding: 28px 32px;
+    margin-bottom: 32px;
+  }
+  .snapshot-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .snapshot-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #5b9cf6;
+    flex-shrink: 0;
+  }
+  .scenario-tabs {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+  .scenario-tab {
+    padding: 5px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: transparent;
+    color: #666;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .scenario-tab.active {
+    background: rgba(91,156,246,0.15);
+    border-color: rgba(91,156,246,0.4);
+    color: #5b9cf6;
+  }
+  .scenario-tab:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: #aaa; }
+  .scenario-tab.add-tab {
+    color: #444;
+    border-style: dashed;
+    padding: 5px 10px;
+  }
+  .scenario-tab.add-tab:hover { color: #5b9cf6; border-color: rgba(91,156,246,0.4); }
+  .scenario-tab.del-tab {
+    color: #f87171;
+    border-color: rgba(248,113,113,0.2);
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .scenario-name-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .scenario-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    color: #e0e0e0;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    padding: 4px 0;
+    flex: 1;
+    max-width: 280px;
+  }
+  .scenario-name-input:focus { border-bottom-color: rgba(91,156,246,0.5); }
+
+  .snap-share-btns { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .snap-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid;
+  }
+  .snap-btn-link {
+    background: rgba(201,168,76,0.1);
+    border-color: rgba(201,168,76,0.3);
+    color: #c9a84c;
+  }
+  .snap-btn-link:hover { background: rgba(201,168,76,0.2); }
+  .snap-btn-link.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+  .snap-btn-text {
+    background: rgba(91,156,246,0.1);
+    border-color: rgba(91,156,246,0.3);
+    color: #5b9cf6;
+  }
+  .snap-btn-text:hover { background: rgba(91,156,246,0.2); }
+  .snap-btn-text.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+
+  .snap-alloc-rows { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .snap-alloc-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .snap-alloc-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #555;
+    width: 230px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .snap-alloc-track { flex: 1; position: relative; height: 24px; display: flex; align-items: center; }
+  .snap-alloc-fill {
+    position: absolute; height: 3px;
+    background: linear-gradient(90deg, #5b9cf6, #93c5fd);
+    border-radius: 2px; pointer-events: none;
+  }
+  input[type=range].snap-range {
+    position: absolute; width: 100%; height: 3px;
+    appearance: none; background: rgba(255,255,255,0.08);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  input[type=range].snap-range::-webkit-slider-thumb {
+    appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: #5b9cf6;
+    border: 2px solid #1a1a2e; cursor: pointer;
+    transition: transform 0.1s;
+  }
+  input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  .snap-alloc-val {
+    font-size: 13px; font-weight: 700; color: #5b9cf6;
+    width: 90px; text-align: right; flex-shrink: 0;
+  }
+
+  .snap-results {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .snap-result-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .snap-result-card .label {
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: #444; margin-bottom: 6px;
+  }
+  .snap-result-card .value { font-size: 20px; font-weight: 800; }
+
   @media (max-width: 680px) {
     .summary { grid-template-columns: repeat(2, 1fr); }
     .arr-grid { grid-template-columns: 1fr; }
     .header h1 { font-size: 28px; }
     .slider-row-value { width: 90px; font-size: 12px; }
     .slider-row-label { width: 68px; font-size: 9px; }
+    .snap-results { grid-template-columns: repeat(2, 1fr); }
+    .snap-alloc-label { width: 140px; }
   }
 </style>
 </head>
@@ -388,6 +555,8 @@
     <p>Model FullControl's revenue across business verticals. Adjust MRR and price ranges per model.</p>
     <button class="copy-link-btn" id="copy-link-btn" onclick="copyLink()">🔗 Copy shareable link</button>
   </div>
+
+  <div id="snapshot-section"></div>
 
   <div class="summary">
     <div class="summary-card">
@@ -615,6 +784,9 @@
     const count = parseInt(document.getElementById('acad-count').value) || 0;
     document.getElementById('portfolio-arr').textContent = fmt(totalSel * 12 * count);
     document.getElementById('portfolio-sub').textContent = `portfolio ARR — ${count} academies at selected price`;
+
+    // keep snapshot results in sync when pricing changes
+    if (document.getElementById('snap-total-acad')) updateSnapResults();
   }
 
   function buildCards() {
@@ -777,8 +949,194 @@
 
   document.getElementById('acad-count').addEventListener('input', updateSummary);
 
+  /* ════════════════════════════════════════
+     SNAPSHOT SYSTEM
+     ════════════════════════════════════════ */
+
+  const SNAP_ALLOC_MAX = 100;
+
+  let snapshots = [
+    { id: 's1', name: 'Scenario A', alloc: { 'training-sched': 30, 'training-basic': 20, 'club': 15, 'gym': 10, 'internal': 10, 'external': 15 } },
+    { id: 's2', name: 'Scenario B', alloc: { 'training-sched': 50, 'training-basic': 10, 'club': 10, 'gym': 5,  'internal': 5,  'external': 10 } },
+  ];
+  let activeSnapId = 's1';
+  let nextSnapNum  = 3;
+
+  function activeSnap() { return snapshots.find(s => s.id === activeSnapId); }
+
+  function snapMetrics(snap) {
+    let totalAcad = 0, totalRev = 0, totalRevMin = 0, totalRevMax = 0;
+    MODELS.forEach(m => {
+      if (!state[m.id].enabled) return;
+      const n = snap.alloc[m.id] || 0;
+      totalAcad    += n;
+      totalRev     += n * state[m.id].selected;
+      totalRevMin  += n * state[m.id].rangeMin;
+      totalRevMax  += n * state[m.id].rangeMax;
+    });
+    return {
+      totalAcad,
+      totalRev,
+      blendedARPU: totalAcad > 0 ? Math.round(totalRev / totalAcad) : 0,
+      arr: totalRev * 12,
+      totalRevMin,
+      totalRevMax,
+    };
+  }
+
+  function buildSnapshotSection() {
+    const wrap = document.getElementById('snapshot-section');
+    const snap = activeSnap();
+    const m    = snapMetrics(snap);
+
+    const tabsHtml = snapshots.map(s => `
+      <button class="scenario-tab ${s.id === activeSnapId ? 'active' : ''}"
+        onclick="setActiveSnap('${s.id}')">${s.name}</button>
+    `).join('') + `<button class="scenario-tab add-tab" onclick="addSnap()">+ Add</button>`;
+
+    const allocRows = MODELS.map(mod => {
+      const n   = snap.alloc[mod.id] || 0;
+      const pct = n / SNAP_ALLOC_MAX * 100;
+      return `
+        <div class="snap-alloc-row">
+          <div class="snap-alloc-label">${mod.icon} ${mod.name}</div>
+          <div class="snap-alloc-track">
+            <div class="snap-alloc-fill" id="sf-${mod.id}" style="width:${pct}%"></div>
+            <input type="range" class="snap-range" id="sr-${mod.id}"
+              min="0" max="${SNAP_ALLOC_MAX}" step="1" value="${n}"
+              oninput="updateSnapAlloc('${mod.id}', this.value)">
+          </div>
+          <div class="snap-alloc-val" id="sv-${mod.id}">${n} acad.</div>
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      <div class="snapshot-section">
+        <div class="snapshot-header">
+          <span class="snapshot-title">Launch Snapshot</span>
+          <div class="scenario-tabs">${tabsHtml}</div>
+        </div>
+
+        <div class="scenario-name-row">
+          <input class="scenario-name-input" id="snap-name-input" value="${snap.name}"
+            oninput="renameSnap(this.value)" placeholder="Scenario name">
+          ${snapshots.length > 1
+            ? `<button class="scenario-tab del-tab" onclick="deleteSnap()">Delete</button>`
+            : ''}
+          <div class="snap-share-btns">
+            <button class="snap-btn snap-btn-link" id="snap-link-btn" onclick="copySnapLink()">🔗 Copy link</button>
+            <button class="snap-btn snap-btn-text" id="snap-text-btn" onclick="copySnapText()">📋 Copy summary</button>
+          </div>
+        </div>
+
+        <div class="snap-alloc-rows">${allocRows}</div>
+
+        <div class="snap-results">
+          <div class="snap-result-card">
+            <div class="label">Academies</div>
+            <div class="value blue" id="snap-total-acad">${m.totalAcad}</div>
+          </div>
+          <div class="snap-result-card">
+            <div class="label">Blended ARPU</div>
+            <div class="value gold" id="snap-arpu">${m.totalAcad > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—'}</div>
+          </div>
+          <div class="snap-result-card">
+            <div class="label">FC Revenue / mo</div>
+            <div class="value green" id="snap-rev">${fmtFull(m.totalRev)}</div>
+          </div>
+          <div class="snap-result-card">
+            <div class="label">ARR</div>
+            <div class="value purple" id="snap-arr">${fmt(m.arr)}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function updateSnapResults() {
+    const snap = activeSnap();
+    const m    = snapMetrics(snap);
+    document.getElementById('snap-total-acad').textContent = m.totalAcad;
+    document.getElementById('snap-arpu').textContent = m.totalAcad > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—';
+    document.getElementById('snap-rev').textContent  = fmtFull(m.totalRev);
+    document.getElementById('snap-arr').textContent  = fmt(m.arr);
+  }
+
+  function updateSnapAlloc(modelId, rawVal) {
+    const n = parseInt(rawVal) || 0;
+    activeSnap().alloc[modelId] = n;
+    document.getElementById(`sf-${modelId}`).style.width = (n / SNAP_ALLOC_MAX * 100) + '%';
+    document.getElementById(`sv-${modelId}`).textContent = n + ' acad.';
+    updateSnapResults();
+  }
+
+  function setActiveSnap(id) {
+    activeSnapId = id;
+    buildSnapshotSection();
+  }
+
+  function addSnap() {
+    const id = 's' + (nextSnapNum++);
+    const defaultAlloc = {};
+    MODELS.forEach(m => { defaultAlloc[m.id] = 10; });
+    snapshots.push({ id, name: 'Scenario ' + String.fromCharCode(64 + snapshots.length + 1), alloc: defaultAlloc });
+    activeSnapId = id;
+    buildSnapshotSection();
+  }
+
+  function deleteSnap() {
+    if (snapshots.length <= 1) return;
+    snapshots = snapshots.filter(s => s.id !== activeSnapId);
+    activeSnapId = snapshots[0].id;
+    buildSnapshotSection();
+  }
+
+  function renameSnap(name) {
+    activeSnap().name = name;
+    // update tab label without full rebuild
+    document.querySelectorAll('.scenario-tab.active').forEach(el => { if (el.textContent !== name) el.textContent = name; });
+  }
+
+  function copySnapText() {
+    const snap = activeSnap();
+    const m    = snapMetrics(snap);
+    const lines = [
+      `FullControl — ${snap.name}`,
+      '─'.repeat(40),
+    ];
+    MODELS.forEach(mod => {
+      const n = snap.alloc[mod.id] || 0;
+      if (n === 0) return;
+      const rev = n * state[mod.id].selected;
+      lines.push(`${mod.name}: ${n} acad. @ ${fmtFull(state[mod.id].selected)}/mo = ${fmtFull(rev)}/mo`);
+    });
+    lines.push('─'.repeat(40));
+    lines.push(`Total academies:  ${m.totalAcad}`);
+    lines.push(`Blended ARPU:     ${fmtFull(m.blendedARPU)}/mo`);
+    lines.push(`FC Revenue / mo:  ${fmtFull(m.totalRev)}`);
+    lines.push(`ARR:              ${fmt(m.arr)}`);
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      const btn = document.getElementById('snap-text-btn');
+      btn.textContent = '✓ Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = '📋 Copy summary'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  function copySnapLink() {
+    const hash = serializeState();
+    const url  = location.href.split('#')[0] + '#' + hash;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('snap-link-btn');
+      btn.textContent = '✓ Link copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = '🔗 Copy link'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  /* ════════════════════════════════════════ */
+
   function serializeState() {
-    const data = { acad: parseInt(document.getElementById('acad-count').value) || 50 };
+    const data = { acad: parseInt(document.getElementById('acad-count').value) || 50, snaps: snapshots, activeSnap: activeSnapId };
     MODELS.forEach(m => {
       const s = state[m.id];
       const entry = { on: s.enabled ? 1 : 0, rMin: s.rangeMin, rMax: s.rangeMax, sel: s.selected };
@@ -795,6 +1153,8 @@
     try {
       const data = JSON.parse(atob(hash));
       if (data.acad) document.getElementById('acad-count').value = data.acad;
+      if (data.snaps)      { snapshots = data.snaps; nextSnapNum = snapshots.length + 1; }
+      if (data.activeSnap) activeSnapId = data.activeSnap;
       MODELS.forEach(m => {
         const e = data[m.id];
         if (!e) return;
@@ -821,6 +1181,7 @@
   }
 
   restoreFromUrl();
+  buildSnapshotSection();
   buildCards();
   updateSummary();
 </script>
