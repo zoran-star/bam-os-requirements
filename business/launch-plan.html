@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FullControl Launch Model</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #222637;
+    --border: #2e3347;
+    --text: #e8eaf0;
+    --muted: #7b82a0;
+    --accent: #5b7fff;
+    --accent2: #38d9a9;
+    --accent3: #ff8c42;
+    --accent4: #c97fff;
+    --red: #ff5c7a;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+  }
+
+  header {
+    max-width: 1100px;
+    margin: 0 auto 32px;
+  }
+  header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  header p { color: var(--muted); margin-top: 4px; font-size: 13px; }
+
+  .layout {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .input-group {
+    margin-bottom: 22px;
+  }
+  .input-group:last-child { margin-bottom: 0; }
+
+  .input-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+  .input-label span:first-child {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .input-label .val {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .input-label .val.green { color: var(--accent2); }
+  .input-label .val.orange { color: var(--accent3); }
+  .input-label .val.red { color: var(--red); }
+  .input-label .val.purple { color: var(--accent4); }
+
+  .sub-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: -4px;
+    margin-bottom: 8px;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    appearance: none;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px var(--accent);
+    transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .number-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .number-input:focus { border-color: var(--accent); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+
+  /* Right column */
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Metric cards */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    text-align: center;
+  }
+  .metric-card .m-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .metric-card .m-value {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .metric-card .m-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .metric-card.blue .m-value { color: var(--accent); }
+  .metric-card.green .m-value { color: var(--accent2); }
+  .metric-card.orange .m-value { color: var(--accent3); }
+  .metric-card.purple .m-value { color: var(--accent4); }
+
+  /* Milestone row */
+  .milestones {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .milestone {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .milestone .ms-month {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .milestone .ms-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .milestone .ms-row .ms-key {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .milestone .ms-row .ms-val {
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Chart */
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .chart-title {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .chart-tabs {
+    display: flex;
+    gap: 6px;
+  }
+  .chart-tab {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chart-tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .chart-wrap { position: relative; height: 220px; }
+
+  /* Table */
+  .table-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .table-title { font-size: 13px; font-weight: 600; }
+  .show-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .show-toggle:hover { color: var(--text); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: right;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  th:first-child { text-align: left; }
+  td {
+    font-size: 12px;
+    text-align: right;
+    padding: 9px 10px;
+    border-bottom: 1px solid #1e2133;
+    font-variant-numeric: tabular-nums;
+  }
+  td:first-child { text-align: left; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .highlight-row td { background: rgba(91,127,255,0.06); }
+  .highlight-row td:first-child { color: var(--accent); font-weight: 700; }
+
+  .td-clients { color: var(--accent); font-weight: 600; }
+  .td-mrr { color: var(--accent2); font-weight: 600; }
+  .td-arr { color: var(--accent3); }
+  .td-ltv { color: var(--accent4); }
+  .td-churn { color: var(--red); }
+
+  .more-rows { display: none; }
+
+  /* ARR Target toggle section */
+  .target-section {
+    margin-top: 20px;
+  }
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0;
+  }
+  .toggle-label {
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .toggle-switch {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-track::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-switch input:checked + .toggle-track { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-track::after {
+    transform: translateX(16px);
+    background: #fff;
+  }
+
+  .target-inputs {
+    margin-top: 16px;
+    display: none;
+  }
+  .target-inputs.visible { display: block; }
+
+  .timeline-display {
+    margin-top: 14px;
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    transition: border-color 0.3s, background 0.3s;
+    display: none;
+  }
+  .timeline-display.visible { display: block; }
+  .timeline-display.lit {
+    background: rgba(56,217,169,0.07);
+    border-color: var(--accent2);
+  }
+  .timeline-display.unreachable {
+    background: rgba(255,92,122,0.07);
+    border-color: var(--red);
+  }
+  .tl-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .tl-value {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--accent2);
+    font-variant-numeric: tabular-nums;
+  }
+  .tl-value.unreachable { color: var(--red); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .metrics-grid, .milestones { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FullControl — Launch Financial Model</h1>
+  <p>Adjust the inputs to model client growth, revenue, and lifetime value over 24 months.</p>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: Inputs -->
+  <div class="panel">
+    <div class="panel-title">Model Inputs</div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>Clients at Launch</span>
+        <span class="val" id="lbl-launch">5</span>
+      </div>
+      <input type="range" id="sl-launch" min="1" max="50" step="1" value="5" oninput="sync('launch', this.value)" />
+      <input type="number" class="number-input" id="num-launch" min="1" max="200" value="5" oninput="sync('launch', this.value)" />
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>New Clients / Month</span>
+        <span class="val green" id="lbl-growth">3</span>
+      </div>
+      <div class="sub-label">Post-launch steady-state additions</div>
+      <input type="range" id="sl-growth" min="0" max="30" step="1" value="3" oninput="sync('growth', this.value)" />
+      <input type="number" class="number-input" id="num-growth" min="0" max="100" value="3" oninput="sync('growth', this.value)" />
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>Monthly Churn Rate</span>
+        <span class="val red" id="lbl-churn">3%</span>
+      </div>
+      <div class="sub-label">% of clients lost each month</div>
+      <input type="range" id="sl-churn" min="0" max="20" step="0.5" value="3" oninput="sync('churn', this.value)" />
+      <input type="number" class="number-input" id="num-churn" min="0" max="100" step="0.5" value="3" oninput="sync('churn', this.value)" />
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>Avg Monthly Price</span>
+        <span class="val purple" id="lbl-price">$499</span>
+      </div>
+      <div class="sub-label">Per client, per month (USD)</div>
+      <input type="range" id="sl-price" min="50" max="2000" step="25" value="499" oninput="sync('price', this.value)" />
+      <input type="number" class="number-input" id="num-price" min="1" step="1" value="499" oninput="sync('price', this.value)" />
+    </div>
+
+    <hr class="divider" />
+
+    <div style="font-size: 11px; color: var(--muted); line-height: 1.7;">
+      <strong style="color: var(--text);">LTV Formula</strong><br>
+      Average LTV = Monthly Price ÷ Churn Rate<br>
+      e.g. $499 ÷ 3% = <span id="ltv-explain" style="color: var(--accent4); font-weight: 700;">$16,633</span>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="target-section">
+      <div class="toggle-row">
+        <span class="toggle-label">ARR Target</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="target-toggle" onchange="toggleTarget()" />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+
+      <div class="target-inputs" id="target-inputs">
+        <div class="input-label" style="margin-top:16px;">
+          <span>Target ARR</span>
+          <span class="val green" id="lbl-target">$500k</span>
+        </div>
+        <input type="range" id="sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="syncTarget(this.value)" />
+        <input type="number" class="number-input" id="num-target" min="1" step="1000" value="500000" oninput="syncTarget(this.value)" />
+      </div>
+
+      <div class="timeline-display" id="timeline-display">
+        <div class="tl-label" id="tl-label">Expected timeline to target ARR of —</div>
+        <div class="tl-value" id="tl-value">—</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-col">
+
+    <!-- Live metric cards -->
+    <div class="metrics-grid">
+      <div class="metric-card blue">
+        <div class="m-label">Clients (Month 12)</div>
+        <div class="m-value" id="mc-clients">—</div>
+        <div class="m-sub">active</div>
+      </div>
+      <div class="metric-card green">
+        <div class="m-label">MRR (Month 12)</div>
+        <div class="m-value" id="mc-mrr">—</div>
+        <div class="m-sub">monthly recurring</div>
+      </div>
+      <div class="metric-card orange">
+        <div class="m-label">ARR (Month 12)</div>
+        <div class="m-value" id="mc-arr">—</div>
+        <div class="m-sub">annualised run rate</div>
+      </div>
+      <div class="metric-card purple">
+        <div class="m-label">Avg LTV / Client</div>
+        <div class="m-value" id="mc-ltv">—</div>
+        <div class="m-sub">at current churn</div>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <div class="milestones" id="milestones-grid"></div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-header">
+        <div class="chart-title">24-Month Projection</div>
+        <div class="chart-tabs">
+          <button class="chart-tab active" id="tab-clients" onclick="switchTab('clients')">Clients</button>
+          <button class="chart-tab" id="tab-mrr" onclick="switchTab('mrr')">MRR</button>
+          <button class="chart-tab" id="tab-arr" onclick="switchTab('arr')">ARR</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="mainChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-panel">
+      <div class="table-header">
+        <div class="table-title">Month-by-Month Breakdown</div>
+        <button class="show-toggle" id="toggle-btn" onclick="toggleRows()">Show all 24 months</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Clients</th>
+            <th>New</th>
+            <th>Churned</th>
+            <th>MRR</th>
+            <th>ARR</th>
+            <th>LTV</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let vals = { launch: 5, growth: 3, churn: 3, price: 499 };
+let targetArr = 500000;
+let targetOn = false;
+let activeTab = 'clients';
+let showAll = false;
+let chart = null;
+
+function fmt(n) {
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return '$' + (n / 1_000).toFixed(1) + 'k';
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function fmtFull(n) {
+  return '$' + Math.round(n).toLocaleString();
+}
+
+function sync(key, raw) {
+  const v = parseFloat(raw) || 0;
+  vals[key] = v;
+
+  // Keep slider and number input in sync
+  const sl = document.getElementById('sl-' + key);
+  const num = document.getElementById('num-' + key);
+  if (sl && parseFloat(sl.value) !== v) sl.value = v;
+  if (num && parseFloat(num.value) !== v) num.value = v;
+
+  // Update label
+  const lbl = document.getElementById('lbl-' + key);
+  if (key === 'churn') lbl.textContent = v + '%';
+  else if (key === 'price') lbl.textContent = '$' + v.toLocaleString();
+  else lbl.textContent = v;
+
+  render();
+}
+
+function buildProjection() {
+  const { launch, growth, churn, price } = vals;
+  const churnRate = churn / 100;
+  const rows = [];
+
+  let clients = launch;
+  for (let m = 1; m <= 24; m++) {
+    const newClients = m === 1 ? 0 : growth;
+    const churned = m === 1 ? 0 : Math.round(clients * churnRate * 10) / 10;
+    if (m > 1) {
+      clients = Math.max(0, clients + newClients - churned);
+    }
+    const mrr = clients * price;
+    const arr = mrr * 12;
+    const ltv = churnRate > 0 ? price / churnRate : Infinity;
+    rows.push({ month: m, clients: Math.round(clients), newClients, churned, mrr, arr, ltv });
+
+    if (m === 1) {
+      // After month 1 snapshot, start adding
+      clients = Math.round(clients);
+    }
+  }
+  return rows;
+}
+
+function render() {
+  const rows = buildProjection();
+  const { price, churn } = vals;
+  const churnRate = churn / 100;
+  const ltv = churnRate > 0 ? price / churnRate : 999999;
+
+  // LTV explain
+  document.getElementById('ltv-explain').textContent = churnRate > 0
+    ? fmtFull(ltv)
+    : '∞';
+
+  // Month 12 metric cards
+  const r12 = rows[11];
+  document.getElementById('mc-clients').textContent = r12.clients;
+  document.getElementById('mc-mrr').textContent = fmt(r12.mrr);
+  document.getElementById('mc-arr').textContent = fmt(r12.arr);
+  document.getElementById('mc-ltv').textContent = churnRate > 0 ? fmt(ltv) : '∞';
+
+  // Milestones
+  const milestoneMonths = [1, 6, 12, 24];
+  const milestoneGrid = document.getElementById('milestones-grid');
+  milestoneGrid.innerHTML = milestoneMonths.map(m => {
+    const r = rows[m - 1];
+    return `
+      <div class="milestone">
+        <div class="ms-month">Month ${m}</div>
+        <div class="ms-row"><span class="ms-key">Clients</span><span class="ms-val" style="color:var(--accent)">${r.clients}</span></div>
+        <div class="ms-row"><span class="ms-key">MRR</span><span class="ms-val" style="color:var(--accent2)">${fmt(r.mrr)}</span></div>
+        <div class="ms-row"><span class="ms-key">ARR</span><span class="ms-val" style="color:var(--accent3)">${fmt(r.arr)}</span></div>
+      </div>
+    `;
+  }).join('');
+
+  // Chart
+  updateChart(rows);
+
+  // ARR target
+  renderTarget(rows);
+
+  // Table
+  const highlighted = [6, 12, 24];
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = rows.map((r, i) => {
+    const isMore = i >= 12;
+    const isHL = highlighted.includes(r.month);
+    const ltv2 = churnRate > 0 ? fmtFull(ltv) : '∞';
+    return `<tr class="${isHL ? 'highlight-row' : ''} ${isMore ? 'more-rows' : ''}">
+      <td>Mo. ${r.month}</td>
+      <td class="td-clients">${r.clients}</td>
+      <td style="color:var(--accent2)">${r.month === 1 ? '—' : '+' + Math.round(r.newClients)}</td>
+      <td class="td-churn">${r.month === 1 ? '—' : '−' + r.churned.toFixed(1)}</td>
+      <td class="td-mrr">${fmtFull(r.mrr)}</td>
+      <td class="td-arr">${fmt(r.arr)}</td>
+      <td class="td-ltv">${ltv2}</td>
+    </tr>`;
+  }).join('');
+
+  // Restore show/hide
+  if (!showAll) {
+    document.querySelectorAll('.more-rows').forEach(r => r.style.display = 'none');
+  }
+}
+
+function updateChart(rows) {
+  const labels = rows.map(r => `Mo. ${r.month}`);
+  let data, label, color, fill;
+
+  if (activeTab === 'clients') {
+    data = rows.map(r => r.clients);
+    label = 'Clients';
+    color = '#5b7fff';
+    fill = 'rgba(91,127,255,0.12)';
+  } else if (activeTab === 'mrr') {
+    data = rows.map(r => r.mrr);
+    label = 'MRR ($)';
+    color = '#38d9a9';
+    fill = 'rgba(56,217,169,0.1)';
+  } else {
+    data = rows.map(r => r.arr);
+    label = 'ARR ($)';
+    color = '#ff8c42';
+    fill = 'rgba(255,140,66,0.1)';
+  }
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = data;
+    chart.data.datasets[0].label = label;
+    chart.data.datasets[0].borderColor = color;
+    chart.data.datasets[0].backgroundColor = fill;
+    chart.data.datasets[0].pointBackgroundColor = color;
+    chart.update('none');
+  } else {
+    chart = new Chart(document.getElementById('mainChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data,
+          borderColor: color,
+          backgroundColor: fill,
+          borderWidth: 2,
+          pointBackgroundColor: color,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          fill: true,
+          tension: 0.4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1d27',
+            borderColor: '#2e3347',
+            borderWidth: 1,
+            titleColor: '#7b82a0',
+            bodyColor: '#e8eaf0',
+            padding: 10,
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                if (activeTab === 'clients') return ` ${v} clients`;
+                return ` ${fmtFull(v)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: '#1e2133' },
+            ticks: { color: '#7b82a0', font: { size: 11 }, maxTicksLimit: 12 },
+          },
+          y: {
+            grid: { color: '#1e2133' },
+            ticks: {
+              color: '#7b82a0',
+              font: { size: 11 },
+              callback: v => activeTab === 'clients' ? v : fmt(v)
+            },
+            beginAtZero: true,
+          }
+        },
+        interaction: { mode: 'index', intersect: false }
+      }
+    });
+  }
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  render();
+}
+
+function toggleTarget() {
+  targetOn = document.getElementById('target-toggle').checked;
+  document.getElementById('target-inputs').classList.toggle('visible', targetOn);
+  document.getElementById('timeline-display').classList.toggle('visible', targetOn);
+  render();
+}
+
+function syncTarget(raw) {
+  const v = parseFloat(raw) || 0;
+  targetArr = v;
+  const sl = document.getElementById('sl-target');
+  const num = document.getElementById('num-target');
+  if (parseFloat(sl.value) !== v) sl.value = Math.min(v, 5000000);
+  if (parseFloat(num.value) !== v) num.value = v;
+  document.getElementById('lbl-target').textContent = fmt(v);
+  render();
+}
+
+function renderTarget(rows) {
+  if (!targetOn) return;
+  const display = document.getElementById('timeline-display');
+  const lbl = document.getElementById('tl-label');
+  const val = document.getElementById('tl-value');
+
+  lbl.textContent = `Expected timeline to target ARR of ${fmt(targetArr)}`;
+
+  const hit = rows.find(r => r.arr >= targetArr);
+  if (hit) {
+    display.classList.add('lit');
+    display.classList.remove('unreachable');
+    val.classList.remove('unreachable');
+    const yrs = Math.floor(hit.month / 12);
+    const mos = hit.month % 12;
+    let timeStr = '';
+    if (yrs > 0) timeStr += yrs + (yrs === 1 ? ' year' : ' years');
+    if (yrs > 0 && mos > 0) timeStr += ', ';
+    if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
+    if (!timeStr) timeStr = 'at launch';
+    val.textContent = `Month ${hit.month} — ${timeStr}`;
+  } else {
+    display.classList.remove('lit');
+    display.classList.add('unreachable');
+    val.classList.add('unreachable');
+    val.textContent = 'Not reached within 24 months';
+  }
+}
+
+function toggleRows() {
+  showAll = !showAll;
+  document.querySelectorAll('.more-rows').forEach(r => {
+    r.style.display = showAll ? '' : 'none';
+  });
+  document.getElementById('toggle-btn').textContent = showAll ? 'Show first 12 months' : 'Show all 24 months';
+}
+
+// Init
+render();
+</script>
+</body>
+</html>
