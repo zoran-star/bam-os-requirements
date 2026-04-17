@@ -17,7 +17,7 @@
   }
 
   .canvas {
-    max-width: 1100px;
+    max-width: 900px;
     margin: 0 auto;
     padding: 48px 32px 80px;
   }
@@ -47,332 +47,267 @@
   .summary {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 40px;
+    gap: 14px;
+    margin-bottom: 36px;
   }
   .summary-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 16px;
-    padding: 20px 24px;
+    padding: 18px 20px;
     text-align: center;
   }
   .summary-card .label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #666;
+    color: #555;
     margin-bottom: 8px;
   }
   .summary-card .value {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.5px;
   }
   .summary-card .sub {
-    font-size: 12px;
-    color: #555;
+    font-size: 11px;
+    color: #444;
     margin-top: 4px;
   }
-  .gold { color: #c9a84c; }
+  .gold  { color: #c9a84c; }
   .green { color: #4caf82; }
-  .blue { color: #5b9cf6; }
-  .purple { color: #a78bfa; }
+  .blue  { color: #5b9cf6; }
+  .purple{ color: #a78bfa; }
+  .red   { color: #f87171; }
 
-  /* Models grid */
+  /* Model cards */
   .models {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    margin-bottom: 40px;
+    gap: 14px;
+    margin-bottom: 36px;
   }
 
   .model-card {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 20px;
-    padding: 28px 32px;
-    transition: border-color 0.2s, background 0.2s;
+    padding: 24px 28px;
+    transition: border-color 0.2s, background 0.2s, opacity 0.2s;
   }
-  .model-card.active {
-    background: rgba(255,255,255,0.05);
-    border-color: rgba(201,168,76,0.25);
-  }
-  .model-card.inactive {
-    opacity: 0.4;
-  }
+  .model-card.active  { background: rgba(255,255,255,0.05); border-color: rgba(201,168,76,0.25); }
+  .model-card.inactive { opacity: 0.35; }
 
+  /* Card header */
   .model-header {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  .toggle-wrap {
-    flex-shrink: 0;
+    gap: 14px;
+    margin-bottom: 22px;
   }
   .toggle {
-    width: 44px;
-    height: 24px;
-    background: #333;
-    border-radius: 12px;
+    width: 42px; height: 22px;
+    background: #2e2e44;
+    border-radius: 11px;
     position: relative;
     cursor: pointer;
     transition: background 0.2s;
-    border: none;
-    outline: none;
+    border: none; outline: none;
+    flex-shrink: 0;
   }
   .toggle.on { background: #c9a84c; }
   .toggle::after {
     content: '';
     position: absolute;
-    width: 18px;
-    height: 18px;
+    width: 16px; height: 16px;
     background: white;
     border-radius: 50%;
-    top: 3px;
-    left: 3px;
+    top: 3px; left: 3px;
     transition: transform 0.2s;
   }
   .toggle.on::after { transform: translateX(20px); }
 
-  .model-name {
-    font-size: 18px;
-    font-weight: 700;
-    flex: 1;
-  }
-  .model-icon {
-    font-size: 22px;
-    width: 40px;
-    text-align: center;
-  }
+  .model-icon { font-size: 20px; flex-shrink: 0; }
+  .model-name { font-size: 17px; font-weight: 700; flex: 1; }
 
-  .model-result {
-    text-align: right;
+  .model-badge {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     flex-shrink: 0;
   }
-  .model-result .mrr-fc {
+  .badge-charge {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 800;
     color: #c9a84c;
   }
-  .model-result .take-rate {
-    font-size: 12px;
-    color: #555;
-    margin-top: 2px;
+  .badge-pct {
+    font-size: 13px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.06);
+    color: #888;
+    min-width: 72px;
+    text-align: center;
   }
+  .badge-pct.pct-low    { background: rgba(76,175,130,0.15); color: #4caf82; }
+  .badge-pct.pct-mid    { background: rgba(201,168,76,0.15); color: #c9a84c; }
+  .badge-pct.pct-high   { background: rgba(248,113,113,0.15); color: #f87171; }
 
-  .model-inputs {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 20px;
-    align-items: end;
-  }
-
-  .input-group {
+  /* Slider rows */
+  .slider-rows {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 16px;
   }
-  .input-group label {
-    font-size: 11px;
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .slider-row-label {
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #666;
-  }
-  .input-group .hint {
-    font-size: 11px;
-    color: #444;
-    margin-top: -4px;
-  }
-
-  .dollar-input {
-    position: relative;
-  }
-  .dollar-input span {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #666;
-    font-size: 14px;
-    font-weight: 600;
-    pointer-events: none;
-  }
-  .dollar-input input {
-    width: 100%;
-    padding: 10px 14px 10px 28px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
-    color: #e0e0e0;
-    font-size: 15px;
-    font-weight: 600;
-    font-family: 'Inter', sans-serif;
-    outline: none;
-    transition: border-color 0.2s;
-    -moz-appearance: textfield;
-  }
-  .dollar-input input::-webkit-outer-spin-button,
-  .dollar-input input::-webkit-inner-spin-button { -webkit-appearance: none; }
-  .dollar-input input:focus {
-    border-color: rgba(201,168,76,0.5);
-  }
-
-  /* Price range section */
-  .price-range-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .range-inputs {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-  .range-inputs .dollar-input { flex: 1; }
-  .range-divider {
-    color: #444;
-    font-size: 13px;
+    color: #555;
+    width: 84px;
     flex-shrink: 0;
+    line-height: 1.4;
   }
-
-  /* Price slider */
-  .price-slider-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .slider-track {
+  .slider-row-track {
+    flex: 1;
     position: relative;
-    height: 36px;
+    height: 28px;
     display: flex;
     align-items: center;
   }
-  .slider-bg {
+  .track-bg {
     position: absolute;
-    left: 0; right: 0;
-    height: 4px;
+    left: 0; right: 0; height: 4px;
     background: rgba(255,255,255,0.08);
     border-radius: 2px;
   }
-  .slider-fill {
+  .track-fill {
     position: absolute;
     height: 4px;
-    background: linear-gradient(90deg, #c9a84c, #f0d078);
     border-radius: 2px;
     pointer-events: none;
   }
-  input[type=range] {
+  .track-fill.gold-fill   { background: linear-gradient(90deg, #c9a84c, #f0d078); }
+  .track-fill.range-fill  { background: rgba(201,168,76,0.35); }
+  .track-fill.price-fill  { background: linear-gradient(90deg, #4caf82, #7de8b0); }
+
+  /* Single-thumb range */
+  input[type=range].single {
     position: absolute;
-    width: 100%;
-    height: 4px;
-    appearance: none;
-    background: transparent;
-    outline: none;
-    cursor: pointer;
+    width: 100%; height: 4px;
+    appearance: none; background: transparent;
+    outline: none; cursor: pointer;
   }
-  input[type=range]::-webkit-slider-thumb {
+  input[type=range].single::-webkit-slider-thumb {
     appearance: none;
-    width: 18px;
-    height: 18px;
+    width: 18px; height: 18px;
     border-radius: 50%;
     background: #f0d078;
     border: 2px solid #1a1a2e;
     cursor: pointer;
     transition: transform 0.15s;
   }
-  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-  input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+  input[type=range].single::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range].single:disabled { opacity: 0.3; cursor: not-allowed; }
 
-  .slider-labels {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11px;
-    color: #555;
-    margin-top: 2px;
+  /* Dual-thumb range */
+  input[type=range].dual {
+    position: absolute;
+    width: 100%; height: 4px;
+    appearance: none; background: transparent;
+    outline: none; cursor: pointer;
+    pointer-events: none;
   }
-  .slider-current {
-    text-align: center;
+  input[type=range].dual::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: #c9a84c;
+    border: 2px solid #1a1a2e;
+    cursor: pointer;
+    pointer-events: all;
+    transition: transform 0.15s;
+  }
+  input[type=range].dual::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range].dual:disabled { opacity: 0.3; }
+  input[type=range].dual:disabled::-webkit-slider-thumb { pointer-events: none; }
+
+  .slider-row-value {
     font-size: 13px;
     font-weight: 700;
     color: #c9a84c;
+    width: 130px;
+    flex-shrink: 0;
+    text-align: right;
   }
+  .slider-row-value.green-val { color: #4caf82; }
+  .slider-row-value.dim { color: #555; font-weight: 500; }
 
   /* ARR section */
   .arr-section {
     background: rgba(255,255,255,0.03);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 20px;
-    padding: 32px;
+    padding: 28px 32px;
   }
   .arr-section h2 {
-    font-size: 16px;
+    font-size: 13px;
     font-weight: 700;
-    color: #888;
+    color: #666;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 24px;
+    letter-spacing: 0.07em;
+    margin-bottom: 20px;
   }
   .arr-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 28px;
+    gap: 14px;
+    margin-bottom: 24px;
   }
   .arr-card {
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 14px;
-    padding: 20px;
+    padding: 18px;
     text-align: center;
   }
   .arr-card .label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: #555;
     margin-bottom: 8px;
   }
-  .arr-card .value {
-    font-size: 24px;
-    font-weight: 800;
-  }
-  .arr-card .sub {
-    font-size: 12px;
-    color: #444;
-    margin-top: 4px;
-  }
+  .arr-card .value { font-size: 22px; font-weight: 800; }
+  .arr-card .sub { font-size: 11px; color: #444; margin-top: 4px; }
   .arr-divider {
     border: none;
     border-top: 1px solid rgba(255,255,255,0.06);
-    margin: 24px 0;
+    margin: 20px 0;
   }
 
-  /* Academy count */
+  /* Academy count row */
   .acad-section {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 16px;
     flex-wrap: wrap;
   }
-  .acad-label {
-    font-size: 14px;
-    color: #666;
-    flex-shrink: 0;
-  }
-  .acad-input-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .acad-input-wrap input {
-    width: 90px;
-    padding: 8px 14px;
+  .acad-label { font-size: 14px; color: #666; flex-shrink: 0; }
+  .acad-input {
+    width: 80px;
+    padding: 7px 12px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 10px;
@@ -384,28 +319,18 @@
     text-align: center;
     -moz-appearance: textfield;
   }
-  .acad-input-wrap input::-webkit-outer-spin-button,
-  .acad-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
-  .acad-result {
-    flex: 1;
-    text-align: right;
-  }
-  .acad-result .big {
-    font-size: 28px;
-    font-weight: 800;
-    color: #4caf82;
-  }
-  .acad-result .small {
-    font-size: 12px;
-    color: #444;
-    margin-top: 3px;
-  }
+  .acad-input::-webkit-outer-spin-button,
+  .acad-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .acad-result { flex: 1; text-align: right; }
+  .acad-result .big { font-size: 26px; font-weight: 800; color: #4caf82; }
+  .acad-result .small { font-size: 12px; color: #444; margin-top: 3px; }
 
-  @media (max-width: 720px) {
+  @media (max-width: 680px) {
     .summary { grid-template-columns: repeat(2, 1fr); }
-    .model-inputs { grid-template-columns: 1fr; }
     .arr-grid { grid-template-columns: 1fr; }
     .header h1 { font-size: 28px; }
+    .slider-row-value { width: 90px; font-size: 12px; }
+    .slider-row-label { width: 68px; font-size: 9px; }
   }
 </style>
 </head>
@@ -417,34 +342,31 @@
     <p>Model FullControl's revenue across business verticals. Adjust MRR and price ranges per model.</p>
   </div>
 
-  <!-- Summary strip -->
   <div class="summary">
     <div class="summary-card">
-      <div class="label">Total Academy MRR</div>
+      <div class="label">Academy MRR</div>
       <div class="value gold" id="s-academy-mrr">$0</div>
-      <div class="sub">active models only</div>
+      <div class="sub">active models</div>
     </div>
     <div class="summary-card">
-      <div class="label">FC Monthly (min)</div>
+      <div class="label">FC / mo (floor)</div>
       <div class="value blue" id="s-fc-min">$0</div>
-      <div class="sub">floor across models</div>
+      <div class="sub">sum of range mins</div>
     </div>
     <div class="summary-card">
-      <div class="label">FC Monthly (selected)</div>
+      <div class="label">FC / mo (selected)</div>
       <div class="value green" id="s-fc-selected">$0</div>
       <div class="sub">at your price points</div>
     </div>
     <div class="summary-card">
-      <div class="label">FC Monthly (max)</div>
+      <div class="label">FC / mo (ceiling)</div>
       <div class="value purple" id="s-fc-max">$0</div>
-      <div class="sub">ceiling across models</div>
+      <div class="sub">sum of range maxes</div>
     </div>
   </div>
 
-  <!-- Model cards -->
   <div class="models" id="models-container"></div>
 
-  <!-- ARR projection -->
   <div class="arr-section">
     <h2>ARR Projection</h2>
     <div class="arr-grid">
@@ -454,7 +376,7 @@
         <div class="sub">per academy × 12</div>
       </div>
       <div class="arr-card">
-        <div class="label">ARR at Selected Price</div>
+        <div class="label">ARR — Selected</div>
         <div class="value green" id="arr-selected">$0</div>
         <div class="sub">per academy × 12</div>
       </div>
@@ -469,10 +391,8 @@
 
     <div class="acad-section">
       <div class="acad-label">With</div>
-      <div class="acad-input-wrap">
-        <input type="number" id="acad-count" value="50" min="1">
-        <span style="font-size:14px; color:#666;">academies</span>
-      </div>
+      <input type="number" class="acad-input" id="acad-count" value="50" min="1">
+      <span style="font-size:14px; color:#555;">academies</span>
       <div class="acad-result">
         <div class="big" id="portfolio-arr">$0</div>
         <div class="small" id="portfolio-sub">portfolio ARR at selected price</div>
@@ -484,71 +404,117 @@
 
 <script>
   const MODELS = [
-    { id: 'training',  name: 'Training Classes',  icon: '🏀', defaultMrr: 8000,  defaultMin: 149, defaultMax: 399 },
-    { id: 'club',      name: 'Club Teams',         icon: '🏆', defaultMrr: 6000,  defaultMin: 99,  defaultMax: 299 },
-    { id: 'gym',       name: 'Gym Rental',         icon: '🏗️', defaultMrr: 4000,  defaultMin: 79,  defaultMax: 199 },
-    { id: 'internal',  name: 'Internal Leagues',   icon: '📋', defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199 },
-    { id: 'external',  name: 'External Leagues',   icon: '🌐', defaultMrr: 5000,  defaultMin: 99,  defaultMax: 249 },
+    { id: 'training', name: 'Training Classes', icon: '🏀', defaultMrr: 8000,  defaultMin: 199, defaultMax: 499, defaultSel: 299 },
+    { id: 'club',     name: 'Club Teams',        icon: '🏆', defaultMrr: 6000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
+    { id: 'gym',      name: 'Gym Rental',         icon: '🏗️', defaultMrr: 4000,  defaultMin: 99,  defaultMax: 249, defaultSel: 149 },
+    { id: 'internal', name: 'Internal Leagues',   icon: '📋', defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199, defaultSel: 129 },
+    { id: 'external', name: 'External Leagues',   icon: '🌐', defaultMrr: 5000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
   ];
+
+  const MRR_MAX  = 40000;
+  const PRICE_MIN = 50;
+  const PRICE_MAX = 1500;
 
   const state = {};
   MODELS.forEach(m => {
     state[m.id] = {
       enabled: true,
       mrr: m.defaultMrr,
-      min: m.defaultMin,
-      max: m.defaultMax,
-      selected: Math.round((m.defaultMin + m.defaultMax) / 2),
+      rangeMin: m.defaultMin,
+      rangeMax: m.defaultMax,
+      selected: m.defaultSel,
     };
   });
 
   function fmt(n) {
     if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
-    if (n >= 1000) return '$' + n.toLocaleString();
+    if (n >= 10000)   return '$' + (n / 1000).toFixed(0) + 'k';
+    if (n >= 1000)    return '$' + n.toLocaleString();
     return '$' + n;
   }
 
-  function pct(charge, mrr) {
-    if (!mrr) return '—';
-    return (charge / mrr * 100).toFixed(1) + '% of MRR';
+  function fmtFull(n) {
+    return '$' + n.toLocaleString();
   }
 
-  function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
-
-  function updateSliderFill(id) {
-    const s = state[id];
-    const rangeEl = document.getElementById(`slider-${id}`);
-    const fillEl = document.getElementById(`fill-${id}`);
-    const range = s.max - s.min;
-    if (range <= 0) {
-      fillEl.style.left = '0%';
-      fillEl.style.width = '100%';
-      return;
-    }
-    const pctVal = (s.selected - s.min) / range * 100;
-    fillEl.style.left = '0%';
-    fillEl.style.width = pctVal + '%';
+  function pctColor(p) {
+    if (!p || p === 0) return '';
+    if (p < 5)  return 'pct-low';
+    if (p < 12) return 'pct-mid';
+    return 'pct-high';
   }
 
-  function updateModelResult(id) {
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  /* ── MRR slider fill ── */
+  function updateMrrFill(id) {
     const s = state[id];
-    const card = document.getElementById(`card-${id}`);
-    card.className = 'model-card ' + (s.enabled ? 'active' : 'inactive');
+    const pct = s.mrr / MRR_MAX * 100;
+    document.getElementById(`mrr-fill-${id}`).style.width = pct + '%';
+  }
+
+  /* ── Dual-range fill ── */
+  function updateRangeFill(id) {
+    const s = state[id];
+    const span = PRICE_MAX - PRICE_MIN;
+    const l = (s.rangeMin - PRICE_MIN) / span * 100;
+    const w = (s.rangeMax - s.rangeMin) / span * 100;
+    const fill = document.getElementById(`range-fill-${id}`);
+    fill.style.left  = l + '%';
+    fill.style.width = Math.max(0, w) + '%';
+  }
+
+  /* ── Price slider fill ── */
+  function updatePriceFill(id) {
+    const s = state[id];
+    const span = s.rangeMax - s.rangeMin;
+    const pct = span > 0 ? (s.selected - s.rangeMin) / span * 100 : 0;
+    document.getElementById(`price-fill-${id}`).style.width = pct + '%';
+  }
+
+  function updateModelUI(id) {
+    const s = state[id];
+    const p = s.mrr > 0 ? (s.selected / s.mrr * 100) : 0;
+    const pStr = s.mrr > 0 ? p.toFixed(1) + '%' : '—';
+
+    // card class
+    document.getElementById(`card-${id}`).className = 'model-card ' + (s.enabled ? 'active' : 'inactive');
     document.getElementById(`toggle-${id}`).className = 'toggle ' + (s.enabled ? 'on' : '');
-    document.getElementById(`fc-charge-${id}`).textContent = s.enabled ? fmt(s.selected) + '/mo' : '—';
-    document.getElementById(`take-rate-${id}`).textContent = s.enabled ? pct(s.selected, s.mrr) : '';
 
-    const rangeEl = document.getElementById(`slider-${id}`);
-    rangeEl.min = s.min;
-    rangeEl.max = s.max;
-    rangeEl.value = s.selected;
-    rangeEl.disabled = !s.enabled;
+    // badge
+    document.getElementById(`badge-charge-${id}`).textContent = s.enabled ? fmtFull(s.selected) + '/mo' : '—';
+    const pctEl = document.getElementById(`badge-pct-${id}`);
+    pctEl.textContent = s.enabled ? pStr + ' of MRR' : '—';
+    pctEl.className = 'badge-pct ' + (s.enabled ? pctColor(p) : '');
 
-    document.getElementById(`slider-label-${id}`).textContent = s.enabled ? fmt(s.selected) + '/mo' : '—';
-    document.getElementById(`slider-min-${id}`).textContent = fmt(s.min);
-    document.getElementById(`slider-max-${id}`).textContent = fmt(s.max);
+    // MRR slider
+    const mrrEl = document.getElementById(`mrr-slider-${id}`);
+    mrrEl.value = s.mrr;
+    mrrEl.disabled = !s.enabled;
+    document.getElementById(`mrr-val-${id}`).textContent = fmtFull(s.mrr) + '/mo';
+    document.getElementById(`mrr-val-${id}`).className = 'slider-row-value' + (s.enabled ? '' : ' dim');
+    updateMrrFill(id);
 
-    updateSliderFill(id);
+    // Range sliders
+    const rMinEl = document.getElementById(`range-min-${id}`);
+    const rMaxEl = document.getElementById(`range-max-${id}`);
+    rMinEl.value = s.rangeMin;
+    rMaxEl.value = s.rangeMax;
+    rMinEl.disabled = !s.enabled;
+    rMaxEl.disabled = !s.enabled;
+    document.getElementById(`range-val-${id}`).textContent = fmtFull(s.rangeMin) + ' — ' + fmtFull(s.rangeMax);
+    updateRangeFill(id);
+
+    // Price slider
+    const priceEl = document.getElementById(`price-slider-${id}`);
+    priceEl.min = s.rangeMin;
+    priceEl.max = s.rangeMax;
+    priceEl.value = s.selected;
+    priceEl.disabled = !s.enabled;
+    document.getElementById(`price-val-${id}`).textContent = fmtFull(s.selected) + '/mo';
+    document.getElementById(`price-val-${id}`).className = 'slider-row-value green-val' + (s.enabled ? '' : ' dim');
+    updatePriceFill(id);
+
     updateSummary();
   }
 
@@ -558,9 +524,9 @@
       const s = state[m.id];
       if (!s.enabled) return;
       totalMrr += s.mrr;
-      totalMin += s.min;
+      totalMin += s.rangeMin;
       totalSel += s.selected;
-      totalMax += s.max;
+      totalMax += s.rangeMax;
     });
     document.getElementById('s-academy-mrr').textContent = fmt(totalMrr);
     document.getElementById('s-fc-min').textContent = fmt(totalMin);
@@ -582,6 +548,7 @@
 
     MODELS.forEach(m => {
       const s = state[m.id];
+      const p = s.mrr > 0 ? (s.selected / s.mrr * 100).toFixed(1) : '—';
 
       const card = document.createElement('div');
       card.id = `card-${m.id}`;
@@ -589,56 +556,55 @@
 
       card.innerHTML = `
         <div class="model-header">
-          <div class="toggle-wrap">
-            <button class="toggle on" id="toggle-${m.id}" title="Toggle model"></button>
-          </div>
-          <div class="model-icon">${m.icon}</div>
-          <div class="model-name">${m.name}</div>
-          <div class="model-result">
-            <div class="mrr-fc" id="fc-charge-${m.id}">${fmt(s.selected)}/mo</div>
-            <div class="take-rate" id="take-rate-${m.id}">${pct(s.selected, s.mrr)}</div>
+          <button class="toggle on" id="toggle-${m.id}"></button>
+          <span class="model-icon">${m.icon}</span>
+          <span class="model-name">${m.name}</span>
+          <div class="model-badge">
+            <span class="badge-charge" id="badge-charge-${m.id}">${fmtFull(s.selected)}/mo</span>
+            <span class="badge-pct ${pctColor(s.selected / s.mrr * 100)}" id="badge-pct-${m.id}">${p}% of MRR</span>
           </div>
         </div>
 
-        <div class="model-inputs">
+        <div class="slider-rows">
 
-          <div class="input-group">
-            <label>Academy MRR from this model</label>
-            <div class="dollar-input">
-              <span>$</span>
-              <input type="number" id="mrr-${m.id}" value="${s.mrr}" min="0" placeholder="0">
+          <!-- MRR -->
+          <div class="slider-row">
+            <div class="slider-row-label">Academy MRR</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill gold-fill" id="mrr-fill-${m.id}" style="left:0;width:${s.mrr/MRR_MAX*100}%"></div>
+              <input type="range" class="single" id="mrr-slider-${m.id}"
+                min="0" max="${MRR_MAX}" step="100" value="${s.mrr}">
             </div>
-            <div class="hint">monthly revenue the academy earns</div>
+            <div class="slider-row-value" id="mrr-val-${m.id}">${fmtFull(s.mrr)}/mo</div>
           </div>
 
-          <div class="input-group">
-            <label>FC price range (min → max)</label>
-            <div class="range-inputs">
-              <div class="dollar-input">
-                <span>$</span>
-                <input type="number" id="min-${m.id}" value="${s.min}" min="0" placeholder="0">
-              </div>
-              <span class="range-divider">→</span>
-              <div class="dollar-input">
-                <span>$</span>
-                <input type="number" id="max-${m.id}" value="${s.max}" min="0" placeholder="0">
-              </div>
+          <!-- Price range (dual thumb) -->
+          <div class="slider-row">
+            <div class="slider-row-label">FC Price Range</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill range-fill" id="range-fill-${m.id}"
+                style="left:${(s.rangeMin-PRICE_MIN)/(PRICE_MAX-PRICE_MIN)*100}%;width:${(s.rangeMax-s.rangeMin)/(PRICE_MAX-PRICE_MIN)*100}%"></div>
+              <input type="range" class="dual" id="range-min-${m.id}"
+                min="${PRICE_MIN}" max="${PRICE_MAX}" step="5" value="${s.rangeMin}">
+              <input type="range" class="dual" id="range-max-${m.id}"
+                min="${PRICE_MIN}" max="${PRICE_MAX}" step="5" value="${s.rangeMax}">
             </div>
-            <div class="hint">what FullControl charges monthly</div>
+            <div class="slider-row-value" id="range-val-${m.id}">${fmtFull(s.rangeMin)} — ${fmtFull(s.rangeMax)}</div>
           </div>
 
-          <div class="price-slider-group">
-            <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#666;">Your price</label>
-            <div class="slider-track">
-              <div class="slider-bg"></div>
-              <div class="slider-fill" id="fill-${m.id}" style="left:0%; width:50%"></div>
-              <input type="range" id="slider-${m.id}" min="${s.min}" max="${s.max}" value="${s.selected}">
+          <!-- Your price -->
+          <div class="slider-row">
+            <div class="slider-row-label">Your Price</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill price-fill" id="price-fill-${m.id}"
+                style="left:0;width:${(s.selected-s.rangeMin)/(s.rangeMax-s.rangeMin)*100}%"></div>
+              <input type="range" class="single" id="price-slider-${m.id}"
+                min="${s.rangeMin}" max="${s.rangeMax}" step="5" value="${s.selected}">
             </div>
-            <div class="slider-labels">
-              <span id="slider-min-${m.id}">${fmt(s.min)}</span>
-              <span class="slider-current" id="slider-label-${m.id}">${fmt(s.selected)}/mo</span>
-              <span id="slider-max-${m.id}">${fmt(s.max)}</span>
-            </div>
+            <div class="slider-row-value green-val" id="price-val-${m.id}">${fmtFull(s.selected)}/mo</div>
           </div>
 
         </div>
@@ -646,41 +612,39 @@
 
       container.appendChild(card);
 
-      // Events
+      // Toggle
       document.getElementById(`toggle-${m.id}`).addEventListener('click', () => {
         state[m.id].enabled = !state[m.id].enabled;
-        updateModelResult(m.id);
+        updateModelUI(m.id);
       });
 
-      document.getElementById(`mrr-${m.id}`).addEventListener('input', e => {
-        state[m.id].mrr = parseInt(e.target.value) || 0;
-        updateModelResult(m.id);
+      // MRR slider
+      document.getElementById(`mrr-slider-${m.id}`).addEventListener('input', e => {
+        state[m.id].mrr = parseInt(e.target.value);
+        updateModelUI(m.id);
       });
 
-      document.getElementById(`min-${m.id}`).addEventListener('input', e => {
-        const val = parseInt(e.target.value) || 0;
-        state[m.id].min = val;
-        state[m.id].selected = clamp(state[m.id].selected, val, state[m.id].max);
-        updateModelResult(m.id);
+      // Range min slider
+      document.getElementById(`range-min-${m.id}`).addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        state[m.id].rangeMin = Math.min(val, state[m.id].rangeMax - 5);
+        state[m.id].selected = clamp(state[m.id].selected, state[m.id].rangeMin, state[m.id].rangeMax);
+        updateModelUI(m.id);
       });
 
-      document.getElementById(`max-${m.id}`).addEventListener('input', e => {
-        const val = parseInt(e.target.value) || 0;
-        state[m.id].max = val;
-        state[m.id].selected = clamp(state[m.id].selected, state[m.id].min, val);
-        updateModelResult(m.id);
+      // Range max slider
+      document.getElementById(`range-max-${m.id}`).addEventListener('input', e => {
+        const val = parseInt(e.target.value);
+        state[m.id].rangeMax = Math.max(val, state[m.id].rangeMin + 5);
+        state[m.id].selected = clamp(state[m.id].selected, state[m.id].rangeMin, state[m.id].rangeMax);
+        updateModelUI(m.id);
       });
 
-      document.getElementById(`slider-${m.id}`).addEventListener('input', e => {
+      // Price slider
+      document.getElementById(`price-slider-${m.id}`).addEventListener('input', e => {
         state[m.id].selected = parseInt(e.target.value);
-        updateSliderFill(m.id);
-        document.getElementById(`fc-charge-${m.id}`).textContent = fmt(state[m.id].selected) + '/mo';
-        document.getElementById(`take-rate-${m.id}`).textContent = pct(state[m.id].selected, state[m.id].mrr);
-        document.getElementById(`slider-label-${m.id}`).textContent = fmt(state[m.id].selected) + '/mo';
-        updateSummary();
+        updateModelUI(m.id);
       });
-
-      updateSliderFill(m.id);
     });
   }
 
