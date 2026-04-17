@@ -845,7 +845,39 @@ function toggleRows() {
   document.getElementById('toggle-btn').textContent = showAll ? 'Show first 12 months' : 'Show all 24 months';
 }
 
+function saveState() {
+  localStorage.setItem('fc-launch-model', JSON.stringify({
+    launch: vals.launch, growth: vals.growth, churn: vals.churn, price: vals.price,
+    targetArr, targetOn,
+  }));
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('fc-launch-model'));
+    if (!s) return;
+    sync('launch', s.launch);
+    sync('growth', s.growth);
+    sync('churn', s.churn);
+    sync('price', s.price);
+    if (s.targetArr) syncTarget(s.targetArr);
+    if (s.targetOn) {
+      document.getElementById('target-toggle').checked = true;
+      toggleTarget();
+    }
+  } catch(e) {}
+}
+
+// Patch sync/syncTarget to auto-save
+const _origSync = sync;
+sync = function(k, v) { _origSync(k, v); saveState(); };
+const _origSyncTarget = syncTarget;
+syncTarget = function(v) { _origSyncTarget(v); saveState(); };
+const _origToggleTarget = toggleTarget;
+toggleTarget = function() { _origToggleTarget(); saveState(); };
+
 // Init
+loadState();
 render();
 </script>
 </body>
