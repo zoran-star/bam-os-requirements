@@ -965,23 +965,17 @@
   function activeSnap() { return snapshots.find(s => s.id === activeSnapId); }
 
   function snapMetrics(snap) {
-    let totalAcad = 0, totalRev = 0, totalRevMin = 0, totalRevMax = 0;
+    let totalPct = 0, weightedRev = 0;
     MODELS.forEach(m => {
       if (!state[m.id].enabled) return;
-      const n = snap.alloc[m.id] || 0;
-      totalAcad    += n;
-      totalRev     += n * state[m.id].selected;
-      totalRevMin  += n * state[m.id].rangeMin;
-      totalRevMax  += n * state[m.id].rangeMax;
+      const pct = snap.alloc[m.id] || 0;
+      totalPct    += pct;
+      weightedRev += pct * state[m.id].selected;
     });
-    return {
-      totalAcad,
-      totalRev,
-      blendedARPU: totalAcad > 0 ? Math.round(totalRev / totalAcad) : 0,
-      arr: totalRev * 12,
-      totalRevMin,
-      totalRevMax,
-    };
+    const blendedARPU = totalPct > 0 ? Math.round(weightedRev / totalPct) : 0;
+    const acadCount   = parseInt(document.getElementById('acad-count')?.value) || 0;
+    const totalRev    = blendedARPU * acadCount;
+    return { totalPct, blendedARPU, totalRev, arr: totalRev * 12, acadCount };
   }
 
   function buildSnapshotSection() {
@@ -1033,12 +1027,12 @@
 
         <div class="snap-results">
           <div class="snap-result-card">
-            <div class="label">Academies</div>
-            <div class="value blue" id="snap-total-acad">${m.totalAcad}</div>
+            <div class="label">% Allocated</div>
+            <div class="value blue" id="snap-total-acad">${m.totalPct}%</div>
           </div>
           <div class="snap-result-card">
             <div class="label">Blended ARPU</div>
-            <div class="value gold" id="snap-arpu">${m.totalAcad > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—'}</div>
+            <div class="value gold" id="snap-arpu">${m.totalPct > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—'}</div>
           </div>
           <div class="snap-result-card">
             <div class="label">FC Revenue / mo</div>
@@ -1055,8 +1049,8 @@
   function updateSnapResults() {
     const snap = activeSnap();
     const m    = snapMetrics(snap);
-    document.getElementById('snap-total-acad').textContent = m.totalAcad;
-    document.getElementById('snap-arpu').textContent = m.totalAcad > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—';
+    document.getElementById('snap-total-acad').textContent = m.totalPct + '%';
+    document.getElementById('snap-arpu').textContent = m.totalPct > 0 ? fmtFull(m.blendedARPU) + '/mo' : '—';
     document.getElementById('snap-rev').textContent  = fmtFull(m.totalRev);
     document.getElementById('snap-arr').textContent  = fmt(m.arr);
   }
@@ -1065,7 +1059,7 @@
     const n = parseInt(rawVal) || 0;
     activeSnap().alloc[modelId] = n;
     document.getElementById(`sf-${modelId}`).style.width = (n / SNAP_ALLOC_MAX * 100) + '%';
-    document.getElementById(`sv-${modelId}`).textContent = n + ' acad.';
+    document.getElementById(`sv-${modelId}`).textContent = n + '%';
     updateSnapResults();
   }
 
