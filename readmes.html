@@ -175,6 +175,56 @@
 
 <div class="main">
 
+<div class="section-label">📁 Main Repo</div>
+
+<!-- ROOT -->
+<div class="card c-gray" id="r-root" style="--gray-bg:#f9fafb;--gray-border:#e5e7eb;">
+  <div class="card-header" onclick="toggle('r-root')" style="border-left-color:#4b5563;">
+    <div class="card-emoji">🗃</div>
+    <div class="card-meta">
+      <div class="card-title">bam-os-requirements</div>
+      <div class="card-path">/ (root)</div>
+    </div>
+    <div class="card-right">
+      <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+    </div>
+  </div>
+  <div class="card-body">
+    <textarea class="readme-textarea" id="rm-root"># bam-os-requirements
+
+## What it's for
+The central repository for FullControl — an AI-native operating system for basketball training academies. This repo holds the product prototype, planning tools, live deployment apps, AI sales agents, and all business planning materials. Everything needed to build, ship, and sell FullControl lives here.
+
+## Who's working on it
+Zoran Savic (founder, product owner), Cole (requirements and design)
+
+## Current status
+Active development. The FullControl prototype is complete. BAM GTA Phase 1 is in backend integration. AI sales agents are live for BAM GTA. Business planning materials are in progress.
+
+## End goal
+Build FullControl into the go-to operating system for basketball academies, then achieve a successful acquisition at $5M–$15M+. Phase 1 at BAM GTA is the first proof point.
+
+## Core blockers
+- BAM GTA backend integration in progress (GHL + Stripe)
+- Exit strategy to be finalised
+
+## Sub-projects
+- **prototype/** — FullControl product prototype (React/Vite, live on Vercel)
+- **whiteboard/** — requirements planning tool (React/Vite, live on Vercel)
+- **market-research/** — market data survey (scrapped, to be reworked)
+- **bam-gta-phase1/** — first live deployment at BAM Basketball GTA
+- **fc-internal-content-engine/** — AI content generation pipeline
+- **sales-conversation-agents/** — AI sales agent system prompts
+- **business/** — investor deck, business plan, and planning materials
+
+## How it all connects
+The prototype is the product vision. The whiteboard drives decisions about what gets built. BAM GTA Phase 1 is the first real-world implementation. The sales agents automate the funnel. The content engine handles marketing. The business materials tell the acquisition story.</textarea>
+    <div class="card-actions">
+      <button class="btn btn-copy" onclick="copy('rm-root', this)">Copy README</button>
+    </div>
+  </div>
+</div>
+
 <div class="section-label">🟢 Live Apps</div>
 
 <!-- PROTOTYPE -->
