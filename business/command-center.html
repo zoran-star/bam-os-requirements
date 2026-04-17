@@ -999,6 +999,12 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 .tl-value { font-size: 17px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
 .tl-value.unreachable { color: #ff5c7a; }
 .val.lm-red { color: #ff5c7a; }
+.lm-scenario-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; text-align: center; flex: 1; min-width: 100px; }
+.lm-scenario-btn.active { background: rgba(91,159,255,0.1); border-color: rgba(91,159,255,0.4); color: var(--text); }
+.lm-scenario-btn:hover:not(.active) { border-color: rgba(255,255,255,0.15); color: var(--text); }
+.lm-scenario-btn .sc-name { display: block; font-size: 13px; font-weight: 700; }
+.lm-scenario-btn .sc-arpu { display: block; font-size: 11px; margin-top: 3px; color: var(--muted); font-weight: 600; }
+.lm-scenario-btn.active .sc-arpu { color: var(--accent2); }
 </style>
 </head>
 <body>
@@ -1369,13 +1375,8 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
           <input type="range" style="width:100%" id="lm-sl-churn" min="0" max="20" step="0.5" value="3" oninput="lmSync('churn', this.value)" />
         </div>
 
-        <div class="input-group-launch">
-          <div class="input-label">
-            <span>Avg Monthly Price</span>
-            <span class="val" style="color:var(--accent4)" id="lm-lbl-price">$499</span>
-          </div>
-          <div class="sub-label">Per new client, per month (USD)</div>
-          <input type="range" style="width:100%" id="lm-sl-price" min="50" max="2000" step="25" value="499" oninput="lmSync('price', this.value)" />
+        <div class="input-group-launch" id="lm-scenario-selector">
+          <!-- populated by lmRenderScenarioSelector() -->
         </div>
 
         <hr class="divider" />
@@ -1740,6 +1741,7 @@ function copySnapText() {
 }
 function exportToLaunchTab() {
   const snap = activeSnap(); const m = snapMetrics(snap);
+  lmSelectedSnapId = snap.id;
   lmSync('launchArpu', m.blendedARPU);
   const btn = document.getElementById('snap-launch-btn');
   btn.textContent = '✓ ARPU set to ' + pFmtFull(m.blendedARPU);
@@ -1761,6 +1763,7 @@ let lmTargetOn = false;
 let lmActiveTab = 'clients';
 let lmShowAll = false;
 let lmChart = null;
+let lmSelectedSnapId = null; // which pricing scenario drives the per-client price
 
 function lmFmt(n) {
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
@@ -1768,6 +1771,43 @@ function lmFmt(n) {
   return '$' + Math.round(n).toLocaleString();
 }
 function lmFmtFull(n) { return '$' + Math.round(n).toLocaleString(); }
+
+function lmGetScenarioPrice() {
+  const id = lmSelectedSnapId || snapshots[0]?.id;
+  const snap = snapshots.find(s => s.id === id) || snapshots[0];
+  if (!snap) return lmVals.price;
+  const m = snapMetrics(snap);
+  return m.blendedARPU > 0 ? m.blendedARPU : lmVals.price;
+}
+
+function lmSelectScenario(snapId) {
+  lmSelectedSnapId = snapId;
+  lmVals.price = lmGetScenarioPrice();
+  lmSaveState();
+  lmRender();
+}
+
+function lmRenderScenarioSelector() {
+  const container = document.getElementById('lm-scenario-selector');
+  if (!container) return;
+  const activeId = lmSelectedSnapId || snapshots[0]?.id;
+  const tabs = snapshots.map(snap => {
+    const m = snapMetrics(snap);
+    const isActive = snap.id === activeId;
+    return `<button class="lm-scenario-btn ${isActive ? 'active' : ''}" onclick="lmSelectScenario('${snap.id}')">
+      <span class="sc-name">${snap.name}</span>
+      <span class="sc-arpu">${m.blendedARPU > 0 ? pFmtFull(m.blendedARPU) + '/mo' : '—'}</span>
+    </button>`;
+  }).join('');
+  container.innerHTML = `
+    <div class="input-label">
+      <span>New Client Price</span>
+      <span class="val" style="color:var(--accent4)">${pFmtFull(lmVals.price)}/mo</span>
+    </div>
+    <div class="sub-label">Blended ARPU from your pricing scenario</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${tabs}</div>
+  `;
+}
 
 function lmSync(key, raw) {
   const v = parseFloat(raw) || 0;
@@ -1829,6 +1869,10 @@ function lmBuildProjection() {
 }
 
 function lmRender() {
+  // Always pull price from the selected pricing scenario
+  lmVals.price = lmGetScenarioPrice();
+  lmRenderScenarioSelector();
+
   const rows = lmBuildProjection();
   const { price, churn } = lmVals;
   const churnRate = churn / 100;
@@ -1970,7 +2014,7 @@ function lmToggleRows() {
 }
 
 function lmSaveState() {
-  localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, targetOn: lmTargetOn }));
+  localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, targetOn: lmTargetOn, selectedSnapId: lmSelectedSnapId }));
 }
 
 function lmLoadState() {
@@ -2004,6 +2048,7 @@ function lmLoadState() {
       document.getElementById('lm-target-inputs')?.classList.add('visible');
       document.getElementById('lm-timeline-display')?.classList.add('visible');
     }
+    if (s.selectedSnapId) lmSelectedSnapId = s.selectedSnapId;
   } catch(e) {}
 }
 
