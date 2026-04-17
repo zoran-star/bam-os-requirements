@@ -1119,23 +1119,63 @@
   }
 
   function copySnapText() {
-    const snap = activeSnap();
-    const m    = snapMetrics(snap);
+    const acadCount = parseInt(document.getElementById('acad-count')?.value) || 0;
+    const D = '─'.repeat(48);
     const lines = [
-      `FullControl — ${snap.name}`,
-      '─'.repeat(40),
+      'FULLCONTROL PRICING CALCULATOR',
+      D,
+      '',
+      '── PRICING BY BUSINESS MODEL ──',
+      '',
     ];
+
     MODELS.forEach(mod => {
-      const n = snap.alloc[mod.id] || 0;
-      if (n === 0) return;
-      const rev = n * state[mod.id].selected;
-      lines.push(`${mod.name}: ${n}% @ ${fmtFull(state[mod.id].selected)}/mo`);
+      const s = state[mod.id];
+      if (!s.enabled) return;
+      lines.push(`${mod.name}`);
+      if (mod.isTrainingType) {
+        lines.push(`  Clients: ${s.clients}  |  ARPU: ${fmtFull(s.arpu)}/mo  |  Academy MRR: ${fmtFull(s.mrr)}/mo`);
+      } else {
+        lines.push(`  Academy MRR: ${fmtFull(s.mrr)}/mo`);
+      }
+      lines.push(`  FC Price Range: ${fmtFull(s.rangeMin)} – ${fmtFull(s.rangeMax)}/mo`);
+      lines.push(`  FC Your Price:  ${fmtFull(s.selected)}/mo  (${s.mrr > 0 ? (s.selected/s.mrr*100).toFixed(1) + '% of MRR' : '—'})`);
+      lines.push('');
     });
-    lines.push('─'.repeat(40));
-    lines.push(`Total academies:  ${m.totalAcad}`);
-    lines.push(`Blended ARPU:     ${fmtFull(m.blendedARPU)}/mo`);
-    lines.push(`FC Revenue / mo:  ${fmtFull(m.totalRev)}`);
-    lines.push(`ARR:              ${fmt(m.arr)}`);
+
+    lines.push(D);
+    lines.push('');
+    lines.push('── LAUNCH SCENARIOS ──');
+    lines.push('');
+
+    snapshots.forEach(snap => {
+      const m = snapMetrics(snap);
+      lines.push(`${snap.name}`);
+      MODELS.forEach(mod => {
+        const pct = snap.alloc[mod.id] || 0;
+        if (!state[mod.id].enabled) return;
+        lines.push(`  ${mod.name}: ${pct}% @ ${fmtFull(state[mod.id].selected)}/mo`);
+      });
+      lines.push(`  % Allocated: ${m.totalPct}%  |  Blended ARPU: ${fmtFull(m.blendedARPU)}/mo`);
+      lines.push(`  FC Revenue/mo: ${fmtFull(m.totalRev)}  |  ARR: ${fmt(m.arr)}  (${acadCount} academies)`);
+      lines.push('');
+    });
+
+    lines.push(D);
+    lines.push('');
+    lines.push('── ARR PROJECTION ──');
+    lines.push('');
+    let totalMin = 0, totalSel = 0, totalMax = 0;
+    MODELS.forEach(mod => {
+      const s = state[mod.id];
+      if (!s.enabled) return;
+      totalMin += s.rangeMin; totalSel += s.selected; totalMax += s.rangeMax;
+    });
+    lines.push(`Academies modelled: ${acadCount}`);
+    lines.push(`ARR floor:    ${fmt(totalMin * 12 * acadCount)}`);
+    lines.push(`ARR selected: ${fmt(totalSel * 12 * acadCount)}`);
+    lines.push(`ARR ceiling:  ${fmt(totalMax * 12 * acadCount)}`);
+
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       const btn = document.getElementById('snap-text-btn');
       btn.textContent = '✓ Copied!';
