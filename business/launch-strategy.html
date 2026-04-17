@@ -506,7 +506,7 @@ hr.section-div {
 </head>
 <body>
 
-<button class="export-btn" id="export-btn" onclick="exportNotes()">Export Notes</button>
+<button class="export-btn" id="export-btn" onclick="exportNotes()">Save &amp; Share</button>
 
 <div class="shell">
 
@@ -550,6 +550,7 @@ hr.section-div {
       <div class="eyebrow">Workshop Document</div>
       <h1>Launch Strategy</h1>
       <p class="subtitle">Working document for workshopping how FullControl gets to market — distribution activation, sales motion, positioning, and launch readiness. This is the tactical layer.</p>
+      <div style="font-size:11px; color:var(--muted); margin-top:8px;" id="save-info"></div>
       <div class="status-row">
         <div class="status-pill"><span class="dot dot-green"></span> Distribution model confirmed</div>
         <div class="status-pill"><span class="dot dot-yellow"></span> Sales motion in progress</div>
@@ -1011,66 +1012,97 @@ hr.section-div {
 </div>
 
 <script>
-  // Highlight active nav link on scroll
+  // ── Nav scroll highlight ──
   const sections = document.querySelectorAll('.section[id]');
   const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
-
   const observer = new IntersectionObserver(entries => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        navLinks.forEach(link => link.classList.remove('active'));
-        const active = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
-        if (active) active.classList.add('active');
+        navLinks.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+        if (a) a.classList.add('active');
       }
     });
   }, { threshold: 0.3 });
-
   sections.forEach(s => observer.observe(s));
 
-  // Persist notes in localStorage
-  document.querySelectorAll('textarea').forEach((ta, i) => {
-    const key = 'fc-launch-notes-' + i;
-    const saved = localStorage.getItem(key);
-    if (saved) ta.value = saved;
-    ta.addEventListener('input', () => localStorage.setItem(key, ta.value));
-  });
+  // ── State helpers ──
+  const LS_KEY = 'fc-launch-state';
 
-  // Export all notes grouped by section
-  const sectionMeta = [
-    { id: 'phases', title: 'Phase Overview', fields: ['Phase 0', 'Phase 1', 'Phase 2', 'Phase 3', 'Phase strategy notes'] },
-    { id: 'distribution', title: 'Distribution Engine', fields: ['Coleman / BAM Brand', 'Existing Network', 'Organic / Content', 'Cold Outreach', 'Partnerships', 'Referrals', 'Distribution strategy notes'] },
-    { id: 'sales-motion', title: 'Sales Motion', fields: ['Who\'s Selling', 'Sales Cycle Length', 'Trial / Pilot Model', 'Sales motion notes'] },
-    { id: 'positioning', title: 'Positioning', fields: ['One-Line Pitch', 'Three Angles (Holy Trinity)', 'Target Archetypes', 'Positioning notes'] },
-    { id: 'launch-readiness', title: 'Launch Readiness', fields: ['Product', 'Infrastructure', 'Team', 'Sales Assets', 'Launch readiness notes'] },
-    { id: 'open-decisions', title: 'Open Decisions', fields: ['New decisions to track'] },
-  ];
+  function getTextareas() {
+    return Array.from(document.querySelectorAll('textarea'));
+  }
 
+  function readValues() {
+    return getTextareas().map(ta => ta.value);
+  }
+
+  function writeValues(values) {
+    getTextareas().forEach((ta, i) => {
+      if (values[i] !== undefined) ta.value = values[i];
+    });
+  }
+
+  function saveToLocalStorage() {
+    const state = { savedAt: Date.now(), values: readValues() };
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  }
+
+  // Wire up autosave to localStorage on every keystroke
+  getTextareas().forEach(ta => ta.addEventListener('input', saveToLocalStorage));
+
+  // ── Load state: JSON file is shared baseline, localStorage wins if newer ──
+  async function loadState() {
+    let fileState = null;
+    try {
+      const res = await fetch('./launch-strategy-state.json?nocache=' + Date.now());
+      if (res.ok) fileState = await res.json();
+    } catch(e) {}
+
+    let lsState = null;
+    try { lsState = JSON.parse(localStorage.getItem(LS_KEY)); } catch(e) {}
+
+    // Pick whichever is newer
+    if (lsState && fileState) {
+      const source = lsState.savedAt >= fileState.savedAt ? lsState : fileState;
+      writeValues(source.values);
+    } else if (lsState) {
+      writeValues(lsState.values);
+    } else if (fileState) {
+      writeValues(fileState.values);
+      saveToLocalStorage(); // seed localStorage from file
+    }
+
+    // Show last-saved info
+    const source = (lsState && fileState)
+      ? (lsState.savedAt >= fileState.savedAt ? lsState : fileState)
+      : (lsState || fileState);
+    if (source) {
+      const d = new Date(source.savedAt);
+      document.getElementById('save-info').textContent =
+        `Last saved ${d.toLocaleDateString('en-CA')} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+    }
+  }
+
+  loadState();
+
+  // ── Save & Share: downloads launch-strategy-state.json ──
   function exportNotes() {
-    const allTextareas = Array.from(document.querySelectorAll('textarea'));
-    let taIndex = 0;
-    const sectionTextareas = sectionMeta.map(sec => {
-      const fields = sec.fields.map(label => ({ label, value: allTextareas[taIndex++]?.value?.trim() || '' }));
-      return { ...sec, fields };
-    });
+    const state = { savedAt: Date.now(), values: readValues() };
+    saveToLocalStorage();
 
-    const lines = ['# FullControl Launch Strategy — Notes Export', `_${new Date().toLocaleDateString('en-CA')}_`, ''];
-    sectionTextareas.forEach(sec => {
-      const hasContent = sec.fields.some(f => f.value);
-      if (!hasContent) return;
-      lines.push(`## ${sec.title}`);
-      sec.fields.forEach(f => {
-        if (f.value) lines.push(`**${f.label}:** ${f.value}`);
-      });
-      lines.push('');
-    });
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'launch-strategy-state.json';
+    a.click();
+    URL.revokeObjectURL(url);
 
-    const output = lines.join('\n');
-    navigator.clipboard.writeText(output).then(() => {
-      const btn = document.getElementById('export-btn');
-      btn.textContent = 'Copied!';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Export Notes'; btn.classList.remove('copied'); }, 2000);
-    });
+    const btn = document.getElementById('export-btn');
+    btn.textContent = 'Downloaded — commit the file!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Save & Share'; btn.classList.remove('copied'); }, 3000);
   }
 </script>
 </body>
