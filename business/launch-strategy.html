@@ -228,9 +228,10 @@ body {
   height: 3px;
 }
 .phase-card.p0::before { background: var(--muted); }
-.phase-card.p1::before { background: var(--accent); }
-.phase-card.p2::before { background: var(--accent2); }
-.phase-card.p3::before { background: var(--accent3); }
+.phase-card.p1::before { background: var(--muted); }
+.phase-card.p2::before { background: var(--accent); }
+.phase-card.p3::before { background: var(--accent2); }
+.phase-card.p4::before { background: var(--accent3); }
 
 .phase-label {
   font-size: 10px;
@@ -240,9 +241,58 @@ body {
   margin-bottom: 6px;
 }
 .phase-card.p0 .phase-label { color: var(--muted); }
-.phase-card.p1 .phase-label { color: var(--accent); }
-.phase-card.p2 .phase-label { color: var(--accent2); }
-.phase-card.p3 .phase-label { color: var(--accent3); }
+.phase-card.p1 .phase-label { color: var(--muted); }
+.phase-card.p2 .phase-label { color: var(--accent); }
+.phase-card.p3 .phase-label { color: var(--accent2); }
+.phase-card.p4 .phase-label { color: var(--accent3); }
+
+/* ── Sub-phase rows (Phase 2 detail) ── */
+.subphase-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.subphase-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.sp1 { background: var(--accent2); }
+.sp2 { background: var(--accent3); }
+.sp3 { background: var(--accent5); }
+.sp4 { background: var(--accent4); }
+.subphase-content { flex: 1; }
+.subphase-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.subphase-tag {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 2px 9px;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+}
+.subphase-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.subphase-desc strong { color: var(--text); }
 
 .phase-title {
   font-size: 13px;
@@ -567,48 +617,89 @@ hr.section-div {
         <span class="section-number">01</span>
         <span class="section-title">Phase Overview</span>
       </div>
-      <p class="section-desc">Four phases from internal beta to fitness studio expansion. Each phase has a clear focus and target segment.</p>
+      <p class="section-desc">Four phases. Each phase is both a distribution milestone and a product build milestone — new clients require new features before they can onboard.</p>
 
+      <!-- Top-level phase strip -->
       <div class="phase-grid">
-        <div class="phase-card p0">
-          <div class="phase-label">Phase 0</div>
-          <div class="phase-title">Internal Beta</div>
-          <div class="phase-timing">Pre-launch</div>
-          <div class="phase-goal"><strong>BAM academies + consulting clients.</strong> High-volume feedback. Validate product across team sports, individual sports, and fitness before market launch.</div>
-          <div class="notes-wrap" style="margin-top:12px">
-            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 0..."></textarea>
-          </div>
-        </div>
         <div class="phase-card p1">
           <div class="phase-label">Phase 1</div>
-          <div class="phase-title">Basketball Launch</div>
-          <div class="phase-timing">Months 0–6</div>
-          <div class="phase-goal">Leverage existing network. <strong>100–200 basketball academies in first 90 days.</strong> Test traction in other team sports after month 3.</div>
+          <div class="phase-title">BAM GTA</div>
+          <div class="phase-timing">Internal beta</div>
+          <div class="phase-goal"><strong>Zoran's own academy.</strong> Validate core product, collect bugs and feature creeps, connect backend. Training Classes model (core).</div>
           <div class="notes-wrap" style="margin-top:12px">
             <textarea class="notes-field" rows="2" placeholder="Notes on Phase 1..."></textarea>
           </div>
         </div>
         <div class="phase-card p2">
           <div class="phase-label">Phase 2</div>
-          <div class="phase-title">All Sports</div>
-          <div class="phase-timing">Months 6–18</div>
-          <div class="phase-goal">Pick <strong>2–3 team sports.</strong> Create content, find partners, sponsor events. Goal: 300 non-basketball academies by Month 12.</div>
+          <div class="phase-title">BAM Business Clients</div>
+          <div class="phase-timing">23 active clients — all basketball</div>
+          <div class="phase-goal">Sequential rollout by business model. <strong>Each sub-group requires PRD + prototype updates + backend before onboarding.</strong> External sales begin when GTA similars go live.</div>
           <div class="notes-wrap" style="margin-top:12px">
             <textarea class="notes-field" rows="2" placeholder="Notes on Phase 2..."></textarea>
           </div>
         </div>
         <div class="phase-card p3">
           <div class="phase-label">Phase 3</div>
-          <div class="phase-title">Fitness</div>
-          <div class="phase-timing">Months 18+</div>
-          <div class="phase-goal">Fitness studios. <strong>More catered approach</strong> leveraging proven product and expanded operator network.</div>
+          <div class="phase-title">FC Basketball Launch</div>
+          <div class="phase-timing">All basketball academies outside BAM Business</div>
+          <div class="phase-goal">Gated on <strong>all 23 BAM Business clients live.</strong> Pre-marketing starts during Phase 2. Zoran leads sales.</div>
           <div class="notes-wrap" style="margin-top:12px">
             <textarea class="notes-field" rows="2" placeholder="Notes on Phase 3..."></textarea>
           </div>
         </div>
+        <div class="phase-card p4">
+          <div class="phase-label">Phase 4</div>
+          <div class="phase-title">Second Industry</div>
+          <div class="phase-timing">TBD — Cole researching</div>
+          <div class="phase-goal">Beta testers from second sport first. Then full launch. Then <strong>rinse and repeat</strong> for all industries.</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 4..."></textarea>
+          </div>
+        </div>
       </div>
 
-      <div class="notes-wrap">
+      <!-- Phase 2 sub-group detail -->
+      <div style="margin-top:20px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:var(--accent);margin-bottom:12px;">Phase 2 — Rollout Sequence</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+
+          <div class="subphase-row">
+            <div class="subphase-marker sp1"></div>
+            <div class="subphase-content">
+              <div class="subphase-title">2a — GTA Similars <span class="subphase-tag">Training Classes (standard)</span></div>
+              <div class="subphase-desc">Same business model as BAM GTA. No new features needed — connect backend, onboard. <strong>Sales to external basketball academies begin here.</strong></div>
+            </div>
+          </div>
+
+          <div class="subphase-row">
+            <div class="subphase-marker sp2"></div>
+            <div class="subphase-content">
+              <div class="subphase-title">2b — Miami <span class="subphase-tag">Adds: Gym Rental module</span></div>
+              <div class="subphase-desc">Miami clients run gym rentals as a revenue stream. FC builds Gym Rental module ($99–$249/mo) before they onboard. Update PRDs + prototype to support this business model.</div>
+            </div>
+          </div>
+
+          <div class="subphase-row">
+            <div class="subphase-marker sp3"></div>
+            <div class="subphase-content">
+              <div class="subphase-title">2c — San Diego <span class="subphase-tag">Adds: Multi-location support</span></div>
+              <div class="subphase-desc">San Diego clients operate multiple locations. FC builds multi-location feature before they onboard. Update PRDs + prototype to support this architecture.</div>
+            </div>
+          </div>
+
+          <div class="subphase-row">
+            <div class="subphase-marker sp4"></div>
+            <div class="subphase-content">
+              <div class="subphase-title">2d — Rest of BAM Business <span class="subphase-tag">All 23 clients live</span></div>
+              <div class="subphase-desc">Remaining BAM Business academies onboard. Pre-marketing to the broader basketball market begins here. Gate clears for Phase 3.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="notes-wrap" style="margin-top:16px;">
         <div class="notes-label">Phase strategy notes</div>
         <textarea class="notes-field" rows="3" placeholder="Overall phase strategy, timing decisions, dependencies..."></textarea>
       </div>
