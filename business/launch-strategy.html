@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FullControl — Launch Strategy Workshop</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0b0d12;
+  --surface: #131720;
+  --surface2: #1a1f2e;
+  --border: #252b3d;
+  --text: #e2e5f0;
+  --muted: #6b7494;
+  --accent: #7c6af7;
+  --accent2: #38d9a9;
+  --accent3: #f5a623;
+  --accent4: #e05c7a;
+  --accent5: #5b9fff;
+  --radius: 12px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ── Layout ── */
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+/* ── Sidebar nav ── */
+.sidenav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 28px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.sidenav-header {
+  padding: 0 20px 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.sidenav-header .brand {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.sidenav-header .doc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 12px 20px 6px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+}
+.nav-link:hover { color: var(--text); background: var(--surface2); }
+.nav-link.active { color: var(--text); border-left-color: var(--accent); background: rgba(124,106,247,0.06); }
+.nav-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ── Main content ── */
+.main {
+  padding: 40px 48px 80px;
+  max-width: 900px;
+}
+
+.page-header {
+  margin-bottom: 48px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+.page-header .eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.page-header h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  margin-bottom: 8px;
+}
+.page-header .subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 560px;
+}
+.status-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.status-pill .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.dot-green { background: var(--accent2); }
+.dot-yellow { background: var(--accent3); }
+.dot-red { background: var(--accent4); }
+.dot-blue { background: var(--accent5); }
+.dot-purple { background: var(--accent); }
+
+/* ── Sections ── */
+.section {
+  margin-bottom: 56px;
+  scroll-margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.section-number {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  min-width: 28px;
+}
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+.section-desc {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 20px;
+  padding-left: 40px;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 12px;
+}
+.card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.card-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.card-body strong { color: var(--text); }
+
+/* ── Phase timeline ── */
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.phase-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.phase-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.phase-card.p0::before { background: var(--muted); }
+.phase-card.p1::before { background: var(--accent); }
+.phase-card.p2::before { background: var(--accent2); }
+.phase-card.p3::before { background: var(--accent3); }
+
+.phase-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.phase-card.p0 .phase-label { color: var(--muted); }
+.phase-card.p1 .phase-label { color: var(--accent); }
+.phase-card.p2 .phase-label { color: var(--accent2); }
+.phase-card.p3 .phase-label { color: var(--accent3); }
+
+.phase-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.phase-timing {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.phase-goal {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.phase-goal strong { color: var(--text); }
+
+/* ── Funnel ── */
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.funnel-stage {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s;
+  cursor: default;
+}
+.funnel-stage:hover { border-color: var(--accent); }
+.funnel-icon {
+  font-size: 18px;
+  min-width: 28px;
+  text-align: center;
+}
+.funnel-content { flex: 1; }
+.funnel-name {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.funnel-detail {
+  font-size: 12px;
+  color: var(--muted);
+}
+.funnel-stat {
+  text-align: right;
+  min-width: 80px;
+}
+.funnel-stat .stat-val {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.funnel-stat .stat-lbl {
+  font-size: 10px;
+  color: var(--muted);
+}
+.funnel-arrow {
+  text-align: center;
+  color: var(--border);
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ── Channel grid ── */
+.channel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.channel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.channel-icon { font-size: 24px; margin-bottom: 10px; }
+.channel-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.channel-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.channel-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.tag-primary { color: var(--accent2); border-color: rgba(56,217,169,0.2); }
+.tag-secondary { color: var(--accent3); border-color: rgba(245,166,35,0.2); }
+.tag-test { color: var(--muted); }
+
+/* ── Decision table ── */
+.decision-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+.decision-table th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.decision-table td {
+  font-size: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--surface2);
+  vertical-align: top;
+}
+.decision-table tr:last-child td { border-bottom: none; }
+.decision-table tr:hover td { background: var(--surface); }
+.td-q { color: var(--text); font-weight: 600; }
+.td-status { white-space: nowrap; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 100px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.badge-open { background: rgba(224,92,122,0.1); color: var(--accent4); }
+.badge-decided { background: rgba(56,217,169,0.1); color: var(--accent2); }
+.badge-tbd { background: rgba(107,116,148,0.15); color: var(--muted); }
+.badge-workshop { background: rgba(124,106,247,0.1); color: var(--accent); }
+
+/* ── Positioning grid ── */
+.pos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pos-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+.pos-card .pos-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.pos-card.them .pos-label { color: var(--accent4); }
+.pos-card.us .pos-label { color: var(--accent2); }
+.pos-card ul { list-style: none; }
+.pos-card ul li {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--surface2);
+  padding-left: 14px;
+  position: relative;
+}
+.pos-card ul li:last-child { border-bottom: none; }
+.pos-card ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.pos-card.them ul li::before { background: rgba(224,92,122,0.5); }
+.pos-card.us ul li::before { background: var(--accent2); }
+.pos-card ul li strong { color: var(--text); }
+
+/* ── Notes field ── */
+.notes-wrap {
+  margin-top: 12px;
+}
+.notes-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.notes-field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.6;
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 72px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.notes-field:focus { border-color: var(--accent); }
+.notes-field::placeholder { color: var(--muted); opacity: 0.6; }
+
+/* ── Divider ── */
+hr.section-div {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 40px 0;
+}
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidenav { display: none; }
+  .main { padding: 24px 20px 60px; }
+  .phase-grid { grid-template-columns: repeat(2, 1fr); }
+  .channel-grid { grid-template-columns: repeat(2, 1fr); }
+  .pos-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <nav class="sidenav">
+    <div class="sidenav-header">
+      <div class="brand">FullControl</div>
+      <div class="doc-title">Launch Strategy</div>
+    </div>
+
+    <div class="nav-section-label">Sections</div>
+    <a class="nav-link active" href="#phases">
+      <span class="nav-dot" style="background:var(--accent)"></span> Phase Overview
+    </a>
+    <a class="nav-link" href="#distribution">
+      <span class="nav-dot" style="background:var(--accent2)"></span> Distribution Engine
+    </a>
+    <a class="nav-link" href="#sales-motion">
+      <span class="nav-dot" style="background:var(--accent3)"></span> Sales Motion
+    </a>
+    <a class="nav-link" href="#positioning">
+      <span class="nav-dot" style="background:var(--accent5)"></span> Positioning
+    </a>
+    <a class="nav-link" href="#launch-readiness">
+      <span class="nav-dot" style="background:var(--accent4)"></span> Launch Readiness
+    </a>
+    <a class="nav-link" href="#open-decisions">
+      <span class="nav-dot" style="background:var(--muted)"></span> Open Decisions
+    </a>
+
+    <div class="nav-section-label" style="margin-top:24px">Related</div>
+    <a class="nav-link" href="launch-plan.html">Financial Model</a>
+    <a class="nav-link" href="business/fullcontrol-investor-playbook.html">Investor Playbook</a>
+    <a class="nav-link" href="business/plan.html">Business Plan</a>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <div class="page-header">
+      <div class="eyebrow">Workshop Document</div>
+      <h1>Launch Strategy</h1>
+      <p class="subtitle">Working document for workshopping how FullControl gets to market — distribution activation, sales motion, positioning, and launch readiness. This is the tactical layer.</p>
+      <div class="status-row">
+        <div class="status-pill"><span class="dot dot-green"></span> Distribution model confirmed</div>
+        <div class="status-pill"><span class="dot dot-yellow"></span> Sales motion in progress</div>
+        <div class="status-pill"><span class="dot dot-purple"></span> Exit planning coming</div>
+        <div class="status-pill"><span class="dot dot-blue"></span> Expansion path expanding</div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════
+         1. PHASE OVERVIEW
+    ══════════════════════════════════ -->
+    <section class="section" id="phases">
+      <div class="section-header">
+        <span class="section-number">01</span>
+        <span class="section-title">Phase Overview</span>
+      </div>
+      <p class="section-desc">Four phases from internal beta to fitness studio expansion. Each phase has a clear focus and target segment.</p>
+
+      <div class="phase-grid">
+        <div class="phase-card p0">
+          <div class="phase-label">Phase 0</div>
+          <div class="phase-title">Internal Beta</div>
+          <div class="phase-timing">Pre-launch</div>
+          <div class="phase-goal"><strong>BAM academies + consulting clients.</strong> High-volume feedback. Validate product across team sports, individual sports, and fitness before market launch.</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 0..."></textarea>
+          </div>
+        </div>
+        <div class="phase-card p1">
+          <div class="phase-label">Phase 1</div>
+          <div class="phase-title">Basketball Launch</div>
+          <div class="phase-timing">Months 0–6</div>
+          <div class="phase-goal">Leverage existing network. <strong>100–200 basketball academies in first 90 days.</strong> Test traction in other team sports after month 3.</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 1..."></textarea>
+          </div>
+        </div>
+        <div class="phase-card p2">
+          <div class="phase-label">Phase 2</div>
+          <div class="phase-title">All Sports</div>
+          <div class="phase-timing">Months 6–18</div>
+          <div class="phase-goal">Pick <strong>2–3 team sports.</strong> Create content, find partners, sponsor events. Goal: 300 non-basketball academies by Month 12.</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 2..."></textarea>
+          </div>
+        </div>
+        <div class="phase-card p3">
+          <div class="phase-label">Phase 3</div>
+          <div class="phase-title">Fitness</div>
+          <div class="phase-timing">Months 18+</div>
+          <div class="phase-goal">Fitness studios. <strong>More catered approach</strong> leveraging proven product and expanded operator network.</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="2" placeholder="Notes on Phase 3..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-label">Phase strategy notes</div>
+        <textarea class="notes-field" rows="3" placeholder="Overall phase strategy, timing decisions, dependencies..."></textarea>
+      </div>
+    </section>
+
+    <hr class="section-div" />
+
+    <!-- ══════════════════════════════════
+         2. DISTRIBUTION ENGINE
+    ══════════════════════════════════ -->
+    <section class="section" id="distribution">
+      <div class="section-header">
+        <span class="section-number">02</span>
+        <span class="section-title">Distribution Engine</span>
+      </div>
+      <p class="section-desc">How we actually get in front of academy owners. Three channels — each needs a specific activation plan.</p>
+
+      <div class="channel-grid">
+        <div class="channel-card">
+          <div class="channel-icon">🏀</div>
+          <div class="channel-name">Coleman / BAM Brand</div>
+          <div class="channel-desc">500K+ followers. 5 locations. 10K+ athletes. The most recognizable brand in basketball training — direct distribution to day-one users.</div>
+          <div class="channel-tag tag-primary">PRIMARY</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="How does this channel actually get activated? Content strategy, DMs, referrals, events?"></textarea>
+          </div>
+        </div>
+        <div class="channel-card">
+          <div class="channel-icon">🤝</div>
+          <div class="channel-name">Existing Network</div>
+          <div class="channel-desc">Consulting clients across team sports — soccer, volleyball, baseball, martial arts. Pre-validated relationships with beta access.</div>
+          <div class="channel-tag tag-primary">PRIMARY</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="How many contacts? Warm outreach sequence? Who owns the relationship?"></textarea>
+          </div>
+        </div>
+        <div class="channel-card">
+          <div class="channel-icon">📣</div>
+          <div class="channel-name">Organic / Content</div>
+          <div class="channel-desc">Content marketing, social proof, word-of-mouth from early customers. Long-term flywheel — starts slow, compounds.</div>
+          <div class="channel-tag tag-secondary">SECONDARY</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="What content? Which platforms? What's the content angle (results, behind-the-scenes, education)?"></textarea>
+          </div>
+        </div>
+        <div class="channel-card">
+          <div class="channel-icon">🎯</div>
+          <div class="channel-name">Cold Outreach</div>
+          <div class="channel-desc">Targeted outreach to basketball academies not in the existing network. Needs ICP definition and a sequenced playbook.</div>
+          <div class="channel-tag tag-test">WORKSHOP</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="ICP definition, outreach sequence, who does this, what's the conversion target?"></textarea>
+          </div>
+        </div>
+        <div class="channel-card">
+          <div class="channel-icon">🤜</div>
+          <div class="channel-name">Partnerships</div>
+          <div class="channel-desc">Associations, league operators, event sponsors, equipment brands. Access to concentrated groups of academy owners.</div>
+          <div class="channel-tag tag-test">WORKSHOP</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="Which associations or leagues? What's the partnership model? Revenue share, co-marketing?"></textarea>
+          </div>
+        </div>
+        <div class="channel-card">
+          <div class="channel-icon">🗣️</div>
+          <div class="channel-name">Referrals</div>
+          <div class="channel-desc">Academy owners talk to each other. A strong referral mechanism turns every customer into a distribution node.</div>
+          <div class="channel-tag tag-test">WORKSHOP</div>
+          <div class="notes-wrap" style="margin-top:12px">
+            <textarea class="notes-field" rows="3" placeholder="What's the referral incentive? When do we ask? How is it tracked?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-label">Distribution strategy notes</div>
+        <textarea class="notes-field" rows="3" placeholder="Overall distribution strategy, channel priority order, what we're testing first..."></textarea>
+      </div>
+    </section>
+
+    <hr class="section-div" />
+
+    <!-- ══════════════════════════════════
+         3. SALES MOTION
+    ══════════════════════════════════ -->
+    <section class="section" id="sales-motion">
+      <div class="section-header">
+        <span class="section-number">03</span>
+        <span class="section-title">Sales Motion</span>
+      </div>
+      <p class="section-desc">The funnel from awareness to paying customer. Who's selling, what's the process, what does conversion look like.</p>
+
+      <div class="funnel">
+        <div class="funnel-stage">
+          <div class="funnel-icon">👋</div>
+          <div class="funnel-content">
+            <div class="funnel-name">Awareness</div>
+            <div class="funnel-detail">Academy owner learns FullControl exists — via Coleman's content, referral, cold outreach, or event</div>
+          </div>
+          <div class="funnel-stat">
+            <div class="stat-val" style="color:var(--accent)">?</div>
+            <div class="stat-lbl">leads/mo target</div>
+          </div>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-stage">
+          <div class="funnel-icon">💬</div>
+          <div class="funnel-content">
+            <div class="funnel-name">Conversation</div>
+            <div class="funnel-detail">Initial call or DM — qualify the lead, understand their current setup, identify the pain</div>
+          </div>
+          <div class="funnel-stat">
+            <div class="stat-val" style="color:var(--accent2)">?</div>
+            <div class="stat-lbl">conv rate</div>
+          </div>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-stage">
+          <div class="funnel-icon">🎬</div>
+          <div class="funnel-content">
+            <div class="funnel-name">Demo / Trial</div>
+            <div class="funnel-detail">Walkthrough of the product — show the automation, the dashboard, the AI. Free trial or pilot period?</div>
+          </div>
+          <div class="funnel-stat">
+            <div class="stat-val" style="color:var(--accent3)">?</div>
+            <div class="stat-lbl">conv rate</div>
+          </div>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-stage">
+          <div class="funnel-icon">🚀</div>
+          <div class="funnel-content">
+            <div class="funnel-name">Onboarding</div>
+            <div class="funnel-detail">Academy owner is live — data entered, integrations connected, automations running</div>
+          </div>
+          <div class="funnel-stat">
+            <div class="stat-val" style="color:var(--accent5)">?</div>
+            <div class="stat-lbl">days to live</div>
+          </div>
+        </div>
+        <div class="funnel-arrow">↓</div>
+        <div class="funnel-stage">
+          <div class="funnel-icon">💰</div>
+          <div class="funnel-content">
+            <div class="funnel-name">Paying Customer</div>
+            <div class="funnel-detail">First charge clears — customer is retained and on the growth flywheel</div>
+          </div>
+          <div class="funnel-stat">
+            <div class="stat-val" style="color:var(--accent2)">$499</div>
+            <div class="stat-lbl">avg MRR / customer</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-label" style="color:var(--accent3)">Who's Selling</div>
+        <div class="card-body">
+          <strong>Zoran</strong> — founder-led sales in Phase 1. This is intentional: the founder should own the first 20–30 customers to learn objections, refine positioning, and build the playbook before handing off.
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Who else is in the sales motion? Coleman? A dedicated SDR at some point? When does it stop being founder-led?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent)">Sales Cycle Length</div>
+        <div class="card-body">
+          Target SMB operators — should be fast. <strong>Days to weeks, not months.</strong> Typical objections: cost, "I already use X", time to set up, trust.
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="What's the expected sales cycle for a typical academy owner? What's the blocker at each stage?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent2)">Trial / Pilot Model</div>
+        <div class="card-body">
+          Do we offer a free trial, a paid pilot, or go straight to subscription? <strong>Decision needed.</strong>
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Free trial? Paid pilot at a discount? What's the duration? What's the conversion trigger?"></textarea>
+        </div>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-label">Sales motion notes</div>
+        <textarea class="notes-field" rows="3" placeholder="Overall sales strategy, key decisions, what we want to workshop..."></textarea>
+      </div>
+    </section>
+
+    <hr class="section-div" />
+
+    <!-- ══════════════════════════════════
+         4. POSITIONING
+    ══════════════════════════════════ -->
+    <section class="section" id="positioning">
+      <div class="section-header">
+        <span class="section-number">04</span>
+        <span class="section-title">Positioning</span>
+      </div>
+      <p class="section-desc">Why FullControl, not the incumbent. The message that lands with academy owners in the first 30 seconds.</p>
+
+      <div class="pos-grid">
+        <div class="pos-card them">
+          <div class="pos-label">Current Tools (Them)</div>
+          <ul>
+            <li><strong>CoachIQ, Upper Hand, TeamSnap:</strong> tools that assist the business</li>
+            <li>Scheduling + payments, not automation</li>
+            <li>Generic — not built for trainers</li>
+            <li>No intelligence layer — just record-keeping</li>
+            <li>Still requires manual work for marketing, follow-up, retention</li>
+            <li>Multi-tool stack — no single source of truth</li>
+          </ul>
+        </div>
+        <div class="pos-card us">
+          <div class="pos-label">FullControl (Us)</div>
+          <ul>
+            <li><strong>Agents that run the business,</strong> not tools that assist it</li>
+            <li>Full stack: lead gen → cancellation</li>
+            <li>Built for basketball trainers — by one</li>
+            <li>Cross-domain intelligence — sees patterns across marketing, sales, retention</li>
+            <li>Automates the workflows you hate: follow-ups, no-shows, dunning, booking</li>
+            <li>One platform — replaces the stack</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent)">One-Line Pitch</div>
+        <div class="card-body">
+          <em style="color:var(--text)">"FullControl runs your basketball academy so you can spend time coaching, not managing."</em>
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Iterate on the one-liner here — what resonates with academy owners? What's been tested?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent2)">Three Angles (Holy Trinity)</div>
+        <div class="card-body">
+          <strong>Time</strong> — get hours back from admin, follow-up, scheduling<br />
+          <strong>Knowledge</strong> — know what's working, what's not, what to do next<br />
+          <strong>Capital</strong> — more clients retained, more trials converted, lower churn
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Which angle hits hardest in conversations? What's the opening hook we lead with?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent3)">Target Archetypes</div>
+        <div class="card-body">
+          <strong>Young hungry trainer</strong> — wants to grow fast, build a brand, leverage tech<br />
+          <strong>Established trainer</strong> — wants time back, family time, system running without them
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Which archetype do we go after first? Different message for each?"></textarea>
+        </div>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-label">Positioning notes</div>
+        <textarea class="notes-field" rows="3" placeholder="What's working, what needs refinement, key messaging decisions..."></textarea>
+      </div>
+    </section>
+
+    <hr class="section-div" />
+
+    <!-- ══════════════════════════════════
+         5. LAUNCH READINESS
+    ══════════════════════════════════ -->
+    <section class="section" id="launch-readiness">
+      <div class="section-header">
+        <span class="section-number">05</span>
+        <span class="section-title">Launch Readiness</span>
+      </div>
+      <p class="section-desc">What needs to be true before we go to market. Minimum bar for Phase 1 launch.</p>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent2)">Product</div>
+        <div class="card-body">
+          What's the minimum viable product for launch? Which features must be live on day one vs. what can be phased in?
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="3" placeholder="List the must-have features for launch. What breaks if it's not there on day one?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent3)">Infrastructure</div>
+        <div class="card-body">
+          Cloud provider, multi-tenancy model, and human interface (chat vs. dashboard vs. hybrid) — <strong>Toronto sprint decisions.</strong>
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="3" placeholder="What's blocking on infra? Timeline for Toronto sprint decisions?"></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent)">Team</div>
+        <div class="card-body">
+          Current CRLF: <strong>finding a new dev.</strong> Launch timeline is directly blocked by this.
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="Dev search status, timeline, what we can build in the meantime..."></textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label" style="color:var(--accent5)">Sales Assets</div>
+        <div class="card-body">
+          Demo, pitch deck, one-pager, case study (BAM GTA as the first case study).
+        </div>
+        <div class="notes-wrap" style="margin-top:12px">
+          <textarea class="notes-field" rows="2" placeholder="What's built, what's missing, what do we need before first outreach?"></textarea>
+        </div>
+      </div>
+
+      <div class="notes-wrap">
+        <div class="notes-label">Launch readiness notes</div>
+        <textarea class="notes-field" rows="3" placeholder="Overall readiness assessment, what's the critical path to launch day..."></textarea>
+      </div>
+    </section>
+
+    <hr class="section-div" />
+
+    <!-- ══════════════════════════════════
+         6. OPEN DECISIONS
+    ══════════════════════════════════ -->
+    <section class="section" id="open-decisions">
+      <div class="section-header">
+        <span class="section-number">06</span>
+        <span class="section-title">Open Decisions</span>
+      </div>
+      <p class="section-desc">Key questions that need to be answered before or during launch. Workshop these.</p>
+
+      <table class="decision-table">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Area</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="td-q">How does Coleman's brand actually get activated for launch? Content, DMs, dedicated post, live event?</td>
+            <td style="color:var(--muted); white-space:nowrap">Distribution</td>
+            <td class="td-status"><span class="badge badge-open">Open</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">Free trial, paid pilot, or straight to subscription?</td>
+            <td style="color:var(--muted); white-space:nowrap">Sales</td>
+            <td class="td-status"><span class="badge badge-open">Open</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">What's the launch price? Is there a launch discount or early-adopter pricing?</td>
+            <td style="color:var(--muted); white-space:nowrap">Pricing</td>
+            <td class="td-status"><span class="badge badge-open">Open</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">Which 2–3 team sports do we expand to in Phase 2? How do we choose?</td>
+            <td style="color:var(--muted); white-space:nowrap">Expansion</td>
+            <td class="td-status"><span class="badge badge-workshop">Workshop</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">When does founder-led sales hand off to a dedicated sales hire?</td>
+            <td style="color:var(--muted); white-space:nowrap">Sales</td>
+            <td class="td-status"><span class="badge badge-tbd">TBD</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">What's the referral mechanism? What's the incentive for an academy owner to refer another?</td>
+            <td style="color:var(--muted); white-space:nowrap">Distribution</td>
+            <td class="td-status"><span class="badge badge-workshop">Workshop</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">Is BAM GTA the public case study? How do we frame it (proof of concept vs. first customer)?</td>
+            <td style="color:var(--muted); white-space:nowrap">Positioning</td>
+            <td class="td-status"><span class="badge badge-open">Open</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">Toronto sprint: cloud provider, multi-tenancy model, human interface decision — what's the timeline?</td>
+            <td style="color:var(--muted); white-space:nowrap">Infrastructure</td>
+            <td class="td-status"><span class="badge badge-open">Open</span></td>
+          </tr>
+          <tr>
+            <td class="td-q">What's the target for buyer conversations (exit path)? Month 4–6 per the plan — is that still the target?</td>
+            <td style="color:var(--muted); white-space:nowrap">Exit</td>
+            <td class="td-status"><span class="badge badge-tbd">TBD</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="notes-wrap">
+        <div class="notes-label">New decisions to track</div>
+        <textarea class="notes-field" rows="4" placeholder="Add new open decisions here as they come up during the workshop..."></textarea>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active nav link on scroll
+  const sections = document.querySelectorAll('.section[id]');
+  const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(link => link.classList.remove('active'));
+        const active = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(s => observer.observe(s));
+
+  // Persist notes in localStorage
+  document.querySelectorAll('textarea').forEach((ta, i) => {
+    const key = 'fc-launch-notes-' + i;
+    const saved = localStorage.getItem(key);
+    if (saved) ta.value = saved;
+    ta.addEventListener('input', () => localStorage.setItem(key, ta.value));
+  });
+</script>
+</body>
+</html>
