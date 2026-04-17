@@ -42,7 +42,7 @@ bam-os-requirements/
 │   ├── fc-company/             ← Investor page
 │   ├── fc-landing/             ← Product landing page (reference)
 │   └── survey-data-map.html    ← Interactive survey data visualization
-├── whiteboard/                 ← Onboarding session whiteboard (Vite/React)
+├── whiteboard/                 ← Planning tool (Vite/React) — sessions live in each project folder
 │                                 Needs Vercel project setup (see Whiteboard section)
 ├── sales-conversation-agents/  ← Sales conversation AI system prompts
 ├── bam-gta-phase1/             ← Phase 1 live deployment (BAM GTA)
@@ -70,9 +70,9 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 
 **Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
 
-## Onboarding Whiteboard
+## Whiteboard — Planning Tool
 
-The whiteboard app is a visual kanban board for managing onboarding review sessions. Located at `whiteboard/`.
+The whiteboard is a standalone planning tool (Vite/React) at `whiteboard/`. It's used to run structured review sessions for any project. The tool itself lives in `whiteboard/` — but the session output files (HTML review pages) live inside each project's own folder, not in `whiteboard/`. For example, FullControl product sessions live in `app/sessions/`.
 
 ### How it works — the full 6-step cycle
 
