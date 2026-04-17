@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FullControl — Repo Overview</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --border: #e8e5df;
+    --text: #1a1a2e;
+    --muted: #8b8b9e;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+
+    --blue:   #2563eb; --blue-bg:   #eff6ff; --blue-border:   #bfdbfe;
+    --green:  #059669; --green-bg:  #f0fdf4; --green-border:  #bbf7d0;
+    --purple: #7c3aed; --purple-bg: #faf5ff; --purple-border: #e9d5ff;
+    --orange: #d97706; --orange-bg: #fffbeb; --orange-border: #fde68a;
+    --teal:   #0d9488; --teal-bg:   #f0fdfa; --teal-border:   #99f6e4;
+    --amber:  #b45309; --amber-bg:  #fefce8; --amber-border:  #fef08a;
+    --violet: #6d28d9; --violet-bg: #f5f3ff; --violet-border: #ddd6fe;
+    --pink:   #be185d; --pink-bg:   #fdf2f8; --pink-border:   #fbcfe8;
+    --gray:   #4b5563; --gray-bg:   #f9fafb; --gray-border:   #e5e7eb;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px 24px 80px;
+  }
+
+  /* HEADER */
+  .header {
+    max-width: 780px;
+    margin: 0 auto 48px;
+    text-align: center;
+  }
+  .header .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .header p {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 540px;
+    margin: 0 auto 20px;
+  }
+  .quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .quick-link {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    text-decoration: none;
+    border: 1.5px solid;
+    transition: opacity 0.15s;
+  }
+  .quick-link:hover { opacity: 0.7; }
+
+  /* LAYOUT */
+  .main { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+  /* SECTION LABEL */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 24px 0 8px 4px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    cursor: pointer;
+    user-select: none;
+    border-left: 4px solid transparent;
+    transition: background 0.15s;
+  }
+  .card-header:hover { background: #fafafa; }
+
+  .card-emoji { font-size: 22px; flex-shrink: 0; }
+
+  .card-meta { flex: 1; min-width: 0; }
+  .card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .card-path {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .card-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .badge-live    { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .badge-phase1  { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+  .badge-tool    { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+  .badge-ref     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+  .chevron {
+    width: 20px; height: 20px;
+    color: var(--muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+  }
+  .card.open .chevron { transform: rotate(180deg); }
+
+  /* CARD BODY */
+  .card-body { display: none; border-top: 1px solid var(--border); }
+  .card.open .card-body { display: block; }
+
+  .card-body-inner { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+  .desc {
+    font-size: 14px;
+    color: #3a3a4e;
+    line-height: 1.65;
+  }
+
+  /* TAGS */
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1.5px solid;
+  }
+
+  /* SUB-ITEMS */
+  .sub-items { display: flex; flex-direction: column; gap: 8px; }
+  .sub-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .sub-item-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+  .sub-item-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* DIVIDER LABEL */
+  .divider-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  /* NOTES */
+  .notes-wrap { display: flex; flex-direction: column; gap: 6px; }
+  .notes-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .notes-area {
+    width: 100%;
+    min-height: 90px;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .notes-area:focus { border-color: #a5b4fc; }
+  .notes-area::placeholder { color: #c0bfcc; }
+
+  .copy-btn {
+    align-self: flex-end;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .copy-btn:hover { border-color: #a5b4fc; color: var(--blue); }
+  .copy-btn.copied { border-color: var(--green-border); color: var(--green); background: var(--green-bg); }
+
+  /* GLOBAL NOTES CARD */
+  .global-notes-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .global-notes-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .global-notes-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  /* COLOR THEMES */
+  .c-blue   .card-header { border-left-color: var(--blue); }
+  .c-blue   .card-header:hover { background: var(--blue-bg); }
+  .c-green  .card-header { border-left-color: var(--green); }
+  .c-green  .card-header:hover { background: var(--green-bg); }
+  .c-purple .card-header { border-left-color: var(--purple); }
+  .c-purple .card-header:hover { background: var(--purple-bg); }
+  .c-orange .card-header { border-left-color: var(--orange); }
+  .c-orange .card-header:hover { background: var(--orange-bg); }
+  .c-teal   .card-header { border-left-color: var(--teal); }
+  .c-teal   .card-header:hover { background: var(--teal-bg); }
+  .c-amber  .card-header { border-left-color: var(--amber); }
+  .c-amber  .card-header:hover { background: var(--amber-bg); }
+  .c-violet .card-header { border-left-color: var(--violet); }
+  .c-violet .card-header:hover { background: var(--violet-bg); }
+  .c-pink   .card-header { border-left-color: var(--pink); }
+  .c-pink   .card-header:hover { background: var(--pink-bg); }
+  .c-gray   .card-header { border-left-color: var(--gray); }
+  .c-gray   .card-header:hover { background: var(--gray-bg); }
+
+  .tag-blue   { color: var(--blue);   background: var(--blue-bg);   border-color: var(--blue-border); }
+  .tag-green  { color: var(--green);  background: var(--green-bg);  border-color: var(--green-border); }
+  .tag-purple { color: var(--purple); background: var(--purple-bg); border-color: var(--purple-border); }
+  .tag-orange { color: var(--orange); background: var(--orange-bg); border-color: var(--orange-border); }
+  .tag-teal   { color: var(--teal);   background: var(--teal-bg);   border-color: var(--teal-border); }
+  .tag-amber  { color: var(--amber);  background: var(--amber-bg);  border-color: var(--amber-border); }
+  .tag-violet { color: var(--violet); background: var(--violet-bg); border-color: var(--violet-border); }
+  .tag-pink   { color: var(--pink);   background: var(--pink-bg);   border-color: var(--pink-border); }
+  .tag-gray   { color: var(--gray);   background: var(--gray-bg);   border-color: var(--gray-border); }
+
+  @media (max-width: 600px) {
+    body { padding: 20px 14px 60px; }
+    .header h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">bam-os-requirements</div>
+  <h1>FullControl — Repo Overview</h1>
+  <p>AI-native operating system for basketball academies. Built for acquisition ($5M–$15M+). Every folder, every project, every connection — in one place.</p>
+  <div class="quick-links">
+    <a class="quick-link" style="color:var(--blue);border-color:var(--blue-border);background:var(--blue-bg)" href="https://fullcontrol-prototype-six.vercel.app" target="_blank">🖥 Prototype</a>
+    <a class="quick-link" style="color:var(--purple);border-color:var(--purple-border);background:var(--purple-bg)" href="https://whiteboard-beta-indol.vercel.app" target="_blank">🗂 Whiteboard</a>
+    <a class="quick-link" style="color:var(--green);border-color:var(--green-border);background:var(--green-bg)" href="https://full-control-survey.vercel.app" target="_blank">📋 Market Survey</a>
+    <a class="quick-link" style="color:var(--gray);border-color:var(--gray-border);background:var(--gray-bg)" href="https://github.com/zoran-star/bam-os-requirements" target="_blank">⌥ GitHub</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ─── LIVE APPS ─── -->
+  <div class="section-label">🟢 Live Apps — Auto-Deploy on Push to Main</div>
+
+  <!-- PROTOTYPE -->
+  <div class="card c-blue" id="card-prototype">
+    <div class="card-header" onclick="toggle('card-prototype')">
+      <div class="card-emoji">🖥</div>
+      <div class="card-meta">
+        <div class="card-title">FullControl Prototype</div>
+        <div class="card-path">prototype/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-live">● Live</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">The core product. Desktop web app showing every FullControl feature — the reference implementation everything else is built toward. Every design decision, every flow, every screen lives here first.</p>
+        <div class="tags">
+          <span class="tag tag-blue">React / Vite</span>
+          <span class="tag tag-blue">fullcontrol-prototype-six.vercel.app</span>
+        </div>
+        <div class="divider-label">Pages</div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">🏠 Home</div><div class="sub-item-desc">Operator dashboard — key stats, Sage AI bar, global inbox preview</div></div>
+          <div class="sub-item"><div class="sub-item-title">📈 Sales</div><div class="sub-item-desc">Lead pipeline, trial management, post-trial conversion flow</div></div>
+          <div class="sub-item"><div class="sub-item-title">📣 Marketing</div><div class="sub-item-desc">Campaign manager, audience angles, ad performance tracking</div></div>
+          <div class="sub-item"><div class="sub-item-title">✍️ Content</div><div class="sub-item-desc">AI content pipeline, swipe review, calendar scheduling</div></div>
+          <div class="sub-item"><div class="sub-item-title">👥 Members</div><div class="sub-item-desc">Profiles, retention tracking, billing and payment status</div></div>
+          <div class="sub-item"><div class="sub-item-title">📅 Schedule</div><div class="sub-item-desc">Class management, capacity limits, attendance marking</div></div>
+          <div class="sub-item"><div class="sub-item-title">⚙️ Settings</div><div class="sub-item-desc">Business config, integrations, team management</div></div>
+          <div class="sub-item"><div class="sub-item-title">📱 Member App</div><div class="sub-item-desc">Embedded member-facing view — what the parent app will become at scale</div></div>
+        </div>
+        <div class="divider-label">Planning Sessions</div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">prototype/sessions/</div><div class="sub-item-desc">15 HTML review session files — all 10 onboarding sections + nitty-gritty workshops. Output from whiteboard planning sessions.</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-prototype" placeholder="Add notes about the prototype — status, what's next, blockers, decisions..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-prototype', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WHITEBOARD -->
+  <div class="card c-purple" id="card-whiteboard">
+    <div class="card-header" onclick="toggle('card-whiteboard')">
+      <div class="card-emoji">🗂</div>
+      <div class="card-meta">
+        <div class="card-title">Requirements Whiteboard</div>
+        <div class="card-path">whiteboard/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-tool">Tool</span>
+        <span class="badge badge-live">● Live</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">Standalone planning tool used to run structured review sessions for any project. Sessions are approved, rejected, or given feedback — then exported to Claude Code for execution. The tool itself lives here; session output files live inside each project's own folder.</p>
+        <div class="tags">
+          <span class="tag tag-purple">React / Vite</span>
+          <span class="tag tag-purple">Notion API</span>
+          <span class="tag tag-purple">whiteboard-beta-indol.vercel.app</span>
+        </div>
+        <div class="divider-label">How it works</div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Review sessions in Notion</div><div class="sub-item-desc">Sessions DB stores all cards. Each session has items to approve, reject, or give feedback on.</div></div>
+          <div class="sub-item"><div class="sub-item-title">Export for AI</div><div class="sub-item-desc">Click "Export for AI" → paste into Claude Code → Claude processes decisions, updates Notion + prototype.</div></div>
+          <div class="sub-item"><div class="sub-item-title">whiteboard/api/</div><div class="sub-item-desc">sessions.js (read/write Notion sessions), backlog.js (write backlog items)</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-whiteboard" placeholder="Add notes about the whiteboard — current sessions, what needs reviewing, process changes..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-whiteboard', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MARKET RESEARCH -->
+  <div class="card c-green" id="card-market-research">
+    <div class="card-header" onclick="toggle('card-market-research')">
+      <div class="card-emoji">📋</div>
+      <div class="card-meta">
+        <div class="card-title">Market Research Survey</div>
+        <div class="card-path">market-research/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-ref">Reference</span>
+        <span class="badge badge-live">● Live</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">Survey sent out to basketball academies to collect market data. Embeds the FC prototype so owners can see what they're reacting to. Response data saves to Supabase and feeds into business decisions.</p>
+        <div class="tags">
+          <span class="tag tag-green">React / Vite</span>
+          <span class="tag tag-green">Supabase</span>
+          <span class="tag tag-green">full-control-survey.vercel.app</span>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-market-research" placeholder="Add notes about the market survey — response rates, key findings, what to follow up on..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-market-research', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── BAM GTA PHASE 1 ─── -->
+  <div class="section-label">🏀 BAM GTA Phase 1 — First Live Deployment</div>
+
+  <!-- STAFF -->
+  <div class="card c-orange" id="card-staff">
+    <div class="card-header" onclick="toggle('card-staff')">
+      <div class="card-emoji">🏃</div>
+      <div class="card-meta">
+        <div class="card-title">Staff Dashboard</div>
+        <div class="card-path">bam-gta-phase1/bam-gta-staff/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-phase1">Phase 1</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">Internal web app for BAM coaches and admin at the Greater Toronto Area location. Implements the full FullControl feature set in a real academy. Where the product proves itself with real operators — this is the data flywheel.</p>
+        <div class="tags">
+          <span class="tag tag-orange">React / Vite</span>
+          <span class="tag tag-orange">GoHighLevel</span>
+          <span class="tag tag-orange">Stripe</span>
+        </div>
+        <div class="divider-label">Features</div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Pipeline → Trials → Post-Trial</div><div class="sub-item-desc">Full lead flow from inquiry through trial to paid membership</div></div>
+          <div class="sub-item"><div class="sub-item-title">Sessions + Inbox</div><div class="sub-item-desc">Class management, attendance marking, staff ↔ parent messaging via GHL</div></div>
+          <div class="sub-item"><div class="sub-item-title">Failed Payments + Analysis</div><div class="sub-item-desc">Dunning recovery workflow, business metrics, retention reporting</div></div>
+          <div class="sub-item"><div class="sub-item-title">Member Profiles + Onboarding</div><div class="sub-item-desc">Full member history, billing, new member onboarding checklist</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-staff" placeholder="Add notes about the staff dashboard — integration status, blockers, what's live vs pending..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-staff', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARENT APP -->
+  <div class="card c-orange" id="card-parent">
+    <div class="card-header" onclick="toggle('card-parent')">
+      <div class="card-emoji">📱</div>
+      <div class="card-meta">
+        <div class="card-title">Parent App</div>
+        <div class="card-path">bam-gta-phase1/bam-gta-parent/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-phase1">Phase 1</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">Mobile-first web app for parents and athletes. Self-serve class booking, schedule view, direct messaging with staff. Completes the loop — operators manage via the staff dashboard, members self-serve here.</p>
+        <div class="tags">
+          <span class="tag tag-orange">React / Vite</span>
+          <span class="tag tag-orange">GoHighLevel</span>
+          <span class="tag tag-orange">Stripe</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">Schedule + Book Classes</div><div class="sub-item-desc">View upcoming sessions, self-serve booking — surfaces in staff Sessions view</div></div>
+          <div class="sub-item"><div class="sub-item-title">Messages + Profile</div><div class="sub-item-desc">Messaging routed via GHL, athlete attendance history and billing</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-parent" placeholder="Add notes about the parent app — integration status, what's live vs pending..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-parent', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GHL WORKFLOWS -->
+  <div class="card c-pink" id="card-ghl">
+    <div class="card-header" onclick="toggle('card-ghl')">
+      <div class="card-emoji">⚡</div>
+      <div class="card-meta">
+        <div class="card-title">GHL Workflows + Info</div>
+        <div class="card-path">bam-gta-phase1/info/</div>
+      </div>
+      <div class="card-right">
+        <span class="badge badge-ref">Reference</span>
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">Reference documentation for all GoHighLevel automation workflows powering BAM GTA. Every trigger, action, timing, and condition documented. Danny's operating manual for the automation layer.</p>
+        <div class="tags">
+          <span class="tag tag-pink">GoHighLevel</span>
+          <span class="tag tag-pink">HTML docs</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">ghl-workflows-for-danny-v2.html</div><div class="sub-item-desc">Latest docs — trial confirmations, follow-ups, dunning, conversion sequences</div></div>
+          <div class="sub-item"><div class="sub-item-title">overview.md</div><div class="sub-item-desc">How staff app, parent app, and GHL connect and pass data between each other</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-ghl" placeholder="Add notes about GHL — workflow QA status, Danny's updates, pending automations..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-ghl', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SUPPORTING SYSTEMS ─── -->
+  <div class="section-label">⚙️ Supporting Systems</div>
+
+  <!-- CONTENT ENGINE -->
+  <div class="card c-teal" id="card-content-engine">
+    <div class="card-header" onclick="toggle('card-content-engine')">
+      <div class="card-emoji">✍️</div>
+      <div class="card-meta">
+        <div class="card-title">Content Engine</div>
+        <div class="card-path">fc-internal-content-engine/</div>
+      </div>
+      <div class="card-right">
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">AI-powered content generation pipeline. Academy owners brief content through Notion, the engine generates reels, carousels, and threads, then syncs them back. Powers the Content page in the main prototype.</p>
+        <div class="tags">
+          <span class="tag tag-teal">React / Vite</span>
+          <span class="tag tag-teal">Supabase</span>
+          <span class="tag tag-teal">Notion API</span>
+          <span class="tag tag-teal">AI generation</span>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-content-engine" placeholder="Add notes about the content engine — status, what's wired up, what's still pending..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-content-engine', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALES AGENTS -->
+  <div class="card c-violet" id="card-agents">
+    <div class="card-header" onclick="toggle('card-agents')">
+      <div class="card-emoji">🤖</div>
+      <div class="card-meta">
+        <div class="card-title">Sales Conversation Agents</div>
+        <div class="card-path">sales-conversation-agents/</div>
+      </div>
+      <div class="card-right">
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">System prompts for the AI sales agents that run inside GHL automations. A lead texts in — the booking agent qualifies them and schedules a free trial without any human involvement. Future agents: Closing AI (post-trial conversion), Rebooking AI (no-show re-engagement).</p>
+        <div class="tags">
+          <span class="tag tag-violet">GoHighLevel</span>
+          <span class="tag tag-violet">AI agents</span>
+          <span class="tag tag-violet">Prompt templates</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">conversation-ai-booking-agent.txt</div><div class="sub-item-desc">Master template with {{PLACEHOLDER}} variables — tone, qualification logic, objection handling, follow-up cadence</div></div>
+          <div class="sub-item"><div class="sub-item-title">conversation-ai-booking-agent-bam-gta.txt</div><div class="sub-item-desc">BAM GTA instance with all placeholders filled in and live</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-agents" placeholder="Add notes about the conversation agents — what's live, prompt iterations, agent roadmap..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-agents', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── BUSINESS ─── -->
+  <div class="section-label">📊 Business Planning</div>
+
+  <!-- BUSINESS -->
+  <div class="card c-amber" id="card-business">
+    <div class="card-header" onclick="toggle('card-business')">
+      <div class="card-emoji">📊</div>
+      <div class="card-meta">
+        <div class="card-title">Business Materials</div>
+        <div class="card-path">business/</div>
+      </div>
+      <div class="card-right">
+        <svg class="chevron" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-body-inner">
+        <p class="desc">All business planning and investor-facing materials. Exit target: $5M–$15M+. Primary acquisition target: LeagueApps.</p>
+        <div class="tags">
+          <span class="tag tag-amber">HTML docs</span>
+        </div>
+        <div class="sub-items">
+          <div class="sub-item"><div class="sub-item-title">business/business/</div><div class="sub-item-desc">Investor playbook, one-pager pitch, business plan, gap analysis, market data explainer, problem validation docs</div></div>
+          <div class="sub-item"><div class="sub-item-title">business/fc-landing/</div><div class="sub-item-desc">Product landing page — reference design, not currently active</div></div>
+          <div class="sub-item"><div class="sub-item-title">business/repo-map.html</div><div class="sub-item-desc">Dark-theme visual overview of all repo folders and sub-projects</div></div>
+          <div class="sub-item"><div class="sub-item-title">Other docs</div><div class="sub-item-desc">Pipeline diagram, requirements sync report, survey data map, content planner reference</div></div>
+        </div>
+        <div class="notes-wrap">
+          <div class="notes-label">Notes</div>
+          <textarea class="notes-area" id="notes-business" placeholder="Add notes about the business materials — investor conversations, deck updates, acquisition pipeline..."></textarea>
+          <button class="copy-btn" onclick="copyNotes('notes-business', this)">Copy notes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SESSION NOTES ─── -->
+  <div class="section-label">📝 Session Notes</div>
+
+  <div class="global-notes-card">
+    <div class="global-notes-title">Session Notes</div>
+    <div class="global-notes-sub">Use this to capture anything from the current session. Copy and paste it into Claude Code to update READMEs, CLAUDE.md files, or memory.</div>
+    <div class="notes-wrap">
+      <textarea class="notes-area" id="notes-global" style="min-height:140px" placeholder="What did we work on today? What decisions were made? What's the status of each project? What's the next priority?&#10;&#10;Paste this into Claude Code to update all the project context files."></textarea>
+      <button class="copy-btn" onclick="copyNotes('notes-global', this)" style="font-size:13px;padding:8px 18px;">Copy session notes</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggle(id) {
+    const card = document.getElementById(id);
+    card.classList.toggle('open');
+  }
+
+  function copyNotes(id, btn) {
+    const textarea = document.getElementById(id);
+    const text = textarea.value.trim();
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = '✓ Copied';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'Copy notes';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  // Persist notes in localStorage
+  document.querySelectorAll('.notes-area').forEach(ta => {
+    const key = 'notes_' + ta.id;
+    ta.value = localStorage.getItem(key) || '';
+    ta.addEventListener('input', () => localStorage.setItem(key, ta.value));
+  });
+</script>
+
+</body>
+</html>
