@@ -1353,20 +1353,10 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 
         <div class="input-group-launch" style="margin-top:20px;">
           <div class="input-label">
-            <span>New Academies / Month (start)</span>
-            <span class="val" style="color:var(--accent2)" id="lm-lbl-baseGrowth">3</span>
+            <span>New Academies / Month</span>
+            <span class="val" style="color:var(--accent2)" id="lm-lbl-baseGrowth">5</span>
           </div>
-          <div class="sub-label">New clients added in month 1 post-launch</div>
-          <input type="range" style="width:100%" id="lm-sl-baseGrowth" min="0" max="30" step="1" value="3" oninput="lmSync('baseGrowth', this.value)" />
-        </div>
-
-        <div class="input-group-launch">
-          <div class="input-label">
-            <span>Monthly Growth Rate of New Academies</span>
-            <span class="val" style="color:var(--accent2)" id="lm-lbl-growthRate">10%</span>
-          </div>
-          <div class="sub-label">New academy additions compound each month</div>
-          <input type="range" style="width:100%" id="lm-sl-growthRate" min="0" max="50" step="1" value="10" oninput="lmSync('growthRate', this.value)" />
+          <input type="range" style="width:100%" id="lm-sl-baseGrowth" min="5" max="50" step="1" value="5" oninput="lmSync('baseGrowth', this.value)" />
         </div>
 
         <div class="input-group-launch">
@@ -1704,7 +1694,7 @@ function copyLink() {
 function renderPricingUI() { buildSnapshotSection(); buildPricingCards(); updatePricingSummary(); }
 
 // ═══ LAUNCH MODEL TAB ═══
-let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn: 3, price: 499 };
+let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 5, churn: 3, price: 499 };
 let lmTargetArr = 1000000;
 let lmActiveTab = 'clients';
 let lmChart = null;
@@ -1797,13 +1787,12 @@ function lmCheckPricingScenario() {
 }
 
 function lmBuildProjection() {
-  const { launch, baseGrowth, growthRate, churn, price } = lmVals;
+  const { launch, baseGrowth, churn, price } = lmVals;
   const churnRate = churn / 100;
-  const monthlyGrowthRate = growthRate / 100;
   const rows = [];
   let clients = launch;
   for (let m = 1; m <= 24; m++) {
-    const newClients = m === 1 ? 0 : baseGrowth * Math.pow(1 + monthlyGrowthRate, m - 2);
+    const newClients = m === 1 ? 0 : baseGrowth;
     const churned = m === 1 ? 0 : Math.round(clients * churnRate * 10) / 10;
     if (m > 1) clients = Math.max(0, clients + newClients - churned);
     const mrr = clients * price;
@@ -1935,12 +1924,12 @@ function lmRenderTarget(rows) {
     display.classList.remove('lit', 'unreachable');
     val.classList.remove('unreachable');
     // Keep projecting past 24 months to find the actual month
-    const { launch, baseGrowth, growthRate, churn, price } = lmVals;
-    const churnRate = churn / 100, mgr = growthRate / 100;
+    const { baseGrowth, churn, price } = lmVals;
+    const churnRate = churn / 100;
     let clients = rows[rows.length - 1].clients;
     let found = null;
     for (let m = 25; m <= 240; m++) {
-      const newC = baseGrowth * Math.pow(1 + mgr, m - 2);
+      const newC = baseGrowth;
       const churned = Math.round(clients * churnRate * 10) / 10;
       clients = Math.max(0, clients + newC - churned);
       const arr = clients * price * 12;
