@@ -2,12 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "app",
+      "name": "prototype",
       "runtimeExecutable": "/usr/local/bin/node",
       "runtimeArgs": ["node_modules/vite/bin/vite.js"],
       "port": 5173,
       "autoPort": true,
-      "cwd": "app"
+      "cwd": "prototype"
     },
     {
       "name": "survey",
@@ -22,6 +22,18 @@
       "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5181"],
       "port": 5181,
       "cwd": "fc-internal-content-engine"
+    },
+    {
+      "name": "repo-map",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5182", "/Users/zoransavic/bam-os-requirements/business"],
+      "port": 5182
+    },
+    {
+      "name": "overview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5183", "/Users/zoransavic/bam-os-requirements"],
+      "port": 5183
     }
   ]
 }
