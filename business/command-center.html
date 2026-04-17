@@ -1973,15 +1973,21 @@ function lmRenderTarget(rows) {
   } else {
     display.classList.remove('lit', 'unreachable');
     val.classList.remove('unreachable');
-    // Keep projecting past 24 months to find the actual month
-    const { monthOneTotal, baseGrowth, churn, price } = lmVals;
+    const { baseGrowth, churn, price } = lmVals;
     const churnRate = churn / 100;
+    // If churn > 0, clients plateau at baseGrowth/churnRate — check if target is reachable
+    if (churnRate > 0) {
+      const equilibriumClients = baseGrowth / churnRate;
+      if (clientsNeeded && equilibriumClients < clientsNeeded) {
+        val.textContent = 'Not reachable — increase growth or reduce churn';
+        return;
+      }
+    }
     let clients = rows[rows.length - 1].clients;
     let found = null;
     for (let m = 25; m <= 240; m++) {
-      const newC = baseGrowth;
       const churned = Math.round(clients * churnRate * 10) / 10;
-      clients = Math.max(0, clients + newC - churned);
+      clients = Math.max(0, clients + baseGrowth - churned);
       const arr = clients * price * 12;
       if (arr >= lmTargetArr) { found = m; break; }
     }
@@ -1993,7 +1999,7 @@ function lmRenderTarget(rows) {
       if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
       val.textContent = `Month ${found} — ${timeStr}`;
     } else {
-      val.textContent = `Month ${found ?? '240+'}`;
+      val.textContent = 'Not reachable — increase growth or reduce churn';
     }
   }
 }
