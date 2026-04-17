@@ -998,6 +998,7 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 .tl-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 .tl-value { font-size: 17px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
 .tl-value.unreachable { color: #ff5c7a; }
+.tl-clients { font-size: 12px; color: var(--muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
 .val.lm-red { color: #ff5c7a; }
 .arr-target-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
 .arr-target-val { font-size: 28px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; margin: 4px 0; }
@@ -1403,6 +1404,7 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
           <div class="timeline-display visible" id="lm-timeline-display" style="margin:0;">
             <div class="tl-label" id="lm-tl-label">Projected timeline</div>
             <div class="tl-value" id="lm-tl-value">—</div>
+            <div class="tl-clients" id="lm-tl-clients"></div>
           </div>
         </div>
 
@@ -1916,6 +1918,9 @@ function lmRenderTarget(rows) {
   const lbl = document.getElementById('lm-tl-label');
   const val = document.getElementById('lm-tl-value');
   lbl.textContent = `Expected timeline to target ARR of ${lmFmt(lmTargetArr)}`;
+  const clientsNeeded = lmVals.price > 0 ? Math.ceil(lmTargetArr / (lmVals.price * 12)) : null;
+  const clientsEl = document.getElementById('lm-tl-clients');
+  if (clientsEl) clientsEl.textContent = clientsNeeded ? `${clientsNeeded.toLocaleString()} clients needed` : '';
   const hit = rows.find(r => r.arr >= lmTargetArr);
   if (hit) {
     display.classList.add('lit'); display.classList.remove('unreachable');
