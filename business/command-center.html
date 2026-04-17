@@ -1437,9 +1437,6 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
           </div>
         </div>
 
-        <!-- Milestones -->
-        <div class="milestones" id="lm-milestones-grid"></div>
-
         <!-- Chart -->
         <div class="chart-panel">
           <div class="chart-header">
@@ -1448,33 +1445,12 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
               <button class="chart-tab active" id="lm-tab-clients" onclick="lmSwitchChartTab('clients')">Clients</button>
               <button class="chart-tab" id="lm-tab-mrr" onclick="lmSwitchChartTab('mrr')">MRR</button>
               <button class="chart-tab" id="lm-tab-arr" onclick="lmSwitchChartTab('arr')">ARR</button>
+              <button class="chart-tab" id="lm-tab-flow" onclick="lmSwitchChartTab('flow')">New / Churned</button>
             </div>
           </div>
           <div class="chart-wrap">
             <canvas id="lm-mainChart"></canvas>
           </div>
-        </div>
-
-        <!-- Table -->
-        <div class="table-panel">
-          <div class="table-header">
-            <div class="table-title">Month-by-Month Breakdown</div>
-            <button class="show-toggle" id="lm-toggle-btn" onclick="lmToggleRows()">Show all 24 months</button>
-          </div>
-          <table class="lm-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th>Clients</th>
-                <th>New</th>
-                <th>Churned</th>
-                <th>MRR</th>
-                <th>ARR</th>
-                <th>LTV</th>
-              </tr>
-            </thead>
-            <tbody id="lm-table-body"></tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -1761,7 +1737,6 @@ let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn
 let lmTargetArr = 500000;
 let lmTargetOn = false;
 let lmActiveTab = 'clients';
-let lmShowAll = false;
 let lmChart = null;
 let lmSelectedSnapId = null; // which pricing scenario drives the per-client price
 
@@ -1887,40 +1862,48 @@ function lmRender() {
   document.getElementById('lm-mc-arr').textContent = lmFmt(r12.arr);
   document.getElementById('lm-mc-ltv').textContent = churnRate > 0 ? lmFmt(ltv) : '∞';
 
-  const mgEl = document.getElementById('lm-milestones-grid');
-  if (mgEl) mgEl.innerHTML = [1,6,12,24].map(m => {
-    const r = rows[m - 1];
-    return `<div class="milestone"><div class="ms-month">Month ${m}</div><div class="ms-row"><span class="ms-key">Clients</span><span class="ms-val" style="color:var(--accent5)">${r.clients}</span></div><div class="ms-row"><span class="ms-key">MRR</span><span class="ms-val" style="color:var(--accent2)">${lmFmt(r.mrr)}</span></div><div class="ms-row"><span class="ms-key">ARR</span><span class="ms-val" style="color:var(--accent3)">${lmFmt(r.arr)}</span></div></div>`;
-  }).join('');
-
   lmUpdateChart(rows);
 
   const d0El = document.getElementById('lm-day0-mrr-val');
   if (d0El) d0El.textContent = lmFmtFull(lmVals.launch * lmVals.launchArpu);
 
   lmRenderTarget(rows);
-
-  const ltvStr = churnRate > 0 ? lmFmtFull(ltv) : '∞';
-  const tbody = document.getElementById('lm-table-body');
-  if (tbody) tbody.innerHTML = rows.map((r, i) => {
-    const isMore = i >= 12;
-    const isHL = [6,12,24].includes(r.month);
-    return `<tr class="${isHL ? 'lm-highlight' : ''} ${isMore ? 'lm-more' : ''}">
-      <td>Mo. ${r.month}</td>
-      <td class="td-clients">${r.clients}</td>
-      <td style="color:var(--accent2)">${r.month === 1 ? '—' : '+' + Math.round(r.newClients)}</td>
-      <td class="td-churn">${r.month === 1 ? '—' : '−' + r.churned.toFixed(1)}</td>
-      <td class="td-mrr">${lmFmtFull(r.mrr)}</td>
-      <td class="td-arr">${lmFmt(r.arr)}</td>
-      <td class="td-ltv">${ltvStr}</td>
-    </tr>`;
-  }).join('');
-
-  if (!lmShowAll) document.querySelectorAll('.lm-more').forEach(r => r.style.display = 'none');
 }
 
 function lmUpdateChart(rows) {
+  const canvas = document.getElementById('lm-mainChart');
+  if (!canvas) return;
   const labels = rows.map(r => `Mo. ${r.month}`);
+  const baseOpts = {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 }, maxTicksLimit: 12 } },
+      y: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 } }, beginAtZero: true }
+    }
+  };
+
+  if (lmActiveTab === 'flow') {
+    const newData = rows.map(r => r.month === 1 ? 0 : Math.round(r.newClients));
+    const churnData = rows.map(r => r.month === 1 ? 0 : r.churned);
+    if (lmChart) {
+      lmChart.data.labels = labels;
+      lmChart.data.datasets[0].data = newData;
+      lmChart.data.datasets[1].data = churnData;
+      lmChart.update('none');
+    } else {
+      lmChart = new Chart(canvas, {
+        type: 'bar',
+        data: { labels, datasets: [
+          { label: 'New Clients', data: newData, backgroundColor: 'rgba(56,217,169,0.65)', borderColor: '#38d9a9', borderWidth: 1, borderRadius: 3 },
+          { label: 'Churned',     data: churnData, backgroundColor: 'rgba(255,92,122,0.55)',  borderColor: '#ff5c7a', borderWidth: 1, borderRadius: 3 }
+        ]},
+        options: { ...baseOpts, plugins: { legend: { display: true, labels: { color: '#6b7494', font: { size: 11 }, boxWidth: 12, padding: 16 } }, tooltip: { backgroundColor: '#131720', borderColor: '#252b3d', borderWidth: 1, titleColor: '#6b7494', bodyColor: '#e2e5f0', padding: 10 } } }
+      });
+    }
+    return;
+  }
+
   let data, label, color, fill;
   if (lmActiveTab === 'clients') {
     data = rows.map(r => r.clients); label = 'Clients'; color = '#5b9fff'; fill = 'rgba(91,159,255,0.12)';
@@ -1938,20 +1921,10 @@ function lmUpdateChart(rows) {
     lmChart.data.datasets[0].pointBackgroundColor = color;
     lmChart.update('none');
   } else {
-    const canvas = document.getElementById('lm-mainChart');
-    if (!canvas) return;
     lmChart = new Chart(canvas, {
       type: 'line',
       data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: fill, borderWidth: 2, pointBackgroundColor: color, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.4 }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#131720', borderColor: '#252b3d', borderWidth: 1, titleColor: '#6b7494', bodyColor: '#e2e5f0', padding: 10, callbacks: { label: ctx => { const v = ctx.parsed.y; return lmActiveTab === 'clients' ? ` ${v} clients` : ` ${lmFmtFull(v)}`; } } } },
-        scales: {
-          x: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 }, maxTicksLimit: 12 } },
-          y: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 }, callback: v => lmActiveTab === 'clients' ? v : lmFmt(v) }, beginAtZero: true }
-        },
-        interaction: { mode: 'index', intersect: false }
-      }
+      options: { ...baseOpts, plugins: { legend: { display: false }, tooltip: { backgroundColor: '#131720', borderColor: '#252b3d', borderWidth: 1, titleColor: '#6b7494', bodyColor: '#e2e5f0', padding: 10, callbacks: { label: ctx => { const v = ctx.parsed.y; return lmActiveTab === 'clients' ? ` ${v} clients` : ` ${lmFmtFull(v)}`; } } } }, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, ticks: { color: '#6b7494', font: { size: 11 }, callback: v => lmActiveTab === 'clients' ? v : lmFmt(v) } } } }
     });
   }
 }
@@ -2006,12 +1979,6 @@ function lmRenderTarget(rows) {
   }
 }
 
-function lmToggleRows() {
-  lmShowAll = !lmShowAll;
-  document.querySelectorAll('.lm-more').forEach(r => { r.style.display = lmShowAll ? '' : 'none'; });
-  const btn = document.getElementById('lm-toggle-btn');
-  if (btn) btn.textContent = lmShowAll ? 'Show first 12 months' : 'Show all 24 months';
-}
 
 function lmSaveState() {
   localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, targetOn: lmTargetOn, selectedSnapId: lmSelectedSnapId }));
