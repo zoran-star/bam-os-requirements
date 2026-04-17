@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing Calculator — FullControl</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  .canvas {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 40px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #c9a84c, #f0d078, #c9a84c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 10px;
+    letter-spacing: -1px;
+  }
+  .header p {
+    font-size: 15px;
+    color: #777;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Summary strip */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  .summary-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px 24px;
+    text-align: center;
+  }
+  .summary-card .label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .summary-card .value {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .summary-card .sub {
+    font-size: 12px;
+    color: #555;
+    margin-top: 4px;
+  }
+  .gold { color: #c9a84c; }
+  .green { color: #4caf82; }
+  .blue { color: #5b9cf6; }
+  .purple { color: #a78bfa; }
+
+  /* Models grid */
+  .models {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+
+  .model-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    padding: 28px 32px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .model-card.active {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(201,168,76,0.25);
+  }
+  .model-card.inactive {
+    opacity: 0.4;
+  }
+
+  .model-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .toggle-wrap {
+    flex-shrink: 0;
+  }
+  .toggle {
+    width: 44px;
+    height: 24px;
+    background: #333;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    border: none;
+    outline: none;
+  }
+  .toggle.on { background: #c9a84c; }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s;
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  .model-name {
+    font-size: 18px;
+    font-weight: 700;
+    flex: 1;
+  }
+  .model-icon {
+    font-size: 22px;
+    width: 40px;
+    text-align: center;
+  }
+
+  .model-result {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .model-result .mrr-fc {
+    font-size: 20px;
+    font-weight: 700;
+    color: #c9a84c;
+  }
+  .model-result .take-rate {
+    font-size: 12px;
+    color: #555;
+    margin-top: 2px;
+  }
+
+  .model-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    align-items: end;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .input-group label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #666;
+  }
+  .input-group .hint {
+    font-size: 11px;
+    color: #444;
+    margin-top: -4px;
+  }
+
+  .dollar-input {
+    position: relative;
+  }
+  .dollar-input span {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-size: 14px;
+    font-weight: 600;
+    pointer-events: none;
+  }
+  .dollar-input input {
+    width: 100%;
+    padding: 10px 14px 10px 28px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: #e0e0e0;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .dollar-input input::-webkit-outer-spin-button,
+  .dollar-input input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .dollar-input input:focus {
+    border-color: rgba(201,168,76,0.5);
+  }
+
+  /* Price range section */
+  .price-range-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .range-inputs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .range-inputs .dollar-input { flex: 1; }
+  .range-divider {
+    color: #444;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  /* Price slider */
+  .price-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .slider-track {
+    position: relative;
+    height: 36px;
+    display: flex;
+    align-items: center;
+  }
+  .slider-bg {
+    position: absolute;
+    left: 0; right: 0;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+  }
+  .slider-fill {
+    position: absolute;
+    height: 4px;
+    background: linear-gradient(90deg, #c9a84c, #f0d078);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+  input[type=range] {
+    position: absolute;
+    width: 100%;
+    height: 4px;
+    appearance: none;
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #f0d078;
+    border: 2px solid #1a1a2e;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #555;
+    margin-top: 2px;
+  }
+  .slider-current {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #c9a84c;
+  }
+
+  /* ARR section */
+  .arr-section {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    padding: 32px;
+  }
+  .arr-section h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 24px;
+  }
+  .arr-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .arr-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+  }
+  .arr-card .label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #555;
+    margin-bottom: 8px;
+  }
+  .arr-card .value {
+    font-size: 24px;
+    font-weight: 800;
+  }
+  .arr-card .sub {
+    font-size: 12px;
+    color: #444;
+    margin-top: 4px;
+  }
+  .arr-divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin: 24px 0;
+  }
+
+  /* Academy count */
+  .acad-section {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .acad-label {
+    font-size: 14px;
+    color: #666;
+    flex-shrink: 0;
+  }
+  .acad-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .acad-input-wrap input {
+    width: 90px;
+    padding: 8px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    color: #e0e0e0;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+  .acad-input-wrap input::-webkit-outer-spin-button,
+  .acad-input-wrap input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .acad-result {
+    flex: 1;
+    text-align: right;
+  }
+  .acad-result .big {
+    font-size: 28px;
+    font-weight: 800;
+    color: #4caf82;
+  }
+  .acad-result .small {
+    font-size: 12px;
+    color: #444;
+    margin-top: 3px;
+  }
+
+  @media (max-width: 720px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .model-inputs { grid-template-columns: 1fr; }
+    .arr-grid { grid-template-columns: 1fr; }
+    .header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <div class="header">
+    <h1>Pricing Calculator</h1>
+    <p>Model FullControl's revenue across business verticals. Adjust MRR and price ranges per model.</p>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="summary">
+    <div class="summary-card">
+      <div class="label">Total Academy MRR</div>
+      <div class="value gold" id="s-academy-mrr">$0</div>
+      <div class="sub">active models only</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">FC Monthly (min)</div>
+      <div class="value blue" id="s-fc-min">$0</div>
+      <div class="sub">floor across models</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">FC Monthly (selected)</div>
+      <div class="value green" id="s-fc-selected">$0</div>
+      <div class="sub">at your price points</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">FC Monthly (max)</div>
+      <div class="value purple" id="s-fc-max">$0</div>
+      <div class="sub">ceiling across models</div>
+    </div>
+  </div>
+
+  <!-- Model cards -->
+  <div class="models" id="models-container"></div>
+
+  <!-- ARR projection -->
+  <div class="arr-section">
+    <h2>ARR Projection</h2>
+    <div class="arr-grid">
+      <div class="arr-card">
+        <div class="label">ARR Floor</div>
+        <div class="value blue" id="arr-min">$0</div>
+        <div class="sub">per academy × 12</div>
+      </div>
+      <div class="arr-card">
+        <div class="label">ARR at Selected Price</div>
+        <div class="value green" id="arr-selected">$0</div>
+        <div class="sub">per academy × 12</div>
+      </div>
+      <div class="arr-card">
+        <div class="label">ARR Ceiling</div>
+        <div class="value purple" id="arr-max">$0</div>
+        <div class="sub">per academy × 12</div>
+      </div>
+    </div>
+
+    <hr class="arr-divider">
+
+    <div class="acad-section">
+      <div class="acad-label">With</div>
+      <div class="acad-input-wrap">
+        <input type="number" id="acad-count" value="50" min="1">
+        <span style="font-size:14px; color:#666;">academies</span>
+      </div>
+      <div class="acad-result">
+        <div class="big" id="portfolio-arr">$0</div>
+        <div class="small" id="portfolio-sub">portfolio ARR at selected price</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const MODELS = [
+    { id: 'training',  name: 'Training Classes',  icon: '🏀', defaultMrr: 8000,  defaultMin: 149, defaultMax: 399 },
+    { id: 'club',      name: 'Club Teams',         icon: '🏆', defaultMrr: 6000,  defaultMin: 99,  defaultMax: 299 },
+    { id: 'gym',       name: 'Gym Rental',         icon: '🏗️', defaultMrr: 4000,  defaultMin: 79,  defaultMax: 199 },
+    { id: 'internal',  name: 'Internal Leagues',   icon: '📋', defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199 },
+    { id: 'external',  name: 'External Leagues',   icon: '🌐', defaultMrr: 5000,  defaultMin: 99,  defaultMax: 249 },
+  ];
+
+  const state = {};
+  MODELS.forEach(m => {
+    state[m.id] = {
+      enabled: true,
+      mrr: m.defaultMrr,
+      min: m.defaultMin,
+      max: m.defaultMax,
+      selected: Math.round((m.defaultMin + m.defaultMax) / 2),
+    };
+  });
+
+  function fmt(n) {
+    if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
+    if (n >= 1000) return '$' + n.toLocaleString();
+    return '$' + n;
+  }
+
+  function pct(charge, mrr) {
+    if (!mrr) return '—';
+    return (charge / mrr * 100).toFixed(1) + '% of MRR';
+  }
+
+  function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+  function updateSliderFill(id) {
+    const s = state[id];
+    const rangeEl = document.getElementById(`slider-${id}`);
+    const fillEl = document.getElementById(`fill-${id}`);
+    const range = s.max - s.min;
+    if (range <= 0) {
+      fillEl.style.left = '0%';
+      fillEl.style.width = '100%';
+      return;
+    }
+    const pctVal = (s.selected - s.min) / range * 100;
+    fillEl.style.left = '0%';
+    fillEl.style.width = pctVal + '%';
+  }
+
+  function updateModelResult(id) {
+    const s = state[id];
+    const card = document.getElementById(`card-${id}`);
+    card.className = 'model-card ' + (s.enabled ? 'active' : 'inactive');
+    document.getElementById(`toggle-${id}`).className = 'toggle ' + (s.enabled ? 'on' : '');
+    document.getElementById(`fc-charge-${id}`).textContent = s.enabled ? fmt(s.selected) + '/mo' : '—';
+    document.getElementById(`take-rate-${id}`).textContent = s.enabled ? pct(s.selected, s.mrr) : '';
+
+    const rangeEl = document.getElementById(`slider-${id}`);
+    rangeEl.min = s.min;
+    rangeEl.max = s.max;
+    rangeEl.value = s.selected;
+    rangeEl.disabled = !s.enabled;
+
+    document.getElementById(`slider-label-${id}`).textContent = s.enabled ? fmt(s.selected) + '/mo' : '—';
+    document.getElementById(`slider-min-${id}`).textContent = fmt(s.min);
+    document.getElementById(`slider-max-${id}`).textContent = fmt(s.max);
+
+    updateSliderFill(id);
+    updateSummary();
+  }
+
+  function updateSummary() {
+    let totalMrr = 0, totalMin = 0, totalSel = 0, totalMax = 0;
+    MODELS.forEach(m => {
+      const s = state[m.id];
+      if (!s.enabled) return;
+      totalMrr += s.mrr;
+      totalMin += s.min;
+      totalSel += s.selected;
+      totalMax += s.max;
+    });
+    document.getElementById('s-academy-mrr').textContent = fmt(totalMrr);
+    document.getElementById('s-fc-min').textContent = fmt(totalMin);
+    document.getElementById('s-fc-selected').textContent = fmt(totalSel);
+    document.getElementById('s-fc-max').textContent = fmt(totalMax);
+
+    document.getElementById('arr-min').textContent = fmt(totalMin * 12);
+    document.getElementById('arr-selected').textContent = fmt(totalSel * 12);
+    document.getElementById('arr-max').textContent = fmt(totalMax * 12);
+
+    const count = parseInt(document.getElementById('acad-count').value) || 0;
+    document.getElementById('portfolio-arr').textContent = fmt(totalSel * 12 * count);
+    document.getElementById('portfolio-sub').textContent = `portfolio ARR — ${count} academies at selected price`;
+  }
+
+  function buildCards() {
+    const container = document.getElementById('models-container');
+    container.innerHTML = '';
+
+    MODELS.forEach(m => {
+      const s = state[m.id];
+
+      const card = document.createElement('div');
+      card.id = `card-${m.id}`;
+      card.className = 'model-card active';
+
+      card.innerHTML = `
+        <div class="model-header">
+          <div class="toggle-wrap">
+            <button class="toggle on" id="toggle-${m.id}" title="Toggle model"></button>
+          </div>
+          <div class="model-icon">${m.icon}</div>
+          <div class="model-name">${m.name}</div>
+          <div class="model-result">
+            <div class="mrr-fc" id="fc-charge-${m.id}">${fmt(s.selected)}/mo</div>
+            <div class="take-rate" id="take-rate-${m.id}">${pct(s.selected, s.mrr)}</div>
+          </div>
+        </div>
+
+        <div class="model-inputs">
+
+          <div class="input-group">
+            <label>Academy MRR from this model</label>
+            <div class="dollar-input">
+              <span>$</span>
+              <input type="number" id="mrr-${m.id}" value="${s.mrr}" min="0" placeholder="0">
+            </div>
+            <div class="hint">monthly revenue the academy earns</div>
+          </div>
+
+          <div class="input-group">
+            <label>FC price range (min → max)</label>
+            <div class="range-inputs">
+              <div class="dollar-input">
+                <span>$</span>
+                <input type="number" id="min-${m.id}" value="${s.min}" min="0" placeholder="0">
+              </div>
+              <span class="range-divider">→</span>
+              <div class="dollar-input">
+                <span>$</span>
+                <input type="number" id="max-${m.id}" value="${s.max}" min="0" placeholder="0">
+              </div>
+            </div>
+            <div class="hint">what FullControl charges monthly</div>
+          </div>
+
+          <div class="price-slider-group">
+            <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:#666;">Your price</label>
+            <div class="slider-track">
+              <div class="slider-bg"></div>
+              <div class="slider-fill" id="fill-${m.id}" style="left:0%; width:50%"></div>
+              <input type="range" id="slider-${m.id}" min="${s.min}" max="${s.max}" value="${s.selected}">
+            </div>
+            <div class="slider-labels">
+              <span id="slider-min-${m.id}">${fmt(s.min)}</span>
+              <span class="slider-current" id="slider-label-${m.id}">${fmt(s.selected)}/mo</span>
+              <span id="slider-max-${m.id}">${fmt(s.max)}</span>
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      container.appendChild(card);
+
+      // Events
+      document.getElementById(`toggle-${m.id}`).addEventListener('click', () => {
+        state[m.id].enabled = !state[m.id].enabled;
+        updateModelResult(m.id);
+      });
+
+      document.getElementById(`mrr-${m.id}`).addEventListener('input', e => {
+        state[m.id].mrr = parseInt(e.target.value) || 0;
+        updateModelResult(m.id);
+      });
+
+      document.getElementById(`min-${m.id}`).addEventListener('input', e => {
+        const val = parseInt(e.target.value) || 0;
+        state[m.id].min = val;
+        state[m.id].selected = clamp(state[m.id].selected, val, state[m.id].max);
+        updateModelResult(m.id);
+      });
+
+      document.getElementById(`max-${m.id}`).addEventListener('input', e => {
+        const val = parseInt(e.target.value) || 0;
+        state[m.id].max = val;
+        state[m.id].selected = clamp(state[m.id].selected, state[m.id].min, val);
+        updateModelResult(m.id);
+      });
+
+      document.getElementById(`slider-${m.id}`).addEventListener('input', e => {
+        state[m.id].selected = parseInt(e.target.value);
+        updateSliderFill(m.id);
+        document.getElementById(`fc-charge-${m.id}`).textContent = fmt(state[m.id].selected) + '/mo';
+        document.getElementById(`take-rate-${m.id}`).textContent = pct(state[m.id].selected, state[m.id].mrr);
+        document.getElementById(`slider-label-${m.id}`).textContent = fmt(state[m.id].selected) + '/mo';
+        updateSummary();
+      });
+
+      updateSliderFill(m.id);
+    });
+  }
+
+  document.getElementById('acad-count').addEventListener('input', updateSummary);
+
+  buildCards();
+  updateSummary();
+</script>
+</body>
+</html>
