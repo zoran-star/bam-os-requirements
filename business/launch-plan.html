@@ -322,6 +322,90 @@
 
   .more-rows { display: none; }
 
+  /* Info tooltip */
+  .info-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .info-icon {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 700;
+    font-style: italic;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    line-height: 1;
+    user-select: none;
+    font-family: Georgia, serif;
+  }
+  .info-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .info-tooltip {
+    display: none;
+    position: absolute;
+    left: 20px;
+    top: -4px;
+    background: #1e2133;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    width: 240px;
+    z-index: 100;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    pointer-events: none;
+  }
+  .info-tooltip.right-flip {
+    left: auto;
+    right: 20px;
+  }
+  .info-icon:hover + .info-tooltip,
+  .info-wrap:hover .info-tooltip { display: block; }
+  .info-tooltip .tt-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .info-tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 4px;
+    gap: 8px;
+  }
+  .info-tooltip .tt-row .tt-k { color: var(--muted); flex-shrink: 0; }
+  .info-tooltip .tt-row .tt-v { color: var(--text); font-weight: 600; text-align: right; }
+  .info-tooltip .tt-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+
+  /* Day 0 MRR display */
+  .day0-mrr {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: rgba(56,217,169,0.07);
+    border: 1px solid rgba(56,217,169,0.25);
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .day0-mrr .d0-label { font-size: 11px; color: var(--muted); }
+  .day0-mrr .d0-value { font-size: 18px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
+
   /* ARR Target toggle section */
   .target-section {
     margin-top: 20px;
@@ -426,21 +510,63 @@
 
     <div class="input-group">
       <div class="input-label">
-        <span>Clients at Launch</span>
-        <span class="val" id="lbl-launch">5</span>
+        <span style="display:inline-flex;align-items:center;">
+          Academies at Launch
+          <span class="info-wrap">
+            <span class="info-icon">i</span>
+            <span class="info-tooltip">
+              <div class="tt-title">Mike's current client data</div>
+              <div class="tt-row"><span class="tt-k">Total clients billed</span><span class="tt-v">53</span></div>
+              <div class="tt-row"><span class="tt-k">Active clients</span><span class="tt-v">23</span></div>
+              <div class="tt-row"><span class="tt-k">Current MRR</span><span class="tt-v">$18,240</span></div>
+              <div class="tt-divider"></div>
+              <div class="tt-row"><span class="tt-k">6 internal academies</span><span class="tt-v">15% gross rev</span></div>
+              <div class="tt-row"><span class="tt-k">8 SS</span><span class="tt-v">$1,750/mo</span></div>
+              <div class="tt-row"><span class="tt-k">5 SS Core</span><span class="tt-v">$829/mo</span></div>
+              <div class="tt-row"><span class="tt-k">3 BAM OS</span><span class="tt-v">$500/mo</span></div>
+              <div class="tt-row"><span class="tt-k">1 SS Growth</span><span class="tt-v">30% rev split</span></div>
+            </span>
+          </span>
+        </span>
+        <span class="val" id="lbl-launch">23</span>
       </div>
-      <input type="range" id="sl-launch" min="1" max="50" step="1" value="5" oninput="sync('launch', this.value)" />
-      <input type="number" class="number-input" id="num-launch" min="1" max="200" value="5" oninput="sync('launch', this.value)" />
+      <input type="range" id="sl-launch" min="1" max="100" step="1" value="23" oninput="sync('launch', this.value)" />
+      <input type="number" class="number-input" id="num-launch" min="1" max="500" value="23" oninput="sync('launch', this.value)" />
     </div>
 
     <div class="input-group">
       <div class="input-label">
-        <span>New Clients / Month</span>
-        <span class="val green" id="lbl-growth">3</span>
+        <span>ARPU at FC Launch</span>
+        <span class="val purple" id="lbl-launchArpu">$499</span>
       </div>
-      <div class="sub-label">Post-launch steady-state additions</div>
-      <input type="range" id="sl-growth" min="0" max="30" step="1" value="3" oninput="sync('growth', this.value)" />
-      <input type="number" class="number-input" id="num-growth" min="0" max="100" value="3" oninput="sync('growth', this.value)" />
+      <div class="sub-label">What each existing academy pays on day 0</div>
+      <input type="range" id="sl-launchArpu" min="50" max="2000" step="25" value="499" oninput="sync('launchArpu', this.value)" />
+      <input type="number" class="number-input" id="num-launchArpu" min="1" step="1" value="499" oninput="sync('launchArpu', this.value)" />
+    </div>
+
+    <div class="day0-mrr">
+      <span class="d0-label">Day 0 MRR</span>
+      <span class="d0-value" id="day0-mrr-val">$11,477</span>
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>New Academies / Month (start)</span>
+        <span class="val green" id="lbl-baseGrowth">3</span>
+      </div>
+      <div class="sub-label">New clients added in month 1 post-launch</div>
+      <input type="range" id="sl-baseGrowth" min="0" max="30" step="1" value="3" oninput="sync('baseGrowth', this.value)" />
+      <input type="number" class="number-input" id="num-baseGrowth" min="0" max="200" value="3" oninput="sync('baseGrowth', this.value)" />
+    </div>
+
+    <div class="input-group">
+      <div class="input-label">
+        <span>Monthly Growth Rate of New Academies</span>
+        <span class="val green" id="lbl-growthRate">10%</span>
+      </div>
+      <div class="sub-label">New academy additions compound each month</div>
+      <input type="range" id="sl-growthRate" min="0" max="50" step="1" value="10" oninput="sync('growthRate', this.value)" />
+      <input type="number" class="number-input" id="num-growthRate" min="0" max="200" step="1" value="10" oninput="sync('growthRate', this.value)" />
     </div>
 
     <div class="input-group">
@@ -570,7 +696,7 @@
 </div>
 
 <script>
-let vals = { launch: 5, growth: 3, churn: 3, price: 499 };
+let vals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn: 3, price: 499 };
 let targetArr = 500000;
 let targetOn = false;
 let activeTab = 'clients';
@@ -599,21 +725,23 @@ function sync(key, raw) {
 
   // Update label
   const lbl = document.getElementById('lbl-' + key);
-  if (key === 'churn') lbl.textContent = v + '%';
-  else if (key === 'price') lbl.textContent = '$' + v.toLocaleString();
+  if (key === 'churn' || key === 'growthRate') lbl.textContent = v + '%';
+  else if (key === 'price' || key === 'launchArpu') lbl.textContent = '$' + v.toLocaleString();
   else lbl.textContent = v;
 
   render();
 }
 
 function buildProjection() {
-  const { launch, growth, churn, price } = vals;
+  const { launch, baseGrowth, growthRate, churn, price } = vals;
   const churnRate = churn / 100;
+  const monthlyGrowthRate = growthRate / 100;
   const rows = [];
 
   let clients = launch;
   for (let m = 1; m <= 24; m++) {
-    const newClients = m === 1 ? 0 : growth;
+    // New academies this month: base * (1 + rate)^(month-2), starts at month 2
+    const newClients = m === 1 ? 0 : baseGrowth * Math.pow(1 + monthlyGrowthRate, m - 2);
     const churned = m === 1 ? 0 : Math.round(clients * churnRate * 10) / 10;
     if (m > 1) {
       clients = Math.max(0, clients + newClients - churned);
@@ -622,11 +750,6 @@ function buildProjection() {
     const arr = mrr * 12;
     const ltv = churnRate > 0 ? price / churnRate : Infinity;
     rows.push({ month: m, clients: Math.round(clients), newClients, churned, mrr, arr, ltv });
-
-    if (m === 1) {
-      // After month 1 snapshot, start adding
-      clients = Math.round(clients);
-    }
   }
   return rows;
 }
@@ -666,6 +789,9 @@ function render() {
 
   // Chart
   updateChart(rows);
+
+  // Day 0 MRR
+  document.getElementById('day0-mrr-val').textContent = fmtFull(vals.launch * vals.launchArpu);
 
   // ARR target
   renderTarget(rows);
@@ -847,7 +973,7 @@ function toggleRows() {
 
 function saveState() {
   localStorage.setItem('fc-launch-model', JSON.stringify({
-    launch: vals.launch, growth: vals.growth, churn: vals.churn, price: vals.price,
+    launch: vals.launch, launchArpu: vals.launchArpu, baseGrowth: vals.baseGrowth, growthRate: vals.growthRate, churn: vals.churn, price: vals.price,
     targetArr, targetOn,
   }));
 }
@@ -857,7 +983,9 @@ function loadState() {
     const s = JSON.parse(localStorage.getItem('fc-launch-model'));
     if (!s) return;
     sync('launch', s.launch);
-    sync('growth', s.growth);
+    if (s.launchArpu != null) sync('launchArpu', s.launchArpu);
+    if (s.baseGrowth != null) sync('baseGrowth', s.baseGrowth);
+    if (s.growthRate != null) sync('growthRate', s.growthRate);
     sync('churn', s.churn);
     sync('price', s.price);
     if (s.targetArr) syncTarget(s.targetArr);
