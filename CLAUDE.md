@@ -33,7 +33,7 @@ This repository holds the FullControl product prototype, survey, onboarding flow
 
 ```
 bam-os-requirements/
-├── app/                        ← FullControl prototype (Vite/React)
+├── prototype/                        ← FullControl prototype (Vite/React)
 │                                 Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
 ├── market-research/            ← Market research survey sent to academies (Vite/React)
 │                                 Auto-deploys to: https://full-control-survey.vercel.app
@@ -53,7 +53,7 @@ bam-os-requirements/
 ```
 
 ### Key files
-- `app/src/` — the prototype (reference implementation of all features)
+- `prototype/src/` — the prototype (reference implementation of all features)
 - `business/fc-company/index.html` — investor-facing page (active)
 - `business/fc-landing/index.html` — product landing page (reference, not active)
 - `sales-conversation-agents/conversation-ai-booking-agent.txt` — AI booking agent system prompt template
@@ -65,14 +65,14 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 
 | App | Directory | Live URL |
 |-----|-----------|----------|
-| Prototype | `app/` | https://fullcontrol-prototype-six.vercel.app |
+| Prototype | `prototype/` | https://fullcontrol-prototype-six.vercel.app |
 | Market Research Survey | `market-research/` | https://full-control-survey.vercel.app |
 
 **Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
 
 ## Whiteboard — Planning Tool
 
-The whiteboard is a standalone planning tool (Vite/React) at `whiteboard/`. It's used to run structured review sessions for any project. The tool itself lives in `whiteboard/` — but the session output files (HTML review pages) live inside each project's own folder, not in `whiteboard/`. For example, FullControl product sessions live in `app/sessions/`.
+The whiteboard is a standalone planning tool (Vite/React) at `whiteboard/`. It's used to run structured review sessions for any project. The tool itself lives in `whiteboard/` — but the session output files (HTML review pages) live inside each project's own folder, not in `whiteboard/`. For example, FullControl product sessions live in `prototype/sessions/`.
 
 ### How it works — the full 6-step cycle
 
@@ -165,7 +165,7 @@ After discussing all feedback items, present a confirmation checklist with ALL 5
 1. **Sessions to create** — List every new session to be created from feedback. Include title and what it covers.
 2. **Onboarding Data** — What data points need to be added to the Onboarding Data Points DB? This includes not just owner-typed fields (Business Name, Selling Points) but also **configuration settings that power automated workflows** — timers, thresholds, channel preferences, cadence settings, defaults. Ask yourself: "Are there any settings, defaults, thresholds, or config values that need to be set during onboarding for this feature to work?" If nothing, say "Nothing to add here."
 3. **Notion updates** — What changes to Business Requirements pages, Working Memory, or other Notion pages? Be specific: which page, which job IDs added/changed. Remember: if the prototype was updated, nudge about updating Notion too (and vice versa).
-4. **Prototype updates** — What changes to the prototype (app/src/)? Which page/component, what's being added/changed. If nothing, say "Nothing to change here." Remember: if Notion was updated, nudge about updating the prototype too (and vice versa).
+4. **Prototype updates** — What changes to the prototype (prototype/src/)? Which page/component, what's being added/changed. If nothing, say "Nothing to change here." Remember: if Notion was updated, nudge about updating the prototype too (and vice versa).
 5. **Other actions** — Git commits, deployments, backlog items, marking session complete, etc.
 
 **Wait for the user to confirm before executing anything.** Do not start updating Notion, writing code, or creating sessions until the user says go. They may want to adjust, add, or remove actions from the list.
@@ -177,7 +177,7 @@ Only after user confirmation, execute the agreed actions. Categories:
 - **Update Notion Business Requirements** — Add or modify job IDs on the relevant domain page (Marketing, Sales, Member Management, etc.). For large pages that timeout via MCP, use the Node script approach: `whiteboard/push-requirements.mjs` pattern with `@notionhq/client` and the token from `whiteboard/.env.production`.
 - **Update Onboarding Data Points DB** (`49be4ce65ada4d45b736070e11452edb`) — For approved data collection items, ensure they exist in the Data Points DB with correct Category, Collection Phase, Input Type, etc.
 - **Create Backlog items** (`39c1f40a005c4c9ba50b0c7fe47b45bd`) — For prototype changes, create a Backlog entry with Status: Proposed and a description of what to build.
-- **Update the prototype** (`app/src/`) — If the user wants to build something now, make the changes to the Vite/React prototype.
+- **Update the prototype** (`prototype/src/`) — If the user wants to build something now, make the changes to the Vite/React prototype.
 - **Create follow-up sessions** — If new topics surfaced during discussion, create new session cards in the Sessions DB (`4e5492be5027427cbbc8994bcd73905c`) with Status: "To Do", Type: "Follow-up", and populated SECTION Data. Use the Node script approach for writing SECTION Data (JSON chunked into 1900-char rich_text segments).
 - **Update Working Memory** — If significant decisions were made, update the Working Memory page in Notion.
 - TO MOVE FORWARD: Automatic — proceed to Step 5 after all actions complete.
@@ -225,11 +225,11 @@ The Onboarding Data Points DB tracks everything an academy owner needs to provid
 The interactive desktop prototype is a Vite/React app located at:
 
 ```
-app/src/
+prototype/src/
 ```
 
 **This is where all UI/prototype edits should be made.** The app structure:
-- `src/pages/` — page-level components (Home, Sales, Members, Marketing, Settings, member-app/)
+- `src/pages/` — page-level components (Home, Sales, Members, Marketing, Settings, member-prototype/)
 - `src/components/` — shared components (Layout, Sidebar, GlobalInbox, PageBanner, StatPill)
 - `src/styles/` — CSS modules per component/page
 - `src/hooks/` — custom React hooks
@@ -240,7 +240,7 @@ app/src/
 
 There are two sources of truth — they serve different purposes and must stay in sync:
 
-1. **Prototype** (`app/src/`) — the reference implementation showing what's been built. This is the living spec for UI, features, and interactions. When someone asks "what does the Sales page look like?" — the prototype is the answer. It deploys to https://fullcontrol-prototype-six.vercel.app on every push to `main`.
+1. **Prototype** (`prototype/src/`) — the reference implementation showing what's been built. This is the living spec for UI, features, and interactions. When someone asks "what does the Sales page look like?" — the prototype is the answer. It deploys to https://fullcontrol-prototype-six.vercel.app on every push to `main`.
 2. **Notion** — structured requirement tables under the [Business Requirements](https://www.notion.so/31b5aca8ac0f81dca970c023294b24de) parent page. When someone asks "what are the requirements for the Sales domain?" — Notion is the answer. Each domain page has a table of job IDs with full specs. Domains:
    - [Marketing](https://www.notion.so/31b5aca8ac0f81d3bffdc79932d118c9)
    - [Content](https://www.notion.so/31f5aca8ac0f81229933dab1be576bf1)
