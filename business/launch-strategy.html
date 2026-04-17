@@ -479,9 +479,34 @@ hr.section-div {
   .channel-grid { grid-template-columns: repeat(2, 1fr); }
   .pos-grid { grid-template-columns: 1fr; }
 }
+
+.export-btn {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  padding: 12px 22px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(124,106,247,0.4);
+  transition: all 0.15s;
+  z-index: 100;
+}
+.export-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(124,106,247,0.5); }
+.export-btn.copied { background: var(--accent2); box-shadow: 0 4px 20px rgba(56,217,169,0.4); }
 </style>
 </head>
 <body>
+
+<button class="export-btn" id="export-btn" onclick="exportNotes()">Export Notes</button>
 
 <div class="shell">
 
@@ -1009,6 +1034,44 @@ hr.section-div {
     if (saved) ta.value = saved;
     ta.addEventListener('input', () => localStorage.setItem(key, ta.value));
   });
+
+  // Export all notes grouped by section
+  const sectionMeta = [
+    { id: 'phases', title: 'Phase Overview', fields: ['Phase 0', 'Phase 1', 'Phase 2', 'Phase 3', 'Phase strategy notes'] },
+    { id: 'distribution', title: 'Distribution Engine', fields: ['Coleman / BAM Brand', 'Existing Network', 'Organic / Content', 'Cold Outreach', 'Partnerships', 'Referrals', 'Distribution strategy notes'] },
+    { id: 'sales-motion', title: 'Sales Motion', fields: ['Who\'s Selling', 'Sales Cycle Length', 'Trial / Pilot Model', 'Sales motion notes'] },
+    { id: 'positioning', title: 'Positioning', fields: ['One-Line Pitch', 'Three Angles (Holy Trinity)', 'Target Archetypes', 'Positioning notes'] },
+    { id: 'launch-readiness', title: 'Launch Readiness', fields: ['Product', 'Infrastructure', 'Team', 'Sales Assets', 'Launch readiness notes'] },
+    { id: 'open-decisions', title: 'Open Decisions', fields: ['New decisions to track'] },
+  ];
+
+  function exportNotes() {
+    const allTextareas = Array.from(document.querySelectorAll('textarea'));
+    let taIndex = 0;
+    const sectionTextareas = sectionMeta.map(sec => {
+      const fields = sec.fields.map(label => ({ label, value: allTextareas[taIndex++]?.value?.trim() || '' }));
+      return { ...sec, fields };
+    });
+
+    const lines = ['# FullControl Launch Strategy — Notes Export', `_${new Date().toLocaleDateString('en-CA')}_`, ''];
+    sectionTextareas.forEach(sec => {
+      const hasContent = sec.fields.some(f => f.value);
+      if (!hasContent) return;
+      lines.push(`## ${sec.title}`);
+      sec.fields.forEach(f => {
+        if (f.value) lines.push(`**${f.label}:** ${f.value}`);
+      });
+      lines.push('');
+    });
+
+    const output = lines.join('\n');
+    navigator.clipboard.writeText(output).then(() => {
+      const btn = document.getElementById('export-btn');
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Export Notes'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
 </script>
 </body>
 </html>
