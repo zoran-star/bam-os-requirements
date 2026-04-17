@@ -1929,7 +1929,28 @@ function lmRenderTarget(rows) {
   } else {
     display.classList.remove('lit', 'unreachable');
     val.classList.remove('unreachable');
-    val.textContent = 'Beyond 24 months';
+    // Keep projecting past 24 months to find the actual month
+    const { launch, baseGrowth, growthRate, churn, price } = lmVals;
+    const churnRate = churn / 100, mgr = growthRate / 100;
+    let clients = rows[rows.length - 1].clients;
+    let found = null;
+    for (let m = 25; m <= 240; m++) {
+      const newC = baseGrowth * Math.pow(1 + mgr, m - 2);
+      const churned = Math.round(clients * churnRate * 10) / 10;
+      clients = Math.max(0, clients + newC - churned);
+      const arr = clients * price * 12;
+      if (arr >= lmTargetArr) { found = m; break; }
+    }
+    if (found) {
+      const yrs = Math.floor(found / 12), mos = found % 12;
+      let timeStr = '';
+      if (yrs > 0) timeStr += yrs + (yrs === 1 ? ' year' : ' years');
+      if (yrs > 0 && mos > 0) timeStr += ', ';
+      if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
+      val.textContent = `Month ${found} — ${timeStr}`;
+    } else {
+      val.textContent = `Month ${found ?? '240+'}`;
+    }
   }
 }
 
