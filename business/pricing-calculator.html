@@ -253,6 +253,32 @@
   .slider-row-value.green-val { color: #4caf82; }
   .slider-row-value.dim { color: #555; font-weight: 500; }
 
+  /* Computed MRR row (training classes) */
+  .computed-row {
+    background: rgba(201,168,76,0.05);
+    border: 1px solid rgba(201,168,76,0.12);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin: 0 -12px;
+  }
+  .computed-formula {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #555;
+  }
+  .formula-num {
+    font-weight: 700;
+    color: #c9a84c;
+    font-size: 14px;
+  }
+  .formula-op {
+    color: #444;
+    font-size: 12px;
+  }
+
   /* ARR section */
   .arr-section {
     background: rgba(255,255,255,0.03);
@@ -415,6 +441,10 @@
   const PRICE_MIN = 50;
   const PRICE_MAX = 1500;
 
+  const CLIENTS_MAX = 500;
+  const ARPU_MIN = 150;
+  const ARPU_MAX = 250;
+
   const state = {};
   MODELS.forEach(m => {
     state[m.id] = {
@@ -425,6 +455,11 @@
       selected: m.defaultSel,
     };
   });
+
+  // Training-specific derived state
+  state.training.clients = 75;
+  state.training.arpu    = 200;
+  state.training.mrr     = state.training.clients * state.training.arpu;
 
   function fmt(n) {
     if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
@@ -487,13 +522,30 @@
     pctEl.textContent = s.enabled ? pStr + ' of MRR' : '—';
     pctEl.className = 'badge-pct ' + (s.enabled ? pctColor(p) : '');
 
-    // MRR slider
-    const mrrEl = document.getElementById(`mrr-slider-${id}`);
-    mrrEl.value = s.mrr;
-    mrrEl.disabled = !s.enabled;
-    document.getElementById(`mrr-val-${id}`).textContent = fmtFull(s.mrr) + '/mo';
-    document.getElementById(`mrr-val-${id}`).className = 'slider-row-value' + (s.enabled ? '' : ' dim');
-    updateMrrFill(id);
+    // MRR — training uses computed value; others use slider
+    if (id === 'training') {
+      document.getElementById('clients-slider').value = s.clients;
+      document.getElementById('clients-fill').style.width = (s.clients / CLIENTS_MAX * 100) + '%';
+      document.getElementById('clients-val').textContent = s.clients + ' members';
+
+      document.getElementById('arpu-slider').value = s.arpu;
+      document.getElementById('arpu-fill').style.width = ((s.arpu - ARPU_MIN) / (ARPU_MAX - ARPU_MIN) * 100) + '%';
+      document.getElementById('arpu-val').textContent = fmtFull(s.arpu) + '/mo';
+
+      document.getElementById('training-mrr-clients').textContent = s.clients;
+      document.getElementById('training-mrr-arpu').textContent = fmtFull(s.arpu);
+      document.getElementById('mrr-val-training').textContent = fmtFull(s.mrr) + '/mo';
+
+      document.getElementById('clients-slider').disabled = !s.enabled;
+      document.getElementById('arpu-slider').disabled    = !s.enabled;
+    } else {
+      const mrrEl = document.getElementById(`mrr-slider-${id}`);
+      mrrEl.value = s.mrr;
+      mrrEl.disabled = !s.enabled;
+      document.getElementById(`mrr-val-${id}`).textContent = fmtFull(s.mrr) + '/mo';
+      document.getElementById(`mrr-val-${id}`).className = 'slider-row-value' + (s.enabled ? '' : ' dim');
+      updateMrrFill(id);
+    }
 
     // Range sliders
     const rMinEl = document.getElementById(`range-min-${id}`);
@@ -554,6 +606,58 @@
       card.id = `card-${m.id}`;
       card.className = 'model-card active';
 
+      const isTraining = m.id === 'training';
+
+      const mrrSliderRow = isTraining ? `
+          <!-- Clients -->
+          <div class="slider-row">
+            <div class="slider-row-label">Clients</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill gold-fill" id="clients-fill" style="left:0;width:${s.clients/CLIENTS_MAX*100}%"></div>
+              <input type="range" class="single" id="clients-slider"
+                min="0" max="${CLIENTS_MAX}" step="1" value="${s.clients}">
+            </div>
+            <div class="slider-row-value" id="clients-val">${s.clients} members</div>
+          </div>
+
+          <!-- ARPU -->
+          <div class="slider-row">
+            <div class="slider-row-label">ARPU</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill gold-fill" id="arpu-fill" style="left:0;width:${(s.arpu-ARPU_MIN)/(ARPU_MAX-ARPU_MIN)*100}%"></div>
+              <input type="range" class="single" id="arpu-slider"
+                min="${ARPU_MIN}" max="${ARPU_MAX}" step="5" value="${s.arpu}">
+            </div>
+            <div class="slider-row-value" id="arpu-val">${fmtFull(s.arpu)}/mo</div>
+          </div>
+
+          <!-- Computed MRR -->
+          <div class="slider-row computed-row">
+            <div class="slider-row-label">Academy MRR</div>
+            <div class="computed-formula">
+              <span class="formula-num" id="training-mrr-clients">${s.clients}</span>
+              <span class="formula-op">members ×</span>
+              <span class="formula-num" id="training-mrr-arpu">${fmtFull(s.arpu)}</span>
+              <span class="formula-op">=</span>
+            </div>
+            <div class="slider-row-value gold" id="mrr-val-training">${fmtFull(s.mrr)}/mo</div>
+          </div>
+      ` : `
+          <!-- MRR -->
+          <div class="slider-row">
+            <div class="slider-row-label">Academy MRR</div>
+            <div class="slider-row-track">
+              <div class="track-bg"></div>
+              <div class="track-fill gold-fill" id="mrr-fill-${m.id}" style="left:0;width:${s.mrr/MRR_MAX*100}%"></div>
+              <input type="range" class="single" id="mrr-slider-${m.id}"
+                min="0" max="${MRR_MAX}" step="100" value="${s.mrr}">
+            </div>
+            <div class="slider-row-value" id="mrr-val-${m.id}">${fmtFull(s.mrr)}/mo</div>
+          </div>
+      `;
+
       card.innerHTML = `
         <div class="model-header">
           <button class="toggle on" id="toggle-${m.id}"></button>
@@ -567,17 +671,7 @@
 
         <div class="slider-rows">
 
-          <!-- MRR -->
-          <div class="slider-row">
-            <div class="slider-row-label">Academy MRR</div>
-            <div class="slider-row-track">
-              <div class="track-bg"></div>
-              <div class="track-fill gold-fill" id="mrr-fill-${m.id}" style="left:0;width:${s.mrr/MRR_MAX*100}%"></div>
-              <input type="range" class="single" id="mrr-slider-${m.id}"
-                min="0" max="${MRR_MAX}" step="100" value="${s.mrr}">
-            </div>
-            <div class="slider-row-value" id="mrr-val-${m.id}">${fmtFull(s.mrr)}/mo</div>
-          </div>
+          ${mrrSliderRow}
 
           <!-- Price range (dual thumb) -->
           <div class="slider-row">
@@ -618,11 +712,24 @@
         updateModelUI(m.id);
       });
 
-      // MRR slider
-      document.getElementById(`mrr-slider-${m.id}`).addEventListener('input', e => {
-        state[m.id].mrr = parseInt(e.target.value);
-        updateModelUI(m.id);
-      });
+      // MRR slider (non-training only)
+      if (m.id === 'training') {
+        document.getElementById('clients-slider').addEventListener('input', e => {
+          state.training.clients = parseInt(e.target.value);
+          state.training.mrr = state.training.clients * state.training.arpu;
+          updateModelUI('training');
+        });
+        document.getElementById('arpu-slider').addEventListener('input', e => {
+          state.training.arpu = parseInt(e.target.value);
+          state.training.mrr = state.training.clients * state.training.arpu;
+          updateModelUI('training');
+        });
+      } else {
+        document.getElementById(`mrr-slider-${m.id}`).addEventListener('input', e => {
+          state[m.id].mrr = parseInt(e.target.value);
+          updateModelUI(m.id);
+        });
+      }
 
       // Range min slider
       document.getElementById(`range-min-${m.id}`).addEventListener('input', e => {
