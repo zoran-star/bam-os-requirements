@@ -1927,9 +1927,9 @@ function lmRenderTarget(rows) {
     if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
     val.textContent = `Month ${hit.month} — ${timeStr || 'at launch'}`;
   } else {
-    display.classList.remove('lit'); display.classList.add('unreachable');
-    val.classList.add('unreachable');
-    val.textContent = 'Not reached within 24 months';
+    display.classList.remove('lit', 'unreachable');
+    val.classList.remove('unreachable');
+    val.textContent = 'Beyond 24 months';
   }
 }
 
