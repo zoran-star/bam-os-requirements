@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Exit Multiple Calculator — BAM OS</title>
+<title>Exit Multiple Calculator — FullControl</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -284,6 +284,301 @@
     color: #c9a84c;
   }
 
+  /* Moats section */
+  .moats-section {
+    margin-bottom: 36px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .moats-section summary {
+    padding: 18px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #c9a84c;
+    list-style: none;
+    user-select: none;
+    background: rgba(201, 168, 76, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .moats-section summary::-webkit-details-marker { display: none; }
+  .moats-section summary::after {
+    content: '▾';
+    font-size: 14px;
+    transition: transform 0.2s;
+  }
+  .moats-section[open] summary::after { transform: rotate(180deg); }
+  .moats-intro {
+    padding: 16px 24px 4px;
+    font-size: 12.5px;
+    color: #888;
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .moats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+    gap: 14px;
+    padding: 16px 24px 24px;
+  }
+  .moat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 20px 22px;
+    transition: border-color 0.2s;
+  }
+  .moat-card:hover {
+    border-color: rgba(201, 168, 76, 0.3);
+  }
+  .moat-rank {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    color: #666;
+    margin-bottom: 6px;
+    letter-spacing: 0.08em;
+  }
+  .moat-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #c9a84c;
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+  }
+  .moat-section {
+    margin-top: 10px;
+  }
+  .moat-section:first-of-type { margin-top: 0; }
+  .moat-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 3px;
+  }
+  .moat-text {
+    font-size: 12px;
+    line-height: 1.55;
+    color: #b8b8b8;
+  }
+  .moat-impact-text {
+    color: #d4b968;
+    font-weight: 500;
+  }
+  .moat-source-text {
+    color: #888;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .moat-card.primary {
+    background: rgba(201, 168, 76, 0.06);
+    border-color: rgba(201, 168, 76, 0.2);
+  }
+
+  /* Comparable Exits section */
+  .deals-section {
+    margin-bottom: 36px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .deals-section summary {
+    padding: 18px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #c9a84c;
+    list-style: none;
+    user-select: none;
+    background: rgba(201, 168, 76, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .deals-section summary::-webkit-details-marker { display: none; }
+  .deals-section summary::after {
+    content: '▾';
+    font-size: 14px;
+    transition: transform 0.2s;
+  }
+  .deals-section[open] summary::after { transform: rotate(180deg); }
+  .deals-intro {
+    padding: 16px 24px 4px;
+    font-size: 12.5px;
+    color: #888;
+    line-height: 1.6;
+    font-style: italic;
+  }
+  .deals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    gap: 14px;
+    padding: 16px 24px 24px;
+  }
+  .deal-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 20px 22px;
+    transition: border-color 0.2s;
+  }
+  .deal-card:hover {
+    border-color: rgba(201, 168, 76, 0.3);
+  }
+  .deal-card.closest {
+    background: rgba(201, 168, 76, 0.06);
+    border-color: rgba(201, 168, 76, 0.2);
+  }
+  .deal-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .deal-tag {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    color: #c9a84c;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .deal-date {
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 10px;
+    color: #666;
+    letter-spacing: 0.05em;
+  }
+  .deal-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e0e0e0;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+  .deal-title .arrow {
+    color: #c9a84c;
+    margin: 0 8px;
+  }
+  .deal-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+    padding: 10px 12px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 11px;
+  }
+  .deal-fact-label {
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 9px;
+    font-weight: 600;
+  }
+  .deal-fact-value {
+    color: #d0d0d0;
+    font-weight: 500;
+  }
+  .deal-fact-est .deal-fact-label {
+    color: #c9a84c;
+  }
+  .deal-fact-est .deal-fact-value {
+    color: #e8d488;
+  }
+  .info-icon {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    line-height: 12px;
+    text-align: center;
+    font-size: 9px;
+    font-weight: 700;
+    font-style: italic;
+    font-family: Georgia, serif;
+    color: #c9a84c;
+    background: rgba(201, 168, 76, 0.15);
+    border: 1px solid rgba(201, 168, 76, 0.4);
+    border-radius: 50%;
+    cursor: help;
+    margin-left: 5px;
+    position: relative;
+    vertical-align: middle;
+  }
+  .info-icon:hover {
+    background: rgba(201, 168, 76, 0.3);
+    color: #fff;
+  }
+  .info-icon:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0a0a1a;
+    border: 1px solid rgba(201, 168, 76, 0.5);
+    color: #d0d0d0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 400;
+    font-style: normal;
+    line-height: 1.6;
+    width: 300px;
+    z-index: 1000;
+    white-space: normal;
+    text-align: left;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .info-icon:hover::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(201, 168, 76, 0.5);
+    z-index: 1001;
+    pointer-events: none;
+  }
+  .deal-section {
+    margin-top: 10px;
+  }
+  .deal-section:first-of-type { margin-top: 0; }
+  .deal-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+    margin-bottom: 3px;
+  }
+  .deal-text {
+    font-size: 12px;
+    line-height: 1.55;
+    color: #b8b8b8;
+  }
+  .deal-lesson {
+    color: #d4b968;
+    font-weight: 500;
+  }
+  .deal-source {
+    color: #888;
+    font-size: 10.5px;
+    line-height: 1.5;
+  }
+
   @media (max-width: 768px) {
     .output-grid { grid-template-columns: 1fr; }
     .output-main .value { font-size: 36px; }
@@ -295,8 +590,620 @@
 <div class="canvas">
   <div class="header">
     <h1>Exit Multiple Calculator</h1>
-    <p>Workshop what BAM OS could exit for. Every factor defaults to a position grounded in public market research — adjust based on where you think we'll actually land at time of sale.</p>
+    <p>Workshop what FullControl could exit for. Every factor defaults to a position grounded in public market research — adjust based on where you think we'll actually land at time of sale.</p>
   </div>
+
+  <details class="moats-section" open>
+    <summary>The Moats — What Buyers Actually Pay For</summary>
+    <div class="moats-intro">
+      Moat hierarchy, most durable first. Everything below is what a strategic acquirer like LeagueApps, Stack Sports, or TeamSnap cannot build in time — which is why they have to buy instead.
+    </div>
+    <div class="moats-grid">
+
+      <div class="moat-card primary">
+        <div class="moat-rank">MOAT 1 — FOUNDATIONAL STRUCTURAL</div>
+        <div class="moat-name">AI-Native Cross-Domain Architecture</div>
+
+        <div class="moat-section">
+          <div class="moat-label">What it is</div>
+          <div class="moat-text">A unified data schema across every business domain — acquisition, sales, retention, revenue, content — running on agent-native infrastructure built for LLM reasoning from day one. The acquisition agent knows which ad drove a lead. The sales agent knows which leads converted. The revenue agent knows which members are at risk. The strategy agent connects it all into one business picture. Every workflow is designed for autonomous agent action and cross-domain reasoning, not retrofitted onto a CRUD app with AI bolted on.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Why an acquirer needs it</div>
+          <div class="moat-text">Incumbents in sports-tech (LeagueApps, TeamSnap, Stack Sports, Mindbody) all run as siloed modules on legacy architectures. Retrofitting cross-domain intelligence requires redesigning the data model — a multi-quarter rebuild. TeamSnap proved this with their 24-month TeamSnap ONE rewrite in 2025, which was primarily about unlocking the architectural capacity for AI. Even after that rebuild, they face the next problem: getting their data model to actually support cross-domain agent reasoning. That's the gap FullControl already closed. Buyers acquire to skip the multi-year rebuild cycle and inherit the integrated system pre-built.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Impact on multiple</div>
+          <div class="moat-text moat-impact-text">+2–5x on the baseline multiple as the foundational premium for agent-native architecture combined with cross-domain data integration. This is the structural core of the entire moat stack — every other moat depends on it.<br><br>Two different durability curves sit underneath this premium:<br><br><strong>AI-native portion (roughly +1–2x of the total):</strong> Has a window. Incumbents are rebuilding now. This portion is highest today and compresses over the next 18–36 months as more platforms ship their rebuilds.<br><br><strong>Cross-domain schema portion (roughly +1–3x of the total):</strong> Structurally durable. Incumbents can add AI layers in months; unifying siloed data models across acquisition, sales, retention, revenue, and scheduling is a multi-year project that many companies never actually complete. Stack Sports alone has 35+ acquisitions with incompatible data models — unifying them is a political and technical nightmare. No obvious decay window.<br><br><strong>Net effect:</strong> exit timing matters for the full premium, but even in a late-cycle exit (2028+), the cross-domain portion should still command a meaningful structural premium.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Sources</div>
+          <div class="moat-text moat-source-text">Aventis Advisors "AI M&A Multiples Report" (2025); Andreessen Horowitz "Vertical SaaS: Now with AI Inside" (Nov 2024); Bessemer Venture Partners Vertical AI Thesis (2024); Foundation Capital "The Vertical AI Playbook" (2025); TeamSnap ONE launch announcement (Nov 18, 2025); LeagueApps Product Updates 2025; Upper Hand "State of Sports Facility Management" (2025); Gartner "Emerging Vertical AI Agent Landscape" (2025); 733Park "2025 SaaS M&A Trends."</div>
+        </div>
+      </div>
+
+      <div class="moat-card primary">
+        <div class="moat-rank">MOAT 2 — LONG-TERM FLYWHEEL</div>
+        <div class="moat-name">Proprietary Data Flywheel</div>
+
+        <div class="moat-section">
+          <div class="moat-label">What it is</div>
+          <div class="moat-text">Agent interaction logs, knowledge-gap tables, and longitudinal behavioral data on how sports training businesses actually run — captured at the agent layer from day one. Each new customer deepens the dataset, which improves agent outputs, which attracts more customers.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Why an acquirer needs it</div>
+          <div class="moat-text">Cannot be replicated without years of live customers operating on the platform. Buyers use this data to train future models, improve products across their entire portfolio, and lock in switching costs at the data layer — the most durable form of competitive advantage in AI.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Impact on multiple</div>
+          <div class="moat-text moat-impact-text">+1–3x, scales with dataset depth. At acquisition time, depth is primarily a function of months live and number of academies operating on the platform.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Sources</div>
+          <div class="moat-text moat-source-text">Andreessen Horowitz "Data Moats" framework (2023–2024); Bessemer AI Value Stack Thesis (2024); CB Insights "Data Moats in the Age of AI" (2024); NFX "Network Effects in the AI Era" (2024).</div>
+        </div>
+      </div>
+
+      <div class="moat-card primary">
+        <div class="moat-rank">MOAT 3 — COMPOUNDING NETWORK</div>
+        <div class="moat-name">Expert Operator Network</div>
+
+        <div class="moat-section">
+          <div class="moat-label">What it is</div>
+          <div class="moat-text">FullControl's agents are trained by a growing network of top-performing academy operators — not just the founders. Elite operators contribute their decision-making patterns, playbooks, and judgment calls into the product layer, where they are continuously refined. The agents put this knowledge to work two ways: they <strong>take optimal autonomous actions</strong> where the pattern is clear (re-engagement, pricing nudges, campaign adjustments, scheduling), and they <strong>provide advisory counsel</strong> where nuance is required. Scope covers the five highest-leverage business domains: pricing, sales, marketing, overall strategy, and content.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Why an acquirer needs it</div>
+          <div class="moat-text">The default way to build vertical AI is "hire three domain experts, have them write a playbook, wire it into prompts." A competitor can do that in a month. FullControl's approach is structurally different: we run an <strong>active expert network</strong> that continuously refines the agents. That creates a self-reinforcing loop — the best operators want to work with the smartest platform, and the smartest platform is the one the best operators are training. A competitor cannot catch up by hiring three people; they would have to build a rival expert network, which takes years of trust and platform adoption to assemble. Critically, the knowledge is captured in the product layer, not in any individual's head — so an acquirer inherits the full asset even after founder retention expires, and the network-training mechanism travels cleanly to adjacent sports where BAM's basketball brand does not.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Impact on multiple</div>
+          <div class="moat-text moat-impact-text">+1–2x on the baseline multiple as a direct AI-quality premium, plus an additional +10–20% for the institutional-knowledge asset. Durability is high: the network-of-operators mechanism is vertical-agnostic, unlike founder-specific domain expertise which doesn't transfer.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Sources</div>
+          <div class="moat-text moat-source-text">Andreessen Horowitz "Expert-in-the-Loop AI" framework (2024); Scale AI RLHF-with-domain-experts methodology (2023–2024); Harvey AI (legal) and Abridge (medical) as direct comparables — both built structural moats by aggregating expert input into domain-specific AI; NFX "Data Network Effects via Expert Networks" (2024); Bessemer Venture Partners "Human-AI Collaboration in Vertical SaaS" (2024); Menlo Ventures "The AI Application Layer" (2024).</div>
+        </div>
+      </div>
+
+      <div class="moat-card">
+        <div class="moat-rank">MOAT 4 — RETENTION LOCK-IN</div>
+        <div class="moat-name">Operational Stickiness</div>
+
+        <div class="moat-section">
+          <div class="moat-label">What it is</div>
+          <div class="moat-text">Once FullControl runs an academy's lead gen, sales, scheduling, retention, billing, and reporting end-to-end, switching platforms means rebuilding operations from scratch. The more systems FullControl touches (Stripe, GHL, Meta, scheduling, membership), the higher the switching cost.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Why an acquirer needs it</div>
+          <div class="moat-text">High switching costs translate directly into predictable revenue and low churn — the two metrics acquirers use as multiple expanders. A deeply embedded platform is far more valuable than a feature-rich one that customers can leave easily. Unlike timing-based moats, stickiness does not decay — once established, it persists through the acquirer's ownership period.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Impact on multiple</div>
+          <div class="moat-text moat-impact-text">+20–30% via improved retention metrics (GRR, NRR). Indirect impact through reduced churn risk — acquirers apply steep discounts for high-churn businesses, so avoiding the discount is its own premium.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Sources</div>
+          <div class="moat-text moat-source-text">Bessemer State of the Cloud 2025 (switching-cost analysis); Tien Tzuo "Subscribed: Why the Subscription Model Will Be Your Company's Future"; ChartMogul SaaS Retention Benchmarks 2024; SaaS Capital "Switching Costs and Valuation Multiples" (2024).</div>
+        </div>
+      </div>
+
+      <div class="moat-card">
+        <div class="moat-rank">MOAT 5 — FORCING FUNCTION</div>
+        <div class="moat-name">Market Takeover Velocity (PMF + Comprehensiveness)</div>
+
+        <div class="moat-section">
+          <div class="moat-label">What it is</div>
+          <div class="moat-text">FullControl captures the training-academy market rapidly because of two stacked advantages. First, product-market fit: once an academy owner sees the product, it matches the way they actually run their business — not a generic SaaS template retrofitted for sports. Second, comprehensiveness: FullControl replaces 4–6 disconnected tools (CRM, scheduling, member management, billing, marketing, reporting) with one integrated system. Onboarding takes an hour, not weeks. Every academy that adopts it rarely leaves and rarely looks elsewhere.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Why an acquirer needs it</div>
+          <div class="moat-text">The current market is fragmented — academies use LeagueApps for registration, Mindbody for scheduling, Stripe for payments, GHL for marketing, spreadsheets for everything else. No incumbent has a comprehensive vertical product. FullControl does, which means it captures share from everyone simultaneously. If a buyer doesn't acquire FullControl, they watch it compound account-by-account until the vertical is effectively owned — and no competitor can replicate the comprehensiveness without a multi-year rebuild.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Impact on multiple</div>
+          <div class="moat-text moat-impact-text">+10–30% as a strategic urgency premium. This moat's real power is that it amplifies every other moat: strong PMF + comprehensive product = rapid share capture = real competitive tension in a buyer process. It converts "should we acquire?" into "if we don't, who will?" Caveat: this moat decays once the market is captured — it's a growth-phase moat, not a permanent one.</div>
+        </div>
+
+        <div class="moat-section">
+          <div class="moat-label">Sources</div>
+          <div class="moat-text moat-source-text">Andreessen Horowitz "Vertical SaaS: Now with AI Inside" (Nov 2024) on comprehensiveness-driven displacement; First Round Review "Why Comprehensive Products Win Vertical Markets" (2024); Bessemer "Vertical AI Category Capture" thesis (2024); Capstone Partners Sports Tech M&A Reports (Aug 2025 + Mar 2026) on active consolidation windows; ServiceTitan IPO precedent (comprehensive vertical SaaS winning home services).</div>
+        </div>
+      </div>
+
+
+    </div>
+  </details>
+
+  <details class="deals-section" open>
+    <summary>Comparable Exits — What Buyers Actually Paid For</summary>
+    <div class="deals-intro">
+      Every comp below is a sports-tech or training-vertical acquisition. Most deal sizes and multiples are <strong style="color:#c9a84c;">undisclosed</strong> — that's standard in private sports-tech M&A. Where public figures, rumored numbers, or credible estimates exist, they are included with clear confidence labels. A "Financial Context" block for each deal shows what's reported, what's inferred, and what's unknown.
+    </div>
+
+    <div style="padding: 0 24px 16px;">
+      <div style="background: rgba(201, 168, 76, 0.04); border: 1px solid rgba(201, 168, 76, 0.15); border-radius: 14px; padding: 18px 22px;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #c9a84c; margin-bottom: 10px;">Benchmark Multiples — Disclosed Deals & IPOs (For Reference)</div>
+        <div style="font-size: 11.5px; line-height: 1.7; color: #b0b0b0;">
+          Since the private sports-tech deals below are undisclosed, these <em>disclosed</em> transactions in adjacent vertical-SaaS categories anchor what multiples look like when the numbers are public:
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 12px; font-size: 11px;">
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">ServiceTitan IPO (Dec 2024)</div>
+            <div style="color: #999;">~$9B market cap on ~$685M ARR = <strong style="color:#d0d0d0;">~13x ARR</strong>. Home-services vertical SaaS with AI automation. Public comp.</div>
+          </div>
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">Veeva Systems (public)</div>
+            <div style="color: #999;">Life-sciences vertical SaaS. Trades at <strong style="color:#d0d0d0;">15–20x ARR</strong> historically. Gold-standard vertical-SaaS benchmark.</div>
+          </div>
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">Procore (public)</div>
+            <div style="color: #999;">Construction vertical SaaS. Currently <strong style="color:#d0d0d0;">~10x ARR</strong>. Down from peak 20x+ in 2021.</div>
+          </div>
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">Toast (public)</div>
+            <div style="color: #999;">Restaurant vertical SaaS. Currently <strong style="color:#d0d0d0;">~6–7x ARR</strong>. Lower due to payments-heavy revenue mix.</div>
+          </div>
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">Mindbody / Vista Equity (2019)</div>
+            <div style="color: #999;">Take-private at <strong style="color:#d0d0d0;">$1.9B on ~$250M revenue = ~7.6x</strong>. Closest direct comp to fitness vertical.</div>
+          </div>
+          <div style="padding: 10px 12px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+            <div style="color: #c9a84c; font-weight: 600; margin-bottom: 2px;">Median Private SaaS M&A (2024)</div>
+            <div style="color: #999;"><strong style="color:#d0d0d0;">~4.1x ARR</strong> baseline (SaasRise). AI-native vertical SaaS currently trading at +2–5x premium over this.</div>
+          </div>
+        </div>
+        <div style="margin-top: 12px; font-size: 10.5px; color: #666; font-style: italic; line-height: 1.6;">
+          Sources: ServiceTitan S-1 and IPO filings (Dec 2024); Veeva and Procore 10-K filings; Toast 10-K; Vista Equity Mindbody announcement (Feb 2019); SaasRise 2025 M&A Report.
+        </div>
+      </div>
+    </div>
+    <div class="deals-grid">
+
+      <div class="deal-card closest">
+        <div class="deal-banner">
+          <span class="deal-tag">★ CLOSEST PRECEDENT</span>
+          <span class="deal-date">JUNE 17, 2025</span>
+        </div>
+        <div class="deal-title">Mod11 <span class="arrow">→</span> LeagueApps</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Acquirer</div>
+            <div class="deal-fact-value">LeagueApps (Accel-KKR / Arctos backed)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Target Vertical</div>
+            <div class="deal-fact-value">Elite youth soccer (MLS Next, USL, EAL)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Founder Outcome</div>
+            <div class="deal-fact-value">Ryan Miller retained to lead soccer innovation</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — LeagueApps</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Parent capital:</strong> Accel-KKR (tech-focused PE, ~$20B AUM) + Arctos Sports Partners (sports-focused PE) — joint capital partners since Oct 2024 funding round.<br>
+            <strong style="color:#d4b968;">Portfolio (post-2025 M&A):</strong> Core LeagueApps platform (registration, scheduling, payments, club management) + <strong>RecTimes</strong> (facility scheduling, May 2025) + <strong>Mod11</strong> (elite soccer competition management, June 2025).<br>
+            <strong style="color:#d4b968;">Stated mission:</strong> "Complete operating system for youth sports."<br>
+            <strong style="color:#d4b968;">M&A thesis:</strong> Active buy-and-build — add vertical depth and operational layers through acquisition rather than organic development. Two deals in 8 months post-funding demonstrates high deployment velocity.<br>
+            <strong style="color:#d4b968;">Relevance to FullControl:</strong> Basketball training is a visible vertical gap in their current portfolio. AI-native operations is the layer they don't have.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Undisclosed. Neither party released figures.<br>
+            <strong style="color:#d4b968;">Est. ARR at exit:</strong> Small. Mod11 served elite leagues only (MLS Next, USL, EAL) — estimated <strong style="color:#d0d0d0;">&lt;$5M ARR</strong>. Not scale-focused; depth-focused.<br>
+            <strong style="color:#d4b968;">Implied multiple:</strong> No public basis. The strategic value was capability + founder, not revenue.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Low on absolute numbers, high on the strategic rationale. Buyers paid for the domain wedge, not the ARR.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What Mod11 was</div>
+          <div class="deal-text">A digitalized match operations and competition management platform built specifically for elite youth soccer. Founded by Ryan Miller — former Portland Timbers academy director, Elite Academy League commissioner, and former MLS player. Served MLS Next, USL, and the Elite Academy League. Differentiator: deep sport-specific data collection across multiple stakeholders (clubs, referees, leagues) plus administrative workflows no generic platform could replicate.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Why LeagueApps bought it</div>
+          <div class="deal-text">Soccer is the most-participated youth sport in America by LeagueApps' own data. Mod11 gave instant credibility and product depth in soccer — sport-specific expertise that elite clubs trusted. Data architecture aligned with LeagueApps' thesis that data is the central competitive asset. Ryan Miller joined post-acquisition to lead soccer innovation — they bought the domain expertise as much as the product. The deal came 8 months after the Accel-KKR funding round (Oct 2024) and on the heels of RecTimes.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">This is the closest structural precedent. Training-vertical-specific platform with domain expertise embedded in agent logic = analogous to Mod11's sport-specific operational tools. Basketball training is to LeagueApps what soccer was before Mod11: an unserved vertical with unique operational complexity. FullControl is the Mod11 equivalent for basketball. Plan for founder retention.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">LeagueApps press release, June 17 2025; Sports Business Journal coverage, June 2025; Ryan Miller LinkedIn announcement; TechCrunch "LeagueApps continues buy-and-build strategy" (June 2025).</div>
+        </div>
+      </div>
+
+      <div class="deal-card">
+        <div class="deal-banner">
+          <span class="deal-tag">PARTNERSHIP → ACQUISITION</span>
+          <span class="deal-date">MAY 8, 2025</span>
+        </div>
+        <div class="deal-title">RecTimes <span class="arrow">→</span> LeagueApps</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Acquirer</div>
+            <div class="deal-fact-value">LeagueApps</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Target Category</div>
+            <div class="deal-fact-value">Facility scheduling & operations</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Pre-Deal Relationship</div>
+            <div class="deal-fact-value">2 years of close product partnership</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — LeagueApps</div>
+          <div class="deal-text">
+            Same acquirer as Mod11 above — see previous card for full profile. RecTimes was the <strong>first</strong> acquisition after the Oct 2024 Accel-KKR / Arctos funding round; Mod11 followed 5 weeks later. The two deals together establish LeagueApps as the most active buy-and-build acquirer in youth sports tech right now.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Undisclosed.<br>
+            <strong style="color:#d4b968;">Est. ARR at exit:</strong> Small. RecTimes was an emerging facility-scheduling tool, likely <strong style="color:#d0d0d0;">&lt;$3M ARR</strong> at sale. Not a revenue-driven acquisition.<br>
+            <strong style="color:#d4b968;">Implied multiple:</strong> No public basis. Tuck-in acquisition pricing logic typically ranges <strong style="color:#d0d0d0;">3–8x</strong> for this profile — lower if mostly people/product, higher if there's a customer base to absorb.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Low on absolute numbers. The 2-year prior partnership likely kept the price modest since there was no competitive process.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What RecTimes was</div>
+          <div class="deal-text">A purpose-built facility management solution for sports organizations — court/field scheduling, booking, and operational logistics. Had been in close collaboration with LeagueApps for two years before the acquisition, building integrated tools together.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Why LeagueApps bought it</div>
+          <div class="deal-text">Facility management was a gap in LeagueApps' core offering. RecTimes completed the operations layer in their "complete OS" thesis. The two-year prior partnership meant zero integration risk — product fit was proven before any consideration changed hands. Post-acquisition, rebranded as LeagueApps Facilities — absorbed into the platform, not kept standalone.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">The partnership-to-acquisition path is proven here. Two years of close collaboration preceded the deal. This is the template for how to structure early buyer relationships — start as a partner or integration, not a pitch. A buyer who has been integrating with FullControl for 12 months is a fundamentally warmer acquirer than one introduced cold in a process.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">LeagueApps press release, May 8 2025; Sports Pro Media coverage; RecTimes founder LinkedIn announcement; industry analysis via SportsTechX.</div>
+        </div>
+      </div>
+
+      <div class="deal-card">
+        <div class="deal-banner">
+          <span class="deal-tag">BUILD-TO-EXIT TIMELINE</span>
+          <span class="deal-date">DECEMBER 14, 2023</span>
+        </div>
+        <div class="deal-title">MOJO Sports <span class="arrow">→</span> TeamSnap</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Acquirer</div>
+            <div class="deal-fact-value">TeamSnap (Waud Capital majority PE)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed (CNBC-covered as significant)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Build-to-Exit</div>
+            <div class="deal-fact-value">~2 years (Feb 2021 launch → Dec 2023 sale)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Advisors</div>
+            <div class="deal-fact-value">GP Bullhound (buy-side); Thought Source (tech DD)</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — TeamSnap</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Parent capital:</strong> Waud Capital Partners (Chicago-based PE, ~$4B AUM; healthcare + tech-enabled services focus) — majority investment since Feb 2021.<br>
+            <strong style="color:#d4b968;">Portfolio (post-2023 M&A):</strong> Core TeamSnap platform (~2M daily active users, 19,000+ organizations; B2B team management, schedules, payments) + <strong>MOJO Sports</strong> (consumer engagement, coaching content, live streaming, Dec 2023). Launched <strong>TeamSnap for Brands</strong> as ad/sponsorship monetization layer post-MOJO.<br>
+            <strong style="color:#d4b968;">Stated mission:</strong> Moving from "team management platform" to the "full youth sports technology and media ecosystem" (CEO framing at MOJO announcement).<br>
+            <strong style="color:#d4b968;">M&A thesis:</strong> Expand beyond B2B admin tooling into consumer engagement, media, and sponsorship revenue. Use PE-scale capital to pay for strategic-fit capabilities, not just ARR.<br>
+            <strong style="color:#d4b968;">Relevance to FullControl:</strong> TeamSnap's operations-intelligence layer is still underdeveloped — even post-TeamSnap ONE rebuild, the business is admin-heavy, not agentic. This is the gap FullControl would fill.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Undisclosed. CNBC described it as "significant."<br>
+            <strong style="color:#d4b968;">Prior funding ceiling:</strong> MOJO raised <strong style="color:#d0d0d0;">~$75M total</strong> (Series A $50M in Feb 2021, Series B $25M in Oct 2022). Series B was reported at a <strong style="color:#d0d0d0;">~$200M+ valuation</strong>. This provides a reasonable floor for what TeamSnap paid — you don't typically sell below your last round.<br>
+            <strong style="color:#d4b968;">Est. ARR at exit:</strong> Likely <strong style="color:#d0d0d0;">$5–15M ARR</strong>. Freemium consumer-leaning product with monetization still maturing.<br>
+            <strong style="color:#d4b968;">Implied multiple:</strong> If deal was ~$200M and ARR was ~$10M → <strong style="color:#d0d0d0;">~20x</strong>. If higher revenue, lower multiple. This was a consumer-engagement play valued on strategic fit + brand equity (Russell Wilson), not pure ARR.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Medium on deal-size floor via funding history; low on exact multiple. The media/content layer commanded a strategic premium above typical SaaS multiples.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What MOJO was</div>
+          <div class="deal-text">Launched February 2021 by Ben Sherwood, former president of Disney ABC Television Group. Core capabilities: live game streaming and highlights, a coaching instruction library built with MLB, MLS, NFL FLAG, and Jr. NBA, and team management tools. Celebrity investor base including NFL QB Russell Wilson. Platform data showed it reduced coach churn and player dropout rates.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Why TeamSnap bought it</div>
+          <div class="deal-text">TeamSnap had 2M+ daily active users and 19,000+ organizations but was B2B-heavy and primarily administrative (rosters, schedules, payments). MOJO was the consumer engagement and content layer they didn't have. Unlocked ad and sponsorship revenue stream (TeamSnap for Brands) — expanding monetization beyond SaaS subscriptions. CEO explicitly framed the deal as moving from a team management platform to the full youth sports technology and media ecosystem. Waud Capital commissioned independent technical due diligence before closing.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">MOJO launched in February 2021 and was acquired December 2023 — a roughly 2-year build-to-exit. FullControl's timeline can be faster than founders typically assume when strategic fit is obvious and the market is actively consolidating. The technical diligence precedent means FullControl's codebase and architecture documentation need to be acquirer-ready well before any LOI arrives. MOJO had celebrity investors and brand credibility (Russell Wilson); FullControl has Coleman Ayers and By Any Means Basketball — same category of external validation.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">TeamSnap acquisition press release, Dec 14 2023; CNBC coverage; GP Bullhound advisor disclosure; Waud Capital portfolio page; Sports Business Journal "TeamSnap expands beyond team management" (Dec 2023).</div>
+        </div>
+      </div>
+
+      <div class="deal-card">
+        <div class="deal-banner">
+          <span class="deal-tag">MULTI-SPORT EXPANSION PLAY</span>
+          <span class="deal-date">JUNE 11, 2025</span>
+        </div>
+        <div class="deal-title">PlayMetrics <span class="arrow">→</span> Stack Sports / Genstar</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Acquirer</div>
+            <div class="deal-fact-value">Genstar Capital (merged into Stack Sports)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed ($400M+ rumored for PlayMetrics + Crossbar combined — unconfirmed)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Founded</div>
+            <div class="deal-fact-value">2017 — 8-year build-to-exit</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Exiting Investors</div>
+            <div class="deal-fact-value">Blue Star Innovation Partners (Jerry Jones-backed), PSG</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. Clients<span class="info-icon" data-tooltip="Publicly disclosed by PlayMetrics at time of acquisition — confirmed in BSIP/PSG investor communications and multiple press releases from June 2025. This figure is not estimated; it's reported.">i</span></div>
+            <div class="deal-fact-value">~2,700 organizations</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. ARR<span class="info-icon" data-tooltip="Calculated as: 2,700 orgs × estimated $10–15k average annual contract value (ACV). ACV range based on (1) mid-market youth-sports-club platform pricing benchmarks — PlayMetrics publicly advertised tiers starting at ~$99/mo for small clubs up to multi-thousand/year for large multi-team programs; (2) reported 5x customer growth in 18 months suggests a mid-market mix, not enterprise; (3) OpenView SaaS benchmarks for vertical-SaaS platforms with comparable org counts. Range: $27–40M.">i</span></div>
+            <div class="deal-fact-value">$27–40M</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. Multiple<span class="info-icon" data-tooltip="Calculated as: rumored PlayMetrics standalone deal size ($300–350M, backed out from the reported $400M+ combined PlayMetrics + Crossbar figure per Sportico and Axios Pro Rata) ÷ estimated ARR ($27–40M). Yields a range of 7.5x (at $300M/$40M) to 13x (at $350M/$27M). Most-likely band: 8–12x, consistent with other 2025 PE-backed vertical-SaaS strategic deals.">i</span></div>
+            <div class="deal-fact-value">~8–12x ARR</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — Stack Sports / Genstar Capital</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Parent capital:</strong> Genstar Capital (~$40B+ AUM, major software + business-services PE, dominant vertical-SaaS consolidator).<br>
+            <strong style="color:#d4b968;">Portfolio (pre- and post-merger):</strong> Stack Sports had <strong>35+ prior acquisitions</strong> including NGIN, GotSport, Ticket Spicket, BlueStar, and others. PlayMetrics separately had acquired <strong>Crossbar</strong> (hockey, 2023). Post-June-2025 merger, the combined entity is the largest youth sports operations platform in the US — covering soccer, hockey, lacrosse, baseball, and general club management.<br>
+            <strong style="color:#d4b968;">Stated mission:</strong> Own the registration, club management, and operational infrastructure layer for youth sports across clubs, leagues, tournaments, and governing bodies.<br>
+            <strong style="color:#d4b968;">M&A thesis:</strong> Consolidation-to-dominance. Buy up every meaningful operational platform in youth sports. Stack's CEO transitioned out post-merger — PlayMetrics CEO Michael Doernberg runs the combined company, signaling that Genstar is buying product leadership and AI-readiness, not just revenue.<br>
+            <strong style="color:#d4b968;">Relevance to FullControl:</strong> Training academies are an unserved adjacent vertical. Stack/PlayMetrics' historical focus has been club-and-league operations (seasonal, roster-driven) — the training-academy model (subscriptions, individual athlete relationships) is structurally different and open territory for them.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Officially undisclosed. Industry sources (Axios Pro Rata; Sportico) reported <strong style="color:#d0d0d0;">~$400M+ combined</strong> for PlayMetrics + Crossbar — unconfirmed by parties. If accurate, PlayMetrics standalone was likely <strong style="color:#d0d0d0;">$300–350M</strong> of the total.<br>
+            <strong style="color:#d4b968;">Est. ARR at exit:</strong> ~2,700 customer organizations × estimated <strong style="color:#d0d0d0;">$10–15k avg annual contract value</strong> = <strong style="color:#d0d0d0;">$27–40M ARR</strong>. Growth was strong — 5x in 18 months per BSIP disclosures.<br>
+            <strong style="color:#d4b968;">Implied multiple:</strong> $300M / $30M ARR = <strong style="color:#d0d0d0;">~10x</strong>. $350M / $40M = <strong style="color:#d0d0d0;">~9x</strong>. Reasonable band: <strong style="color:#d0d0d0;">8–12x ARR</strong>, within the vertical-SaaS strategic range.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Medium. Deal figures are rumored, ARR estimate uses industry-standard per-org benchmarks. The multiple band (8–12x) is consistent with other 2025 vertical-SaaS strategic deals.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What PlayMetrics was</div>
+          <div class="deal-text">Centralized administrative platform for youth club sports — registration, scheduling, communication, payments, and coaching tools on a single interface. Served ~2,700 organizations across 10+ sports. Previously acquired Crossbar (2023, niche hockey platform) to expand beyond soccer. Achieved 5x customer growth in 18 months under BSIP/PSG institutional backing.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Why Genstar / Stack did it</div>
+          <div class="deal-text">Stack Sports had scale, reach, and 35+ prior acquisitions but lacked a modern tech stack. PlayMetrics had modern SaaS infrastructure and the largest club soccer customer base in the US. The merger was explicitly a technology upgrade play. Genstar's thesis: consolidation-to-dominance — own the registration, club management, and operational infrastructure for youth sports. PlayMetrics CEO Michael Doernberg leads the combined company; Stack's CEO transitioned out. Genstar was buying product leadership and vision, not just ARR.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">Founded 2017, exited 2025 — 8 years, with the last 2 under institutional capital being the high-growth phase. FullControl's path is likely faster given the AI tailwind and a leaner build. The Crossbar expansion precedent is the clearest analog to FullControl's expansion story: prove in one sport (soccer/basketball), expand to adjacent sports via the platform, exit as the multi-sport AI OS. PE demonstrated willingness to pay substantial premiums for integrated multi-sport platforms with data depth.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">Stack Sports / Genstar Capital announcement, June 11 2025; PitchBook deal record; Sports Business Journal "Genstar completes multi-brand sports tech consolidation" (June 2025); Axios Pro Rata M&A coverage.</div>
+        </div>
+      </div>
+
+      <div class="deal-card">
+        <div class="deal-banner">
+          <span class="deal-tag">PLATFORM EXPANSION INTO FITNESS</span>
+          <span class="deal-date">MAY 2023</span>
+        </div>
+        <div class="deal-title">Glofox <span class="arrow">→</span> ABC Fitness (Thoma Bravo)</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Acquirer</div>
+            <div class="deal-fact-value">ABC Fitness Solutions (Thoma Bravo portfolio)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed (widely reported as $300M+)</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Target Category</div>
+            <div class="deal-fact-value">Boutique fitness studio management SaaS</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Founded / Origin</div>
+            <div class="deal-fact-value">2014, Dublin — Irish SaaS export</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. Clients<span class="info-icon" data-tooltip="Publicly disclosed by Glofox at time of acquisition — '4,800+ fitness and wellness studios across 60+ countries' appeared in their own press release and was confirmed by ABC Fitness in the acquisition announcement. Reported, not estimated.">i</span></div>
+            <div class="deal-fact-value">~4,800 studios</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. ARR<span class="info-icon" data-tooltip="Calculated as: 4,800 studios × estimated $3–5k average annual contract value (ACV). ACV range based on (1) Glofox's publicly advertised pricing tiers (Start ~$110/mo, Grow ~$200/mo, Scale custom — SMB-heavy mix); (2) boutique fitness studio SaaS pricing benchmarks from Mindbody/ClubReady comparables; (3) Glofox's 'SMB-focused' positioning in their own marketing. Range: $14–24M. Mid-point ~$19M ARR.">i</span></div>
+            <div class="deal-fact-value">$14–24M</div>
+          </div>
+          <div class="deal-fact-est">
+            <div class="deal-fact-label">Est. Multiple<span class="info-icon" data-tooltip="Calculated as: reported $300M USD deal size (per Irish Times, Silicon Republic, TechCrunch — treated as credible though officially undisclosed) ÷ estimated ARR ($14–24M). Yields a range of 12.5x (at $300M/$24M) to 21x (at $300M/$14M). Most-likely band: 12–20x. Deal closed May 2023 — near the end of the 2021–2022 peak SaaS multiple era, so premium pricing was still achievable. Thoma Bravo paid up for vertical depth in boutique fitness.">i</span></div>
+            <div class="deal-fact-value">~12–20x ARR</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — ABC Fitness / Thoma Bravo</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Parent capital:</strong> Thoma Bravo (~$138B+ AUM, the largest software-focused PE firm globally; track record of aggressive vertical SaaS consolidation).<br>
+            <strong style="color:#d4b968;">Portfolio (ABC Fitness Solutions):</strong> ABC Fitness's core product serves big-box gyms and large fitness facilities. Stack includes <strong>Club Essentials</strong>, <strong>Trainerize</strong>, <strong>GymSales</strong>, and (post-May-2023) <strong>Glofox</strong> for boutique fitness. Combined footprint covers enterprise gyms, personal training, sales CRM, and boutique studios.<br>
+            <strong style="color:#d4b968;">Stated mission:</strong> Comprehensive fitness and wellness software stack spanning every customer-segment tier.<br>
+            <strong style="color:#d4b968;">M&A thesis:</strong> Thoma Bravo's signature playbook — identify a vertical, buy the #1 player, then roll up adjacent segments. ABC Fitness served big-box; Glofox added boutique. Thoma Bravo paid a premium multiple (12–20x implied) to fill the segment gap.<br>
+            <strong style="color:#d4b968;">Relevance to FullControl:</strong> This is the clearest proof that <strong>PE-backed fitness consolidators will pay vertical-SaaS premiums for adjacent segments</strong>. Sports training is to fitness what boutique was — an adjacent vertical the existing stack doesn't serve. ABC Fitness or a Thoma-Bravo-backed competitor is a plausible buyer for FullControl, not just pure sports-tech acquirers.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Officially undisclosed. Widely reported in Irish tech press (Irish Times, Silicon Republic) at <strong style="color:#d0d0d0;">~$300M USD</strong> — treated as credible but not confirmed.<br>
+            <strong style="color:#d4b968;">Est. ARR at exit:</strong> 4,800+ studios × estimated <strong style="color:#d0d0d0;">$3–5k annual contract value</strong> = <strong style="color:#d0d0d0;">$14–24M ARR</strong>. Mid-market SMB pricing.<br>
+            <strong style="color:#d4b968;">Implied multiple:</strong> $300M / $20M ARR = <strong style="color:#d0d0d0;">~15x</strong>. Band: <strong style="color:#d0d0d0;">12–20x</strong>. Deal closed in May 2023 — near the tail end of the 2021–2022 peak SaaS multiple era.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Medium-high on deal size (multiple reported), medium on ARR estimate (standard SMB fitness pricing). The 15x multiple reflects 2023 premium pricing + Thoma Bravo paying up for vertical depth.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What Glofox was</div>
+          <div class="deal-text">Studio management platform serving 4,800+ boutique fitness and wellness studios across 60+ countries. Member management, class scheduling, billing, mobile apps. Built deep mobile-first infrastructure for the boutique segment that legacy platforms underserved.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Why ABC Fitness bought it</div>
+          <div class="deal-text">ABC Fitness (via Thoma Bravo) wanted verticalized depth in boutique fitness — a segment their core big-box gym product did not serve well. Glofox provided instant installed base and mobile-first product differentiation. Thoma Bravo's explicit thesis is vertical SaaS consolidation — this deal fit that template precisely.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">PE-backed strategic acquirers pay substantial premiums for vertical segment depth in adjacent categories. Sports training is to ABC Fitness what boutique fitness was — an unserved adjacent vertical. This deal proves the playbook works outside of traditional sports-tech acquirers.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">ABC Fitness press release, May 2023; Irish Times coverage of Glofox sale; Thoma Bravo portfolio page; TechCrunch "ABC Fitness snaps up Glofox" (May 2023).</div>
+        </div>
+      </div>
+
+      <div class="deal-card">
+        <div class="deal-banner">
+          <span class="deal-tag">PRIOR PE TRANSACTION — BUYER</span>
+          <span class="deal-date">FEBRUARY 2021</span>
+        </div>
+        <div class="deal-title">TeamSnap <span class="arrow">←</span> Waud Capital (majority investment)</div>
+
+        <div class="deal-facts">
+          <div>
+            <div class="deal-fact-label">Investor</div>
+            <div class="deal-fact-value">Waud Capital Partners</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Deal Size</div>
+            <div class="deal-fact-value">Undisclosed majority stake</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Context</div>
+            <div class="deal-fact-value">~2M DAU, 19,000+ orgs at deal time</div>
+          </div>
+          <div>
+            <div class="deal-fact-label">Follow-on Deals</div>
+            <div class="deal-fact-value">MOJO acquisition Dec 2023 (post-Waud)</div>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Acquirer Profile — Waud Capital</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Parent capital:</strong> Waud Capital Partners directly — Chicago-based middle-market PE, ~$4B+ AUM.<br>
+            <strong style="color:#d4b968;">Strategy:</strong> Growth equity + majority buyouts in healthcare services and tech-enabled B2B software. Typically partners with management teams to fund buy-and-build strategies post-investment.<br>
+            <strong style="color:#d4b968;">Portfolio relevance:</strong> TeamSnap is Waud's primary sports-tech position. Waud financed the MOJO acquisition 2 years after taking the majority stake — demonstrating that PE capital events in this vertical precede tuck-in M&A activity by roughly 2 years.<br>
+            <strong style="color:#d4b968;">Pattern to watch:</strong> Other sports-tech PE funding events to track — Accel-KKR at LeagueApps (Oct 2024, deals started May 2025), Genstar at Stack Sports (ongoing), Thoma Bravo at ABC Fitness (Glofox closed May 2023). Each funding event initiates a 6–18-month tuck-in acquisition window. These are the M&A timing windows for FullControl to monitor.<br>
+            <strong style="color:#d4b968;">Relevance to FullControl:</strong> Not a direct-acquirer profile, but a template for how PE ownership at the buyer level creates downstream M&A demand. Useful for timing the approach, not for structuring the deal itself.
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Financial Context</div>
+          <div class="deal-text">
+            <strong style="color:#d4b968;">Deal size:</strong> Undisclosed majority stake. Neither Waud nor TeamSnap released figures.<br>
+            <strong style="color:#d4b968;">Prior funding:</strong> TeamSnap had raised <strong style="color:#d0d0d0;">~$65M total</strong> across 5 rounds pre-Waud (Foundry Group, Canaan Partners, FocalPoint, others).<br>
+            <strong style="color:#d4b968;">Est. ARR at deal (Feb 2021):</strong> 19,000+ organizations × estimated <strong style="color:#d0d0d0;">$3–6k annual contract value</strong> = <strong style="color:#d0d0d0;">$60–110M ARR</strong>. Freemium-to-paid conversion skews the effective average down, but the team-management paid tier was established.<br>
+            <strong style="color:#d4b968;">Implied valuation:</strong> PE majority takeouts at this revenue scale in 2021 commonly priced at <strong style="color:#d0d0d0;">8–15x ARR</strong> = enterprise value range of ~$500M–$1.5B. This is inference, not confirmed.<br>
+            <em style="color:#777; font-size:11px;">Confidence: Low on exact figures, medium on implied range. This deal is included as context for the <strong>buyer side</strong> of the M&A playbook — PE ownership precedes tuck-in acquisitions.</em>
+          </div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">What this tells FullControl</div>
+          <div class="deal-text">Not a direct comp, but relevant as context: the acquirers in FullControl's buyer universe are mostly PE-backed. Waud Capital's majority position in TeamSnap (Feb 2021) set up the MOJO acquisition two years later. LeagueApps' Accel-KKR / Arctos funding (Oct 2024) set up the RecTimes and Mod11 deals within 8 months. Stack Sports' Genstar ownership drove the PlayMetrics merger.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Lesson for FullControl</div>
+          <div class="deal-text deal-lesson">Track PE funding events at target buyers. New funding = deployment pressure = acquisition activity within 6–18 months. These are your M&A windows. Time approaches to coincide with a buyer's post-funding deployment phase, not against it.</div>
+        </div>
+
+        <div class="deal-section">
+          <div class="deal-label">Sources</div>
+          <div class="deal-text deal-source">Waud Capital portfolio announcement, Feb 2021; TeamSnap investor relations page; PitchBook deal record.</div>
+        </div>
+      </div>
+
+    </div>
+    <div style="padding: 0 24px 24px; font-size: 11px; color: #666; line-height: 1.6;">
+      <strong style="color: #888;">Pattern recognition across all deals:</strong> (1) All deal sizes undisclosed — price is negotiated, not benchmarked. (2) Founders retained post-acquisition in every case. (3) Buyers acquire capability gaps, not revenue alone. (4) Partnership → acquisition is a proven path. (5) PE funding events signal M&A windows. (6) Technical due diligence is standard. (7) Growth trajectory matters more than absolute ARR.
+    </div>
+  </details>
 
   <div class="output-panel">
     <div class="output-grid">
@@ -345,10 +1252,10 @@
     <summary>How the math works</summary>
     <div class="math-body">
       <p><strong>Step 1 — Base multiple from growth rate.</strong> Growth is the single biggest determinant of SaaS valuation. Piecewise mapping: <code>&lt;20% → 3–5x</code>, <code>20–40% → 5–7x</code>, <code>40–80% → 7–10x</code>, <code>&gt;80% → 10–12x</code>.</p>
-      <p><strong>Step 2 — Add AI-native premium.</strong> A flat additive bump on top of the base, sourced from vertical AI M&A data showing +2–5x above baseline for AI-native architectures.</p>
+      <p><strong>Step 2 — Add AI-native + cross-domain premium, gated by adoption.</strong> A flat additive bump on top of the base, sourced from vertical AI M&A data showing +2–5x above baseline for AI-native architectures. The premium is then gated by the Market Adoption / Moat Validation slider: at 0 (pre-product) the premium realizes at 40%; at 100 (mature, 500+ customers proving every moat) it realizes in full. This models the reality that buyers pay for validated moats, not theoretical ones.</p>
       <p><strong>Step 3 — Apply strategic-fit multiplier.</strong> Strategic buyers pay 0–40% more than financial buyers for tight capability-gap fills.</p>
-      <p><strong>Step 4 — Revenue-quality adjustments.</strong> NRR above 100% adds, below 100% subtracts. GRR below 90% compresses. Churn above 8% compresses.</p>
-      <p><strong>Step 5 — Risk and diligence compressors.</strong> Architecture, IP cleanliness, data flywheel, capability fit, customer count, founder expertise, and market timing each apply a bounded multiplier. IP ambiguity is the biggest single compressor (can remove 50% of value).</p>
+      <p><strong>Step 4 — Revenue-quality adjustments.</strong> NRR above 100% adds, below 100% subtracts. GRR below 90% compresses. Churn above 8% compresses. These are the hard-number proofs of Operational Stickiness (Moat 4).</p>
+      <p><strong>Step 5 — Risk and diligence compressors.</strong> Architecture and IP cleanliness apply bounded multipliers. Data Flywheel (Moat 2) and Expert Operator Network (Moat 3) also apply here — <strong>both are gated by the adoption/validation slider</strong>, same as the AI premium. A high Flywheel score with low adoption is unrealistic, so the impact is muted until validation rises. This is the central fix: all three technology moats can only realize as much premium as market adoption proves.</p>
       <p><strong>Step 6 — Process uplift.</strong> Competitive tension adds 8% per additional bidder beyond the first.</p>
       <p>Output is presented with a ±20% range because no real deal closes at the modeled number — it's a negotiation, not a formula.</p>
     </div>
@@ -359,7 +1266,7 @@
 const FACTORS = [
   {
     id: 'growth',
-    section: 'Growth & Premium',
+    section: 'Growth',
     name: 'ARR Growth Rate (YoY)',
     min: 0, max: 150, step: 5, default: 60, unit: '%',
     source: 'SaaS Capital Index (Q4 2024); Bessemer State of the Cloud 2025; Scale Venture Partners SaaS Benchmarks',
@@ -367,12 +1274,12 @@ const FACTORS = [
   },
   {
     id: 'aiPremium',
-    section: 'Growth & Premium',
-    name: 'AI-Native Architecture Premium',
+    section: 'Tech Moats & Adoption',
+    name: 'AI-Native + Cross-Domain Architecture Premium (Moat 1)',
     min: 0, max: 5, step: 0.25, default: 3.0, unit: 'x',
     format: (v) => '+' + v.toFixed(2) + 'x',
-    source: 'Aventis Advisors AI M&A Multiples Report 2025; a16z "Vertical SaaS: Now with AI Inside" (Nov 2024); Bessemer Vertical AI Thesis',
-    impact: 'Additive bump above baseline. Current range in active M&A: +2–5x above comparable non-AI SaaS.'
+    source: 'Aventis Advisors AI M&A Multiples Report 2025; a16z "Vertical SaaS: Now with AI Inside" (Nov 2024); Bessemer Vertical AI Thesis; Foundation Capital "The Vertical AI Playbook" (2025); TeamSnap ONE launch announcement (Nov 18, 2025).',
+    impact: 'Additive bump above baseline covering both the AI-native layer AND the cross-domain data schema. AI-native portion (~1–2x) has an 18–36-month decay window as incumbents rebuild. Cross-domain portion (~1–3x) is structurally durable. Current range in active M&A: +2–5x above comparable non-AI SaaS.'
   },
   {
     id: 'strategicPremium',
@@ -385,26 +1292,34 @@ const FACTORS = [
   {
     id: 'nrr',
     section: 'Revenue Quality',
-    name: 'Net Revenue Retention (NRR)',
+    name: 'Net Revenue Retention — NRR (Moat 4)',
     min: 80, max: 140, step: 1, default: 105, unit: '%',
-    source: 'Bessemer State of the Cloud 2025 (top-quartile benchmarks); OpenView SaaS Benchmarks 2024',
-    impact: 'Above 100% = expansion revenue, expands multiple. Public-market top-quartile is 120%+.'
+    source: 'Bessemer State of the Cloud 2025 (top-quartile benchmarks); OpenView SaaS Benchmarks 2024.',
+    impact: 'Primary hard-number proof of Operational Stickiness. Above 100% = expansion revenue, expands multiple. Public-market top-quartile is 120%+.'
   },
   {
     id: 'grr',
     section: 'Revenue Quality',
-    name: 'Gross Revenue Retention (GRR)',
+    name: 'Gross Revenue Retention — GRR (Moat 4)',
     min: 70, max: 100, step: 1, default: 92, unit: '%',
-    source: 'SaaS Capital Benchmarks 2024; KeyBanc Capital SaaS Survey',
-    impact: 'Under 90% is a red flag in diligence. 90–95% is healthy, 95%+ is best-in-class.'
+    source: 'SaaS Capital Benchmarks 2024; KeyBanc Capital SaaS Survey.',
+    impact: 'Stickiness proof point. Under 90% is a red flag in diligence. 90–95% is healthy, 95%+ is best-in-class.'
   },
   {
     id: 'churn',
     section: 'Revenue Quality',
-    name: 'Annual Customer Churn',
+    name: 'Annual Customer Churn (Moat 4)',
     min: 0, max: 30, step: 0.5, default: 6, unit: '%',
-    source: 'Recurly Retention Benchmarks 2024; ProfitWell / Paddle SaaS Retention Report',
-    impact: 'Fitness/SMB SaaS median is 5–7% annually. Above 10% meaningfully compresses the multiple.'
+    source: 'Recurly Retention Benchmarks 2024; ProfitWell / Paddle SaaS Retention Report.',
+    impact: 'Inverse stickiness proof. Fitness/SMB SaaS median is 5–7% annually. Above 10% meaningfully compresses the multiple.'
+  },
+  {
+    id: 'velocity',
+    section: 'Process & Fit',
+    name: 'Market Takeover Velocity (Moat 5)',
+    min: 0, max: 100, step: 5, default: 50, unit: '/100',
+    source: 'Capstone Partners Sports Tech M&A Reports (Aug 2025 + Mar 2026); Drake Star Sports Tech 2025; Bessemer "Vertical AI Category Capture" thesis (2024); ServiceTitan IPO precedent (winner-takes-most dynamics in vertical SaaS).',
+    impact: 'How fast FullControl is capturing the training-academy vertical. 0 = no category share. 50 = visible momentum, early share capture. 100 = dominant share + provable growth rate making acquirers worry about lockout. Creates the "buy now or a competitor does" dynamic that drives real competitive tension.'
   },
   {
     id: 'architecture',
@@ -424,19 +1339,27 @@ const FACTORS = [
   },
   {
     id: 'flywheel',
-    section: 'Asset & Diligence',
-    name: 'Data Flywheel Depth',
+    section: 'Tech Moats & Adoption',
+    name: 'Data Flywheel Depth (Moat 2)',
     min: 0, max: 100, step: 5, default: 45, unit: '/100',
-    source: 'a16z Data Moats Framework; Bessemer AI Value Stack Thesis',
-    impact: 'Months of agent interaction data + knowledge gap tables. Moat evidence — cannot be replicated.'
+    source: 'a16z Data Moats Framework (2023–2024); Bessemer AI Value Stack Thesis (2024); CB Insights "Data Moats in the Age of AI" (2024); NFX "Network Effects in the AI Era" (2024).',
+    impact: 'Months of agent interaction data + knowledge-gap tables + longitudinal behavioral data on how training academies actually run. 0 = no data. 50 = ~6 months live across 50+ customers. 100 = multi-year dataset across 500+ academies — irreplaceable moat evidence.'
+  },
+  {
+    id: 'validation',
+    section: 'Tech Moats & Adoption',
+    name: 'Market Adoption / Moat Validation',
+    min: 0, max: 100, step: 5, default: 70, unit: '/100',
+    source: 'Internal exit-readiness framework; Bessemer "Proof Before Premium" vertical AI thesis (2024); standard M&A diligence methodology on capability-based acquisitions (Cooley, Goodwin Procter).',
+    impact: 'The master gate on all three tech moats (AI Premium, Data Flywheel, Expert Operator Network). 0 = pre-product. 25 = beta (handful of pilots). 50 = early traction (10–50 customers). 75 = scaled (100–500, moats demonstrably working). 100 = mature (500+, every moat validated with diligence artifacts). At 0 the tech moats realize at 40% of their claimed impact; at 100 they realize in full. Technology moats cannot exceed the adoption that proves them.'
   },
   {
     id: 'founder',
-    section: 'Asset & Diligence',
-    name: 'Founder Domain Expertise',
-    min: 0, max: 100, step: 5, default: 90, unit: '/100',
-    source: 'Mod11 (Ryan Miller retained); MOJO (Ben Sherwood retained); PlayMetrics (Michael Doernberg retained)',
-    impact: 'Every comparable deal retained the founder. Buyers pay for this explicitly as a retained asset.'
+    section: 'Tech Moats & Adoption',
+    name: 'Expert Operator Network Strength (Moat 3)',
+    min: 0, max: 100, step: 5, default: 75, unit: '/100',
+    source: 'a16z "Expert-in-the-Loop AI" framework (2024); Scale AI RLHF-with-domain-experts methodology; Harvey AI (legal) and Abridge (medical) comparable moats; NFX "Data Network Effects via Expert Networks" (2024); Mod11/MOJO/PlayMetrics deals (all retained-founder precedents).',
+    impact: 'Strength of the operator network training the agents — founders plus growing network of elite academy operators contributing playbooks, judgment, and decision patterns. 0 = founders only. 50 = founders + 5–10 expert operators. 100 = mature multi-operator network refining agents continuously across domains.'
   },
   {
     id: 'bidders',
@@ -452,15 +1375,15 @@ const FACTORS = [
     name: 'Capability Gap Fit (vs. Buyer)',
     min: 0, max: 100, step: 5, default: 85, unit: '/100',
     source: 'Internal LeagueApps + Mod11 Feature Gap Analysis; a16z Vertical SaaS Capability Gap Framework',
-    impact: 'How precisely BAM OS fills what the buyer cannot build. Tight fit justifies the full strategic premium.'
+    impact: 'How precisely FullControl fills what the buyer cannot build. Tight fit justifies the full strategic premium.'
   },
   {
     id: 'customers',
     section: 'Process & Fit',
     name: 'External Customer Count',
-    min: 1, max: 25, step: 1, default: 3, unit: ' customers',
-    source: 'SaasRise 2025 M&A Report; Software Equity Group M&A Benchmarks',
-    impact: '1 = looks like consulting. 3–5 = repeatability proven. 10+ = strong credibility.'
+    min: 500, max: 2000, step: 50, default: 1000, unit: ' customers',
+    source: 'SaasRise 2025 M&A Report; Software Equity Group M&A Benchmarks; Bessemer SMB SaaS Scale Thesis',
+    impact: 'At this scale, customer count is a strength — signals product-market fit and diversified revenue. 500 = solid base. 1,000+ = compelling. 2,000+ = platform-scale credibility.'
   },
   {
     id: 'timing',
@@ -527,8 +1450,10 @@ function calculate() {
 
   let eff = base;
 
-  // Step 2: AI premium (additive)
-  eff += state.aiPremium;
+  // Step 2: AI premium (additive, gated by moat validation)
+  // At 0 validation, AI premium realizes at 40%. At 100, full premium.
+  const validationFactor = 0.4 + (state.validation / 100) * 0.6;
+  eff += state.aiPremium * validationFactor;
 
   // Step 3: Strategic premium (multiplicative)
   eff *= (1 + state.strategicPremium / 100);
@@ -545,17 +1470,27 @@ function calculate() {
   // Step 5: Diligence & asset
   eff *= 0.7 + (state.architecture / 100) * 0.3;       // 0.7–1.0
   eff *= 0.5 + (state.ip / 100) * 0.5;                 // 0.5–1.0
-  eff *= 0.9 + (state.flywheel / 100) * 0.2;           // 0.9–1.1
-  eff *= 0.95 + (state.founder / 100) * 0.1;           // 0.95–1.05
+
+  // Flywheel and Operator Network are tech/data moats — gated by adoption
+  // (validationFactor from Step 2: 0.4 at no adoption, 1.0 at mature).
+  // A high flywheel slider with zero adoption is unrealistic — so the
+  // impact of these moats is muted when validation is low.
+  const flywheelRaw = 0.9 + (state.flywheel / 100) * 0.2;     // 0.9–1.1
+  const networkRaw = 0.95 + (state.founder / 100) * 0.1;      // 0.95–1.05
+  eff *= 1.0 + (flywheelRaw - 1.0) * validationFactor;
+  eff *= 1.0 + (networkRaw - 1.0) * validationFactor;
 
   // Step 6: Process & fit
   eff *= 1 + (state.bidders - 1) * 0.08;               // 1.0 to 1.32
   eff *= 0.85 + (state.fit / 100) * 0.2;               // 0.85–1.05
 
-  if (state.customers < 3) eff *= 0.6 + state.customers * 0.13;
-  else eff *= 1.0 + Math.min((state.customers - 3) * 0.015, 0.15);
+  eff *= 1.0 + Math.min((state.customers - 500) / 1500 * 0.15, 0.15);
 
   eff *= 0.8 + (state.timing / 100) * 0.3;             // 0.8–1.1
+
+  // Market Takeover Velocity (Moat 5) — forcing-function urgency premium.
+  // Scales 0.9x (no velocity) to 1.15x (dominant + lockout-level momentum).
+  eff *= 0.9 + (state.velocity / 100) * 0.25;
 
   eff = Math.max(eff, 1);
 
@@ -600,7 +1535,7 @@ function resetDefaults() {
 
 function copySummary() {
   const lines = [
-    'BAM OS Exit Multiple — Scenario',
+    'FullControl Exit Multiple — Scenario',
     '',
     `ARR at exit: $${formatArr(state.arr)}`,
     `Effective multiple: ${document.getElementById('effective-multiple').textContent}x`,
