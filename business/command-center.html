@@ -844,6 +844,80 @@ table tr:hover { background: var(--surface2); }
   color: var(--muted);
   margin-top: 2px;
 }
+
+/* ─── FULL PRICING CALCULATOR STYLES ─── */
+.pct-low    { background: rgba(76,175,130,0.15); color: #4caf82; }
+.pct-mid    { background: rgba(201,168,76,0.15); color: #c9a84c; }
+.pct-high   { background: rgba(248,113,113,0.15); color: #f87171; }
+.badge-pct.pct-low    { background: rgba(76,175,130,0.15); color: #4caf82; }
+.badge-pct.pct-mid    { background: rgba(201,168,76,0.15); color: #c9a84c; }
+.badge-pct.pct-high   { background: rgba(248,113,113,0.15); color: #f87171; }
+.slider-rows { display: flex; flex-direction: column; gap: 16px; }
+.slider-row { display: flex; align-items: center; gap: 16px; }
+.slider-row-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #555; width: 84px; flex-shrink: 0; line-height: 1.4; }
+.slider-row-track { flex: 1; position: relative; height: 28px; display: flex; align-items: center; }
+.track-bg { position: absolute; left: 0; right: 0; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; }
+.track-fill { position: absolute; height: 4px; border-radius: 2px; pointer-events: none; }
+.track-fill.gold-fill   { background: linear-gradient(90deg, #c9a84c, #f0d078); }
+.track-fill.range-fill  { background: rgba(201,168,76,0.35); }
+.track-fill.price-fill  { background: linear-gradient(90deg, #4caf82, #7de8b0); }
+input[type=range].single { position: absolute; width: 100%; height: 4px; appearance: none; background: transparent; outline: none; cursor: pointer; }
+input[type=range].single::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #f0d078; border: 2px solid #1a1a2e; cursor: pointer; transition: transform 0.15s; }
+input[type=range].single::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range].single:disabled { opacity: 0.3; cursor: not-allowed; }
+input[type=range].dual { position: absolute; width: 100%; height: 4px; appearance: none; background: transparent; outline: none; cursor: pointer; pointer-events: none; }
+input[type=range].dual::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #c9a84c; border: 2px solid #1a1a2e; cursor: pointer; pointer-events: all; transition: transform 0.15s; }
+input[type=range].dual::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range].dual:disabled { opacity: 0.3; }
+input[type=range].dual:disabled::-webkit-slider-thumb { pointer-events: none; }
+.slider-row-value { font-size: 13px; font-weight: 700; color: #c9a84c; width: 130px; flex-shrink: 0; text-align: right; }
+.slider-row-value.green-val { color: #4caf82; }
+.slider-row-value.dim { color: #555; font-weight: 500; }
+.computed-row { background: rgba(201,168,76,0.05); border: 1px solid rgba(201,168,76,0.12); border-radius: 10px; padding: 8px 12px; margin: 0 -12px; }
+.computed-formula { flex: 1; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+.formula-num { font-weight: 700; color: #c9a84c; font-size: 14px; }
+.formula-op { color: #444; font-size: 12px; }
+/* Snapshot section */
+.snapshot-section { background: rgba(91,156,246,0.04); border: 1px solid rgba(91,156,246,0.15); border-radius: 20px; padding: 28px 32px; margin-bottom: 32px; }
+.snapshot-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.snapshot-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #5b9cf6; flex-shrink: 0; }
+.scenario-tabs { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; margin-bottom: 0; }
+.scenario-tab { padding: 5px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: #666; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.scenario-tab.active { background: rgba(91,156,246,0.15); border-color: rgba(91,156,246,0.4); color: #5b9cf6; }
+.scenario-tab:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: #aaa; }
+.scenario-tab.add-tab { color: #444; border-style: dashed; padding: 5px 10px; }
+.scenario-tab.add-tab:hover { color: #5b9cf6; border-color: rgba(91,156,246,0.4); }
+.scenario-tab.del-tab { color: #f87171; border-color: rgba(248,113,113,0.2); padding: 5px 8px; font-size: 11px; }
+.scenario-name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.scenario-name-input { background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.1); color: #e0e0e0; font-size: 17px; font-weight: 700; font-family: inherit; outline: none; padding: 4px 0; flex: 1; max-width: 280px; }
+.scenario-name-input:focus { border-bottom-color: rgba(91,156,246,0.5); }
+.snap-share-btns { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.snap-btn { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 0.15s; border: 1px solid; }
+.snap-btn-link { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.3); color: #c9a84c; }
+.snap-btn-link:hover { background: rgba(201,168,76,0.2); }
+.snap-btn-link.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+.snap-btn-text { background: rgba(91,156,246,0.1); border-color: rgba(91,156,246,0.3); color: #5b9cf6; }
+.snap-btn-text:hover { background: rgba(91,156,246,0.2); }
+.snap-btn-text.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+.snap-btn-launch { background: rgba(56,217,169,0.1); border-color: rgba(56,217,169,0.3); color: #38d9a9; }
+.snap-btn-launch:hover { background: rgba(56,217,169,0.2); }
+.snap-btn-launch.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+.snap-alloc-rows { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.snap-alloc-row { display: flex; align-items: center; gap: 14px; }
+.snap-alloc-label { font-size: 11px; font-weight: 600; color: #555; width: 230px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.snap-alloc-track { flex: 1; position: relative; height: 24px; display: flex; align-items: center; }
+.snap-alloc-fill { position: absolute; height: 3px; background: linear-gradient(90deg, #5b9cf6, #93c5fd); border-radius: 2px; pointer-events: none; }
+input[type=range].snap-range { position: absolute; width: 100%; height: 3px; appearance: none; background: rgba(255,255,255,0.08); border-radius: 2px; outline: none; cursor: pointer; }
+input[type=range].snap-range::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #5b9cf6; border: 2px solid #1a1a2e; cursor: pointer; transition: transform 0.1s; }
+input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.snap-alloc-val { font-size: 13px; font-weight: 700; color: #5b9cf6; width: 90px; text-align: right; flex-shrink: 0; }
+.snap-results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.snap-result-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; padding: 14px 16px; text-align: center; }
+.snap-result-card .label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #444; margin-bottom: 6px; }
+.snap-result-card .value { font-size: 20px; font-weight: 800; }
+.copy-link-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.3); border-radius: 10px; color: #c9a84c; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s; }
+.copy-link-btn:hover { background: rgba(201,168,76,0.2); }
+.copy-link-btn.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
 </style>
 </head>
 <body>
@@ -1066,13 +1140,41 @@ table tr:hover { background: var(--surface2); }
   <div class="pricing-canvas">
     <div class="pricing-header">
       <h1>Pricing Calculator</h1>
-      <p>Configure price points and business model mix to project revenue</p>
+      <p>Model FullControl's revenue across business verticals. Adjust MRR and price ranges per model.</p>
+      <div style="margin-top:16px;">
+        <button class="copy-link-btn" id="copy-link-btn" onclick="copyLink()">🔗 Copy shareable link</button>
+      </div>
     </div>
 
-    <div class="summary" id="summary"></div>
+    <div id="snapshot-section"></div>
 
-    <div class="arr-section">
-      <h2>ARR Projection</h2>
+    <div class="summary">
+      <div class="summary-card">
+        <div class="label">Academy MRR</div>
+        <div class="value gold" id="s-academy-mrr">$0</div>
+        <div class="sub">active models</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">FC / mo (floor)</div>
+        <div class="value blue" id="s-fc-min">$0</div>
+        <div class="sub">sum of range mins</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">FC / mo (selected)</div>
+        <div class="value green" id="s-fc-selected">$0</div>
+        <div class="sub">at your price points</div>
+      </div>
+      <div class="summary-card">
+        <div class="label">FC / mo (ceiling)</div>
+        <div class="value purple" id="s-fc-max">$0</div>
+        <div class="sub">sum of range maxes</div>
+      </div>
+    </div>
+
+    <div class="models" id="models-container"></div>
+
+    <div class="arr-section" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 20px; padding: 28px 32px;">
+      <h2 style="font-size:13px; font-weight:700; color:#666; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:20px;">ARR Projection</h2>
       <div class="arr-grid">
         <div class="arr-card">
           <div class="label">ARR Floor</div>
@@ -1090,9 +1192,7 @@ table tr:hover { background: var(--surface2); }
           <div class="sub">per academy × 12</div>
         </div>
       </div>
-
       <hr class="arr-divider">
-
       <div class="acad-section">
         <div class="acad-label">With</div>
         <input type="number" class="acad-input" id="acad-count" value="50" min="1">
@@ -1102,12 +1202,6 @@ table tr:hover { background: var(--surface2); }
           <div class="small" id="portfolio-sub">portfolio ARR at selected price</div>
         </div>
       </div>
-    </div>
-
-    <div class="models" id="models-container"></div>
-
-    <div style="text-align: center; margin-top: 40px; padding: 20px; background: rgba(255,255,255,0.02); border-radius: 12px;">
-      <p style="color: #999; font-size: 12px;">Pricing scenarios feed into the Launch Model. When you create or select a scenario, it becomes the ARPU for new customers in the financial model.</p>
     </div>
   </div>
 </div>
@@ -1279,128 +1373,233 @@ function switchSection(sectionId) {
   event.target.classList.add('active');
 }
 
-// ═══ PRICING TAB ═══
-function renderPricingUI() {
-  const { models } = sharedState.pricing;
+// ═══ PRICING TAB — Full Calculator ═══
+const MODELS = [
+  { id: 'training-sched',  name: 'Training Classes (with Scheduling App)', icon: '🏀', isTrainingType: true,  clientsMax: 250, defaultMrr: 15000, defaultMin: 249, defaultMax: 599, defaultSel: 399, defaultClients: 75, defaultArpu: 200 },
+  { id: 'training-basic',  name: 'Training Classes (no Scheduling App)',   icon: '🏀', isTrainingType: true,  clientsMax: 50,  defaultMrr: 15000, defaultMin: 50,  defaultMax: 250, defaultSel: 149, defaultClients: 25, defaultArpu: 200 },
+  { id: 'club',            name: 'Club Teams',                              icon: '🏆', isTrainingType: false, defaultMrr: 6000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
+  { id: 'gym',             name: 'Gym Rental',                              icon: '🏗️', isTrainingType: false, defaultMrr: 4000,  defaultMin: 99,  defaultMax: 249, defaultSel: 149 },
+  { id: 'internal',        name: 'Internal Leagues',                        icon: '📋', isTrainingType: false, defaultMrr: 3000,  defaultMin: 79,  defaultMax: 199, defaultSel: 129 },
+  { id: 'external',        name: 'External Leagues',                        icon: '🌐', isTrainingType: false, defaultMrr: 5000,  defaultMin: 149, defaultMax: 349, defaultSel: 229 },
+];
+const MRR_MAX = 40000, PRICE_MIN = 50, PRICE_MAX = 1500, CLIENTS_MAX = 250, ARPU_MIN = 150, ARPU_MAX = 250;
+const pricingState = {};
+MODELS.forEach(m => {
+  pricingState[m.id] = { enabled: true, mrr: m.defaultMrr, rangeMin: m.defaultMin, rangeMax: m.defaultMax, selected: m.defaultSel };
+  if (m.isTrainingType) { pricingState[m.id].clients = m.defaultClients; pricingState[m.id].arpu = m.defaultArpu; pricingState[m.id].mrr = m.defaultClients * m.defaultArpu; }
+});
 
-  // Calculate pricing stats
-  let minPrice = Infinity, maxPrice = 0, selectedPrice = 0, priceCount = 0;
-  models.forEach(m => {
-    if (m.active) {
-      minPrice = Math.min(minPrice, m.rangeMin);
-      maxPrice = Math.max(maxPrice, m.rangeMax);
-      selectedPrice += m.selected;
-      priceCount++;
-    }
+function pFmt(n) {
+  if (n >= 1000000) return '$' + (n / 1000000).toFixed(2) + 'M';
+  if (n >= 10000)   return '$' + (n / 1000).toFixed(0) + 'k';
+  if (n >= 1000)    return '$' + n.toLocaleString();
+  return '$' + n;
+}
+function pFmtFull(n) { return '$' + Math.round(n).toLocaleString(); }
+function pPctColor(p) { if (!p || p === 0) return ''; if (p < 5) return 'pct-low'; if (p < 12) return 'pct-mid'; return 'pct-high'; }
+function pClamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function updateMrrFill(id) {
+  const s = pricingState[id];
+  document.getElementById(`mrr-fill-${id}`).style.width = (s.mrr / MRR_MAX * 100) + '%';
+}
+function updateRangeFill(id) {
+  const s = pricingState[id];
+  const span = PRICE_MAX - PRICE_MIN;
+  const l = (s.rangeMin - PRICE_MIN) / span * 100;
+  const w = (s.rangeMax - s.rangeMin) / span * 100;
+  const fill = document.getElementById(`range-fill-${id}`);
+  fill.style.left = l + '%'; fill.style.width = Math.max(0, w) + '%';
+}
+function updatePriceFill(id) {
+  const s = pricingState[id];
+  const span = s.rangeMax - s.rangeMin;
+  document.getElementById(`price-fill-${id}`).style.width = (span > 0 ? (s.selected - s.rangeMin) / span * 100 : 0) + '%';
+}
+function updateModelUI(id) {
+  const s = pricingState[id];
+  const p = s.mrr > 0 ? (s.selected / s.mrr * 100) : 0;
+  document.getElementById(`card-${id}`).className = 'model-card ' + (s.enabled ? 'active' : 'inactive');
+  document.getElementById(`toggle-${id}`).className = 'toggle ' + (s.enabled ? 'on' : '');
+  document.getElementById(`badge-charge-${id}`).textContent = s.enabled ? pFmtFull(s.selected) + '/mo' : '—';
+  const pctEl = document.getElementById(`badge-pct-${id}`);
+  pctEl.textContent = s.enabled ? (s.mrr > 0 ? p.toFixed(1) + '% of MRR' : '—') : '—';
+  pctEl.className = 'badge-pct ' + (s.enabled ? pPctColor(p) : '');
+  const modelCfg = MODELS.find(m => m.id === id);
+  if (modelCfg.isTrainingType) {
+    document.getElementById(`clients-slider-${id}`).value = s.clients;
+    document.getElementById(`clients-fill-${id}`).style.width = (s.clients / modelCfg.clientsMax * 100) + '%';
+    document.getElementById(`clients-val-${id}`).textContent = s.clients + ' members';
+    document.getElementById(`arpu-slider-${id}`).value = s.arpu;
+    document.getElementById(`arpu-fill-${id}`).style.width = ((s.arpu - ARPU_MIN) / (ARPU_MAX - ARPU_MIN) * 100) + '%';
+    document.getElementById(`arpu-val-${id}`).textContent = pFmtFull(s.arpu) + '/mo';
+    document.getElementById(`mrr-clients-${id}`).textContent = s.clients;
+    document.getElementById(`mrr-arpu-${id}`).textContent = pFmtFull(s.arpu);
+    document.getElementById(`mrr-val-${id}`).textContent = pFmtFull(s.mrr) + '/mo';
+    document.getElementById(`clients-slider-${id}`).disabled = !s.enabled;
+    document.getElementById(`arpu-slider-${id}`).disabled = !s.enabled;
+  } else {
+    const mrrEl = document.getElementById(`mrr-slider-${id}`);
+    mrrEl.value = s.mrr; mrrEl.disabled = !s.enabled;
+    document.getElementById(`mrr-val-${id}`).textContent = pFmtFull(s.mrr) + '/mo';
+    document.getElementById(`mrr-val-${id}`).className = 'slider-row-value' + (s.enabled ? '' : ' dim');
+    updateMrrFill(id);
+  }
+  const rMinEl = document.getElementById(`range-min-${id}`), rMaxEl = document.getElementById(`range-max-${id}`);
+  rMinEl.value = s.rangeMin; rMaxEl.value = s.rangeMax;
+  rMinEl.disabled = !s.enabled; rMaxEl.disabled = !s.enabled;
+  document.getElementById(`range-val-${id}`).textContent = pFmtFull(s.rangeMin) + ' — ' + pFmtFull(s.rangeMax);
+  updateRangeFill(id);
+  const priceEl = document.getElementById(`price-slider-${id}`);
+  priceEl.min = s.rangeMin; priceEl.max = s.rangeMax; priceEl.value = s.selected; priceEl.disabled = !s.enabled;
+  document.getElementById(`price-val-${id}`).textContent = pFmtFull(s.selected) + '/mo';
+  document.getElementById(`price-val-${id}`).className = 'slider-row-value green-val' + (s.enabled ? '' : ' dim');
+  updatePriceFill(id);
+  updatePricingSummary();
+}
+
+function updatePricingSummary() {
+  let totalMrr = 0, totalMin = 0, totalSel = 0, totalMax = 0;
+  MODELS.forEach(m => {
+    const s = pricingState[m.id];
+    if (!s.enabled) return;
+    totalMrr += s.mrr; totalMin += s.rangeMin; totalSel += s.selected; totalMax += s.rangeMax;
   });
+  document.getElementById('s-academy-mrr').textContent = pFmt(totalMrr);
+  document.getElementById('s-fc-min').textContent = pFmt(totalMin);
+  document.getElementById('s-fc-selected').textContent = pFmt(totalSel);
+  document.getElementById('s-fc-max').textContent = pFmt(totalMax);
+  document.getElementById('arr-min').textContent = pFmt(totalMin * 12);
+  document.getElementById('arr-selected').textContent = pFmt(totalSel * 12);
+  document.getElementById('arr-max').textContent = pFmt(totalMax * 12);
+  const count = parseInt(document.getElementById('acad-count')?.value) || 0;
+  document.getElementById('portfolio-arr').textContent = pFmt(totalSel * 12 * count);
+  document.getElementById('portfolio-sub').textContent = `portfolio ARR — ${count} academies at selected price`;
+  if (document.getElementById('snap-total-acad')) updateSnapResults();
+}
 
-  const blendedARPU = priceCount > 0 ? Math.round(selectedPrice / priceCount) : 0;
-  sharedState.pricing.blendedARPU = blendedARPU;
-
-  // ARR calculations (per academy)
-  const arrMin = Math.round(minPrice * 12);
-  const arrSelected = Math.round(selectedPrice * 12);
-  const arrMax = Math.round(maxPrice * 12);
-
-  // Portfolio ARR
-  const acadCount = parseInt(document.getElementById('acad-count')?.value) || 50;
-  const portfolioArr = Math.round(blendedARPU * 12 * acadCount);
-
-  // Render summary (top cards)
-  const summaryHtml = `
-    <div class="summary-card">
-      <div class="label">Blended ARPU</div>
-      <div class="value gold">$${blendedARPU}</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">FC / mo (floor)</div>
-      <div class="value blue">$${minPrice}</div>
-      <div class="sub">sum of range mins</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">FC / mo (selected)</div>
-      <div class="value green">$${selectedPrice}</div>
-      <div class="sub">at your price points</div>
-    </div>
-    <div class="summary-card">
-      <div class="label">FC / mo (ceiling)</div>
-      <div class="value purple">$${maxPrice}</div>
-      <div class="sub">sum of range maxes</div>
-    </div>
-  `;
-  document.getElementById('summary').innerHTML = summaryHtml;
-
-  // Update ARR section
-  document.getElementById('arr-min').textContent = '$' + arrMin.toLocaleString();
-  document.getElementById('arr-selected').textContent = '$' + arrSelected.toLocaleString();
-  document.getElementById('arr-max').textContent = '$' + arrMax.toLocaleString();
-  document.getElementById('portfolio-arr').textContent = '$' + portfolioArr.toLocaleString();
-  document.getElementById('portfolio-sub').textContent = 'portfolio ARR (' + acadCount + ' academies @ $' + blendedARPU + '/mo)';
-
-  // Render model cards
-  let modelsHtml = '';
-  models.forEach(m => {
-    const alloc = activeSc.allocations[m.id] || 0;
-    const pct = m.mrr > 0 ? (m.selected / m.mrr * 100).toFixed(1) : '—';
-    modelsHtml += `
-      <div class="model-card ${m.active ? 'active' : 'inactive'}">
-        <div class="model-header">
-          <button class="toggle ${m.active ? 'on' : ''}" onclick="toggleModel('${m.id}')"></button>
-          <span class="model-icon">${m.icon}</span>
-          <span class="model-name">${m.name}</span>
-          <div class="model-badge">
-            <span class="badge-charge">$${m.selected}</span>
-            <span class="badge-pct">${alloc}%</span>
-          </div>
-        </div>
-        ${m.active ? `
-          <div class="model-body">
-            <div class="model-col">
-              <div class="model-row">
-                <label>Academy MRR</label>
-                <span class="value">$${m.mrr.toLocaleString()}</span>
-              </div>
-              <div class="model-row">
-                <label>ARPU Range</label>
-                <span class="value">$${m.rangeMin}–$${m.rangeMax}</span>
-              </div>
-            </div>
-            <div class="model-col">
-              <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Price Slider</div>
-              <div class="input-group">
-                <input type="range" min="${m.rangeMin}" max="${m.rangeMax}" value="${m.selected}" oninput="updateModelPrice('${m.id}', this.value)">
-              </div>
-            </div>
-          </div>
-        ` : ''}
-      </div>
+function buildPricingCards() {
+  const container = document.getElementById('models-container');
+  container.innerHTML = '';
+  MODELS.forEach(m => {
+    const s = pricingState[m.id];
+    const p = s.mrr > 0 ? (s.selected / s.mrr * 100).toFixed(1) : '—';
+    const card = document.createElement('div');
+    card.id = `card-${m.id}`; card.className = 'model-card active';
+    const mrrSliderRow = m.isTrainingType ? `
+      <div class="slider-row"><div class="slider-row-label">Clients</div><div class="slider-row-track"><div class="track-bg"></div><div class="track-fill gold-fill" id="clients-fill-${m.id}" style="left:0;width:${s.clients/m.clientsMax*100}%"></div><input type="range" class="single" id="clients-slider-${m.id}" min="0" max="${m.clientsMax}" step="1" value="${s.clients}"></div><div class="slider-row-value" id="clients-val-${m.id}">${s.clients} members</div></div>
+      <div class="slider-row"><div class="slider-row-label">ARPU</div><div class="slider-row-track"><div class="track-bg"></div><div class="track-fill gold-fill" id="arpu-fill-${m.id}" style="left:0;width:${(s.arpu-ARPU_MIN)/(ARPU_MAX-ARPU_MIN)*100}%"></div><input type="range" class="single" id="arpu-slider-${m.id}" min="${ARPU_MIN}" max="${ARPU_MAX}" step="5" value="${s.arpu}"></div><div class="slider-row-value" id="arpu-val-${m.id}">${pFmtFull(s.arpu)}/mo</div></div>
+      <div class="slider-row computed-row"><div class="slider-row-label">Academy MRR</div><div class="computed-formula"><span class="formula-num" id="mrr-clients-${m.id}">${s.clients}</span><span class="formula-op">members ×</span><span class="formula-num" id="mrr-arpu-${m.id}">${pFmtFull(s.arpu)}</span><span class="formula-op">=</span></div><div class="slider-row-value gold" id="mrr-val-${m.id}">${pFmtFull(s.mrr)}/mo</div></div>
+    ` : `
+      <div class="slider-row"><div class="slider-row-label">Academy MRR</div><div class="slider-row-track"><div class="track-bg"></div><div class="track-fill gold-fill" id="mrr-fill-${m.id}" style="left:0;width:${s.mrr/MRR_MAX*100}%"></div><input type="range" class="single" id="mrr-slider-${m.id}" min="0" max="${MRR_MAX}" step="100" value="${s.mrr}"></div><div class="slider-row-value" id="mrr-val-${m.id}">${pFmtFull(s.mrr)}/mo</div></div>
     `;
+    card.innerHTML = `
+      <div class="model-header">
+        <button class="toggle on" id="toggle-${m.id}"></button>
+        <span class="model-icon">${m.icon}</span>
+        <span class="model-name">${m.name}</span>
+        <div class="model-badge">
+          <span class="badge-charge" id="badge-charge-${m.id}">${pFmtFull(s.selected)}/mo</span>
+          <span class="badge-pct ${pPctColor(s.selected / s.mrr * 100)}" id="badge-pct-${m.id}">${p}% of MRR</span>
+        </div>
+      </div>
+      <div class="slider-rows">
+        ${mrrSliderRow}
+        <div class="slider-row"><div class="slider-row-label">FC Price Range</div><div class="slider-row-track"><div class="track-bg"></div><div class="track-fill range-fill" id="range-fill-${m.id}" style="left:${(s.rangeMin-PRICE_MIN)/(PRICE_MAX-PRICE_MIN)*100}%;width:${(s.rangeMax-s.rangeMin)/(PRICE_MAX-PRICE_MIN)*100}%"></div><input type="range" class="dual" id="range-min-${m.id}" min="${PRICE_MIN}" max="${PRICE_MAX}" step="5" value="${s.rangeMin}"><input type="range" class="dual" id="range-max-${m.id}" min="${PRICE_MIN}" max="${PRICE_MAX}" step="5" value="${s.rangeMax}"></div><div class="slider-row-value" id="range-val-${m.id}">${pFmtFull(s.rangeMin)} — ${pFmtFull(s.rangeMax)}</div></div>
+        <div class="slider-row"><div class="slider-row-label">Your Price</div><div class="slider-row-track"><div class="track-bg"></div><div class="track-fill price-fill" id="price-fill-${m.id}" style="left:0;width:${(s.selected-s.rangeMin)/(s.rangeMax-s.rangeMin)*100}%"></div><input type="range" class="single" id="price-slider-${m.id}" min="${s.rangeMin}" max="${s.rangeMax}" step="5" value="${s.selected}"></div><div class="slider-row-value green-val" id="price-val-${m.id}">${pFmtFull(s.selected)}/mo</div></div>
+      </div>`;
+    container.appendChild(card);
+    document.getElementById(`toggle-${m.id}`).addEventListener('click', () => { pricingState[m.id].enabled = !pricingState[m.id].enabled; updateModelUI(m.id); });
+    if (m.isTrainingType) {
+      document.getElementById(`clients-slider-${m.id}`).addEventListener('input', e => { pricingState[m.id].clients = parseInt(e.target.value); pricingState[m.id].mrr = pricingState[m.id].clients * pricingState[m.id].arpu; updateModelUI(m.id); });
+      document.getElementById(`arpu-slider-${m.id}`).addEventListener('input', e => { pricingState[m.id].arpu = parseInt(e.target.value); pricingState[m.id].mrr = pricingState[m.id].clients * pricingState[m.id].arpu; updateModelUI(m.id); });
+    } else {
+      document.getElementById(`mrr-slider-${m.id}`).addEventListener('input', e => { pricingState[m.id].mrr = parseInt(e.target.value); updateModelUI(m.id); });
+    }
+    document.getElementById(`range-min-${m.id}`).addEventListener('input', e => { const val = parseInt(e.target.value); pricingState[m.id].rangeMin = Math.min(val, pricingState[m.id].rangeMax - 5); pricingState[m.id].selected = pClamp(pricingState[m.id].selected, pricingState[m.id].rangeMin, pricingState[m.id].rangeMax); updateModelUI(m.id); });
+    document.getElementById(`range-max-${m.id}`).addEventListener('input', e => { const val = parseInt(e.target.value); pricingState[m.id].rangeMax = Math.max(val, pricingState[m.id].rangeMin + 5); pricingState[m.id].selected = pClamp(pricingState[m.id].selected, pricingState[m.id].rangeMin, pricingState[m.id].rangeMax); updateModelUI(m.id); });
+    document.getElementById(`price-slider-${m.id}`).addEventListener('input', e => { pricingState[m.id].selected = parseInt(e.target.value); updateModelUI(m.id); });
   });
-  document.getElementById('models-container').innerHTML = modelsHtml;
 }
 
-function switchPricingScenario(idx) {
-  sharedState.pricing.activeScenario = idx;
-  renderPricingUI();
-  updateLaunchModel(); // Sync with launch model
+// ─── Snapshot system ───
+const SNAP_ALLOC_MAX = 100;
+let snapshots = [
+  { id: 's1', name: 'Scenario A', alloc: { 'training-sched': 30, 'training-basic': 20, 'club': 15, 'gym': 10, 'internal': 10, 'external': 15 } },
+  { id: 's2', name: 'Scenario B', alloc: { 'training-sched': 50, 'training-basic': 10, 'club': 10, 'gym': 10, 'internal': 10, 'external': 10 } },
+];
+let activeSnapId = 's1', nextSnapNum = 3;
+function activeSnap() { return snapshots.find(s => s.id === activeSnapId); }
+function snapMetrics(snap) {
+  let totalPct = 0, weightedRev = 0;
+  MODELS.forEach(m => {
+    if (!pricingState[m.id].enabled) return;
+    const pct = snap.alloc[m.id] || 0;
+    totalPct += pct; weightedRev += pct * pricingState[m.id].selected;
+  });
+  const blendedARPU = totalPct > 0 ? Math.round(weightedRev / totalPct) : 0;
+  const acadCount = parseInt(document.getElementById('acad-count')?.value) || 0;
+  const totalRev = blendedARPU * acadCount;
+  return { totalPct, blendedARPU, totalRev, arr: totalRev * 12, acadCount };
 }
-
-function toggleModel(modelId) {
-  const model = sharedState.pricing.models.find(m => m.id === modelId);
-  if (model) {
-    model.active = !model.active;
-    renderPricingUI();
-  }
+function buildSnapshotSection() {
+  const wrap = document.getElementById('snapshot-section');
+  const snap = activeSnap();
+  const m = snapMetrics(snap);
+  const tabsHtml = snapshots.map(s => `<button class="scenario-tab ${s.id === activeSnapId ? 'active' : ''}" onclick="setActiveSnap('${s.id}')">${s.name}</button>`).join('') + `<button class="scenario-tab add-tab" onclick="addSnap()">+ Add</button>`;
+  const allocRows = MODELS.map(mod => {
+    const n = snap.alloc[mod.id] || 0;
+    return `<div class="snap-alloc-row"><div class="snap-alloc-label">${mod.icon} ${mod.name}</div><div class="snap-alloc-track"><div class="snap-alloc-fill" id="sf-${mod.id}" style="width:${n}%"></div><input type="range" class="snap-range" id="sr-${mod.id}" min="0" max="${SNAP_ALLOC_MAX}" step="1" value="${n}" oninput="updateSnapAlloc('${mod.id}', this.value)"></div><div class="snap-alloc-val" id="sv-${mod.id}">${n}%</div></div>`;
+  }).join('');
+  wrap.innerHTML = `<div class="snapshot-section"><div class="snapshot-header"><span class="snapshot-title">Launch Snapshot</span><div class="scenario-tabs">${tabsHtml}</div></div><div class="scenario-name-row"><input class="scenario-name-input" id="snap-name-input" value="${snap.name}" oninput="renameSnap(this.value)" placeholder="Scenario name">${snapshots.length > 1 ? `<button class="scenario-tab del-tab" onclick="deleteSnap()">Delete</button>` : ''}<div class="snap-share-btns"><button class="snap-btn snap-btn-text" id="snap-text-btn" onclick="copySnapText()">📋 Copy summary</button><button class="snap-btn snap-btn-launch" id="snap-launch-btn" onclick="exportToLaunchTab()">→ Use in Launch Model</button></div></div><div class="snap-alloc-rows">${allocRows}</div><div class="snap-results"><div class="snap-result-card"><div class="label">% Allocated</div><div class="value blue" id="snap-total-acad">${m.totalPct}%</div></div><div class="snap-result-card"><div class="label">Blended ARPU</div><div class="value gold" id="snap-arpu">${m.totalPct > 0 ? pFmtFull(m.blendedARPU) + '/mo' : '—'}</div></div><div class="snap-result-card"><div class="label">FC Revenue / mo</div><div class="value green" id="snap-rev">${pFmtFull(m.totalRev)}</div></div><div class="snap-result-card"><div class="label">ARR</div><div class="value purple" id="snap-arr">${pFmt(m.arr)}</div></div></div></div>`;
 }
-
-function updateModelPrice(modelId, value) {
-  const model = sharedState.pricing.models.find(m => m.id === modelId);
-  if (model) {
-    model.selected = parseInt(value);
-    renderPricingUI();
-    updateLaunchModel(); // Sync ARPU
-  }
+function updateSnapResults() {
+  const snap = activeSnap(); const m = snapMetrics(snap);
+  document.getElementById('snap-total-acad').textContent = m.totalPct + '%';
+  document.getElementById('snap-arpu').textContent = m.totalPct > 0 ? pFmtFull(m.blendedARPU) + '/mo' : '—';
+  document.getElementById('snap-rev').textContent = pFmtFull(m.totalRev);
+  document.getElementById('snap-arr').textContent = pFmt(m.arr);
 }
+function updateSnapAlloc(modelId, rawVal) {
+  const snap = activeSnap(); const newVal = pClamp(parseInt(rawVal) || 0, 0, 100);
+  snap.alloc[modelId] = newVal;
+  const others = MODELS.filter(m => m.id !== modelId);
+  const remaining = 100 - newVal; const otherSum = others.reduce((s, m) => s + (snap.alloc[m.id] || 0), 0);
+  if (otherSum === 0) { const each = Math.floor(remaining / others.length); others.forEach(m => { snap.alloc[m.id] = each; }); if (others.length > 0) snap.alloc[others[0].id] += remaining - each * others.length; }
+  else { others.forEach(m => { snap.alloc[m.id] = Math.round((snap.alloc[m.id] / otherSum) * remaining); }); const total = MODELS.reduce((s, m) => s + (snap.alloc[m.id] || 0), 0); if (total !== 100) snap.alloc[others[0].id] += 100 - total; }
+  MODELS.forEach(m => { const v = snap.alloc[m.id] || 0; const sr = document.getElementById(`sr-${m.id}`); if (sr) sr.value = v; const sf = document.getElementById(`sf-${m.id}`); if (sf) sf.style.width = v + '%'; const sv = document.getElementById(`sv-${m.id}`); if (sv) sv.textContent = v + '%'; });
+  updateSnapResults();
+}
+function setActiveSnap(id) { activeSnapId = id; buildSnapshotSection(); }
+function addSnap() { const id = 's' + (nextSnapNum++); const def = {}; MODELS.forEach(m => { def[m.id] = 10; }); snapshots.push({ id, name: 'Scenario ' + String.fromCharCode(64 + snapshots.length + 1), alloc: def }); activeSnapId = id; buildSnapshotSection(); }
+function deleteSnap() { if (snapshots.length <= 1) return; snapshots = snapshots.filter(s => s.id !== activeSnapId); activeSnapId = snapshots[0].id; buildSnapshotSection(); }
+function renameSnap(name) { activeSnap().name = name; document.querySelectorAll('.scenario-tab.active').forEach(el => { if (el.textContent !== name) el.textContent = name; }); }
+function copySnapText() {
+  const acadCount = parseInt(document.getElementById('acad-count')?.value) || 0;
+  const D = '─'.repeat(48);
+  const lines = ['FULLCONTROL PRICING CALCULATOR', D, '', '── PRICING BY BUSINESS MODEL ──', ''];
+  MODELS.forEach(mod => { const s = pricingState[mod.id]; if (!s.enabled) return; lines.push(mod.name); if (mod.isTrainingType) lines.push(`  Clients: ${s.clients}  |  ARPU: ${pFmtFull(s.arpu)}/mo  |  Academy MRR: ${pFmtFull(s.mrr)}/mo`); else lines.push(`  Academy MRR: ${pFmtFull(s.mrr)}/mo`); lines.push(`  FC Price Range: ${pFmtFull(s.rangeMin)} – ${pFmtFull(s.rangeMax)}/mo`); lines.push(`  FC Your Price:  ${pFmtFull(s.selected)}/mo  (${s.mrr > 0 ? (s.selected/s.mrr*100).toFixed(1) + '% of MRR' : '—'})`); lines.push(''); });
+  lines.push(D, '', '── LAUNCH SCENARIOS ──', '');
+  snapshots.forEach(snap => { const m = snapMetrics(snap); lines.push(snap.name); MODELS.forEach(mod => { const pct = snap.alloc[mod.id] || 0; if (!pricingState[mod.id].enabled) return; lines.push(`  ${mod.name}: ${pct}% @ ${pFmtFull(pricingState[mod.id].selected)}/mo`); }); lines.push(`  % Allocated: ${m.totalPct}%  |  Blended ARPU: ${pFmtFull(m.blendedARPU)}/mo`); lines.push(`  FC Revenue/mo: ${pFmtFull(m.totalRev)}  |  ARR: ${pFmt(m.arr)}  (${acadCount} academies)`); lines.push(''); });
+  navigator.clipboard.writeText(lines.join('\n')).then(() => { const btn = document.getElementById('snap-text-btn'); btn.textContent = '✓ Copied!'; btn.classList.add('copied'); setTimeout(() => { btn.innerHTML = '📋 Copy summary'; btn.classList.remove('copied'); }, 2000); });
+}
+function exportToLaunchTab() {
+  const snap = activeSnap(); const m = snapMetrics(snap);
+  // Update the Launch Model tab's ARPU input and re-run model
+  const launchArpuInput = document.getElementById('input-launch-arpu');
+  if (launchArpuInput) { launchArpuInput.value = m.blendedARPU; updateLaunchModel(); }
+  const btn = document.getElementById('snap-launch-btn');
+  btn.textContent = '✓ ARPU set to ' + pFmtFull(m.blendedARPU);
+  btn.classList.add('copied');
+  setTimeout(() => { btn.innerHTML = '→ Use in Launch Model'; btn.classList.remove('copied'); }, 2500);
+}
+function copyLink() {
+  const data = { acad: parseInt(document.getElementById('acad-count').value) || 50, snaps: snapshots, activeSnap: activeSnapId };
+  MODELS.forEach(m => { const s = pricingState[m.id]; const entry = { on: s.enabled ? 1 : 0, rMin: s.rangeMin, rMax: s.rangeMax, sel: s.selected }; if (m.isTrainingType) { entry.cl = s.clients; entry.ar = s.arpu; } else { entry.mrr = s.mrr; } data[m.id] = entry; });
+  const url = location.href.split('#')[0] + '#pricing-' + btoa(JSON.stringify(data));
+  navigator.clipboard.writeText(url).then(() => { const btn = document.getElementById('copy-link-btn'); btn.textContent = '✓ Link copied!'; btn.classList.add('copied'); setTimeout(() => { btn.innerHTML = '🔗 Copy shareable link'; btn.classList.remove('copied'); }, 2000); });
+}
+function renderPricingUI() { buildSnapshotSection(); buildPricingCards(); updatePricingSummary(); }
 
 // ═══ LAUNCH MODEL TAB ═══
 function updateLaunchModel() {
@@ -1563,15 +1762,15 @@ function updateChart(data) {
 
 // Initialize
 window.addEventListener('load', () => {
-  updateLaunchModel();
   renderPricingUI();
+  updateLaunchModel();
   document.getElementById('input-launch').addEventListener('change', updateLaunchModel);
   document.getElementById('input-launch-arpu').addEventListener('change', updateLaunchModel);
   document.getElementById('input-growth').addEventListener('change', updateLaunchModel);
   document.getElementById('input-growth-rate').addEventListener('change', updateLaunchModel);
   document.getElementById('input-churn').addEventListener('change', updateLaunchModel);
   document.getElementById('input-target-arr').addEventListener('change', updateLaunchModel);
-  document.getElementById('acad-count').addEventListener('input', renderPricingUI);
+  document.getElementById('acad-count').addEventListener('input', updatePricingSummary);
 });
 </script>
 
