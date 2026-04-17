@@ -477,6 +477,13 @@
   }
   .snap-btn-text:hover { background: rgba(91,156,246,0.2); }
   .snap-btn-text.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+  .snap-btn-launch {
+    background: rgba(56,217,169,0.1);
+    border-color: rgba(56,217,169,0.3);
+    color: #38d9a9;
+  }
+  .snap-btn-launch:hover { background: rgba(56,217,169,0.2); }
+  .snap-btn-launch.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
 
   .snap-alloc-rows { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
   .snap-alloc-row {
@@ -1020,6 +1027,7 @@
           <div class="snap-share-btns">
             <button class="snap-btn snap-btn-link" id="snap-link-btn" onclick="copySnapLink()">🔗 Copy link</button>
             <button class="snap-btn snap-btn-text" id="snap-text-btn" onclick="copySnapText()">📋 Copy summary</button>
+            <button class="snap-btn snap-btn-launch" id="snap-launch-btn" onclick="exportToLaunchPlan()">→ Use in Launch Plan</button>
           </div>
         </div>
 
@@ -1193,6 +1201,23 @@
       btn.classList.add('copied');
       setTimeout(() => { btn.innerHTML = '🔗 Copy link'; btn.classList.remove('copied'); }, 2000);
     });
+  }
+
+  function exportToLaunchPlan() {
+    const snap = activeSnap();
+    const m = snapMetrics(snap);
+    const scenarioData = {
+      name: snap.name,
+      blendedARPU: m.blendedARPU,
+      allocation: snap.alloc,
+      timestamp: Date.now(),
+      acadCount: parseInt(document.getElementById('acad-count').value) || 50
+    };
+    localStorage.setItem('fc-pricing-scenario', JSON.stringify(scenarioData));
+    const btn = document.getElementById('snap-launch-btn');
+    btn.textContent = '✓ Ready for Launch Plan';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = '→ Use in Launch Plan'; btn.classList.remove('copied'); }, 2000);
   }
 
   /* ════════════════════════════════════════ */

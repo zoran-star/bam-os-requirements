@@ -540,6 +540,10 @@
       </div>
       <div class="sub-label">What each existing academy pays on day 0</div>
       <input type="range" id="sl-launchArpu" min="50" max="2000" step="25" value="499" oninput="sync('launchArpu', this.value)" />
+      <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+        <button id="load-pricing-btn" style="padding: 6px 12px; border: 1px solid rgba(56,217,169,0.3); background: rgba(56,217,169,0.1); color: #38d9a9; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: none;" onclick="loadPricingScenario()">← Load from Pricing</button>
+        <a href="pricing-calculator.html" style="padding: 6px 12px; border: 1px solid rgba(91,156,246,0.3); background: rgba(91,156,246,0.1); color: #5b9cf6; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none;">→ Configure in Pricing</a>
+      </div>
     </div>
 
     <div class="day0-mrr">
@@ -723,6 +727,33 @@ function sync(key, raw) {
   else lbl.textContent = v;
 
   render();
+}
+
+function loadPricingScenario() {
+  try {
+    const data = JSON.parse(localStorage.getItem('fc-pricing-scenario'));
+    if (data && data.blendedARPU) {
+      sync('launchArpu', data.blendedARPU);
+      const btn = document.getElementById('load-pricing-btn');
+      btn.textContent = '✓ Loaded: ' + data.name;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = '← Load from Pricing'; btn.classList.remove('copied'); }, 2000);
+    }
+  } catch (e) { console.error('Failed to load pricing scenario:', e); }
+}
+
+function checkPricingScenario() {
+  const btn = document.getElementById('load-pricing-btn');
+  const saved = localStorage.getItem('fc-pricing-scenario');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.blendedARPU) {
+        btn.style.display = 'inline-block';
+        btn.title = 'Load scenario: ' + data.name + ' (ARPU: $' + Math.round(data.blendedARPU) + ')';
+      }
+    } catch (e) { }
+  }
 }
 
 function buildProjection() {
@@ -999,6 +1030,7 @@ toggleTarget = function() { _origToggleTarget(); saveState(); };
 
 // Init
 loadState();
+checkPricingScenario();
 render();
 </script>
 </body>
