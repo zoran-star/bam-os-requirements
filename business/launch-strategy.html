@@ -294,6 +294,56 @@ body {
 }
 .subphase-desc strong { color: var(--text); }
 
+/* ── Sub-phase step flow ── */
+.subphase-steps {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.sp-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-width: 0;
+}
+.sp-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.sd-build    { background: var(--muted); }
+.sd-internal { background: var(--accent); }
+.sd-beta     { background: var(--accent3); }
+.sd-live     { background: var(--accent2); }
+.sp-step-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sp-step-desc {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  display: block;
+}
+.sp-step-arrow {
+  color: var(--border);
+  font-size: 14px;
+  padding-top: 8px;
+  flex-shrink: 0;
+}
+
 .phase-title {
   font-size: 13px;
   font-weight: 700;
@@ -669,6 +719,27 @@ hr.section-div {
             <div class="subphase-content">
               <div class="subphase-title">2a — GTA Similars <span class="subphase-tag">Training Classes (standard)</span></div>
               <div class="subphase-desc">Same business model as BAM GTA. No new features needed — connect backend, onboard. <strong>Sales to external basketball academies begin here.</strong></div>
+              <div class="subphase-steps">
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-build"></div>
+                  <div class="sp-step-label">Build<span class="sp-step-desc">Update PRDs + prototype, connect backend</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-internal"></div>
+                  <div class="sp-step-label">Internal Test<span class="sp-step-desc">Zoran + team validate internally</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-beta"></div>
+                  <div class="sp-step-label">Academy Beta<span class="sp-step-desc">Select BAM Business clients test first</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-live"></div>
+                  <div class="sp-step-label">Live<span class="sp-step-desc">Full sub-group onboarded</span></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -677,6 +748,27 @@ hr.section-div {
             <div class="subphase-content">
               <div class="subphase-title">2b — Miami <span class="subphase-tag">Adds: Gym Rental module</span></div>
               <div class="subphase-desc">Miami clients run gym rentals as a revenue stream. FC builds Gym Rental module ($99–$249/mo) before they onboard. Update PRDs + prototype to support this business model.</div>
+              <div class="subphase-steps">
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-build"></div>
+                  <div class="sp-step-label">Build<span class="sp-step-desc">Gym Rental module + PRDs + prototype</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-internal"></div>
+                  <div class="sp-step-label">Internal Test<span class="sp-step-desc">Validate Gym Rental feature internally</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-beta"></div>
+                  <div class="sp-step-label">Academy Beta<span class="sp-step-desc">One Miami client tests first</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-live"></div>
+                  <div class="sp-step-label">Live<span class="sp-step-desc">All Miami clients onboarded</span></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -685,6 +777,27 @@ hr.section-div {
             <div class="subphase-content">
               <div class="subphase-title">2c — San Diego <span class="subphase-tag">Adds: Multi-location support</span></div>
               <div class="subphase-desc">San Diego clients operate multiple locations. FC builds multi-location feature before they onboard. Update PRDs + prototype to support this architecture.</div>
+              <div class="subphase-steps">
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-build"></div>
+                  <div class="sp-step-label">Build<span class="sp-step-desc">Multi-location feature + PRDs + prototype</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-internal"></div>
+                  <div class="sp-step-label">Internal Test<span class="sp-step-desc">Validate multi-location internally</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-beta"></div>
+                  <div class="sp-step-label">Academy Beta<span class="sp-step-desc">One SD client tests first</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-live"></div>
+                  <div class="sp-step-label">Live<span class="sp-step-desc">All SD clients onboarded</span></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -693,6 +806,27 @@ hr.section-div {
             <div class="subphase-content">
               <div class="subphase-title">2d — Rest of BAM Business <span class="subphase-tag">All 23 clients live</span></div>
               <div class="subphase-desc">Remaining BAM Business academies onboard. Pre-marketing to the broader basketball market begins here. Gate clears for Phase 3.</div>
+              <div class="subphase-steps">
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-build"></div>
+                  <div class="sp-step-label">Build<span class="sp-step-desc">Any remaining PRD + prototype updates</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-internal"></div>
+                  <div class="sp-step-label">Internal Test<span class="sp-step-desc">Validate remaining features internally</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-beta"></div>
+                  <div class="sp-step-label">Academy Beta<span class="sp-step-desc">Select clients test before full rollout</span></div>
+                </div>
+                <div class="sp-step-arrow">→</div>
+                <div class="sp-step">
+                  <div class="sp-step-dot sd-live"></div>
+                  <div class="sp-step-label">Live<span class="sp-step-desc">All 23 BAM Business clients on FC</span></div>
+                </div>
+              </div>
             </div>
           </div>
 
