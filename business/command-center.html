@@ -918,6 +918,87 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 .copy-link-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 20px; background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.3); border-radius: 10px; color: #c9a84c; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; transition: background 0.2s; }
 .copy-link-btn:hover { background: rgba(201,168,76,0.2); }
 .copy-link-btn.copied { background: rgba(76,175,130,0.15); border-color: rgba(76,175,130,0.4); color: #4caf82; }
+
+/* ─── LAUNCH MODEL TAB STYLES ─── */
+.lm-wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+.lm-header { margin-bottom: 32px; }
+.lm-header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.lm-header p { color: var(--muted); margin-top: 4px; font-size: 13px; }
+.lm-layout { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+.lm-right { display: flex; flex-direction: column; gap: 20px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.metric-card .m-label { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.metric-card .m-value { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+.metric-card .m-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.metric-card.mc-blue .m-value { color: var(--accent5); }
+.metric-card.mc-green .m-value { color: var(--accent2); }
+.metric-card.mc-orange .m-value { color: var(--accent3); }
+.metric-card.mc-purple .m-value { color: var(--accent4); }
+.milestones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.milestone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.milestone .ms-month { font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.milestone .ms-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.milestone .ms-key { font-size: 11px; color: var(--muted); }
+.milestone .ms-val { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.chart-title { font-size: 13px; font-weight: 600; }
+.chart-tabs { display: flex; gap: 6px; }
+.chart-tab { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
+.chart-tab.active { background: var(--accent5); border-color: var(--accent5); color: #fff; }
+.chart-wrap { position: relative; height: 220px; }
+.table-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+.table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.table-title { font-size: 13px; font-weight: 600; }
+.show-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; padding: 5px 12px; cursor: pointer; }
+.show-toggle:hover { color: var(--text); }
+.lm-table { width: 100%; border-collapse: collapse; }
+.lm-table th { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); text-align: right; padding: 0 10px 10px; border-bottom: 1px solid var(--border); }
+.lm-table th:first-child { text-align: left; }
+.lm-table td { font-size: 12px; text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--surface2); font-variant-numeric: tabular-nums; }
+.lm-table td:first-child { text-align: left; color: var(--muted); }
+.lm-table tr:last-child td { border-bottom: none; }
+.lm-table tr:hover td { background: var(--surface2); }
+.lm-highlight td { background: rgba(91,127,255,0.06); }
+.lm-highlight td:first-child { color: var(--accent5); font-weight: 700; }
+.td-clients { color: var(--accent5); font-weight: 600; }
+.td-mrr { color: var(--accent2); font-weight: 600; }
+.td-arr { color: var(--accent3); }
+.td-ltv { color: var(--accent4); }
+.td-churn { color: var(--accent4); }
+.lm-more { display: none; }
+.day0-mrr { margin-top: 14px; padding: 12px 14px; background: rgba(56,217,169,0.07); border: 1px solid rgba(56,217,169,0.25); border-radius: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+.day0-mrr .d0-label { font-size: 11px; color: var(--muted); }
+.day0-mrr .d0-value { font-size: 18px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.info-wrap { position: relative; display: inline-flex; align-items: center; margin-left: 6px; vertical-align: middle; }
+.info-icon { width: 15px; height: 15px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); font-size: 9px; font-weight: 700; font-style: italic; display: flex; align-items: center; justify-content: center; cursor: default; line-height: 1; user-select: none; font-family: Georgia, serif; }
+.info-icon:hover { border-color: var(--accent); color: var(--accent); }
+.info-tooltip { display: none; position: absolute; left: 20px; top: -4px; background: #1e2133; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; width: 240px; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,0.4); pointer-events: none; }
+.info-icon:hover + .info-tooltip, .info-wrap:hover .info-tooltip { display: block; }
+.info-tooltip .tt-title { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.info-tooltip .tt-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; gap: 8px; }
+.info-tooltip .tt-k { color: var(--muted); flex-shrink: 0; }
+.info-tooltip .tt-v { color: var(--text); font-weight: 600; text-align: right; }
+.info-tooltip .tt-divider { border: none; border-top: 1px solid var(--border); margin: 8px 0; }
+.target-section { margin-top: 20px; }
+.toggle-row { display: flex; justify-content: space-between; align-items: center; }
+.toggle-label { font-size: 13px; font-weight: 500; }
+.toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-track { position: absolute; inset: 0; background: var(--border); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+.toggle-track::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: transform 0.2s, background 0.2s; }
+.toggle-switch input:checked + .toggle-track { background: var(--accent5); }
+.toggle-switch input:checked + .toggle-track::after { transform: translateX(16px); background: #fff; }
+.target-inputs { margin-top: 16px; display: none; }
+.target-inputs.visible { display: block; }
+.timeline-display { margin-top: 14px; border-radius: 10px; padding: 14px 16px; background: var(--surface2); border: 1px solid var(--border); transition: border-color 0.3s, background 0.3s; display: none; }
+.timeline-display.visible { display: block; }
+.timeline-display.lit { background: rgba(56,217,169,0.07); border-color: var(--accent2); }
+.timeline-display.unreachable { background: rgba(255,92,122,0.07); border-color: #ff5c7a; }
+.tl-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.tl-value { font-size: 17px; font-weight: 800; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.tl-value.unreachable { color: #ff5c7a; }
+.val.lm-red { color: #ff5c7a; }
 </style>
 </head>
 <body>
@@ -1208,117 +1289,191 @@ input[type=range].snap-range::-webkit-slider-thumb:hover { transform: scale(1.2)
 
 <!-- ═══ LAUNCH MODEL TAB ═══ -->
 <div id="launch" class="tab-content">
-  <div style="max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px;">
-    <header style="margin-bottom: 32px;">
-      <h1 style="font-size: 22px; font-weight: 700;">FullControl Launch Financial Model</h1>
-      <p style="color: var(--muted); margin-top: 4px; font-size: 13px;">Inputs from Launch Strategy (Phase 2 academies) + Pricing (scenarios). Outputs: 24-month projections.</p>
-    </header>
+  <div class="lm-wrap">
+    <div class="lm-header">
+      <h1>FullControl — Launch Financial Model</h1>
+      <p>Adjust the inputs to model client growth, revenue, and lifetime value over 24 months.</p>
+    </div>
 
-    <div class="launch-layout">
-      <!-- Left panel: inputs -->
+    <div class="lm-layout">
+      <!-- LEFT: Inputs -->
       <div class="panel">
-        <div class="panel-title">Inputs</div>
+        <div class="panel-title">Model Inputs</div>
 
         <div class="input-group-launch">
           <div class="input-label">
-            <span>Academies at Launch</span>
-            <span class="val" id="val-launch">23</span>
+            <span style="display:inline-flex;align-items:center;">
+              Academies at Launch
+              <span class="info-wrap">
+                <span class="info-icon">i</span>
+                <span class="info-tooltip">
+                  <div class="tt-title">Mike's current client data</div>
+                  <div class="tt-row"><span class="tt-k">Total clients billed</span><span class="tt-v">53</span></div>
+                  <div class="tt-row"><span class="tt-k">Active clients</span><span class="tt-v">23</span></div>
+                  <div class="tt-row"><span class="tt-k">Current MRR</span><span class="tt-v">$18,240</span></div>
+                  <div class="tt-divider"></div>
+                  <div class="tt-row"><span class="tt-k">6 internal academies</span><span class="tt-v">15% gross rev</span></div>
+                  <div class="tt-row"><span class="tt-k">8 SS</span><span class="tt-v">$1,750/mo</span></div>
+                  <div class="tt-row"><span class="tt-k">5 SS Core</span><span class="tt-v">$829/mo</span></div>
+                  <div class="tt-row"><span class="tt-k">3 BAM OS</span><span class="tt-v">$500/mo</span></div>
+                  <div class="tt-row"><span class="tt-k">1 SS Growth</span><span class="tt-v">30% rev split</span></div>
+                </span>
+              </span>
+            </span>
+            <span class="val" id="lm-lbl-launch">23</span>
           </div>
-          <input type="number" id="input-launch" class="number-input" value="23" min="1" max="500">
-          <div class="sub-label">BAM Business Phase 2 academies</div>
+          <input type="range" style="width:100%" id="lm-sl-launch" min="1" max="100" step="1" value="23" oninput="lmSync('launch', this.value)" />
         </div>
-
-        <div class="divider"></div>
 
         <div class="input-group-launch">
           <div class="input-label">
             <span>ARPU at FC Launch</span>
-            <span class="val" id="val-launch-arpu">$499</span>
+            <span class="val" style="color:var(--accent4)" id="lm-lbl-launchArpu">$499</span>
           </div>
-          <div class="arpu-selector" id="arpu-selector"></div>
-          <input type="number" id="input-launch-arpu" class="number-input" value="499" min="50" max="2000" style="display:none;">
-          <div class="sub-label">Click a scenario above, or adjust manually</div>
+          <div class="sub-label">What each existing academy pays on day 0</div>
+          <input type="range" style="width:100%" id="lm-sl-launchArpu" min="50" max="2000" step="25" value="499" oninput="lmSync('launchArpu', this.value)" />
+          <div style="margin-top: 10px;">
+            <button id="lm-load-pricing-btn" style="padding: 6px 12px; border: 1px solid rgba(56,217,169,0.3); background: rgba(56,217,169,0.1); color: #38d9a9; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: none;" onclick="lmLoadPricingScenario()">← Load from Pricing</button>
+          </div>
         </div>
 
-        <div class="divider"></div>
+        <div class="day0-mrr">
+          <span class="d0-label">Day 0 MRR</span>
+          <span class="d0-value" id="lm-day0-mrr-val">$11,477</span>
+        </div>
+
+        <div class="input-group-launch" style="margin-top:20px;">
+          <div class="input-label">
+            <span>New Academies / Month (start)</span>
+            <span class="val" style="color:var(--accent2)" id="lm-lbl-baseGrowth">3</span>
+          </div>
+          <div class="sub-label">New clients added in month 1 post-launch</div>
+          <input type="range" style="width:100%" id="lm-sl-baseGrowth" min="0" max="30" step="1" value="3" oninput="lmSync('baseGrowth', this.value)" />
+        </div>
 
         <div class="input-group-launch">
           <div class="input-label">
-            <span>New Academies / Month</span>
-            <span class="val" id="val-growth">3</span>
+            <span>Monthly Growth Rate of New Academies</span>
+            <span class="val" style="color:var(--accent2)" id="lm-lbl-growthRate">10%</span>
           </div>
-          <input type="number" id="input-growth" class="number-input" value="3" min="0" max="50">
+          <div class="sub-label">New academy additions compound each month</div>
+          <input type="range" style="width:100%" id="lm-sl-growthRate" min="0" max="50" step="1" value="10" oninput="lmSync('growthRate', this.value)" />
         </div>
 
         <div class="input-group-launch">
           <div class="input-label">
-            <span>Growth Rate</span>
-            <span class="val" id="val-growth-rate">10%</span>
+            <span>Monthly Churn Rate</span>
+            <span class="val lm-red" id="lm-lbl-churn">3%</span>
           </div>
-          <input type="range" id="input-growth-rate" min="0" max="50" value="10" oninput="updateGrowthRateDisplay()">
+          <div class="sub-label">% of clients lost each month</div>
+          <input type="range" style="width:100%" id="lm-sl-churn" min="0" max="20" step="0.5" value="3" oninput="lmSync('churn', this.value)" />
         </div>
 
         <div class="input-group-launch">
           <div class="input-label">
-            <span>Churn Rate</span>
-            <span class="val" id="val-churn">3%</span>
+            <span>Avg Monthly Price</span>
+            <span class="val" style="color:var(--accent4)" id="lm-lbl-price">$499</span>
           </div>
-          <input type="range" id="input-churn" min="0" max="20" value="3" oninput="updateChurnDisplay()">
+          <div class="sub-label">Per new client, per month (USD)</div>
+          <input type="range" style="width:100%" id="lm-sl-price" min="50" max="2000" step="25" value="499" oninput="lmSync('price', this.value)" />
         </div>
 
-        <div class="divider"></div>
+        <hr class="divider" />
 
-        <div class="input-group-launch">
-          <div class="input-label">
-            <span>ARR Target (optional)</span>
-            <span class="val" id="val-target-arr">—</span>
+        <div style="font-size: 11px; color: var(--muted); line-height: 1.7;">
+          <strong style="color: var(--text);">LTV Formula</strong><br>
+          Average LTV = Monthly Price ÷ Churn Rate<br>
+          e.g. $499 ÷ 3% = <span id="lm-ltv-explain" style="color: var(--accent4); font-weight: 700;">$16,633</span>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="target-section">
+          <div class="toggle-row">
+            <span class="toggle-label">ARR Target</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="lm-target-toggle" onchange="lmToggleTarget()" />
+              <span class="toggle-track"></span>
+            </label>
           </div>
-          <input type="number" id="input-target-arr" class="number-input" placeholder="e.g., 2000000">
-          <div class="sub-label">For planning purposes</div>
+          <div class="target-inputs" id="lm-target-inputs">
+            <div class="input-label" style="margin-top:16px;">
+              <span>Target ARR</span>
+              <span class="val" style="color:var(--accent2)" id="lm-lbl-target">$500k</span>
+            </div>
+            <input type="range" style="width:100%" id="lm-sl-target" min="10000" max="5000000" step="10000" value="500000" oninput="lmSyncTarget(this.value)" />
+          </div>
+          <div class="timeline-display" id="lm-timeline-display">
+            <div class="tl-label" id="lm-tl-label">Expected timeline to target ARR of —</div>
+            <div class="tl-value" id="lm-tl-value">—</div>
+          </div>
         </div>
       </div>
 
-      <!-- Right column: outputs -->
-      <div class="right-col">
+      <!-- RIGHT -->
+      <div class="lm-right">
         <!-- Metric cards -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-          <div class="metric-card">
-            <div class="metric-label">Day 0 MRR</div>
-            <div class="metric-value" id="metric-day0-mrr">$11,477</div>
+        <div class="metrics-grid">
+          <div class="metric-card mc-blue">
+            <div class="m-label">Clients (Month 12)</div>
+            <div class="m-value" id="lm-mc-clients">—</div>
+            <div class="m-sub">active</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Month 12 Clients</div>
-            <div class="metric-value" id="metric-m12-clients">48</div>
+          <div class="metric-card mc-green">
+            <div class="m-label">MRR (Month 12)</div>
+            <div class="m-value" id="lm-mc-mrr">—</div>
+            <div class="m-sub">monthly recurring</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Month 12 MRR</div>
-            <div class="metric-value" id="metric-m12-mrr">$23,952</div>
+          <div class="metric-card mc-orange">
+            <div class="m-label">ARR (Month 12)</div>
+            <div class="m-value" id="lm-mc-arr">—</div>
+            <div class="m-sub">annualised run rate</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Month 12 ARR</div>
-            <div class="metric-value" id="metric-m12-arr">$287,424</div>
+          <div class="metric-card mc-purple">
+            <div class="m-label">Avg LTV / Client</div>
+            <div class="m-value" id="lm-mc-ltv">—</div>
+            <div class="m-sub">at current churn</div>
           </div>
         </div>
 
+        <!-- Milestones -->
+        <div class="milestones" id="lm-milestones-grid"></div>
+
         <!-- Chart -->
-        <div class="chart-container">
-          <canvas id="forecast-chart"></canvas>
+        <div class="chart-panel">
+          <div class="chart-header">
+            <div class="chart-title">24-Month Projection</div>
+            <div class="chart-tabs">
+              <button class="chart-tab active" id="lm-tab-clients" onclick="lmSwitchChartTab('clients')">Clients</button>
+              <button class="chart-tab" id="lm-tab-mrr" onclick="lmSwitchChartTab('mrr')">MRR</button>
+              <button class="chart-tab" id="lm-tab-arr" onclick="lmSwitchChartTab('arr')">ARR</button>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="lm-mainChart"></canvas>
+          </div>
         </div>
 
         <!-- Table -->
-        <div class="table-container">
-          <table id="forecast-table">
+        <div class="table-panel">
+          <div class="table-header">
+            <div class="table-title">Month-by-Month Breakdown</div>
+            <button class="show-toggle" id="lm-toggle-btn" onclick="lmToggleRows()">Show all 24 months</button>
+          </div>
+          <table class="lm-table">
             <thead>
               <tr>
                 <th>Month</th>
                 <th>Clients</th>
+                <th>New</th>
+                <th>Churned</th>
                 <th>MRR</th>
                 <th>ARR</th>
+                <th>LTV</th>
               </tr>
             </thead>
-            <tbody id="table-body"></tbody>
+            <tbody id="lm-table-body"></tbody>
           </table>
-          <button class="toggle-btn" id="toggle-btn" onclick="toggleAllMonths()">Show all 24 months</button>
         </div>
       </div>
     </div>
@@ -1363,7 +1518,7 @@ function switchTab(tabName) {
   document.getElementById(tabName).classList.add('active');
   event.target.classList.add('active');
   if (tabName === 'pricing') setTimeout(() => renderPricingUI(), 0);
-  if (tabName === 'launch') setTimeout(() => updateLaunchModel(), 0);
+  if (tabName === 'launch') setTimeout(() => { lmCheckPricingScenario(); lmRender(); }, 0);
 }
 
 function switchSection(sectionId) {
@@ -1585,9 +1740,7 @@ function copySnapText() {
 }
 function exportToLaunchTab() {
   const snap = activeSnap(); const m = snapMetrics(snap);
-  // Update the Launch Model tab's ARPU input and re-run model
-  const launchArpuInput = document.getElementById('input-launch-arpu');
-  if (launchArpuInput) { launchArpuInput.value = m.blendedARPU; updateLaunchModel(); }
+  lmSync('launchArpu', m.blendedARPU);
   const btn = document.getElementById('snap-launch-btn');
   btn.textContent = '✓ ARPU set to ' + pFmtFull(m.blendedARPU);
   btn.classList.add('copied');
@@ -1602,174 +1755,262 @@ function copyLink() {
 function renderPricingUI() { buildSnapshotSection(); buildPricingCards(); updatePricingSummary(); }
 
 // ═══ LAUNCH MODEL TAB ═══
-function updateLaunchModel() {
-  const input = {
-    launch: parseInt(document.getElementById('input-launch').value) || 23,
-    launchArpu: parseInt(document.getElementById('input-launch-arpu').value) || sharedState.pricing.blendedARPU,
-    baseGrowth: parseInt(document.getElementById('input-growth').value) || 3,
-    growthRate: parseInt(document.getElementById('input-growth-rate').value) || 10,
-    churn: parseInt(document.getElementById('input-churn').value) || 3,
-    targetArr: parseInt(document.getElementById('input-target-arr').value) || 0
-  };
+let lmVals = { launch: 23, launchArpu: 499, baseGrowth: 3, growthRate: 10, churn: 3, price: 499 };
+let lmTargetArr = 500000;
+let lmTargetOn = false;
+let lmActiveTab = 'clients';
+let lmShowAll = false;
+let lmChart = null;
 
-  sharedState.launch = input;
+function lmFmt(n) {
+  if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000) return '$' + (n / 1_000).toFixed(1) + 'k';
+  return '$' + Math.round(n).toLocaleString();
+}
+function lmFmtFull(n) { return '$' + Math.round(n).toLocaleString(); }
 
-  // Calculate 24-month forecast
-  let clients = input.launch;
-  let data = [];
+function lmSync(key, raw) {
+  const v = parseFloat(raw) || 0;
+  lmVals[key] = v;
+  const sl = document.getElementById('lm-sl-' + key);
+  if (sl && parseFloat(sl.value) !== v) sl.value = v;
+  const lbl = document.getElementById('lm-lbl-' + key);
+  if (lbl) {
+    if (key === 'churn' || key === 'growthRate') lbl.textContent = v + '%';
+    else if (key === 'price' || key === 'launchArpu') lbl.textContent = '$' + v.toLocaleString();
+    else lbl.textContent = v;
+  }
+  lmRender();
+  lmSaveState();
+}
 
-  for (let m = 0; m < 24; m++) {
-    const newClients = m === 0 ? 0 : input.baseGrowth + (clients * input.growthRate / 100);
-    const churnClients = clients * (input.churn / 100);
-    clients = Math.max(0, clients + newClients - churnClients);
-    const mrr = clients * input.launchArpu;
+function lmLoadPricingScenario() {
+  try {
+    const data = JSON.parse(localStorage.getItem('fc-pricing-scenario'));
+    if (data && data.blendedARPU) {
+      lmSync('launchArpu', data.blendedARPU);
+      const btn = document.getElementById('lm-load-pricing-btn');
+      btn.textContent = '✓ Loaded: ' + data.name;
+      setTimeout(() => { btn.textContent = '← Load from Pricing'; }, 2000);
+    }
+  } catch (e) {}
+}
+
+function lmCheckPricingScenario() {
+  const btn = document.getElementById('lm-load-pricing-btn');
+  if (!btn) return;
+  const saved = localStorage.getItem('fc-pricing-scenario');
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      if (data.blendedARPU) {
+        btn.style.display = 'inline-block';
+        btn.title = 'Load: ' + data.name + ' (ARPU: $' + Math.round(data.blendedARPU) + ')';
+      }
+    } catch (e) {}
+  }
+}
+
+function lmBuildProjection() {
+  const { launch, baseGrowth, growthRate, churn, price } = lmVals;
+  const churnRate = churn / 100;
+  const monthlyGrowthRate = growthRate / 100;
+  const rows = [];
+  let clients = launch;
+  for (let m = 1; m <= 24; m++) {
+    const newClients = m === 1 ? 0 : baseGrowth * Math.pow(1 + monthlyGrowthRate, m - 2);
+    const churned = m === 1 ? 0 : Math.round(clients * churnRate * 10) / 10;
+    if (m > 1) clients = Math.max(0, clients + newClients - churned);
+    const mrr = clients * price;
     const arr = mrr * 12;
-
-    data.push({ month: m, clients: Math.round(clients), mrr: Math.round(mrr), arr: Math.round(arr) });
+    rows.push({ month: m, clients: Math.round(clients), newClients, churned, mrr, arr });
   }
-
-  // Update metrics
-  document.getElementById('val-launch').textContent = input.launch;
-  document.getElementById('val-launch-arpu').textContent = '$' + input.launchArpu;
-  document.getElementById('val-growth').textContent = input.baseGrowth;
-  document.getElementById('val-growth-rate').textContent = input.growthRate + '%';
-  document.getElementById('val-churn').textContent = input.churn + '%';
-  document.getElementById('metric-day0-mrr').textContent = '$' + (input.launch * input.launchArpu).toLocaleString();
-  document.getElementById('metric-m12-clients').textContent = Math.round(data[11].clients);
-  document.getElementById('metric-m12-mrr').textContent = '$' + Math.round(data[11].mrr).toLocaleString();
-  document.getElementById('metric-m12-arr').textContent = '$' + Math.round(data[11].arr).toLocaleString();
-
-  // Render ARPU scenario buttons
-  const { scenarios } = sharedState.pricing;
-  let arpu_html = '';
-  scenarios.forEach((sc, i) => {
-    arpu_html += `<button class="arpu-btn ${i === sharedState.pricing.activeScenario ? 'active' : ''}" onclick="switchARPUScenario(${i})">${sc.name}</button>`;
-  });
-  document.getElementById('arpu-selector').innerHTML = arpu_html;
-
-  // Update table
-  let tbody = '';
-  data.slice(0, 12).forEach(d => {
-    tbody += `<tr><td>Month ${d.month + 1}</td><td>${d.clients}</td><td>$${d.mrr.toLocaleString()}</td><td>$${d.arr.toLocaleString()}</td></tr>`;
-  });
-  document.getElementById('table-body').innerHTML = tbody;
-
-  // Update chart
-  updateChart(data);
+  return rows;
 }
 
-function switchARPUScenario(idx) {
-  sharedState.pricing.activeScenario = idx;
-  const scenario = sharedState.pricing.scenarios[idx];
-  let totalPrice = 0;
-  sharedState.pricing.models.forEach(m => {
-    if (scenario.allocations[m.id]) {
-      const alloc = scenario.allocations[m.id];
-      totalPrice += m.selected * (alloc / 100);
-    }
-  });
-  document.getElementById('input-launch-arpu').value = Math.round(totalPrice);
-  updateLaunchModel();
+function lmRender() {
+  const rows = lmBuildProjection();
+  const { price, churn } = lmVals;
+  const churnRate = churn / 100;
+  const ltv = churnRate > 0 ? price / churnRate : 999999;
+
+  const ltvEl = document.getElementById('lm-ltv-explain');
+  if (ltvEl) ltvEl.textContent = churnRate > 0 ? lmFmtFull(ltv) : '∞';
+
+  const r12 = rows[11];
+  document.getElementById('lm-mc-clients').textContent = r12.clients;
+  document.getElementById('lm-mc-mrr').textContent = lmFmt(r12.mrr);
+  document.getElementById('lm-mc-arr').textContent = lmFmt(r12.arr);
+  document.getElementById('lm-mc-ltv').textContent = churnRate > 0 ? lmFmt(ltv) : '∞';
+
+  const mgEl = document.getElementById('lm-milestones-grid');
+  if (mgEl) mgEl.innerHTML = [1,6,12,24].map(m => {
+    const r = rows[m - 1];
+    return `<div class="milestone"><div class="ms-month">Month ${m}</div><div class="ms-row"><span class="ms-key">Clients</span><span class="ms-val" style="color:var(--accent5)">${r.clients}</span></div><div class="ms-row"><span class="ms-key">MRR</span><span class="ms-val" style="color:var(--accent2)">${lmFmt(r.mrr)}</span></div><div class="ms-row"><span class="ms-key">ARR</span><span class="ms-val" style="color:var(--accent3)">${lmFmt(r.arr)}</span></div></div>`;
+  }).join('');
+
+  lmUpdateChart(rows);
+
+  const d0El = document.getElementById('lm-day0-mrr-val');
+  if (d0El) d0El.textContent = lmFmtFull(lmVals.launch * lmVals.launchArpu);
+
+  lmRenderTarget(rows);
+
+  const ltvStr = churnRate > 0 ? lmFmtFull(ltv) : '∞';
+  const tbody = document.getElementById('lm-table-body');
+  if (tbody) tbody.innerHTML = rows.map((r, i) => {
+    const isMore = i >= 12;
+    const isHL = [6,12,24].includes(r.month);
+    return `<tr class="${isHL ? 'lm-highlight' : ''} ${isMore ? 'lm-more' : ''}">
+      <td>Mo. ${r.month}</td>
+      <td class="td-clients">${r.clients}</td>
+      <td style="color:var(--accent2)">${r.month === 1 ? '—' : '+' + Math.round(r.newClients)}</td>
+      <td class="td-churn">${r.month === 1 ? '—' : '−' + r.churned.toFixed(1)}</td>
+      <td class="td-mrr">${lmFmtFull(r.mrr)}</td>
+      <td class="td-arr">${lmFmt(r.arr)}</td>
+      <td class="td-ltv">${ltvStr}</td>
+    </tr>`;
+  }).join('');
+
+  if (!lmShowAll) document.querySelectorAll('.lm-more').forEach(r => r.style.display = 'none');
 }
 
-function updateGrowthRateDisplay() {
-  const val = document.getElementById('input-growth-rate').value;
-  document.getElementById('val-growth-rate').textContent = val + '%';
-  updateLaunchModel();
-}
-
-function updateChurnDisplay() {
-  const val = document.getElementById('input-churn').value;
-  document.getElementById('val-churn').textContent = val + '%';
-  updateLaunchModel();
-}
-
-function toggleAllMonths() {
-  const btn = document.getElementById('toggle-btn');
-  const tbody = document.getElementById('table-body');
-  const data = sharedState.launchData || [];
-
-  if (btn.textContent.includes('Show all')) {
-    let html = '';
-    for (let m = 0; m < 24; m++) {
-      if (data[m]) {
-        html += `<tr><td>Month ${m + 1}</td><td>${data[m].clients}</td><td>$${data[m].mrr.toLocaleString()}</td><td>$${data[m].arr.toLocaleString()}</td></tr>`;
-      }
-    }
-    tbody.innerHTML = html;
-    btn.textContent = 'Show first 12 months';
+function lmUpdateChart(rows) {
+  const labels = rows.map(r => `Mo. ${r.month}`);
+  let data, label, color, fill;
+  if (lmActiveTab === 'clients') {
+    data = rows.map(r => r.clients); label = 'Clients'; color = '#5b9fff'; fill = 'rgba(91,159,255,0.12)';
+  } else if (lmActiveTab === 'mrr') {
+    data = rows.map(r => r.mrr); label = 'MRR ($)'; color = '#38d9a9'; fill = 'rgba(56,217,169,0.1)';
   } else {
-    let html = '';
-    for (let m = 0; m < 12; m++) {
-      if (data[m]) {
-        html += `<tr><td>Month ${m + 1}</td><td>${data[m].clients}</td><td>$${data[m].mrr.toLocaleString()}</td><td>$${data[m].arr.toLocaleString()}</td></tr>`;
+    data = rows.map(r => r.arr); label = 'ARR ($)'; color = '#f5a623'; fill = 'rgba(245,166,35,0.1)';
+  }
+  if (lmChart) {
+    lmChart.data.labels = labels;
+    lmChart.data.datasets[0].data = data;
+    lmChart.data.datasets[0].label = label;
+    lmChart.data.datasets[0].borderColor = color;
+    lmChart.data.datasets[0].backgroundColor = fill;
+    lmChart.data.datasets[0].pointBackgroundColor = color;
+    lmChart.update('none');
+  } else {
+    const canvas = document.getElementById('lm-mainChart');
+    if (!canvas) return;
+    lmChart = new Chart(canvas, {
+      type: 'line',
+      data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: fill, borderWidth: 2, pointBackgroundColor: color, pointRadius: 3, pointHoverRadius: 5, fill: true, tension: 0.4 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#131720', borderColor: '#252b3d', borderWidth: 1, titleColor: '#6b7494', bodyColor: '#e2e5f0', padding: 10, callbacks: { label: ctx => { const v = ctx.parsed.y; return lmActiveTab === 'clients' ? ` ${v} clients` : ` ${lmFmtFull(v)}`; } } } },
+        scales: {
+          x: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 }, maxTicksLimit: 12 } },
+          y: { grid: { color: '#1a1f2e' }, ticks: { color: '#6b7494', font: { size: 11 }, callback: v => lmActiveTab === 'clients' ? v : lmFmt(v) }, beginAtZero: true }
+        },
+        interaction: { mode: 'index', intersect: false }
       }
-    }
-    tbody.innerHTML = html;
-    btn.textContent = 'Show all 24 months';
+    });
   }
 }
 
-let forecastChart = null;
+function lmSwitchChartTab(tab) {
+  lmActiveTab = tab;
+  document.querySelectorAll('#launch .chart-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('lm-tab-' + tab).classList.add('active');
+  if (lmChart) { lmChart.destroy(); lmChart = null; }
+  lmRender();
+}
 
-function updateChart(data) {
-  const ctx = document.getElementById('forecast-chart');
-  const months = data.map((_, i) => `M${i + 1}`);
-  const clients = data.map(d => d.clients);
-  const mrr = data.map(d => d.mrr / 1000);
+function lmToggleTarget() {
+  lmTargetOn = document.getElementById('lm-target-toggle').checked;
+  document.getElementById('lm-target-inputs').classList.toggle('visible', lmTargetOn);
+  document.getElementById('lm-timeline-display').classList.toggle('visible', lmTargetOn);
+  lmRender();
+  lmSaveState();
+}
 
-  if (forecastChart) {
-    forecastChart.destroy();
+function lmSyncTarget(raw) {
+  const v = parseFloat(raw) || 0;
+  lmTargetArr = v;
+  const sl = document.getElementById('lm-sl-target');
+  if (sl && parseFloat(sl.value) !== v) sl.value = Math.min(v, 5000000);
+  const lbl = document.getElementById('lm-lbl-target');
+  if (lbl) lbl.textContent = lmFmt(v);
+  lmRender();
+  lmSaveState();
+}
+
+function lmRenderTarget(rows) {
+  if (!lmTargetOn) return;
+  const display = document.getElementById('lm-timeline-display');
+  const lbl = document.getElementById('lm-tl-label');
+  const val = document.getElementById('lm-tl-value');
+  lbl.textContent = `Expected timeline to target ARR of ${lmFmt(lmTargetArr)}`;
+  const hit = rows.find(r => r.arr >= lmTargetArr);
+  if (hit) {
+    display.classList.add('lit'); display.classList.remove('unreachable');
+    val.classList.remove('unreachable');
+    const yrs = Math.floor(hit.month / 12), mos = hit.month % 12;
+    let timeStr = '';
+    if (yrs > 0) timeStr += yrs + (yrs === 1 ? ' year' : ' years');
+    if (yrs > 0 && mos > 0) timeStr += ', ';
+    if (mos > 0) timeStr += mos + (mos === 1 ? ' month' : ' months');
+    val.textContent = `Month ${hit.month} — ${timeStr || 'at launch'}`;
+  } else {
+    display.classList.remove('lit'); display.classList.add('unreachable');
+    val.classList.add('unreachable');
+    val.textContent = 'Not reached within 24 months';
   }
+}
 
-  forecastChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: months,
-      datasets: [
-        {
-          label: 'Clients',
-          data: clients,
-          borderColor: '#5b9cf6',
-          backgroundColor: 'rgba(91, 156, 246, 0.1)',
-          tension: 0.3,
-          yAxisID: 'y'
-        },
-        {
-          label: 'MRR ($k)',
-          data: mrr,
-          borderColor: '#38d9a9',
-          backgroundColor: 'rgba(56, 217, 169, 0.1)',
-          tension: 0.3,
-          yAxisID: 'y1'
+function lmToggleRows() {
+  lmShowAll = !lmShowAll;
+  document.querySelectorAll('.lm-more').forEach(r => { r.style.display = lmShowAll ? '' : 'none'; });
+  const btn = document.getElementById('lm-toggle-btn');
+  if (btn) btn.textContent = lmShowAll ? 'Show first 12 months' : 'Show all 24 months';
+}
+
+function lmSaveState() {
+  localStorage.setItem('fc-launch-model', JSON.stringify({ ...lmVals, targetArr: lmTargetArr, targetOn: lmTargetOn }));
+}
+
+function lmLoadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('fc-launch-model'));
+    if (!s) return;
+    ['launch','launchArpu','baseGrowth','growthRate','churn','price'].forEach(k => {
+      if (s[k] != null) {
+        lmVals[k] = s[k];
+        const sl = document.getElementById('lm-sl-' + k);
+        if (sl) sl.value = s[k];
+        const lbl = document.getElementById('lm-lbl-' + k);
+        if (lbl) {
+          if (k === 'churn' || k === 'growthRate') lbl.textContent = s[k] + '%';
+          else if (k === 'price' || k === 'launchArpu') lbl.textContent = '$' + Number(s[k]).toLocaleString();
+          else lbl.textContent = s[k];
         }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: true, labels: { color: '#999', font: { size: 11 } } } },
-      scales: {
-        y: { type: 'linear', display: true, position: 'left', ticks: { color: '#999' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y1: { type: 'linear', display: true, position: 'right', ticks: { color: '#999' }, grid: { drawOnChartArea: false } }
       }
+    });
+    if (s.targetArr) {
+      lmTargetArr = s.targetArr;
+      const sl = document.getElementById('lm-sl-target');
+      if (sl) sl.value = Math.min(s.targetArr, 5000000);
+      const lbl = document.getElementById('lm-lbl-target');
+      if (lbl) lbl.textContent = lmFmt(s.targetArr);
     }
-  });
-
-  sharedState.launchData = data;
+    if (s.targetOn) {
+      lmTargetOn = true;
+      const tog = document.getElementById('lm-target-toggle');
+      if (tog) tog.checked = true;
+      document.getElementById('lm-target-inputs')?.classList.add('visible');
+      document.getElementById('lm-timeline-display')?.classList.add('visible');
+    }
+  } catch(e) {}
 }
 
 // Initialize
 window.addEventListener('load', () => {
   renderPricingUI();
-  updateLaunchModel();
-  document.getElementById('input-launch').addEventListener('change', updateLaunchModel);
-  document.getElementById('input-launch-arpu').addEventListener('change', updateLaunchModel);
-  document.getElementById('input-growth').addEventListener('change', updateLaunchModel);
-  document.getElementById('input-growth-rate').addEventListener('change', updateLaunchModel);
-  document.getElementById('input-churn').addEventListener('change', updateLaunchModel);
-  document.getElementById('input-target-arr').addEventListener('change', updateLaunchModel);
+  lmLoadState();
   document.getElementById('acad-count').addEventListener('input', updatePricingSummary);
 });
 </script>
