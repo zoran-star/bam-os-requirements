@@ -1,6 +1,6 @@
 # FullControl Prototype
 
-The reference implementation of the FullControl OS. Every feature is designed and validated here before being built for real customers. Auto-deploys to fullcontrol-prototype-six.vercel.app on every push to main.
+The dream world front-end sandbox for FullControl OS. This is where every feature is designed, validated, and shown — before anything gets handed to a dev team. Auto-deploys to fullcontrol-prototype-six.vercel.app on every push to main.
 
 
 ## Structure

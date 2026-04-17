@@ -2,6 +2,9 @@
 
 System prompts and other building materials to set up the AI sales agents that run inside of Full Control. This is the "AI-native" layer that makes FullControl feel autonomous.
 
+## Status
+Booking agent is being built for BAM GTA. Zoran is working with Danny on sourcing training data from the best sales academies in the BAM Business network to train the agent. Still early stage.
+
 ## Current agents
 - conversation-ai-booking-agent.txt — master template with {{PLACEHOLDER}} variables
 - conversation-ai-booking-agent-bam-gta.txt — BAM GTA instance (all placeholders filled in)

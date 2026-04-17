@@ -12,5 +12,9 @@ First live deployment of FullControl at BAM Basketball's Greater Toronto Area lo
 - Parent app: prototype complete, pending live integration
 - The Dev team is currently integrating the backend
 
+## Core blockers
+- Backend integration in progress (GHL + Stripe)
+- Decision on where to build workflows (GHL or FC native)
+
 ## Goal
 Phase 1 proves the product works in a real academy. Real operator interactions here are the evidence that justifies the acquisition multiple. This is the data flywheel.

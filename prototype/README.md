@@ -1,16 +1,23 @@
-# React + Vite
+# FullControl Prototype
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## What it's for
+The reference implementation of the FullControl OS — a desktop web app showing every feature of the product. This is where every design decision, user flow, and screen is built and validated before anything gets handed to a dev team.
 
-Currently, two official plugins are available:
+## Who's working on it
+Zoran (product owner), Cole (requirements and design)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Current status
+Prototype complete. Being used as the design reference for the BAM GTA live build. Actively updated as new features are designed and reviewed.
 
-## React Compiler
+## End goal
+A fully validated, feature-complete prototype that covers every domain of the FullControl OS — Sales, Marketing, Content, Members, Schedule, and Settings — ready to hand to any dev team as a production spec.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Core blockers
+- Prototype and Notion requirements must stay in sync — drift between the two creates confusion
+- Features should only be added after whiteboard session review and human confirmation
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## How it connects to other projects
+- **whiteboard/** — planning sessions drive what gets built here
+- **bam-gta-phase1/** — the GTA staff and parent apps are location-specific implementations of this prototype
+- **fc-internal-content-engine/** — the Content page in this prototype is the UI layer for the content engine
+- **Notion** — business requirements live in Notion; this prototype is the living implementation
