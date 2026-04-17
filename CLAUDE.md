@@ -35,7 +35,7 @@ This repository holds the FullControl product prototype, survey, onboarding flow
 bam-os-requirements/
 ├── app/                        ← FullControl prototype (Vite/React)
 │                                 Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
-├── survey/                     ← User survey (Vite/React)
+├── market-research/            ← Market research survey sent to academies (Vite/React)
 │                                 Auto-deploys to: https://full-control-survey.vercel.app
 ├── business/                   ← All business planning materials
 │   ├── business/               ← Investor deck, pitch docs, planning files
@@ -66,7 +66,7 @@ Both apps auto-deploy on every push to `main` via Vercel Git integration:
 | App | Directory | Live URL |
 |-----|-----------|----------|
 | Prototype | `app/` | https://fullcontrol-prototype-six.vercel.app |
-| Survey | `survey/` | https://full-control-survey.vercel.app |
+| Market Research Survey | `market-research/` | https://full-control-survey.vercel.app |
 
 **Do NOT manually deploy via CLI.** Just push to `main` and Vercel handles it.
 
