@@ -120,15 +120,14 @@ Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
 
 ## Phase 1 · Discovery
 
-The specific questions to collect are already in the database and will be workshopped in Phase 2. Phase 1 is only about context that can't be inferred from the DB.
+The specific questions to collect are already in the database and will be workshopped in Phase 2. Branching paths and conditional logic are also Phase 2 territory — they only become clear once the question structure is visible.
 
-Ask the user (in a single message — keep it tight):
+Phase 1 has one job: understand the north star purpose of this menu item.
 
-1. Which menu item? (if not already stated)
-2. What is the north star purpose — what does the operator walk away with after submitting?
-3. Are there different modes or paths? (e.g. does any answer split the form into different sections?)
+Ask the user (one question only):
+- What is this menu item for — what does the operator walk away able to build after submitting?
 
-Do NOT ask what data the form collects — that belongs in Phase 2. Do NOT ask about specific questions, input types, or fields. Listen for: end goal and branching logic only.
+If the purpose is already obvious from the menu item name and context, state your understanding and move straight to Phase 2 without asking. Do NOT ask about branching, specific fields, or data collected.
 
 ---
 
@@ -136,11 +135,13 @@ Do NOT ask what data the form collects — that belongs in Phase 2. Do NOT ask a
 
 ### 2a — Draft the question list
 
-Propose a candidate list of questions based on Phase 1. For each:
+Propose a candidate list of questions based on Phase 1 and the existing DB. For each:
 - Draft question text (sentence case, ≤12 words)
 - Suggested Input Type (from the 14 valid values)
 - Mandatory or optional
 - Topic area
+
+Also identify any branching paths at this stage — if any question answer should open up a different section (e.g. "Are there brackets? → Yes → describe each bracket"), flag it here and design the conditional logic in 2b/2c.
 
 Present as a flat numbered list. Example:
 ```
