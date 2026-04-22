@@ -345,6 +345,7 @@ After verifying the front end, look at the full question set with fresh eyes and
 - **Options quality** — for Check One / Check Many, are the options clear, mutually exclusive, and complete?
 - **Sort order gaps** — are sort_orders sequential and logical now that the form is visible end-to-end?
 - **Wording** — now that you've seen the form render, does any question label read awkwardly or need tightening?
+- **Open-Ended catch-all questions** — look for vague "anything else?" or "list your fields" Open-Ended questions. These are opportunities to replace with a structured Check Many with an "Add another field" option (same pattern as Player Intake Q2 and Youth Academy Q12). The Check Many + Add another field pattern gives the AI agent structured data to work with and is always preferable to freeform catch-alls.
 
 Present a short improvement list. Ask the user which ones to action before moving to Phase 6.
 
