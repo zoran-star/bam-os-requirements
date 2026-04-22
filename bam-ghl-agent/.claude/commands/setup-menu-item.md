@@ -143,14 +143,15 @@ Propose a candidate list of questions based on Phase 1 and the existing DB. For 
 
 Also identify any branching paths at this stage — if any question answer should open up a different section (e.g. "Are there brackets? → Yes → describe each bracket"), flag it here and design the conditional logic in 2b/2c.
 
-Present as a flat numbered list. Example:
-```
-1. What is the business name? (Text Input, mandatory)
-2. Upload your logo. (File Upload, mandatory)
-3. What are your brand colors? (Open-Ended, optional)
-4. Do you have brand fonts? (Check One — Yes / No, mandatory)
-5. Upload your font files. (File Upload, optional — only if Q4 = Yes)
-```
+Present as a table. Example:
+
+| # | Question | Input Type | Mandatory | Notes |
+|---|----------|-----------|-----------|-------|
+| 1 | What is the business name? | Text Input | ✅ | |
+| 2 | Upload your logo. | File Upload | ✅ | |
+| 3 | What are your brand colors? | Open-Ended | — | |
+| 4 | Do you have brand fonts? | Check One | ✅ | Yes / No |
+| 4a | Upload your font files. | File Upload | — | Conditional on Q4 = Yes |
 
 Ask: "Does this cover everything? Anything missing, wrong, or to remove?"
 
