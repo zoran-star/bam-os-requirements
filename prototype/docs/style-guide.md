@@ -498,8 +498,7 @@ The Supabase `Questions Database` table is the source of truth for all intake fo
 
 **Note to Client (`Note to Client` column)**
 - Internal context only — what the system does with this data, what it unlocks, or what to watch out for.
-- Written in ALL CAPS (rendered in gold mono by the portal).
-- Short, no period: `INCLUDE GOOGLE DRIVE LINKS HERE. ENSURE SHARING PERMISSIONS ARE SET TO 'ANYONE WITH THE LINK CAN VIEW'`
+- No ALL CAPS requirement — write naturally in sentence case.
 - Not customer-facing instructions — those belong in `Placeholder`.
 
 **Options (`Options` column)**
