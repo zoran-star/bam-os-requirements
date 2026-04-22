@@ -120,13 +120,15 @@ Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
 
 ## Phase 1 · Discovery
 
-Ask the user (in a single message):
+The specific questions to collect are already in the database and will be workshopped in Phase 2. Phase 1 is only about context that can't be inferred from the DB.
 
-1. Which menu item are we setting up?
-2. What does this flow collect? What does the team need from the operator to actually build this thing?
+Ask the user (in a single message — keep it tight):
+
+1. Which menu item? (if not already stated)
+2. What is the north star purpose — what does the operator walk away with after submitting?
 3. Are there different modes or paths? (e.g. does any answer split the form into different sections?)
 
-Listen, ask follow-ups, and get a clear picture of: the end goal, the topic areas, and any branching paths. Do NOT jump to structuring questions yet.
+Do NOT ask what data the form collects — that belongs in Phase 2. Do NOT ask about specific questions, input types, or fields. Listen for: end goal and branching logic only.
 
 ---
 
