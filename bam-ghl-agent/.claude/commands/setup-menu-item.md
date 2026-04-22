@@ -318,12 +318,25 @@ Fix anything broken before marking Phase 5 complete.
 
 - Question label: sentence case, Inter 500 15px, white
 - Placeholder: muted (`--text-mute`), `e.g., ...` format
-- Note to Client: gold mono, ALL CAPS, small tracking
+- Note to Client: gold mono, small tracking
 - Required asterisk: gold, smaller than label
 - Selected option: gold border + ghost background
 - Continue/Submit: solid gold, ink text, JetBrains Mono uppercase
 
 Commit and push `client-portal.html` after Phase 5 so the live portal updates.
+
+### 5d — Database improvement review
+
+After verifying the front end, look at the full question set with fresh eyes and flag any opportunities to improve the database:
+
+- **Missing Placeholders** — any Text Input or Open-Ended without a Placeholder that would benefit from one?
+- **Mandatory vs optional** — is anything mandatory that shouldn't block submission, or optional that should be required?
+- **Note to Client gaps** — any question where the operator might not understand what the system does with their answer?
+- **Options quality** — for Check One / Check Many, are the options clear, mutually exclusive, and complete?
+- **Sort order gaps** — are sort_orders sequential and logical now that the form is visible end-to-end?
+- **Wording** — now that you've seen the form render, does any question label read awkwardly or need tightening?
+
+Present a short improvement list. Ask the user which ones to action before moving to Phase 6.
 
 ---
 
