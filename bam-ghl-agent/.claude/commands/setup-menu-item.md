@@ -99,8 +99,7 @@ Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
 - Never restates the question. Never says "Type your answer here."
 
 **Note to Client**
-- ALL CAPS. Internal context — what the system does with this answer.
-- No period at end: `INCLUDE GOOGLE DRIVE LINKS. SET SHARING TO 'ANYONE WITH THE LINK'`
+- Internal context — what the system does with this answer. No ALL CAPS required.
 - Not customer-facing — that's Placeholder's job.
 
 **Options (for Check One / Check Many / Dropdown)**
@@ -222,7 +221,7 @@ Valid Places Asked values: `Gym Rental`, `Branding`, `Player Intake`, `New Hire`
 Flag any values that don't match exactly (wrong casing, typos, deprecated names). Present these to the user **before** the per-item audit with a clear note: "⚠️ Structural issue found across the database — these Places Asked values don't match any portal menu item: [list]. Want to fix these now or track them as an open loop?"
 
 Also flag:
-- Questions with `Places Asked` containing the current menu item AND other items — these may need splitting if the question wording should differ by context
+- **Questions shared across multiple `Places Asked` values** — always call these out explicitly. Show which other menu items they appear in and ask the user whether the question wording is generic enough to be shared, or whether it should be split into separate menu-item-specific rows. Never silently leave a shared question if its wording is specific to one context.
 - Orphaned sub-fields (Parent Question set but parent no longer exists)
 - Any Input Type value not in the valid 14-value enum
 
