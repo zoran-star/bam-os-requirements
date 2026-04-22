@@ -1,0 +1,3154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BAM Business — Client Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* ── Full Control · Ink (dark surfaces) ── */
+    --bg:           #0A0A0B;              /* canonical ink */
+    --ink:          #0A0A0B;
+    --surface:      #131316;              /* ink-2 · raised surface */
+    --surface-el:   #1C1C21;              /* ink-3 · cards & elevated */
+    --surface-hov:  #22222A;
+    --surface-alt:  #131316;
+    --line:         #2A2A31;              /* line-dark — hairline divider */
+    --line-str:     #383842;              /* line-dark-2 — focus/borders */
+    --border:       #2A2A31;
+    --border-med:   #2A2A31;
+    --border-str:   #383842;
+    /* Paper mirrors (for light mode) */
+    --paper:        #F5F1E8;
+    --paper-2:      #EBE4D3;
+    --paper-3:      #E0D7C1;
+    --line-light:   #D4C9AD;
+    --line-light-2: #B8A77F;
+    /* Typography color roles */
+    --text:         #F5F1E8;              /* paper as default text on ink */
+    --text-sub:     rgba(245,241,232,0.60);
+    --text-mute:    rgba(245,241,232,0.38);
+    /* Gold — signal */
+    --accent:       #E8C547;              /* signal gold */
+    --gold:         #E8C547;
+    --gold-2:       #C9A55C;
+    --gold-3:       #8B6F2A;
+    --gold-hi:      #F4D788;
+    --accent-ghost: rgba(232,197,71,0.08);
+    --accent-border:rgba(232,197,71,0.22);
+    --accent-glow:  0 0 0 1px rgba(232,197,71,0.28);
+    /* Pace — semantic (muted) */
+    --green:        #9FD88A;  --pace-go:   #9FD88A;
+    --green-soft:   rgba(159,216,138,0.10);
+    --amber:        #E8C547;
+    --amber-soft:   rgba(232,197,71,0.10);
+    --red:          #E87560;   --pace-stop: #E87560;
+    --red-soft:     rgba(232,117,96,0.10);
+    --blue:         #5A8FB8;   --pace-flow: #5A8FB8;
+    --blue-soft:    rgba(90,143,184,0.10);
+    /* No shadows in Full Control */
+    --card-shadow:  none;
+    --card-hover:   none;
+    --sidebar-w:    240px;
+    --radius:       4px;
+    --radius-sm:    3px;
+    --radius-lg:    6px;
+    /* Type families */
+    --display: "Space Grotesk", "Inter", sans-serif;
+    --sans:    "Inter", system-ui, sans-serif;
+    --mono:    "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  html, body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    font-feature-settings: "ss01","cv11";
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .app {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: var(--ink);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-top {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Full Control compass mark as the brand icon */
+  .brand-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 0;
+    background: transparent;
+    border: 1px solid var(--gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    overflow: visible;
+  }
+  .brand-icon svg { width: 100%; height: 100%; display: block; }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .brand-name {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .brand-name em { color: var(--gold); font-style: normal; font-weight: 600; }
+
+  .brand-sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-mute);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+  }
+
+  /* Client selector */
+  .client-selector {
+    margin: 18px 24px 0;
+    padding: 12px 14px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .client-selector:hover { border-color: var(--line-str); background: var(--surface); }
+
+  .client-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    flex-shrink: 0;
+    animation: fc-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes fc-pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  .client-name {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .client-chevron {
+    font-size: 9px;
+    color: var(--text-mute);
+    font-family: var(--mono);
+  }
+
+  /* Nav */
+  .nav {
+    flex: 1;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+  }
+
+  .nav-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    padding: 18px 12px 10px;
+    margin-top: 4px;
+  }
+
+  .nav-label:first-child { margin-top: 0; padding-top: 0; }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: color 0.12s ease, background 0.12s ease;
+    border: none;
+    text-decoration: none;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-sub);
+    letter-spacing: -0.005em;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+  }
+
+  .nav-item:hover { color: var(--text); }
+
+  .nav-item.active {
+    background: rgba(232,197,71,0.06);
+    color: var(--gold);
+    font-weight: 500;
+  }
+
+  /* Small bullet dot on active nav item — Full Control hallmark */
+  .nav-item::before {
+    content: "";
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    flex-shrink: 0;
+  }
+  .nav-item.active::before { opacity: 1; }
+
+  .nav-item .nav-icon {
+    display: none; /* Full Control nav is text-led, no emoji icons */
+  }
+
+  .nav-badge {
+    margin-left: auto;
+    background: transparent;
+    color: var(--gold);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 0;
+    border-radius: 0;
+    min-width: auto;
+    text-align: right;
+    letter-spacing: 0.1em;
+  }
+
+  /* Sidebar bottom */
+  .sidebar-bottom {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .user-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-3) 100%);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .user-info { flex: 1; min-width: 0; }
+
+  .user-name {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .user-role {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  /* ── Main content ── */
+  .main {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--ink);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    gap: 32px;
+  }
+
+  /* Section kicker above title — Full Control head pattern */
+  .topbar-kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .topbar-title {
+    font-family: var(--display);
+    font-size: 32px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .topbar-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    margin-top: 12px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+
+  /* ── Content area ── */
+  .content {
+    padding: 36px 40px 56px;
+    flex: 1;
+  }
+
+  /* Views */
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn 0.25s ease both; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Section header ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 14px;
+  }
+
+  /* ── Cards (flat, hairline-bordered) ── */
+  .card {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    box-shadow: none;
+  }
+
+  .card-title {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 4px;
+  }
+
+  .card-sub {
+    font-size: 13px;
+    color: var(--text-sub);
+    line-height: 1.5;
+  }
+
+  /* ── Grid ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+  /* ── Stat card — the Full Control instrument tile ── */
+  .stat-card {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: none;
+    transition: border-color 0.15s ease;
+    cursor: default;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .stat-card:hover { border-color: var(--line-str); }
+
+  .stat-value {
+    font-family: var(--display);
+    font-size: 34px;
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 0;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-sub);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    order: -1;
+  }
+
+  .stat-change {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 400;
+    margin-top: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border-radius: 0;
+    letter-spacing: 0.05em;
+    background: transparent !important;
+  }
+
+  .stat-change.up   { color: var(--gold); }
+  .stat-change.down { color: var(--pace-stop); }
+
+  /* ── Status pill (Full Control: mono-styled with a colored dot, no pill fill) ── */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border-radius: 0;
+    background: transparent !important;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  .pill.green  { color: var(--pace-go);   }
+  .pill.amber  { color: var(--gold);       }
+  .pill.red    { color: var(--pace-stop); }
+  .pill.blue   { color: var(--pace-flow); }
+  .pill.accent { color: var(--gold);       }
+
+  /* ── Row list ── */
+  .row-list { display: flex; flex-direction: column; }
+
+  .row-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .row-item:last-child { border-bottom: none; }
+
+  .row-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: transparent !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+    filter: grayscale(1) brightness(1.1);
+  }
+
+  .row-info { flex: 1; min-width: 0; }
+
+  .row-title {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: -0.01em;
+  }
+
+  .row-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-sub);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .row-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    text-align: right;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    letter-spacing: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-primary {
+    background: var(--gold);
+    color: var(--ink);
+    box-shadow: none;
+  }
+
+  .btn-primary:hover { filter: brightness(1.06); }
+  .btn-primary:active { transform: translateY(1px); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-sub);
+    border: 1px solid var(--line);
+  }
+
+  .btn-ghost:hover { background: var(--surface); color: var(--text); border-color: var(--line-str); }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--line); margin: 32px 0; }
+
+  /* ── Space utils ── */
+  .mb-8  { margin-bottom: 8px;  }
+  .mb-12 { margin-bottom: 12px; }
+  .mb-16 { margin-bottom: 16px; }
+  .mb-24 { margin-bottom: 24px; }
+  .mb-32 { margin-bottom: 32px; }
+
+  .flex { display: flex; }
+  .flex-between { display: flex; align-items: center; justify-content: space-between; }
+  .flex-center  { display: flex; align-items: center; }
+  .gap-8  { gap: 8px; }
+  .gap-12 { gap: 12px; }
+
+  /* ── Progress bar (hairline instrument track) ── */
+  .progress-bar { height: 2px; background: var(--line); border-radius: 0; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 0; background: var(--gold); transition: width 1.1s cubic-bezier(0.16,1,0.3,1); }
+
+  /* ── Chat ── */
+  .chat-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    height: calc(100vh - 73px);
+    overflow: hidden;
+  }
+
+  .chat-sidebar {
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 20px 0;
+  }
+
+  .chat-search {
+    margin: 0 20px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    padding: 10px 4px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    width: calc(100% - 40px);
+    transition: border-color 0.15s ease;
+  }
+
+  .chat-search::placeholder { color: var(--text-mute); font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .chat-search:focus { border-bottom-color: var(--gold); box-shadow: none; }
+
+  .chat-thread {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+    border-left: 2px solid transparent;
+  }
+
+  .chat-thread:hover { background: var(--surface); }
+
+  .chat-thread.active {
+    background: rgba(232,197,71,0.04);
+    border-left-color: var(--gold);
+  }
+
+  .thread-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-sub);
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+  }
+
+  .thread-info { flex: 1; min-width: 0; }
+
+  .thread-name {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .thread-preview {
+    font-size: 12px;
+    color: var(--text-mute);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  .thread-meta { flex-shrink: 0; text-align: right; }
+
+  .thread-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.08em;
+  }
+
+  .thread-unread {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin: 4px 0 0 auto;
+  }
+
+  /* Chat main */
+  .chat-main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  .chat-header-name {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .chat-header-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-sub);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .msg-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .msg-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .msg-row.outgoing { flex-direction: row-reverse; }
+
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--surface-el);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-sub);
+    flex-shrink: 0;
+  }
+
+  .msg-avatar.bam { background: var(--accent-ghost); color: var(--accent); }
+
+  .msg-bubble {
+    max-width: 65%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+  }
+
+  .msg-row.outgoing .msg-bubble {
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--text);
+  }
+
+  .msg-time {
+    font-size: 11px;
+    color: var(--text-mute);
+    padding: 0 4px;
+    align-self: center;
+  }
+
+  .chat-date-divider {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-mute);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    position: relative;
+  }
+
+  .chat-date-divider::before, .chat-date-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: calc(50% - 60px);
+    height: 1px;
+    background: var(--border);
+  }
+
+  .chat-date-divider::before { left: 0; }
+  .chat-date-divider::after { right: 0; }
+
+  .chat-input-area {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .chat-input-wrap {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    transition: border-color 0.15s ease;
+  }
+
+  .chat-input-wrap:focus-within { border-color: var(--gold); box-shadow: none; }
+
+  .chat-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    resize: none;
+    line-height: 1.5;
+    max-height: 120px;
+    min-height: 20px;
+  }
+
+  .chat-input::placeholder { color: var(--text-mute); }
+
+  .chat-send {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    background: var(--gold);
+    border: none;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: filter 0.15s ease;
+  }
+
+  .chat-send:hover { filter: brightness(1.08); }
+
+  /* ── Toggle tabs — flat, hairline separator style ── */
+  .tab-row {
+    display: flex;
+    gap: 28px;
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 24px;
+    width: 100%;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .tab {
+    padding: 12px 0;
+    border-radius: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+    border: none;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+  }
+
+  .tab.active {
+    background: transparent;
+    color: var(--gold);
+    font-weight: 500;
+    border-bottom-color: var(--gold);
+    box-shadow: none;
+  }
+
+  .tab:hover:not(.active) { color: var(--text); background: transparent; }
+
+  /* ── Ticket type tiles — editorial slabs, hairline borders, colored dot ── */
+  .ticket-types {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin-bottom: 36px;
+    border: 1px solid var(--line);
+    background: var(--line); /* hairlines between tiles */
+  }
+  .ttype {
+    padding: 32px 28px;
+    border-radius: 0;
+    border: none;
+    background: var(--ink);
+    color: var(--text);
+    cursor: pointer;
+    font-family: var(--sans);
+    text-align: left;
+    transition: background 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 28px;
+    min-height: 180px;
+    position: relative;
+  }
+  .ttype:hover { background: var(--surface); transform: none; filter: none; box-shadow: none; }
+  .ttype::before {
+    content: "";
+    position: absolute;
+    top: 28px;
+    left: 28px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .ttype-red::before   { background: var(--pace-stop); }
+  .ttype-amber::before { background: var(--gold); }
+  .ttype-blue::before  { background: var(--pace-flow); }
+
+  .ttype-icon { display: none; }
+  .ttype-kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    padding-left: 20px;
+  }
+  .ttype-label {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  /* Strip legacy bg fills */
+  .ttype-red, .ttype-amber, .ttype-blue { background: var(--ink); color: var(--text); }
+
+  /* ── Ticket rows in list ── */
+  .ticket-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 0;
+    border-radius: 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background .15s ease;
+  }
+  .ticket-row + .ticket-row { margin-top: 0; }
+  .ticket-row:hover { background: var(--surface); border-color: var(--line); padding-left: 8px; padding-right: 8px; }
+  .ticket-row-title { flex: 1; font-family: var(--display); font-size: 15px; font-weight: 500; color: var(--text); letter-spacing: -0.01em; }
+  .ticket-row-date  { font-family: var(--mono); font-size: 10px; color: var(--text-sub); letter-spacing: 0.1em; text-transform: uppercase; margin-left: auto; padding-left: 12px; }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border-radius: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: transparent !important;
+    border: none !important;
+  }
+  .status-pill::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .status-pill.action-required { color: var(--pace-stop); }
+  .status-pill.in-progress     { color: var(--gold); }
+  .status-pill.needs-review    { color: var(--pace-flow); }
+  .status-pill.approved        { color: var(--pace-go); }
+
+  .load-more {
+    display: block;
+    margin: 24px auto 0;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-sub);
+    padding: 12px 26px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: all .15s ease;
+  }
+  .load-more:hover { background: var(--surface); color: var(--text); border-color: var(--line-str); }
+
+  /* ── Ticket detail view ── */
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .detail-back {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text);
+    width: 40px; height: 40px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 14px;
+    font-family: var(--mono);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s ease;
+    flex-shrink: 0;
+  }
+  .detail-back:hover { background: var(--surface); border-color: var(--line-str); }
+  .detail-title { flex: 1; font-family: var(--display); font-size: 28px; font-weight: 500; letter-spacing: -0.02em; color: var(--text); text-transform: none; }
+  .detail-date { font-family: var(--mono); font-size: 10px; color: var(--text-sub); letter-spacing: 0.15em; text-transform: uppercase; white-space: nowrap; }
+
+  .detail-field { margin-bottom: 24px; }
+  .detail-field-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    margin-bottom: 10px;
+  }
+  .detail-field-value {
+    padding: 14px 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    min-height: 44px;
+  }
+  .detail-field textarea {
+    width: 100%;
+    padding: 14px 0;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--gold);
+    border-radius: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--sans);
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    box-shadow: none;
+    min-height: 80px;
+  }
+  .detail-field textarea:focus {
+    border-bottom-color: var(--gold-hi);
+    box-shadow: none;
+  }
+
+  .team-note {
+    padding: 18px 20px;
+    background: transparent;
+    border: 1px solid var(--pace-stop);
+    border-left-width: 2px;
+    border-radius: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 28px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .team-note-icon { display: none; }
+  .team-note-body { color: var(--text); }
+  .team-note-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--pace-stop);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .detail-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 32px;
+    justify-content: flex-end;
+  }
+
+  .user-guide {
+    margin-top: 32px;
+    padding: 28px 32px;
+    background: transparent;
+    border: 1px solid var(--pace-go);
+    border-left-width: 2px;
+    border-radius: 0;
+  }
+  .user-guide-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--pace-go);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .user-guide-body { color: var(--text); font-size: 14px; line-height: 1.75; white-space: pre-wrap; }
+
+  /* ── Inline intake screens ── */
+  .intake-wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    animation: intake-fade .25s ease;
+  }
+  @keyframes intake-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .intake-screen { display: none; flex-direction: column; gap: 16px; }
+  .intake-screen.active { display: flex; animation: intake-slide .4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes intake-slide { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  .intake-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+  }
+  .intake-card.error-card { background: var(--red-soft); border-color: rgba(232,117,96,0.25); }
+  .intake-card.change-card { background: var(--amber-soft); border-color: rgba(232,197,71,0.25); }
+
+  .q-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-2);
+    margin-bottom: 10px;
+  }
+  .q-title {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .q-subtitle {
+    font-size: 14px;
+    color: var(--text-sub);
+    line-height: 1.55;
+    margin-bottom: 20px;
+  }
+
+  .alert-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--red-soft);
+    border: 1px solid rgba(232,117,96,0.25);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    font-size: 13px; font-weight: 600; color: var(--red);
+  }
+  .alert-banner .alert-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--red); flex-shrink: 0;
+    animation: pulse-red 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .field-label {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold-2);
+  }
+  .input-wrap { position: relative; display: flex; flex-direction: column; gap: 8px; }
+
+  .intake-wrap textarea {
+    width: 100%; min-height: 88px;
+    background: transparent;
+    border: none; border-bottom: 1px solid var(--line);
+    border-radius: 0; padding: 10px 0;
+    font-family: inherit; font-size: 15px;
+    color: var(--text); resize: none; outline: none;
+    transition: border-color 0.15s ease;
+    line-height: 1.5;
+  }
+  .intake-wrap textarea::placeholder { color: var(--text-mute); }
+  .intake-wrap textarea:focus { border-bottom-color: var(--gold); }
+
+  .input-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .mini-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-sub);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .mini-btn:hover { background: var(--surface-el); border-color: var(--line-str); color: var(--text); }
+  .mini-btn.active { background: var(--accent-ghost); border-color: var(--accent-border); color: var(--gold); }
+  .mini-btn input[type=file] { display: none; }
+  .mini-btn.red-alert-toggle.active { background: var(--red-soft); border-color: rgba(232,117,96,0.35); color: var(--red); }
+
+  .intake-primary {
+    width: 100%;
+    padding: 14px 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gold);
+    background: var(--gold);
+    color: #0A0A0B;
+    font-family: var(--mono);
+    font-size: 11px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .intake-primary:hover { background: var(--gold-2); border-color: var(--gold-2); }
+  .intake-primary:disabled { background: transparent; border-color: var(--line); color: var(--text-mute); cursor: not-allowed; }
+
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .menu-item {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 16px 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.18s ease;
+  }
+  .menu-item:hover { border-color: var(--line-str); background: var(--surface-el); }
+  .menu-item.selected { border-color: var(--accent-border); background: var(--accent-ghost); }
+  .menu-item .m-label {
+    font-size: 13px; font-weight: 500;
+    color: var(--text); letter-spacing: -0.01em;
+  }
+  .menu-item.selected .m-label { color: var(--gold); }
+  .menu-item.else-item { grid-column: 1 / -1; background: var(--surface-el); }
+
+  .form-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .form-title { font-family: var(--display); font-size: 22px; font-weight: 500; letter-spacing: -0.02em; color: var(--text); }
+  .form-desc { font-size: 13px; color: var(--text-sub); margin-top: 2px; }
+
+  .confirm-card { text-align: center; padding: 48px 24px; }
+  .confirm-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--pace-go);
+    margin: 0 auto 20px;
+    animation: fc-pulse 2.4s ease-in-out infinite;
+  }
+
+  .file-list { font-size: 12px; color: var(--text-sub); padding-left: 4px; }
+
+  body.recording .mini-btn.voice-btn {
+    background: var(--red-soft);
+    border-color: var(--red);
+    color: var(--red);
+    animation: breathe 1.2s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232,117,96,0.35); }
+    50% { box-shadow: 0 0 0 6px rgba(232,117,96,0); }
+  }
+
+  /* ── Dynamic form UI ── */
+  .dform-page-indicator {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 20px;
+  }
+  .dform-pip {
+    height: 3px; border-radius: 2px; flex: 1;
+    background: var(--line);
+    transition: background 0.2s ease;
+  }
+  .dform-pip.active { background: var(--gold); }
+
+  .dform-question { margin-bottom: 24px; }
+  .dform-question-label {
+    font-size: 15px; font-weight: 500;
+    color: var(--text); margin-bottom: 6px;
+    line-height: 1.4;
+  }
+  .dform-question-label .req { color: var(--gold); margin-left: 3px; font-size: 12px; }
+  .dform-placeholder {
+    font-size: 13px; color: var(--text-sub);
+    margin-bottom: 10px; line-height: 1.5;
+  }
+  .dform-note {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gold-2); margin-top: 6px;
+  }
+
+  /* Text / link / email / phone inputs */
+  .dform-input {
+    width: 100%;
+    background: transparent;
+    border: none; border-bottom: 1px solid var(--line);
+    padding: 9px 0; font-family: inherit; font-size: 15px;
+    color: var(--text); outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .dform-input::placeholder { color: var(--text-mute); }
+  .dform-input:focus { border-bottom-color: var(--gold); }
+
+  /* Open-ended textarea */
+  .dform-textarea {
+    width: 100%; min-height: 80px;
+    background: transparent;
+    border: none; border-bottom: 1px solid var(--line);
+    padding: 9px 0; font-family: inherit; font-size: 15px;
+    color: var(--text); resize: none; outline: none;
+    transition: border-color 0.15s ease; line-height: 1.5;
+  }
+  .dform-textarea::placeholder { color: var(--text-mute); }
+  .dform-textarea:focus { border-bottom-color: var(--gold); }
+
+  /* Radio (Check One) */
+  .dform-options { display: flex; flex-direction: column; gap: 8px; }
+  .dform-option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .dform-option:hover { border-color: var(--line-str); background: var(--surface-el); }
+  .dform-option.selected { border-color: var(--accent-border); background: var(--accent-ghost); }
+  .dform-option-dot {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1.5px solid var(--line-str); flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+  .dform-option.selected .dform-option-dot {
+    border-color: var(--gold); background: var(--gold);
+    box-shadow: inset 0 0 0 3px var(--surface);
+  }
+  .dform-option-text { font-size: 14px; color: var(--text); }
+
+  /* Checkbox (Check Many) */
+  .dform-option .dform-option-box {
+    width: 16px; height: 16px; border-radius: 3px;
+    border: 1.5px solid var(--line-str); flex-shrink: 0;
+    transition: all 0.15s ease; position: relative;
+  }
+  .dform-option.selected .dform-option-box {
+    border-color: var(--gold); background: var(--gold);
+  }
+  .dform-option.selected .dform-option-box::after {
+    content: '';
+    position: absolute; top: 2px; left: 5px;
+    width: 4px; height: 8px;
+    border: 2px solid #0A0A0B;
+    border-top: none; border-left: none;
+    transform: rotate(45deg);
+  }
+
+  /* File drop */
+  .dform-file-zone {
+    display: block; width: 100%;
+    border: 1px dashed var(--line-str);
+    border-radius: var(--radius-sm);
+    padding: 20px; text-align: center;
+    cursor: pointer; transition: border-color 0.15s ease;
+  }
+  .dform-file-zone:hover { border-color: var(--gold); }
+  .dform-file-zone-text { font-size: 13px; color: var(--text-sub); }
+
+  .dform-file-names { font-size: 12px; color: var(--text-sub); margin-top: 8px; }
+
+  /* Staff Selector */
+  .dform-staff-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .dform-staff-row {
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .dform-staff-row-top {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 10px; align-items: end;
+  }
+  .dform-staff-notif {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .dform-staff-notif-opt {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer; font-size: 13px; color: var(--text-sub);
+    transition: all 0.15s ease; user-select: none;
+  }
+  .dform-staff-notif-opt:hover { border-color: var(--line-str); color: var(--text); }
+  .dform-staff-notif-opt.selected { border-color: var(--accent-border); background: var(--accent-ghost); color: var(--gold); }
+  .dform-staff-notif-label {
+    font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-mute); margin-bottom: 6px;
+  }
+
+  /* Time picker */
+  .dform-time {
+    background: transparent;
+    border: none; border-bottom: 1px solid var(--line);
+    padding: 9px 0; font-family: inherit; font-size: 15px;
+    color: var(--text); outline: none;
+    transition: border-color 0.15s ease;
+    color-scheme: dark;
+  }
+  .dform-time:focus { border-bottom-color: var(--gold); }
+
+  /* Block Builder */
+  .dform-block-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .dform-block-row {
+    display: grid; grid-template-columns: 2fr 1fr 1fr auto;
+    gap: 10px; align-items: end;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .dform-block-field { display: flex; flex-direction: column; gap: 4px; }
+  .dform-block-field-label {
+    font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-mute);
+  }
+  .dform-block-remove {
+    background: transparent; border: none;
+    color: var(--text-mute); cursor: pointer;
+    font-size: 16px; padding: 4px; line-height: 1;
+    transition: color 0.15s ease;
+    align-self: flex-end;
+  }
+  .dform-block-remove:hover { color: var(--red); }
+  .dform-add-block {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gold-2); cursor: pointer; background: none; border: none;
+    padding: 0; transition: color 0.15s ease;
+  }
+  .dform-add-block:hover { color: var(--gold); }
+
+  /* Discount Builder */
+  .dform-discount-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .dform-discount-row {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 10px; align-items: end;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+
+  /* Staff Selector */
+  .dform-staff-note {
+    font-size: 13px; color: var(--text-sub);
+    padding: 12px 14px;
+    background: var(--surface-el); border: 1px solid var(--line);
+    border-radius: var(--radius-sm); line-height: 1.5;
+  }
+
+  /* Staff Notification Block */
+  .dform-notif-block {
+    font-size: 13px; color: var(--text-sub);
+    padding: 12px 14px;
+    background: var(--amber-soft); border: 1px solid rgba(232,197,71,0.25);
+    border-radius: var(--radius-sm); line-height: 1.5;
+  }
+
+  /* Nav buttons */
+  .dform-nav { display: flex; gap: 10px; margin-top: 24px; }
+  .dform-back {
+    padding: 13px 20px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--line);
+    background: transparent;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-sub); cursor: pointer;
+    transition: all 0.15s ease; flex-shrink: 0;
+  }
+  .dform-back:hover { border-color: var(--line-str); color: var(--text); }
+
+  /* Loading state */
+  .dform-loading {
+    text-align: center; padding: 40px 0;
+    font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text-mute);
+  }
+
+  @media (max-width: 560px) {
+    .menu-grid { grid-template-columns: repeat(2, 1fr); }
+    .q-title { font-size: 22px; }
+    .dform-block-row { grid-template-columns: 1fr 1fr auto; }
+    .dform-block-row .dform-block-field:first-child { grid-column: 1 / -1; }
+    .dform-discount-row { grid-template-columns: 1fr auto; }
+    .dform-discount-row .dform-block-field:first-child { grid-column: 1 / -1; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line-str); border-radius: 0; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-3); }
+
+  /* ── Readout line ── */
+  .readout {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+    margin-top: 8px;
+  }
+  .readout .dot-pulse {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gold);
+    margin-right: 8px;
+    animation: fc-pulse 2.4s ease-in-out infinite;
+    vertical-align: 1px;
+  }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  /* ── Theme toggle button ── */
+  .theme-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-top: 8px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .theme-toggle:hover { border-color: var(--line-str); color: var(--text-sub); background: var(--surface); }
+  .theme-toggle-icon { font-size: 13px; line-height: 1; }
+
+  /* ── Light theme override ── */
+  html[data-theme="light"] {
+    --bg:           #F5F1E8;
+    --ink:          #F5F1E8;
+    --surface:      #EBE4D3;
+    --surface-el:   #E0D7C1;
+    --surface-hov:  #D4C9AD;
+    --surface-alt:  #EBE4D3;
+    --line:         #D4C9AD;
+    --line-str:     #B8A77F;
+    --border:       #D4C9AD;
+    --border-med:   #D4C9AD;
+    --border-str:   #B8A77F;
+    --text:         #0A0A0B;
+    --text-sub:     rgba(10,10,11,0.65);
+    --text-mute:    rgba(10,10,11,0.38);
+    --accent-ghost: rgba(139,111,42,0.08);
+    --accent-border:rgba(139,111,42,0.22);
+    --accent-glow:  0 0 0 1px rgba(139,111,42,0.28);
+    --gold:         #8B6F2A;
+    --gold-2:       #C9A55C;
+    --gold-3:       #8B6F2A;
+    --gold-hi:      #C9A55C;
+    --green-soft:   rgba(80,140,60,0.10);
+    --amber-soft:   rgba(139,111,42,0.10);
+    --red-soft:     rgba(180,70,50,0.10);
+    --blue-soft:    rgba(50,100,150,0.10);
+  }
+
+  html[data-theme="light"] body { background: var(--ink); }
+  html[data-theme="light"] .sidebar { background: var(--surface); }
+  html[data-theme="light"] .main { background: var(--bg); }
+  html[data-theme="light"] .client-dot { background: var(--gold-2); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-icon">
+          <!-- Full Control compass mark (reduced) -->
+          <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="17" cy="17" r="12" fill="none" stroke="#E8C547" stroke-width="1"/>
+            <circle cx="17" cy="17" r="5" fill="none" stroke="#C9A55C" stroke-width="0.8"/>
+            <line x1="17" y1="3" x2="17" y2="31" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+            <line x1="3" y1="17" x2="31" y2="17" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+            <polygon points="17,8 19,17 17,26 15,17" fill="#E8C547"/>
+            <circle cx="17" cy="17" r="1.3" fill="#0A0A0B" stroke="#E8C547" stroke-width="0.6"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">BAM<em> ·</em> OS</div>
+          <div class="brand-sub">Client Portal</div>
+        </div>
+      </div>
+
+      <div class="client-selector">
+        <div class="client-dot"></div>
+        <div class="client-name">Elite Hoops Academy</div>
+        <div class="client-chevron">›</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">§ Navigate</div>
+
+      <div class="nav-item active" onclick="switchView('systems', this)">
+        <span class="nav-icon">⚙️</span>
+        Systems
+      </div>
+
+      <div class="nav-item" onclick="switchView('marketing', this)">
+        <span class="nav-icon">📣</span>
+        Marketing
+      </div>
+
+      <div class="nav-label">§ Command</div>
+
+      <div class="nav-item" onclick="switchView('chat', this)">
+        <span class="nav-icon">💬</span>
+        Chat
+        <span class="nav-badge">03</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <button class="theme-toggle" onclick="toggleTheme()" id="themeToggleBtn">
+        <span class="theme-toggle-icon" id="themeToggleIcon">☀</span>
+        <span id="themeToggleLabel">Light mode</span>
+      </button>
+      <div class="user-row">
+        <div class="user-avatar">JC</div>
+        <div class="user-info">
+          <div class="user-name">Jordan Cole</div>
+          <div class="user-role">Academy Owner</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- ══════════════════════════════
+         SYSTEMS VIEW
+    ══════════════════════════════ -->
+    <div class="view active" id="view-systems">
+      <!-- LIST SCREEN -->
+      <div id="systems-list">
+        <div class="topbar">
+          <div>
+            <span class="topbar-kicker">§ 01 · Systems</span>
+            <div class="topbar-title">Support tickets.</div>
+          </div>
+        </div>
+
+        <div class="content">
+
+        <!-- 3 ticket-type tiles (Full Control slabs) -->
+        <div class="readout" style="margin-bottom:12px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-right:8px;vertical-align:1px;animation:fc-pulse 2.4s ease-in-out infinite"></span>Open a new request</div>
+        <div class="ticket-types">
+          <button class="ttype ttype-red" onclick="openIntake('error')">
+            <div class="ttype-kicker">01 · Error</div>
+            <div class="ttype-label">Fix something that's broken.</div>
+          </button>
+          <button class="ttype ttype-amber" onclick="openIntake('change')">
+            <div class="ttype-kicker">02 · Change</div>
+            <div class="ttype-label">Adjust something that already exists.</div>
+          </button>
+          <button class="ttype ttype-blue" onclick="openIntake('build')">
+            <div class="ttype-kicker">03 · Build</div>
+            <div class="ttype-label">Build something new.</div>
+          </button>
+        </div>
+
+        <!-- Tickets list with Live / Approved tabs -->
+        <div class="readout" style="margin-bottom:12px;">Track what's in flight</div>
+        <div class="card" style="padding-top:8px">
+          <div class="tab-row">
+            <div class="tab active" data-tab="live" onclick="switchTicketTab('live', this)">Live Tickets</div>
+            <div class="tab" data-tab="approved" onclick="switchTicketTab('approved', this)">Approved</div>
+          </div>
+
+          <div id="ticket-list-live"></div>
+          <div id="ticket-list-approved" style="display:none"></div>
+
+          <button class="load-more" onclick="alert('Load more — hook this to backend later')">Load more · ↓</button>
+        </div>
+
+        </div><!-- /.content -->
+      </div><!-- /#systems-list -->
+
+      <!-- DETAIL SCREEN (hidden until a ticket is clicked) -->
+      <div id="systems-detail" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:0">
+          <div style="width:100%"></div>
+        </div>
+        <div class="content">
+          <div id="detail-body"><!-- rendered by JS --></div>
+        </div>
+      </div>
+
+      <!-- INTAKE SCREEN (inline — new ticket form) -->
+      <div id="systems-intake" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:0">
+          <div style="display:flex;align-items:flex-end;gap:18px;width:100%">
+            <button class="detail-back" onclick="closeIntake()" aria-label="Back">←</button>
+            <div>
+              <span class="topbar-kicker" id="intake-kicker">§ New ticket</span>
+              <div class="topbar-title" id="intake-title">New ticket.</div>
+              <div class="topbar-sub" id="intake-sub">Tell us what you need</div>
+            </div>
+          </div>
+        </div>
+        <div class="content" style="padding-top:8px">
+          <div class="intake-wrap">
+
+            <!-- Error -->
+            <div class="intake-screen" id="screen-error">
+              <div class="alert-banner">
+                <div class="alert-dot"></div>
+                This will be flagged as urgent — we'll look at it right away
+              </div>
+              <div class="intake-card error-card">
+                <div class="q-label">Error ticket</div>
+                <div class="q-title">Tell us what's broken</div>
+                <div class="q-subtitle">The more detail you can give us, the faster we can fix it.</div>
+
+                <div class="field-group">
+                  <div class="field-label">Where is the error happening?</div>
+                  <div class="input-wrap">
+                    <textarea id="error-where" placeholder="e.g. On the booking page, the form doesn't submit..." rows="3"></textarea>
+                    <div class="input-actions">
+                      <label class="mini-btn" style="cursor:pointer">
+                        Attach file
+                        <input type="file" multiple accept="image/*,.pdf" onchange="handleFile(this, 'error-files')">
+                      </label>
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'error-where')">Voice</button>
+                    </div>
+                    <div id="error-files" class="file-list"></div>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-label">How should it work instead?</div>
+                  <div class="input-wrap">
+                    <textarea id="error-should" placeholder="e.g. When someone clicks submit, it should..." rows="3"></textarea>
+                    <div class="input-actions">
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'error-should')">Voice</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-label">Is this blocking your business right now?</div>
+                  <button class="mini-btn red-alert-toggle" id="redAlertBtn" onclick="toggleRedAlert()" style="align-self:flex-start">
+                    Mark as urgent — Red Alert
+                  </button>
+                </div>
+
+                <button class="intake-primary" onclick="submitTicket('error')">Submit error report →</button>
+              </div>
+            </div>
+
+            <!-- Change -->
+            <div class="intake-screen" id="screen-change">
+              <div class="intake-card change-card">
+                <div class="q-label">Change ticket</div>
+                <div class="q-title">What needs to change?</div>
+                <div class="q-subtitle">Show us what you want updated — a screenshot or description both work great.</div>
+
+                <div class="field-group">
+                  <div class="field-label">What do you want to change?</div>
+                  <div class="input-wrap">
+                    <textarea id="change-what" placeholder="e.g. The hero section headline on the home page..." rows="3"></textarea>
+                    <div class="input-actions">
+                      <label class="mini-btn" style="cursor:pointer">
+                        Attach file
+                        <input type="file" multiple accept="image/*,.pdf" onchange="handleFile(this, 'change-files')">
+                      </label>
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'change-what')">Voice</button>
+                    </div>
+                    <div id="change-files" class="file-list"></div>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-label">How should it look or read instead?</div>
+                  <div class="input-wrap">
+                    <textarea id="change-how" placeholder="e.g. Change the headline to 'Train different.' and make it..." rows="3"></textarea>
+                    <div class="input-actions">
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'change-how')">Voice</button>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="intake-primary" onclick="submitTicket('change')">Submit change request →</button>
+              </div>
+            </div>
+
+            <!-- Menu selector -->
+            <div class="intake-screen" id="screen-menu">
+              <div class="intake-card">
+                <div class="q-label">Build · Pick one</div>
+                <div class="q-title">What do you want to build?</div>
+                <div class="q-subtitle">Select one — we'll build it for you. Need more than one? Submit another ticket after.</div>
+
+                <div class="menu-grid" id="menuGrid">
+                  <div class="menu-item" data-item="Branding" onclick="selectMenuItem(this)"><div class="m-label">Branding</div></div>
+                  <div class="menu-item" data-item="Gym Rental" onclick="selectMenuItem(this)"><div class="m-label">Gym Rental</div></div>
+                  <div class="menu-item" data-item="Player Intake" onclick="selectMenuItem(this)"><div class="m-label">Player Intake</div></div>
+                  <div class="menu-item" data-item="New Hire" onclick="selectMenuItem(this)"><div class="m-label">New Hire</div></div>
+                  <div class="menu-item" data-item="Youth Academy" onclick="selectMenuItem(this)"><div class="m-label">Youth Academy</div></div>
+                  <div class="menu-item" data-item="Internal Tournament" onclick="selectMenuItem(this)"><div class="m-label">Internal Tournament</div></div>
+                  <div class="menu-item" data-item="Sponsor Inquiry" onclick="selectMenuItem(this)"><div class="m-label">Sponsor Inquiry</div></div>
+                  <div class="menu-item" data-item="Camps / Clinics" onclick="selectMenuItem(this)"><div class="m-label">Camps / Clinics</div></div>
+                  <div class="menu-item" data-item="Upsells" onclick="selectMenuItem(this)"><div class="m-label">Upsells</div></div>
+                  <div class="menu-item" data-item="Staff Member" onclick="selectMenuItem(this)"><div class="m-label">Staff Member</div></div>
+                  <div class="menu-item else-item" data-item="Build something else" onclick="selectMenuItem(this)"><div class="m-label">I want to build something else</div></div>
+                </div>
+              </div>
+              <button class="intake-primary" id="moveOnBtn" disabled onclick="openMenuForm()">Continue →</button>
+            </div>
+
+            <!-- Menu item form (items 1-9) — dynamically rendered -->
+            <div class="intake-screen" id="screen-menu-form">
+              <div class="intake-card" id="menu-form-card">
+                <div id="menu-form-content">
+                  <div class="dform-loading">Loading…</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Custom (item 10) -->
+            <div class="intake-screen" id="screen-custom">
+              <div class="intake-card">
+                <div class="q-label">Custom request</div>
+                <div class="q-title">Tell us what you have in mind</div>
+                <div class="q-subtitle">Describe what you want and we'll figure it out together.</div>
+
+                <div class="field-group">
+                  <div class="field-label">Describe what you want to build</div>
+                  <div class="input-wrap">
+                    <textarea id="custom-desc" placeholder="e.g. I want a section where people can sign up for a waitlist..." rows="4"></textarea>
+                    <div class="input-actions">
+                      <label class="mini-btn" style="cursor:pointer">
+                        Attach files
+                        <input type="file" multiple accept="image/*,.pdf" onchange="handleFile(this, 'custom-files')">
+                      </label>
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'custom-desc')">Voice</button>
+                    </div>
+                    <div id="custom-files" class="file-list"></div>
+                  </div>
+                </div>
+
+                <div class="field-group">
+                  <div class="field-label">Give us all the info we'll need to build this</div>
+                  <div class="input-wrap">
+                    <textarea id="custom-info" placeholder="Any details, context, examples, or requirements..." rows="3"></textarea>
+                    <div class="input-actions">
+                      <button class="mini-btn voice-btn" onclick="toggleVoice(this, 'custom-info')">Voice</button>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="intake-primary" onclick="submitTicket('custom')">Submit custom request →</button>
+              </div>
+            </div>
+
+            <!-- Confirmation -->
+            <div class="intake-screen" id="screen-confirm">
+              <div class="intake-card confirm-card">
+                <div class="confirm-dot"></div>
+                <div class="q-title" style="text-align:center">You're all set.</div>
+                <div class="q-subtitle" style="text-align:center;max-width:360px;margin:8px auto 24px">Ticket submitted. Our team will review and get back to you within 45 minutes during business hours.</div>
+                <button class="intake-primary" style="max-width:320px;margin:0 auto;display:block" onclick="closeIntake()">Back to systems</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         MARKETING VIEW
+    ══════════════════════════════ -->
+    <div class="view" id="view-marketing">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 02 · Marketing</span>
+          <div class="topbar-title">Leads, funnels, signal.</div>
+          <div class="topbar-sub">Q2 · 2026 · Last sync 09:41</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost">↓ Export</button>
+          <button class="btn btn-primary">+ New Campaign</button>
+        </div>
+      </div>
+
+      <div class="content">
+
+        <!-- Stats -->
+        <div class="grid-3 mb-24">
+          <div class="stat-card">
+            <div class="stat-value">142</div>
+            <div class="stat-label">New Leads This Month</div>
+            <div class="stat-change up">↑ 18% vs last month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">38%</div>
+            <div class="stat-label">Trial Booking Rate</div>
+            <div class="stat-change up">↑ 5pts vs last month</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">$2,840</div>
+            <div class="stat-label">Revenue from Funnels</div>
+            <div class="stat-change up">↑ 12% vs last month</div>
+          </div>
+        </div>
+
+        <div class="grid-2 mb-24">
+
+          <!-- Active Funnels -->
+          <div class="card">
+            <div class="flex-between mb-16">
+              <div class="card-title">Active Funnels</div>
+              <span class="pill green"><span class="pill-dot" style="background:var(--green)"></span>4 Live</span>
+            </div>
+            <div class="row-list">
+              <div class="row-item">
+                <div class="row-icon" style="background:var(--accent-ghost)">🏀</div>
+                <div class="row-info">
+                  <div class="row-title">Youth Academy — Main</div>
+                  <div class="row-sub">84 visitors · 32 leads this month</div>
+                </div>
+                <div class="row-meta">
+                  <div style="font-size:15px;font-weight:700;color:var(--green)">38%</div>
+                  <div class="row-sub">conv.</div>
+                </div>
+              </div>
+              <div class="row-item">
+                <div class="row-icon" style="background:var(--blue-soft)">🏠</div>
+                <div class="row-info">
+                  <div class="row-title">Gym Rental — Landing</div>
+                  <div class="row-sub">41 visitors · 18 leads this month</div>
+                </div>
+                <div class="row-meta">
+                  <div style="font-size:15px;font-weight:700;color:var(--green)">44%</div>
+                  <div class="row-sub">conv.</div>
+                </div>
+              </div>
+              <div class="row-item">
+                <div class="row-icon" style="background:var(--green-soft)">⛺</div>
+                <div class="row-info">
+                  <div class="row-title">Summer Camp — Waitlist</div>
+                  <div class="row-sub">203 visitors · 67 signups</div>
+                </div>
+                <div class="row-meta">
+                  <div style="font-size:15px;font-weight:700;color:var(--amber)">33%</div>
+                  <div class="row-sub">conv.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lead sources -->
+          <div class="card">
+            <div class="flex-between mb-16">
+              <div class="card-title">Lead Sources</div>
+              <span class="pill accent">This Month</span>
+            </div>
+            <div class="row-list">
+              <div class="row-item" style="border:none;padding-bottom:10px">
+                <div class="row-info">
+                  <div class="flex-between mb-8">
+                    <div class="row-title" style="font-size:13px">Instagram</div>
+                    <div style="font-size:13px;font-weight:600;color:var(--text)">58 leads</div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width:72%;background:var(--accent)"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="row-item" style="border:none;padding-bottom:10px">
+                <div class="row-info">
+                  <div class="flex-between mb-8">
+                    <div class="row-title" style="font-size:13px">Google Search</div>
+                    <div style="font-size:13px;font-weight:600;color:var(--text)">41 leads</div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width:51%;background:var(--blue)"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="row-item" style="border:none;padding-bottom:10px">
+                <div class="row-info">
+                  <div class="flex-between mb-8">
+                    <div class="row-title" style="font-size:13px">Referral</div>
+                    <div style="font-size:13px;font-weight:600;color:var(--text)">28 leads</div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width:35%;background:var(--green)"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="row-item" style="border:none">
+                <div class="row-info">
+                  <div class="flex-between mb-8">
+                    <div class="row-title" style="font-size:13px">Word of Mouth</div>
+                    <div style="font-size:13px;font-weight:600;color:var(--text)">15 leads</div>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-fill" style="width:19%;background:var(--amber)"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Campaigns -->
+        <div class="section-label">Campaigns</div>
+        <div class="card">
+          <div class="row-list">
+            <div class="row-item">
+              <div class="row-icon" style="background:var(--green-soft)">📧</div>
+              <div class="row-info">
+                <div class="row-title">Summer Camp Announcement</div>
+                <div class="row-sub">Email · Sent Apr 14 · 847 contacts</div>
+              </div>
+              <div class="row-meta">
+                <span class="pill green">42% open</span>
+                <div class="row-sub" style="margin-top:4px">18% click</div>
+              </div>
+            </div>
+            <div class="row-item">
+              <div class="row-icon" style="background:var(--blue-soft)">📱</div>
+              <div class="row-info">
+                <div class="row-title">Trial Reminder — April Batch</div>
+                <div class="row-sub">SMS · Sent Apr 12 · 124 contacts</div>
+              </div>
+              <div class="row-meta">
+                <span class="pill green">91% delivered</span>
+                <div class="row-sub" style="margin-top:4px">24% replied</div>
+              </div>
+            </div>
+            <div class="row-item">
+              <div class="row-icon" style="background:var(--amber-soft)">📣</div>
+              <div class="row-info">
+                <div class="row-title">Spring Promo — Gym Rental</div>
+                <div class="row-sub">Email · Scheduled Apr 22 · 312 contacts</div>
+              </div>
+              <div class="row-meta">
+                <span class="pill amber">Scheduled</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         CHAT VIEW
+    ══════════════════════════════ -->
+    <div class="view" id="view-chat">
+      <div class="chat-layout">
+
+        <!-- Thread list -->
+        <div class="chat-sidebar">
+          <input class="chat-search" placeholder="Search messages…" type="text">
+
+          <div class="chat-thread active">
+            <div class="thread-avatar bam" style="background:var(--accent-ghost);color:var(--accent);font-size:12px">BA</div>
+            <div class="thread-info">
+              <div class="thread-name">BAM Support Team</div>
+              <div class="thread-preview">Your New Hire page is almost ready…</div>
+            </div>
+            <div class="thread-meta">
+              <div class="thread-time">2h ago</div>
+              <div class="thread-unread"></div>
+            </div>
+          </div>
+
+          <div class="chat-thread">
+            <div class="thread-avatar" style="background:var(--red-soft);color:var(--red)">BA</div>
+            <div class="thread-info">
+              <div class="thread-name">BAM Support Team</div>
+              <div class="thread-preview">🚨 Error ticket update: we found the issue…</div>
+            </div>
+            <div class="thread-meta">
+              <div class="thread-time">5h ago</div>
+              <div class="thread-unread"></div>
+            </div>
+          </div>
+
+          <div class="chat-thread">
+            <div class="thread-avatar" style="background:var(--surface-el);color:var(--text-sub)">BA</div>
+            <div class="thread-info">
+              <div class="thread-name">BAM Support Team</div>
+              <div class="thread-preview">Your Youth Academy page is live! Here's your guide…</div>
+            </div>
+            <div class="thread-meta">
+              <div class="thread-time">Yesterday</div>
+              <div class="thread-unread"></div>
+            </div>
+          </div>
+
+          <div class="chat-thread">
+            <div class="thread-avatar" style="background:var(--surface-el);color:var(--text-sub)">BA</div>
+            <div class="thread-info">
+              <div class="thread-name">BAM Support Team</div>
+              <div class="thread-preview">Gym Rental automation is all set 🎉</div>
+            </div>
+            <div class="thread-meta">
+              <div class="thread-time">Apr 15</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat main -->
+        <div class="chat-main">
+          <div class="chat-header">
+            <div>
+              <span class="topbar-kicker">§ 03 · Signal</span>
+              <div class="chat-header-name">BAM Support Team</div>
+              <div class="chat-header-sub">Holding line · replies within a few hours</div>
+            </div>
+            <div>
+              <span class="pill green"><span class="pill-dot" style="background:var(--green)"></span>Online</span>
+            </div>
+          </div>
+
+          <div class="chat-messages">
+
+            <div class="chat-date-divider">Today</div>
+
+            <div class="msg-group">
+              <div class="msg-row">
+                <div class="msg-avatar bam">BA</div>
+                <div class="msg-bubble">Hey Jordan! Just wanted to give you an update — your New Hire landing page is looking great. We're putting the finishing touches on the form automation now.</div>
+                <div class="msg-time">10:14 AM</div>
+              </div>
+              <div class="msg-row">
+                <div class="msg-avatar bam">BA</div>
+                <div class="msg-bubble">Once the automation is tested, we'll send over your user guide so you know exactly how to use it. Should be done by end of day.</div>
+              </div>
+            </div>
+
+            <div class="msg-group">
+              <div class="msg-row outgoing">
+                <div class="msg-avatar" style="background:var(--surface-el);color:var(--text-sub)">JC</div>
+                <div class="msg-bubble">That's awesome, thanks! Quick question — will applicants get an automatic confirmation email when they submit?</div>
+                <div class="msg-time">10:22 AM</div>
+              </div>
+            </div>
+
+            <div class="msg-group">
+              <div class="msg-row">
+                <div class="msg-avatar bam">BA</div>
+                <div class="msg-bubble">Yes! The automation triggers immediately on submit — they'll get a confirmation SMS + email within 60 seconds. You'll also get an internal notification so you know when a new application comes in.</div>
+                <div class="msg-time">10:31 AM</div>
+              </div>
+            </div>
+
+            <div class="msg-group">
+              <div class="msg-row outgoing">
+                <div class="msg-avatar" style="background:var(--surface-el);color:var(--text-sub)">JC</div>
+                <div class="msg-bubble">Perfect, that's exactly what I needed. Can't wait to see it live 🔥</div>
+                <div class="msg-time">10:35 AM</div>
+              </div>
+            </div>
+
+            <div class="msg-group">
+              <div class="msg-row">
+                <div class="msg-avatar bam">BA</div>
+                <div class="msg-bubble">We'll have it ready for you shortly. We'll drop the link and user guide here when it's done!</div>
+                <div class="msg-time">10:36 AM</div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-input-area">
+            <div class="chat-input-wrap">
+              <textarea class="chat-input" rows="1" placeholder="Message BAM support…"
+                oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();}">
+              </textarea>
+              <div class="chat-send">↑</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchView(name, el) {
+  // Update nav
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+
+  // Update views
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+}
+
+/* ════════════════════════════════
+   SUPPORT TICKETS
+   ════════════════════════════════ */
+
+const STATUS_LABEL = {
+  'action-required': 'Action Required',
+  'in-progress':     'In Progress',
+  'needs-review':    'Completed — Needs Review',
+  'approved':        'Approved',
+};
+
+const STATUS_LABEL_SHORT = {
+  'action-required': 'Action Required',
+  'in-progress':     'In Progress',
+  'needs-review':    'In-Review',
+  'approved':        'Approved',
+};
+
+// Field schemas per ticket type — drive rendering of the detail view
+const FIELD_SCHEMAS = {
+  'error': [
+    { key: 'where',  label: 'Where is the error happening?' },
+    { key: 'should', label: 'How should it work instead?' },
+  ],
+  'change': [
+    { key: 'what', label: 'What do you want to change?' },
+    { key: 'how',  label: 'How should it look or read instead?' },
+  ],
+  'build-menu': [
+    { key: 'item',     label: 'Menu item' },
+    { key: 'describe', label: 'What you need' },
+    { key: 'refs',     label: 'Examples / references' },
+  ],
+  'build-custom': [
+    { key: 'desc', label: 'Describe what you want to build' },
+    { key: 'info', label: 'Additional info' },
+  ],
+};
+
+// Mock tickets — replace with backend later
+let tickets = [
+  {
+    id: 1, type: 'error', title: 'fix sales text copy',
+    status: 'action-required', target: null,
+    data: {
+      where: 'On the sales page — the headline at the top isn\'t right.',
+      should: 'It should say "Train different." not "Train better."',
+    },
+    teamNote: 'Can you share a screenshot or link to the exact section? We want to make sure we\'re editing the right block.',
+    editFields: ['where'],
+  },
+  {
+    id: 2, type: 'build-menu', title: 'add internal league',
+    status: 'needs-review', target: 'May 14',
+    data: {
+      item: 'Internal Tournament',
+      describe: 'An 8-team internal summer league for our 12–14U players. Weekly games over 6 weeks, then a championship round.',
+      refs: 'Format similar to the Drew League — simple standings page + weekly schedule.',
+    },
+  },
+  {
+    id: 3, type: 'change', title: 'fix sales text copy',
+    status: 'in-progress', target: 'May 18',
+    data: {
+      what: 'Copy on the trial signup page — there\'s a typo in the intro paragraph.',
+      how: 'Should read "your first session" not "you first session".',
+    },
+  },
+  {
+    id: 4, type: 'change', title: 'update hero headline on home',
+    status: 'approved', target: 'Apr 28',
+    data: {
+      what: 'The hero headline on the homepage.',
+      how: 'Change it to "Train Different."',
+    },
+    userGuide: '✅ Your homepage hero headline has been updated.\n\n1. Visit your site to see the change live.\n2. The new headline reads: "Train Different."\n3. To edit this anytime, go to GHL → Websites → Home → Hero Section and update the text block.\n\nLet us know if anything looks off — we\'re happy to tweak.',
+  },
+  {
+    id: 5, type: 'build-menu', title: 'build gym rental booking',
+    status: 'approved', target: 'Apr 18',
+    data: {
+      item: 'Gym Rental',
+      describe: 'A public booking page for teams/groups to rent our gym on weekends.',
+      refs: 'Similar to how Peerspace lists their venues.',
+    },
+    userGuide: '✅ Your Gym Rental booking flow is live.\n\n1. Share this link with prospects: yoursite.com/gym-rental\n2. Inquiries land in GHL → Pipelines → Gym Rental Pipeline\n3. Auto-response is sent within 5 min of submission\n\nReady to go.',
+  },
+];
+
+// ── Renderers ────────────────────────
+function renderTicketLists() {
+  const live = tickets.filter(t => t.status !== 'approved');
+  const approved = tickets.filter(t => t.status === 'approved');
+  document.getElementById('ticket-list-live').innerHTML = live.length
+    ? live.map(rowHTML).join('')
+    : '<div style="padding:24px;text-align:center;color:var(--text-sub);font-size:13px">No live tickets. Submit a new one above.</div>';
+  document.getElementById('ticket-list-approved').innerHTML = approved.length
+    ? approved.map(rowHTML).join('')
+    : '<div style="padding:24px;text-align:center;color:var(--text-sub);font-size:13px">No approved tickets yet.</div>';
+}
+
+function rowHTML(t) {
+  const dateBit = t.target ? `<div class="ticket-row-date">target completion: ${t.target}</div>` : '';
+  return `
+    <div class="ticket-row" onclick="openTicket(${t.id})">
+      <div class="ticket-row-title">${escapeHTML(t.title)}</div>
+      <span class="status-pill ${t.status}">${STATUS_LABEL_SHORT[t.status]}</span>
+      ${dateBit}
+    </div>`;
+}
+
+function escapeHTML(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function switchTicketTab(tab, el) {
+  document.querySelectorAll('#view-systems .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ticket-list-live').style.display     = (tab === 'live' ? 'block' : 'none');
+  document.getElementById('ticket-list-approved').style.display = (tab === 'approved' ? 'block' : 'none');
+}
+
+// ── Detail view ──────────────────────
+let _currentTicketId = null;
+let _editMode = false;
+
+function openTicket(id) {
+  _currentTicketId = id;
+  _editMode = (getTicket(id).status === 'action-required'); // auto-edit when team needs input
+  renderDetail();
+  document.getElementById('systems-list').style.display = 'none';
+  document.getElementById('systems-detail').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function closeDetail() {
+  _currentTicketId = null;
+  _editMode = false;
+  document.getElementById('systems-detail').style.display = 'none';
+  document.getElementById('systems-list').style.display = 'block';
+}
+
+function getTicket(id) { return tickets.find(t => t.id === id); }
+
+function renderDetail() {
+  const t = getTicket(_currentTicketId);
+  if (!t) return;
+  const schema = FIELD_SCHEMAS[t.type];
+  const fieldsToEdit = new Set(_editMode ? (t.editFields && t.editFields.length ? t.editFields : schema.map(f => f.key)) : []);
+
+  const teamNoteHTML = (_editMode && t.teamNote) ? `
+    <div class="team-note">
+      <div class="team-note-icon">💬</div>
+      <div class="team-note-body">
+        <span class="team-note-label">Our team needs</span>
+        ${escapeHTML(t.teamNote)}
+      </div>
+    </div>` : '';
+
+  const fieldsHTML = schema.map(f => {
+    const val = t.data[f.key] || '';
+    const editable = fieldsToEdit.has(f.key);
+    const body = editable
+      ? `<textarea id="edit-${f.key}" rows="3">${escapeHTML(val)}</textarea>`
+      : `<div class="detail-field-value">${escapeHTML(val) || '<span style="color:var(--text-mute)">—</span>'}</div>`;
+    return `
+      <div class="detail-field">
+        <div class="detail-field-label">${escapeHTML(f.label)}</div>
+        ${body}
+      </div>`;
+  }).join('');
+
+  let actionsHTML = '';
+  if (_editMode) {
+    actionsHTML = `
+      <div class="detail-actions">
+        <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEdit()">Submit to team →</button>
+      </div>`;
+  } else if (t.status === 'needs-review') {
+    actionsHTML = `
+      <div class="detail-actions">
+        <button class="btn btn-ghost" onclick="enterEdit()">Edit</button>
+        <button class="btn btn-primary" onclick="approveTicket()">Approve ✓</button>
+      </div>`;
+  }
+
+  const guideHTML = (t.status === 'approved' && t.userGuide) ? `
+    <div class="user-guide">
+      <div class="user-guide-label">📘 User guide</div>
+      <div class="user-guide-body">${escapeHTML(t.userGuide)}</div>
+    </div>` : '';
+
+  const dateBit = t.target ? `<div class="detail-date">target completion: ${t.target}</div>` : '';
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-header">
+      <button class="detail-back" onclick="closeDetail()" aria-label="Back">←</button>
+      <div class="detail-title">${escapeHTML(t.title)}</div>
+      <span class="status-pill ${t.status}">${STATUS_LABEL[t.status]}</span>
+      ${dateBit}
+    </div>
+    ${teamNoteHTML}
+    ${fieldsHTML}
+    ${actionsHTML}
+    ${guideHTML}
+  `;
+}
+
+function enterEdit()  { _editMode = true;  renderDetail(); }
+function cancelEdit() { _editMode = (getTicket(_currentTicketId).status === 'action-required'); renderDetail(); }
+
+function submitEdit() {
+  const t = getTicket(_currentTicketId);
+  const schema = FIELD_SCHEMAS[t.type];
+  const editable = (t.editFields && t.editFields.length ? t.editFields : schema.map(f => f.key));
+  editable.forEach(k => {
+    const el = document.getElementById('edit-' + k);
+    if (el) t.data[k] = el.value;
+  });
+  // resubmitting bounces status back to In Progress & clears teamNote
+  t.status = 'in-progress';
+  t.teamNote = null;
+  t.editFields = null;
+  _editMode = false;
+  renderDetail();
+  renderTicketLists();
+}
+
+function approveTicket() {
+  const t = getTicket(_currentTicketId);
+  t.status = 'approved';
+  if (!t.userGuide) {
+    t.userGuide = '✅ Your ticket has been approved.\n\nA detailed user guide will appear here — the team will populate it on their end.';
+  }
+  renderDetail();
+  renderTicketLists();
+}
+
+// ── Inline intake ────────────────────
+const INTAKE_META = {
+  error:  { kicker: '§ 01 · Error',  title: 'Fix something that\'s broken.',    sub: 'Tell us what\'s not working.',        screen: 'screen-error' },
+  change: { kicker: '§ 02 · Change', title: 'Adjust something that exists.',     sub: 'Describe the update you want.',       screen: 'screen-change' },
+  build:  { kicker: '§ 03 · Build',  title: 'Build something new.',              sub: 'Pick what we should build for you.',  screen: 'screen-menu' },
+};
+
+const menuMeta = {
+  'Branding':            { desc: 'Logos, colors, fonts and brand assets' },
+  'Gym Rental':          { desc: 'Short-term and long-term rental booking' },
+  'Player Intake':       { desc: 'Post-payment player development form' },
+  'New Hire':            { desc: 'Landing page for job applicants' },
+  'Youth Academy':       { desc: 'Youth training program section' },
+  'Internal Tournament': { desc: 'Tournament registration and setup' },
+  'Sponsor Inquiry':     { desc: 'Sponsor lead capture form' },
+  'Camps / Clinics':     { desc: 'Camp or clinic sign-up page' },
+  'Upsells':             { desc: 'Post-purchase upsell offer' },
+  'Staff Member':        { desc: 'Add a staff member to your system' },
+};
+
+let _currentIntakeScreen = null;
+let selectedMenuItem = null;
+let isRedAlert = false;
+
+function showScreen(id) {
+  document.querySelectorAll('.intake-screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+  _currentIntakeScreen = id;
+  window.scrollTo(0, 0);
+}
+
+function openIntake(type) {
+  const meta = INTAKE_META[type] || { kicker: '§ New ticket', title: 'New ticket.', sub: 'Tell us what you need.', screen: 'screen-error' };
+  document.getElementById('intake-kicker').textContent = meta.kicker;
+  document.getElementById('intake-title').textContent  = meta.title;
+  document.getElementById('intake-sub').textContent    = meta.sub;
+  document.getElementById('systems-list').style.display   = 'none';
+  document.getElementById('systems-detail').style.display = 'none';
+  document.getElementById('systems-intake').style.display = 'block';
+  showScreen(meta.screen);
+}
+
+function closeIntake() {
+  document.getElementById('systems-intake').style.display = 'none';
+  document.getElementById('systems-list').style.display   = 'block';
+  resetIntake();
+}
+
+function resetIntake() {
+  document.querySelectorAll('#systems-intake textarea').forEach(t => t.value = '');
+  document.querySelectorAll('#systems-intake .file-list').forEach(f => f.textContent = '');
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('selected'));
+  selectedMenuItem = null;
+  const moveOn = document.getElementById('moveOnBtn');
+  if (moveOn) moveOn.disabled = true;
+  isRedAlert = false;
+  const raBtn = document.getElementById('redAlertBtn');
+  if (raBtn) raBtn.classList.remove('active');
+}
+
+function selectMenuItem(el) {
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedMenuItem = el.dataset.item;
+  document.getElementById('moveOnBtn').disabled = false;
+}
+
+// ── Supabase client ──────────────────────────────────────────────
+const _sb = supabase.createClient(
+  'https://yoepbpwajszopxzzyzzk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvZXBicHdhanN6b3B4enp5enprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NzIyMjcsImV4cCI6MjA5MjQ0ODIyN30.b5g8ia17JSZlyH7izXgDm3iREWvZEPaQYRgdLkvkQiU'
+);
+
+// ── Dynamic form state ────────────────────────────────────────────
+let _dformQuestions   = [];   // all questions for current menu item
+let _dformPages       = [];   // array of page arrays (after filtering)
+let _dformCurrentPage = 0;
+let _dformAnswers     = {};   // { questionId: value }
+let _dformBlocks      = {};   // { questionId: [{...subfield answers}] }
+
+// ── Entry point ───────────────────────────────────────────────────
+async function openMenuForm() {
+  if (!selectedMenuItem) return;
+  if (selectedMenuItem === 'Build something else') {
+    showScreen('screen-custom');
+    return;
+  }
+  showScreen('screen-menu-form');
+  _dformAnswers     = {};
+  _dformBlocks      = {};
+  _dformCurrentPage = 0;
+  document.getElementById('menu-form-content').innerHTML =
+    '<div class="dform-loading">Loading…</div>';
+
+  const { data, error } = await _sb
+    .from('Questions Database')
+    .select('*')
+    .contains('Places Asked', [selectedMenuItem])
+    .order('sort_order');
+
+  if (error) {
+    document.getElementById('menu-form-content').innerHTML =
+      '<div class="dform-loading">Failed to load questions.</div>';
+    return;
+  }
+
+  // Fetch child rows (sub-fields) whose parent is in the fetched set
+  const parentIds = data.map(q => q.id);
+  const { data: children } = await _sb
+    .from('Questions Database')
+    .select('*')
+    .in('Parent Question', parentIds)
+    .order('sort_order');
+
+  _dformQuestions = [...data, ...(children || [])];
+  _dformRenderPage();
+}
+
+// ── Determine visible pages based on current answers ──────────────
+function _dformGetVisiblePages() {
+  // Group questions by page number (null = page 1)
+  const byPage = {};
+  for (const q of _dformQuestions) {
+    if (q['Parent Question']) continue; // sub-fields rendered inside parent
+    const p = q['Page'] ?? 1;
+    if (!byPage[p]) byPage[p] = [];
+    byPage[p].push(q);
+  }
+  const sortedPageNums = Object.keys(byPage).map(Number).sort((a,b) => a-b);
+
+  // Filter pages: a page is visible if at least one of its questions is visible
+  return sortedPageNums
+    .map(n => byPage[n])
+    .filter(qs => qs.some(q => _dformIsVisible(q)));
+}
+
+function _dformIsVisible(q) {
+  const depId    = q['Dependent On'];
+  const depVals  = q['Dependent On Value'];  // text[] or null
+  if (!depId) return true;
+  const answer = _dformAnswers[depId];
+  if (!answer) return false;
+  if (!depVals || depVals.length === 0) return true;
+  // answer can be a string (check-one) or array (check-many)
+  const ansArr = Array.isArray(answer) ? answer : [answer];
+  return depVals.some(v => ansArr.includes(v));
+}
+
+// ── Render current page ───────────────────────────────────────────
+function _dformRenderPage() {
+  _dformPages = _dformGetVisiblePages();
+  const page  = _dformPages[_dformCurrentPage] || [];
+  const total = _dformPages.length;
+  const isLast = _dformCurrentPage === total - 1;
+
+  let html = '';
+
+  // Page indicator (only if >1 page)
+  if (total > 1) {
+    html += '<div class="dform-page-indicator">';
+    for (let i = 0; i < total; i++) {
+      html += `<div class="dform-pip${i <= _dformCurrentPage ? ' active' : ''}"></div>`;
+    }
+    html += '</div>';
+  }
+
+  // Form header
+  const meta = menuMeta[selectedMenuItem] || { desc: '' };
+  html += `<div class="form-header" style="margin-bottom:20px">
+    <div>
+      <div class="form-title">${selectedMenuItem}</div>
+      ${meta.desc ? `<div class="form-desc">${meta.desc}</div>` : ''}
+    </div>
+  </div>`;
+
+  // Questions
+  for (const q of page) {
+    if (!_dformIsVisible(q)) continue;
+    html += _dformRenderQuestion(q);
+  }
+
+  // Nav
+  html += '<div class="dform-nav">';
+  if (_dformCurrentPage > 0) {
+    html += `<button class="dform-back" onclick="_dformBack()">← Back</button>`;
+  }
+  if (isLast) {
+    html += `<button class="intake-primary" onclick="_dformSubmit()">Submit request →</button>`;
+  } else {
+    html += `<button class="intake-primary" onclick="_dformNext()">Continue →</button>`;
+  }
+  html += '</div>';
+
+  document.getElementById('menu-form-content').innerHTML = html;
+  window.scrollTo(0, 0);
+}
+
+// ── Render a single question ──────────────────────────────────────
+function _dformRenderQuestion(q) {
+  const id      = q.id;
+  const label   = q['Question'] || '';
+  const type    = q['Input Type'] || 'Text Input';
+  const ph      = q['Placeholder'] || '';
+  const note    = q['Note to Client'] || '';
+  const req     = q['Mandatory'] ? '<span class="req">*</span>' : '';
+  const options = q['Options'] || [];
+
+  let inner = '';
+
+  switch (type) {
+    case 'Text Input':
+    case 'Phone Number':
+    case 'E-Mail':
+    case 'Link Input': {
+      const itype = type === 'E-Mail' ? 'email' : type === 'Phone Number' ? 'tel' : type === 'Link Input' ? 'url' : 'text';
+      inner = `<input class="dform-input" type="${itype}" placeholder="${ph}"
+        value="${_dformAnswers[id] || ''}"
+        oninput="_dformSetAnswer('${id}', this.value)">`;
+      break;
+    }
+    case 'Open-Ended':
+      inner = `<textarea class="dform-textarea" placeholder="${ph}"
+        oninput="_dformSetAnswer('${id}', this.value)">${_dformAnswers[id] || ''}</textarea>`;
+      break;
+
+    case 'Check One':
+    case 'Dropdown': {
+      inner = '<div class="dform-options">';
+      for (const opt of options) {
+        const sel = _dformAnswers[id] === opt ? ' selected' : '';
+        inner += `<div class="dform-option${sel}" onclick="_dformSelectOne('${id}', '${opt.replace(/'/g,"\\'")}', this.closest('.dform-options'), this)">
+          <div class="dform-option-dot"></div>
+          <div class="dform-option-text">${opt}</div>
+        </div>`;
+      }
+      inner += '</div>';
+      break;
+    }
+
+    case 'Check Many': {
+      inner = '<div class="dform-options">';
+      const checked = _dformAnswers[id] || [];
+      for (const opt of options) {
+        const sel = checked.includes(opt) ? ' selected' : '';
+        inner += `<div class="dform-option${sel}" onclick="_dformToggleMany('${id}', '${opt.replace(/'/g,"\\'")}', this)">
+          <div class="dform-option-box"></div>
+          <div class="dform-option-text">${opt}</div>
+        </div>`;
+      }
+      inner += '</div>';
+      break;
+    }
+
+    case 'File Upload': {
+      const fid = `dfile-${id}`;
+      inner = `<div class="dform-file-zone" onclick="document.getElementById('${fid}').click()">
+        <div class="dform-file-zone-text">↑ Click to attach files</div>
+        <input type="file" multiple id="${fid}" style="display:none" onchange="_dformFileChange('${id}', this)">
+        <div class="dform-file-names" id="${fid}-names"></div>
+      </div>`;
+      break;
+    }
+
+    case 'Time Picker':
+      inner = `<input class="dform-time" type="time"
+        value="${_dformAnswers[id] || ''}"
+        onchange="_dformSetAnswer('${id}', this.value)">`;
+      break;
+
+    case 'Block Builder': {
+      inner = _dformRenderBlockBuilder(q);
+      break;
+    }
+
+    case 'Discount Builder': {
+      inner = _dformRenderDiscountBuilder(q);
+      break;
+    }
+
+    case 'Staff Selector':
+      inner = _dformRenderStaffSelector(q);
+      break;
+
+    case 'Staff Notification Block':
+      inner = `<div class="dform-notif-block">Staff will be notified once this request is submitted.</div>`;
+      break;
+
+    default:
+      inner = `<input class="dform-input" type="text" placeholder="${ph}"
+        value="${_dformAnswers[id] || ''}"
+        oninput="_dformSetAnswer('${id}', this.value)">`;
+  }
+
+  return `<div class="dform-question" id="dq-${id}">
+    <div class="dform-question-label">${label}${req}</div>
+    ${ph && type !== 'Text Input' && type !== 'Open-Ended' && type !== 'Link Input' && type !== 'Phone Number' && type !== 'E-Mail' && type !== 'Time Picker'
+      ? `<div class="dform-placeholder">${ph}</div>` : ''}
+    ${inner}
+    ${note ? `<div class="dform-note">${note}</div>` : ''}
+  </div>`;
+}
+
+// ── Staff Selector ────────────────────────────────────────────────
+function _dformRenderStaffSelector(q) {
+  const id = q.id;
+  if (!_dformBlocks[id]) _dformBlocks[id] = [];
+  const staff = _dformBlocks[id];
+
+  let html = `<div class="dform-staff-list" id="staff-${id}">`;
+  staff.forEach((member, mi) => {
+    const notifMethod = member.notif || '';
+    html += `<div class="dform-staff-row">
+      <div class="dform-staff-row-top">
+        <div class="dform-block-field">
+          <div class="dform-block-field-label">Name</div>
+          <input class="dform-input" type="text" value="${member.name || ''}" placeholder="Staff name"
+            oninput="_dformUpdateBlock('${id}', ${mi}, 'name', this.value)">
+        </div>
+        <div class="dform-block-field">
+          <div class="dform-block-field-label">Phone</div>
+          <input class="dform-input" type="tel" value="${member.phone || ''}" placeholder="(000) 000-0000"
+            oninput="_dformUpdateBlock('${id}', ${mi}, 'phone', this.value)">
+        </div>
+        <button class="dform-block-remove" onclick="_dformRemoveBlock('${id}', ${mi})" title="Remove">×</button>
+      </div>
+      <div>
+        <div class="dform-staff-notif-label">Notification method</div>
+        <div class="dform-staff-notif">
+          ${['Text', 'In-App'].map(opt => `
+          <div class="dform-staff-notif-opt${notifMethod === opt ? ' selected' : ''}"
+            onclick="_dformStaffNotif('${id}', ${mi}, '${opt}', this)">
+            ${opt}
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<button class="dform-add-block" onclick="_dformAddStaff('${id}')">+ Add staff member</button>`;
+  return html;
+}
+
+function _dformAddStaff(id) {
+  if (!_dformBlocks[id]) _dformBlocks[id] = [];
+  _dformBlocks[id].push({ name: '', phone: '', notif: '' });
+  _dformRenderPage();
+}
+
+function _dformStaffNotif(id, mi, val, el) {
+  const current = _dformBlocks[id]?.[mi]?.notif || [];
+  const arr = Array.isArray(current) ? current : (current ? [current] : []);
+  const idx = arr.indexOf(val);
+  if (idx === -1) arr.push(val); else arr.splice(idx, 1);
+  _dformUpdateBlock(id, mi, 'notif', arr);
+  el.classList.toggle('selected');
+}
+
+// ── Block Builder ─────────────────────────────────────────────────
+function _dformRenderBlockBuilder(q) {
+  const id = q.id;
+  if (!_dformBlocks[id]) _dformBlocks[id] = [];
+  const subFields = _dformQuestions.filter(sq => sq['Parent Question'] === id);
+  const blocks    = _dformBlocks[id];
+
+  let html = `<div class="dform-block-list" id="blocks-${id}">`;
+  blocks.forEach((block, bi) => {
+    html += _dformRenderBlockRow(id, bi, subFields, block);
+  });
+  html += `</div>`;
+  html += `<button class="dform-add-block" onclick="_dformAddBlock('${id}')">+ Add time block</button>`;
+  return html;
+}
+
+function _dformRenderBlockRow(parentId, bi, subFields, block) {
+  let html = `<div class="dform-block-row" id="block-${parentId}-${bi}">`;
+  for (const sf of subFields) {
+    const sfLabel = sf['Question'] || '';
+    const sfType  = sf['Input Type'] || 'Text Input';
+    const sfVal   = block[sf.id] || '';
+    html += `<div class="dform-block-field">
+      <div class="dform-block-field-label">${sfLabel}</div>`;
+    if (sfType === 'Time Picker') {
+      html += `<input class="dform-time" type="time" value="${sfVal}"
+        onchange="_dformUpdateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">`;
+    } else if (sfType === 'Check One' || sfType === 'Dropdown') {
+      const opts = sf['Options'] || [];
+      html += `<select class="dform-input" style="cursor:pointer"
+        onchange="_dformUpdateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">
+        <option value="">Select…</option>`;
+      for (const o of opts) {
+        html += `<option value="${o}"${sfVal === o ? ' selected' : ''}>${o}</option>`;
+      }
+      html += `</select>`;
+    } else {
+      html += `<input class="dform-input" type="text" value="${sfVal}"
+        oninput="_dformUpdateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">`;
+    }
+    html += `</div>`;
+  }
+  html += `<button class="dform-block-remove" onclick="_dformRemoveBlock('${parentId}', ${bi})" title="Remove">×</button>`;
+  html += `</div>`;
+  return html;
+}
+
+function _dformAddBlock(parentId) {
+  if (!_dformBlocks[parentId]) _dformBlocks[parentId] = [];
+  _dformBlocks[parentId].push({});
+  _dformRenderPage();
+}
+
+function _dformRemoveBlock(parentId, bi) {
+  _dformBlocks[parentId].splice(bi, 1);
+  _dformRenderPage();
+}
+
+function _dformUpdateBlock(parentId, bi, sfId, val) {
+  if (!_dformBlocks[parentId]) _dformBlocks[parentId] = [];
+  if (!_dformBlocks[parentId][bi]) _dformBlocks[parentId][bi] = {};
+  _dformBlocks[parentId][bi][sfId] = val;
+}
+
+// ── Discount Builder ──────────────────────────────────────────────
+function _dformRenderDiscountBuilder(q) {
+  const id = q.id;
+  if (!_dformBlocks[id]) _dformBlocks[id] = [];
+  const blocks = _dformBlocks[id];
+
+  let html = `<div class="dform-discount-list" id="discounts-${id}">`;
+  blocks.forEach((block, bi) => {
+    html += `<div class="dform-discount-row" id="discount-${id}-${bi}">
+      <div class="dform-block-field">
+        <div class="dform-block-field-label">Quantity</div>
+        <input class="dform-input" type="text" placeholder="e.g. 10 sessions"
+          value="${block.qty || ''}"
+          oninput="_dformUpdateBlock('${id}', ${bi}, 'qty', this.value)">
+      </div>
+      <div class="dform-block-field">
+        <div class="dform-block-field-label">Discount</div>
+        <input class="dform-input" type="text" placeholder="e.g. 10%"
+          value="${block.discount || ''}"
+          oninput="_dformUpdateBlock('${id}', ${bi}, 'discount', this.value)">
+      </div>
+      <button class="dform-block-remove" onclick="_dformRemoveBlock('${id}', ${bi})" title="Remove">×</button>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<button class="dform-add-block" onclick="_dformAddDiscount('${id}')">+ Add tier</button>`;
+  return html;
+}
+
+function _dformAddDiscount(parentId) {
+  if (!_dformBlocks[parentId]) _dformBlocks[parentId] = [];
+  _dformBlocks[parentId].push({ qty: '', discount: '' });
+  _dformRenderPage();
+}
+
+// ── Answer helpers ────────────────────────────────────────────────
+function _dformSetAnswer(id, val) {
+  _dformAnswers[id] = val;
+  // Re-render if this answer controls conditional visibility
+  const controls = _dformQuestions.some(q => q['Dependent On'] === id);
+  if (controls) _dformRenderPage();
+}
+
+function _dformSelectOne(id, val, container, el) {
+  _dformAnswers[id] = val;
+  container.querySelectorAll('.dform-option').forEach(e => e.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+  const controls = _dformQuestions.some(q => q['Dependent On'] === id);
+  if (controls) _dformRenderPage();
+}
+
+function _dformToggleMany(id, val, el) {
+  if (!_dformAnswers[id]) _dformAnswers[id] = [];
+  const arr = _dformAnswers[id];
+  const idx = arr.indexOf(val);
+  if (idx === -1) { arr.push(val); el.classList.add('selected'); }
+  else            { arr.splice(idx, 1); el.classList.remove('selected'); }
+  const controls = _dformQuestions.some(q => q['Dependent On'] === id);
+  if (controls) _dformRenderPage();
+}
+
+function _dformFileChange(id, input) {
+  const names = Array.from(input.files).map(f => f.name).join(', ');
+  _dformAnswers[id] = input.files;
+  const namesEl = document.getElementById(`dfile-${id}-names`);
+  if (namesEl) namesEl.textContent = names;
+}
+
+// ── Navigation ────────────────────────────────────────────────────
+function _dformNext() {
+  _dformPages = _dformGetVisiblePages();
+  if (_dformCurrentPage < _dformPages.length - 1) {
+    _dformCurrentPage++;
+    _dformRenderPage();
+  }
+}
+
+function _dformBack() {
+  if (_dformCurrentPage > 0) {
+    _dformCurrentPage--;
+    _dformRenderPage();
+  }
+}
+
+function _dformSubmit() {
+  submitTicket('menu');
+}
+
+function handleFile(input, targetId) {
+  const c = document.getElementById(targetId);
+  if (!c || !input.files.length) return;
+  c.textContent = Array.from(input.files).map(f => f.name).join(', ');
+}
+
+let mediaRecorder = null;
+let isRecording = false;
+
+function toggleVoice(btn, targetId) {
+  if (isRecording) {
+    if (mediaRecorder) mediaRecorder.stop();
+    return;
+  }
+  if (!navigator.mediaDevices) { alert('Voice input not available in this browser.'); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    isRecording = true;
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('active');
+    document.body.classList.add('recording');
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.onstop = () => {
+      const ta = document.getElementById(targetId);
+      if (ta) ta.placeholder = 'Voice note recorded — transcription not available in this demo';
+      stream.getTracks().forEach(t => t.stop());
+      isRecording = false;
+      btn.textContent = 'Voice';
+      btn.classList.remove('active');
+      document.body.classList.remove('recording');
+    };
+    mediaRecorder.start();
+  }).catch(() => {
+    const ta = document.getElementById(targetId);
+    if (ta) ta.focus();
+  });
+}
+
+function toggleRedAlert() {
+  isRedAlert = !isRedAlert;
+  const btn = document.getElementById('redAlertBtn');
+  btn.classList.toggle('active', isRedAlert);
+}
+
+function submitTicket(type) {
+  // TODO: wire to backend. For now just show confirmation.
+  showScreen('screen-confirm');
+}
+
+// Init
+renderTicketLists();
+
+// Chat thread switching
+document.querySelectorAll('.chat-thread').forEach(thread => {
+  thread.addEventListener('click', function() {
+    document.querySelectorAll('.chat-thread').forEach(t => t.classList.remove('active'));
+    this.classList.add('active');
+    // Remove unread dot
+    const dot = this.querySelector('.thread-unread');
+    if (dot) dot.remove();
+    // Remove badge count
+    const badge = document.querySelector('.nav-badge');
+    if (badge) badge.textContent = Math.max(0, parseInt(badge.textContent) - 1) || badge.remove();
+  });
+});
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.getAttribute('data-theme') === 'light';
+  const next = isLight ? 'dark' : 'light';
+  html.setAttribute('data-theme', next);
+  document.getElementById('themeToggleIcon').textContent = isLight ? '☀' : '☾';
+  document.getElementById('themeToggleLabel').textContent = isLight ? 'Light mode' : 'Dark mode';
+}
+</script>
+
+</body>
+</html>
