@@ -46,7 +46,7 @@ Both must be read before you start Phase 1. If either is unavailable, flag it. I
 | `Input Type` | input_type_enum | YES | Must be one of the 14 valid values below |
 | `Placeholder` | text | YES | Helper text shown in/below the input |
 | `Mandatory` | boolean | NO | Defaults to false |
-| `Note to Client` | text | YES | Internal context shown in gold mono — ALL CAPS |
+| `Note to Client` | text | YES | Internal context shown in gold mono — sentence case, no ALL CAPS |
 | `Places Asked` | text[] | YES | Menu item name(s) exactly — null for sub-fields |
 | `Page` | integer | NO | 1 = always shown, 2+ = conditional page |
 | `Options` | text[] | YES | For Check One / Check Many / Dropdown |
@@ -417,3 +417,4 @@ Confirm: "Phase 7 complete — skill, style guide, and memory updated."
 - Always commit and push after Phase 5
 - Always run Phase 7 at the end of every session — never skip it
 - Question text must be unique across the entire DB (it's the natural key). When splitting a shared question into a menu-item-specific row, always use menu-item-specific wording (e.g. "How do you want the youth academy sales system to go?" not "How do you want the sales system to go?"). Never rely on ON CONFLICT DO NOTHING to silently skip an insert — if it conflicts, the row didn't land.
+- Yes/No follow-up questions must always be wired as conditionals. If a Check One (Yes/No) question has a follow-up that only applies to one answer, set `Dependent On` + `Dependent On Value` on the follow-up immediately — never leave it always visible.
