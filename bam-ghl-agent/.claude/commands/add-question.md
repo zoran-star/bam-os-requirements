@@ -7,7 +7,7 @@ You are helping the user add a new question to the FullControl support portal's 
 Before doing anything else, load these two sources:
 
 1. **Memory doc** — `supabase_questions_db.md` in persistent memory (`~/.claude/projects/-Users-zoransavic/memory/`). Has the full schema, all 14 valid Input Type enum values, valid Places Asked strings, and insert rules.
-2. **Style guide** — `prototype/docs/style-guide.md` Section 10. Has writing rules, multi-page flow logic, sub-field rules, and the Gym Rental worked example.
+2. **Style guide** — canonical path: `/Users/zoransavic/bam-ghl-agent/prototype/docs/style-guide.md` (GitHub: `prototype/docs/style-guide.md` on `main` of `bam-os-requirements`). Read Section 10 specifically. Never use a worktree copy as the source of truth.
 
 Then fetch existing questions so you can avoid duplicates:
 

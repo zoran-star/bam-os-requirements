@@ -25,9 +25,9 @@ Phase 6: Wrap-up                ✅ / ⬅️ YOU ARE HERE / ⬜
 
 Before Phase 1, load two sources:
 1. **Memory doc** — `supabase_questions_db.md` in your persistent memory (`~/.claude/projects/-Users-zoransavic/memory/`). Contains the full schema, all 14 enum values, valid Places Asked strings, insert rules, and useful queries.
-2. **Style guide** — `prototype/docs/style-guide.md`, specifically Section 10 (Questions Database Input Guide). Contains writing rules, multi-page flow logic, sub-field rules, and the Gym Rental worked example as the canonical structure reference.
+2. **Style guide** — canonical path: `/Users/zoransavic/bam-ghl-agent/prototype/docs/style-guide.md` (GitHub: `prototype/docs/style-guide.md` on `main` of `bam-os-requirements`). Read Section 10 specifically (Questions Database Input Guide). This is the ONLY version to read or update — never use a worktree copy as the source of truth.
 
-Both must be read before you start Phase 1. If either is unavailable, flag it.
+Both must be read before you start Phase 1. If either is unavailable, flag it. If the style guide is missing Section 10, flag it — Section 10 should exist (added April 2026); the worktree may need a `git pull`.
 
 ---
 
@@ -205,6 +205,26 @@ WHERE "Parent Question" IS NOT NULL
 ORDER BY "Parent Question", "sort_order";
 ```
 
+### Structural improvement check (run first)
+
+Before auditing this menu item's questions, run a global check for structural issues across the whole database:
+
+```sql
+SELECT unnest("Places Asked") AS place, COUNT(*) AS n
+FROM "Questions Database"
+WHERE "Places Asked" IS NOT NULL
+GROUP BY place ORDER BY place;
+```
+
+Valid Places Asked values: `Gym Rental`, `Branding`, `Player Intake`, `New Hire`, `Youth Academy`, `Internal Tournament`, `Sponsor Inquiry`, `Camps / Clinics`, `Upsells`
+
+Flag any values that don't match exactly (wrong casing, typos, deprecated names). Present these to the user **before** the per-item audit with a clear note: "⚠️ Structural issue found across the database — these Places Asked values don't match any portal menu item: [list]. Want to fix these now or track them as an open loop?"
+
+Also flag:
+- Questions with `Places Asked` containing the current menu item AND other items — these may need splitting if the question wording should differ by context
+- Orphaned sub-fields (Parent Question set but parent no longer exists)
+- Any Input Type value not in the valid 14-value enum
+
 ### Audit checklist
 
 Flag each issue:
@@ -220,6 +240,7 @@ Flag each issue:
 | Question in agreed structure but missing from DB | INSERT |
 | Question in DB but not in agreed structure | Flag as orphan — ask user |
 | Duplicate Question text | Flag for resolution |
+| Question shared across multiple Places Asked but wording should differ | Flag for splitting |
 
 Present summary:
 ```
