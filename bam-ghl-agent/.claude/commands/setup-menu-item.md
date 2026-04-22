@@ -223,9 +223,17 @@ Valid Places Asked values: `Gym Rental`, `Branding`, `Player Intake`, `New Hire`
 Flag any values that don't match exactly (wrong casing, typos, deprecated names). Present these to the user **before** the per-item audit with a clear note: "⚠️ Structural issue found across the database — these Places Asked values don't match any portal menu item: [list]. Want to fix these now or track them as an open loop?"
 
 Also flag:
-- **Questions shared across multiple `Places Asked` values** — always call these out explicitly. Show which other menu items they appear in and ask the user whether the question wording is generic enough to be shared, or whether it should be split into separate menu-item-specific rows. Never silently leave a shared question if its wording is specific to one context.
+- **Questions shared across multiple `Places Asked` values** — this is always a structural problem. `sort_order` is a global field, so a shared question's position cannot be controlled independently per menu item. The rule is: one question per menu item, no sharing. When a shared question is found, the fix is always to split it — remove the current menu item from `Places Asked` and insert a new menu-item-specific row with the correct sort_order. Never leave a shared question in place.
 - Orphaned sub-fields (Parent Question set but parent no longer exists)
 - Any Input Type value not in the valid 14-value enum
+
+Run this query at the start of every Phase 3 to surface all shared questions globally:
+```sql
+SELECT "Question", "Places Asked", array_length("Places Asked", 1) as shared_count
+FROM "Questions Database"
+WHERE array_length("Places Asked", 1) > 1
+ORDER BY shared_count DESC;
+```
 
 ### Audit checklist
 
