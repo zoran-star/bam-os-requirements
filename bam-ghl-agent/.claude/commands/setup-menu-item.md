@@ -80,7 +80,7 @@ All 14 types have renderers in `client-portal.html`. If the user needs a 15th ty
 
 ```
 Gym Rental · Branding · Player Intake · New Hire · Youth Academy
-Internal Tournament · Sponsor Inquiry · Camps / Clinics · Upsells
+Internal Tournament · Sponsor Inquiry · Camps / Clinics · Upsells · Promo
 ```
 
 Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
