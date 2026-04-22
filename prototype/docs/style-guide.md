@@ -455,7 +455,7 @@ The Supabase `Questions Database` table is the source of truth for all intake fo
 | `Input Type` | enum | ✅ | See input types below |
 | `Placeholder` | text | — | Helper text shown inside or below the input. Format: `e.g., 1 hour, 30 minutes` |
 | `Mandatory` | boolean | — | Shows a gold `*` next to the question label |
-| `Note to Client` | text | — | Internal-facing context shown in gold mono below the input. All caps, no period needed. |
+| `Note to Client` | text | — | Internal-facing context shown in gold mono below the input. Write naturally in sentence case — no ALL CAPS required. |
 | `Places Asked` | text[] | ✅ | Array of menu item names exactly matching the portal menu: `Gym Rental`, `Branding`, `Player Intake`, etc. Leave null for sub-fields. |
 | `Page` | integer | — | Which page of the multi-step form this question lives on. `1` = always shown, `2+` = conditional pages. Null defaults to page 1. |
 | `Dependent On` | uuid (FK) | — | The `id` of another question that controls whether this one is shown |
@@ -512,6 +512,8 @@ Two types of conditional logic — use the right one:
 
 **Same-page conditional** (`Dependent On` set, same `Page` number as trigger)
 Use for small follow-ups directly tied to an answer on the same page. The question appears/disappears immediately as the user selects. Fine for 1–2 questions.
+
+**Yes/No follow-up rule:** If a `Check One` question has Yes/No options and a follow-up question only makes sense when the answer is "Yes" (e.g. "Are there brackets? → Describe each bracket."), always wire the follow-up as a same-page conditional (`Dependent On` → brackets question UUID, `Dependent On Value` → `['Yes']`). Never leave a Yes/No follow-up always visible.
 
 **Full-page conditional** (`Dependent On` + higher `Page` number)
 Use when an entire section only applies to one path. Example: all short-term-only questions on Page 2 — only visible after answering "Short term" or "Both" on Page 1 and clicking Continue. Use when 3+ questions form a coherent section.
