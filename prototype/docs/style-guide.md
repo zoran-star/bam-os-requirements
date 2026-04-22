@@ -440,3 +440,134 @@ Before you send a screen to Zoran:
 - [ ] No drop shadows on cards
 
 If it still reads like Stripe or Linear — it's not there yet. It should read like a yacht's bridge console crossed with a Massimo Vignelli annual report.
+
+---
+
+## 10 · Questions Database — Input Guide
+
+The Supabase `Questions Database` table is the source of truth for all intake form questions. Each row is one question. This section defines how to write questions so they render correctly in the portal and feel on-brand.
+
+### Schema reference
+
+| Column | Type | Required | Notes |
+|---|---|---|---|
+| `Question` | text (PK) | ✅ | The question label shown to the user. Sentence case, ends with `?` or `.` |
+| `Input Type` | enum | ✅ | See input types below |
+| `Placeholder` | text | — | Helper text shown inside or below the input. Format: `e.g., 1 hour, 30 minutes` |
+| `Mandatory` | boolean | — | Shows a gold `*` next to the question label |
+| `Note to Client` | text | — | Internal-facing context shown in gold mono below the input. All caps, no period needed. |
+| `Places Asked` | text[] | ✅ | Array of menu item names exactly matching the portal menu: `Gym Rental`, `Branding`, `Player Intake`, etc. Leave null for sub-fields. |
+| `Page` | integer | — | Which page of the multi-step form this question lives on. `1` = always shown, `2+` = conditional pages. Null defaults to page 1. |
+| `Dependent On` | uuid (FK) | — | The `id` of another question that controls whether this one is shown |
+| `Dependent On Value` | text[] | — | The answer value(s) that must be selected for this question to appear. e.g. `{Short term, Both}` |
+| `Options` | text[] | — | For `Check One`, `Check Many`, `Dropdown` — the list of selectable options |
+| `Parent Question` | uuid (FK) | — | Set this for sub-fields that live inside a `Block Builder` or `Discount Builder`. Leave null for standalone questions. Sub-fields do not need `Places Asked`. |
+| `sort_order` | integer | — | Controls display order within a page/parent. Lower = earlier. Set explicitly for sub-fields. |
+
+### Input types
+
+| Type | Use when | Renders as |
+|---|---|---|
+| `Text Input` | Short single-line answer | Hairline bottom-border text field |
+| `Open-Ended` | Longer free-form answer | Multi-line textarea |
+| `Link Input` | URL or Google Drive link | Text field with `url` type |
+| `Phone Number` | Phone number | Text field with `tel` type |
+| `E-Mail` | Email address | Text field with `email` type |
+| `Check One` | Pick exactly one option | Bordered radio rows |
+| `Check Many` | Pick multiple options | Bordered checkbox rows |
+| `Dropdown` | Pick one from a long list | Bordered radio rows (same as Check One) |
+| `File Upload` | Documents, images, agreements | Dashed-border click zone |
+| `Time Picker` | Specific time (hour/minute) | Native time input |
+| `Block Builder` | Repeating structured rows (e.g. time blocks) | Add/remove rows with sub-field columns |
+| `Discount Builder` | Repeating quantity + discount tiers | Add/remove rows with Quantity + Discount columns |
+| `Staff Selector` | Staff member assignment with notification method | Add/remove rows with Name + Phone + Text/In-App toggle |
+| `Staff Notification Block` | Informational only, no input | Gold-tinted info banner |
+
+### Writing rules (voice & format)
+
+**Question label (`Question` column)**
+- Sentence case. Never all-caps.
+- Ends with `?` for questions, `.` for instructions (`Add your time blocks.`)
+- Be direct. `What is the cost per rental block?` not `Please provide the cost information for each rental block`
+- Max ~12 words. If it takes longer, split into two questions.
+
+**Placeholder (`Placeholder` column)**
+- Starts with `e.g.,` for examples: `e.g., 1 hour, 30 minutes`
+- Or is a short instruction: `Include street, city, state, ZIP`
+- Never restates the question. Never says "Type your answer here."
+
+**Note to Client (`Note to Client` column)**
+- Internal context only — what the system does with this data, what it unlocks, or what to watch out for.
+- Written in ALL CAPS (rendered in gold mono by the portal).
+- Short, no period: `INCLUDE GOOGLE DRIVE LINKS HERE. ENSURE SHARING PERMISSIONS ARE SET TO 'ANYONE WITH THE LINK CAN VIEW'`
+- Not customer-facing instructions — those belong in `Placeholder`.
+
+**Options (`Options` column)**
+- Sentence case. No trailing punctuation.
+- Keep labels short — 1–4 words: `Short term`, `Long term`, `Both`
+- The portal renders them as bordered rows with a dot or checkbox — they need to look clean at any width.
+
+### Multi-page flow rules
+
+Two types of conditional logic — use the right one:
+
+**Same-page conditional** (`Dependent On` set, same `Page` number as trigger)
+Use for small follow-ups directly tied to an answer on the same page. The question appears/disappears immediately as the user selects. Fine for 1–2 questions.
+
+**Full-page conditional** (`Dependent On` + higher `Page` number)
+Use when an entire section only applies to one path. Example: all short-term-only questions on Page 2 — only visible after answering "Short term" or "Both" on Page 1 and clicking Continue. Use when 3+ questions form a coherent section.
+
+Rules:
+- Page `1` is always shown to everyone.
+- Page `2+` questions must also have `Dependent On` + `Dependent On Value` set.
+- The page indicator pips are auto-generated — no config needed.
+- ≤6 total questions with no branching → single page. Major conditional split (3+ questions for one path) → separate page.
+
+### Sub-field rules (Block Builder / Discount Builder / Staff Selector)
+
+- Sub-fields have `Parent Question` set to the parent row's UUID.
+- They do **not** need `Places Asked` — they inherit through their parent.
+- They **must** have `sort_order` set — column order left-to-right = ascending `sort_order`.
+- Standard time block order: Day → sort_order 1, Start Time → 2, End Time → 3.
+
+### Worked example — Gym Rental structure
+
+```
+PAGE 1 — Always shown
+├── Do you do long term, short term, or both? (Check One, mandatory)
+│     Options: Short term / Long term / Both
+├── Input who you want to be notified for gym rentals. (Staff Selector, mandatory)
+├── Are there any on-site features customers receive? (Open-Ended, optional)
+├── Input any gym rules you have. (Open-Ended, optional)
+├── Upload any assets (images, videos, logos). (File Upload, optional)
+├── What is the location (full address) of the event/program? (Text Input, mandatory)
+├── Are there any features people get renting long term? (Open-Ended, optional)
+└── What dates are closed — holidays, breaks, blackouts? (Open-Ended, optional)
+
+PAGE 2 — Only if Q1 = "Short term" OR "Both"
+│   (All: Dependent On → Q1.id, Dependent On Value → ["Short term","Both"])
+├── How long is one rental block? (Text Input, mandatory, Placeholder: e.g., 1 hour, 30 minutes)
+├── What is the cost per rental block? (Text Input, mandatory)
+├── Add your available rental time blocks. (Block Builder, mandatory)
+│     Sub-field 1: Day (Check One — Mon/Tue/Wed/Thu/Fri/Sat/Sun, sort_order 1)
+│     Sub-field 2: Start Time (Time Picker, sort_order 2)
+│     Sub-field 3: End Time (Time Picker, sort_order 3)
+├── Add quantity discounts. (Discount Builder, optional)
+│     Sub-field 1: Minimum blocks (Text Input, sort_order 1)
+│     Sub-field 2: Discount percentage (Text Input, sort_order 2)
+├── Are there any discounts for weekends or specific times? (Open-Ended, optional)
+├── What extra info should appear in booking confirmations? (Open-Ended, optional)
+├── Is there a calendar that the rentals should sync to? (Text Input, optional)
+└── Upload your gym rental agreement. (File Upload, mandatory)
+```
+
+### Quick checklist before inserting a question
+
+- [ ] `Question` is sentence case and under 12 words
+- [ ] `Input Type` matches the actual kind of answer expected
+- [ ] `Places Asked` is set (or `Parent Question` is set — not both)
+- [ ] `Mandatory` is true only if the system cannot work without this answer
+- [ ] `Page` is set if the question belongs to a conditional page
+- [ ] `Dependent On` + `Dependent On Value` are set for conditional questions
+- [ ] `Options` are populated for `Check One`, `Check Many`, `Dropdown`
+- [ ] `sort_order` is set for sub-fields
