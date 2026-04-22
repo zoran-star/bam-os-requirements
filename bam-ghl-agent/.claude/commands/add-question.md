@@ -4,10 +4,12 @@ You are helping the user add a new question to the FullControl support portal's 
 
 ## Step 1 — Load context
 
-Before doing anything else, read both of these:
+Before doing anything else, load these two sources:
 
-1. `prototype/docs/style-guide.md` — Section 10 (Question Input Guide) defines the schema, input types, writing rules, and checklist.
-2. Fetch existing questions from Supabase so you can see what's already there and avoid duplicates:
+1. **Memory doc** — `supabase_questions_db.md` in persistent memory (`~/.claude/projects/-Users-zoransavic/memory/`). Has the full schema, all 14 valid Input Type enum values, valid Places Asked strings, and insert rules.
+2. **Style guide** — `prototype/docs/style-guide.md` Section 10. Has writing rules, multi-page flow logic, sub-field rules, and the Gym Rental worked example.
+
+Then fetch existing questions so you can avoid duplicates:
 
 ```sql
 SELECT "Question", "Input Type", "Places Asked", "Page", "Mandatory", "Dependent On Value", "Options", "Parent Question", "sort_order"

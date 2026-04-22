@@ -21,40 +21,126 @@ Phase 6: Wrap-up                ✅ / ⬅️ YOU ARE HERE / ⬜
 
 ---
 
+## Built-in knowledge — load this before starting
+
+Before Phase 1, load two sources:
+1. **Memory doc** — `supabase_questions_db.md` in your persistent memory (`~/.claude/projects/-Users-zoransavic/memory/`). Contains the full schema, all 14 enum values, valid Places Asked strings, insert rules, and useful queries.
+2. **Style guide** — `prototype/docs/style-guide.md`, specifically Section 10 (Questions Database Input Guide). Contains writing rules, multi-page flow logic, sub-field rules, and the Gym Rental worked example as the canonical structure reference.
+
+Both must be read before you start Phase 1. If either is unavailable, flag it.
+
+---
+
+### Supabase
+- Project ref: `yoepbpwajszopxzzyzzk`
+- Table: `Questions Database`
+- Connection: use the Supabase MCP tools (`execute_sql`, `apply_migration`)
+
+### Full schema
+
+| Column | Type | Nullable | Notes |
+|---|---|---|---|
+| `id` | uuid | NO | Auto-generated PK — never set manually |
+| `Question` | text | NO | Unique question label — the natural key |
+| `Input Type` | input_type_enum | YES | Must be one of the 14 valid values below |
+| `Placeholder` | text | YES | Helper text shown in/below the input |
+| `Mandatory` | boolean | NO | Defaults to false |
+| `Note to Client` | text | YES | Internal context shown in gold mono — ALL CAPS |
+| `Places Asked` | text[] | YES | Menu item name(s) exactly — null for sub-fields |
+| `Page` | integer | NO | 1 = always shown, 2+ = conditional page |
+| `Options` | text[] | YES | For Check One / Check Many / Dropdown |
+| `Dependent On` | uuid | YES | FK → `id` of the controlling question |
+| `Dependent On Value` | text[] | YES | Trigger values that make this question visible |
+| `Parent Question` | uuid | YES | FK → `id` of Block/Discount Builder parent |
+| `sort_order` | integer | YES | Display order — sub-fields must have this set |
+
+### Valid Input Types (exact enum values — use these strings exactly)
+
+| Value | Use when | Renders as |
+|---|---|---|
+| `Text Input` | Short single-line free text | Hairline bottom-border text field |
+| `Open-Ended` | Longer free-form answer | Multi-line textarea |
+| `Link Input` | URL or Google Drive link | Text field, url type |
+| `Phone Number` | Phone number | Text field, tel type |
+| `E-Mail` | Email address | Text field, email type |
+| `Check One` | Pick exactly one option | Bordered radio rows |
+| `Check Many` | Pick multiple options | Bordered checkbox rows |
+| `Dropdown` | One from a long list | Bordered radio rows (same render as Check One) |
+| `File Upload` | Documents, images, agreements | Dashed-border click zone |
+| `Time Picker` | Specific time (hour/minute) | Native time input |
+| `Block Builder` | Repeating rows with sub-fields (e.g. time blocks) | Add/remove rows |
+| `Discount Builder` | Repeating quantity + discount tiers | Add/remove rows (Quantity + Discount columns) |
+| `Staff Selector` | Staff member with notification method | Add/remove rows (Name + Phone + Text/In-App) |
+| `Staff Notification Block` | Informational only, no input | Gold-tinted info banner |
+
+All 14 types have renderers in `client-portal.html`. If the user needs a 15th type, you will need to build it in Phase 5.
+
+### Valid menu item names (exact strings for `Places Asked`)
+
+```
+Gym Rental · Branding · Player Intake · New Hire · Youth Academy
+Internal Tournament · Sponsor Inquiry · Camps / Clinics · Upsells
+```
+
+Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
+
+### Key branding rules (from style-guide.md section 10)
+
+**Question label (`Question` column)**
+- Sentence case. Never all-caps.
+- Ends with `?` for questions, `.` for instructions (`Add your time blocks.`)
+- ≤12 words. If longer, split.
+- Direct. `What is the cost per block?` not `Please provide the cost information for each rental block`
+
+**Placeholder**
+- `e.g., 1 hour, 30 minutes` for examples
+- Short instruction for guidance: `Include street, city, state, ZIP`
+- Never restates the question. Never says "Type your answer here."
+
+**Note to Client**
+- ALL CAPS. Internal context — what the system does with this answer.
+- No period at end: `INCLUDE GOOGLE DRIVE LINKS. SET SHARING TO 'ANYONE WITH THE LINK'`
+- Not customer-facing — that's Placeholder's job.
+
+**Options (for Check One / Check Many / Dropdown)**
+- Sentence case. 1–4 words. No trailing punctuation.
+- `Short term` `Long term` `Both` — not `Short-term rental` `Long-term rental` `Both options`
+
+**Multi-page rules**
+- Page 1 = always shown. Page 2+ = conditional AND has `Dependent On` + `Dependent On Value` set.
+- Never put a major conditional section on the same page as its trigger — use a separate page.
+- Simple show/hide (e.g. a follow-up to one answer) can stay on the same page using `Dependent On`.
+
+**Sub-field rules**
+- `sort_order` must be set. Left-to-right column order = ascending sort_order.
+- `Parent Question` = UUID of the Block Builder / Discount Builder parent row.
+- No `Places Asked` on sub-fields — they inherit through their parent.
+
+---
+
 ## Phase 1 · Discovery
 
-**Goal:** Understand what this menu item collects and why.
+Ask the user (in a single message):
 
-Read `prototype/docs/style-guide.md` section 10 before starting so you know the schema and writing rules.
+1. Which menu item are we setting up?
+2. What does this flow collect? What does the team need from the operator to actually build this thing?
+3. Are there different modes or paths? (e.g. does any answer split the form into different sections?)
 
-Ask the user:
-
-1. Which menu item are we setting up? (Branding, Player Intake, New Hire, Youth Academy, Internal Tournament, Sponsor Inquiry, Camps / Clinics, Upsells)
-2. What does this flow need to collect? Describe it in plain language — what does the operator need to provide for the team to build this thing?
-3. Are there different "modes" or paths? (e.g. Gym Rental had short-term vs long-term — does this item branch based on any answer?)
-
-Listen carefully. The user may give you a lot of context at once or just a few words. Either way, ask follow-ups until you have a clear picture of:
-- The end goal (what gets built from this data)
-- The major topic areas the questions will cover
-- Any branching paths
-
-Do NOT jump to structuring questions yet. Just understand what this is.
+Listen, ask follow-ups, and get a clear picture of: the end goal, the topic areas, and any branching paths. Do NOT jump to structuring questions yet.
 
 ---
 
 ## Phase 2 · Structure Design
 
-**Goal:** Design the page/question structure together with the user before touching the database.
-
 ### 2a — Draft the question list
 
-Based on Phase 1, propose a candidate list of questions. For each one, note:
-- The question text (draft — user will approve)
-- Suggested input type
-- Whether it's mandatory
-- Which "topic area" it belongs to
+Propose a candidate list of questions based on Phase 1. For each:
+- Draft question text (sentence case, ≤12 words)
+- Suggested Input Type (from the 14 valid values)
+- Mandatory or optional
+- Topic area
 
-Present as a flat list first. Example:
+Present as a flat numbered list. Example:
 ```
 1. What is the business name? (Text Input, mandatory)
 2. Upload your logo. (File Upload, mandatory)
@@ -63,36 +149,26 @@ Present as a flat list first. Example:
 5. Upload your font files. (File Upload, optional — only if Q4 = Yes)
 ```
 
-Ask the user: "Does this cover everything? Anything missing, wrong, or that should be removed?"
+Ask: "Does this cover everything? Anything missing, wrong, or to remove?"
 
-Iterate until the question list is agreed.
+Iterate until the list is agreed.
 
 ### 2b — Design the page structure
 
-Once questions are agreed, organize them into pages:
-- **Page 1** = questions always shown to everyone
-- **Page 2+** = questions that only appear based on a Page 1 answer (conditional pages)
-
-Rules:
-- If a question is conditional on another question's answer AND belongs to a different "section" of the form, it should be on a separate page
-- Simple show/hide within a page (e.g. "upload logo" only if "yes I have a logo") stays on the same page using `Dependent On` logic
-- Block Builders and their sub-fields are always on the same page as the parent
-
-Present the page structure as a tree:
+Organize into pages and present as a tree:
 
 ```
 PAGE 1 — Always shown
 ├── Q1: What is the business name? (Text Input, mandatory)
 ├── Q2: Upload your logo. (File Upload, mandatory)
-├── Q3: What are your brand colors? (Open-Ended, optional)
 └── Q4: Do you have brand fonts? (Check One — Yes / No, mandatory)
-    └── Q5: Upload your font files. (File Upload — only if Q4 = Yes) [same page, conditional]
+    └── Q5: Upload font files. (File Upload — only if Q4 = Yes) [same-page conditional]
 
-PAGE 2 — [condition: only if Q4 = Yes]  ← example of a full page conditional
-(or leave on page 1 as a conditional question)
+PAGE 2 — Only shown if [condition]
+└── Q6: ...
 ```
 
-For each Block Builder, list the sub-fields with their order:
+For Block Builders, show sub-fields:
 ```
 Q8: Add your availability. (Block Builder, mandatory)
   Sub-field 1: Day (Check One — Mon/Tue/Wed/Thu/Fri/Sat/Sun, sort_order 1)
@@ -100,34 +176,28 @@ Q8: Add your availability. (Block Builder, mandatory)
   Sub-field 3: End Time (Time Picker, sort_order 3)
 ```
 
-Ask the user to confirm the page structure before moving to Phase 3. This is the most important design decision — get it right before writing any SQL.
+**Confirm the page structure before touching the database.** This is the most critical design step.
 
-### 2c — Assign input types and options
+### 2c — Lock in options and conditionals
 
-For every `Check One`, `Check Many`, or `Dropdown` question, confirm the exact options with the user. Write them in sentence case.
+For every `Check One`, `Check Many`, or `Dropdown`: confirm exact options (sentence case, 1–4 words).
 
-For every conditional question, confirm:
-- Which question it depends on (`Dependent On`)
-- Which answer triggers it (`Dependent On Value` — can be multiple values)
+For every conditional question: confirm which question it depends on and which answer(s) trigger it.
 
 ---
 
 ## Phase 3 · Supabase Audit
 
-**Goal:** Check what's already in the database and identify exactly what needs to be inserted or fixed.
-
-Run this query to see existing questions for the menu item:
+Fetch existing questions for this menu item:
 ```sql
-SELECT id, "Question", "Input Type", "Places Asked", "Page", "Mandatory",
-       "Placeholder", "Options", "Dependent On", "Dependent On Value",
-       "Parent Question", "sort_order"
+SELECT id, "Question", "Input Type", "Page", "Mandatory", "Placeholder",
+       "Options", "Dependent On", "Dependent On Value", "Parent Question", "sort_order"
 FROM "Questions Database"
-WHERE "Places Asked" @> ARRAY['<menu item name>']
-   OR "Parent Question" IS NOT NULL
+WHERE "Places Asked" @> ARRAY['<menu item>']
 ORDER BY "Page", "sort_order";
 ```
 
-Also run this to see all sub-fields (parent questions might belong to this menu item even if already inserted):
+Also fetch any existing sub-fields whose parent might belong to this menu item:
 ```sql
 SELECT id, "Question", "Input Type", "Parent Question", "sort_order"
 FROM "Questions Database"
@@ -135,150 +205,127 @@ WHERE "Parent Question" IS NOT NULL
 ORDER BY "Parent Question", "sort_order";
 ```
 
-### Audit checks — flag any of these:
+### Audit checklist
 
-| Issue | What to do |
+Flag each issue:
+
+| Issue | Action |
 |---|---|
-| Question exists but has wrong Input Type | Flag for UPDATE |
-| Question exists but missing Options | Flag for UPDATE |
-| Question exists but Placeholder is blank | Flag for UPDATE |
-| Question exists but wrong Page number | Flag for UPDATE |
-| Dependent On is set but Dependent On Value is null | Flag for UPDATE |
-| Sub-field exists but sort_order is null | Flag for UPDATE |
-| Question in agreed structure is missing entirely | Flag for INSERT |
-| Question in database is NOT in the agreed structure | Flag as orphan — ask user if it should be deleted or kept |
-| Duplicate question text | Flag for resolution |
+| Question exists, wrong Input Type | UPDATE |
+| Question exists, missing Options | UPDATE |
+| Question exists, blank Placeholder when one is needed | UPDATE |
+| Question exists, wrong Page | UPDATE |
+| `Dependent On` set but `Dependent On Value` is null | UPDATE |
+| Sub-field with null sort_order | UPDATE |
+| Question in agreed structure but missing from DB | INSERT |
+| Question in DB but not in agreed structure | Flag as orphan — ask user |
+| Duplicate Question text | Flag for resolution |
 
-Present the audit as a two-column summary:
+Present summary:
 ```
-✅ Already correct (n questions)
-⚠️  Needs update (n questions) — list them
-➕  Needs insert (n questions) — list them
-❓  Orphan / unexpected (n questions) — list them
+✅ Already correct — n questions
+⚠️  Needs update — n questions: [list]
+➕  Needs insert — n questions: [list]
+❓  Orphan / unexpected — n questions: [list]
 ```
 
-Ask the user to confirm the plan before executing anything.
+Confirm the plan with the user before Phase 4.
 
 ---
 
 ## Phase 4 · Confirm & Insert
 
-**Goal:** Show the exact SQL, get confirmation, then execute.
+### 4a — Resolve UUIDs
 
-### 4a — Resolve UUIDs for Dependent On references
-
-If any question has `Dependent On` set, run a SELECT first to get the UUID:
+Any `Dependent On` or `Parent Question` that references another question by name: resolve its UUID first.
 ```sql
 SELECT id, "Question" FROM "Questions Database"
-WHERE "Question" IN ('<question 1>', '<question 2>');
+WHERE "Question" IN ('<q1>', '<q2>');
 ```
 
 ### 4b — Show the full SQL plan
 
-Present every INSERT and UPDATE you're about to run. Group by type:
+List every INSERT and UPDATE clearly. Then ask: "Does this look right? Say go when ready."
 
-```
-INSERTS (n):
-  • "What is the business name?" — Text Input, Page 1, mandatory
-  • "Upload your logo." — File Upload, Page 1, mandatory
-  ...
-
-UPDATES (n):
-  • "Do you have brand fonts?" — adding Options: ['Yes', 'No']
-  ...
-```
-
-Wait for explicit user confirmation ("go", "confirmed", "do it") before running anything.
+**Do not run any SQL until the user explicitly confirms.**
 
 ### 4c — Execute
 
-Run INSERTs using `ON CONFLICT DO NOTHING` on the `Question` PK.
-Run UPDATEs one at a time by UUID.
+INSERTs: use `ON CONFLICT ("Question") DO NOTHING` — or `ON CONFLICT DO NOTHING` if `Question` is the natural key.
+UPDATEs: target by `id` (UUID), not by Question text.
 
-After all SQL runs, verify with a SELECT:
+Verify after:
 ```sql
 SELECT "Question", "Input Type", "Page", "Mandatory", "Options", "sort_order"
 FROM "Questions Database"
-WHERE "Places Asked" @> ARRAY['<menu item name>']
+WHERE "Places Asked" @> ARRAY['<menu item>']
 ORDER BY "Page", "sort_order";
 ```
 
-Confirm to the user: "All n questions are in the database."
+Confirm: "All n questions are in the database."
 
 ---
 
 ## Phase 5 · Front End Verification
 
-**Goal:** Make sure every question type used in this menu item renders correctly in `client-portal.html`.
+### 5a — Check renderer coverage
 
-### 5a — Check the renderer
+Read `client-portal.html` and find `_dformRenderQuestion`. Confirm every Input Type used in this menu item has a `case` in the switch statement.
 
-Read `client-portal.html` and find the `_dformRenderQuestion` function. Check that every Input Type used in this menu item has a `case` in the switch statement.
-
-Valid types that already have renderers (as of Gym Rental build):
-- Text Input, Open-Ended, Link Input, Phone Number, E-Mail
-- Check One, Check Many, Dropdown
-- File Upload
-- Time Picker
-- Block Builder, Discount Builder
-- Staff Selector, Staff Notification Block
-
-**If a new Input Type is being used that doesn't have a renderer**, build it now:
-1. Add the CSS to the `/* ── Dynamic form UI ──` section
+All 14 built-in types are already handled. If a new type is needed:
+1. Add CSS to the `/* ── Dynamic form UI ──` block
 2. Add the `case` to `_dformRenderQuestion`
-3. Add any supporting JS functions (add/remove/update handlers)
-4. Verify in the preview
+3. Add supporting JS functions (add/remove/update handlers)
+4. Test in preview
 
-### 5b — Test the flow in the preview
+### 5b — Test in the preview
 
-Use the preview server at port 5184. Open the portal and navigate: Build something new → [menu item]. Step through the form. Check:
+Navigate: Build something new → [menu item]. Step through:
 
-- [ ] Page 1 loads and shows the right questions
-- [ ] Any Check One / Check Many shows all expected options
-- [ ] Conditional questions appear/disappear correctly when their trigger answer is selected
-- [ ] Page 2 (if exists) appears after the correct answer on page 1
-- [ ] Block Builders add/remove rows correctly with sub-fields in the right order
-- [ ] File upload zones render as full-width dashed boxes
-- [ ] Staff Selector adds/removes rows with Name, Phone, and notification method toggle
-- [ ] "Continue →" appears when multiple pages exist; "Submit request →" on the last page
+- [ ] Page 1 shows correct questions in the right order
+- [ ] Check One / Check Many shows all expected options
+- [ ] Conditional questions appear/disappear when triggered
+- [ ] Page 2 appears after the correct answer (Continue → button appears)
+- [ ] Block Builder sub-fields show in the right column order
+- [ ] File upload zones are full-width dashed boxes
 - [ ] Back button appears on pages 2+
+- [ ] Submit request → appears on the last page
 
-Report what you see. If anything looks broken, fix it before marking Phase 5 complete.
+Fix anything broken before marking Phase 5 complete.
 
-### 5c — Branding check per question type
+### 5c — Branding spot-check
 
-For each question rendered, verify it follows style guide rules:
-- Question label: sentence case, Inter 500 15px
-- Placeholder: muted text (`--text-mute`), shows as `e.g., ...`
+- Question label: sentence case, Inter 500 15px, white
+- Placeholder: muted (`--text-mute`), `e.g., ...` format
 - Note to Client: gold mono, ALL CAPS, small tracking
 - Required asterisk: gold, smaller than label
-- Options: bordered rows with dot/checkbox, gold border + ghost bg when selected
-- Continue/Submit button: solid gold, ink text, mono uppercase
+- Selected option: gold border + ghost background
+- Continue/Submit: solid gold, ink text, JetBrains Mono uppercase
 
-Flag anything that looks off-brand.
+Commit and push `client-portal.html` after Phase 5 so the live portal updates.
 
 ---
 
 ## Phase 6 · Wrap-up
 
-Summarise what was done:
-- How many questions inserted / updated
-- Page structure (e.g. "2 pages — page 1 always shown, page 2 for [condition]")
+Summarize:
+- Questions inserted / updated
+- Page structure used
 - Any new input type renderers built
-- Any branding issues fixed
+- Branding issues fixed
 
-Then suggest what's next:
-- Which menu items are still not set up?
-- Are there any open questions about this item's logic that should go into Notion Open Loops?
-- Should the style guide be updated with any new input type?
+Then suggest:
+- Which menu items are still unset up?
+- Any unresolved logic that should go into Notion Open Loops?
+- Does the style guide need updating for any new input type?
 
 ---
 
-## Important rules
+## Hard rules
 
-- **Never run SQL without explicit user confirmation in Phase 4**
-- **Never skip Phase 2 structure design** — the Gym Rental workflow took several iterations to get the page/conditional structure right; that conversation is the whole point
-- **Phase 2 is a conversation, not a monologue** — propose, listen, adjust, confirm
-- If the user says an input type that doesn't exist in the enum, propose the closest valid one and explain why
-- If the user isn't sure about page structure, default to: one page if ≤6 questions and no branching; two pages if there's a major conditional split
-- Commit and push `client-portal.html` changes after Phase 5 so the live portal gets updated
+- Never run SQL without explicit user confirmation in Phase 4
+- Never skip Phase 2 — the structure conversation is the whole point
+- Phase 2 is a conversation, not a monologue — propose, listen, adjust, confirm
+- If the user proposes an Input Type not in the enum, flag it and suggest the closest valid one
+- If ≤6 questions and no branching: single page. If major conditional split: two pages.
+- Always commit and push after Phase 5
