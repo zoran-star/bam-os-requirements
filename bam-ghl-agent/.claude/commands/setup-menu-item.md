@@ -414,3 +414,4 @@ Confirm: "Phase 7 complete — skill, style guide, and memory updated."
 - If ≤6 questions and no branching: single page. If major conditional split: two pages.
 - Always commit and push after Phase 5
 - Always run Phase 7 at the end of every session — never skip it
+- Question text must be unique across the entire DB (it's the natural key). When splitting a shared question into a menu-item-specific row, always use menu-item-specific wording (e.g. "How do you want the youth academy sales system to go?" not "How do you want the sales system to go?"). Never rely on ON CONFLICT DO NOTHING to silently skip an insert — if it conflicts, the row didn't land.
