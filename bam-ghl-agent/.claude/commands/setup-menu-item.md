@@ -14,6 +14,7 @@ Phase 3: Supabase audit         ✅ / ⬅️ YOU ARE HERE / ⬜
 Phase 4: Confirm & insert       ✅ / ⬅️ YOU ARE HERE / ⬜
 Phase 5: Front end verification ✅ / ⬅️ YOU ARE HERE / ⬜
 Phase 6: Wrap-up                ✅ / ⬅️ YOU ARE HERE / ⬜
+Phase 7: Self-update            ✅ / ⬅️ YOU ARE HERE / ⬜
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👉 [What the user needs to do next]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -342,6 +343,46 @@ Then suggest:
 
 ---
 
+## Phase 7 · Self-update
+
+After every session, update the skill itself and all knowledge sources it pulls from. This keeps the skill sharp for the next run.
+
+### 7a — Update this skill file
+
+Review the session for anything that should be baked into future runs:
+
+- **New input type discovered or clarified?** Add it to the input types table and renderer checklist in Phase 5.
+- **New question-writing rule learned?** Add it to the branding rules section.
+- **Phase instructions were unclear or caused a bad question from the user?** Rewrite that phase's instructions.
+- **A new valid `Places Asked` value was added to the portal?** Add it to the valid menu item names list.
+- **Hard rule learned the hard way?** Add it to the Hard rules section at the bottom.
+
+Edit: `/Users/zoransavic/bam-ghl-agent/.claude/commands/setup-menu-item.md`
+
+### 7b — Update the style guide (Section 10)
+
+If any new input types, writing rules, or structural patterns came out of this session, add them to Section 10 of the canonical style guide.
+
+Edit: `prototype/docs/style-guide.md` in the worktree, then commit and push to `main` on `bam-os-requirements`.
+
+### 7c — Update the memory doc
+
+If the session revealed new schema details, new valid enum values, new `Places Asked` strings, or corrected any existing info in the memory doc — update it.
+
+Edit: `~/.claude/projects/-Users-zoransavic/memory/supabase_questions_db.md`
+Update the index: `~/.claude/projects/-Users-zoransavic/memory/MEMORY.md` if a new memory file was created.
+
+### 7d — Commit everything
+
+After all updates:
+1. Commit `setup-menu-item.md` and any other `.claude/commands/` changes to `main`
+2. Commit `prototype/docs/style-guide.md` to `main` if updated
+3. Push both to `origin main`
+
+Confirm: "Phase 7 complete — skill, style guide, and memory updated."
+
+---
+
 ## Hard rules
 
 - Never run SQL without explicit user confirmation in Phase 4
@@ -350,3 +391,4 @@ Then suggest:
 - If the user proposes an Input Type not in the enum, flag it and suggest the closest valid one
 - If ≤6 questions and no branching: single page. If major conditional split: two pages.
 - Always commit and push after Phase 5
+- Always run Phase 7 at the end of every session — never skip it
