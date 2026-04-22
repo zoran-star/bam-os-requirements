@@ -1460,6 +1460,27 @@
   }
   .dform-file-zone:hover { border-color: var(--gold); }
   .dform-file-zone-text { font-size: 13px; color: var(--text-sub); }
+  .dform-custom-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .dform-custom-field-row { display: flex; align-items: center; gap: 8px; }
+  .dform-custom-field-input {
+    flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--line-str);
+    color: var(--text-main); font-family: var(--sans); font-size: 14px;
+    padding: 8px 0; outline: none;
+  }
+  .dform-custom-field-input::placeholder { color: var(--text-sub); }
+  .dform-custom-field-input:focus { border-bottom-color: var(--gold); }
+  .dform-custom-field-remove {
+    background: none; border: none; color: var(--text-sub); font-size: 12px;
+    cursor: pointer; padding: 4px; line-height: 1; flex-shrink: 0;
+  }
+  .dform-custom-field-remove:hover { color: var(--pace-stop); }
+  .dform-custom-field-add {
+    align-self: flex-start; margin-top: 4px;
+    background: none; border: none; color: var(--gold);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; padding: 0;
+  }
+  .dform-custom-field-add:hover { opacity: 0.75; }
 
   .dform-file-names { font-size: 12px; color: var(--text-sub); margin-top: 8px; }
 
@@ -2806,16 +2827,35 @@ function _dformRenderQuestion(q) {
     }
 
     case 'Check Many': {
-      inner = '<div class="dform-options">';
       const checked = _dformAnswers[id] || [];
+      inner = '<div class="dform-options">';
       for (const opt of options) {
         const sel = checked.includes(opt) ? ' selected' : '';
-        inner += `<div class="dform-option${sel}" onclick="_dformToggleMany('${id}', '${opt.replace(/'/g,"\\'")}', this)">
+        const onclick = opt === 'Add another field'
+          ? `_dformToggleMany('${id}', '${opt.replace(/'/g,"\\'")}', this); _dformRenderPage();`
+          : `_dformToggleMany('${id}', '${opt.replace(/'/g,"\\'")}', this)`;
+        inner += `<div class="dform-option${sel}" onclick="${onclick}">
           <div class="dform-option-box"></div>
           <div class="dform-option-text">${opt}</div>
         </div>`;
       }
       inner += '</div>';
+      if (checked.includes('Add another field')) {
+        if (!Array.isArray(_dformAnswers[id + '_custom'])) _dformAnswers[id + '_custom'] = [''];
+        const customs = _dformAnswers[id + '_custom'];
+        inner += '<div class="dform-custom-fields">';
+        customs.forEach((val, i) => {
+          inner += `<div class="dform-custom-field-row">
+            <input class="dform-custom-field-input" type="text"
+              placeholder="e.g., What position do you play?"
+              value="${val.replace(/"/g, '&quot;')}"
+              oninput="_dformCustomFieldUpdate('${id}', ${i}, this.value)">
+            ${customs.length > 1 ? `<button class="dform-custom-field-remove" onclick="_dformCustomFieldRemove('${id}', ${i})">✕</button>` : ''}
+          </div>`;
+        });
+        inner += `<button class="dform-custom-field-add" onclick="_dformCustomFieldAdd('${id}')">+ Add another field</button>`;
+        inner += '</div>';
+      }
       break;
     }
 
@@ -3046,6 +3086,20 @@ function _dformToggleMany(id, val, el) {
   else            { arr.splice(idx, 1); el.classList.remove('selected'); }
   const controls = _dformQuestions.some(q => q['Dependent On'] === id);
   if (controls) _dformRenderPage();
+}
+
+function _dformCustomFieldUpdate(id, i, val) {
+  if (!Array.isArray(_dformAnswers[id + '_custom'])) _dformAnswers[id + '_custom'] = [''];
+  _dformAnswers[id + '_custom'][i] = val;
+}
+function _dformCustomFieldAdd(id) {
+  if (!Array.isArray(_dformAnswers[id + '_custom'])) _dformAnswers[id + '_custom'] = [''];
+  _dformAnswers[id + '_custom'].push('');
+  _dformRenderPage();
+}
+function _dformCustomFieldRemove(id, i) {
+  _dformAnswers[id + '_custom'].splice(i, 1);
+  _dformRenderPage();
 }
 
 function _dformFileChange(id, input) {
