@@ -34,7 +34,11 @@ This repository holds the FullControl product prototype, survey, onboarding flow
 ```
 bam-os-requirements/
 ├── prototype/                        ← FullControl prototype (Vite/React)
-│                                 Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
+│   │                             Auto-deploys to: https://fullcontrol-prototype-six.vercel.app
+│   └── bam-gta-phase1/           ← Phase 1 live deployment (BAM GTA)
+│       ├── bam-gta-staff/        ← Staff dashboard app
+│       ├── bam-gta-parent/       ← Parent/athlete app
+│       └── info/                 ← GHL workflows + overview docs
 ├── market-research/            ← Market research survey sent to academies (Vite/React)
 │                                 Auto-deploys to: https://full-control-survey.vercel.app
 ├── business/                   ← All business planning materials
@@ -51,10 +55,6 @@ bam-os-requirements/
 │   ├── bam-gta-staff/          ← BAM GTA staff dashboard (React/Vite)
 │   ├── docs/                   ← Schema, brand, and copy convention references
 │   └── sections/               ← HTML section templates
-├── bam-gta-phase1/             ← Phase 1 live deployment (BAM GTA)
-│   ├── bam-gta-staff/          ← Staff dashboard app
-│   ├── bam-gta-parent/         ← Parent/athlete app
-│   └── info/                   ← GHL workflows + overview docs
 └── CLAUDE.md
 ```
 
