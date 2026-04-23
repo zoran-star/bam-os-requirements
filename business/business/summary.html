@@ -159,31 +159,85 @@ td {
 td:last-child { font-weight: 600; color: var(--gold); text-align: right; }
 
 /* Team */
-.team-row {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  padding: 14px 0;
+.team-entry {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 32px;
+  padding: 20px 0;
   border-bottom: 1px solid var(--line-dark);
+  align-items: stretch;
 }
-.team-row:last-child { border-bottom: none; }
-.team-avatar {
-  width: 36px;
-  height: 36px;
+.team-entry:last-child { border-bottom: none; }
+.team-entry-featured .team-card { min-height: 240px; }
+.team-entry-featured .team-bio { font-size: 15px; }
+.team-photo {
+  width: 180px;
+  height: 220px;
+  background: var(--ink-2);
+  border: 1px solid var(--line-dark);
   border-radius: 4px;
-  background: linear-gradient(135deg, var(--gold), var(--gold-3));
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  color: var(--ink);
-  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--paper);
+  opacity: 0.3;
+  margin-top: 18px;
+  overflow: hidden;
 }
-.team-name { font-family: var(--display); font-size: 14px; font-weight: 500; color: var(--paper); }
-.team-role { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.45; margin-top: 3px; }
+.team-photo img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 1; }
+.team-photo:has(img) { opacity: 1; }
+.team-card {
+  position: relative;
+  width: 220px;
+  height: 100%;
+  min-height: 160px;
+  border: 1px solid var(--line-dark);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+.team-card-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.team-card-overlay {
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(0deg, rgba(15,17,18,0.95) 0%, rgba(15,17,18,0.75) 25%, rgba(15,17,18,0.15) 55%, rgba(15,17,18,0) 80%);
+  pointer-events: none;
+}
+.team-card-text { position: relative; z-index: 2; padding: 14px 20px 14px; width: 100%; }
+.team-card-text .team-name { font-size: 26px; white-space: nowrap; line-height: 1.1; }
+.team-card-text .team-tag { margin-top: 4px; opacity: 0.75; font-size: 12px; letter-spacing: 0.14em; line-height: 1.35; }
+.team-card-placeholder {
+  background:
+    linear-gradient(135deg, rgba(232,197,71,0.04) 0%, rgba(0,0,0,0) 55%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0 2px, transparent 2px 8px),
+    var(--ink-2);
+}
+.team-card-placeholder::after {
+  content: "PHOTO";
+  position: absolute;
+  bottom: 20px; right: 22px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--paper);
+  opacity: 0.25;
+  z-index: 2;
+}
+.team-name { font-family: var(--display); font-size: 22px; font-weight: 500; color: var(--paper); letter-spacing: -0.01em; }
+.team-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.45; color: var(--paper); margin-top: 10px; line-height: 1.6; }
+.team-role-title { font-family: var(--display); font-size: 18px; font-weight: 500; color: var(--paper); letter-spacing: -0.01em; }
+.team-bio { font-family: var(--sans); font-size: 14px; line-height: 1.65; color: var(--paper); opacity: 0.75; margin-top: 10px; max-width: 640px; }
+.team-bio ul { padding-left: 0; margin: 0; list-style: none; }
+.team-bio ul li { padding: 4px 0 4px 20px; border-bottom: none; font-size: 14px; line-height: 1.5; text-wrap: pretty; }
+.team-bio ul li::before { top: 12px; }
+@media (max-width: 700px) {
+  .team-entry { grid-template-columns: 1fr; gap: 12px; }
+}
 
 /* Q&A */
 .qa { margin: 12px 0; padding: 16px 20px; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; }
@@ -379,16 +433,17 @@ footer {
 <!-- ONE-LINER -->
 <section>
   <div class="section-kicker">§ 01 · Investor Summary</div>
-  <h1>All-in-one AI command center for trainers.</h1>
-  <p>FullControl is the all-in-one AI-powered command center for sports, fitness, and potentially more service scheduling-based businesses. One system that helps operators understand what's happening, decide what matters, and take action &mdash; being built by people who need it.</p>
+  <h1>The first all-in-one AI command center for trainers.</h1>
+  <p>FullControl is the first vertically integrated, AI-native software for sports and fitness operators, designed to simplify their day to days. One system that helps operators understand what&rsquo;s happening, make informed decisions, and take action &mdash; being built by people who need it.</p>
   <div class="readout">Navigate · Command · Lead &nbsp;·&nbsp; April 2026</div>
 </section>
 
 <!-- PROBLEM -->
 <section>
   <div class="section-kicker">§ 02 · The Problem</div>
-  <h2>Trainers run their business on 5&ndash;8 disconnected tools</h2>
-  <p>CRM, scheduling, payments, marketing, analytics, member management &mdash; each one solves part of the problem. <strong>None of them work together.</strong> Operators spend 30&ndash;40 hours a week on manual admin instead of coaching. No single platform covers everything an academy actually needs.</p>
+  <h2>Trainers&rsquo; tools today are either too complex, too weak, or both.</h2>
+  <p>There are several tools a trainer needs to understand to reach their business potential, and the current list of options are either not powerful enough, or aren&rsquo;t specifically designed for the industry, forcing driven operators to waste their time piecing together a broken puzzle, instead of building a culture that will help them win.</p>
+  <p style="margin-top:16px">We started the widest <a href="https://byanymeansbball.com/locations" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">basketball academy franchise in North America</a>, and an <a href="https://byanymeansbusiness.com/" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">all-around agency</a> for other academies, having served 30+ clients on a regular basis. Being fully immersed into the day to day of 30+ academies, <strong>we have heard their complaints first hand, and have the same complaints ourselves.</strong></p>
 </section>
 
 <!-- COMPARABLES -->
@@ -406,7 +461,7 @@ footer {
       <div class="comp-meta">Founded 2019 &middot; 450+ businesses &middot; $50&ndash;$150/mo</div>
     </div>
     <p><strong>How they&rsquo;re similar:</strong> Same audience (private sports coaches), same &ldquo;all-in-one&rdquo; pitch, same vertical. Scheduling, payments, CRM, website builder, video analysis, branded app. Raised $1.3M pre-seed (Dec 2024).</p>
-    <div class="comp-gap"><strong>What&rsquo;s missing:</strong> No AI. No marketing automation. No content tools. No churn prediction or proactive retention. Narrower feature scope &mdash; operators still need separate tools for lead gen, follow-ups, and business intelligence.</div>
+    <div class="comp-gap"><strong>What&rsquo;s missing:</strong> Essentially a customer-facing scheduling app with a history of moving too slow to adapt to what their clients actually need. Operators still cobble together separate tools for everything beyond booking.</div>
   </div>
 
   <div class="comp-card">
@@ -508,23 +563,46 @@ footer {
 <!-- GO TO MARKET -->
 <section>
   <div class="section-kicker">§ 05 · Go to Market</div>
-  <h2>Start with basketball. Expand from there.</h2>
+  <h2>Start where our network is. Let performance pull us into every sport.</h2>
 
   <div class="phase" style="margin-top:24px">
-    <div class="phase-label">Phase 1 · Basketball Training</div>
-    <p>Our co-founder Coleman Ayers runs <strong>By Any Means Basketball</strong> &mdash; 500K+ social media followers, 5 locations, 10K+ athletes, and one of the most recognized brands in the basketball training world. Through By Any Means Business, we&rsquo;ve already worked hands-on with <strong>30+ basketball academies</strong> across marketing, operations, and strategy &mdash; helping them scale 2x&ndash;10x in ARR and cut 30&ndash;40 hrs/week of manual work.</p>
-    <p style="margin-top:10px">Beyond those 30+ academies, Coleman&rsquo;s international camps and networking &mdash; combined with Mike&rsquo;s role as lead sales person for BAM Business &mdash; have built a network of <strong>150+ contacts</strong> working in private basketball academies (owners, trainers, managers) across <strong>40+ countries and 100+ cities</strong>.</p>
-    <p style="margin-top:10px">These relationships are our <strong>first customers and distribution channel</strong>. They already know us, trust us, and have told us exactly what they need. We&rsquo;re not cold-starting &mdash; we&rsquo;re productizing relationships that already exist.</p>
+    <div class="phase-label">Phase 1 · Own Basketball</div>
+    <p>We start where we have the most operator relationships. Co-founder Coleman Ayers runs <strong>By Any Means Basketball</strong> &mdash; 500K+ followers, 5 locations, 10K+ athletes. Through By Any Means Business, we&rsquo;ve worked hands-on with <strong>30+ basketball academies</strong>, and Coleman and Mike&rsquo;s combined network covers <strong>150+ operator contacts across 40+ countries and 100+ cities</strong>.</p>
+    <p style="margin-top:10px">Basketball is our proving ground. Full product depth across every business model an operator runs:</p>
+    <ul style="margin-top:8px;padding-left:20px;line-height:1.7">
+      <li>Training classes &amp; memberships</li>
+      <li>Team management</li>
+      <li>Gym rental</li>
+      <li>Internal leagues</li>
+      <li><span style="opacity:0.6">External leagues &mdash; under evaluation</span></li>
+    </ul>
+    <p style="margin-top:10px">Every feature, every AI workflow, every onboarding flow gets stress-tested against real academies first. We&rsquo;re not cold-starting &mdash; we&rsquo;re productizing relationships that already exist.</p>
   </div>
 
   <div class="phase">
-    <div class="phase-label">Phase 2 · All Sports Training</div>
-    <p>Soccer, tennis, baseball, swimming &mdash; every sport with a session-based coaching model has the same operational problems. Same scheduling headaches, same member management, same manual follow-ups. The product translates directly.</p>
+    <div class="phase-label">Phase 2 · Expand into Sports Performance</div>
+    <p>This is our second-deepest network, and it&rsquo;s the smartest bridge into every other sport. Performance facilities (S&amp;C, speed, agility) serve athletes from soccer, football, baseball, volleyball, lacrosse, hockey &mdash; all under one roof. <strong>Land one performance facility, reach ten sports&rsquo; worth of athletes and parents.</strong></p>
+    <p style="margin-top:10px">Product coverage:</p>
+    <ul style="margin-top:8px;padding-left:20px;line-height:1.7">
+      <li>Training classes &amp; memberships</li>
+      <li>Gym/facility rental</li>
+      <li>Player feedback &amp; progression tracking</li>
+    </ul>
+    <p style="margin-top:10px">Performance training is also the purest all-memberships business model in sports &mdash; no teams, no seasons, no league calendars. The fit is clean and the cross-sport pollination is free.</p>
   </div>
 
   <div class="phase">
-    <div class="phase-label">Phase 3 · Fitness &amp; Beyond</div>
-    <p>Independent gyms, personal training studios, and group fitness &mdash; any service business built on recurring sessions and client relationships. Same playbook as Toast (restaurants &rarr; food service) or ServiceTitan (HVAC &rarr; all trades). Start narrow, expand with the platform.</p>
+    <div class="phase-label">Phase 3 · Replicate into Other Sports</div>
+    <p>Once the basketball + performance playbook is proven, we port the same business-model coverage into the next wave &mdash; starting where our performance facilities have already introduced FullControl to operators and parents:</p>
+    <ul style="margin-top:8px;padding-left:20px;line-height:1.7">
+      <li>Soccer</li>
+      <li>Baseball / softball</li>
+      <li>Volleyball</li>
+      <li>Tennis</li>
+      <li>Gymnastics</li>
+      <li>Martial arts</li>
+    </ul>
+    <p style="margin-top:10px">Each new sport is a terminology and AI-prompt configuration on the same engine &mdash; not a rebuild. We compound credibility in one vertical before touching the next, and let performance do the cross-sport marketing for free.</p>
   </div>
 </section>
 
@@ -532,49 +610,150 @@ footer {
 <section>
   <div class="section-kicker">§ 06 · The Team</div>
   <h2>Operators building for operators</h2>
-  <div style="margin-top:8px">
-    <div class="team-row">
-      <div class="team-avatar">ZS</div>
+  <div style="margin-top:12px">
+
+    <div class="team-entry team-entry-featured">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/zoran.jpg" alt="Zoran Savic">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Zoran Savic</div>
+          <div class="team-tag">Co-Founder<br>Product</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Zoran Savic</div>
-        <div class="team-role">Co-Founder · Product &amp; Technology &nbsp;—&nbsp; Waterloo &amp; Laurier · Deloitte · Academy Founder</div>
+        <div class="team-bio">
+          <ul>
+            <li>Double degree in Mathematics (Waterloo) and Business Administration (Laurier), varsity athlete at both institutions</li>
+            <li>Deloitte Payments Practice, worked closely with the planning and launch of two pieces of Canada&rsquo;s national payments infrastructure</li>
+            <li>Founded BAM GTA and scaled the academy to operate independently of the founder within 14 months</li>
+            <li>Redesigned operations across 30+ sports businesses and codified the work into repeatable playbooks</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="team-row">
-      <div class="team-avatar">CA</div>
+
+    <div class="team-entry team-entry-featured">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/coleman.jpg" alt="Coleman Ayers">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Coleman Ayers</div>
+          <div class="team-tag">Co-Founder<br>Brand &amp; Strategy</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Coleman Ayers</div>
-        <div class="team-role">Co-Founder · Brand &amp; Strategy &nbsp;—&nbsp; Founder of By Any Means Basketball · 700K+ Followers · Academy Founder</div>
+        <div class="team-bio">
+          <ul>
+            <li>Founder of By Any Means Basketball, one of the most recognized basketball education brands online</li>
+            <li>Built a combined audience of over 700K followers across Instagram, YouTube, and TikTok</li>
+            <li>Hosted basketball camps and coaches clinics in 37+ countries and 100+ cities across six continents</li>
+            <li>Founded By Any Means Coaches, an education platform for basketball coaches (17K followers on Instagram)</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="team-row">
-      <div class="team-avatar">MI</div>
+
+    <div class="team-entry">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/mike.jpg" alt="Mike" style="object-position:center 5%;transform:scale(0.9);transform-origin:center 15%;">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Mike Eluki</div>
+          <div class="team-tag">Sales &amp; Client Success</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Mike</div>
-        <div class="team-role">Sales &nbsp;—&nbsp; BAM Business Lead Sales · Academy Operator</div>
+        <div class="team-bio">
+          <ul>
+            <li>Client Success Lead at By Any Means Business</li>
+            <li>Consulted 50+ sports businesses on a weekly basis</li>
+            <li>Lead operator of the BAM Miami ecosystem (gym, training, club teams)</li>
+            <li>Connected to hundreds of sports business owners across the globe</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="team-row">
-      <div class="team-avatar">CM</div>
+
+    <div class="team-entry">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/cam.jpg" alt="Cam">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Cameron Wells</div>
+          <div class="team-tag">Content &amp; Branding</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Cam</div>
-        <div class="team-role">Content &amp; Branding &nbsp;—&nbsp; Strategy Consultant · KPMG · Led Content for NBA Players incl. Myles Turner</div>
+        <div class="team-bio">
+          <ul>
+            <li>Former Strategy Consultant at KPMG</li>
+            <li>Content &amp; Branding Director for the By Any Means ecosystem</li>
+            <li>Content Director for professional athletes, including NBA player Myles Turner</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="team-row">
-      <div class="team-avatar">DA</div>
+
+    <div class="team-entry">
+      <div class="team-card team-card-placeholder">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Danny Liu</div>
+          <div class="team-tag">Developer<br>AI Architecture</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Danny</div>
-        <div class="team-role">Developer &nbsp;—&nbsp; Former Data Engineer &amp; Engineering Manager at Uplift · Software Engineer at Upgrade · AI Architecture</div>
+        <div class="team-bio">
+          <ul>
+            <li>Computer Science graduate, University of Waterloo</li>
+            <li>Former Data Engineer and Engineering Manager at Uplift</li>
+            <li>Software Engineer at Upgrade</li>
+            <li>Leads AI architecture at FullControl</li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="team-row">
-      <div class="team-avatar">LU</div>
+
+    <div class="team-entry">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/luka.jpg" alt="Luka" style="object-fit:contain;object-position:center top;background:var(--ink-2);">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Luka Mircetic</div>
+          <div class="team-tag">Software Engineering</div>
+        </div>
+      </div>
       <div>
-        <div class="team-name">Luka</div>
-        <div class="team-role">Software Engineering &nbsp;—&nbsp; Biomedical Engineering · McMaster · Previously Tesla</div>
+        <div class="team-bio">
+          <ul>
+            <li>Biomedical Engineering, McMaster University</li>
+            <li>Software Developer at Archon Systems</li>
+            <li>Previously a Software Engineer at Shopify</li>
+            <li>Former Data Engineer at Tesla (Palo Alto)</li>
+          </ul>
+        </div>
       </div>
     </div>
+
+    <div class="team-entry">
+      <div class="team-card team-card-placeholder">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Jacky</div>
+          <div class="team-tag">Junior Software Developer</div>
+        </div>
+      </div>
+      <div>
+        <div class="team-bio">
+          <ul>
+            <li>Computer Science undergraduate at Trent University</li>
+            <li>Junior developer on the FullControl engineering team</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
   </div>
 </section>
 
