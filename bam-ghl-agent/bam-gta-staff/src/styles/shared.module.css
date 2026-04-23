@@ -1,0 +1,85 @@
+.page { padding: var(--sp-xl) var(--sp-2xl); max-width: 1400px; }
+.pageHeader { margin-bottom: var(--sp-xl); }
+.pageTitle { font-size: var(--fs-2xl); font-weight: 800; color: var(--tp); letter-spacing: -0.02em; }
+.pageDesc { font-size: var(--fs-md); color: var(--ts); margin-top: var(--sp-xs); }
+.card { background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-xl); box-shadow: var(--shadow-sm); }
+.cardTitle { font-size: var(--fs-lg); font-weight: 700; color: var(--tp); margin-bottom: var(--sp-lg); }
+
+/* Kanban */
+.kanban { display: flex; gap: var(--sp-lg); overflow-x: auto; padding-bottom: var(--sp-lg); }
+.kanbanCol { flex: 1; min-width: 300px; background: var(--surf2); border-radius: var(--r-md); padding: var(--sp-lg); }
+.kanbanColHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-lg); }
+.kanbanColTitle { font-size: var(--fs-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ts); }
+.kanbanCount { font-size: var(--fs-xs); font-weight: 700; color: var(--tm); background: var(--surf3); padding: 2px 8px; border-radius: var(--r-full); }
+.kanbanCard { background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--sp-md) var(--sp-lg); margin-bottom: var(--sp-sm); cursor: pointer; transition: all 140ms var(--es); }
+.kanbanCard:hover { border-color: var(--borderm); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.kanbanCardName { font-size: var(--fs-md); font-weight: 700; color: var(--tp); }
+.kanbanCardMeta { font-size: var(--fs-xs); color: var(--ts); margin-top: 4px; }
+.kanbanCardAlert { border-left: 3px solid var(--gold); }
+
+/* Table */
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; font-size: var(--fs-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--tm); padding: var(--sp-sm) var(--sp-md); border-bottom: 1px solid var(--border); }
+.table td { font-size: var(--fs-md); color: var(--tp); padding: var(--sp-md); border-bottom: 1px solid var(--border); }
+.table tr:hover td { background: var(--surf2); }
+
+/* Stats row */
+.statsRow { display: flex; gap: var(--sp-lg); margin-bottom: var(--sp-xl); flex-wrap: wrap; }
+.stat { background: var(--surf); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-lg) var(--sp-xl); flex: 1; min-width: 160px; }
+.statValue { font-size: var(--fs-2xl); font-weight: 800; color: var(--tp); font-family: var(--fm); }
+.statLabel { font-size: var(--fs-xs); font-weight: 600; color: var(--ts); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+.statTrend { font-size: var(--fs-xs); font-weight: 600; margin-top: 4px; }
+.statUp { color: var(--green); }
+.statDown { color: var(--red); }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--r-sm); font-size: var(--fs-sm); font-weight: 600; border: 1px solid var(--border); background: var(--surf); color: var(--tp); transition: all 120ms var(--es); }
+.btn:hover { background: var(--surf2); border-color: var(--borderm); }
+.btnGold { background: var(--gold); color: #fff; border-color: var(--gold); }
+.btnGold:hover { background: var(--goldl); }
+.btnDanger { color: var(--red); border-color: rgba(224,90,66,0.3); }
+.btnDanger:hover { background: var(--redl); }
+
+/* Badges */
+.statusBadge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; }
+.statusActive { background: var(--greenl); color: var(--green); }
+.statusPaused { background: var(--warnl); color: var(--warn); }
+.statusFailed { background: var(--redl); color: var(--red); }
+.statusTrial { background: var(--bluel); color: var(--blue); }
+.statusCancelled { background: var(--surf3); color: var(--tm); }
+
+/* Empty state */
+.empty { text-align: center; padding: var(--sp-3xl) var(--sp-xl); color: var(--tm); }
+.emptyIcon { font-size: 48px; margin-bottom: var(--sp-lg); opacity: 0.3; }
+.emptyText { font-size: var(--fs-md); font-weight: 500; }
+
+/* Drawer overlay */
+.drawerOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100; display: flex; justify-content: flex-end; }
+.drawer { width: 480px; max-width: 90vw; background: var(--surf); height: 100vh; overflow-y: auto; box-shadow: var(--shadow-lg); padding: var(--sp-xl); }
+.drawerClose { background: none; border: none; color: var(--tm); cursor: pointer; padding: 4px; }
+.drawerClose:hover { color: var(--tp); }
+.drawerHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-xl); }
+.drawerTitle { font-size: var(--fs-xl); font-weight: 800; color: var(--tp); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: var(--sp-xl); }
+.tab { padding: 10px 16px; font-size: var(--fs-sm); font-weight: 600; color: var(--ts); cursor: pointer; border-bottom: 2px solid transparent; transition: all 120ms; background: none; border-top: none; border-left: none; border-right: none; }
+.tab:hover { color: var(--tp); }
+.tabActive { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* Health dots */
+.healthDot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.healthGreen { background: var(--green); }
+.healthYellow { background: var(--warn); }
+.healthRed { background: var(--red); }
+
+/* Search */
+.searchWrap { position: relative; margin-bottom: var(--sp-lg); }
+.searchInput { width: 100%; padding: 10px 14px 10px 38px; border: 1px solid var(--border); border-radius: var(--r-sm); font-size: var(--fs-md); background: var(--surf); color: var(--tp); }
+.searchInput:focus { border-color: rgba(200,168,78,0.4); outline: none; }
+.searchIcon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--tm); }
+
+/* Flex utils */
+.flexBetween { display: flex; align-items: center; justify-content: space-between; }
+.flexGap { display: flex; align-items: center; gap: var(--sp-sm); }
+.flexCol { display: flex; flex-direction: column; gap: var(--sp-sm); }

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Questions DB — Schema Map</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --ink: #e8eaed;
+    --mute: #8a8f98;
+    --gold: #d4a94a;
+    --green: #4ade80;
+    --blue: #60a5fa;
+    --purple: #c084fc;
+    --pink: #f472b6;
+    --orange: #fb923c;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 32px;
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    max-width: 1200px; margin: 0 auto;
+  }
+  h1 { font-size: 32px; margin: 0 0 8px; letter-spacing: -0.5px; }
+  .sub { color: var(--mute); font-size: 14px; margin-bottom: 40px; }
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--gold); margin: 48px 0 16px; font-weight: 600;
+  }
+  .grid { display: grid; gap: 12px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g5 { grid-template-columns: repeat(5, 1fr); }
+
+  .card {
+    background: var(--card); border-radius: 12px; padding: 16px 18px;
+    border-left: 3px solid var(--mute);
+  }
+  .card.required { border-left-color: var(--red); }
+  .card.optional { border-left-color: var(--blue); }
+  .card.fk { border-left-color: var(--purple); }
+  .card.auto { border-left-color: var(--green); }
+
+  .col-name { font-family: "SF Mono", monospace; font-size: 13px; font-weight: 600; }
+  .col-type { color: var(--mute); font-size: 11px; margin-top: 2px; font-family: "SF Mono", monospace; }
+  .col-note { margin-top: 8px; font-size: 12px; color: var(--ink); opacity: 0.85; line-height: 1.4; }
+
+  .tile {
+    background: var(--card); border-radius: 10px; padding: 14px;
+    text-align: center; position: relative;
+  }
+  .tile .num {
+    font-size: 26px; font-weight: 700; letter-spacing: -1px;
+  }
+  .tile .label { font-size: 11px; color: var(--mute); margin-top: 4px; }
+  .tile.portal { border-top: 3px solid var(--green); }
+  .tile.offportal { border-top: 3px solid var(--mute); opacity: 0.7; }
+
+  .type {
+    background: var(--card); border-radius: 8px; padding: 10px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px;
+  }
+  .type .bar {
+    height: 4px; border-radius: 2px; margin-top: 6px;
+  }
+
+  .rule {
+    background: var(--card); border-radius: 10px; padding: 14px 16px;
+    font-size: 13px; line-height: 1.5;
+    border-left: 3px solid var(--gold);
+  }
+  .rule b { color: var(--gold); }
+
+  .flow {
+    background: var(--card); border-radius: 12px; padding: 20px;
+    font-family: "SF Mono", monospace; font-size: 12px;
+    line-height: 1.8; color: var(--mute);
+  }
+  .flow .node { color: var(--ink); }
+  .flow .kw { color: var(--pink); }
+  .flow .fk-hl { color: var(--purple); }
+
+  .legend {
+    display: flex; gap: 16px; margin: 8px 0 24px; flex-wrap: wrap;
+    font-size: 11px; color: var(--mute);
+  }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; }
+  .d-red { background: var(--red); }
+  .d-blue { background: var(--blue); }
+  .d-purple { background: var(--purple); }
+  .d-green { background: var(--green); }
+</style>
+</head>
+<body>
+
+<h1>Questions Database — Schema Map</h1>
+<div class="sub">Supabase · project <code>yoepbpwajszopxzzyzzk</code> · table <code>Questions Database</code></div>
+
+<h2>The 13 Columns</h2>
+<div class="legend">
+  <span><div class="dot d-red"></div> required</span>
+  <span><div class="dot d-blue"></div> optional</span>
+  <span><div class="dot d-purple"></div> foreign key</span>
+  <span><div class="dot d-green"></div> auto</span>
+</div>
+<div class="grid g3">
+  <div class="card auto"><div class="col-name">id</div><div class="col-type">uuid · auto</div><div class="col-note">PK. Never set manually.</div></div>
+  <div class="card required"><div class="col-name">Question</div><div class="col-type">text · unique</div><div class="col-note">Natural key. Must be menu-item-specific.</div></div>
+  <div class="card optional"><div class="col-name">Input Type</div><div class="col-type">enum (14 values)</div><div class="col-note">Controls renderer in portal.</div></div>
+  <div class="card optional"><div class="col-name">Placeholder</div><div class="col-type">text</div><div class="col-note">Helper text inside the input.</div></div>
+  <div class="card required"><div class="col-name">Mandatory</div><div class="col-type">boolean</div><div class="col-note">true / false. No nulls.</div></div>
+  <div class="card optional"><div class="col-name">Note to Client</div><div class="col-type">text</div><div class="col-note">Gold mono context line. Sentence case.</div></div>
+  <div class="card optional"><div class="col-name">Places Asked</div><div class="col-type">text[]</div><div class="col-note">Menu items. NULL for sub-fields.</div></div>
+  <div class="card required"><div class="col-name">Page</div><div class="col-type">integer</div><div class="col-note">1 = always. 2+ = conditional page.</div></div>
+  <div class="card optional"><div class="col-name">Options</div><div class="col-type">text[]</div><div class="col-note">Check One/Many/Dropdown only.</div></div>
+  <div class="card fk"><div class="col-name">Dependent On</div><div class="col-type">uuid → id</div><div class="col-note">Controlling question for same-page conditional.</div></div>
+  <div class="card optional"><div class="col-name">Dependent On Value</div><div class="col-type">text[]</div><div class="col-note">Trigger answer(s). Pairs with Dependent On.</div></div>
+  <div class="card fk"><div class="col-name">Parent Question</div><div class="col-type">uuid → id</div><div class="col-note">For Block/Discount/Staff builder sub-fields.</div></div>
+  <div class="card optional"><div class="col-name">sort_order</div><div class="col-type">integer</div><div class="col-note">Display order. Required on sub-fields.</div></div>
+</div>
+
+<h2>Menu Items — Question Counts</h2>
+<div class="grid g5">
+  <div class="tile portal"><div class="num">17</div><div class="label">Internal Tournament</div></div>
+  <div class="tile portal"><div class="num">16</div><div class="label">Gym Rental</div></div>
+  <div class="tile portal"><div class="num">14</div><div class="label">Youth Academy</div></div>
+  <div class="tile portal"><div class="num">14</div><div class="label">Camps / Clinics</div></div>
+  <div class="tile portal"><div class="num">9</div><div class="label">Staff Member</div></div>
+  <div class="tile portal"><div class="num">7</div><div class="label">Sponsor Inquiry</div></div>
+  <div class="tile portal"><div class="num">7</div><div class="label">Promo</div></div>
+  <div class="tile portal"><div class="num">5</div><div class="label">Player Intake</div></div>
+  <div class="tile portal"><div class="num">5</div><div class="label">New Hire</div></div>
+  <div class="tile portal"><div class="num">4</div><div class="label">Upsells</div></div>
+  <div class="tile offportal"><div class="num">26</div><div class="label">Training (off-portal)</div></div>
+  <div class="tile offportal"><div class="num">12</div><div class="label">Branding (off-portal)</div></div>
+  <div class="tile offportal"><div class="num">8</div><div class="label">General Onboarding (off-portal)</div></div>
+  <div class="tile offportal"><div class="num">7</div><div class="label">Main Site (off-portal)</div></div>
+</div>
+
+<h2>Input Types — 14 Enum Values</h2>
+<div class="grid g2">
+  <div class="type" style="border-left: 3px solid var(--blue);"><span>Text Input</span><b>58</b></div>
+  <div class="type" style="border-left: 3px solid var(--blue);"><span>Open-Ended</span><b>46</b></div>
+  <div class="type" style="border-left: 3px solid var(--orange);"><span>File Upload</span><b>13</b></div>
+  <div class="type" style="border-left: 3px solid var(--purple);"><span>Check One</span><b>12</b></div>
+  <div class="type" style="border-left: 3px solid var(--pink);"><span>Staff Selector</span><b>7</b></div>
+  <div class="type" style="border-left: 3px solid var(--purple);"><span>Check Many</span><b>5</b></div>
+  <div class="type" style="border-left: 3px solid var(--purple);"><span>Dropdown</span><b>3</b></div>
+  <div class="type" style="border-left: 3px solid var(--green);"><span>Time Picker</span><b>2</b></div>
+  <div class="type" style="border-left: 3px solid var(--blue);"><span>Link Input</span><b>2</b></div>
+  <div class="type" style="border-left: 3px solid var(--blue);"><span>E-Mail</span><b>1</b></div>
+  <div class="type" style="border-left: 3px solid var(--pink);"><span>Block Builder</span><b>1</b></div>
+  <div class="type" style="border-left: 3px solid var(--pink);"><span>Discount Builder</span><b>1</b></div>
+  <div class="type" style="border-left: 3px solid var(--blue);"><span>Phone Number</span><b>1</b></div>
+  <div class="type" style="border-left: 3px solid var(--gold);"><span>Staff Notification Block</span><b>0</b></div>
+</div>
+
+<h2>Two Relationship Patterns</h2>
+<div class="grid g2">
+  <div class="flow">
+<span class="kw">// Same-page conditional</span><br>
+<span class="node">Question A</span> <span class="kw">(Check One)</span><br>
+&nbsp;&nbsp;↓ <span class="fk-hl">Dependent On</span> = A.id<br>
+&nbsp;&nbsp;↓ <span class="fk-hl">Dependent On Value</span> = ['Yes']<br>
+<span class="node">Question B</span> <span class="kw">(shows if A = Yes)</span>
+  </div>
+  <div class="flow">
+<span class="kw">// Builder sub-fields</span><br>
+<span class="node">Block Builder Q</span><br>
+&nbsp;&nbsp;↓ <span class="fk-hl">Parent Question</span> = Q.id<br>
+&nbsp;&nbsp;↓ <span class="fk-hl">sort_order</span> = 1, 2, 3…<br>
+<span class="node">Sub-field</span> <span class="kw">(no Places Asked)</span>
+  </div>
+</div>
+
+<h2>Hard Rules</h2>
+<div class="grid g2">
+  <div class="rule"><b>One question per menu item.</b> Split with menu-item-specific wording. Shared generics are rare.</div>
+  <div class="rule"><b>Yes/No follow-ups → always conditional.</b> Wire via Dependent On + Dependent On Value. No exceptions.</div>
+  <div class="rule"><b>Sub-fields never carry Places Asked.</b> They inherit from their parent.</div>
+  <div class="rule"><b>Question text is the natural key.</b> Unique across the whole table.</div>
+  <div class="rule"><b>Options only on Check/Dropdown.</b> Required when Input Type is one of those three.</div>
+  <div class="rule"><b>Page & Mandatory never null.</b> Integer and boolean respectively.</div>
+</div>
+
+<h2>Integrity — Last Audit</h2>
+<div class="grid g4">
+  <div class="tile portal"><div class="num" style="color:var(--green)">0</div><div class="label">Orphan FKs</div></div>
+  <div class="tile portal"><div class="num" style="color:var(--green)">0</div><div class="label">Null required fields</div></div>
+  <div class="tile portal"><div class="num" style="color:var(--green)">0</div><div class="label">Sub-field issues</div></div>
+  <div class="tile" style="border-top: 3px solid var(--orange)"><div class="num" style="color:var(--orange)">6</div><div class="label">Missing Options (off-portal)</div></div>
+</div>
+
+</body>
+</html>

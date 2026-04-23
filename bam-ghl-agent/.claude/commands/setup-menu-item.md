@@ -78,9 +78,20 @@ All 14 types have renderers in `client-portal.html`. If the user needs a 15th ty
 
 ### Valid menu item names (exact strings for `Places Asked`)
 
+**Portal tiles (rendered in `client-portal.html`):**
 ```
-Gym Rental · Branding · Player Intake · New Hire · Youth Academy
-Internal Tournament · Sponsor Inquiry · Camps / Clinics · Upsells
+Gym Rental · Player Intake · New Hire · Youth Academy · Internal Tournament
+Sponsor Inquiry · Camps / Clinics · Upsells · Promo · Staff Member
+```
+
+**Onboarding flow (separate standalone pages, not portal):**
+```
+Class · Offer · Parent Onboarding
+```
+
+**Off-portal / legacy (kept in DB, not yet placed):**
+```
+Branding · General Onboarding · Main Site · Training
 ```
 
 Sub-fields (rows with `Parent Question` set) do NOT get `Places Asked`.
@@ -143,14 +154,15 @@ Propose a candidate list of questions based on Phase 1 and the existing DB. For 
 
 Also identify any branching paths at this stage — if any question answer should open up a different section (e.g. "Are there brackets? → Yes → describe each bracket"), flag it here and design the conditional logic in 2b/2c.
 
-Present as a flat numbered list. Example:
-```
-1. What is the business name? (Text Input, mandatory)
-2. Upload your logo. (File Upload, mandatory)
-3. What are your brand colors? (Open-Ended, optional)
-4. Do you have brand fonts? (Check One — Yes / No, mandatory)
-5. Upload your font files. (File Upload, optional — only if Q4 = Yes)
-```
+Present as a table. Example:
+
+| # | Question | Input Type | Mandatory | Notes |
+|---|----------|-----------|-----------|-------|
+| 1 | What is the business name? | Text Input | ✅ | |
+| 2 | Upload your logo. | File Upload | ✅ | |
+| 3 | What are your brand colors? | Open-Ended | — | |
+| 4 | Do you have brand fonts? | Check One | ✅ | Yes / No |
+| 4a | Upload your font files. | File Upload | — | Conditional on Q4 = Yes |
 
 Ask: "Does this cover everything? Anything missing, wrong, or to remove?"
 
@@ -277,7 +289,14 @@ WHERE "Question" IN ('<q1>', '<q2>');
 
 ### 4b — Show the full SQL plan
 
-List every INSERT and UPDATE clearly. Then ask: "Does this look right? Say go when ready."
+**Do not show raw SQL to the user.** Present the plan as a plain-English table:
+
+| # | Question | Type | Required |
+|---|----------|------|----------|
+| 1 | What is the name of this class? | Short text | ✅ |
+| 2 | Describe this class. | Long text | — |
+
+Then ask: "Does this look right? Say go when ready."
 
 **Do not run any SQL until the user explicitly confirms.**
 
@@ -300,7 +319,17 @@ Confirm: "All n questions are in the database."
 
 ## Phase 5 · Front End Verification
 
-### 5a — Check renderer coverage
+**Portal items** → verify in `client-portal.html` (5a–5d below).
+
+**Non-portal onboarding items** (e.g. Class, Offer, Parent Onboarding) → Phase 5 is deferred. Build a standalone HTML page (e.g. `class-setup.html`) that fetches from Supabase and renders the questions. These pages form a multi-step flow linked in order. When building:
+- Use the same CSS variables and design system as `client-portal.html`
+- Fetch questions via Supabase JS CDN, filter by `Places Asked @> ARRAY['<value>']`
+- Fetch sub-fields via `Parent Question IN (parentIds)`
+- Reuse the same renderer functions (renderBlockBuilder, renderStaffSelector, etc.)
+- For multi-record builders (classes, offers): show a saved-items list + "+ Add" button pattern
+- Link pages in order via `window.location.href`
+
+### 5a — Check renderer coverage (portal items only)
 
 Read `client-portal.html` and find `_dformRenderQuestion`. Confirm every Input Type used in this menu item has a `case` in the switch statement.
 
@@ -418,3 +447,6 @@ Confirm: "Phase 7 complete — skill, style guide, and memory updated."
 - Always run Phase 7 at the end of every session — never skip it
 - Question text must be unique across the entire DB (it's the natural key). When splitting a shared question into a menu-item-specific row, always use menu-item-specific wording (e.g. "How do you want the youth academy sales system to go?" not "How do you want the sales system to go?"). Never rely on ON CONFLICT DO NOTHING to silently skip an insert — if it conflicts, the row didn't land.
 - Yes/No follow-up questions must always be wired as conditionals. If a Check One (Yes/No) question has a follow-up that only applies to one answer, set `Dependent On` + `Dependent On Value` on the follow-up immediately — never leave it always visible.
+- Never show raw SQL to the user in Phase 4. Present the plan as a plain-English table (question, type, required). Only run SQL after explicit confirmation.
+- When a question text already exists in the DB under a different Places Asked, do NOT reuse it — ON CONFLICT DO NOTHING will silently skip the insert. Always use menu-item-specific wording (e.g. "How do you want the sales system to go for this offer?" not the generic version).
+- For non-portal onboarding flows (Class, Offer, Parent Onboarding etc.), Phase 5 means building a standalone HTML page — not verifying in client-portal.html. Use the same design system and Supabase fetching pattern. Link pages in sequence via window.location.href.

@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Error Ticket — Internal View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0F0F0F;
+    --surface: #161616;
+    --surface2: #1E1E1E;
+    --surface3: #252525;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #F0EDE8;
+    --text2: #888884;
+    --text3: #555552;
+    --red: #FF453A;
+    --red-soft: rgba(255,69,58,0.12);
+    --red-border: rgba(255,69,58,0.25);
+    --amber: #FF9F0A;
+    --amber-soft: rgba(255,159,10,0.1);
+    --green: #32D74B;
+    --green-soft: rgba(50,215,75,0.1);
+    --blue: #0A84FF;
+    --blue-soft: rgba(10,132,255,0.1);
+    --purple: #BF5AF2;
+    --purple-soft: rgba(191,90,242,0.1);
+    --teal: #5AC8FA;
+    --teal-soft: rgba(90,200,250,0.1);
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Instrument Sans', -apple-system, sans-serif;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  html { background: var(--bg); color: var(--text); font-family: var(--sans); }
+  body { min-height: 100vh; }
+
+  /* ── Page layout ── */
+  .page { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  /* ── Ticket header ── */
+  .ticket-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ticket-meta { display: flex; flex-direction: column; gap: 8px; }
+
+  .ticket-id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+  }
+
+  .ticket-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--red-soft);
+    border: 1px solid var(--red-border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--red);
+    letter-spacing: 0.3px;
+  }
+
+  .pulse {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .ticket-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    line-height: 1.2;
+    color: var(--text);
+    margin-top: 4px;
+  }
+
+  .ticket-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .badge {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    background: var(--surface2);
+    font-family: var(--mono);
+  }
+
+  .status-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .status-pill {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+  }
+
+  .status-pill.open {
+    background: var(--amber-soft);
+    border: 1px solid rgba(255,159,10,0.3);
+    color: var(--amber);
+  }
+
+  .status-pill.in-progress {
+    background: var(--blue-soft);
+    border: 1px solid rgba(10,132,255,0.3);
+    color: var(--blue);
+  }
+
+  .status-pill.done {
+    background: var(--green-soft);
+    border: 1px solid rgba(50,215,75,0.3);
+    color: var(--green);
+  }
+
+  .assigned-to {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+
+  /* ── Submission details ── */
+  .section { margin-bottom: 24px; }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 10px;
+  }
+
+  .submission-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .sub-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+
+  .sub-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .sub-card-content {
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+
+  /* ── Claude analysis header ── */
+  .claude-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .claude-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--purple-soft);
+    border: 1px solid rgba(191,90,242,0.25);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--purple);
+  }
+
+  .claude-badge svg {
+    width: 16px; height: 16px;
+    fill: var(--purple);
+    flex-shrink: 0;
+  }
+
+  .claude-header-text {
+    font-size: 13px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+
+  /* ── Analysis panels ── */
+  .analysis-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .analysis-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    animation: fadeIn 0.4s ease both;
+  }
+
+  .analysis-panel:nth-child(1) { animation-delay: 0.05s; }
+  .analysis-panel:nth-child(2) { animation-delay: 0.1s; }
+  .analysis-panel:nth-child(3) { animation-delay: 0.15s; }
+  .analysis-panel:nth-child(4) { animation-delay: 0.2s; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+  }
+
+  .panel-header:hover { background: var(--surface2); }
+
+  .panel-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .panel-icon.red   { background: var(--red-soft); }
+  .panel-icon.amber { background: var(--amber-soft); }
+  .panel-icon.teal  { background: var(--teal-soft); }
+  .panel-icon.green { background: var(--green-soft); }
+
+  .panel-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.2px;
+  }
+
+  .panel-subtitle {
+    font-size: 12px;
+    color: var(--text3);
+    margin-top: 1px;
+  }
+
+  .panel-toggle {
+    font-size: 11px;
+    color: var(--text3);
+    transition: transform 0.2s ease;
+    line-height: 1;
+  }
+
+  .panel-toggle.open { transform: rotate(180deg); }
+
+  .panel-body {
+    padding: 18px;
+    display: none;
+  }
+
+  .panel-body.open { display: block; }
+
+  /* ── Error location ── */
+  .error-location-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--red-soft);
+    border: 1px solid var(--red-border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--red);
+    margin-bottom: 12px;
+  }
+
+  .body-text {
+    font-size: 14px;
+    color: var(--text2);
+    line-height: 1.65;
+  }
+
+  .body-text strong { color: var(--text); font-weight: 600; }
+
+  /* ── Steps list ── */
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .step-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 24px; height: 24px;
+    border-radius: 6px;
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-content { font-size: 14px; color: var(--text2); line-height: 1.55; }
+  .step-content strong { color: var(--text); font-weight: 600; }
+
+  .step-item.done .step-num {
+    background: var(--green-soft);
+    border-color: rgba(50,215,75,0.3);
+    color: var(--green);
+  }
+
+  .step-item.done .step-content { text-decoration: line-through; opacity: 0.5; }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #A8D8A8;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin-top: 12px;
+    position: relative;
+  }
+
+  .code-block .copy-btn {
+    position: absolute;
+    top: 10px; right: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .code-block .copy-btn:hover { color: var(--text); border-color: var(--border); }
+  .code-block .copy-btn.copied { color: var(--green); border-color: rgba(50,215,75,0.3); }
+
+  /* ── Copy (text) asset ── */
+  .copy-asset {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--text);
+    line-height: 1.6;
+    margin-top: 10px;
+    position: relative;
+  }
+
+  .copy-asset-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+
+  /* ── User guide ── */
+  .guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .guide-step {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    align-items: flex-start;
+  }
+
+  .guide-step-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--teal-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .guide-step-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .guide-step-desc {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.5;
+  }
+
+  /* ── Action bar ── */
+  .action-bar {
+    display: flex;
+    gap: 10px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+    letter-spacing: -0.1px;
+  }
+
+  .action-btn.primary {
+    background: var(--blue);
+    color: white;
+  }
+
+  .action-btn.primary:hover { opacity: 0.88; }
+
+  .action-btn.secondary {
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+
+  .action-btn.secondary:hover { color: var(--text); border-color: var(--border); }
+
+  .action-btn.danger {
+    background: var(--red-soft);
+    color: var(--red);
+    border: 1px solid var(--red-border);
+  }
+
+  /* ── Generating state ── */
+  .generating {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--purple-soft);
+    border: 1px solid rgba(191,90,242,0.2);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--purple);
+    margin-bottom: 16px;
+  }
+
+  .gen-dots span {
+    display: inline-block;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--purple);
+    animation: genBounce 1.2s ease-in-out infinite;
+  }
+
+  .gen-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .gen-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes genBounce {
+    0%,80%,100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-4px); opacity: 1; }
+  }
+
+  /* ── Floating feedback button ── */
+  .fab {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 24px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    letter-spacing: -0.1px;
+  }
+
+  .fab:hover { background: var(--surface3); color: var(--text); border-color: var(--border); }
+
+  .fab.active {
+    background: var(--purple-soft);
+    border-color: rgba(191,90,242,0.4);
+    color: var(--purple);
+    box-shadow: 0 4px 20px rgba(191,90,242,0.2);
+  }
+
+  .fab-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  /* ── Notes field (shown in feedback mode) ── */
+  .panel-notes {
+    display: none;
+    border-top: 1px solid var(--border);
+    padding: 14px 18px;
+    background: rgba(191,90,242,0.04);
+    animation: noteSlide 0.25s cubic-bezier(0.16,1,0.3,1) both;
+  }
+
+  @keyframes noteSlide {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  body.feedback-mode .panel-notes { display: block; }
+
+  .notes-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--purple);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .notes-textarea {
+    width: 100%;
+    background: var(--surface3);
+    border: 1px solid rgba(191,90,242,0.2);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--text);
+    resize: none;
+    outline: none;
+    line-height: 1.55;
+    min-height: 72px;
+    transition: border-color 0.15s ease;
+  }
+
+  .notes-textarea::placeholder { color: var(--text3); }
+  .notes-textarea:focus { border-color: rgba(191,90,242,0.5); }
+
+  /* ── Feedback submit bar ── */
+  .feedback-bar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid rgba(191,90,242,0.2);
+    padding: 14px 24px;
+    z-index: 999;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    box-shadow: 0 -8px 32px rgba(0,0,0,0.3);
+    animation: barSlide 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  }
+
+  @keyframes barSlide {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  body.feedback-mode .feedback-bar { display: flex; }
+
+  .feedback-bar-left {
+    font-size: 13px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .feedback-bar-left strong { color: var(--purple); }
+
+  .feedback-bar-right {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .fb-btn {
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s ease;
+    letter-spacing: -0.1px;
+  }
+
+  .fb-btn.copy {
+    background: var(--surface3);
+    color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+
+  .fb-btn.copy:hover { color: var(--text); }
+  .fb-btn.copy.copied { color: var(--green); border-color: rgba(50,215,75,0.3); }
+
+  .fb-btn.submit {
+    background: var(--purple);
+    color: white;
+    box-shadow: 0 2px 12px rgba(191,90,242,0.3);
+  }
+
+  .fb-btn.submit:hover { opacity: 0.88; }
+  .fb-btn.submit.sent { background: var(--green); box-shadow: 0 2px 12px rgba(50,215,75,0.3); }
+
+  /* ── Copy modal overlay ── */
+  .copy-modal-wrap {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .copy-modal-wrap.open { display: flex; }
+
+  .copy-modal {
+    background: var(--surface);
+    border: 1px solid rgba(191,90,242,0.25);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 680px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    animation: modalPop 0.3s cubic-bezier(0.16,1,0.3,1) both;
+  }
+
+  @keyframes modalPop {
+    from { transform: scale(0.94); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  .copy-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .copy-modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .copy-modal-close {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-modal-close:hover { color: var(--text); }
+
+  .copy-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .copy-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .submission-grid { grid-template-columns: 1fr; }
+    .ticket-header { flex-direction: column; }
+    .status-block { align-items: flex-start; }
+    .fab { top: 12px; right: 12px; padding: 8px 12px; font-size: 12px; }
+    .feedback-bar { flex-direction: column; align-items: stretch; gap: 10px; }
+    .feedback-bar-right { justify-content: stretch; }
+    .fb-btn { flex: 1; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<button class="fab" id="feedbackFab" onclick="toggleFeedbackMode()">
+  <div class="fab-dot"></div>
+  Improve Claude
+</button>
+
+<div class="copy-modal-wrap" id="copyModal">
+  <div class="copy-modal">
+    <div class="copy-modal-header">
+      <div class="copy-modal-title">📋 Package for AI — copy this into Claude</div>
+      <button class="copy-modal-close" onclick="closeCopyModal()">Close</button>
+    </div>
+    <div class="copy-modal-body" id="copyModalBody"></div>
+    <div class="copy-modal-footer">
+      <button class="fb-btn copy" id="modalCopyBtn" onclick="copyModalContent()">Copy all</button>
+      <button class="fb-btn submit" onclick="closeCopyModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="feedback-bar">
+  <div class="feedback-bar-left">
+    <strong>Feedback mode on</strong> — add notes to any Claude recommendation below
+  </div>
+  <div class="feedback-bar-right">
+    <button class="fb-btn copy" id="copyForAiBtn" onclick="openCopyModal()">📋 Copy for AI</button>
+    <button class="fb-btn submit" id="submitImprovementBtn" onclick="submitImprovement()">Submit improvement ticket →</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- ── Ticket header ── -->
+  <div class="ticket-header">
+    <div class="ticket-meta">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="ticket-type">
+          <div class="pulse"></div>
+          Error ticket
+        </div>
+        <div class="ticket-id">#ERR-00247 · submitted 2 min ago</div>
+      </div>
+      <div class="ticket-title">Booking form not submitting on mobile</div>
+      <div class="ticket-badges">
+        <span class="badge">Elevate Hoops NYC</span>
+        <span class="badge">booking-page</span>
+        <span class="badge">form</span>
+        <span class="badge">mobile</span>
+      </div>
+    </div>
+    <div class="status-block">
+      <button class="status-pill open" onclick="cycleStatus(this)">Open</button>
+      <div class="assigned-to">unassigned</div>
+    </div>
+  </div>
+
+  <!-- ── What the client submitted ── -->
+  <div class="section">
+    <div class="section-label">Client submission</div>
+    <div class="submission-grid">
+      <div class="sub-card">
+        <div class="sub-card-label">Where is the error?</div>
+        <div class="sub-card-content">On the booking page, when I try to book a free trial on my phone, I click the submit button but nothing happens. No confirmation, no error message, just nothing.</div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-label">How should it work?</div>
+        <div class="sub-card-content">When I click submit it should take me to a confirmation page that says my spot is booked and tells me what to expect next.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── Claude analysis ── -->
+  <div class="claude-header">
+    <div class="claude-badge">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+      Claude analysis
+    </div>
+    <div class="claude-header-text">Generated on ticket submission · review before actioning</div>
+  </div>
+
+  <div class="generating" id="generatingBar" style="display:none">
+    <div class="gen-dots"><span></span><span></span><span></span></div>
+    Claude is analysing this ticket…
+  </div>
+
+  <div class="analysis-grid">
+
+    <!-- Panel 1: Where Claude thinks the error is -->
+    <div class="analysis-panel">
+      <div class="panel-header" onclick="togglePanel(this)">
+        <div class="panel-header-left">
+          <div class="panel-icon red">🔍</div>
+          <div>
+            <div class="panel-title">Where Claude thinks the error is</div>
+            <div class="panel-subtitle">Root cause diagnosis</div>
+          </div>
+        </div>
+        <div class="panel-toggle open">▾</div>
+      </div>
+      <div class="panel-body open">
+        <div class="error-location-tag">📍 booking-page → free-trial-form → submit handler</div>
+        <div class="body-text">
+          The most likely cause is a <strong>JavaScript event listener conflict on mobile</strong>. The submit button uses an <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">onclick</code> handler that fires correctly on desktop but is being blocked on iOS Safari by the <strong>300ms tap delay</strong> or a <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">touchstart</code> / <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">touchend</code> conflict in the GHL embed wrapper.
+          <br><br>
+          Secondary possibility: the form's <strong>required field validation is failing silently</strong> — a field is empty or has an invalid value but the error state isn't being shown on mobile viewports due to a CSS overflow or z-index issue hiding the validation message.
+          <br><br>
+          Third possibility: the <strong>GHL calendar embed inside the form is blocking the submit button</strong> on smaller screens — the calendar overlay div has a higher z-index than the submit button, making the button untappable.
+        </div>
+      </div>
+      <div class="panel-notes">
+        <div class="notes-label">✏️ Your notes on this diagnosis</div>
+        <textarea class="notes-textarea" data-panel="error-location" placeholder="e.g. I checked and it's definitely the z-index issue — the calendar iframe is overlapping the button on iPhone 13..."></textarea>
+      </div>
+
+      </div>
+    </div>
+
+    <!-- Panel 2: Proposed fix steps -->
+    <div class="analysis-panel">
+      <div class="panel-header" onclick="togglePanel(this)">
+        <div class="panel-header-left">
+          <div class="panel-icon amber">🛠</div>
+          <div>
+            <div class="panel-title">Proposed steps to fix it</div>
+            <div class="panel-subtitle">Ordered by likelihood · check these first</div>
+          </div>
+        </div>
+        <div class="panel-toggle open">▾</div>
+      </div>
+      <div class="panel-body open">
+        <div class="steps-list" id="stepsList">
+          <div class="step-item" onclick="toggleStep(this)">
+            <div class="step-num">1</div>
+            <div class="step-content"><strong>Open the booking page on iOS Safari (not Chrome)</strong> and inspect the submit button tap area. If nothing happens on tap, confirm with DevTools remote debugging whether the click event is firing at all.</div>
+          </div>
+          <div class="step-item" onclick="toggleStep(this)">
+            <div class="step-num">2</div>
+            <div class="step-content"><strong>Check for z-index stacking issues</strong> — open the GHL page editor, inspect the section containing the form, and confirm no overlapping elements are sitting above the submit button on mobile breakpoints.</div>
+          </div>
+          <div class="step-item" onclick="toggleStep(this)">
+            <div class="step-num">3</div>
+            <div class="step-content"><strong>Test all required fields</strong> — fill the form completely with valid data on mobile and retry. If it submits, the issue is hidden validation UI. Add explicit error styling for mobile.</div>
+          </div>
+          <div class="step-item" onclick="toggleStep(this)">
+            <div class="step-num">4</div>
+            <div class="step-content"><strong>If using a custom HTML form embedded in GHL</strong> — add <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">touch-action: manipulation</code> to the submit button CSS to eliminate the 300ms delay on iOS.</div>
+          </div>
+          <div class="step-item" onclick="toggleStep(this)">
+            <div class="step-num">5</div>
+            <div class="step-content"><strong>Last resort</strong> — swap the submit handler from <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">onclick</code> to a <code style="font-family:var(--mono);font-size:12px;background:var(--surface3);padding:2px 6px;border-radius:4px;color:var(--teal)">form.addEventListener('submit')</code> listener which is more reliable cross-platform.</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--text3);">Click a step to mark it done</div>
+      </div>
+      <div class="panel-notes">
+        <div class="notes-label">✏️ Your notes on these steps</div>
+        <textarea class="notes-textarea" data-panel="fix-steps" placeholder="e.g. Step 2 worked — the calendar was overlapping. Step 4 wasn't needed. Claude should have put z-index check first..."></textarea>
+      </div>
+    </div>
+
+    <!-- Panel 3: Proposed assets -->
+    <div class="analysis-panel">
+      <div class="panel-header" onclick="togglePanel(this)">
+        <div class="panel-header-left">
+          <div class="panel-icon teal">📦</div>
+          <div>
+            <div class="panel-title">Proposed assets</div>
+            <div class="panel-subtitle">Copy + code ready to use or adapt</div>
+          </div>
+        </div>
+        <div class="panel-toggle">▾</div>
+      </div>
+      <div class="panel-body">
+        <div class="copy-asset-label">Copy — confirmation message (post-submit)</div>
+        <div class="copy-asset">
+          <strong>You're booked! 🎉</strong><br>
+          Your free trial has been reserved. We'll send you a confirmation to the email you provided. Expect to hear from the coaching team within 24 hours with everything you need to know before your first session.
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="copy-asset-label">Copy — mobile form error state (validation)</div>
+          <div class="copy-asset">
+            Please fill in all required fields before submitting. If you're having trouble, try refreshing the page or reaching us directly at <strong>[contact email]</strong>.
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="copy-asset-label">Code fix — submit button CSS (add this)</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>.submit-btn {
+  touch-action: manipulation;  /* removes 300ms iOS tap delay */
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  position: relative;
+  z-index: 10;  /* ensure above any overlapping elements */
+}</pre>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="copy-asset-label">Code fix — JS submit handler (replace onclick)</div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+<pre>document.querySelector('form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  // your existing submit logic here
+  // then redirect to confirmation:
+  window.location.href = '/booking-confirmation';
+});</pre>
+          </div>
+        </div>
+      </div>
+      <div class="panel-notes">
+        <div class="notes-label">✏️ Your notes on these assets</div>
+        <textarea class="notes-textarea" data-panel="assets" placeholder="e.g. The confirmation copy is good but should mention session location. The CSS fix worked perfectly. The JS handler wasn't needed..."></textarea>
+      </div>
+    </div>
+    <div class="analysis-panel">
+      <div class="panel-header" onclick="togglePanel(this)">
+        <div class="panel-header-left">
+          <div class="panel-icon green">📖</div>
+          <div>
+            <div class="panel-title">Proposed user guide</div>
+            <div class="panel-subtitle">For the client — send once fixed</div>
+          </div>
+        </div>
+        <div class="panel-toggle">▾</div>
+      </div>
+      <div class="panel-body">
+        <div class="body-text" style="margin-bottom:16px;">
+          Send this to the client after the fix is deployed. Explains what was wrong and what to expect going forward.
+        </div>
+        <div class="guide-steps">
+          <div class="guide-step">
+            <div class="guide-step-icon">✅</div>
+            <div>
+              <div class="guide-step-title">Your booking form is fixed</div>
+              <div class="guide-step-desc">We found and resolved an issue that was preventing the form from submitting on mobile devices. The fix is now live on your site.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-icon">📱</div>
+            <div>
+              <div class="guide-step-title">How to book on mobile</div>
+              <div class="guide-step-desc">Open your booking page, fill in all fields including your name, email, and preferred session time, then tap Submit. You'll be taken to a confirmation page immediately.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-icon">📧</div>
+            <div>
+              <div class="guide-step-title">What happens after you book</div>
+              <div class="guide-step-desc">You'll receive a confirmation email within a few minutes. The coaching team will follow up within 24 hours with session details.</div>
+            </div>
+          </div>
+          <div class="guide-step">
+            <div class="guide-step-icon">🆘</div>
+            <div>
+              <div class="guide-step-title">If you ever have trouble again</div>
+              <div class="guide-step-desc">Submit a support ticket through your BAM portal and we'll look at it within 45 minutes during business hours.</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;">
+          <button class="action-btn secondary" style="font-size:12px;padding:8px 14px;">Copy guide text</button>
+          <button class="action-btn secondary" style="font-size:12px;padding:8px 14px;">Send to client</button>
+        </div>
+      </div>
+      <div class="panel-notes">
+        <div class="notes-label">✏️ Your notes on this user guide</div>
+        <textarea class="notes-textarea" data-panel="user-guide" placeholder="e.g. The guide is mostly right but step 2 should mention Android too. The support ticket link needs to be updated to our actual portal URL..."></textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Action bar ── -->
+  <div class="action-bar">
+    <button class="action-btn primary" onclick="cycleStatus(document.querySelector('.status-pill'))">Mark in progress</button>
+    <button class="action-btn secondary">Assign to team member</button>
+    <button class="action-btn secondary">Add internal note</button>
+    <button class="action-btn danger" style="margin-left:auto">Flag for review</button>
+  </div>
+
+  <!-- ── Start build CTA ── -->
+  <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--border);">
+    <button onclick="window.location.href='build-mode.html'" style="
+      width:100%;
+      padding:20px 24px;
+      border-radius:16px;
+      border:none;
+      background:var(--green);
+      color:#000;
+      font-family:var(--sans);
+      font-size:17px;
+      font-weight:700;
+      letter-spacing:-0.3px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      transition:all 0.18s ease;
+      box-shadow:0 4px 24px rgba(50,215,75,0.25);
+    " onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 30px rgba(50,215,75,0.35)'"
+       onmouseout="this.style.transform='none';this.style.boxShadow='0 4px 24px rgba(50,215,75,0.25)'">
+      <span>Start build</span>
+      <span style="font-size:20px;">→</span>
+    </button>
+    <div style="text-align:center;font-size:12px;color:var(--text3);margin-top:10px;font-family:var(--mono);">Opens build mode — timer + notes for your second monitor</div>
+  </div>
+
+</div>
+
+<script>
+function togglePanel(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.panel-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function toggleStep(item) {
+  item.classList.toggle('done');
+}
+
+function cycleStatus(btn) {
+  const states = [
+    { label: 'Open',        cls: 'open' },
+    { label: 'In progress', cls: 'in-progress' },
+    { label: 'Done',        cls: 'done' },
+  ];
+  const current = states.findIndex(s => btn.classList.contains(s.cls));
+  const next = states[(current + 1) % states.length];
+  states.forEach(s => btn.classList.remove(s.cls));
+  btn.classList.add(next.cls);
+  btn.textContent = next.label;
+}
+
+function copyCode(btn) {
+  const pre = btn.nextElementSibling;
+  navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function toggleFeedbackMode() {
+  const body = document.body;
+  const fab = document.getElementById('feedbackFab');
+  const isOn = body.classList.toggle('feedback-mode');
+  fab.classList.toggle('active', isOn);
+  fab.innerHTML = isOn
+    ? '<div class="fab-dot"></div> Exit feedback'
+    : '<div class="fab-dot"></div> Improve Claude';
+  if (isOn) {
+    document.querySelectorAll('.panel-body:not(.open)').forEach(b => {
+      b.classList.add('open');
+      const toggle = b.previousElementSibling.querySelector('.panel-toggle');
+      if (toggle) toggle.classList.add('open');
+    });
+    setTimeout(() => {
+      document.querySelector('.panel-notes textarea')?.focus();
+    }, 300);
+  }
+}
+
+function getNotes() {
+  const notes = {};
+  document.querySelectorAll('.notes-textarea').forEach(ta => {
+    if (ta.value.trim()) notes[ta.dataset.panel] = ta.value.trim();
+  });
+  return notes;
+}
+
+function buildPackage() {
+  const ticketTitle = document.querySelector('.ticket-title')?.textContent || 'Error ticket';
+  const ticketId = document.querySelector('.ticket-id')?.textContent || '';
+  const notes = getNotes();
+
+  const panelLabels = {
+    'error-location': 'Where Claude thinks the error is',
+    'fix-steps':      'Proposed steps to fix it',
+    'assets':         'Proposed assets',
+    'user-guide':     'Proposed user guide',
+  };
+
+  let out = `IMPROVEMENT TICKET — AI PACKAGE\n`;
+  out += `${'─'.repeat(48)}\n`;
+  out += `Ticket: ${ticketTitle}\n`;
+  out += `ID: ${ticketId}\n`;
+  out += `Generated: ${new Date().toLocaleString()}\n\n`;
+
+  out += `TEAM NOTES BY SECTION\n${'─'.repeat(48)}\n`;
+
+  if (Object.keys(notes).length === 0) {
+    out += `(No notes added yet — add notes in feedback mode before copying)\n\n`;
+  } else {
+    Object.entries(notes).forEach(([key, val]) => {
+      out += `\n[${panelLabels[key] || key}]\n${val}\n`;
+    });
+  }
+
+  out += `\n${'─'.repeat(48)}\nINSTRUCTIONS FOR AI\n${'─'.repeat(48)}\n`;
+  out += `The above notes are from a BAM Business team member who reviewed Claude's analysis of error ticket "${ticketTitle}".\n\n`;
+  out += `Based on these notes, please:\n`;
+  out += `1. Identify where Claude's diagnosis was correct vs. incorrect\n`;
+  out += `2. Suggest how the error diagnosis prompt should be updated\n`;
+  out += `3. Suggest any fix steps that should be reordered or added\n`;
+  out += `4. Flag any assets that need updating for accuracy\n`;
+  out += `5. Output an improved version of the system prompt section that handles this type of error\n`;
+
+  return out;
+}
+
+function openCopyModal() {
+  const content = buildPackage();
+  document.getElementById('copyModalBody').textContent = content;
+  document.getElementById('copyModal').classList.add('open');
+  const btn = document.getElementById('modalCopyBtn');
+  btn.textContent = 'Copy all';
+  btn.classList.remove('copied');
+}
+
+function closeCopyModal() {
+  document.getElementById('copyModal').classList.remove('open');
+}
+
+function copyModalContent() {
+  const text = document.getElementById('copyModalBody').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('modalCopyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy all'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+
+function submitImprovement() {
+  const btn = document.getElementById('submitImprovementBtn');
+  const notes = getNotes();
+  const package_ = buildPackage();
+
+  btn.textContent = 'Submitting…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    btn.textContent = '✓ Improvement ticket submitted';
+    btn.classList.add('sent');
+    btn.disabled = false;
+
+    setTimeout(() => {
+      btn.textContent = 'Submit improvement ticket →';
+      btn.classList.remove('sent');
+    }, 4000);
+  }, 1200);
+}
+
+document.getElementById('copyModal').addEventListener('click', function(e) {
+  if (e.target === this) closeCopyModal();
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeCopyModal();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — Set Up Your Classes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:           #0A0A0B;
+    --surface:      #131316;
+    --surface-el:   #1C1C21;
+    --surface-hov:  #22222A;
+    --line:         #2A2A31;
+    --line-str:     #383842;
+    --text:         #F5F1E8;
+    --text-sub:     rgba(245,241,232,0.60);
+    --text-mute:    rgba(245,241,232,0.38);
+    --accent:       #E8C547;
+    --gold:         #E8C547;
+    --gold-2:       #C9A55C;
+    --accent-ghost: rgba(232,197,71,0.08);
+    --accent-border:rgba(232,197,71,0.22);
+    --green:        #9FD88A;
+    --green-soft:   rgba(159,216,138,0.10);
+    --red:          #E87560;
+    --radius:       4px;
+    --radius-lg:    6px;
+    --display: "Space Grotesk", "Inter", sans-serif;
+    --sans:    "Inter", system-ui, sans-serif;
+    --mono:    "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Page shell ── */
+  .page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 64px 24px 120px;
+  }
+
+  /* ── Step indicator ── */
+  .step-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 48px;
+  }
+  .step-pip {
+    height: 3px;
+    flex: 1;
+    border-radius: 2px;
+    background: var(--line-str);
+  }
+  .step-pip.active { background: var(--gold); }
+  .step-pip.done   { background: var(--gold-2); }
+
+  /* ── Header ── */
+  .page-eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .page-title {
+    font-family: var(--display);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+  .page-sub {
+    color: var(--text-sub);
+    font-size: 14px;
+    margin-bottom: 40px;
+    max-width: 480px;
+    line-height: 1.6;
+  }
+
+  /* ── Saved class cards ── */
+  .class-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .class-card {
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .class-card:hover { border-color: var(--line-str); }
+  .class-card-left { display: flex; align-items: center; gap: 12px; }
+  .class-card-icon {
+    width: 36px; height: 36px;
+    background: var(--accent-ghost);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-size: 15px;
+  }
+  .class-card-name { font-weight: 500; font-size: 14px; }
+  .class-card-meta { font-size: 12px; color: var(--text-mute); margin-top: 1px; }
+  .class-card-actions { display: flex; gap: 8px; }
+  .class-card-btn {
+    font-size: 12px; color: var(--text-mute);
+    background: none; border: none; cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius);
+    transition: color 0.15s, background 0.15s;
+    font-family: var(--sans);
+  }
+  .class-card-btn:hover { color: var(--text); background: var(--surface-hov); }
+  .class-card-btn.danger:hover { color: var(--red); }
+
+  /* ── Add class button ── */
+  .add-class-btn {
+    width: 100%;
+    background: var(--surface);
+    border: 1px dashed var(--line-str);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    color: var(--text-mute);
+    font-size: 14px;
+    font-family: var(--sans);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    margin-bottom: 40px;
+  }
+  .add-class-btn:hover { border-color: var(--gold-2); color: var(--text); }
+
+  /* ── Form panel ── */
+  .form-panel {
+    background: var(--surface);
+    border: 1px solid var(--line-str);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px;
+    margin-bottom: 40px;
+    display: none;
+  }
+  .form-panel.open { display: block; }
+  .form-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .form-panel-title {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 600;
+  }
+  .form-close-btn {
+    background: none; border: none;
+    color: var(--text-mute); font-size: 18px;
+    cursor: pointer; padding: 4px 8px;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+  }
+  .form-close-btn:hover { color: var(--text); }
+
+  /* ── Dynamic form elements ── */
+  .dform-question { margin-bottom: 24px; }
+  .dform-question-label {
+    font-size: 15px; font-weight: 500;
+    margin-bottom: 10px; line-height: 1.4;
+  }
+  .req { color: var(--gold); font-size: 12px; margin-left: 3px; }
+
+  .dform-input {
+    width: 100%;
+    background: var(--surface-el);
+    border: none;
+    border-bottom: 1px solid var(--line-str);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 0;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .dform-input:focus { border-bottom-color: var(--gold); }
+  .dform-input::placeholder { color: var(--text-mute); }
+
+  select.dform-input {
+    border: 1px solid var(--line-str);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    background: var(--surface-el);
+    appearance: none;
+  }
+
+  .dform-textarea {
+    width: 100%;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 12px;
+    outline: none;
+    resize: vertical;
+    min-height: 88px;
+    transition: border-color 0.15s;
+  }
+  .dform-textarea:focus { border-color: var(--gold); }
+  .dform-textarea::placeholder { color: var(--text-mute); }
+
+  .dform-options { display: flex; flex-direction: column; gap: 8px; }
+  .dform-option {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dform-option:hover { border-color: var(--line-str); }
+  .dform-option.selected {
+    border-color: var(--accent-border);
+    background: var(--accent-ghost);
+  }
+  .dform-option-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--line-str);
+    flex-shrink: 0;
+  }
+  .dform-option.selected .dform-option-dot {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
+  .dform-option-text { font-size: 14px; }
+
+  .dform-time {
+    background: var(--surface-el);
+    border: 1px solid var(--line-str);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    colorscheme: dark;
+  }
+
+  /* ── Block Builder ── */
+  .dform-block-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+  .dform-block-row {
+    display: flex; gap: 10px; align-items: flex-end;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+  }
+  .dform-block-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .dform-block-field-label { font-size: 11px; color: var(--text-mute); font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; }
+  .dform-block-remove {
+    background: none; border: none;
+    color: var(--text-mute); font-size: 16px;
+    cursor: pointer; flex-shrink: 0;
+    padding: 6px; border-radius: var(--radius);
+    line-height: 1;
+  }
+  .dform-block-remove:hover { color: var(--red); }
+  .dform-add-block {
+    background: none;
+    border: 1px dashed var(--line-str);
+    border-radius: var(--radius);
+    color: var(--text-mute);
+    font-size: 13px;
+    font-family: var(--sans);
+    padding: 8px 14px;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .dform-add-block:hover { border-color: var(--gold-2); color: var(--text); }
+
+  /* ── Staff Selector ── */
+  .dform-staff-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+  .dform-staff-row {
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .dform-staff-row-top { display: flex; gap: 10px; align-items: flex-end; }
+  .dform-staff-notif-label { font-size: 11px; color: var(--text-mute); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .dform-staff-notif { display: flex; gap: 8px; }
+  .dform-staff-notif-opt {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .dform-staff-notif-opt:hover { border-color: var(--line-str); }
+  .dform-staff-notif-opt.selected { border-color: var(--accent-border); background: var(--accent-ghost); color: var(--gold); }
+
+  .dform-note {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--gold-2); margin-top: 8px; line-height: 1.5;
+  }
+  .dform-loading { color: var(--text-mute); font-size: 14px; padding: 20px 0; }
+
+  /* ── Form footer ── */
+  .form-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+  .btn {
+    font-family: var(--mono); font-size: 12px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 12px 24px; border-radius: var(--radius);
+    cursor: pointer; border: none;
+    transition: opacity 0.15s;
+  }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--line-str);
+    color: var(--text-mute);
+  }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-mute); }
+  .btn-primary {
+    background: var(--gold);
+    color: var(--bg);
+    font-weight: 500;
+  }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+
+  /* ── Continue bar ── */
+  .continue-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 16px 24px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .continue-bar-left { font-size: 13px; color: var(--text-mute); }
+  .continue-bar-left b { color: var(--text); }
+  .continue-bar-right { display: flex; gap: 10px; align-items: center; }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px 0 24px;
+    color: var(--text-mute);
+    font-size: 13px;
+  }
+  .empty-icon { font-size: 28px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- Step bar (Classes = step 1 of 2) -->
+  <div class="step-bar">
+    <div class="step-pip active"></div>
+    <div class="step-pip"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="page-eyebrow">Step 1 of 2 — Training Setup</div>
+  <h1 class="page-title">Set up your classes.</h1>
+  <p class="page-sub">Each class defines a group you train — who it's for, when it runs, and where. You can add as many as you need.</p>
+
+  <!-- Saved classes list -->
+  <div class="class-list" id="class-list">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">📋</div>
+      No classes yet — add your first one below.
+    </div>
+  </div>
+
+  <!-- Add class button -->
+  <button class="add-class-btn" id="add-btn" onclick="openForm()">+ Add a class</button>
+
+  <!-- Form panel -->
+  <div class="form-panel" id="form-panel">
+    <div class="form-panel-header">
+      <div class="form-panel-title" id="form-panel-title">New class</div>
+      <button class="form-close-btn" onclick="closeForm()">×</button>
+    </div>
+    <div id="form-content">
+      <div class="dform-loading">Loading…</div>
+    </div>
+    <div class="form-footer">
+      <button class="btn btn-ghost" onclick="closeForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveClass()">Save class</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Continue bar -->
+<div class="continue-bar">
+  <div class="continue-bar-left">
+    <span id="class-count-label">0 classes added</span>
+  </div>
+  <div class="continue-bar-right">
+    <button class="btn btn-ghost" onclick="history.back()">Back</button>
+    <button class="btn btn-primary" id="continue-btn" onclick="goToOffers()" disabled>Continue to offers</button>
+  </div>
+</div>
+
+<script>
+const _sb = supabase.createClient(
+  'https://yoepbpwajszopxzzyzzk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvZXBicHdhanN6b3B4enp5enprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NzIyMjcsImV4cCI6MjA5MjQ0ODIyN30.b5g8ia17JSZlyH7izXgDm3iREWvZEPaQYRgdLkvkQiU'
+);
+
+let _questions  = [];
+let _answers    = {};
+let _blocks     = {};
+let _savedClasses = [];
+let _editingIndex = null;
+
+// ── Load questions on boot ────────────────────────────────────────
+async function loadQuestions() {
+  const { data, error } = await _sb
+    .from('Questions Database')
+    .select('*')
+    .contains('Places Asked', ['Class'])
+    .order('sort_order');
+
+  if (error || !data) return;
+
+  const parentIds = data.map(q => q.id);
+  const { data: children } = await _sb
+    .from('Questions Database')
+    .select('*')
+    .in('Parent Question', parentIds)
+    .order('sort_order');
+
+  _questions = [...data, ...(children || [])];
+}
+
+// ── Form open/close ───────────────────────────────────────────────
+function openForm(editIndex = null) {
+  _editingIndex = editIndex;
+  _answers = {};
+  _blocks  = {};
+
+  if (editIndex !== null) {
+    const cls = _savedClasses[editIndex];
+    _answers = { ...cls.answers };
+    _blocks  = JSON.parse(JSON.stringify(cls.blocks || {}));
+    document.getElementById('form-panel-title').textContent = cls.name || 'Edit class';
+  } else {
+    document.getElementById('form-panel-title').textContent = 'New class';
+  }
+
+  document.getElementById('form-panel').classList.add('open');
+  document.getElementById('add-btn').style.display = 'none';
+  renderForm();
+  document.getElementById('form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeForm() {
+  document.getElementById('form-panel').classList.remove('open');
+  document.getElementById('add-btn').style.display = 'block';
+  _editingIndex = null;
+}
+
+// ── Render form ───────────────────────────────────────────────────
+function renderForm() {
+  const container = document.getElementById('form-content');
+  if (!_questions.length) {
+    container.innerHTML = '<div class="dform-loading">No questions found.</div>';
+    return;
+  }
+
+  const topLevel = _questions.filter(q => !q['Parent Question']);
+  let html = '';
+  for (const q of topLevel) html += renderQuestion(q);
+  container.innerHTML = html;
+}
+
+function renderQuestion(q) {
+  const id      = q.id;
+  const label   = q['Question'] || '';
+  const type    = q['Input Type'] || 'Text Input';
+  const ph      = q['Placeholder'] || '';
+  const note    = q['Note to Client'] || '';
+  const req     = q['Mandatory'] ? '<span class="req">*</span>' : '';
+  const options = q['Options'] || [];
+
+  let inner = '';
+
+  switch (type) {
+    case 'Text Input':
+    case 'Phone Number':
+    case 'E-Mail':
+    case 'Link Input': {
+      const itype = type === 'E-Mail' ? 'email' : type === 'Phone Number' ? 'tel' : type === 'Link Input' ? 'url' : 'text';
+      inner = `<input class="dform-input" type="${itype}" placeholder="${ph}"
+        value="${(_answers[id] || '').replace(/"/g,'&quot;')}"
+        oninput="setAnswer('${id}', this.value)">`;
+      break;
+    }
+    case 'Open-Ended':
+      inner = `<textarea class="dform-textarea" placeholder="${ph}"
+        oninput="setAnswer('${id}', this.value)">${_answers[id] || ''}</textarea>`;
+      break;
+
+    case 'Check One':
+    case 'Dropdown': {
+      inner = '<div class="dform-options">';
+      for (const opt of options) {
+        const sel = _answers[id] === opt ? ' selected' : '';
+        inner += `<div class="dform-option${sel}" onclick="selectOne('${id}', '${opt.replace(/'/g,"\\'")}', this.closest('.dform-options'), this)">
+          <div class="dform-option-dot"></div>
+          <div class="dform-option-text">${opt}</div>
+        </div>`;
+      }
+      inner += '</div>';
+      break;
+    }
+
+    case 'Time Picker':
+      inner = `<input class="dform-time" type="time"
+        value="${_answers[id] || ''}"
+        onchange="setAnswer('${id}', this.value)">`;
+      break;
+
+    case 'Block Builder':
+      inner = renderBlockBuilder(q);
+      break;
+
+    case 'Staff Selector':
+      inner = renderStaffSelector(q);
+      break;
+
+    default:
+      inner = `<input class="dform-input" type="text" placeholder="${ph}"
+        value="${(_answers[id] || '').replace(/"/g,'&quot;')}"
+        oninput="setAnswer('${id}', this.value)">`;
+  }
+
+  return `<div class="dform-question">
+    <div class="dform-question-label">${label}${req}</div>
+    ${inner}
+    ${note ? `<div class="dform-note">${note}</div>` : ''}
+  </div>`;
+}
+
+// ── Block Builder ─────────────────────────────────────────────────
+function renderBlockBuilder(q) {
+  const id = q.id;
+  if (!_blocks[id]) _blocks[id] = [];
+  const subFields = _questions.filter(sq => sq['Parent Question'] === id);
+
+  let html = `<div class="dform-block-list" id="blocks-${id}">`;
+  _blocks[id].forEach((block, bi) => {
+    html += renderBlockRow(id, bi, subFields, block);
+  });
+  html += `</div>`;
+  html += `<button class="dform-add-block" onclick="addBlock('${id}')">+ Add time block</button>`;
+  return html;
+}
+
+function renderBlockRow(parentId, bi, subFields, block) {
+  let html = `<div class="dform-block-row">`;
+  for (const sf of subFields) {
+    const sfLabel = sf['Question'] || '';
+    const sfType  = sf['Input Type'] || 'Text Input';
+    const sfVal   = block[sf.id] || '';
+    html += `<div class="dform-block-field">
+      <div class="dform-block-field-label">${sfLabel}</div>`;
+    if (sfType === 'Time Picker') {
+      html += `<input class="dform-time" type="time" value="${sfVal}"
+        onchange="updateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">`;
+    } else if (sfType === 'Check One' || sfType === 'Dropdown') {
+      const opts = sf['Options'] || [];
+      html += `<select class="dform-input" style="cursor:pointer"
+        onchange="updateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">
+        <option value="">Select…</option>`;
+      for (const o of opts) {
+        html += `<option value="${o}"${sfVal === o ? ' selected' : ''}>${o}</option>`;
+      }
+      html += `</select>`;
+    } else {
+      html += `<input class="dform-input" type="text" value="${sfVal}"
+        oninput="updateBlock('${parentId}', ${bi}, '${sf.id}', this.value)">`;
+    }
+    html += `</div>`;
+  }
+  html += `<button class="dform-block-remove" onclick="removeBlock('${parentId}', ${bi})" title="Remove">×</button>`;
+  html += `</div>`;
+  return html;
+}
+
+function addBlock(parentId) {
+  if (!_blocks[parentId]) _blocks[parentId] = [];
+  _blocks[parentId].push({});
+  renderForm();
+}
+function removeBlock(parentId, bi) { _blocks[parentId].splice(bi, 1); renderForm(); }
+function updateBlock(parentId, bi, sfId, val) {
+  if (!_blocks[parentId]) _blocks[parentId] = [];
+  if (!_blocks[parentId][bi]) _blocks[parentId][bi] = {};
+  _blocks[parentId][bi][sfId] = val;
+}
+
+// ── Staff Selector ────────────────────────────────────────────────
+function renderStaffSelector(q) {
+  const id = q.id;
+  if (!_blocks[id]) _blocks[id] = [];
+
+  let html = `<div class="dform-staff-list">`;
+  _blocks[id].forEach((member, mi) => {
+    html += `<div class="dform-staff-row">
+      <div class="dform-staff-row-top">
+        <div class="dform-block-field">
+          <div class="dform-block-field-label">Name</div>
+          <input class="dform-input" type="text" value="${member.name || ''}" placeholder="Coach name"
+            oninput="updateBlock('${id}', ${mi}, 'name', this.value)">
+        </div>
+        <div class="dform-block-field">
+          <div class="dform-block-field-label">Phone</div>
+          <input class="dform-input" type="tel" value="${member.phone || ''}" placeholder="(000) 000-0000"
+            oninput="updateBlock('${id}', ${mi}, 'phone', this.value)">
+        </div>
+        <button class="dform-block-remove" onclick="removeBlock('${id}', ${mi})" title="Remove">×</button>
+      </div>
+      <div>
+        <div class="dform-staff-notif-label">Notification method</div>
+        <div class="dform-staff-notif">
+          ${['Text', 'In-App'].map(opt => {
+            const current = member.notif || '';
+            const arr = Array.isArray(current) ? current : (current ? [current] : []);
+            const sel = arr.includes(opt) ? ' selected' : '';
+            return `<div class="dform-staff-notif-opt${sel}"
+              onclick="toggleStaffNotif('${id}', ${mi}, '${opt}', this)">${opt}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<button class="dform-add-block" onclick="addStaff('${id}')">+ Add coach</button>`;
+  return html;
+}
+
+function addStaff(id) {
+  if (!_blocks[id]) _blocks[id] = [];
+  _blocks[id].push({ name: '', phone: '', notif: [] });
+  renderForm();
+}
+function toggleStaffNotif(id, mi, val, el) {
+  if (!_blocks[id]?.[mi]) return;
+  const current = _blocks[id][mi].notif || [];
+  const arr = Array.isArray(current) ? current : (current ? [current] : []);
+  const idx = arr.indexOf(val);
+  if (idx === -1) arr.push(val); else arr.splice(idx, 1);
+  _blocks[id][mi].notif = arr;
+  el.classList.toggle('selected');
+}
+
+// ── Answer helpers ────────────────────────────────────────────────
+function setAnswer(id, val) { _answers[id] = val; }
+function selectOne(id, val, container, el) {
+  _answers[id] = val;
+  container.querySelectorAll('.dform-option').forEach(e => e.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+}
+
+// ── Save class ────────────────────────────────────────────────────
+function saveClass() {
+  const nameQ = _questions.find(q => q['Question'] === 'What is the name of this class?');
+  const name  = nameQ ? (_answers[nameQ.id] || '').trim() : '';
+  const genderQ = _questions.find(q => q['Question'] === 'What gender is this class for?');
+  const ageQ    = _questions.find(q => q['Question'] === 'What age range is this class for?');
+  const meta    = [genderQ && _answers[genderQ.id], ageQ && _answers[ageQ.id]].filter(Boolean).join(' · ');
+
+  const cls = {
+    name:    name || 'Untitled class',
+    meta:    meta,
+    answers: { ..._answers },
+    blocks:  JSON.parse(JSON.stringify(_blocks))
+  };
+
+  if (_editingIndex !== null) {
+    _savedClasses[_editingIndex] = cls;
+  } else {
+    _savedClasses.push(cls);
+  }
+
+  closeForm();
+  renderClassList();
+}
+
+// ── Render saved class list ───────────────────────────────────────
+function renderClassList() {
+  const list  = document.getElementById('class-list');
+  const empty = document.getElementById('empty-state');
+  const count = _savedClasses.length;
+
+  document.getElementById('class-count-label').innerHTML =
+    count === 0 ? '0 classes added'
+    : `<b>${count}</b> class${count > 1 ? 'es' : ''} added`;
+
+  document.getElementById('continue-btn').disabled = count === 0;
+
+  if (count === 0) {
+    list.innerHTML = '';
+    list.appendChild(empty);
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  list.innerHTML = _savedClasses.map((cls, i) => `
+    <div class="class-card">
+      <div class="class-card-left">
+        <div class="class-card-icon">📋</div>
+        <div>
+          <div class="class-card-name">${cls.name}</div>
+          ${cls.meta ? `<div class="class-card-meta">${cls.meta}</div>` : ''}
+        </div>
+      </div>
+      <div class="class-card-actions">
+        <button class="class-card-btn" onclick="openForm(${i})">Edit</button>
+        <button class="class-card-btn danger" onclick="deleteClass(${i})">Remove</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteClass(i) {
+  _savedClasses.splice(i, 1);
+  renderClassList();
+}
+
+function goToOffers() {
+  window.location.href = 'offer-setup.html';
+}
+
+// ── Boot ─────────────────────────────────────────────────────────
+loadQuestions().then(() => {
+  renderClassList();
+});
+</script>
+</body>
+</html>

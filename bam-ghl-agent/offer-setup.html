@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — Set Up Your Offers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0B; --surface: #131316; --surface-el: #1C1C21; --surface-hov: #22222A;
+    --line: #2A2A31; --line-str: #383842;
+    --text: #F5F1E8; --text-sub: rgba(245,241,232,0.60); --text-mute: rgba(245,241,232,0.38);
+    --gold: #E8C547; --gold-2: #C9A55C;
+    --accent-ghost: rgba(232,197,71,0.08); --accent-border: rgba(232,197,71,0.22);
+    --green: #9FD88A; --red: #E87560;
+    --radius: 4px; --radius-lg: 6px;
+    --display: "Space Grotesk","Inter",sans-serif;
+    --sans: "Inter",system-ui,sans-serif;
+    --mono: "JetBrains Mono",ui-monospace,monospace;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 680px; margin: 0 auto; padding: 64px 24px 120px; }
+
+  .step-bar { display: flex; gap: 6px; margin-bottom: 48px; }
+  .step-pip { height: 3px; flex: 1; border-radius: 2px; background: var(--line-str); }
+  .step-pip.done { background: var(--gold-2); }
+  .step-pip.active { background: var(--gold); }
+
+  .page-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .page-title { font-family: var(--display); font-size: 30px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 8px; }
+  .page-sub { color: var(--text-sub); font-size: 14px; margin-bottom: 40px; max-width: 480px; line-height: 1.6; }
+
+  .offer-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .offer-card { background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; }
+  .offer-card-left { display: flex; align-items: center; gap: 12px; }
+  .offer-type-badge { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); background: var(--accent-ghost); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 3px 8px; white-space: nowrap; }
+  .offer-card-name { font-weight: 500; font-size: 14px; }
+  .offer-card-meta { font-size: 12px; color: var(--text-mute); margin-top: 1px; }
+  .offer-card-actions { display: flex; gap: 8px; }
+  .card-btn { font-size: 12px; color: var(--text-mute); background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: var(--radius); font-family: var(--sans); transition: color 0.15s, background 0.15s; }
+  .card-btn:hover { color: var(--text); background: var(--surface-hov); }
+  .card-btn.danger:hover { color: var(--red); }
+
+  .add-btn { width: 100%; background: var(--surface); border: 1px dashed var(--line-str); border-radius: var(--radius-lg); padding: 16px; color: var(--text-mute); font-size: 14px; font-family: var(--sans); cursor: pointer; transition: border-color 0.15s, color 0.15s; margin-bottom: 40px; }
+  .add-btn:hover { border-color: var(--gold-2); color: var(--text); }
+
+  .form-panel { background: var(--surface); border: 1px solid var(--line-str); border-radius: var(--radius-lg); padding: 28px 24px; margin-bottom: 40px; display: none; }
+  .form-panel.open { display: block; }
+  .form-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .form-panel-title { font-family: var(--display); font-size: 17px; font-weight: 600; }
+  .form-close-btn { background: none; border: none; color: var(--text-mute); font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: var(--radius); font-family: var(--sans); }
+  .form-close-btn:hover { color: var(--text); }
+
+  /* Page indicator */
+  .form-page-indicator { display: flex; gap: 6px; margin-bottom: 24px; }
+  .form-pip { height: 3px; flex: 1; border-radius: 2px; background: var(--line-str); }
+  .form-pip.active { background: var(--gold); }
+
+  /* Dynamic form */
+  .dform-question { margin-bottom: 24px; }
+  .dform-question-label { font-size: 15px; font-weight: 500; margin-bottom: 10px; line-height: 1.4; }
+  .req { color: var(--gold); font-size: 12px; margin-left: 3px; }
+  .dform-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--line-str); color: var(--text); font-family: var(--sans); font-size: 14px; padding: 10px 0; outline: none; transition: border-color 0.15s; }
+  .dform-input:focus { border-bottom-color: var(--gold); }
+  .dform-input::placeholder { color: var(--text-mute); }
+  select.dform-input { border: 1px solid var(--line-str); border-radius: var(--radius); padding: 10px 12px; background: var(--surface-el); appearance: none; cursor: pointer; }
+  .dform-textarea { width: 100%; background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); font-family: var(--sans); font-size: 14px; padding: 12px; outline: none; resize: vertical; min-height: 88px; transition: border-color 0.15s; }
+  .dform-textarea:focus { border-color: var(--gold); }
+  .dform-textarea::placeholder { color: var(--text-mute); }
+  .dform-options { display: flex; flex-direction: column; gap: 8px; }
+  .dform-option { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .dform-option:hover { border-color: var(--line-str); }
+  .dform-option.selected { border-color: var(--accent-border); background: var(--accent-ghost); }
+  .dform-option-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line-str); flex-shrink: 0; }
+  .dform-option.selected .dform-option-dot { background: var(--gold); border-color: var(--gold); }
+  .dform-option-text { font-size: 14px; }
+  .dform-time { background: var(--surface-el); border: 1px solid var(--line-str); border-radius: var(--radius); color: var(--text); font-family: var(--sans); font-size: 14px; padding: 10px 12px; outline: none; color-scheme: dark; }
+  .dform-file-zone { border: 1px dashed var(--line-str); border-radius: var(--radius); padding: 24px; text-align: center; cursor: pointer; transition: border-color 0.15s; }
+  .dform-file-zone:hover { border-color: var(--gold-2); }
+  .dform-file-zone-text { color: var(--text-mute); font-size: 13px; }
+  .dform-file-names { margin-top: 8px; font-size: 12px; color: var(--gold-2); }
+  .dform-note { font-family: var(--mono); font-size: 11px; color: var(--gold-2); margin-top: 8px; line-height: 1.5; }
+
+  /* Block Builder */
+  .dform-block-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+  .dform-block-row { display: flex; gap: 10px; align-items: flex-end; background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  .dform-block-field { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .dform-block-field-label { font-size: 11px; color: var(--text-mute); font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; }
+  .dform-block-remove { background: none; border: none; color: var(--text-mute); font-size: 16px; cursor: pointer; flex-shrink: 0; padding: 6px; border-radius: var(--radius); line-height: 1; }
+  .dform-block-remove:hover { color: var(--red); }
+  .dform-add-block { background: none; border: 1px dashed var(--line-str); border-radius: var(--radius); color: var(--text-mute); font-size: 13px; font-family: var(--sans); padding: 8px 14px; cursor: pointer; width: 100%; transition: border-color 0.15s, color 0.15s; }
+  .dform-add-block:hover { border-color: var(--gold-2); color: var(--text); }
+
+  /* Staff Selector */
+  .dform-staff-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+  .dform-staff-row { background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .dform-staff-row-top { display: flex; gap: 10px; align-items: flex-end; }
+  .dform-staff-notif-label { font-size: 11px; color: var(--text-mute); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .dform-staff-notif { display: flex; gap: 8px; }
+  .dform-staff-notif-opt { border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 14px; font-size: 13px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .dform-staff-notif-opt.selected { border-color: var(--accent-border); background: var(--accent-ghost); color: var(--gold); }
+
+  /* Section divider for offer type groups */
+  .dform-section-label { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); padding: 12px 0 4px; border-top: 1px solid var(--line); margin-bottom: 20px; margin-top: 8px; }
+
+  .form-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .btn { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 12px 24px; border-radius: var(--radius); cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-str); color: var(--text-mute); }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-mute); }
+  .btn-primary { background: var(--gold); color: var(--bg); font-weight: 500; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+
+  .continue-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .continue-bar-left { font-size: 13px; color: var(--text-mute); }
+  .continue-bar-left b { color: var(--text); }
+
+  .empty-state { text-align: center; padding: 32px 0 24px; color: var(--text-mute); font-size: 13px; }
+  .empty-icon { font-size: 28px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="step-bar">
+    <div class="step-pip done"></div>
+    <div class="step-pip active"></div>
+    <div class="step-pip"></div>
+  </div>
+
+  <div class="page-eyebrow">Step 2 of 3 — Training Setup</div>
+  <h1 class="page-title">Set up your offers.</h1>
+  <p class="page-sub">Each offer defines a pricing option — single session, package, or membership. Add one for each product you sell.</p>
+
+  <div class="offer-list" id="offer-list">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">💳</div>
+      No offers yet — add your first one below.
+    </div>
+  </div>
+
+  <button class="add-btn" id="add-btn" onclick="openForm()">+ Add an offer</button>
+
+  <div class="form-panel" id="form-panel">
+    <div class="form-panel-header">
+      <div class="form-panel-title" id="form-panel-title">New offer</div>
+      <button class="form-close-btn" onclick="closeForm()">×</button>
+    </div>
+    <div class="form-page-indicator" id="form-page-indicator">
+      <div class="form-pip active" id="pip-0"></div>
+      <div class="form-pip" id="pip-1"></div>
+    </div>
+    <div id="form-content"><div style="color:var(--text-mute);padding:20px 0">Loading…</div></div>
+    <div class="form-footer" id="form-footer"></div>
+  </div>
+</div>
+
+<div class="continue-bar">
+  <div class="continue-bar-left"><span id="offer-count-label">0 offers added</span></div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="btn btn-ghost" onclick="history.back()">Back</button>
+    <button class="btn btn-primary" id="continue-btn" onclick="goToParent()" disabled>Continue to parent setup</button>
+  </div>
+</div>
+
+<script>
+const _sb = supabase.createClient(
+  'https://yoepbpwajszopxzzyzzk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvZXBicHdhanN6b3B4enp5enprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NzIyMjcsImV4cCI6MjA5MjQ0ODIyN30.b5g8ia17JSZlyH7izXgDm3iREWvZEPaQYRgdLkvkQiU'
+);
+
+let _questions = [];
+let _answers   = {};
+let _blocks    = {};
+let _formPage  = 0; // 0 = page 1, 1 = page 2
+let _savedOffers  = [];
+let _editingIndex = null;
+
+async function loadQuestions() {
+  const { data } = await _sb.from('Questions Database').select('*').contains('Places Asked', ['Offer']).order('sort_order');
+  if (!data) return;
+  const parentIds = data.map(q => q.id);
+  const { data: children } = await _sb.from('Questions Database').select('*').in('Parent Question', parentIds).order('sort_order');
+  _questions = [...data, ...(children || [])];
+}
+
+function isVisible(q) {
+  const depId   = q['Dependent On'];
+  const depVals = q['Dependent On Value'];
+  if (!depId) return true;
+  const answer = _answers[depId];
+  if (!answer) return false;
+  if (!depVals || !depVals.length) return true;
+  const arr = Array.isArray(answer) ? answer : [answer];
+  return depVals.some(v => arr.includes(v));
+}
+
+function getPageQuestions(pageNum) {
+  return _questions.filter(q => !q['Parent Question'] && (q['Page'] ?? 1) === pageNum && isVisible(q));
+}
+
+function openForm(editIndex = null) {
+  _editingIndex = editIndex;
+  _answers = {};
+  _blocks  = {};
+  _formPage = 0;
+
+  if (editIndex !== null) {
+    const o = _savedOffers[editIndex];
+    _answers = { ...(o.answers || {}) };
+    _blocks  = JSON.parse(JSON.stringify(o.blocks || {}));
+    document.getElementById('form-panel-title').textContent = o.title || 'Edit offer';
+  } else {
+    document.getElementById('form-panel-title').textContent = 'New offer';
+  }
+
+  document.getElementById('form-panel').classList.add('open');
+  document.getElementById('add-btn').style.display = 'none';
+  renderFormPage();
+  document.getElementById('form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeForm() {
+  document.getElementById('form-panel').classList.remove('open');
+  document.getElementById('add-btn').style.display = 'block';
+  _editingIndex = null;
+  _formPage = 0;
+}
+
+function renderFormPage() {
+  // Pip indicators
+  document.getElementById('pip-0').className = 'form-pip' + (_formPage >= 0 ? ' active' : '');
+  document.getElementById('pip-1').className = 'form-pip' + (_formPage >= 1 ? ' active' : '');
+
+  const pageNum = _formPage + 1;
+  const qs = getPageQuestions(pageNum);
+  let html = '';
+
+  if (pageNum === 2) {
+    const typeAnswer = Object.entries(_answers).find(([id, val]) => {
+      const q = _questions.find(q => q.id === id);
+      return q && q['Question'] === 'What type of offer is this?';
+    });
+    const offerType = typeAnswer ? typeAnswer[1] : '';
+    if (offerType) {
+      html += `<div class="dform-section-label">${offerType}</div>`;
+    }
+  }
+
+  for (const q of qs) html += renderQuestion(q);
+
+  document.getElementById('form-content').innerHTML = html || '<div style="color:var(--text-mute);padding:12px 0">No questions on this page.</div>';
+
+  const footer = document.getElementById('form-footer');
+  if (pageNum === 1) {
+    footer.innerHTML = `
+      <button class="btn btn-ghost" onclick="closeForm()">Cancel</button>
+      <button class="btn btn-primary" onclick="nextPage()">Continue →</button>`;
+  } else {
+    footer.innerHTML = `
+      <button class="btn btn-ghost" onclick="prevPage()">← Back</button>
+      <button class="btn btn-primary" onclick="saveOffer()">Save offer</button>`;
+  }
+}
+
+function nextPage() { _formPage = 1; renderFormPage(); document.getElementById('form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+function prevPage() { _formPage = 0; renderFormPage(); document.getElementById('form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+function renderQuestion(q) {
+  const id      = q.id;
+  const label   = q['Question'] || '';
+  const type    = q['Input Type'] || 'Text Input';
+  const ph      = q['Placeholder'] || '';
+  const note    = q['Note to Client'] || '';
+  const req     = q['Mandatory'] ? '<span class="req">*</span>' : '';
+  const options = q['Options'] || [];
+  let inner = '';
+
+  switch (type) {
+    case 'Text Input': case 'Phone Number': case 'E-Mail': case 'Link Input': {
+      const itype = type === 'E-Mail' ? 'email' : type === 'Phone Number' ? 'tel' : type === 'Link Input' ? 'url' : 'text';
+      inner = `<input class="dform-input" type="${itype}" placeholder="${ph}" value="${(_answers[id]||'').replace(/"/g,'&quot;')}" oninput="setAnswer('${id}',this.value)">`;
+      break;
+    }
+    case 'Open-Ended':
+      inner = `<textarea class="dform-textarea" placeholder="${ph}" oninput="setAnswer('${id}',this.value)">${_answers[id]||''}</textarea>`;
+      break;
+    case 'Check One': case 'Dropdown': {
+      inner = '<div class="dform-options">';
+      for (const opt of options) {
+        const sel = _answers[id] === opt ? ' selected' : '';
+        inner += `<div class="dform-option${sel}" onclick="selectOne('${id}','${opt.replace(/'/g,"\\'")}',this.closest('.dform-options'),this)">
+          <div class="dform-option-dot"></div><div class="dform-option-text">${opt}</div></div>`;
+      }
+      inner += '</div>';
+      break;
+    }
+    case 'File Upload': {
+      const fid = `dfile-${id}`;
+      inner = `<div class="dform-file-zone" onclick="document.getElementById('${fid}').click()">
+        <div class="dform-file-zone-text">↑ Click to attach files</div>
+        <input type="file" multiple id="${fid}" style="display:none" onchange="fileChange('${id}',this)">
+        <div class="dform-file-names" id="${fid}-names"></div></div>`;
+      break;
+    }
+    case 'Time Picker':
+      inner = `<input class="dform-time" type="time" value="${_answers[id]||''}" onchange="setAnswer('${id}',this.value)">`;
+      break;
+    case 'Block Builder':
+      inner = renderBlockBuilder(q);
+      break;
+    case 'Staff Selector':
+      inner = renderStaffSelector(q);
+      break;
+    default:
+      inner = `<input class="dform-input" type="text" placeholder="${ph}" value="${(_answers[id]||'').replace(/"/g,'&quot;')}" oninput="setAnswer('${id}',this.value)">`;
+  }
+
+  return `<div class="dform-question">
+    <div class="dform-question-label">${label}${req}</div>
+    ${inner}
+    ${note ? `<div class="dform-note">${note}</div>` : ''}
+  </div>`;
+}
+
+function renderBlockBuilder(q) {
+  const id = q.id;
+  if (!_blocks[id]) _blocks[id] = [];
+  const subs = _questions.filter(sq => sq['Parent Question'] === id);
+  let html = `<div class="dform-block-list">`;
+  _blocks[id].forEach((block, bi) => {
+    html += `<div class="dform-block-row">`;
+    for (const sf of subs) {
+      const sfVal = block[sf.id] || '';
+      const sfType = sf['Input Type'] || 'Text Input';
+      html += `<div class="dform-block-field"><div class="dform-block-field-label">${sf['Question']}</div>`;
+      if (sfType === 'Time Picker') {
+        html += `<input class="dform-time" type="time" value="${sfVal}" onchange="updateBlock('${id}',${bi},'${sf.id}',this.value)">`;
+      } else if (sfType === 'Check One' || sfType === 'Dropdown') {
+        html += `<select class="dform-input" style="cursor:pointer" onchange="updateBlock('${id}',${bi},'${sf.id}',this.value)">
+          <option value="">Select…</option>${(sf['Options']||[]).map(o=>`<option value="${o}"${sfVal===o?' selected':''}>${o}</option>`).join('')}</select>`;
+      } else {
+        html += `<input class="dform-input" type="text" placeholder="${sf['Placeholder']||''}" value="${sfVal}" oninput="updateBlock('${id}',${bi},'${sf.id}',this.value)">`;
+      }
+      html += `</div>`;
+    }
+    html += `<button class="dform-block-remove" onclick="removeBlock('${id}',${bi})">×</button></div>`;
+  });
+  html += `</div><button class="dform-add-block" onclick="addBlock('${id}')">+ Add tier</button>`;
+  return html;
+}
+
+function renderStaffSelector(q) {
+  const id = q.id;
+  if (!_blocks[id]) _blocks[id] = [];
+  let html = `<div class="dform-staff-list">`;
+  _blocks[id].forEach((m, mi) => {
+    html += `<div class="dform-staff-row">
+      <div class="dform-staff-row-top">
+        <div class="dform-block-field"><div class="dform-block-field-label">Name</div>
+          <input class="dform-input" type="text" value="${m.name||''}" placeholder="Staff name" oninput="updateBlock('${id}',${mi},'name',this.value)"></div>
+        <div class="dform-block-field"><div class="dform-block-field-label">Phone</div>
+          <input class="dform-input" type="tel" value="${m.phone||''}" placeholder="(000) 000-0000" oninput="updateBlock('${id}',${mi},'phone',this.value)"></div>
+        <button class="dform-block-remove" onclick="removeBlock('${id}',${mi})">×</button>
+      </div>
+      <div><div class="dform-staff-notif-label">Notification method</div>
+        <div class="dform-staff-notif">${['Text','In-App'].map(opt=>{
+          const arr=Array.isArray(m.notif)?m.notif:(m.notif?[m.notif]:[]);
+          return `<div class="dform-staff-notif-opt${arr.includes(opt)?' selected':''}" onclick="toggleNotif('${id}',${mi},'${opt}',this)">${opt}</div>`;
+        }).join('')}</div>
+      </div>
+    </div>`;
+  });
+  html += `</div><button class="dform-add-block" onclick="addStaff('${id}')">+ Add staff member</button>`;
+  return html;
+}
+
+function setAnswer(id, val) {
+  _answers[id] = val;
+  const controls = _questions.some(q => q['Dependent On'] === id);
+  if (controls) renderFormPage();
+}
+function selectOne(id, val, container, el) {
+  _answers[id] = val;
+  container.querySelectorAll('.dform-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  const controls = _questions.some(q => q['Dependent On'] === id);
+  if (controls) renderFormPage();
+}
+function fileChange(id, input) {
+  const names = Array.from(input.files).map(f => f.name).join(', ');
+  const namesEl = document.getElementById(`dfile-${id}-names`);
+  if (namesEl) namesEl.textContent = names;
+  _answers[id] = names;
+}
+function addBlock(pid) { if(!_blocks[pid])_blocks[pid]=[]; _blocks[pid].push({}); renderFormPage(); }
+function removeBlock(pid, bi) { _blocks[pid].splice(bi,1); renderFormPage(); }
+function updateBlock(pid, bi, sfId, val) { if(!_blocks[pid])_blocks[pid]=[]; if(!_blocks[pid][bi])_blocks[pid][bi]={}; _blocks[pid][bi][sfId]=val; }
+function addStaff(id) { if(!_blocks[id])_blocks[id]=[]; _blocks[id].push({name:'',phone:'',notif:[]}); renderFormPage(); }
+function toggleNotif(id, mi, val, el) {
+  const arr = Array.isArray(_blocks[id]?.[mi]?.notif)?_blocks[id][mi].notif:[];
+  const idx = arr.indexOf(val);
+  if(idx===-1) arr.push(val); else arr.splice(idx,1);
+  _blocks[id][mi].notif = arr;
+  el.classList.toggle('selected');
+}
+
+function saveOffer() {
+  const typeQ  = _questions.find(q => q['Question'] === 'What type of offer is this?');
+  const titleQ = _questions.find(q => q['Question'] === 'What is the title of this offer?');
+  const classQ = _questions.find(q => q['Question'] === 'Which class does this offer apply to?');
+  const offerType = typeQ  ? (_answers[typeQ.id]  || '') : '';
+  const title     = titleQ ? (_answers[titleQ.id] || 'Untitled offer') : 'Untitled offer';
+  const className = classQ ? (_answers[classQ.id] || '') : '';
+
+  const offer = { type: offerType, title, meta: className, answers: {..._answers}, blocks: JSON.parse(JSON.stringify(_blocks)) };
+  if (_editingIndex !== null) { _savedOffers[_editingIndex] = offer; } else { _savedOffers.push(offer); }
+  closeForm();
+  renderOfferList();
+}
+
+function renderOfferList() {
+  const list  = document.getElementById('offer-list');
+  const empty = document.getElementById('empty-state');
+  const count = _savedOffers.length;
+  document.getElementById('offer-count-label').innerHTML = count === 0 ? '0 offers added' : `<b>${count}</b> offer${count>1?'s':''} added`;
+  document.getElementById('continue-btn').disabled = count === 0;
+  if (count === 0) { list.innerHTML = ''; list.appendChild(empty); empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = _savedOffers.map((o,i) => `
+    <div class="offer-card">
+      <div class="offer-card-left">
+        <div class="offer-type-badge">${o.type || '—'}</div>
+        <div>
+          <div class="offer-card-name">${o.title}</div>
+          ${o.meta ? `<div class="offer-card-meta">Class: ${o.meta}</div>` : ''}
+        </div>
+      </div>
+      <div class="offer-card-actions">
+        <button class="card-btn" onclick="openForm(${i})">Edit</button>
+        <button class="card-btn danger" onclick="deleteOffer(${i})">Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+function deleteOffer(i) { _savedOffers.splice(i,1); renderOfferList(); }
+function goToParent() { window.location.href = 'parent-onboarding.html'; }
+
+loadQuestions().then(() => renderOfferList());
+</script>
+</body>
+</html>

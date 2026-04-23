@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FullControl — Parent Onboarding Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0B; --surface: #131316; --surface-el: #1C1C21; --surface-hov: #22222A;
+    --line: #2A2A31; --line-str: #383842;
+    --text: #F5F1E8; --text-sub: rgba(245,241,232,0.60); --text-mute: rgba(245,241,232,0.38);
+    --gold: #E8C547; --gold-2: #C9A55C;
+    --accent-ghost: rgba(232,197,71,0.08); --accent-border: rgba(232,197,71,0.22);
+    --green: #9FD88A; --red: #E87560;
+    --radius: 4px; --radius-lg: 6px;
+    --display: "Space Grotesk","Inter",sans-serif;
+    --sans: "Inter",system-ui,sans-serif;
+    --mono: "JetBrains Mono",ui-monospace,monospace;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 680px; margin: 0 auto; padding: 64px 24px 120px; }
+
+  .step-bar { display: flex; gap: 6px; margin-bottom: 48px; }
+  .step-pip { height: 3px; flex: 1; border-radius: 2px; background: var(--line-str); }
+  .step-pip.done { background: var(--gold-2); }
+  .step-pip.active { background: var(--gold); }
+
+  .page-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .page-title { font-family: var(--display); font-size: 30px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 8px; }
+  .page-sub { color: var(--text-sub); font-size: 14px; margin-bottom: 40px; max-width: 480px; line-height: 1.6; }
+
+  /* Question card */
+  .question-card { background: var(--surface); border: 1px solid var(--line-str); border-radius: var(--radius-lg); padding: 28px 24px; margin-bottom: 24px; }
+  .question-label { font-size: 15px; font-weight: 500; margin-bottom: 6px; line-height: 1.4; }
+  .req { color: var(--gold); font-size: 12px; margin-left: 3px; }
+  .question-hint { font-size: 13px; color: var(--text-mute); margin-bottom: 20px; }
+
+  /* Check Many options */
+  .options-grid { display: flex; flex-direction: column; gap: 8px; }
+  .option-row { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+  .option-row:hover { border-color: var(--line-str); }
+  .option-row.selected { border-color: var(--accent-border); background: var(--accent-ghost); }
+  .option-box { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--line-str); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
+  .option-row.selected .option-box { background: var(--gold); border-color: var(--gold); }
+  .option-check { font-size: 10px; color: var(--bg); font-weight: 700; display: none; }
+  .option-row.selected .option-check { display: block; }
+  .option-text { font-size: 14px; }
+
+  /* Add another field */
+  .custom-fields { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .custom-field-row { display: flex; gap: 8px; align-items: center; }
+  .custom-field-input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--line-str); color: var(--text); font-family: var(--sans); font-size: 14px; padding: 10px 0; outline: none; transition: border-color 0.15s; }
+  .custom-field-input:focus { border-bottom-color: var(--gold); }
+  .custom-field-input::placeholder { color: var(--text-mute); }
+  .custom-field-remove { background: none; border: none; color: var(--text-mute); font-size: 16px; cursor: pointer; padding: 4px 8px; border-radius: var(--radius); line-height: 1; }
+  .custom-field-remove:hover { color: var(--red); }
+  .add-custom-btn { background: none; border: 1px dashed var(--line-str); border-radius: var(--radius); color: var(--text-mute); font-size: 13px; font-family: var(--sans); padding: 8px 14px; cursor: pointer; width: 100%; margin-top: 10px; transition: border-color 0.15s, color 0.15s; }
+  .add-custom-btn:hover { border-color: var(--gold-2); color: var(--text); }
+
+  /* Selection summary */
+  .selection-summary { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .summary-label { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+  .summary-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .summary-tag { background: var(--accent-ghost); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 4px 10px; font-size: 12px; color: var(--gold-2); }
+  .summary-empty { font-size: 13px; color: var(--text-mute); }
+
+  .continue-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .continue-bar-left { font-size: 13px; color: var(--text-mute); }
+  .continue-bar-left b { color: var(--text); }
+
+  .btn { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; padding: 12px 24px; border-radius: var(--radius); cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-str); color: var(--text-mute); }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-mute); }
+  .btn-primary { background: var(--gold); color: var(--bg); font-weight: 500; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+
+  .loading { color: var(--text-mute); font-size: 14px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="step-bar">
+    <div class="step-pip done"></div>
+    <div class="step-pip done"></div>
+    <div class="step-pip active"></div>
+  </div>
+
+  <div class="page-eyebrow">Step 3 of 3 — Training Setup</div>
+  <h1 class="page-title">Parent onboarding fields.</h1>
+  <p class="page-sub">Choose what information you want to collect from parents when they enrol their child. You can add custom fields too.</p>
+
+  <div id="question-area"><div class="loading">Loading…</div></div>
+</div>
+
+<div class="continue-bar">
+  <div class="continue-bar-left"><span id="count-label">0 fields selected</span></div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button class="btn btn-ghost" onclick="history.back()">Back</button>
+    <button class="btn btn-primary" id="finish-btn" onclick="finish()" disabled>Finish setup</button>
+  </div>
+</div>
+
+<script>
+const _sb = supabase.createClient(
+  'https://yoepbpwajszopxzzyzzk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlvZXBicHdhanN6b3B4enp5enprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NzIyMjcsImV4cCI6MjA5MjQ0ODIyN30.b5g8ia17JSZlyH7izXgDm3iREWvZEPaQYRgdLkvkQiU'
+);
+
+let _question    = null;
+let _selected    = new Set();
+let _customFields = [''];
+
+async function load() {
+  const { data } = await _sb.from('Questions Database').select('*').contains('Places Asked', ['Parent Onboarding']).order('sort_order').limit(1);
+  if (!data || !data.length) {
+    document.getElementById('question-area').innerHTML = '<div class="loading">No question found.</div>';
+    return;
+  }
+  _question = data[0];
+  render();
+}
+
+function toggleOption(opt) {
+  if (opt === 'Add another field') {
+    if (_selected.has(opt)) { _selected.delete(opt); _customFields = ['']; }
+    else { _selected.add(opt); }
+  } else {
+    if (_selected.has(opt)) _selected.delete(opt);
+    else _selected.add(opt);
+  }
+  render();
+  updateCount();
+}
+
+function updateCustomField(i, val) {
+  _customFields[i] = val;
+  updateCount();
+}
+
+function addCustomField() {
+  _customFields.push('');
+  render();
+}
+
+function removeCustomField(i) {
+  _customFields.splice(i, 1);
+  if (_customFields.length === 0) _customFields = [''];
+  render();
+  updateCount();
+}
+
+function updateCount() {
+  const standardCount = [..._selected].filter(s => s !== 'Add another field').length;
+  const customCount   = _customFields.filter(f => f.trim()).length;
+  const total = standardCount + customCount;
+  document.getElementById('count-label').innerHTML = total === 0 ? '0 fields selected' : `<b>${total}</b> field${total > 1 ? 's' : ''} selected`;
+  document.getElementById('finish-btn').disabled = total === 0;
+}
+
+function render() {
+  if (!_question) return;
+  const options = _question['Options'] || [];
+  const showCustom = _selected.has('Add another field');
+  const allSelected = [..._selected].filter(s => s !== 'Add another field');
+
+  let html = `<div class="question-card">
+    <div class="question-label">${_question['Question']}<span class="req">*</span></div>
+    <div class="question-hint">Select all that apply — tick "Add another field" to add your own.</div>
+    <div class="options-grid">`;
+
+  for (const opt of options) {
+    const sel = _selected.has(opt) ? ' selected' : '';
+    html += `<div class="option-row${sel}" onclick="toggleOption('${opt.replace(/'/g,"\\'")}')">
+      <div class="option-box"><div class="option-check">✓</div></div>
+      <div class="option-text">${opt}</div>
+    </div>`;
+  }
+
+  html += `</div>`;
+
+  if (showCustom) {
+    html += `<div class="custom-fields">`;
+    _customFields.forEach((val, i) => {
+      html += `<div class="custom-field-row">
+        <input class="custom-field-input" type="text" placeholder="e.g., Instagram handle, school name…"
+          value="${val.replace(/"/g,'&quot;')}"
+          oninput="updateCustomField(${i}, this.value)">
+        ${_customFields.length > 1 ? `<button class="custom-field-remove" onclick="removeCustomField(${i})">×</button>` : ''}
+      </div>`;
+    });
+    html += `<button class="add-custom-btn" onclick="addCustomField()">+ Add another</button>`;
+    html += `</div>`;
+  }
+
+  if (allSelected.length > 0 || _customFields.some(f => f.trim())) {
+    const customLabels = _customFields.filter(f => f.trim()).map(f => `<div class="summary-tag">${f}</div>`).join('');
+    const standardLabels = allSelected.map(f => `<div class="summary-tag">${f}</div>`).join('');
+    html += `<div class="selection-summary">
+      <div class="summary-label">Selected fields</div>
+      <div class="summary-tags">${standardLabels}${customLabels}</div>
+    </div>`;
+  }
+
+  html += `</div>`;
+  document.getElementById('question-area').innerHTML = html;
+  updateCount();
+}
+
+function finish() {
+  document.querySelector('.page').innerHTML = `
+    <div style="text-align:center;padding:80px 0">
+      <div style="font-size:48px;margin-bottom:24px">✓</div>
+      <div style="font-family:var(--display);font-size:28px;font-weight:600;letter-spacing:-0.5px;margin-bottom:12px">Setup complete.</div>
+      <div style="color:var(--text-sub);font-size:14px;max-width:360px;margin:0 auto;line-height:1.6">Your classes, offers, and parent onboarding fields are all configured. Your team will reach out with next steps.</div>
+    </div>`;
+  document.querySelector('.continue-bar').style.display = 'none';
+}
+
+load();
+</script>
+</body>
+</html>

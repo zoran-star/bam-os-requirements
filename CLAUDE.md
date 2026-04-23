@@ -45,6 +45,12 @@ bam-os-requirements/
 ├── whiteboard/                 ← Planning tool (Vite/React) — sessions live in each project folder
 │                                 Needs Vercel project setup (see Whiteboard section)
 ├── sales-conversation-agents/  ← Sales conversation AI system prompts
+├── bam-ghl-agent/              ← Autonomous GHL agent for client builds and support tickets
+│   ├── client-portal.html      ← Client-facing support portal (10 tiles)
+│   ├── bam-portal/             ← React/Vite staff portal app (live on Vercel)
+│   ├── bam-gta-staff/          ← BAM GTA staff dashboard (React/Vite)
+│   ├── docs/                   ← Schema, brand, and copy convention references
+│   └── sections/               ← HTML section templates
 ├── bam-gta-phase1/             ← Phase 1 live deployment (BAM GTA)
 │   ├── bam-gta-staff/          ← Staff dashboard app
 │   ├── bam-gta-parent/         ← Parent/athlete app

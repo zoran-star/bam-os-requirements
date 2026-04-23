@@ -24,6 +24,7 @@ Build FullControl into the go-to operating system for sports and fitness busines
 - **bam-gta-phase1/** — first live deployment at BAM Basketball GTA
 - **fc-internal-content-engine/** — AI content generation pipeline
 - **sales-conversation-agents/** — AI sales agent system prompts
+- **bam-ghl-agent/** — autonomous GHL agent for BAM OS client builds and support tickets
 - **business/** — investor deck, business plan, and planning materials
 
 ## How it all connects
