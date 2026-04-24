@@ -34,6 +34,13 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["serve", "-l", "5183", "/Users/zoransavic/bam-os-requirements"],
       "port": 5183
+    },
+    {
+      "name": "bam-portal",
+      "runtimeExecutable": "/Users/zoransavic/.nvm/versions/node/v24.14.0/bin/node",
+      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5184", "--strictPort"],
+      "port": 5184,
+      "cwd": "bam-ghl-agent/bam-portal"
     }
   ]
 }

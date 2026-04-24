@@ -10,6 +10,7 @@ import {
   approveTicket,
   denyTicket,
 } from "../services/ticketsService";
+import AsanaImportView from "./AsanaImportView";
 
 const STATUS_LABEL = {
   open:             "New",
@@ -81,6 +82,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         { key: "delegation", label: "Delegation", count: tickets.filter(x => x.status === "open").length },
         { key: "execution",  label: "Execution",  count: tickets.filter(x => ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
         { key: "review",     label: "Review",     count: tickets.filter(x => x.status === "in_review").length },
+        { key: "import",     label: "Asana Import" },
       ]
     : [
         { key: "execution", label: "My Tickets", count: tickets.filter(x => x.assigned_to === me?.id && ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
@@ -110,20 +112,28 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         ))}
       </div>
 
-      {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
+      {tab === "import" ? (
+        <AsanaImportView tokens={t} dark={dark} />
+      ) : (
+        <>
+          {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
 
-      {!loading && visibleTickets.length === 0 && (
-        <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-          No tickets in this tab.
-        </div>
+          {!loading && visibleTickets.length === 0 && (
+            <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+              No tickets in this tab.
+            </div>
+          )}
+        </>
       )}
 
       {/* Tickets list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {visibleTickets.map(x => (
-          <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
-        ))}
-      </div>
+      {tab !== "import" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {visibleTickets.map(x => (
+            <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+          ))}
+        </div>
+      )}
 
       {selected && (
         <TicketModal
