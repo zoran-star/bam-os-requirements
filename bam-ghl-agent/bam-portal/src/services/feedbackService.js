@@ -13,7 +13,7 @@ export async function submitFeedback({ body, source = "text", page = "", author 
 
     // Post to Slack via API route
     try {
-      await fetch("/api/feedback?action=submit", {
+      await fetch("/api/slack/channels?action=feedback-submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: row.id, body, source, page, author }),

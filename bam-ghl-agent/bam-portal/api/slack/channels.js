@@ -184,6 +184,71 @@ async function handleDisconnect(req, res) {
   return res.status(200).json({ ok: true });
 }
 
+// ─── Feedback: submit to Slack (folded in from /api/feedback) ───
+async function handleFeedbackSubmit(req, res) {
+  const { id, body, source, page, author } = req.body || {};
+  if (!body) return res.status(400).json({ error: "Missing feedback body" });
+  const token = process.env.SLACK_BOT_TOKEN || process.env.SLACK_USER_TOKEN;
+  const channel = process.env.FEEDBACK_SLACK_CHANNEL;
+  if (!token || !channel) return res.status(200).json({ ok: true, slack: false });
+  const sourceEmoji = source === "voice" ? ":studio_microphone:" : ":pencil:";
+  const pageLabel = page ? ` _(from ${page} page)_` : "";
+  const slackBody = {
+    channel,
+    text: `${sourceEmoji} *Portal Feedback* from *${author || "Mike"}*${pageLabel}\n\n>${body.split("\n").join("\n>")}\n\n_React with :white_check_mark: to approve for build_`,
+    unfurl_links: false,
+  };
+  try {
+    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(slackBody),
+    });
+    const slackJson = await slackRes.json();
+    if (slackJson.ok && id) {
+      await supabase.from("portal_feedback").update({ slack_ts: slackJson.ts, slack_channel: slackJson.channel }).eq("id", id);
+    }
+    return res.status(200).json({ ok: true, slack: slackJson.ok });
+  } catch (err) {
+    return res.status(200).json({ ok: true, slack: false, error: err.message });
+  }
+}
+
+// ─── Feedback: Slack reaction webhook (folded in from /api/feedback) ───
+async function handleFeedbackWebhook(req, res) {
+  const body = req.body;
+  if (body.type === "url_verification") return res.status(200).json({ challenge: body.challenge });
+  if (body.type !== "event_callback") return res.status(200).json({ ok: true });
+  const event = body.event;
+  if (event.type !== "reaction_added") return res.status(200).json({ ok: true });
+  const approvers = (process.env.FEEDBACK_APPROVER_SLACK_IDS || "").split(",").filter(Boolean);
+  const reaction = event.reaction;
+  const userId = event.user;
+  const messageTs = event.item?.ts;
+  const channel = event.item?.channel;
+  if (!["white_check_mark", "heavy_check_mark", "+1"].includes(reaction)) return res.status(200).json({ ok: true });
+  if (approvers.length > 0 && !approvers.includes(userId)) return res.status(200).json({ ok: true, skipped: "not an approver" });
+  if (!messageTs) return res.status(200).json({ ok: true });
+  try {
+    const { data: rows } = await supabase.from("portal_feedback")
+      .select("id, status").eq("slack_ts", messageTs).eq("slack_channel", channel).limit(1);
+    if (rows && rows.length > 0 && rows[0].status === "pending") {
+      await supabase.from("portal_feedback").update({ status: "approved", updated_at: new Date().toISOString() }).eq("id", rows[0].id);
+      const token = process.env.SLACK_BOT_TOKEN || process.env.SLACK_USER_TOKEN;
+      if (token) {
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ channel, thread_ts: messageTs, text: ":white_check_mark: *Approved* — queued for next Claude Code session." }),
+        });
+      }
+    }
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    return res.status(200).json({ ok: true, error: err.message });
+  }
+}
+
 // ─── Main Handler ───
 export default async function handler(req, res) {
   // Prevent browser from caching API responses
@@ -197,6 +262,8 @@ export default async function handler(req, res) {
   if (action === "oauth-callback") return handleOAuthCallback(req, res);
   if (action === "status") return handleStatus(req, res);
   if (action === "disconnect") return handleDisconnect(req, res);
+  if (action === "feedback-submit") return handleFeedbackSubmit(req, res);
+  if (action === "feedback-webhook") return handleFeedbackWebhook(req, res);
 
   // ── Standard Slack operations ──
   const { token, isUserToken } = await resolveSlackToken(req);
