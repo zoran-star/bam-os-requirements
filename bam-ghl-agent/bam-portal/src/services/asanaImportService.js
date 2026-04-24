@@ -25,5 +25,5 @@ export async function importAsanaTicket(payload) {
 }
 
 export async function saveAcademyMapping({ asana_name, client_id = null, skip = false }) {
-  return req("/api/academy-mappings", { method: "POST", body: JSON.stringify({ asana_name, client_id, skip }) });
+  return req("/api/asana-import", { method: "POST", body: JSON.stringify({ kind: "mapping", asana_name, client_id, skip }) });
 }

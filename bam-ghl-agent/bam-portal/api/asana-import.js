@@ -204,8 +204,30 @@ export default async function handler(req, res) {
       });
     }
 
-    // ─── POST: import one Asana ticket as a portal ticket ─────────────────
+    // ─── POST: either save a mapping or import one Asana ticket ──────────
     if (req.method === "POST") {
+      // Sub-action: upsert academy mapping (folded in to keep function count <= 12)
+      if (req.body?.kind === "mapping") {
+        const { asana_name, client_id = null, skip = false } = req.body;
+        if (!asana_name) return res.status(400).json({ error: "asana_name required" });
+        const upsert = await fetch(`${SUPABASE_URL}/rest/v1/academy_mappings`, {
+          method: "POST",
+          headers: { ...SB_HEADERS, Prefer: "resolution=merge-duplicates,return=representation" },
+          body: JSON.stringify({
+            asana_name,
+            client_id: skip ? null : client_id,
+            skip,
+            created_by: me.id,
+          }),
+        });
+        if (!upsert.ok) {
+          const errText = await upsert.text();
+          return res.status(500).json({ error: `upsert failed: ${errText}` });
+        }
+        const [row] = await upsert.json();
+        return res.status(200).json({ data: row });
+      }
+
       const {
         asana_gid,
         client_id,
