@@ -9,7 +9,12 @@
 2. Handles ongoing support tickets from active clients
 3. Gives BAM staff one dashboard to operate everything
 
-**The north star** is an autonomous GHL agent that **augments staff** — the agent drafts the fix / builds the HTML / pulls the assets, and staff review/approve before shipping. Not built yet. Portal infrastructure is step 1.
+**The north star** is **a single portal serving both clients and staff** for BAM Business.
+
+- **Clients** can: interact with staff in dedicated chat windows, see every ad campaign they're running and adjust their own ad spend, submit support tickets and check the status of their systems.
+- **Staff** can: operate every client account from one dashboard (the existing bam-portal/), with the autonomous GHL agent (described below) eventually drafting fixes/builds for staff to review before shipping.
+
+The autonomous agent is a *capability* inside the staff side of the portal — not the destination. The destination is the portal itself.
 
 ---
 
@@ -218,9 +223,23 @@ All frontend work follows the **Full Control design system** at `docs/fullcontro
 
 ---
 
-## North star — the autonomous GHL agent
+## North star — the BAM Business portal (clients + staff)
 
-**Two eventual modes (NOT built yet; portal infrastructure is step 1):**
+The destination is **one portal that serves both sides** of BAM Business:
+
+### Client side — what clients can do in their portal
+- **Chat with staff** in dedicated, per-topic chat windows (not a single firehose).
+- **See every ad campaign** they're running across BAM-managed channels, and **adjust their own ad spend** without going through staff.
+- **Submit support tickets** (Error / Change / Build) and **check the status of their systems** — what's live, what's broken, what's being worked on.
+
+The current `client-portal.html` and onboarding HTML files are the seed of this surface; they will eventually consolidate into a real authenticated client portal.
+
+### Staff side — what staff can do in their portal
+The existing `bam-portal/` React app: cross-client roster, financials, communications, knowledge base, tasks, calendar, systems health. This is where staff operate every client account.
+
+### The autonomous GHL agent (capability inside the staff side, not the destination)
+
+The agent is a feature that lives inside the staff portal — it drafts work for staff to review and approve. **Two eventual modes (NOT built yet; portal infrastructure is step 1):**
 
 ### Mode 1 — Support Ticket Agent (augmenting staff)
 When a client submits an Error/Change/Build ticket:

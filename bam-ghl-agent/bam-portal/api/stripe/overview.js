@@ -54,8 +54,43 @@ export default async function handler(req, res) {
       });
     }
 
+    if (section === "search") {
+      const q = (req.query.q || "").trim();
+      if (!q) return res.status(400).json({ error: "q required" });
+      const url = `/customers/search?query=${encodeURIComponent(`name~"${q}" OR email~"${q}"`)}&limit=20`;
+      const result = await stripeFetch(url);
+      const mapped = (result.data || []).map(c => ({
+        id: c.id, name: c.name || "", email: c.email || "",
+      }));
+      return res.status(200).json({ data: mapped, total: mapped.length });
+    }
+
+    if (section === "count") {
+      let total = 0; let starting_after = null;
+      for (let i = 0; i < 20; i++) {
+        const qs = `limit=100${starting_after ? `&starting_after=${starting_after}` : ""}`;
+        const page = await stripeFetch(`/customers?${qs}`);
+        const pd = page.data || [];
+        total += pd.length;
+        if (!page.has_more || pd.length === 0) break;
+        starting_after = pd[pd.length - 1].id;
+      }
+      return res.status(200).json({ data: { total } });
+    }
+
     if (section === "customers") {
-      const customers = await stripeFetch("/customers?limit=50&expand[]=data.subscriptions");
+      // Paginate to fetch ALL customers (Stripe caps each page at 100)
+      const all = [];
+      let starting_after = null;
+      for (let i = 0; i < 10; i++) {
+        const qs = `limit=100&expand[]=data.subscriptions${starting_after ? `&starting_after=${starting_after}` : ""}`;
+        const page = await stripeFetch(`/customers?${qs}`);
+        const pageData = page.data || [];
+        all.push(...pageData);
+        if (!page.has_more || pageData.length === 0) break;
+        starting_after = pageData[pageData.length - 1].id;
+      }
+      const customers = { data: all };
       const mapped = (customers.data || []).map(c => ({
         id: c.id,
         name: c.name || c.email || "Unknown",

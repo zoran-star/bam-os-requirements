@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { T, calcProgress } from './tokens/tokens';
 import { fetchActionItems } from './services/notionService';
-import { fetchOnboardingClients } from './services/sheetsService';
+import { fetchClients } from './services/clientsService';
 import { fetchTasks, fetchAllTeamTasks, createTask, updateTask } from './services/asanaService';
 import { fetchEvents } from './services/calendarService';
 import { fetchAlerts } from './services/stripeService';
@@ -65,11 +65,11 @@ export default function BAMPortal() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-  // Load onboarding data from Google Sheets (falls back to mock)
+  // Load clients from Supabase (with live Stripe revenue)
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    fetchOnboardingClients().then(({ data }) => {
+    fetchClients().then(({ data }) => {
       if (!cancelled && data) setOnboardingClients(data);
     });
     return () => { cancelled = true; };
