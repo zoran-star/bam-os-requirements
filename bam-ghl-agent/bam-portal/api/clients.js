@@ -100,12 +100,46 @@ function shapeClient(row, revenue) {
   };
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+async function supabaseInsert(path, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Supabase ${res.status}: ${await res.text()}`);
+  return res.json();
+}
 
+export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing (need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)" });
   }
+
+  if (req.method === "POST") {
+    try {
+      const body = req.body || {};
+      const name = typeof body.name === "string" ? body.name.trim() : "";
+      const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+      if (!name) return res.status(400).json({ error: "name required" });
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "valid email required" });
+      }
+
+      const rows = await supabaseInsert("clients", { name, email, status: "onboarding" });
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      return res.status(200).json({ id: row?.id, name: row?.name });
+    } catch (err) {
+      console.error("/api/clients POST error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const id = req.query.id;
