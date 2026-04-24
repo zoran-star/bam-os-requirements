@@ -171,11 +171,16 @@ export default async function handler(req, res) {
         "custom_fields.name","custom_fields.enum_value.name","custom_fields.text_value",
       ].join(",");
 
-      // Asana paginates; we pull up to 100 (more than enough; only 21 incomplete today)
+      // Pull all recent tasks; filter to incomplete client-side.
+      // Using modified_since covers the last ~90 days, which is more than enough
+      // for the current 21 incomplete tickets.
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
       const asanaRes = await asana(
-        `/tasks?project=${TICKETS_MASTER_PROJECT}&completed_since=now&opt_fields=${OPT_FIELDS}&limit=100`
+        `/tasks?project=${TICKETS_MASTER_PROJECT}&modified_since=${ninetyDaysAgo}&opt_fields=${OPT_FIELDS}&limit=100`
       );
+      console.log("asana-import: fetched", (asanaRes.data || []).length, "tasks from project");
       const openTasks = (asanaRes.data || []).filter(t => !t.completed);
+      console.log("asana-import: open (incomplete):", openTasks.length);
 
       // Already-imported gids
       const importedRows = await sb(`tickets?source=eq.asana_import&asana_gid=not.is.null&select=asana_gid`);
