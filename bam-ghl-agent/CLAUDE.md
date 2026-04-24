@@ -70,16 +70,48 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 
 ## Current phase (what we're working on NOW)
 
-1. Customer-facing HTML pages — client-portal, class-setup, offer-setup, parent-onboarding (actively iterating)
-2. Reconnect `bam-portal/` backend with Zoran's keys for full control
-3. Migrate agent knowledge (template sections, build guides, etc.) from Notion → Supabase
-4. Wire up the submit flow: customer submit → Supabase → Asana ticket → staff dashboard
+**Status as of 2026-04-24 — reconnecting bam-portal backend with Zoran's own keys.**
 
-**TBD / will figure out later:**
+### What's wired up
+- **Supabase** — project ref `jnojmfmpnsfmtqmwhopz` (By Any Means Basketball Pro). Tables: `Questions Database` (202 rows, source of truth for all form questions), `user_slack_tokens` (RLS enabled), `clients` (created empty, schema below).
+- **Vercel env vars** — all 10 integrations configured on bam-portal project (Supabase, Anthropic, Asana, Google OAuth, Google Calendar, Google Sheets, GHL, Notion, Slack, Stripe).
+- **Slack** — new BAM Portal app created by Zoran (Client ID `9371199551328.10970298548951`). OAuth end-to-end working, writes to `user_slack_tokens` via upsert.
+- **GHL** — 13 sub-accounts wired via `GHL_LOCATIONS_JSON` (BAM Business, BAM GTA, BAM NY, BAM San Jose, BAM Mountain State, Basketball+, DA Hoops, Danny Cooper Basketball, Johnson Basketball Training, Elite-Smart Athletes, ProBound, DETAIL SD, ADAPT SF). Agency key in Vercel.
+- **Stripe** — BAM Business account confirmed (mike@byanymeansbball.com, $17.7k MRR, 56 subs).
+- **Asana** — workspace GID 1201652590043795 confirmed, Mike Eluki + Coleman visible.
+- **Notion** — 10 SOP pages return metadata but 0 child pages (integration lacks page access). Waiting on Cole to make Zoran workspace owner, then enable workspace-wide integration access.
+
+### `clients` table schema (Supabase)
+```sql
+clients (
+  id uuid pk, name text, status text check in (onboarding|active|paused|churned),
+  ghl_location_id text unique, slack_channel_id, stripe_customer_id, notion_page_id, asana_project_id,
+  created_at, updated_at
+)
+```
+RLS enabled, staff read/write policies live. Does ONE job: join client record → integration IDs. Checkpoints/alerts deferred until client-portal.html scope is locked in (it may handle some onboarding tasks itself, changing what staff needs to track).
+
+### Next steps (in order)
+1. Seed `clients` table with 13 GHL locations
+2. Build `/api/clients.js` to replace `/api/sheets/onboarding.js`
+3. Update `App.jsx` to load clients from new endpoint (currently uses Google Sheets)
+4. Fix client name parsing in Notion `all_clients` endpoint (names return as "?")
+5. Wait for Cole → enable workspace-wide Notion integration
+6. Later: per-user Google Calendar OAuth flow
+7. Later: customer-portal-to-Slack mirroring (Option B for client comms)
+8. Later: revisit checkpoints/alerts once client-portal.html scope is final
+
+### TBD / will figure out later
 - How onboarding flow is triggered (entry URL)
 - Asana ticket schema (same for onboarding + support, or separate?)
-- Per-client vs shared infrastructure (own Supabase row? own GHL sub-account? own Stripe customer?)
 - Submit destination for each form
+
+### Two-path setup (IMPORTANT — causes confusion)
+Project files live in TWO places:
+- `/Users/zoransavic/bam-ghl-agent/` — LOCAL (not in monorepo git). Holds the working HTML files: `client-portal.html`, `class-setup.html`, `offer-setup.html`, `parent-onboarding.html`. Also holds `.claude/commands/` (skills) and `.claude/worktrees/` (session worktrees).
+- `/Users/zoransavic/bam-os-requirements/bam-ghl-agent/` — GIT (inside the monorepo). Holds this CLAUDE.md, `bam-portal/` React app, `docs/`, `sections/`.
+
+Both folders have a `.mcp.json` pointing Supabase at `jnojmfmpnsfmtqmwhopz`. When starting a new session, open Claude Code on `/Users/zoransavic/bam-os-requirements/bam-ghl-agent/` for portal work, or on `/Users/zoransavic/bam-ghl-agent/` for customer HTML work.
 
 ---
 
