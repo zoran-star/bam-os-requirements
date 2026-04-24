@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Mode — BAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0A0A0A;
+  --surface: #111111;
+  --surface2: #191919;
+  --surface3: #222222;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #F0EDE8;
+  --text2: #777773;
+  --text3: #444441;
+  --green: #32D74B;
+  --green-soft: rgba(50,215,75,0.1);
+  --green-border: rgba(50,215,75,0.25);
+  --blue: #0A84FF;
+  --blue-soft: rgba(10,132,255,0.1);
+  --amber: #FF9F0A;
+  --amber-soft: rgba(255,159,10,0.1);
+  --red: #FF453A;
+  --red-soft: rgba(255,69,58,0.1);
+  --purple: #BF5AF2;
+  --purple-soft: rgba(191,90,242,0.1);
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Instrument Sans', -apple-system, sans-serif;
+  --r: 12px;
+  --r-sm: 8px;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── SCREENS ─── */
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ─── READY SCREEN ─── */
+#screen-ready {
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.ready-wrap {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ticket-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  font-family: var(--mono);
+  align-self: flex-start;
+}
+
+.ready-title {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+}
+
+.ready-title span { color: var(--green); }
+
+.ready-desc {
+  font-size: 15px;
+  color: var(--text2);
+  line-height: 1.6;
+  border-left: 2px solid var(--border2);
+  padding-left: 14px;
+}
+
+.ready-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.check-item:hover { color: var(--text); }
+
+.check-box {
+  width: 20px; height: 20px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border2);
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.check-item.checked .check-box {
+  background: var(--green-soft);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.start-btn {
+  width: 100%;
+  padding: 18px;
+  border-radius: var(--r);
+  border: none;
+  background: var(--green);
+  color: #000;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 24px rgba(50,215,75,0.25);
+}
+
+.start-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 30px rgba(50,215,75,0.35); }
+.start-btn:active { transform: scale(0.98); }
+
+/* ─── BUILD SCREEN ─── */
+#screen-build {
+  flex-direction: row;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── LEFT PANEL: Timer ─── */
+.timer-panel {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 24px;
+  gap: 24px;
+  overflow-y: auto;
+}
+
+.panel-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+.timer-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+}
+
+.timer-digits {
+  font-family: var(--mono);
+  font-size: 64px;
+  font-weight: 600;
+  letter-spacing: -2px;
+  color: var(--text);
+  line-height: 1;
+  transition: color 0.3s ease;
+}
+
+.timer-digits.running { color: var(--green); }
+.timer-digits.paused  { color: var(--amber); }
+
+.timer-label {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--text3);
+  letter-spacing: 0.5px;
+}
+
+.timer-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.t-btn {
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.t-btn:hover { color: var(--text); background: var(--surface3); }
+
+.t-btn.play {
+  background: var(--green-soft);
+  border-color: var(--green-border);
+  color: var(--green);
+  grid-column: 1 / -1;
+}
+
+.t-btn.play:hover { background: rgba(50,215,75,0.18); }
+
+.t-btn.pause {
+  background: var(--amber-soft);
+  border-color: rgba(255,159,10,0.25);
+  color: var(--amber);
+  grid-column: 1 / -1;
+}
+
+/* ─── Ticket ref card ─── */
+.ticket-ref {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+}
+
+.ticket-ref-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+  letter-spacing: -0.2px;
+}
+
+.ticket-ref-sub {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.ticket-ref-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.ref-badge {
+  font-size: 10px;
+  font-family: var(--mono);
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  color: var(--text3);
+  background: var(--surface3);
+}
+
+/* ─── Session log ─── */
+.session-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  line-height: 1.4;
+}
+
+.log-entry .log-time {
+  color: var(--text3);
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.log-entry .log-text { color: var(--text2); }
+
+/* Complete build button */
+.complete-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--r);
+  border: none;
+  background: var(--blue);
+  color: white;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 3px 16px rgba(10,132,255,0.25);
+  margin-top: auto;
+}
+
+.complete-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+/* ─── RIGHT PANEL: Notes ─── */
+.notes-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Tab bar */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 20px 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.tab {
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  transition: all 0.15s ease;
+  margin-bottom: -1px;
+  background: transparent;
+  user-select: none;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab.active {
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--border);
+  border-bottom-color: var(--bg);
+}
+
+/* Tab content */
+.tab-content {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-content.active { display: flex; }
+
+/* Notes tab */
+.notes-area {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.notes-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.n-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.n-btn:hover { color: var(--text); background: var(--surface3); }
+.n-btn.active { background: var(--blue-soft); border-color: rgba(10,132,255,0.3); color: var(--blue); }
+
+.notes-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.7;
+  resize: none;
+  min-height: 300px;
+}
+
+.notes-input::placeholder { color: var(--text3); }
+
+/* Screenshot area */
+.screenshot-drop {
+  border: 2px dashed var(--border2);
+  border-radius: var(--r);
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.screenshot-drop:hover {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.screenshot-drop input { display: none; }
+
+.drop-label {
+  font-size: 13px;
+  color: var(--text3);
+  line-height: 1.5;
+}
+
+.screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.screenshot-thumb {
+  aspect-ratio: 16/10;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border2);
+  overflow: hidden;
+  position: relative;
+  background: var(--surface2);
+  cursor: pointer;
+}
+
+.screenshot-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.screenshot-thumb .remove-shot {
+  position: absolute;
+  top: 4px; right: 4px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  border: none;
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.screenshot-thumb:hover .remove-shot { display: flex; }
+
+/* Claude ref tab */
+.claude-ref-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ref-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.ref-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ref-icon {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.ref-title { font-size: 13px; font-weight: 600; color: var(--text); }
+
+.ref-body {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.65;
+}
+
+/* ─── COMPLETE SCREEN ─── */
+#screen-complete {
+  align-items: center;
+  justify-content: flex-start;
+  padding: 40px 24px 80px;
+  overflow-y: auto;
+}
+
+.complete-wrap {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.complete-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.complete-icon {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: var(--green-soft);
+  border: 1px solid var(--green-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.complete-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+}
+
+.complete-subtitle {
+  font-size: 14px;
+  color: var(--text2);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+/* Form card */
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.field-input {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 11px 14px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.field-input:focus { border-color: var(--blue); }
+.field-input::placeholder { color: var(--text3); }
+
+textarea.field-input {
+  resize: none;
+  min-height: 88px;
+  line-height: 1.55;
+}
+
+/* Change log items */
+.changes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.change-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.change-item textarea {
+  flex: 1;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  resize: none;
+  line-height: 1.5;
+  min-height: 52px;
+  transition: border-color 0.15s;
+}
+
+.change-item textarea:focus { border-color: var(--blue); }
+.change-item textarea::placeholder { color: var(--text3); }
+
+.remove-change {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: var(--surface3);
+  color: var(--text3);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 10px;
+  transition: all 0.15s;
+}
+
+.remove-change:hover { color: var(--red); border-color: rgba(255,69,58,0.3); background: var(--red-soft); }
+
+.add-change-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1.5px dashed var(--border2);
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.add-change-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+
+/* Difficulty selector */
+.diff-row {
+  display: flex;
+  gap: 8px;
+}
+
+.diff-chip {
+  flex: 1;
+  padding: 9px 8px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.diff-chip:hover { color: var(--text); border-color: var(--border2); }
+.diff-chip[data-val="easy"].selected { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+.diff-chip[data-val="medium"].selected { background: var(--amber-soft); border-color: rgba(255,159,10,0.3); color: var(--amber); }
+.diff-chip[data-val="hard"].selected { background: var(--red-soft); border-color: rgba(255,69,58,0.3); color: var(--red); }
+
+/* Screenshot section in complete */
+.complete-shots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.complete-drop {
+  border: 2px dashed var(--border2);
+  border-radius: var(--r);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text3);
+}
+
+.complete-drop:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+.complete-drop input { display: none; }
+
+/* Timer summary */
+.time-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  color: var(--text2);
+}
+
+.time-summary strong {
+  font-family: var(--mono);
+  color: var(--green);
+  font-size: 15px;
+}
+
+/* Submit */
+.submit-build-btn {
+  width: 100%;
+  padding: 17px;
+  border-radius: var(--r);
+  border: none;
+  background: var(--blue);
+  color: white;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 24px rgba(10,132,255,0.3);
+}
+
+.submit-build-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 30px rgba(10,132,255,0.4); }
+.submit-build-btn:active { transform: scale(0.98); }
+.submit-build-btn.submitted { background: var(--green); box-shadow: 0 4px 24px rgba(50,215,75,0.3); }
+
+/* ─── SUBMITTED SCREEN ─── */
+#screen-submitted {
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.submitted-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  animation: popIn 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.submitted-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  margin-bottom: 8px;
+}
+
+.submitted-sub {
+  font-size: 15px;
+  color: var(--text2);
+  max-width: 380px;
+  line-height: 1.6;
+  margin: 0 auto 32px;
+}
+
+.submitted-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.stat-pill {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text2);
+}
+
+.stat-pill strong { color: var(--text); }
+
+.new-ticket-btn {
+  padding: 14px 28px;
+  border-radius: var(--r);
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.new-ticket-btn:hover { color: var(--text); background: var(--surface3); }
+</style>
+</head>
+<body>
+
+<!-- ─── SCREEN 1: Ready ─── -->
+<div class="screen active" id="screen-ready">
+  <div class="ready-wrap">
+    <button onclick="window.location.href='error-ticket-internal.html'" style="background:none;border:none;font-family:var(--sans);font-size:13px;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:6px;padding:0;margin-bottom:-8px;transition:color 0.15s" onmouseover="this.style.color='var(--text2)'" onmouseout="this.style.color='var(--text3)'">← Back to ticket</button>
+    <div class="ticket-chip">🔴 #ERR-00247 · Booking form not submitting on mobile</div>
+    <div>
+      <div class="ready-title">Ready to<br><span>start building?</span></div>
+    </div>
+    <div class="ready-desc">
+      This will start a timer and open your build workspace. Keep this on your second monitor while you work in GHL.
+    </div>
+    <div>
+      <div class="panel-label" style="margin-bottom:12px;">Before you start — confirm</div>
+      <div class="ready-checklist" id="readyChecklist">
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          I've read Claude's analysis and fix steps
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          I have the GHL sub-account open in another tab
+        </div>
+        <div class="check-item" onclick="toggleCheck(this)">
+          <div class="check-box"></div>
+          I know what I'm going to change first
+        </div>
+      </div>
+    </div>
+    <button class="start-btn" onclick="startBuild()">Start build →</button>
+  </div>
+</div>
+
+<!-- ─── SCREEN 2: Build mode ─── -->
+<div class="screen" id="screen-build">
+
+  <!-- Left: Timer -->
+  <div class="timer-panel">
+    <div class="panel-label">Build timer</div>
+
+    <div class="timer-display">
+      <div class="timer-digits" id="timerDisplay">00:00</div>
+      <div class="timer-label" id="timerLabel">not started</div>
+    </div>
+
+    <div class="timer-controls">
+      <button class="t-btn play" id="playPauseBtn" onclick="toggleTimer()">▶ Start timer</button>
+      <button class="t-btn" onclick="resetTimer()">↺ Reset</button>
+      <button class="t-btn" onclick="addLap()">+ Lap</button>
+    </div>
+
+    <div class="ticket-ref">
+      <div class="ticket-ref-title">Booking form not submitting on mobile</div>
+      <div class="ticket-ref-sub">iOS Safari · submit button blocked by calendar embed z-index</div>
+      <div class="ticket-ref-badges">
+        <span class="ref-badge">Elevate Hoops NYC</span>
+        <span class="ref-badge">booking-page</span>
+        <span class="ref-badge">z-index</span>
+      </div>
+    </div>
+
+    <div class="session-log" id="sessionLog">
+      <div class="panel-label">Session log</div>
+    </div>
+
+    <button class="complete-btn" onclick="goToComplete()">Mark complete →</button>
+  </div>
+
+  <!-- Right: Notes + Claude ref -->
+  <div class="notes-panel">
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('notes', this)">📝 Notes</div>
+      <div class="tab" onclick="switchTab('screenshots', this)">🖼 Screenshots</div>
+      <div class="tab" onclick="switchTab('ref', this)">🔍 Claude ref</div>
+    </div>
+
+    <!-- Notes tab -->
+    <div class="tab-content active" id="tab-notes">
+      <div class="notes-area">
+        <div class="notes-toolbar">
+          <button class="n-btn" onclick="insertNote('## ')">H2</button>
+          <button class="n-btn" onclick="insertNote('- ')">List</button>
+          <button class="n-btn" onclick="insertNote('✅ ')">Done</button>
+          <button class="n-btn" onclick="insertNote('❌ ')">Blocked</button>
+          <button class="n-btn" onclick="insertNote('⚠️ ')">Warning</button>
+          <button class="n-btn" onclick="insertNote('💡 ')">Idea</button>
+        </div>
+        <textarea
+          class="notes-input"
+          id="buildNotes"
+          placeholder="Start typing... use this to track what you're doing, what's working, what's not. These notes will carry into the completion form."
+          spellcheck="false"
+        ></textarea>
+      </div>
+    </div>
+
+    <!-- Screenshots tab -->
+    <div class="tab-content" id="tab-screenshots">
+      <div class="notes-area">
+        <label class="screenshot-drop" for="buildScreenshots">
+          <input type="file" id="buildScreenshots" multiple accept="image/*" onchange="handleBuildScreenshots(this)">
+          <div>
+            <div style="font-size:24px;margin-bottom:8px;">🖼</div>
+            <div class="drop-label">Drop screenshots here or click to upload<br><span style="font-size:11px;color:var(--text3)">Capture as you build — they'll attach to the completion report</span></div>
+          </div>
+        </label>
+        <div class="screenshot-grid" id="buildShotGrid"></div>
+      </div>
+    </div>
+
+    <!-- Claude ref tab -->
+    <div class="tab-content" id="tab-ref">
+      <div class="claude-ref-area">
+        <div style="font-size:12px;color:var(--text3);padding:2px 0 6px;font-family:var(--mono);">Claude's analysis — read-only reference</div>
+
+        <div class="ref-section">
+          <div class="ref-section-header">
+            <div class="ref-icon" style="background:var(--red-soft)">🔍</div>
+            <div class="ref-title">Where Claude thinks the error is</div>
+          </div>
+          <div class="ref-body">
+            <strong>Most likely:</strong> JavaScript event listener conflict on mobile. The submit button onclick is blocked on iOS Safari by the 300ms tap delay or a touchstart/touchend conflict in the GHL embed wrapper.<br><br>
+            <strong>Secondary:</strong> Required field validation failing silently — error state not visible on mobile viewports.<br><br>
+            <strong>Third:</strong> GHL calendar embed inside the form is blocking the submit button on smaller screens via z-index.
+          </div>
+        </div>
+
+        <div class="ref-section">
+          <div class="ref-section-header">
+            <div class="ref-icon" style="background:var(--amber-soft)">🛠</div>
+            <div class="ref-title">Fix steps</div>
+          </div>
+          <div class="ref-body">
+            1. Open booking page on iOS Safari and confirm tap event firing<br>
+            2. Check z-index stacking in GHL editor for mobile breakpoints<br>
+            3. Test with all fields filled — check for hidden validation errors<br>
+            4. Add <code style="font-family:var(--mono);font-size:11px;background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--blue)">touch-action: manipulation</code> to submit button CSS<br>
+            5. Replace onclick with form.addEventListener('submit')
+          </div>
+        </div>
+
+        <div class="ref-section">
+          <div class="ref-section-header">
+            <div class="ref-icon" style="background:var(--blue-soft)">📦</div>
+            <div class="ref-title">CSS fix to apply</div>
+          </div>
+          <div class="ref-body" style="font-family:var(--mono);font-size:11px;color:var(--green);line-height:1.8;">
+            .submit-btn {<br>
+            &nbsp;&nbsp;touch-action: manipulation;<br>
+            &nbsp;&nbsp;-webkit-tap-highlight-color: transparent;<br>
+            &nbsp;&nbsp;position: relative;<br>
+            &nbsp;&nbsp;z-index: 10;<br>
+            }
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SCREEN 3: Complete ─── -->
+<div class="screen" id="screen-complete">
+  <div class="complete-wrap">
+
+    <div class="complete-header">
+      <div class="complete-icon">🏁</div>
+      <div>
+        <div class="complete-title">Build complete</div>
+        <div class="complete-subtitle">Log what you did — this goes on the ticket record and helps train future builds.</div>
+      </div>
+    </div>
+
+    <div class="time-summary" id="timeSummary">
+      <span>⏱</span>
+      <span>Build time: <strong id="finalTime">00:00</strong></span>
+      <span style="color:var(--text3);font-size:12px;" id="lapCount"></span>
+    </div>
+
+    <div class="form-card">
+
+      <div class="field">
+        <div class="field-label">What did you actually change?</div>
+        <div class="changes-list" id="changesList">
+          <div class="change-item">
+            <textarea placeholder="e.g. Fixed z-index on the GHL calendar embed section — set it to auto so the submit button was no longer blocked..." rows="2"></textarea>
+            <button class="remove-change" onclick="removeChange(this)" style="display:none">×</button>
+          </div>
+        </div>
+        <button class="add-change-btn" onclick="addChange()">+ Add another change</button>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Did Claude's analysis help?</div>
+        <div class="diff-row" id="helpRow">
+          <div class="diff-chip" data-val="yes" onclick="selectHelp(this)">Yes, spot on</div>
+          <div class="diff-chip" data-val="partial" onclick="selectHelp(this)">Partially right</div>
+          <div class="diff-chip" data-val="no" onclick="selectHelp(this)">Missed it</div>
+        </div>
+      </div>
+
+      <div class="field" id="wrongField" style="display:none">
+        <div class="field-label">What did Claude get wrong?</div>
+        <textarea class="field-input" placeholder="e.g. Claude suggested the 300ms tap delay issue first, but actually the z-index was the immediate problem. Should have been step 1 not step 3..." rows="3"></textarea>
+      </div>
+
+      <div class="field">
+        <div class="field-label">How hard was this build?</div>
+        <div class="diff-row">
+          <div class="diff-chip" data-val="easy" onclick="selectDiff(this)">Easy</div>
+          <div class="diff-chip" data-val="medium" onclick="selectDiff(this)">Medium</div>
+          <div class="diff-chip" data-val="hard" onclick="selectDiff(this)">Hard</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Any notes carried over from build mode</div>
+        <textarea class="field-input" id="carriedNotes" placeholder="Notes from your build session will appear here..." rows="4" readonly style="cursor:default;opacity:0.7;"></textarea>
+      </div>
+
+      <div class="field">
+        <div class="field-label">Screenshots</div>
+        <div class="complete-shots">
+          <div class="screenshot-grid" id="completeShotGrid"></div>
+          <label class="complete-drop" for="completeShots">
+            <input type="file" id="completeShots" multiple accept="image/*" onchange="handleCompleteShots(this)">
+            <span>📎</span>
+            <span>Attach screenshots of before / after</span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <button class="submit-build-btn" id="submitBuildBtn" onclick="submitBuild()">Submit completion report →</button>
+
+  </div>
+</div>
+
+<!-- ─── SCREEN 4: Submitted ─── -->
+<div class="screen" id="screen-submitted">
+  <div class="submitted-icon">✅</div>
+  <div class="submitted-title">Build logged</div>
+  <div class="submitted-sub">The completion report has been submitted. The ticket is now marked done and the data will feed into future Claude improvements.</div>
+  <div class="submitted-stats" id="submittedStats">
+    <div class="stat-pill">Time: <strong id="statTime">—</strong></div>
+    <div class="stat-pill">Changes: <strong id="statChanges">—</strong></div>
+    <div class="stat-pill">Difficulty: <strong id="statDiff">—</strong></div>
+  </div>
+  <button class="new-ticket-btn" onclick="location.reload()">← Back to tickets</button>
+</div>
+
+<script>
+let timerInterval = null;
+let seconds = 0;
+let isRunning = false;
+let laps = [];
+let buildScreenshots = [];
+let completeScreenshots = [];
+
+function goToScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  el.querySelector('.check-box').textContent = el.classList.contains('checked') ? '✓' : '';
+}
+
+function startBuild() {
+  goToScreen('screen-build');
+  addLog('Build session started');
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60).toString().padStart(2, '0');
+  const sc = (s % 60).toString().padStart(2, '0');
+  return `${m}:${sc}`;
+}
+
+function toggleTimer() {
+  const btn = document.getElementById('playPauseBtn');
+  const display = document.getElementById('timerDisplay');
+  const label = document.getElementById('timerLabel');
+
+  if (!isRunning) {
+    isRunning = true;
+    btn.textContent = '⏸ Pause';
+    btn.className = 't-btn pause';
+    display.className = 'timer-digits running';
+    label.textContent = 'running';
+    addLog('Timer started');
+    timerInterval = setInterval(() => {
+      seconds++;
+      document.getElementById('timerDisplay').textContent = formatTime(seconds);
+    }, 1000);
+  } else {
+    isRunning = false;
+    clearInterval(timerInterval);
+    btn.textContent = '▶ Resume';
+    btn.className = 't-btn play';
+    display.className = 'timer-digits paused';
+    label.textContent = 'paused at ' + formatTime(seconds);
+    addLog('Timer paused — ' + formatTime(seconds));
+  }
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  isRunning = false;
+  seconds = 0;
+  document.getElementById('timerDisplay').textContent = '00:00';
+  document.getElementById('timerDisplay').className = 'timer-digits';
+  document.getElementById('timerLabel').textContent = 'reset';
+  document.getElementById('playPauseBtn').textContent = '▶ Start timer';
+  document.getElementById('playPauseBtn').className = 't-btn play';
+  addLog('Timer reset');
+}
+
+function addLap() {
+  laps.push(formatTime(seconds));
+  addLog('Lap ' + laps.length + ' — ' + formatTime(seconds));
+}
+
+function addLog(text) {
+  const log = document.getElementById('sessionLog');
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-text">${text}</span>`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function insertNote(prefix) {
+  const ta = document.getElementById('buildNotes');
+  const pos = ta.selectionStart;
+  const val = ta.value;
+  ta.value = val.slice(0, pos) + '\n' + prefix + val.slice(pos);
+  ta.selectionStart = ta.selectionEnd = pos + prefix.length + 1;
+  ta.focus();
+}
+
+function handleBuildScreenshots(input) {
+  const grid = document.getElementById('buildShotGrid');
+  Array.from(input.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      buildScreenshots.push(e.target.result);
+      addThumb(grid, e.target.result, buildScreenshots, buildScreenshots.length - 1);
+      addLog('Screenshot added');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function addThumb(grid, src, arr, idx) {
+  const div = document.createElement('div');
+  div.className = 'screenshot-thumb';
+  div.innerHTML = `<img src="${src}"><button class="remove-shot" onclick="removeShot(this, ${idx})">×</button>`;
+  grid.appendChild(div);
+}
+
+function removeShot(btn, idx) {
+  btn.closest('.screenshot-thumb').remove();
+}
+
+function goToComplete() {
+  if (isRunning) toggleTimer();
+  document.getElementById('finalTime').textContent = formatTime(seconds);
+  document.getElementById('lapCount').textContent = laps.length ? laps.length + ' laps' : '';
+  const notes = document.getElementById('buildNotes').value;
+  document.getElementById('carriedNotes').value = notes || '';
+  const completeGrid = document.getElementById('completeShotGrid');
+  completeGrid.innerHTML = '';
+  buildScreenshots.forEach((src, i) => addThumb(completeGrid, src, completeScreenshots, i));
+  addLog('Moved to completion form');
+  goToScreen('screen-complete');
+}
+
+function addChange() {
+  const list = document.getElementById('changesList');
+  const div = document.createElement('div');
+  div.className = 'change-item';
+  div.innerHTML = `<textarea placeholder="Describe what you changed..." rows="2"></textarea><button class="remove-change" onclick="removeChange(this)">×</button>`;
+  list.appendChild(div);
+  div.querySelector('textarea').focus();
+  updateRemoveButtons();
+}
+
+function removeChange(btn) {
+  btn.closest('.change-item').remove();
+  updateRemoveButtons();
+}
+
+function updateRemoveButtons() {
+  const items = document.querySelectorAll('.change-item');
+  items.forEach((item, i) => {
+    const btn = item.querySelector('.remove-change');
+    btn.style.display = items.length > 1 ? 'flex' : 'none';
+  });
+}
+
+function selectHelp(el) {
+  document.querySelectorAll('#helpRow .diff-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const wrongField = document.getElementById('wrongField');
+  wrongField.style.display = (el.dataset.val === 'partial' || el.dataset.val === 'no') ? 'flex' : 'none';
+}
+
+function selectDiff(el) {
+  el.closest('.diff-row').querySelectorAll('.diff-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function handleCompleteShots(input) {
+  const grid = document.getElementById('completeShotGrid');
+  Array.from(input.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      completeScreenshots.push(e.target.result);
+      addThumb(grid, e.target.result, completeScreenshots, completeScreenshots.length - 1);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function submitBuild() {
+  const btn = document.getElementById('submitBuildBtn');
+  btn.textContent = 'Submitting…';
+  btn.disabled = true;
+
+  const changes = Array.from(document.querySelectorAll('#changesList textarea'))
+    .map(t => t.value.trim()).filter(Boolean);
+
+  const diff = document.querySelector('.diff-row:last-of-type .diff-chip.selected')?.dataset.val || 'unknown';
+
+  setTimeout(() => {
+    document.getElementById('statTime').textContent = formatTime(seconds);
+    document.getElementById('statChanges').textContent = changes.length;
+    document.getElementById('statDiff').textContent = diff.charAt(0).toUpperCase() + diff.slice(1);
+    goToScreen('screen-submitted');
+  }, 1000);
+}
+</script>
+</body>
+</html>

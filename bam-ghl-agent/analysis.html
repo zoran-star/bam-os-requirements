@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Ticket Analysis & Recommendations</title>
+    <style>
+        :root {
+            --bg: #08080A;
+            --surface: #0F0F12;
+            --surface-el: #16161A;
+            --surface-hov: #1C1C21;
+            --border: rgba(255,255,255,0.05);
+            --border-med: rgba(255,255,255,0.08);
+            --border-str: rgba(255,255,255,0.14);
+            --text: #EDEDEC;
+            --text-sub: #8E8E93;
+            --text-mute: #48484A;
+            --accent: #D4CF8A;
+            --accent-ghost: rgba(212,207,138,0.06);
+            --accent-border: rgba(212,207,138,0.15);
+            --green: #34D399;
+            --green-soft: rgba(52,211,153,0.10);
+            --amber: #FBBF24;
+            --amber-soft: rgba(251,191,36,0.10);
+            --red: #FB7185;
+            --red-soft: rgba(251,113,133,0.08);
+            --blue: #60A5FA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        .header {
+            margin-bottom: 60px;
+            animation: fadeIn 0.6s ease;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.03em;
+        }
+
+        .header p {
+            font-size: 16px;
+            color: var(--text-sub);
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-med);
+            overflow-x: auto;
+            padding-bottom: 0;
+        }
+
+        .nav-tab {
+            padding: 12px 20px;
+            border: none;
+            background: none;
+            color: var(--text-sub);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            color: var(--accent);
+        }
+
+        .nav-tab.active {
+            color: var(--accent);
+        }
+
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border-med);
+            border-radius: 14px;
+            padding: 20px 24px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .chart {
+            background: var(--surface);
+            border: 1px solid var(--border-med);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 20px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .bar-label {
+            min-width: 140px;
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .bar-container {
+            flex: 1;
+            height: 32px;
+            background: var(--surface-el);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(135deg, var(--accent), #A8A260);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            color: #1A1A1A;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .bar-label-count {
+            min-width: 40px;
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .recommendations {
+            display: grid;
+            gap: 20px;
+        }
+
+        .rec-card {
+            background: var(--surface);
+            border: 1px solid var(--border-med);
+            border-radius: 14px;
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .rec-card:hover {
+            border-color: var(--accent-border);
+            box-shadow: 0 8px 32px rgba(212,207,138,0.08);
+        }
+
+        .rec-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--accent-ghost);
+            border: 1px solid var(--accent-border);
+            border-radius: 8px;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .rec-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .rec-desc {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-bottom: 12px;
+            line-height: 1.6;
+        }
+
+        .rec-impact {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+            color: var(--green);
+            margin-bottom: 12px;
+        }
+
+        .impact-badge {
+            background: var(--green-soft);
+            border: 1px solid rgba(52,211,153,0.15);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .task-list {
+            font-size: 13px;
+            color: var(--text-sub);
+            padding-left: 20px;
+        }
+
+        .task-list li {
+            margin-bottom: 6px;
+        }
+
+        .task-list li strong {
+            color: var(--text);
+        }
+
+        .flow-diagram {
+            background: var(--surface);
+            border: 1px solid var(--border-med);
+            border-radius: 14px;
+            padding: 32px 24px;
+            margin-bottom: 32px;
+            font-size: 13px;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .flow-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .flow-arrow {
+            color: var(--accent);
+            font-size: 20px;
+        }
+
+        .flow-box {
+            background: var(--surface-el);
+            border: 1px solid var(--accent-border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            color: var(--accent);
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .feedback-section {
+            background: var(--surface);
+            border: 1px solid var(--border-med);
+            border-radius: 14px;
+            padding: 32px;
+            margin-top: 40px;
+        }
+
+        .feedback-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .feedback-desc {
+            font-size: 14px;
+            color: var(--text-sub);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+        }
+
+        .form-input, .form-textarea {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--surface-el);
+            border: 1px solid var(--border-med);
+            border-radius: 10px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .form-input:focus, .form-textarea:focus {
+            border-color: var(--accent-border);
+            box-shadow: 0 0 0 3px rgba(212,207,138,0.12);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .form-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--accent), #A8A260);
+            color: #1A1A1A;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+            box-shadow: 0 4px 16px rgba(212,207,138,0.25);
+        }
+
+        .form-button:hover {
+            filter: brightness(1.1);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 32px rgba(212,207,138,0.4);
+        }
+
+        .form-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .success-message {
+            display: none;
+            background: var(--green-soft);
+            border: 1px solid rgba(52,211,153,0.15);
+            color: var(--green);
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .highlight {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--accent-ghost);
+            border: 1px solid var(--accent-border);
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-right: 8px;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        .comparison-box {
+            background: var(--surface-el);
+            border: 1px solid var(--border-med);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .comparison-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-sub);
+            margin-bottom: 12px;
+            letter-spacing: 0.04em;
+        }
+
+        .comparison-list {
+            font-size: 13px;
+            color: var(--text-sub);
+        }
+
+        .comparison-list li {
+            margin-bottom: 8px;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .comparison-list li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Support Ticket System Analysis</h1>
+            <p>Data-driven recommendations for improving client intake flow</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-section="findings">Findings</button>
+            <button class="nav-tab" data-section="recommendations">Recommendations</button>
+            <button class="nav-tab" data-section="implementation">Implementation</button>
+            <button class="nav-tab" data-section="feedback">Your Feedback</button>
+        </div>
+
+        <!-- FINDINGS SECTION -->
+        <div id="findings" class="section active">
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Tickets Analyzed</div>
+                    <div class="stat-value">100</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Red Alert Rate</div>
+                    <div class="stat-value">40%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Website Requests</div>
+                    <div class="stat-value">49%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Systems Requests</div>
+                    <div class="stat-value">44%</div>
+                </div>
+            </div>
+
+            <div class="chart">
+                <div class="chart-title">Requests by Category</div>
+                <div class="bar-item">
+                    <div class="bar-label">Website</div>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: 49%;">49</div>
+                    </div>
+                    <div class="bar-label-count">49</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label">Systems</div>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: 44%;">44</div>
+                    </div>
+                    <div class="bar-label-count">44</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label">Other</div>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: 5%; background: linear-gradient(135deg, #60A5FA, #3B82F6);">5</div>
+                    </div>
+                    <div class="bar-label-count">5</div>
+                </div>
+            </div>
+
+            <div class="chart">
+                <div class="chart-title">Red Alert Distribution</div>
+                <div class="bar-item">
+                    <div class="bar-label">Urgent (Yes)</div>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: 40%; background: linear-gradient(135deg, #FB7185, #F43F5E);">40</div>
+                    </div>
+                    <div class="bar-label-count">40</div>
+                </div>
+                <div class="bar-item">
+                    <div class="bar-label">Standard (No)</div>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: 55%; background: linear-gradient(135deg, #34D399, #10B981);">55</div>
+                    </div>
+                    <div class="bar-label-count">55</div>
+                </div>
+            </div>
+
+            <div style="background: var(--surface); border: 1px solid var(--border-med); border-radius: 14px; padding: 24px; margin-top: 32px;">
+                <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Key Insights</h3>
+                <ul class="task-list" style="padding-left: 20px;">
+                    <li><strong>Nearly equal split:</strong> Website (49%) and Systems (44%) requests have nearly equal distribution—your intake form should differentiate these paths.</li>
+                    <li><strong>40% are red alerts:</strong> Two in five tickets are flagged urgent. Current single-path flow doesn't prioritize or expedite them.</li>
+                    <li><strong>Recurring patterns:</strong> Multiple tickets mention onboarding, automations, landing pages, and email flows—these could benefit from templated questions.</li>
+                    <li><strong>Freeform inefficiency:</strong> Current form asks "What's your request?" in one text area. Teams then have to parse and categorize—this should happen during intake.</li>
+                    <li><strong>Missing context:</strong> No indication in form whether request is blocking operations or cosmetic. Red alerts should be flagged upfront.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- RECOMMENDATIONS SECTION -->
+        <div id="recommendations" class="section">
+            <div class="recommendations">
+                <div class="rec-card">
+                    <div class="rec-number">1</div>
+                    <div class="rec-title">Split Intake by Category First</div>
+                    <div class="rec-desc">Before showing the detail form, ask: "Is this for your Website or Systems?" This drives different information needs.</div>
+                    <div class="rec-impact">
+                        <span class="impact-badge">Faster triage</span>
+                        <span class="impact-badge">Right team assigned immediately</span>
+                    </div>
+                    <ul class="task-list">
+                        <li><strong>Website:</strong> Landing pages, VSL, copywriting, design, email templates, landing page flows</li>
+                        <li><strong>Systems:</strong> GHL automations, booking flows, integrations, onboarding sequences, payment flows</li>
+                    </ul>
+                </div>
+
+                <div class="rec-card">
+                    <div class="rec-number">2</div>
+                    <div class="rec-title">Add Red Alert Flag as Second Question</div>
+                    <div class="rec-desc">After category, ask: "Is this blocking your business or impacting customers right now?" This triggers 24-hour SLA vs. 2-day SLA.</div>
+                    <div class="rec-impact">
+                        <span class="impact-badge">SLA clarity</span>
+                        <span class="impact-badge">Prevents wrong priorities</span>
+                    </div>
+                    <ul class="task-list">
+                        <li>Red alerts get fast-track routing and earlier review windows</li>
+                        <li>Standard tickets get scheduled review (e.g., twice-weekly)</li>
+                        <li>Clients know their urgency tier upfront</li>
+                    </ul>
+                </div>
+
+                <div class="rec-card">
+                    <div class="rec-number">3</div>
+                    <div class="rec-title">Replace Generic Textarea with Templated Questions</div>
+                    <div class="rec-desc">Instead of "Describe what you need," ask structured questions that vary by category. Examples:</div>
+                    <div class="rec-impact">
+                        <span class="impact-badge">Less back-and-forth</span>
+                        <span class="impact-badge">Better builds</span>
+                    </div>
+                    <div class="comparison-grid">
+                        <div class="comparison-box">
+                            <div class="comparison-label">Website Questions</div>
+                            <div class="comparison-list">
+                                <li>What page/section needs updating?</li>
+                                <li>Any design mockups or references?</li>
+                                <li>Copy examples or tone preferences?</li>
+                                <li>Who approves final version?</li>
+                            </div>
+                        </div>
+                        <div class="comparison-box">
+                            <div class="comparison-label">Systems Questions</div>
+                            <div class="comparison-list">
+                                <li>Which GHL system/funnel affected?</li>
+                                <li>Current behavior vs. desired behavior?</li>
+                                <li>Current automation steps?</li>
+                                <li>Test data to use?</li>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rec-card">
+                    <div class="rec-number">4</div>
+                    <div class="rec-title">Show Estimated Timeline Upfront</div>
+                    <div class="rec-desc">After intake, display: "24-hour build window" for red alerts, "2-day review + build" for standard. Set client expectations immediately.</div>
+                    <div class="rec-impact">
+                        <span class="impact-badge">Transparency</span>
+                        <span class="impact-badge">Reduced follow-ups</span>
+                    </div>
+                    <ul class="task-list">
+                        <li>Prevents clients asking "when will this be done?" before submission</li>
+                        <li>Aligns team capacity with client expectations</li>
+                    </ul>
+                </div>
+
+                <div class="rec-card">
+                    <div class="rec-number">5</div>
+                    <div class="rec-title">Add Confirmation Step Before Submission</div>
+                    <div class="rec-desc">Show a summary: "You've requested [type] in [category], marked as [priority]. We'll [timeline] and send you a build link via email."</div>
+                    <div class="rec-impact">
+                        <span class="impact-badge">Fewer mistakes</span>
+                        <span class="impact-badge">Confidence</span>
+                    </div>
+                    <ul class="task-list">
+                        <li>Client can double-check before submitting</li>
+                        <li>Clear handoff communication reduces support noise</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- IMPLEMENTATION SECTION -->
+        <div id="implementation" class="section">
+            <h2 style="font-size: 20px; font-weight: 700; margin-bottom: 24px; letter-spacing: -0.02em;">New Intake Flow</h2>
+
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">1</div>
+                    <div class="flow-box">Client clicks "New Support Request"</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px; color: var(--accent);">↓</div>
+
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">2</div>
+                    <div class="flow-box">Question 1: "Website or Systems?"</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px; color: var(--accent);">↓</div>
+
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">3</div>
+                    <div class="flow-box">Question 2: "Is this urgent?" (Red Alert?)</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px; color: var(--accent);">↓</div>
+
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">4</div>
+                    <div class="flow-box">Show 4–6 templated questions (based on category)</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px; color: var(--accent);">↓</div>
+
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">5</div>
+                    <div class="flow-box">Confirmation: "Here's what we got. Sound right?"</div>
+                </div>
+                <div style="display: flex; justify-content: center; margin-bottom: 20px; color: var(--accent);">↓</div>
+
+                <div class="flow-step">
+                    <div style="color: var(--accent); font-weight: 700; font-size: 16px;">6</div>
+                    <div class="flow-box">Timeline + confirmation email with unique ticket link</div>
+                </div>
+            </div>
+
+            <h3 style="font-size: 16px; font-weight: 600; margin-top: 32px; margin-bottom: 16px;">Updated Portal View</h3>
+            <div style="background: var(--surface); border: 1px solid var(--border-med); border-radius: 14px; padding: 24px;">
+                <p style="color: var(--text-sub); margin-bottom: 16px;">The Systems page list should show new columns:</p>
+                <ul class="task-list">
+                    <li><strong>Category pill:</strong> "Website" or "Systems" label with color coding</li>
+                    <li><strong>Red Alert indicator:</strong> Red/green dot for urgent vs. standard</li>
+                    <li><strong>Timeline badge:</strong> "24h SLA" or "2-day SLA"</li>
+                    <li><strong>Submission time:</strong> When ticket was created (for triage sorting)</li>
+                </ul>
+            </div>
+
+            <h3 style="font-size: 16px; font-weight: 600; margin-top: 32px; margin-bottom: 16px;">Estimated Build Effort</h3>
+            <div style="background: var(--surface); border: 1px solid var(--border-med); border-radius: 14px; padding: 24px;">
+                <ul class="task-list">
+                    <li><strong>Intake form redesign:</strong> 2–3 hours (add branching logic, template questions)</li>
+                    <li><strong>Portal list update:</strong> 1–2 hours (add columns, sorting)</li>
+                    <li><strong>Asana field mapping:</strong> 30 mins (wire category + red alert to custom fields)</li>
+                    <li><strong>Test & refine:</strong> 1 hour</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- FEEDBACK SECTION -->
+        <div id="feedback" class="section">
+            <div class="feedback-section">
+                <h2 class="feedback-title">Share Your Feedback</h2>
+                <p class="feedback-desc">What do you think? Any concerns, ideas, or changes you'd like to make?</p>
+
+                <div class="success-message" id="successMessage">
+                    ✓ Feedback submitted! I'll review your notes and apply changes.
+                </div>
+
+                <form id="feedbackForm">
+                    <div class="form-group">
+                        <label class="form-label">Which recommendation resonates most?</label>
+                        <select class="form-input" id="resonance" required>
+                            <option value="">Select one...</option>
+                            <option value="category-split">Split by Website/Systems</option>
+                            <option value="red-alert">Red Alert flag & SLA tiers</option>
+                            <option value="templates">Templated questions per category</option>
+                            <option value="timeline">Show timeline upfront</option>
+                            <option value="confirmation">Confirmation step</option>
+                            <option value="all">All of them</option>
+                            <option value="other">Something else</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Any concerns or changes?</label>
+                        <textarea class="form-textarea" id="concerns" placeholder="E.g., 'I worry about too many questions upfront...' or 'You should also ask about X'"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Anything else to add?</label>
+                        <textarea class="form-textarea" id="other" placeholder="Design notes, process changes, feature ideas..."></textarea>
+                    </div>
+
+                    <button type="submit" class="form-button">Send Feedback</button>
+                </form>
+
+                <div style="background: var(--surface-el); border: 1px solid var(--border-med); border-radius: 10px; padding: 16px; margin-top: 24px;">
+                    <p style="font-size: 12px; color: var(--text-sub); margin-bottom: 8px;">💾 <strong>Feedback format:</strong> Your responses will be formatted as Markdown and copied to your chat so you can paste them back.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const sectionId = tab.dataset.section;
+
+                // Deactivate all tabs and sections
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+                // Activate clicked tab and corresponding section
+                tab.classList.add('active');
+                document.getElementById(sectionId).classList.add('active');
+
+                // Scroll to top
+                window.scrollTo(0, 0);
+            });
+        });
+
+        // Feedback form handling
+        document.getElementById('feedbackForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const resonance = document.getElementById('resonance').value;
+            const concerns = document.getElementById('concerns').value;
+            const other = document.getElementById('other').value;
+
+            // Build markdown feedback
+            const feedback = `## Support Ticket Flow Analysis — Feedback
+
+**Most Resonant:** ${resonance}
+
+**Concerns or Changes:**
+${concerns || '(None provided)'}
+
+**Additional Notes:**
+${other || '(None provided)'}
+`;
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(feedback).then(() => {
+                // Show success message
+                const msg = document.getElementById('successMessage');
+                msg.classList.add('show');
+
+                // Log for inspection
+                console.log('Feedback copied to clipboard:');
+                console.log(feedback);
+
+                // Clear form
+                document.getElementById('feedbackForm').reset();
+
+                // Hide message after 5s
+                setTimeout(() => msg.classList.remove('show'), 5000);
+            }).catch(err => {
+                alert('Error copying feedback. Please try again.');
+                console.error(err);
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+CLAUDE.local.md
+builds/
+*.DS_Store
+.env
+node_modules/
