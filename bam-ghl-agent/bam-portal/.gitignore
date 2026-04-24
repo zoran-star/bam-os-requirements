@@ -26,3 +26,4 @@ dist-ssr
 *.sw?
 ghl-keys.json
 .vercel
+.env*.local
