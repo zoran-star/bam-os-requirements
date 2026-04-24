@@ -20,6 +20,7 @@ import SettingsView from './views/SettingsView';
 import SystemsView from './views/SystemsView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
+import SetPasswordView from './views/SetPasswordView';
 import { supabase } from './lib/supabase';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
@@ -27,6 +28,7 @@ import { IconDashboard, IconClients, IconTasks, IconCalendar, IconKnowledge, Ico
 
 export default function BAMPortal() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = not authed
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [dark, setDark] = useState(true);
   const [nav, setNav] = useState("dashboard");
@@ -52,7 +54,8 @@ export default function BAMPortal() {
       setSession(s);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
       setSession(s);
     });
     return () => subscription.unsubscribe();
@@ -275,6 +278,10 @@ export default function BAMPortal() {
 
   if (!session) {
     return <LoginView onLogin={(s) => setSession(s)} supabase={supabase} />;
+  }
+
+  if (recoveryMode) {
+    return <SetPasswordView supabase={supabase} onDone={() => setRecoveryMode(false)} />;
   }
 
   const userName = session.user?.user_metadata?.full_name || session.user?.email?.split("@")[0] || "Mike";
