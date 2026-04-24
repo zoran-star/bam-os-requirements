@@ -75,6 +75,15 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
+      // List all projects in workspace
+      if (req.query.mode === "projects") {
+        const data = await asanaFetch(`/projects?workspace=${WORKSPACE_GID}&limit=100&opt_fields=gid,name,archived,color,notes`);
+        const projects = (data.data || []).map(p => ({
+          id: p.gid, name: p.name, archived: p.archived || false, color: p.color || "", notes: p.notes || "",
+        }));
+        return res.status(200).json({ data: projects });
+      }
+
       const mode = req.query.mode || "user"; // "user", "project", "detail", "comments", "subtasks"
       const userKey = req.query.user || "mike"; // default to Mike
       const projectKey = req.query.project || "all";

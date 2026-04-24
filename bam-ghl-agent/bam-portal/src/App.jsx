@@ -17,10 +17,12 @@ import KnowledgeBaseView from './views/KnowledgeBaseView';
 import CommunicationView from './views/CommunicationView';
 import SearchOverlay from './components/overlays/SearchOverlay';
 import SettingsView from './views/SettingsView';
+import SystemsView from './views/SystemsView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import { supabase } from './lib/supabase';
 import { useIsMobile } from './hooks/useMediaQuery';
+import { useStaffMe } from './hooks/useStaffMe';
 import { IconDashboard, IconClients, IconTasks, IconCalendar, IconKnowledge, IconFinancials, IconMessage, IconSettings, IconAlert, IconSearch, IconTraining } from './components/primitives/Icons';
 
 export default function BAMPortal() {
@@ -60,6 +62,9 @@ export default function BAMPortal() {
     await supabase.auth.signOut();
     setSession(null);
   };
+
+  const me = useStaffMe(session);
+  const canSeeSystems = me && (me.role === "admin" || me.role === "systems_manager" || me.role === "systems_executor");
 
   const tk = dark ? T.dark : T.light;
 
@@ -293,6 +298,7 @@ export default function BAMPortal() {
     knowledge: ["Knowledge Base", "SOPs & Solutions"],
     financials: ["Financials", "BAM internal finances"],
     communication: ["Communication", "Slack channels & messages"],
+    systems: ["Systems", "Ticket delegation & execution"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -305,6 +311,7 @@ export default function BAMPortal() {
     knowledge: IconKnowledge,
     financials: IconFinancials,
     communication: IconMessage,
+    systems: IconTasks,
     training: IconTraining,
     settings: IconSettings,
   };
@@ -317,6 +324,7 @@ export default function BAMPortal() {
     { label: "Knowledge Base", key: "knowledge" },
     { label: "Financials", key: "financials" },
     { label: "Communication", key: "communication" },
+    ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
     { label: "SM Training", key: "training", href: "/training" },
   ];
 
@@ -672,6 +680,9 @@ export default function BAMPortal() {
 
             {/* COMMUNICATION */}
             {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
+
+            {/* SYSTEMS */}
+            {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}

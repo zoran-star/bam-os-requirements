@@ -1,21 +1,199 @@
-import { useState, useEffect } from "react";
-const TICKET_STATUSES = ["New", "In Progress", "Awaiting Client", "Complete"];
+import { useState, useEffect, useCallback } from "react";
+import {
+  fetchTickets,
+  fetchDelegationPool,
+  delegateTicket,
+  startTicket,
+  saveTicketNotes,
+  requestClientAction,
+  submitForReview,
+  approveTicket,
+  denyTicket,
+} from "../services/ticketsService";
 
-const TICKET_PATHS = {
-  "Bug/Change": { color: "red", fields: ["Describe Item", "Bug or Change", "Description", "Timeline", "Drive Link"] },
-  "Systems Menu": { color: "accent", fields: ["Selected System", "Uploaded .docx", "Drive Link", "Additional Context"] },
-  "Custom Build": { color: "blue", fields: ["Category", "Problem", "Who It's For", "Current Process", "Success Outcome"] },
+const STATUS_LABEL = {
+  open:             "New",
+  delegated:        "Delegated",
+  in_progress:      "In progress",
+  awaiting_client:  "Awaiting client",
+  in_review:        "In review",
+  needs_rework:     "Needs rework",
+  approved:         "Approved",
+  done:             "Done",
 };
-import Avatar from '../components/primitives/Avatar';
 
-function TicketModal({ ticket, tokens, dark, onClose, onStatusChange }) {
-  const [tab, setTab] = useState("overview");
-  const [ready, setReady] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setReady(true), 10); return () => clearTimeout(t); }, []);
+function statusColor(status, t) {
+  switch (status) {
+    case "open":             return t.amber;
+    case "delegated":        return t.blue;
+    case "in_progress":      return t.accent;
+    case "awaiting_client":  return t.amber;
+    case "in_review":        return t.blue;
+    case "needs_rework":     return t.red;
+    case "approved":
+    case "done":             return t.green;
+    default:                 return t.textMute;
+  }
+}
 
-  const pathInfo = TICKET_PATHS[ticket.path];
-  const pathColor = pathInfo.color === "red" ? tokens.red : pathInfo.color === "accent" ? tokens.accent : tokens.blue;
-  const tabs = ["overview", "build plan", "messages", "delivery"];
+function formatDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+export default function SystemsView({ tokens: t, dark, me, session }) {
+  const isManager = me?.role === "admin" || me?.role === "systems_manager";
+  const defaultTab = isManager ? "delegation" : "execution";
+
+  const [tab, setTab] = useState(defaultTab);
+  const [tickets, setTickets] = useState([]);
+  const [pool, setPool] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [ticketsRes, poolRes] = await Promise.all([
+      fetchTickets(),
+      fetchDelegationPool(),
+    ]);
+    if (ticketsRes.data) setTickets(ticketsRes.data);
+    if (poolRes.data) setPool(poolRes.data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const visibleTickets = tickets.filter(x => {
+    if (tab === "delegation") return x.status === "open";
+    if (tab === "review") return x.status === "in_review";
+    if (tab === "execution") {
+      if (!["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)) return false;
+      if (isManager) return true;
+      return x.assigned_to === me?.id;
+    }
+    return false;
+  });
+
+  const tabs = isManager
+    ? [
+        { key: "delegation", label: "Delegation", count: tickets.filter(x => x.status === "open").length },
+        { key: "execution",  label: "Execution",  count: tickets.filter(x => ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
+        { key: "review",     label: "Review",     count: tickets.filter(x => x.status === "in_review").length },
+      ]
+    : [
+        { key: "execution", label: "My Tickets", count: tickets.filter(x => x.assigned_to === me?.id && ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
+      ];
+
+  return (
+    <div style={{ padding: "28px 32px" }}>
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: `1px solid ${t.border}` }}>
+        {tabs.map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)} style={{
+            padding: "12px 20px", border: "none", background: "transparent",
+            color: tab === tb.key ? t.text : t.textMute,
+            fontSize: 14, fontWeight: 600, cursor: "pointer",
+            borderBottom: `2px solid ${tab === tb.key ? t.accent : "transparent"}`,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {tb.label}
+            {tb.count > 0 && (
+              <span style={{
+                background: tab === tb.key ? t.accent : t.borderMed,
+                color: tab === tb.key ? "#000" : t.textMute,
+                borderRadius: 10, padding: "2px 8px", fontSize: 11, fontWeight: 700,
+              }}>{tb.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
+
+      {!loading && visibleTickets.length === 0 && (
+        <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+          No tickets in this tab.
+        </div>
+      )}
+
+      {/* Tickets list */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {visibleTickets.map(x => (
+          <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+        ))}
+      </div>
+
+      {selected && (
+        <TicketModal
+          ticket={selected}
+          me={me}
+          isManager={isManager}
+          pool={pool}
+          tokens={t}
+          dark={dark}
+          onClose={() => setSelected(null)}
+          onAction={async () => { await load(); setSelected(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TicketCard({ ticket, tokens: t, onOpen }) {
+  const title = ticket.menu_item
+    || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
+  const preview = Object.values(ticket.fields || {}).filter(Boolean).join(" · ").slice(0, 120);
+  return (
+    <div onClick={onOpen} style={{
+      background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12,
+      padding: "16px 20px", cursor: "pointer", transition: "border-color 0.2s",
+    }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMed}
+      onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(ticket.status, t), textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {STATUS_LABEL[ticket.status] || ticket.status}
+        </span>
+        {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
+        <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{formatDate(ticket.submitted_at)}</span>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
+      <div style={{ fontSize: 13, color: t.textMute, marginBottom: 8 }}>
+        {ticket.client?.name || "Unknown client"}
+        {ticket.assignee && <> · assigned to <b style={{ color: t.textSub }}>{ticket.assignee.name}</b></>}
+      </div>
+      {preview && <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.4 }}>{preview}</div>}
+    </div>
+  );
+}
+
+function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, onClose, onAction }) {
+  const [ticket, setTicket] = useState(initial);
+  const [notes, setNotes] = useState(initial.staff_notes || "");
+  const [userGuide, setUserGuide] = useState(initial.user_guide || "");
+  const [clientRequest, setClientRequest] = useState("");
+  const [denyNotes, setDenyNotes] = useState("");
+  const [assignee, setAssignee] = useState(initial.assigned_to || "");
+  const [showDeny, setShowDeny] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const canExec = isManager || ticket.assigned_to === me?.id;
+
+  const wrap = async (fn) => {
+    setBusy(true);
+    const res = await fn();
+    setBusy(false);
+    if (res?.data) {
+      setTicket(res.data);
+      await onAction();
+    } else if (res?.error) {
+      alert(res.error);
+    }
+  };
 
   return (
     <div onClick={onClose} style={{
@@ -23,482 +201,230 @@ function TicketModal({ ticket, tokens, dark, onClose, onStatusChange }) {
       background: dark ? "rgba(0,0,0,0.80)" : "rgba(0,0,0,0.35)",
       display: "flex", alignItems: "center", justifyContent: "center",
       padding: 24, backdropFilter: "blur(12px)",
-      opacity: ready ? 1 : 0, transition: "opacity 0.2s",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: "100%", maxWidth: 880, maxHeight: "88vh",
-        background: tokens.surface, borderRadius: 20,
-        border: `1px solid ${tokens.borderMed}`,
-        boxShadow: `0 40px 100px rgba(0,0,0,${dark ? 0.7 : 0.2})`,
+        width: "100%", maxWidth: 820, maxHeight: "88vh",
+        background: t.surface, borderRadius: 20,
+        border: `1px solid ${t.borderMed}`,
         display: "flex", flexDirection: "column", overflow: "hidden",
-        transform: ready ? "translateY(0) scale(1)" : "translateY(16px) scale(0.975)",
-        transition: "transform 0.22s cubic-bezier(0.34,1.3,0.64,1)",
       }}>
         {/* Header */}
-        <div style={{ padding: "28px 32px 24px", borderBottom: `1px solid ${tokens.border}`, display: "flex", alignItems: "flex-start", gap: 18, flexShrink: 0 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: tokens.textMute, fontFamily: "monospace" }}>{ticket.id}</span>
-              {ticket.redAlert && <span style={{ fontSize: 12, fontWeight: 600, color: tokens.red }}>{"\ud83d\udd34"} Red Alert</span>}
-            </div>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: tokens.text, margin: 0, letterSpacing: "-0.03em", lineHeight: 1.3 }}>{ticket.description}</h2>
-            <div style={{ display: "flex", gap: 16, fontSize: 14, color: tokens.textMute, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ fontWeight: 500, color: tokens.textSub }}>{ticket.clientName}</span>
-              <span style={{ color: pathColor, fontWeight: 600 }}>{ticket.path}</span>
-              <span>Submitted {ticket.submitted}</span>
-              <span style={{ fontWeight: 500, color: ticket.priority === "High" ? tokens.red : ticket.priority === "Medium" ? tokens.amber : tokens.textMute }}>{ticket.priority} priority</span>
-            </div>
+        <div style={{ padding: "24px 28px", borderBottom: `1px solid ${t.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(ticket.status, t), textTransform: "uppercase", letterSpacing: 0.5 }}>
+              {STATUS_LABEL[ticket.status] || ticket.status}
+            </span>
+            {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
+            <span style={{ fontSize: 11, color: t.textMute, fontFamily: "monospace", marginLeft: "auto" }}>{ticket.id.slice(0, 8)}</span>
           </div>
-          <div onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: tokens.textMute, fontSize: 18, transition: "color 0.12s",
-          }}
-            onMouseEnter={e => e.currentTarget.style.color = tokens.text}
-            onMouseLeave={e => e.currentTarget.style.color = tokens.textMute}
-          >{"\u00d7"}</div>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: "flex", paddingLeft: 32, flexShrink: 0, borderBottom: `1px solid ${tokens.border}`, gap: 8 }}>
-          {tabs.map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{
-              padding: "14px 20px", fontSize: 14, fontWeight: tab === t ? 600 : 400,
-              background: "none", border: "none", cursor: "pointer", fontFamily: "inherit",
-              color: tab === t ? tokens.text : tokens.textMute,
-              borderBottom: `2px solid ${tab === t ? tokens.accent : "transparent"}`,
-              marginBottom: -1, transition: "all 0.12s", textTransform: "capitalize",
-            }}>{t}</button>
-          ))}
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: t.text, margin: 0 }}>
+            {ticket.menu_item || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request")}
+          </h2>
+          <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6 }}>
+            <span>{ticket.client?.name || "Unknown client"}</span>
+            <span>Submitted {formatDate(ticket.submitted_at)}</span>
+            {ticket.assignee && <span>Assigned to {ticket.assignee.name}</span>}
+          </div>
         </div>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: 32 }}>
-          {tab === "overview" && (
-            <div>
-              {/* Status control */}
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 12, letterSpacing: "0.04em" }}>STATUS</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {TICKET_STATUSES.map(s => (
-                    <button key={s} onClick={() => onStatusChange(ticket.id, s)} style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 13, cursor: "pointer",
-                      background: ticket.status === s ? tokens.accentGhost : "transparent",
-                      border: ticket.status === s ? `1px solid ${tokens.accentBorder}` : `1px solid ${tokens.border}`,
-                      color: ticket.status === s ? tokens.accent : tokens.textMute,
-                      fontFamily: "inherit", fontWeight: ticket.status === s ? 600 : 400,
-                      transition: "all 0.12s",
-                    }}>{s}</button>
+        <div style={{ padding: "24px 28px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Submission fields */}
+          <Section title="Submission" tokens={t}>
+            {Object.entries(ticket.fields || {}).map(([k, v]) => (
+              <Row key={k} label={k} value={v} tokens={t} />
+            ))}
+            {(ticket.files || []).length > 0 && (
+              <Row label="Files" tokens={t} value={
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {ticket.files.map((f, i) => (
+                    <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, textDecoration: "none" }}>
+                      📎 {f.name}
+                    </a>
                   ))}
                 </div>
-              </div>
+              } />
+            )}
+          </Section>
 
-              {/* Submission details */}
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 16, letterSpacing: "0.04em" }}>SUBMISSION DETAILS</div>
-                {Object.entries(ticket.fields).map(([key, val]) => (
-                  <div key={key} style={{ display: "flex", gap: 16, marginBottom: 14, alignItems: "flex-start" }}>
-                    <span style={{ width: 160, flexShrink: 0, fontSize: 13, fontWeight: 500, color: tokens.textSub }}>{key}</span>
-                    <span style={{ fontSize: 14, color: tokens.text, lineHeight: 1.6 }}>{val}</span>
-                  </div>
-                ))}
+          {/* Denial notes (visible when rework) */}
+          {ticket.denial_notes && ticket.status === "needs_rework" && (
+            <Section title="⚠️ Denial feedback" tokens={t}>
+              <div style={{ background: dark ? "rgba(232,117,96,0.08)" : "rgba(232,117,96,0.1)", border: `1px solid ${t.red}33`, borderRadius: 8, padding: 12, fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>
+                {ticket.denial_notes}
               </div>
+            </Section>
+          )}
 
-              {/* Manager */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", borderRadius: 12, background: tokens.surfaceAlt }}>
-                <Avatar name={ticket.manager} size={32} />
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>{ticket.manager}</div>
-                  <div style={{ fontSize: 12, color: tokens.textMute }}>Assigned</div>
+          {/* Client action thread */}
+          {(ticket.client_action_request || ticket.client_action_response) && (
+            <Section title="Client action" tokens={t}>
+              {ticket.client_action_request && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>STAFF ASKED</div>
+                  <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_request}</div>
                 </div>
-              </div>
-            </div>
+              )}
+              {ticket.client_action_response && (
+                <div>
+                  <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>CLIENT REPLIED</div>
+                  <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_response}</div>
+                  {(ticket.client_action_files || []).map((f, i) => (
+                    <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
+                  ))}
+                </div>
+              )}
+            </Section>
           )}
 
-          {tab !== "overview" && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 8 }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text }}>{tab.charAt(0).toUpperCase() + tab.slice(1)}</div>
-              <div style={{ fontSize: 14, color: tokens.textMute }}>Connect Supabase to populate this panel.</div>
-            </div>
+          {/* Notes */}
+          <Section title="Notes" tokens={t}>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              onBlur={() => notes !== ticket.staff_notes && wrap(() => saveTicketNotes(ticket.id, notes))}
+              placeholder="Scratchpad for the systems team…"
+              style={{
+                width: "100%", minHeight: 90, padding: 12,
+                background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
+                color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+              }}
+            />
+          </Section>
+
+          {/* User guide (executor edits on submit-review) */}
+          {(ticket.status === "in_progress" || ticket.status === "needs_rework" || ticket.status === "in_review" || ticket.status === "done") && (
+            <Section title="User guide (shown to client on completion)" tokens={t}>
+              <textarea
+                value={userGuide}
+                onChange={e => setUserGuide(e.target.value)}
+                disabled={ticket.status === "in_review" || ticket.status === "done" || !canExec}
+                placeholder="Explain to the client what happens in their GHL…"
+                style={{
+                  width: "100%", minHeight: 80, padding: 12,
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
+                  color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+                  opacity: (ticket.status === "in_review" || ticket.status === "done") ? 0.7 : 1,
+                }}
+              />
+            </Section>
           )}
+
+          {/* Request client action form */}
+          {showRequest && (
+            <Section title="Ask client something" tokens={t}>
+              <textarea
+                value={clientRequest}
+                onChange={e => setClientRequest(e.target.value)}
+                placeholder="What do you need from the client?"
+                style={{
+                  width: "100%", minHeight: 80, padding: 12,
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
+                  color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button onClick={() => setShowRequest(false)} style={btn(t, "ghost")}>Cancel</button>
+                <button disabled={!clientRequest.trim() || busy} onClick={() => wrap(() => requestClientAction(ticket.id, clientRequest))} style={btn(t, "primary")}>Send to client</button>
+              </div>
+            </Section>
+          )}
+
+          {/* Deny form */}
+          {showDeny && (
+            <Section title="Denial feedback" tokens={t}>
+              <textarea
+                value={denyNotes}
+                onChange={e => setDenyNotes(e.target.value)}
+                placeholder="What needs to change before approval?"
+                style={{
+                  width: "100%", minHeight: 80, padding: 12,
+                  background: t.bg, border: `1px solid ${t.red}55`, borderRadius: 8,
+                  color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button onClick={() => setShowDeny(false)} style={btn(t, "ghost")}>Cancel</button>
+                <button disabled={!denyNotes.trim() || busy} onClick={() => wrap(() => denyTicket(ticket.id, denyNotes))} style={btn(t, "danger")}>Deny & send back</button>
+              </div>
+            </Section>
+          )}
+        </div>
+
+        {/* Action bar */}
+        <div style={{ padding: "16px 28px", borderTop: `1px solid ${t.border}`, display: "flex", gap: 8, flexWrap: "wrap", background: t.bg }}>
+          {/* Manager: delegate / reassign */}
+          {isManager && (ticket.status === "open" || ticket.status === "delegated") && (
+            <>
+              <select
+                value={assignee}
+                onChange={e => setAssignee(e.target.value)}
+                style={{ padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13 }}
+              >
+                <option value="">Choose executor…</option>
+                {pool.map(p => <option key={p.id} value={p.id}>{p.name} ({p.role === "systems_manager" ? "Mgr" : "Exec"})</option>)}
+              </select>
+              <button disabled={!assignee || busy} onClick={() => wrap(() => delegateTicket(ticket.id, assignee))} style={btn(t, "primary")}>
+                {ticket.status === "delegated" ? "Reassign" : "Delegate"}
+              </button>
+              {ticket.status === "open" && (
+                <button disabled={busy} onClick={() => wrap(() => delegateTicket(ticket.id, me.id))} style={btn(t, "ghost")}>Self-assign</button>
+              )}
+            </>
+          )}
+
+          {/* Executor: start */}
+          {ticket.status === "delegated" && canExec && (
+            <button disabled={busy} onClick={() => wrap(() => startTicket(ticket.id))} style={btn(t, "primary")}>Start work</button>
+          )}
+
+          {/* Executor: request client action / submit review */}
+          {canExec && (ticket.status === "in_progress" || ticket.status === "needs_rework") && (
+            <>
+              {!showRequest && <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>Request client action</button>}
+              <button disabled={busy || !userGuide.trim()} onClick={() => wrap(() => submitForReview(ticket.id, userGuide))} style={btn(t, "primary")}>Submit for review</button>
+            </>
+          )}
+
+          {/* Manager: approve / deny on in_review */}
+          {isManager && ticket.status === "in_review" && (
+            <>
+              <button disabled={busy} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
+              {!showDeny && <button disabled={busy} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
+            </>
+          )}
+
+          <button onClick={onClose} style={{ ...btn(t, "ghost"), marginLeft: "auto" }}>Close</button>
         </div>
       </div>
     </div>
   );
 }
 
-export default function SystemsView({ tokens, dark }) {
-  const [subTab, setSubTab] = useState("tickets");
-  const [tickets, setTickets] = useState([]);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [expandedProfile, setExpandedProfile] = useState(null);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [profileSearch, setProfileSearch] = useState("");
-  const [toast, setToast] = useState(null);
-  const [copied, setCopied] = useState(false);
-
-  const handleStatusChange = (ticketId, newStatus) => {
-    setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
-    setSelectedTicket(prev => prev ? { ...prev, status: newStatus } : null);
-    if (newStatus === "Complete") {
-      const ticket = tickets.find(t => t.id === ticketId);
-      setToast(`Email sent to ${ticket?.clientName || "client"} \u2014 ticket ${ticketId} marked complete.`);
-      setTimeout(() => setToast(null), 4000);
-    }
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard?.writeText("portal.byanymeanscoaches.com/support-ticket");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const subTabs = ["tickets", "client profiles", "build templates"];
-
-  const [clientProfiles] = useState([]);
-  const [buildTemplates] = useState([]);
-  const filteredProfiles = profileSearch
-    ? clientProfiles.filter(p => p.businessName.toLowerCase().includes(profileSearch.toLowerCase()) || p.niche.toLowerCase().includes(profileSearch.toLowerCase()))
-    : clientProfiles;
-
+function Section({ title, children, tokens: t }) {
   return (
     <div>
-      {/* Sub-tab bar */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 32 }}>
-        {subTabs.map(t => (
-          <button key={t} onClick={() => setSubTab(t)} style={{
-            padding: "10px 22px", borderRadius: 8, fontSize: 14, cursor: "pointer",
-            background: subTab === t ? tokens.accentGhost : "transparent",
-            border: "none", color: subTab === t ? tokens.accent : tokens.textMute,
-            fontFamily: "inherit", fontWeight: subTab === t ? 600 : 400,
-            textTransform: "uppercase", letterSpacing: "0.04em", transition: "all 0.12s",
-          }}>{t}</button>
-        ))}
-      </div>
-
-      {/* TICKETS */}
-      {subTab === "tickets" && (
-        <div>
-          {/* Shareable link bar */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 14, padding: "14px 20px",
-            background: tokens.surfaceEl, borderRadius: 12, marginBottom: 28,
-            border: `1px solid ${tokens.border}`,
-          }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, letterSpacing: "0.04em", flexShrink: 0 }}>CLIENT INTAKE</span>
-            <div style={{ flex: 1, fontSize: 14, color: tokens.accent, fontFamily: "monospace", fontWeight: 500 }}>
-              portal.byanymeanscoaches.com/support-ticket
-            </div>
-            <button onClick={handleCopyLink} style={{
-              padding: "6px 16px", borderRadius: 6, fontSize: 13, cursor: "pointer",
-              background: copied ? tokens.greenSoft : tokens.accentGhost,
-              border: `1px solid ${copied ? tokens.green : tokens.accentBorder}`,
-              color: copied ? tokens.green : tokens.accent,
-              fontFamily: "inherit", fontWeight: 600, transition: "all 0.15s",
-            }}>{copied ? "Copied" : "Copy"}</button>
-          </div>
-
-          {tickets.length === 0 && (
-            <div style={{ padding: "60px 0", textAlign: "center", opacity: 0.4 }}>
-              <div style={{ fontSize: 16, color: tokens.textMute }}>No tickets loaded</div>
-            </div>
-          )}
-          {/* Kanban columns */}
-          <div style={{ display: "flex", gap: 14 }}>
-            {TICKET_STATUSES.map((status, ci) => {
-              const colTickets = tickets.filter(t => t.status === status);
-              return (
-                <div key={ci} style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, padding: "0 4px" }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textMute }}>{status}</span>
-                    <span style={{ fontSize: 12, color: tokens.textMute }}>{colTickets.length}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 120 }}>
-                    {colTickets.map((ticket, ti) => {
-                      const pathInfo = TICKET_PATHS[ticket.path];
-                      const pathColor = pathInfo.color === "red" ? tokens.red : pathInfo.color === "accent" ? tokens.accent : tokens.blue;
-                      return (
-                        <div key={ticket.id}
-                          onClick={() => setSelectedTicket(ticket)}
-                          style={{
-                            background: tokens.surfaceEl, borderRadius: 12,
-                            padding: "16px 18px", cursor: "pointer",
-                            border: `1px solid ${tokens.border}`,
-                            borderLeft: ticket.redAlert ? `3px solid ${tokens.red}` : `1px solid ${tokens.border}`,
-                            transition: "all 0.15s",
-                            opacity: status === "Complete" ? 0.5 : 1,
-                            animation: `cardIn 0.3s ease ${ti * 40}ms both`,
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = tokens.surfaceHov; e.currentTarget.style.borderColor = tokens.borderStr; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = tokens.surfaceEl; e.currentTarget.style.borderColor = tokens.border; }}
-                        >
-                          {/* Header */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, fontFamily: "monospace" }}>{ticket.id}</span>
-                            {ticket.redAlert && <span style={{ fontSize: 11, fontWeight: 600, color: tokens.red }}>{"\ud83d\udd34"} Red Alert</span>}
-                          </div>
-
-                          {/* Client */}
-                          <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, marginBottom: 6, lineHeight: 1.3, letterSpacing: "-0.01em" }}>
-                            {ticket.clientName}
-                          </div>
-
-                          {/* Description */}
-                          <div style={{
-                            fontSize: 13, color: tokens.textSub, lineHeight: 1.5, marginBottom: 12,
-                            overflow: "hidden", textOverflow: "ellipsis",
-                            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                          }}>{ticket.description}</div>
-
-                          {/* Footer */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <span style={{
-                              fontSize: 11, fontWeight: 600, color: pathColor, letterSpacing: "0.02em",
-                              padding: "3px 8px", borderRadius: 5,
-                              background: pathInfo.color === "red" ? tokens.redSoft : pathInfo.color === "accent" ? tokens.accentGhost : `${tokens.blue}12`,
-                            }}>{ticket.path}</span>
-                            <span style={{
-                              fontSize: 11, fontWeight: 600, letterSpacing: "0.02em",
-                              color: ticket.priority === "High" ? tokens.red : ticket.priority === "Medium" ? tokens.amber : tokens.textMute,
-                            }}>{ticket.priority}</span>
-                            <div style={{ flex: 1 }} />
-                            <span style={{ fontSize: 11, color: tokens.textMute }}>{ticket.submitted}</span>
-                          </div>
-                          {/* Copy client link */}
-                          {ticket.publicToken && (
-                            <div style={{ marginTop: 10 }}>
-                              <span
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  navigator.clipboard?.writeText(`${window.location.origin}/ticket/${ticket.publicToken}`);
-                                  e.currentTarget.textContent = "Copied!";
-                                  setTimeout(() => { if (e.currentTarget) e.currentTarget.textContent = "Copy client link"; }, 1500);
-                                }}
-                                style={{
-                                  fontSize: 11, color: tokens.textMute, cursor: "pointer",
-                                  transition: "color 0.12s",
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.color = tokens.accent}
-                                onMouseLeave={e => e.currentTarget.style.color = tokens.textMute}
-                              >Copy client link</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* CLIENT PROFILES */}
-      {subTab === "client profiles" && (
-        <div>
-          {/* Search */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 12, padding: "12px 20px",
-            background: tokens.surfaceEl, borderRadius: 12, marginBottom: 24,
-            border: `1px solid ${tokens.border}`,
-          }}>
-            <span style={{ fontSize: 14, color: tokens.textMute }}>{"\u2315"}</span>
-            <input
-              value={profileSearch} onChange={e => setProfileSearch(e.target.value)}
-              placeholder="Search clients..."
-              style={{
-                flex: 1, background: "none", border: "none", outline: "none",
-                fontSize: 14, color: tokens.text, fontFamily: "inherit",
-              }}
-            />
-          </div>
-
-          {/* Profile rows */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {filteredProfiles.map((profile, pi) => {
-              const expanded = expandedProfile === profile.id;
-              return (
-                <div key={profile.id} style={{ animation: `cardIn 0.3s ease ${pi * 40}ms both` }}>
-                  <div
-                    onClick={() => setExpandedProfile(expanded ? null : profile.id)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 20,
-                      padding: "18px 24px", cursor: "pointer",
-                      background: expanded ? tokens.surfaceAlt : "transparent",
-                      borderRadius: expanded ? "14px 14px 0 0" : 14,
-                      transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = tokens.surfaceEl; }}
-                    onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "transparent"; }}
-                  >
-                    <div style={{ width: 200, minWidth: 200, flexShrink: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: tokens.text, letterSpacing: "-0.01em" }}>{profile.businessName}</div>
-                      <div style={{ fontSize: 13, color: tokens.textMute, marginTop: 3 }}>{profile.niche}</div>
-                    </div>
-                    <div style={{ width: 140, minWidth: 140, flexShrink: 0, fontSize: 13, color: tokens.textSub }}>{profile.location}</div>
-                    <div style={{ width: 140, minWidth: 140, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: tokens.textMute, fontFamily: "monospace" }}>{profile.ghlSubAccount}</span>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      {profile.activeBuilds > 0 ? (
-                        <span style={{ fontSize: 14, fontWeight: 600, color: tokens.accent }}>{profile.activeBuilds} active build{profile.activeBuilds > 1 ? "s" : ""}</span>
-                      ) : (
-                        <span style={{ fontSize: 13, color: tokens.textMute }}>No active builds</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 14, color: expanded ? tokens.accent : tokens.textMute, transition: "color 0.12s", transform: expanded ? "rotate(90deg)" : "rotate(0)", flexShrink: 0 }}>{"\u2192"}</div>
-                  </div>
-
-                  {/* Expanded detail */}
-                  {expanded && (
-                    <div style={{
-                      background: tokens.surfaceEl, borderRadius: "0 0 14px 14px",
-                      padding: "24px 28px", animation: "cardIn 0.2s ease both",
-                    }}>
-                      {/* Overview */}
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>OVERVIEW</div>
-                        <div style={{ fontSize: 14, color: tokens.textSub, lineHeight: 1.7 }}>{profile.overview}</div>
-                      </div>
-
-                      {/* Branding */}
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>BRANDING</div>
-                        <div style={{ display: "flex", gap: 32, alignItems: "flex-start" }}>
-                          <div style={{ display: "flex", gap: 6 }}>
-                            {profile.branding.colors.map((c, i) => (
-                              <div key={i} style={{ width: 28, height: 28, borderRadius: 6, background: c, border: `1px solid ${tokens.borderStr}` }} title={c} />
-                            ))}
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 13, color: tokens.textSub }}><span style={{ color: tokens.textMute }}>Fonts:</span> {profile.branding.fonts}</div>
-                            <div style={{ fontSize: 13, color: tokens.textSub, marginTop: 4 }}><span style={{ color: tokens.textMute }}>Tone:</span> {profile.branding.tone}</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* GHL */}
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>GHL SETUP</div>
-                        <div style={{ fontSize: 14, color: tokens.textSub, lineHeight: 1.7 }}>{profile.ghlSetup}</div>
-                      </div>
-
-                      {/* Builds */}
-                      <div style={{ display: "flex", gap: 40 }}>
-                        {profile.builds.length > 0 && (
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>ACTIVE BUILDS</div>
-                            {profile.builds.map((b, i) => (
-                              <div key={i} style={{ fontSize: 14, color: tokens.accent, fontWeight: 500, marginBottom: 6 }}>{b}</div>
-                            ))}
-                          </div>
-                        )}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>BUILD HISTORY</div>
-                          {profile.history.map((h, i) => (
-                            <div key={i} style={{ fontSize: 13, color: tokens.textSub, marginBottom: 6 }}>{h}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* BUILD TEMPLATES */}
-      {subTab === "build templates" && (
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
-            {buildTemplates.map((tmpl, ti) => {
-              const catColor = tmpl.category === "Funnels" ? tokens.blue : tmpl.category === "Automations" ? tokens.accent : tokens.green;
-              return (
-                <div key={tmpl.id}
-                  onClick={() => setSelectedTemplate(selectedTemplate === tmpl.id ? null : tmpl.id)}
-                  style={{
-                    background: tokens.surfaceEl, borderRadius: 14, cursor: "pointer",
-                    border: `1px solid ${selectedTemplate === tmpl.id ? tokens.borderStr : tokens.border}`,
-                    transition: "all 0.15s", overflow: "hidden",
-                    animation: `cardIn 0.3s ease ${ti * 50}ms both`,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = tokens.borderStr; }}
-                  onMouseLeave={e => { if (selectedTemplate !== tmpl.id) e.currentTarget.style.borderColor = tokens.border; }}
-                >
-                  <div style={{ padding: "22px 24px" }}>
-                    {/* Header */}
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{tmpl.name}</div>
-                      </div>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, color: catColor, letterSpacing: "0.02em",
-                        padding: "3px 8px", borderRadius: 5, flexShrink: 0,
-                        background: tmpl.category === "Funnels" ? `${tokens.blue}12` : tmpl.category === "Automations" ? tokens.accentGhost : tokens.greenSoft,
-                      }}>{tmpl.category}</span>
-                    </div>
-
-                    {/* Description */}
-                    <div style={{ fontSize: 13, color: tokens.textSub, lineHeight: 1.6, marginBottom: 16 }}>{tmpl.description}</div>
-
-                    {/* Status dots */}
-                    <div style={{ display: "flex", gap: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: tmpl.built ? tokens.green : tokens.borderMed }} />
-                        <span style={{ fontSize: 12, color: tmpl.built ? tokens.green : tokens.textMute }}>Built</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: tmpl.approved ? tokens.green : tokens.borderMed }} />
-                        <span style={{ fontSize: 12, color: tmpl.approved ? tokens.green : tokens.textMute }}>Approved</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Expanded detail */}
-                  {selectedTemplate === tmpl.id && (
-                    <div style={{ padding: "0 24px 22px", borderTop: `1px solid ${tokens.border}`, paddingTop: 18, animation: "cardIn 0.2s ease both" }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMute, marginBottom: 10, letterSpacing: "0.04em" }}>TEMPLATE DETAILS</div>
-                      <div style={{ fontSize: 14, color: tokens.textSub, lineHeight: 1.7, marginBottom: 16 }}>
-                        {tmpl.description} This template includes all necessary automations, triggers, and content placeholders. Ready for customization per client branding and business rules.
-                      </div>
-                      <div style={{ display: "flex", gap: 12 }}>
-                        <span style={{ fontSize: 13, color: tokens.accent, fontWeight: 500, cursor: "pointer" }}>Use Template</span>
-                        <span style={{ fontSize: 13, color: tokens.textMute }}>{"\u00b7"}</span>
-                        <span style={{ fontSize: 13, color: tokens.textSub, cursor: "pointer" }}>Duplicate</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Ticket Modal */}
-      {selectedTicket && (
-        <TicketModal
-          ticket={selectedTicket}
-          tokens={tokens}
-          dark={dark}
-          onClose={() => setSelectedTicket(null)}
-          onStatusChange={handleStatusChange}
-        />
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div style={{
-          position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)",
-          background: tokens.green, color: "#fff", padding: "14px 28px",
-          borderRadius: 12, fontSize: 14, fontWeight: 600, zIndex: 2000,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-          animation: "cardIn 0.3s ease both",
-        }}>{toast}</div>
-      )}
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>{title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{children}</div>
     </div>
   );
+}
+
+function Row({ label, value, tokens: t }) {
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ minWidth: 140, fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "capitalize" }}>{label}</div>
+      <div style={{ flex: 1, fontSize: 13, color: t.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {typeof value === "string" ? value : value}
+      </div>
+    </div>
+  );
+}
+
+function btn(t, variant) {
+  const base = { padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none" };
+  if (variant === "primary")     return { ...base, background: t.accent, color: "#000" };
+  if (variant === "danger")      return { ...base, background: t.red, color: "#fff" };
+  if (variant === "danger-ghost")return { ...base, background: "transparent", color: t.red, border: `1px solid ${t.red}55` };
+  return { ...base, background: "transparent", color: t.text, border: `1px solid ${t.border}` };
 }
