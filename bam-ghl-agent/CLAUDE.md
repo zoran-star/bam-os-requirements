@@ -1,5 +1,17 @@
 # BAM GHL Agent
 
+## Project memory
+Project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
+
+## Memory upkeep
+Before every commit, run through:
+- Did a decision get made that future sessions will want? → save to `memories/` and add a line to `MEMORY.md`
+- Did a file move, get created, or get renamed? → update CLAUDE.md paths
+- Did a memory note become stale or wrong? → update or delete it
+- Is `MEMORY.md` still in sync with the `.md` files in the folder?
+
+Memory drift wastes context. Run `/memory-audit` periodically.
+
 ## What this project is (plain english)
 
 **BAM Business** is a white-labeled GoHighLevel agency service. Clients are sports academies and (eventually) home services companies. BAM handles their CRM, automations, websites, funnels, pipelines, and communications inside GHL sub-accounts.

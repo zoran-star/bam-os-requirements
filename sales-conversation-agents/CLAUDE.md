@@ -1,5 +1,19 @@
 # Sales Conversation Agents
 
+## Project memory
+Notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first, then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
+
+## Memory upkeep
+Before every commit, run through:
+- Decision worth keeping? → save to `memories/` and add a line to `MEMORY.md`
+- File moved, created, or renamed? → update CLAUDE.md paths
+- A memory note stale or wrong? → update or delete it
+- Is `MEMORY.md` in sync with the files in the folder?
+
+Run `/memory-audit` periodically.
+
+---
+
 System prompts and other building materials to set up the AI sales agents that run inside of Full Control. This is the "AI-native" layer that makes FullControl feel autonomous.
 
 ## Status

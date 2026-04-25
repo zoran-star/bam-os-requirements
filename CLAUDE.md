@@ -1,5 +1,24 @@
 # BAM OS Requirements
 
+## Project memory
+Team-shared project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
+
+## Memory upkeep
+Before every commit, run through:
+- Did a decision get made that future sessions will want? → save to `memories/` and add a line to `MEMORY.md`
+- Did a file move, get created, or get renamed? → update CLAUDE.md paths
+- Did a memory note become stale or wrong? → update or delete it
+- Is `MEMORY.md` still in sync with the `.md` files in the folder?
+
+Memory drift wastes context. Run `/memory-audit` periodically.
+
+## Repo slash commands
+Skills available in this repo (in `.claude/commands/`):
+- `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/README.md + memories/MEMORY.md for a new project folder
+- `/memory-audit` (personal, in ~/.claude) — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+
+When a new project folder is added to the repo, run `/setup-project-memory` to wire it into the memory system.
+
 ## Collaborators
 This repo is a collaborative project between **Zoran** and **Cole**. Both contributors use Claude Code to work on the requirements. Changes made by either collaborator should be committed and pushed promptly so the other person always has the latest state.
 
