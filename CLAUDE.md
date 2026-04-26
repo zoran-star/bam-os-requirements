@@ -14,6 +14,7 @@ Memory drift wastes context. Run `/memory-audit` periodically.
 
 ## Repo slash commands
 Skills available in this repo (in `.claude/commands/`, shared via git):
+- `/start` — session entry sequence: pull, show recent activity, project menu, route to a project, tell user what's next
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
 
@@ -44,17 +45,21 @@ This repo is a collaborative project between **Zoran** and **Cole**. Both contri
 
 When working on requirements, be aware that the other collaborator may have made recent changes — always pull before editing.
 
-## Session startup checklist
-At the very start of every conversation, before doing any work:
+## Session startup — run `/start`
 
-1. **Confirm connections** — verify you have access to GitHub (this repo), Notion MCP, and GoHighLevel MCP (Zoran) or Notion MCP (Cole). Tell the user which connections are live and flag any that are missing or broken.
-2. **Pull latest** — run `git pull` to get the latest changes from the other collaborator.
-3. **Read Working Memory** — fetch the [Working Memory page](https://www.notion.so/31b5aca8ac0f81b59fd9e8b84aecffc9) in Notion. Read it fully. Then tell the user you've read it and briefly summarize the current state: what the CRLF is, what's on the horizon, and any recent decisions that may be relevant to the session.
+At the very start of every conversation in this repo, run **`/start`** unless the user has already given you a specific task. The skill walks through:
 
-**Example startup message:**
-> Connected: GitHub, Notion, GHL. Pulled latest. Read Working Memory — current CRLF is [X], on the horizon: [Y]. Ready to go.
+1. Pull latest + confirm connections (GitHub, Notion MCP, GHL MCP)
+2. Show recent activity (last 5 commits + touched folders)
+3. Present project menu with live status hints from each `memories/MEMORY.md`
+4. Wait for user to pick a project (or "new project")
+5. Load that project's CLAUDE.md + memories
+6. Tell them what's next based on the notes
+7. Begin work
 
-If any connection fails or the Working Memory page can't be fetched, flag it immediately so the user knows context may be incomplete.
+If the user opens with a specific task ("fix the X bug", "edit Y file"), skip `/start` and just do the work — they already know where they're going.
+
+**Working Memory in Notion** ([page](https://www.notion.so/31b5aca8ac0f81b59fd9e8b84aecffc9)) is still the source of truth for the CRLF and high-level state — read it during `/start` step 1 if Notion MCP is connected.
 
 ## After you finish
 Always commit and push changes after making edits. Use descriptive commit messages that reference the job IDs affected (e.g. "Add MEM-010 referral tracking requirement"). This ensures the other collaborator gets changes immediately.
