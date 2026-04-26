@@ -13,11 +13,28 @@ Before every commit, run through:
 Memory drift wastes context. Run `/memory-audit` periodically.
 
 ## Repo slash commands
-Skills available in this repo (in `.claude/commands/`):
-- `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/README.md + memories/MEMORY.md for a new project folder
-- `/memory-audit` (personal, in ~/.claude) — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+Skills available in this repo (in `.claude/commands/`, shared via git):
+- `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
+- `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
 
-When a new project folder is added to the repo, run `/setup-project-memory` to wire it into the memory system.
+## Project router — which folder for which work
+
+When the user asks for something, route to the right folder. Each subfolder has its own CLAUDE.md + memories/ that loads when you `cd` into it. **If the user is working in the wrong folder for the task, tell them to switch.**
+
+| If the user wants to… | Open Claude Code in… |
+|---|---|
+| Edit the FullControl prototype (UI/features) | `prototype/` |
+| Work on BAM GTA (live deployment, staff/parent apps) | `prototype/bam-gta-phase1/` |
+| Edit the staff portal / GHL agent / client portal HTML / onboarding flows | `bam-ghl-agent/` |
+| Run a whiteboard session export / planning tool work | `whiteboard/` (tool) or repo root (process exports) |
+| Investor pages, business planning, decks | `business/` |
+| Market research survey | `market-research/` |
+| AI sales agent prompts (booking / closing / rebooking) | `sales-conversation-agents/` |
+| Add or edit Notion business requirements | repo root (Notion MCP, no specific folder) |
+| Add a new top-level project folder | repo root → run `/setup-project-memory <folder>` |
+| Audit memory health across projects | any folder → run `/memory-audit` |
+
+Each subfolder's CLAUDE.md has the full project-specific context. Memory drift wastes context — see Memory upkeep above.
 
 ## Collaborators
 This repo is a collaborative project between **Zoran** and **Cole**. Both contributors use Claude Code to work on the requirements. Changes made by either collaborator should be committed and pushed promptly so the other person always has the latest state.
