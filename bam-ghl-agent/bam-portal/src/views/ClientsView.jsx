@@ -1336,30 +1336,6 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
         animation: `cardIn 0.3s ease ${index * 40}ms both`,
       }}
     >
-      {/* Top-right card action — depends on account state */}
-      {(onResetPassword || onSetupAccount) && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (client.auth_user_id) onResetPassword?.();
-            else onSetupAccount?.();
-          }}
-          title={client.auth_user_id
-            ? `Send password reset link to ${client.email}`
-            : `Set up a portal login for ${client.name}`}
-          style={{
-            position: "absolute", top: 10, right: 10, zIndex: 2,
-            fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 6,
-            background: client.auth_user_id ? `${tokens.accent}1A` : `${tokens.green}1A`,
-            color: client.auth_user_id ? tokens.accent : tokens.green,
-            border: `1px solid ${client.auth_user_id ? tokens.accent : tokens.green}33`,
-            cursor: "pointer",
-            letterSpacing: 0.4, textTransform: "uppercase",
-            fontFamily: "inherit",
-          }}
-        >{client.auth_user_id ? "🔑 Reset password" : "✉ Set up account"}</button>
-      )}
-
       {/* Health bar accent at top */}
       {health != null && (
         <div style={{
@@ -1391,7 +1367,29 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
               <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 2, paddingLeft: health != null ? 17 : 0, fontFamily: "monospace" }}>{client.email}</div>
             )}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginLeft: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0, marginLeft: 10 }}>
+            {(onResetPassword || onSetupAccount) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (client.auth_user_id) onResetPassword?.();
+                  else onSetupAccount?.();
+                }}
+                title={client.auth_user_id
+                  ? `Send password reset link to ${client.email}`
+                  : `Set up a portal login for ${client.name}`}
+                style={{
+                  fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 6,
+                  background: client.auth_user_id ? `${tokens.accent}1A` : `${tokens.green}1A`,
+                  color: client.auth_user_id ? tokens.accent : tokens.green,
+                  border: `1px solid ${client.auth_user_id ? tokens.accent : tokens.green}33`,
+                  cursor: "pointer",
+                  letterSpacing: 0.4, textTransform: "uppercase",
+                  fontFamily: "inherit",
+                  whiteSpace: "nowrap",
+                }}
+              >{client.auth_user_id ? "🔑 Reset password" : "✉ Set up account"}</button>
+            )}
             <span style={{
               fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6,
               background: `${statusColor}18`, color: statusColor,
