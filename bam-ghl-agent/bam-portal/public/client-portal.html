@@ -3542,9 +3542,11 @@ document.getElementById('login-email')?.addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('login-password').focus();
 });
 
-// Watch for session changes (sign-in/out from other tabs)
-_sb.auth.onAuthStateChange((_event, session) => {
-  if (!session) location.reload();
+// Watch for explicit sign-out from another tab. Only react to SIGNED_OUT —
+// INITIAL_SESSION with a null session would otherwise reload-loop on first
+// page load before the user has logged in.
+_sb.auth.onAuthStateChange((event, _session) => {
+  if (event === 'SIGNED_OUT') location.reload();
 });
 
 boot();
