@@ -17,3 +17,4 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Client Action Thread](project_client_action_thread.md) — multi-round chat between staff & client on a ticket: `tickets.messages` jsonb, state machine, API actions, UI mapping
 - [Client Action Notifications (TODO)](project_client_action_notifications_todo.md) — deferred: Slack/email/SMS notifications when staff requests action or client responds
 - [Client Portal Auth](project_client_auth.md) — email + password login, 1 user per client via `clients.auth_user_id`, manual provisioning, RLS-scoped queries; URL `?client_id=` flow removed
+- [Pre-Launch Checklist](project_pre_launch_checklist.md) — everything intentionally deferred during dev: SMTP for prod email, branded templates, signed URLs, notifications, audit trail, etc. Walk through 🔴 items before first real client.
