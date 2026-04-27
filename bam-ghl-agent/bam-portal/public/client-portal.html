@@ -2476,7 +2476,7 @@ function rowHTML(t) {
   const rowStyle = isAction ? 'style="background:rgba(232,191,96,0.08);border-left:3px solid var(--accent);padding-left:13px"' : '';
   const badge = isAction ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(232,191,96,0.18);padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-right:8px">⏳ Action Needed</span>` : '';
   return `
-    <div class="ticket-row" onclick="openTicket(${t.id})" ${rowStyle}>
+    <div class="ticket-row" onclick="openTicket('${t.id}')" ${rowStyle}>
       ${badge}
       <div class="ticket-row-title">${escapeHTML(t.title)}</div>
       <span class="status-pill ${t.status}">${STATUS_LABEL_SHORT[t.status]}</span>
