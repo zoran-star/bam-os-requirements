@@ -55,7 +55,10 @@ clients.auth_user_id uuid unique references auth.users(id) on delete set null
 
 ## Account creation
 
-**Preferred path: Settings → Clients → "+ New client" (admin only).**
+**Two paths from the staff portal:**
+
+### A) New client from scratch (Settings → Clients → "+ New client")
+Use when adding a brand-new academy that's not in `clients` yet. Creates a new clients row + Supabase auth user in one step.
 
 Form collects: academy name, owner name, owner email, password (or auto-generated), status (default `onboarding`). On submit, `POST /api/clients` does:
 1. Verifies caller is staff with `role = 'admin'`
@@ -65,6 +68,21 @@ Form collects: academy name, owner name, owner email, password (or auto-generate
 5. Returns the new client `id` + `name`
 
 UI then shows the email + password once, with a "Copy credentials" button — staff sends them to the client manually. Password never stored, never shown again.
+
+### B) Set up account for an existing client (Clients page → card → "✉ Set up account")
+Use for the 20+ clients seeded earlier without owner/email/auth_user_id. Each card shows one of two top-right pills:
+- **"✉ Set up account"** (green) when `auth_user_id is null`
+- **"🔑 Reset password"** (gold) when the account exists
+
+Clicking "Set up account" opens `SetupAccountModal` (pre-fills any existing owner_name/email). Submits to `POST /api/clients?action=setup-account` which:
+1. Verifies admin auth (same as path A)
+2. Validates client_id, owner_name, email, password (≥8)
+3. Confirms the client doesn't already have `auth_user_id` (otherwise rejects with "use Reset password instead")
+4. Creates the Supabase auth user (admin API)
+5. UPDATEs the clients row with owner_name + email + auth_user_id
+6. Rolls back the auth user if the UPDATE fails
+
+After success, the modal flips to the credentials display (same as path A) and the page reloads so the card flips to "🔑 Reset password".
 
 **Fallback (Supabase dashboard):** see `bam-ghl-agent/docs/client-account-setup.md`. Used for resets, deactivation, and one-off troubleshooting.
 

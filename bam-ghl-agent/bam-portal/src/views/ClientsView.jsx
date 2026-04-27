@@ -9,6 +9,8 @@ import { supabase } from '../lib/supabase';
 export default function ClientsView({ tokens, dark, onboardingClients, activeClients, onSelectClient }) {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("active");
+  const [setupTarget, setSetupTarget] = useState(null);
+  const [setupRefreshKey, setSetupRefreshKey] = useState(0);
   const [notionClients, setNotionClients] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -621,6 +623,7 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
                   else alert(`Reset link sent to ${client.email}`);
                 } catch (e) { alert("Failed: " + e.message); }
               }}
+              onSetupAccount={() => setSetupTarget(client)}
             />
           ))}
           {clients.length === 0 && (
@@ -629,6 +632,15 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
             </div>
           )}
         </div>
+      )}
+
+      {setupTarget && (
+        <SetupAccountModal
+          tokens={tokens}
+          client={setupTarget}
+          onClose={() => setSetupTarget(null)}
+          onSuccess={() => { setSetupTarget(null); setSetupRefreshKey(k => k + 1); window.location.reload(); }}
+        />
       )}
 
       {/* Lead cards grid — Leads tab */}
@@ -1275,7 +1287,7 @@ function LeadCard({ lead, tokens, dark, index, smColors, stageColorMap, sourceCo
 }
 
 /* ── Client Card — KPI-forward ────────────────────────────────── */
-function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onResetPassword }) {
+function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onResetPassword, onSetupAccount }) {
   const [hov, setHov] = useState(false);
 
   const isOnboarding = client.profileStatus === "onboarding";
@@ -1284,7 +1296,7 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
 
   // Resolve display fields
   const businessName = client.businessName || client.title || client.name || "Unnamed";
-  const clientName = client.clientName || client.owner || "";
+  const clientName = client.clientName || client.owner || client.owner_name || "";
   const manager = client.manager || "";
   // Tier hidden along with health — both were the uniform "Foundations"/"95%"
   // placeholder. Restore by removing this override once a real tier exists.
@@ -1324,22 +1336,28 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
         animation: `cardIn 0.3s ease ${index * 40}ms both`,
       }}
     >
-      {/* Top-right card action: send password reset */}
-      {onResetPassword && client.email && (
+      {/* Top-right card action — depends on account state */}
+      {(onResetPassword || onSetupAccount) && (
         <button
-          onClick={(e) => { e.stopPropagation(); onResetPassword(); }}
-          title={`Send password reset link to ${client.email}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (client.auth_user_id) onResetPassword?.();
+            else onSetupAccount?.();
+          }}
+          title={client.auth_user_id
+            ? `Send password reset link to ${client.email}`
+            : `Set up a portal login for ${client.name}`}
           style={{
             position: "absolute", top: 10, right: 10, zIndex: 2,
             fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 6,
-            background: `${tokens.accent}1A`, color: tokens.accent,
-            border: `1px solid ${tokens.accent}33`, cursor: "pointer",
+            background: client.auth_user_id ? `${tokens.accent}1A` : `${tokens.green}1A`,
+            color: client.auth_user_id ? tokens.accent : tokens.green,
+            border: `1px solid ${client.auth_user_id ? tokens.accent : tokens.green}33`,
+            cursor: "pointer",
             letterSpacing: 0.4, textTransform: "uppercase",
             fontFamily: "inherit",
           }}
-          onMouseEnter={e => e.currentTarget.style.background = `${tokens.accent}33`}
-          onMouseLeave={e => e.currentTarget.style.background = `${tokens.accent}1A`}
-        >🔑 Reset password</button>
+        >{client.auth_user_id ? "🔑 Reset password" : "✉ Set up account"}</button>
       )}
 
       {/* Health bar accent at top */}
@@ -1368,6 +1386,9 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
             </div>
             {clientName && (
               <div style={{ fontSize: 13, color: tokens.textSub, marginTop: 3, paddingLeft: health != null ? 17 : 0 }}>{clientName}</div>
+            )}
+            {client.email && (
+              <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 2, paddingLeft: health != null ? 17 : 0, fontFamily: "monospace" }}>{client.email}</div>
             )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0, marginLeft: 10 }}>
@@ -1496,6 +1517,103 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
           }}>
             {latestUpdate.length > 120 ? latestUpdate.slice(0, 120) + "..." : latestUpdate}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Setup-account modal (creates a portal login for an existing client row) ───
+function SetupAccountModal({ tokens, client, onClose, onSuccess }) {
+  const [ownerName, setOwnerName] = useState(client.owner_name || "");
+  const [email, setEmail] = useState(client.email || "");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const generatePassword = () => {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!#$%&";
+    let p = "";
+    const rnd = (window.crypto?.getRandomValues?.bind(window.crypto)) || null;
+    if (rnd) {
+      const bytes = new Uint32Array(14);
+      rnd(bytes);
+      for (let i = 0; i < 14; i++) p += chars[bytes[i] % chars.length];
+    } else {
+      for (let i = 0; i < 14; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setPassword(p);
+  };
+
+  const submit = async () => {
+    setBusy(true); setError("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/clients?action=setup-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, owner_name: ownerName, email, password }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(json?.error || `HTTP ${res.status}`); setBusy(false); return; }
+      setCreated({ name: client.name, email, password });
+      setBusy(false);
+    } catch (e) { setError(e.message); setBusy(false); }
+  };
+
+  const copyCreds = async () => {
+    const text = `BAM Business portal\nURL: ${window.location.origin}/client-portal.html\nEmail: ${created.email}\nPassword: ${created.password}`;
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
+
+  const labelStyle = { fontSize: 11, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
+  const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
+        {!created ? (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>Set up account — {client.name}</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Creates a portal login linked to this existing client</div>
+
+            <label style={labelStyle}>Owner name</label>
+            <input style={inputStyle} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Jordan Cole" />
+
+            <label style={labelStyle}>Owner email</label>
+            <input style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="owner@academy.com" type="email" />
+
+            <label style={labelStyle}>Password</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" type="text" />
+              <button onClick={generatePassword} style={{ padding: "0 14px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Generate</button>
+            </div>
+
+            {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              <button onClick={submit} disabled={busy} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: busy ? 0.6 : 1 }}>
+                {busy ? "Creating…" : "Create account"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>✓ Account created</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Copy these credentials now — the password will not be shown again</div>
+            <div style={{ background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, padding: 16, fontFamily: "monospace", fontSize: 13, color: tokens.text, marginBottom: 16 }}>
+              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Academy:</span> {created.name}</div>
+              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Email:</span> {created.email}</div>
+              <div><span style={{ color: tokens.textMute }}>Password:</span> {created.password}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={copyCreds} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>{copied ? "✓ Copied" : "Copy credentials"}</button>
+              <button onClick={onSuccess} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Done</button>
+            </div>
+          </>
         )}
       </div>
     </div>
