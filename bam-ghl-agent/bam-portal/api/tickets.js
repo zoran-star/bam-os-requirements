@@ -84,13 +84,25 @@ export default async function handler(req, res) {
   try {
     const isPublic = req.query.public === "1";
 
-    // ─── PUBLIC (client portal) ─────────────────────────────────────
+    // ─── PUBLIC (client portal) — session-based auth ────────────────
     if (isPublic) {
+      // Resolve client_id from the authed Supabase user
+      const auth = req.headers.authorization || "";
+      const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+      if (!token) return res.status(401).json({ error: "auth required" });
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+      });
+      if (!userRes.ok) return res.status(401).json({ error: "invalid token" });
+      const user = await userRes.json();
+      if (!user?.id) return res.status(401).json({ error: "invalid token" });
+      const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id`);
+      const clientId = clientRows?.[0]?.id;
+      if (!clientId) return res.status(403).json({ error: "no linked client" });
+
       if (req.method === "GET") {
-        const clientId = req.query.client_id;
-        if (!clientId) return res.status(400).json({ error: "client_id required" });
         const data = await sb(
-          `tickets?client_id=eq.${clientId}&select=id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at,resolved_at&order=updated_at.desc`
+          `tickets?client_id=eq.${clientId}&select=id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at,resolved_at,messages&order=updated_at.desc`
         );
         return res.status(200).json({ data });
       }
@@ -99,10 +111,10 @@ export default async function handler(req, res) {
         const { id, action } = req.query;
         const body = req.body || {};
         if (action !== "client_respond") return res.status(400).json({ error: "invalid action" });
-        if (!id || !body.client_id) return res.status(400).json({ error: "id and client_id required" });
+        if (!id) return res.status(400).json({ error: "id required" });
 
         const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status,messages`);
-        if (!existing?.length || existing[0].client_id !== body.client_id) {
+        if (!existing?.length || existing[0].client_id !== clientId) {
           return res.status(403).json({ error: "not your ticket" });
         }
         if (existing[0].status !== "awaiting_client") {

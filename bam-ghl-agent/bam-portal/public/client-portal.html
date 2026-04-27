@@ -1712,6 +1712,81 @@
 </head>
 <body>
 
+<style>
+  /* Login overlay */
+  #login-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg, #0E0E12);
+  }
+  #login-overlay .login-card {
+    width: 100%; max-width: 400px;
+    padding: 32px 28px;
+    background: var(--surface, #1A1A20);
+    border: 1px solid var(--line, rgba(255,255,255,0.08));
+    border-radius: 12px;
+    font-family: var(--display, 'Inter', system-ui, sans-serif);
+  }
+  #login-overlay .login-icon {
+    width: 48px; height: 48px; margin: 0 auto 18px;
+  }
+  #login-overlay .login-title {
+    font-size: 18px; font-weight: 600; color: var(--text, #F5F1E8);
+    text-align: center; margin-bottom: 4px;
+  }
+  #login-overlay .login-sub {
+    font-size: 13px; color: var(--text-sub, #98989D);
+    text-align: center; margin-bottom: 24px;
+  }
+  #login-overlay label {
+    display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--text-mute, #6E6E73); margin-bottom: 6px;
+  }
+  #login-overlay input {
+    width: 100%; padding: 10px 12px; margin-bottom: 14px;
+    background: var(--bg, #0E0E12);
+    border: 1px solid var(--line, rgba(255,255,255,0.08));
+    border-radius: 8px;
+    color: var(--text, #F5F1E8); font-size: 14px; font-family: inherit;
+  }
+  #login-overlay input:focus { outline: none; border-color: var(--accent, #E8C547); }
+  #login-overlay button.login-submit {
+    width: 100%; padding: 12px;
+    background: var(--accent, #E8C547); color: #0A0A0B;
+    border: 0; border-radius: 8px; font-weight: 600; font-size: 14px;
+    cursor: pointer; font-family: inherit;
+  }
+  #login-overlay button.login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  #login-overlay .login-error {
+    color: #ED7969; font-size: 12px; margin-top: 10px; text-align: center; min-height: 16px;
+  }
+</style>
+
+<div id="login-overlay">
+  <div class="login-card">
+    <svg class="login-icon" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="17" cy="17" r="12" fill="none" stroke="#E8C547" stroke-width="1"/>
+      <circle cx="17" cy="17" r="5" fill="none" stroke="#C9A55C" stroke-width="0.8"/>
+      <line x1="17" y1="3" x2="17" y2="31" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+      <line x1="3" y1="17" x2="31" y2="17" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+      <polygon points="17,8 19,17 17,26 15,17" fill="#E8C547"/>
+      <circle cx="17" cy="17" r="1.3" fill="#0A0A0B" stroke="#E8C547" stroke-width="0.6"/>
+    </svg>
+    <div class="login-title">Sign in to your portal</div>
+    <div class="login-sub">Enter the email and password BAM provided</div>
+
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" autocomplete="email" placeholder="you@academy.com">
+
+    <label for="login-password">Password</label>
+    <input id="login-password" type="password" autocomplete="current-password" placeholder="••••••••">
+
+    <button id="login-submit" class="login-submit" onclick="signIn()">Sign in →</button>
+    <div id="login-error" class="login-error"></div>
+  </div>
+</div>
+
+
 <div class="app">
 
   <!-- ── Sidebar ── -->
@@ -1750,11 +1825,12 @@
         <span id="themeToggleLabel">Light mode</span>
       </button>
       <div class="user-row">
-        <div class="user-avatar">JC</div>
+        <div class="user-avatar" id="userAvatar">·</div>
         <div class="user-info">
-          <div class="user-name">Jordan Cole</div>
+          <div class="user-name" id="userName">—</div>
           <div class="user-role">Academy Owner</div>
         </div>
+        <button onclick="signOut()" title="Sign out" style="margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--text-mute);font-size:11px;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:var(--mono);letter-spacing:0.1em;text-transform:uppercase">Sign out</button>
       </div>
     </div>
   </aside>
@@ -2370,12 +2446,13 @@ const FIELD_SCHEMAS = {
   ],
 };
 
-// ── Client scoping (stopgap: ?client_id=<uuid> in URL) ───────────────
-const CLIENT_ID = (() => {
-  const q = new URLSearchParams(window.location.search).get('client_id');
-  if (q) { localStorage.setItem('bam_client_id', q); return q; }
-  return localStorage.getItem('bam_client_id') || null;
-})();
+// ── Client scoping — resolved from auth session in boot() ────────────
+let CLIENT_ID = null;
+
+async function _authHeaders() {
+  const { data: { session } } = await _sb.auth.getSession();
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
 
 // Live tickets, loaded from Supabase
 let tickets = [];
@@ -2584,10 +2661,9 @@ async function submitClientResponse() {
   }
   const res = await fetch(`/api/tickets?id=${t.id}&action=client_respond&public=1`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_action_response: note,
+      client_action_response:note,
       client_action_files: uploadedFiles,
     }),
   });
@@ -2623,10 +2699,9 @@ async function submitEdit() {
 
   const res = await fetch(`/api/tickets?id=${t.id}&action=client_respond&public=1`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
     body: JSON.stringify({
-      client_id: CLIENT_ID,
-      client_action_response: responseText,
+      client_action_response:responseText,
       client_action_files: uploadedFiles,
     }),
   });
@@ -3402,7 +3477,27 @@ async function submitTicket(type) {
   showScreen('screen-confirm');
 }
 
-// Init
+// ── Auth boot ─────────────────────────────────────────────────────
+async function signIn() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Email and password required'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  const { error } = await _sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Sign in →';
+  if (error) { errEl.textContent = error.message; return; }
+  await boot();
+}
+
+async function signOut() {
+  await _sb.auth.signOut();
+  CLIENT_ID = null;
+  location.reload();
+}
+
 async function loadAcademyName() {
   const el = document.getElementById('academyName');
   if (!el) return;
@@ -3411,8 +3506,48 @@ async function loadAcademyName() {
   if (error || !data) { el.textContent = 'Unknown academy'; return; }
   el.textContent = data.name;
 }
-loadAcademyName();
-loadTickets();
+
+async function boot() {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    return;
+  }
+  // Resolve client_id from authed user
+  const { data: clientRow } = await _sb.from('clients')
+    .select('id').eq('auth_user_id', session.user.id).maybeSingle();
+  if (!clientRow) {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('login-error').textContent =
+      'Your account is not linked to a client. Contact BAM support.';
+    return;
+  }
+  CLIENT_ID = clientRow.id;
+  document.getElementById('login-overlay').style.display = 'none';
+
+  // Populate user-row from authed email
+  const email = session.user.email || '';
+  document.getElementById('userName').textContent = email;
+  document.getElementById('userAvatar').textContent = email.slice(0, 1).toUpperCase() || '·';
+
+  await loadAcademyName();
+  await loadTickets();
+}
+
+// Allow Enter to submit
+document.getElementById('login-password')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') signIn();
+});
+document.getElementById('login-email')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-password').focus();
+});
+
+// Watch for session changes (sign-in/out from other tabs)
+_sb.auth.onAuthStateChange((_event, session) => {
+  if (!session) location.reload();
+});
+
+boot();
 _attachPasteHandler('error-where',  'error-files');
 _attachPasteHandler('error-should', 'error-files');
 _attachPasteHandler('change-what',  'change-files');
