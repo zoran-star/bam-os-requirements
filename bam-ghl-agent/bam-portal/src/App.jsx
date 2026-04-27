@@ -85,7 +85,12 @@ export default function BAMPortal() {
     if (!session) return;
     let cancelled = false;
     fetchClients().then(({ data }) => {
-      if (!cancelled && data) setOnboardingClients(data);
+      if (!cancelled && data) {
+        // Split by real status from the clients table — was: dump everything
+        // into onboarding regardless of status.
+        setOnboardingClients(data.filter(c => c.status === "onboarding" || !c.status));
+        setActiveClients(data.filter(c => c.status === "active"));
+      }
     });
     return () => { cancelled = true; };
   }, [session]);

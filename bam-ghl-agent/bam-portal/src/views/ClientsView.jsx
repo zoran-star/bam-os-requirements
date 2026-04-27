@@ -439,14 +439,6 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
           )}
         </div>
 
-        {/* Sample data indicator — small floating pill */}
-        {!loading && !isNotionMode && tab !== "leads" && tab !== "messages" && (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-            background: `${tokens.amber}15`, color: tokens.amber,
-            letterSpacing: "0.04em", flexShrink: 0, whiteSpace: "nowrap",
-          }}>SAMPLE</span>
-        )}
       </div>
 
       {/* Summary bar */}
@@ -1278,12 +1270,17 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick }) {
   const businessName = client.businessName || client.title || client.name || "Unnamed";
   const clientName = client.clientName || client.owner || "";
   const manager = client.manager || "";
-  const program = client.program || client.tier || "";
+  // Tier hidden along with health — both were the uniform "Foundations"/"95%"
+  // placeholder. Restore by removing this override once a real tier exists.
+  const program = "";
   const latestUpdate = client.latestUpdate || "";
   const activeClientsCount = client.activeClients;
   const monthlyRevenue = client.monthlyRevenue;
-  const health = client._propData?.health ?? client.health;
-  const healthStatus = client._propData?.healthStatus ?? client.healthStatus;
+  // Health + tier intentionally hidden until real values exist (placeholder
+  // mock was uniformly 95% / "Foundations"). Re-enable by removing these
+  // overrides once Supabase has real columns + real data.
+  const health = null;
+  const healthStatus = null;
   const lastInteraction = client.lastCallDate
     || (client.callLog && client.callLog.length > 0 ? client.callLog[client.callLog.length - 1].date : null)
     || client._propData?.lastCallDate
@@ -1311,16 +1308,6 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick }) {
         animation: `cardIn 0.3s ease ${index * 40}ms both`,
       }}
     >
-      {/* SAMPLE DATA corner tag */}
-      {!isNotionMode && (
-        <div style={{
-          position: "absolute", top: 8, right: 8, zIndex: 1,
-          fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 6,
-          background: `${tokens.amber}15`, color: tokens.amber,
-          letterSpacing: "0.04em", opacity: 0.7,
-        }}>SAMPLE</div>
-      )}
-
       {/* Health bar accent at top */}
       {health != null && (
         <div style={{
