@@ -6,6 +6,7 @@ import {
   startTicket,
   saveTicketNotes,
   requestClientAction,
+  cancelClientRequest,
   submitForReview,
   approveTicket,
   denyTicket,
@@ -84,6 +85,10 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     .filter(x => x.status !== "done" && x.status !== "approved")
     .filter(x => overviewClient === "all" || x.client?.id === overviewClient)
     .sort((a, b) => {
+      // Awaiting_client pinned to top
+      const aAwaiting = a.status === "awaiting_client" ? 0 : 1;
+      const bAwaiting = b.status === "awaiting_client" ? 0 : 1;
+      if (aAwaiting !== bAwaiting) return aAwaiting - bAwaiting;
       const ad = a.due_date ? new Date(a.due_date).getTime() : Infinity;
       const bd = b.due_date ? new Date(b.due_date).getTime() : Infinity;
       return ad - bd;
@@ -142,6 +147,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
           overviewClient={overviewClient}
           setOverviewClient={setOverviewClient}
           onOpen={(x) => setSelected(x)}
+          onCancelClient={async (id) => { await cancelClientRequest(id); await load(); }}
           tokens={t}
         />
       ) : (
@@ -197,7 +203,7 @@ function formatDueDate(s, t) {
 
 const TYPE_LABEL = { error: "Error", change: "Change", build: "Build" };
 
-function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOverviewClient, onOpen, tokens: t }) {
+function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOverviewClient, onOpen, onCancelClient, tokens: t }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -228,15 +234,30 @@ function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOver
         {tickets.map(x => {
           const title = x.menu_item || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
           const due = formatDueDate(x.due_date, t);
+          const awaiting = x.status === "awaiting_client";
           return (
             <div key={x.id} onClick={() => onOpen(x)} style={{
               display: "grid", gridTemplateColumns: "1fr 110px 180px 200px", gap: 12,
-              padding: "14px 16px", background: t.surface, cursor: "pointer", alignItems: "center",
+              padding: "14px 16px",
+              background: awaiting ? (t.bg === "#0E0E12" ? "rgba(232,191,96,0.06)" : "rgba(232,191,96,0.10)") : t.surface,
+              borderLeft: awaiting ? `3px solid ${t.accent}` : "3px solid transparent",
+              cursor: "pointer", alignItems: "center",
             }}
               onMouseEnter={e => e.currentTarget.style.background = t.bg}
-              onMouseLeave={e => e.currentTarget.style.background = t.surface}
+              onMouseLeave={e => e.currentTarget.style.background = awaiting ? (t.bg === "#0E0E12" ? "rgba(232,191,96,0.06)" : "rgba(232,191,96,0.10)") : t.surface}
             >
-              <div style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+                {awaiting && (
+                  <>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: t.accent, background: t.bg === "#0E0E12" ? "rgba(232,191,96,0.15)" : "rgba(232,191,96,0.20)", padding: "3px 8px", borderRadius: 6, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>⏳ Action Needed</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (confirm("Cancel the request to the client?")) onCancelClient?.(x.id); }}
+                      style={{ fontSize: 11, padding: "3px 8px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.textSub, cursor: "pointer", whiteSpace: "nowrap" }}
+                    >Cancel request</button>
+                  </>
+                )}
+                <span style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+              </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: t.textSub }}>{TYPE_LABEL[x.type] || x.type}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: due.color }}>{due.text}</div>
               <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client?.name || "—"}</div>
@@ -382,24 +403,54 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             </Section>
           )}
 
-          {/* Client action thread */}
-          {(ticket.client_action_request || ticket.client_action_response) && (
-            <Section title="Client action" tokens={t}>
-              {ticket.client_action_request && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>STAFF ASKED</div>
-                  <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_request}</div>
+          {/* Client action thread (multi-round) */}
+          {((ticket.messages || []).length > 0 || ticket.client_action_request || ticket.client_action_response) && (
+            <Section title="Client conversation" tokens={t}>
+              {ticket.status === "awaiting_client" && canExec && (
+                <div style={{ marginBottom: 12, padding: 10, background: dark ? "rgba(232,191,96,0.08)" : "rgba(232,191,96,0.12)", border: `1px solid ${t.accent}33`, borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 12, color: t.text, fontWeight: 600 }}>⏳ Awaiting client response</div>
+                  <button onClick={() => wrap(() => cancelClientRequest(ticket.id))} disabled={busy} style={btn(t, "ghost")}>Cancel request</button>
                 </div>
               )}
-              {ticket.client_action_response && (
-                <div>
-                  <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>CLIENT REPLIED</div>
-                  <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_response}</div>
-                  {(ticket.client_action_files || []).map((f, i) => (
-                    <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
-                  ))}
-                </div>
-              )}
+              {(ticket.messages && ticket.messages.length > 0)
+                ? ticket.messages.map((m, i) => (
+                    <div key={i} style={{
+                      marginBottom: 10, padding: 10, borderRadius: 8,
+                      background: m.direction === "client_to_staff"
+                        ? (dark ? "rgba(120,200,140,0.08)" : "rgba(120,200,140,0.12)")
+                        : (dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"),
+                      border: `1px solid ${m.direction === "client_to_staff" ? "rgba(120,200,140,0.25)" : t.border}`,
+                    }}>
+                      <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>
+                        {m.direction === "client_to_staff" ? "CLIENT REPLIED" : "STAFF ASKED"}
+                        {m.system && " · system"}
+                        {" · "}{new Date(m.created_at).toLocaleString()}
+                      </div>
+                      {m.body && <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{m.body}</div>}
+                      {(m.files || []).map((f, j) => (
+                        <a key={j} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
+                      ))}
+                    </div>
+                  ))
+                : (
+                    <>
+                      {ticket.client_action_request && (
+                        <div style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>STAFF ASKED</div>
+                          <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_request}</div>
+                        </div>
+                      )}
+                      {ticket.client_action_response && (
+                        <div>
+                          <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>CLIENT REPLIED</div>
+                          <div style={{ fontSize: 13, color: t.text, whiteSpace: "pre-wrap" }}>{ticket.client_action_response}</div>
+                          {(ticket.client_action_files || []).map((f, i) => (
+                            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, display: "block", marginTop: 4 }}>📎 {f.name}</a>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
             </Section>
           )}
 

@@ -38,6 +38,7 @@ export const delegateTicket       = (id, assigned_to)          => patch(id, "del
 export const startTicket          = (id)                       => patch(id, "start");
 export const saveTicketNotes      = (id, staff_notes)          => patch(id, "notes", { staff_notes });
 export const requestClientAction  = (id, client_action_request)=> patch(id, "request_client", { client_action_request });
+export const cancelClientRequest  = (id)                       => patch(id, "cancel_client_request");
 export const submitForReview      = (id, user_guide)           => patch(id, "submit_review", { user_guide });
 export const approveTicket        = (id)                       => patch(id, "approve");
 export const denyTicket           = (id, denial_notes)         => patch(id, "deny", { denial_notes });

@@ -2431,6 +2431,7 @@ function mapTicket(r) {
     target: null,
     data,
     teamNote: r.client_action_request || null,
+    messages: r.messages || [],
     editFields: null,
     userGuide: r.user_guide || null,
   };
@@ -2439,7 +2440,7 @@ function mapTicket(r) {
 async function loadTickets() {
   if (!CLIENT_ID) { tickets = []; renderTicketLists(); return; }
   const { data, error } = await _sb.from('tickets')
-    .select('id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at')
+    .select('id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at,messages')
     .eq('client_id', CLIENT_ID)
     .order('updated_at', { ascending: false });
   if (error) { console.error('loadTickets:', error.message); return; }
@@ -2471,8 +2472,12 @@ function renderTicketLists() {
 
 function rowHTML(t) {
   const dateBit = t.target ? `<div class="ticket-row-date">target completion: ${t.target}</div>` : '';
+  const isAction = t.status === 'action-required';
+  const rowStyle = isAction ? 'style="background:rgba(232,191,96,0.08);border-left:3px solid var(--accent);padding-left:13px"' : '';
+  const badge = isAction ? `<span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(232,191,96,0.18);padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-right:8px">⏳ Action Needed</span>` : '';
   return `
-    <div class="ticket-row" onclick="openTicket(${t.id})">
+    <div class="ticket-row" onclick="openTicket(${t.id})" ${rowStyle}>
+      ${badge}
       <div class="ticket-row-title">${escapeHTML(t.title)}</div>
       <span class="status-pill ${t.status}">${STATUS_LABEL_SHORT[t.status]}</span>
       ${dateBit}
@@ -2516,43 +2521,52 @@ function renderDetail() {
   const t = getTicket(_currentTicketId);
   if (!t) return;
   const schema = FIELD_SCHEMAS[t.type];
-  const fieldsToEdit = new Set(_editMode ? (t.editFields && t.editFields.length ? t.editFields : schema.map(f => f.key)) : []);
 
-  const teamNoteHTML = (_editMode && t.teamNote) ? `
-    <div class="team-note">
-      <div class="team-note-icon">💬</div>
-      <div class="team-note-body">
-        <span class="team-note-label">Our team needs</span>
-        ${escapeHTML(t.teamNote)}
+  // Action-required: prominent response form at top
+  const isActionRequired = t.status === 'action-required';
+  const latestStaffMsg = (t.messages || []).slice().reverse().find(m => m.direction === 'staff_to_client' && !m.system);
+  const staffAsk = latestStaffMsg?.body || t.teamNote || '';
+
+  const actionFormHTML = isActionRequired ? `
+    <div class="action-required-block" style="background:rgba(232,191,96,0.10);border:1px solid rgba(232,191,96,0.35);border-radius:10px;padding:16px;margin:16px 0;">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⏳ Action needed</div>
+      ${staffAsk ? `<div style="font-size:14px;color:var(--text);margin-bottom:12px;white-space:pre-wrap">${escapeHTML(staffAsk)}</div>` : ''}
+      <textarea id="client-response-note" placeholder="Write your response (optional)" rows="3" style="width:100%;padding:10px;background:var(--surface);border:1px solid var(--line-str);border-radius:8px;color:var(--text);font:inherit;resize:vertical;margin-bottom:8px"></textarea>
+      <div id="client-response-files" class="file-list" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="mini-btn" style="cursor:pointer">
+          Attach files
+          <input type="file" multiple onchange="handleFile(this, 'client-response-files')">
+        </label>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="submitClientResponse()">Send response →</button>
       </div>
     </div>` : '';
 
   const fieldsHTML = schema.map(f => {
     const val = t.data[f.key] || '';
-    const editable = fieldsToEdit.has(f.key);
-    const body = editable
-      ? `<textarea id="edit-${f.key}" rows="3">${escapeHTML(val)}</textarea>`
-      : `<div class="detail-field-value">${escapeHTML(val) || '<span style="color:var(--text-mute)">—</span>'}</div>`;
     return `
       <div class="detail-field">
         <div class="detail-field-label">${escapeHTML(f.label)}</div>
-        ${body}
+        <div class="detail-field-value">${escapeHTML(val) || '<span style="color:var(--text-mute)">—</span>'}</div>
       </div>`;
   }).join('');
 
-  let actionsHTML = '';
-  if (_editMode) {
-    actionsHTML = `
-      <div class="detail-actions">
-        <div id="edit-files" class="file-list" style="flex:1"></div>
-        <label class="mini-btn" style="cursor:pointer">
-          Attach file
-          <input type="file" multiple accept="image/*,.pdf" onchange="handleFile(this, 'edit-files')">
-        </label>
-        <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
-        <button class="btn btn-primary" onclick="submitEdit()">Submit to team →</button>
-      </div>`;
-  }
+  // Conversation thread
+  const threadHTML = (t.messages && t.messages.length > 0) ? `
+    <div style="margin-top:24px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Conversation</div>
+      ${t.messages.map(m => {
+        const isClient = m.direction === 'client_to_staff';
+        return `
+          <div style="margin-bottom:8px;padding:10px;border-radius:8px;background:${isClient ? 'rgba(120,200,140,0.10)' : 'rgba(255,255,255,0.04)'};border:1px solid ${isClient ? 'rgba(120,200,140,0.25)' : 'var(--line)'}">
+            <div style="font-size:10px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">
+              ${isClient ? 'YOU REPLIED' : 'TEAM ASKED'}${m.system ? ' · system' : ''} · ${new Date(m.created_at).toLocaleString()}
+            </div>
+            ${m.body ? `<div style="font-size:13px;color:var(--text);white-space:pre-wrap">${escapeHTML(m.body)}</div>` : ''}
+            ${(m.files || []).map(f => `<a href="${escapeHTML(f.url)}" target="_blank" rel="noreferrer" style="color:var(--accent);font-size:13px;display:block;margin-top:4px">📎 ${escapeHTML(f.name)}</a>`).join('')}
+          </div>`;
+      }).join('')}
+    </div>` : '';
 
   const guideHTML = (t.status === 'approved' && t.userGuide) ? `
     <div class="user-guide">
@@ -2569,11 +2583,40 @@ function renderDetail() {
       <span class="status-pill ${t.status}">${STATUS_LABEL[t.status]}</span>
       ${dateBit}
     </div>
-    ${teamNoteHTML}
+    ${actionFormHTML}
     ${fieldsHTML}
-    ${actionsHTML}
     ${guideHTML}
+    ${threadHTML}
   `;
+}
+
+async function submitClientResponse() {
+  const t = getTicket(_currentTicketId);
+  if (!t) return;
+  const note = (document.getElementById('client-response-note')?.value || '').trim();
+  const uploadedFiles = await _uploadFiles('client-response-files', t.id);
+  if (!note && uploadedFiles.length === 0) {
+    if (!confirm("Send response with no note and no files?")) return;
+  }
+  const res = await fetch(`/api/tickets?id=${t.id}&action=client_respond&public=1`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: CLIENT_ID,
+      client_action_response: note,
+      client_action_files: uploadedFiles,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert('Submit failed: ' + (err.error || res.status));
+    return;
+  }
+  _pendingFiles['client-response-files'] = [];
+  await loadTickets();
+  const refreshed = getTicket(_currentTicketId);
+  if (refreshed) renderDetail();
+  else closeDetail();
 }
 
 function enterEdit()  { _editMode = true;  renderDetail(); }

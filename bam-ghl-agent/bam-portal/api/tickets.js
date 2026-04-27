@@ -101,7 +101,7 @@ export default async function handler(req, res) {
         if (action !== "client_respond") return res.status(400).json({ error: "invalid action" });
         if (!id || !body.client_id) return res.status(400).json({ error: "id and client_id required" });
 
-        const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status`);
+        const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status,messages`);
         if (!existing?.length || existing[0].client_id !== body.client_id) {
           return res.status(403).json({ error: "not your ticket" });
         }
@@ -109,9 +109,19 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "ticket not awaiting client" });
         }
 
+        const newMsg = {
+          direction: "client_to_staff",
+          body: body.client_action_response || "",
+          files: body.client_action_files || [],
+          author_id: null,
+          created_at: new Date().toISOString(),
+        };
+        const messages = [...(existing[0].messages || []), newMsg];
+
         const updated = await sbPatch(`tickets?id=eq.${id}`, {
           client_action_response: body.client_action_response || "",
           client_action_files: body.client_action_files || [],
+          messages,
           status: "in_progress",
           updated_at: new Date().toISOString(),
         });
@@ -175,6 +185,34 @@ export default async function handler(req, res) {
           if (t.assigned_to !== me.id && !isManager(me)) return res.status(403).json({ error: "not your ticket" });
           update.client_action_request = body.client_action_request || "";
           update.status = "awaiting_client";
+          update.messages = [
+            ...(t.messages || []),
+            {
+              direction: "staff_to_client",
+              body: body.client_action_request || "",
+              files: body.files || [],
+              author_id: me.id,
+              created_at: now,
+            },
+          ];
+          break;
+
+        case "cancel_client_request":
+          if (t.assigned_to !== me.id && !isManager(me)) return res.status(403).json({ error: "not your ticket" });
+          if (t.status !== "awaiting_client") return res.status(400).json({ error: "ticket not awaiting client" });
+          update.client_action_request = "";
+          update.status = "in_progress";
+          update.messages = [
+            ...(t.messages || []),
+            {
+              direction: "staff_to_client",
+              body: "(request cancelled by staff)",
+              files: [],
+              author_id: me.id,
+              system: true,
+              created_at: now,
+            },
+          ];
           break;
 
         case "submit_review":
