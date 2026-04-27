@@ -244,12 +244,11 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, sent_to: targetEmail });
       }
 
-      // ── Validate inputs ──
+      // ── Validate inputs (no password — invite flow) ──
       const body = req.body || {};
       const name       = typeof body.name === "string" ? body.name.trim() : "";
       const owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
       const email      = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-      const password   = typeof body.password === "string" ? body.password : "";
       const status     = typeof body.status === "string" && ["onboarding","active","paused","churned"].includes(body.status) ? body.status : "onboarding";
 
       if (!name)       return res.status(400).json({ error: "academy name required" });
@@ -257,31 +256,29 @@ export default async function handler(req, res) {
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "valid email required" });
       }
-      if (!password || password.length < 8) {
-        return res.status(400).json({ error: "password must be at least 8 characters" });
-      }
 
-      // ── Create the Supabase auth user (admin API, auto-confirmed) ──
-      const createUserRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+      // ── Send invite (creates auth user with no password + emails the link) ──
+      const origin = req.headers.origin || `https://${req.headers.host}`;
+      const redirectTo = `${origin}/client-portal.html?type=invite`;
+      const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
         method: "POST",
         headers: {
           apikey: SUPABASE_SERVICE_KEY,
           Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password, email_confirm: true }),
+        body: JSON.stringify({ email, redirect_to: redirectTo }),
       });
-      if (!createUserRes.ok) {
-        const errText = await createUserRes.text();
-        // 422 = email already exists; surface a clean message
-        const friendly = createUserRes.status === 422 || /already/i.test(errText)
+      if (!inviteRes.ok) {
+        const errText = await inviteRes.text();
+        const friendly = inviteRes.status === 422 || /already/i.test(errText)
           ? "an account with that email already exists"
-          : `auth: ${errText}`;
+          : `invite: ${errText}`;
         return res.status(400).json({ error: friendly });
       }
-      const newUser = await createUserRes.json();
-      const auth_user_id = newUser?.id;
-      if (!auth_user_id) return res.status(500).json({ error: "auth user created but id missing" });
+      const invited = await inviteRes.json();
+      const auth_user_id = invited?.id || invited?.user?.id;
+      if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
 
       // ── Insert the clients row, linked to the new auth user ──
       try {
@@ -289,7 +286,7 @@ export default async function handler(req, res) {
           name, owner_name, email, status, auth_user_id,
         });
         const row = Array.isArray(rows) ? rows[0] : rows;
-        return res.status(200).json({ id: row?.id, name: row?.name });
+        return res.status(200).json({ id: row?.id, name: row?.name, email, invited: true });
       } catch (insertErr) {
         // Roll back the auth user if the clients insert fails so they don't get orphaned
         await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
