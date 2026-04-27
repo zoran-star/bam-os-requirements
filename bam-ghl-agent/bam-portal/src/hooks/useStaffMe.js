@@ -4,10 +4,11 @@ import { supabase } from "../lib/supabase";
 // Dev-only role override personas. Activated by localStorage key "dev_role".
 // Set via the dev role switcher in the bottom-left of the screen.
 const DEV_PERSONAS = {
-  zoran:    { id: "dev-zoran",    name: "Zoran (admin)",            role: "admin",             email: "zoran@byanymeansbball.com" },
-  mike:     { id: "dev-mike",     name: "Mike (admin)",             role: "admin",             email: "mike@byanymeansbball.com" },
-  manager:  { id: "dev-manager",  name: "Rosano (systems_manager)", role: "systems_manager",   email: "rarandila@gmail.com" },
-  executor: { id: "dev-executor", name: "Chris (systems_executor)", role: "systems_executor",  email: "mcdelostrinos@gmail.com" },
+  zoran:    { id: "55e35cac-4472-4788-ab2a-4f30c7183904", name: "Zoran (admin)",            role: "admin",             email: "zoran@byanymeansbball.com" },
+  mike:     { id: "dev-mike",                              name: "Mike (admin)",             role: "admin",             email: "mike@byanymeansbball.com" },
+  manager:  { id: "4fe042f4-d890-45c3-a55f-8d18423373dd", name: "Rosano (systems_manager)", role: "systems_manager",   email: "rarandila@gmail.com" },
+  executor: { id: "6e876f7f-6e17-443d-a032-5f28fa0c908b", name: "Chris (systems_executor)", role: "systems_executor",  email: "mcdelostrinos@gmail.com" },
+  jenny:    { id: "98694d3f-ad3c-4607-85a3-f3900789970a", name: "Jenny (systems_executor)", role: "systems_executor",  email: "jennybabeco@gmail.com" },
 };
 
 export function useStaffMe(session) {

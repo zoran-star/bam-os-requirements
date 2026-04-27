@@ -160,11 +160,43 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {visibleTickets.map(x => (
-              <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
-            ))}
-          </div>
+          {tab === "execution" && visibleTickets.length > 0 ? (
+            (() => {
+              const groups = {};
+              visibleTickets.forEach(x => {
+                const name = x.assignee?.name || "Unassigned";
+                (groups[name] = groups[name] || []).push(x);
+              });
+              const names = Object.keys(groups).sort((a, b) => {
+                if (a === "Unassigned") return 1;
+                if (b === "Unassigned") return -1;
+                return a.localeCompare(b);
+              });
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {names.map(name => (
+                    <div key={name}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${t.border}` }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5 }}>{name}</span>
+                        <span style={{ fontSize: 11, color: t.textMute, background: t.surface, padding: "2px 8px", borderRadius: 10 }}>{groups[name].length}</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {groups[name].map(x => (
+                          <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {visibleTickets.map(x => (
+                <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
