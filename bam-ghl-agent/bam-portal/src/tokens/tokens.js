@@ -64,6 +64,7 @@ export const T = {
 };
 
 export function calcProgress(checks) {
+  if (!Array.isArray(checks) || checks.length === 0) return 0;
   return Math.round(checks.filter(Boolean).length / checks.length * 100);
 }
 

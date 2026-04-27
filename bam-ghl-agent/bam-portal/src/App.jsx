@@ -224,7 +224,7 @@ export default function BAMPortal() {
     showToast(`${client.name} moved to Active Clients`);
   };
 
-  const totalAlerts = [...onboardingClients, ...activeClients].reduce((a, c) => a + c.alerts.length, 0);
+  const totalAlerts = [...onboardingClients, ...activeClients].reduce((a, c) => a + (c.alerts?.length || 0), 0);
   const critCount = [...onboardingClients, ...activeClients].filter(c => c.healthStatus === "critical").length;
 
   // Reminders
@@ -242,7 +242,7 @@ export default function BAMPortal() {
   });
   const activeReminders = activeClients.flatMap(c => {
     const reminders = [];
-    c.recurring.forEach((done, i) => {
+    (c.recurring || []).forEach((done, i) => {
       if (!done) reminders.push({ client: c.name, msg: (c.recurringTaskNames || [])[i] || `Recurring task ${i + 1}`, type: "recurring", urgent: c.healthStatus !== "healthy" });
     });
     return reminders;
