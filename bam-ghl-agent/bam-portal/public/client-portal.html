@@ -3283,35 +3283,74 @@ async function _uploadFiles(fileListId, ticketId) {
   return urls;
 }
 
-let mediaRecorder = null;
-let isRecording = false;
+// Live speech-to-text using the browser's Web Speech API
+// Chrome / Edge / Safari support webkitSpeechRecognition; Firefox does not.
+let _voiceRecognition = null;
+let _voiceTargetId = null;
+let _voiceBaseText = '';
 
 function toggleVoice(btn, targetId) {
-  if (isRecording) {
-    if (mediaRecorder) mediaRecorder.stop();
+  if (_voiceRecognition) {
+    _voiceRecognition.stop();
     return;
   }
-  if (!navigator.mediaDevices) { alert('Voice input not available in this browser.'); return; }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    isRecording = true;
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    alert('Live voice transcription is not supported in this browser. Try Chrome, Edge, or Safari.');
+    return;
+  }
+  const ta = document.getElementById(targetId);
+  if (!ta) return;
+
+  _voiceTargetId = targetId;
+  _voiceBaseText = ta.value;
+
+  const rec = new SpeechRec();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = navigator.language || 'en-US';
+
+  rec.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const transcript = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += transcript;
+      else interim += transcript;
+    }
+    if (final) {
+      const sep = (_voiceBaseText && !_voiceBaseText.endsWith(' ') && !_voiceBaseText.endsWith('\n')) ? ' ' : '';
+      _voiceBaseText = _voiceBaseText + sep + final.trim();
+    }
+    const sep = (_voiceBaseText && interim && !_voiceBaseText.endsWith(' ') && !_voiceBaseText.endsWith('\n')) ? ' ' : '';
+    ta.value = _voiceBaseText + (interim ? sep + interim : '');
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  rec.onend = () => {
+    _voiceRecognition = null;
+    _voiceTargetId = null;
+    btn.textContent = '🎤 Voice';
+    btn.classList.remove('active');
+    document.body.classList.remove('recording');
+  };
+
+  rec.onerror = (e) => {
+    console.warn('Speech recognition error:', e.error);
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      alert('Microphone permission was denied. Allow it in your browser settings to use voice input.');
+    }
+  };
+
+  try {
+    rec.start();
+    _voiceRecognition = rec;
     btn.textContent = '⏹ Stop';
     btn.classList.add('active');
     document.body.classList.add('recording');
-    mediaRecorder = new MediaRecorder(stream);
-    mediaRecorder.onstop = () => {
-      const ta = document.getElementById(targetId);
-      if (ta) ta.placeholder = 'Voice note recorded — transcription not available in this demo';
-      stream.getTracks().forEach(t => t.stop());
-      isRecording = false;
-      btn.textContent = 'Voice';
-      btn.classList.remove('active');
-      document.body.classList.remove('recording');
-    };
-    mediaRecorder.start();
-  }).catch(() => {
-    const ta = document.getElementById(targetId);
-    if (ta) ta.focus();
-  });
+  } catch (err) {
+    console.warn('Failed to start speech recognition:', err);
+  }
 }
 
 function toggleRedAlert() {
