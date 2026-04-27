@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { submitFeedback, fetchFeedbackItems } from "../services/feedbackService";
 import { fetchSlackStatus, disconnectSlack, getSlackOAuthUrl } from "../services/slackService";
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { useStaffMe } from '../hooks/useStaffMe';
+import { supabase } from '../lib/supabase';
 
 const INTEGRATIONS = [
   { key: "ghl", label: "GoHighLevel", desc: "CRM, contacts, pipelines, conversations", endpoint: "/api/ghl?action=locations" },
@@ -22,6 +24,8 @@ function StatusDot({ status, tokens }) {
 
 export default function SettingsView({ tokens, dark, setDark, userName, session }) {
   const isMobile = useIsMobile();
+  const me = useStaffMe(session);
+  const [showNewClient, setShowNewClient] = useState(false);
   // ─── Integration status ───
   const [integrationStatus, setIntegrationStatus] = useState({});
 
@@ -174,6 +178,22 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
           </div>
         </div>
       </div>
+
+      {/* ═══ Clients (admin only) ═══ */}
+      {me?.role === "admin" && (
+        <div style={{ ...sectionStyle, animationDelay: "60ms" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <div>
+              <div style={sectionTitle}>Clients</div>
+              <div style={{ fontSize: 13, color: tokens.textMute }}>Create and manage client portal logins</div>
+            </div>
+            <button
+              onClick={() => setShowNewClient(true)}
+              style={{ padding: "8px 14px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >+ New client</button>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Integrations ═══ */}
       <div style={{ ...sectionStyle, animationDelay: "80ms" }}>
@@ -351,6 +371,133 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
               </div>
             )}
           </div>
+        )}
+      </div>
+
+      {showNewClient && (
+        <NewClientModal
+          tokens={tokens}
+          session={session}
+          onClose={() => setShowNewClient(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── New client modal ───────────────────────────────────────────────
+function NewClientModal({ tokens, session, onClose }) {
+  const [name, setName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState("onboarding");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [created, setCreated] = useState(null); // { name, email, password } once successful
+  const [copied, setCopied] = useState(false);
+
+  const generatePassword = () => {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!#$%&";
+    let p = "";
+    const rnd = (window.crypto?.getRandomValues?.bind(window.crypto)) || null;
+    if (rnd) {
+      const bytes = new Uint32Array(14);
+      rnd(bytes);
+      for (let i = 0; i < 14; i++) p += chars[bytes[i] % chars.length];
+    } else {
+      for (let i = 0; i < 14; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    }
+    setPassword(p);
+  };
+
+  const submit = async () => {
+    setBusy(true); setError("");
+    try {
+      const token = session?.access_token;
+      const res = await fetch("/api/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, owner_name: ownerName, email, password, status }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error || `HTTP ${res.status}`);
+        setBusy(false);
+        return;
+      }
+      setCreated({ name, email, password });
+      setBusy(false);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  const copyCreds = async () => {
+    const text = `BAM Business portal\nURL: https://bam-portal-zoran-stars-projects.vercel.app/client-portal.html\nEmail: ${created.email}\nPassword: ${created.password}`;
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  };
+
+  const labelStyle = { fontSize: 11, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
+  const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
+        {!created ? (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>New client</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Creates a portal login linked to a new client row</div>
+
+            <label style={labelStyle}>Academy name</label>
+            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Elite Hoops Academy" />
+
+            <label style={labelStyle}>Owner name</label>
+            <input style={inputStyle} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Jordan Cole" />
+
+            <label style={labelStyle}>Owner email</label>
+            <input style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="owner@academy.com" type="email" />
+
+            <label style={labelStyle}>Password</label>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" type="text" />
+              <button onClick={generatePassword} style={{ padding: "0 14px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Generate</button>
+            </div>
+
+            <label style={labelStyle}>Status</label>
+            <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="onboarding">Onboarding</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="churned">Churned</option>
+            </select>
+
+            {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+              <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+              <button onClick={submit} disabled={busy} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: busy ? 0.6 : 1 }}>
+                {busy ? "Creating…" : "Create client"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>✓ Client created</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Copy these credentials now — the password will not be shown again</div>
+
+            <div style={{ background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, padding: 16, fontFamily: "monospace", fontSize: 13, color: tokens.text, marginBottom: 16 }}>
+              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Academy:</span> {created.name}</div>
+              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Email:</span> {created.email}</div>
+              <div><span style={{ color: tokens.textMute }}>Password:</span> {created.password}</div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={copyCreds} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>{copied ? "✓ Copied" : "Copy credentials"}</button>
+              <button onClick={onClose} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Done</button>
+            </div>
+          </>
         )}
       </div>
     </div>

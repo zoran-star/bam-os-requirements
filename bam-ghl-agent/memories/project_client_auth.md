@@ -53,9 +53,20 @@ clients.auth_user_id uuid unique references auth.users(id) on delete set null
 - Anon ticket reads — RLS now requires authenticated.
 - "Trust the client_id from the body" pattern in /api/tickets.
 
-## Manual account creation (Supabase dashboard)
+## Account creation
 
-See `bam-ghl-agent/docs/client-account-setup.md` for the step-by-step.
+**Preferred path: Settings → Clients → "+ New client" (admin only).**
+
+Form collects: academy name, owner name, owner email, password (or auto-generated), status (default `onboarding`). On submit, `POST /api/clients` does:
+1. Verifies caller is staff with `role = 'admin'`
+2. Creates the Supabase auth user via admin API (`auth_confirm: true`, no email verification)
+3. Inserts the `clients` row with `auth_user_id` linked
+4. Rolls back the auth user if the clients insert fails (no orphans)
+5. Returns the new client `id` + `name`
+
+UI then shows the email + password once, with a "Copy credentials" button — staff sends them to the client manually. Password never stored, never shown again.
+
+**Fallback (Supabase dashboard):** see `bam-ghl-agent/docs/client-account-setup.md`. Used for resets, deactivation, and one-off troubleshooting.
 
 ## Deferred TODOs
 
