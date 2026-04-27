@@ -68,9 +68,28 @@ UI then shows the email + password once, with a "Copy credentials" button — st
 
 **Fallback (Supabase dashboard):** see `bam-ghl-agent/docs/client-account-setup.md`. Used for resets, deactivation, and one-off troubleshooting.
 
+## Password reset
+
+**Staff-triggered reset** (preferred):
+- Each card on the Clients view has a "🔑 Reset password" action (top-right, only when `client.email` is present)
+- Click → confirm → `POST /api/clients?action=reset-password` with `{ email }`
+- Server is admin-only, hits Supabase `/auth/v1/recover` with `redirect_to: <origin>/client-portal.html?type=recovery`
+- Client receives the standard Supabase recovery email
+- Click in email → lands at `client-portal.html#access_token=...&type=recovery`
+- Supabase JS picks up the recovery session automatically; `boot()` detects `type=recovery` in URL hash and shows the **"Set a new password"** card instead of the login overlay
+- `submitNewPassword()` validates (8+ chars, match), calls `_sb.auth.updateUser({ password })`, strips the recovery hash, reloads → normal login flow
+
+**Required Supabase configuration:**
+- Authentication → URL Configuration → Redirect URLs must include `https://<portal-origin>/**` and `http://localhost:5173/**`
+
+**Files touched:**
+- `bam-portal/api/clients.js` (action router + recover call + email/auth_user_id in shapeClient)
+- `bam-portal/public/client-portal.html` (recovery card + boot detection + submitNewPassword)
+- `bam-portal/src/views/ClientsView.jsx` (Reset password button on each card)
+
 ## Deferred TODOs
 
-- Self-serve password reset link in the login UI (currently the only way to reset is via Supabase dashboard or `_sb.auth.resetPasswordForEmail()` — wire up later)
+- Self-serve "Forgot password?" link on the login overlay (today: only staff can trigger a reset). Wire up later.
 - Branded email templates (verify, password-reset) — Supabase defaults are plain
 - SMTP for prod deliverability — Supabase's built-in is fine for testing, switch to Postmark/Resend before scaling
 - Per-client storage isolation — currently any authed client could upload anywhere in `ticket-files`. URL paths are random UUIDs so practical risk is low. Tighten with a path-prefix RLS check if it becomes a concern.

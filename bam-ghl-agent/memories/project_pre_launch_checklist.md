@@ -25,8 +25,6 @@ Things we shipped fast for testing but should be tightened before real clients a
 - **Self-serve password reset UI for clients.** Today: clients can't request a reset from the login screen — staff must trigger it. Add a "Forgot password?" link on the login overlay that calls `resetPasswordForEmail` with the user's email.
 - **Real health + tier columns on clients.** Today: `api/clients.js` returns hardcoded `health: 95` (or 50) and `tier: "Foundations"` for everyone. UI now hides both. Add real columns + populate them when there's a real signal to show.
 - **iOS push notifications via PWA + Web Push.** Once email/SMS aren't enough. Detail in `project_ios_push_pwa.md`.
-- **Move `/cancel` skill into repo `.claude/commands/`.** Currently personal-only at `~/.claude/skills/cancel/SKILL.md`. Move + modernize the Asana ticket creation step to write to the Supabase `tickets` table instead.
-- **BAM GTA staff/parent apps to Vercel.** Currently runs only on localhost. Two new Vercel projects + `vercel link` per app + URL update in root CLAUDE.md.
 - **Clean up bad `academy_mappings` row.** One row has a ticket title (`"Need the section..."`) saved as `asana_name`. Doesn't break anything but is ugly.
 - **Leads count investigation.** Clients view shows "Leads 200" — round number, probably mock. Trace where that comes from and either wire to real GHL data or hide.
 - **Notion + GHL MCP reconnection.** Both intermittently drop during long sessions. Investigate why.

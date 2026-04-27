@@ -4,6 +4,7 @@ import { fetchAllClients } from "../services/notionService";
 import { fetchPipelines, fetchConversations, fetchContact, fetchConversationMessages } from "../services/ghlService";
 import { fetchChannels, fetchMessages } from "../services/slackService";
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { supabase } from '../lib/supabase';
 
 export default function ClientsView({ tokens, dark, onboardingClients, activeClients, onSelectClient }) {
   const isMobile = useIsMobile();
@@ -595,7 +596,7 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
 
       {/* Client cards grid — Active / Onboarding tabs */}
       {!loading && tab !== "leads" && tab !== "messages" && (
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: 20, ...((!isNotionMode) ? { opacity: 0.6 } : {}) }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
           {clients.map((client, i) => (
             <ClientCard
               key={client.id || client.pageId || i}
@@ -605,6 +606,21 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
               index={i}
               isNotionMode={isNotionMode}
               onClick={() => handleCardClick(client)}
+              onResetPassword={async () => {
+                if (!client.email) return alert("No email on file for this client.");
+                if (!confirm(`Send a password reset link to ${client.email}?`)) return;
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  const res = await fetch("/api/clients?action=reset-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+                    body: JSON.stringify({ email: client.email }),
+                  });
+                  const json = await res.json().catch(() => ({}));
+                  if (!res.ok) alert("Failed: " + (json.error || res.status));
+                  else alert(`Reset link sent to ${client.email}`);
+                } catch (e) { alert("Failed: " + e.message); }
+              }}
             />
           ))}
           {clients.length === 0 && (
@@ -1259,7 +1275,7 @@ function LeadCard({ lead, tokens, dark, index, smColors, stageColorMap, sourceCo
 }
 
 /* ── Client Card — KPI-forward ────────────────────────────────── */
-function ClientCard({ client, tokens, dark, index, isNotionMode, onClick }) {
+function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onResetPassword }) {
   const [hov, setHov] = useState(false);
 
   const isOnboarding = client.profileStatus === "onboarding";
@@ -1308,6 +1324,24 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick }) {
         animation: `cardIn 0.3s ease ${index * 40}ms both`,
       }}
     >
+      {/* Top-right card action: send password reset */}
+      {onResetPassword && client.email && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onResetPassword(); }}
+          title={`Send password reset link to ${client.email}`}
+          style={{
+            position: "absolute", top: 10, right: 10, zIndex: 2,
+            fontSize: 10, fontWeight: 600, padding: "4px 9px", borderRadius: 6,
+            background: `${tokens.accent}1A`, color: tokens.accent,
+            border: `1px solid ${tokens.accent}33`, cursor: "pointer",
+            letterSpacing: 0.4, textTransform: "uppercase",
+            fontFamily: "inherit",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = `${tokens.accent}33`}
+          onMouseLeave={e => e.currentTarget.style.background = `${tokens.accent}1A`}
+        >🔑 Reset password</button>
+      )}
+
       {/* Health bar accent at top */}
       {health != null && (
         <div style={{

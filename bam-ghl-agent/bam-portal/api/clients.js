@@ -64,6 +64,9 @@ function shapeClient(row, revenue) {
   return {
     id: row.id,
     name: row.name,
+    owner_name: row.owner_name || null,
+    email: row.email || null,
+    auth_user_id: row.auth_user_id || null,
     status: row.status,
     ghl_location_id: row.ghl_location_id || null,
     slack_channel_id: row.slack_channel_id || null,
@@ -139,6 +142,35 @@ export default async function handler(req, res) {
       );
       const role = staffRows?.[0]?.role;
       if (role !== "admin") return res.status(403).json({ error: "admin only" });
+
+      // ── Action router ──
+      // ?action=reset-password   → send a password-reset email to a client
+      // (no action)              → create a new client (default)
+      const action = req.query.action;
+
+      if (action === "reset-password") {
+        const body = req.body || {};
+        const targetEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        if (!targetEmail) return res.status(400).json({ error: "email required" });
+
+        // Use Supabase auth recover endpoint — sends the standard recovery email
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/client-portal.html?type=recovery`;
+        const recoverRes = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: targetEmail, redirect_to: redirectTo }),
+        });
+        if (!recoverRes.ok) {
+          const errText = await recoverRes.text();
+          return res.status(400).json({ error: errText || `recover ${recoverRes.status}` });
+        }
+        return res.status(200).json({ ok: true, sent_to: targetEmail });
+      }
 
       // ── Validate inputs ──
       const body = req.body || {};
