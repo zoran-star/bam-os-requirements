@@ -63,6 +63,12 @@ in_progress ──[Send to client]──► awaiting_client (status)
 
 See `project_client_action_notifications_todo.md` — notifications (Slack/email/SMS) on send + reply.
 
+## Storage gotcha
+
+The `ticket-files` Supabase Storage bucket is set to **public: true**. Files uploaded via the client portal use `getPublicUrl()` which only resolves when the bucket is public. Initially created as private (2026-04-24), flipped to public on 2026-04-27 after staff couldn't open client-uploaded files (`{"statusCode":"404","error":"Bucket not found"}`).
+
+Security tradeoff: files are accessible to anyone with the URL. URLs use random UUID paths (e.g. `tickets/<ticket-uuid>/<filename>`), so it's security-through-obscurity. If granular per-client access control is ever needed, switch to **signed URLs** (`createSignedUrl(path, expiresIn)`) — staff portal only.
+
 ## Files touched
 
 - DB: migration `add_messages_to_tickets`
