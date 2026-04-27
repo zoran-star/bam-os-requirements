@@ -52,6 +52,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const [pool, setPool] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [overviewClient, setOverviewClient] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +70,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const visibleTickets = tickets.filter(x => {
     if (tab === "delegation") return x.status === "open";
     if (tab === "review") return x.status === "in_review";
+    if (tab === "completed") return x.status === "done" || x.status === "approved";
     if (tab === "execution") {
       if (!["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)) return false;
       if (isManager) return true;
@@ -77,15 +79,32 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     return false;
   });
 
+  const overviewTickets = tickets
+    .filter(x => x.status !== "done" && x.status !== "approved")
+    .filter(x => overviewClient === "all" || x.client?.id === overviewClient)
+    .sort((a, b) => {
+      const ad = a.due_date ? new Date(a.due_date).getTime() : Infinity;
+      const bd = b.due_date ? new Date(b.due_date).getTime() : Infinity;
+      return ad - bd;
+    });
+
+  const academyOptions = Array.from(
+    new Map(tickets.filter(x => x.client?.id).map(x => [x.client.id, x.client.name])).entries()
+  ).sort((a, b) => (a[1] || "").localeCompare(b[1] || ""));
+
+  const completedCount = tickets.filter(x => x.status === "done" || x.status === "approved").length;
   const tabs = isManager
     ? [
+        { key: "overview",   label: "Overview",   count: tickets.filter(x => x.status !== "done" && x.status !== "approved").length },
         { key: "delegation", label: "Delegation", count: tickets.filter(x => x.status === "open").length },
         { key: "execution",  label: "Execution",  count: tickets.filter(x => ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
         { key: "review",     label: "Review",     count: tickets.filter(x => x.status === "in_review").length },
+        { key: "completed",  label: "Completed",  count: completedCount },
         { key: "import",     label: "Asana Import" },
       ]
     : [
         { key: "execution", label: "My Tickets", count: tickets.filter(x => x.assigned_to === me?.id && ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
+        { key: "completed", label: "Completed", count: completedCount },
       ];
 
   return (
@@ -114,6 +133,16 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
       {tab === "import" ? (
         <AsanaImportView tokens={t} dark={dark} />
+      ) : tab === "overview" ? (
+        <OverviewTab
+          tickets={overviewTickets}
+          loading={loading}
+          academyOptions={academyOptions}
+          overviewClient={overviewClient}
+          setOverviewClient={setOverviewClient}
+          onOpen={(x) => setSelected(x)}
+          tokens={t}
+        />
       ) : (
         <>
           {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
@@ -123,16 +152,13 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
               No tickets in this tab.
             </div>
           )}
-        </>
-      )}
 
-      {/* Tickets list */}
-      {tab !== "import" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {visibleTickets.map(x => (
-            <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
-          ))}
-        </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {visibleTickets.map(x => (
+              <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+            ))}
+          </div>
+        </>
       )}
 
       {selected && (
@@ -148,6 +174,76 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         />
       )}
     </div>
+  );
+}
+
+function formatDueDate(s, t) {
+  if (!s) return { text: "No due date", color: t.textMute };
+  const d = new Date(s);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const due = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((due - today) / 86400000);
+  const text = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: due.getFullYear() !== today.getFullYear() ? "numeric" : undefined });
+  let label = text;
+  if (diff < 0) label = `${text} · ${Math.abs(diff)}d overdue`;
+  else if (diff === 0) label = `${text} · today`;
+  else if (diff === 1) label = `${text} · tomorrow`;
+  else if (diff <= 7) label = `${text} · in ${diff}d`;
+  const color = diff < 0 ? t.red : diff <= 2 ? t.amber : t.text;
+  return { text: label, color };
+}
+
+const TYPE_LABEL = { error: "Error", change: "Change", build: "Build" };
+
+function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOverviewClient, onOpen, tokens: t }) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5 }}>Academy</span>
+        <select
+          value={overviewClient}
+          onChange={e => setOverviewClient(e.target.value)}
+          style={{ padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, minWidth: 200 }}
+        >
+          <option value="all">All academies ({academyOptions.length})</option>
+          {academyOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{tickets.length} open · sorted by due date</span>
+      </div>
+
+      {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
+
+      {!loading && tickets.length === 0 && (
+        <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>No open tickets.</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: t.border, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" }}>
+        {tickets.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 180px 200px", gap: 12, padding: "10px 16px", background: t.bg, fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div>Title</div><div>Type</div><div>Due</div><div>Academy</div>
+          </div>
+        )}
+        {tickets.map(x => {
+          const title = x.menu_item || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
+          const due = formatDueDate(x.due_date, t);
+          return (
+            <div key={x.id} onClick={() => onOpen(x)} style={{
+              display: "grid", gridTemplateColumns: "1fr 110px 180px 200px", gap: 12,
+              padding: "14px 16px", background: t.surface, cursor: "pointer", alignItems: "center",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = t.bg}
+              onMouseLeave={e => e.currentTarget.style.background = t.surface}
+            >
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.textSub }}>{TYPE_LABEL[x.type] || x.type}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: due.color }}>{due.text}</div>
+              <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client?.name || "—"}</div>
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

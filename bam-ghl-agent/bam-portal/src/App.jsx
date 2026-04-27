@@ -21,6 +21,7 @@ import SystemsView from './views/SystemsView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
+import DevRoleSwitcher from './components/DevRoleSwitcher';
 import { supabase } from './lib/supabase';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
@@ -68,6 +69,12 @@ export default function BAMPortal() {
 
   const me = useStaffMe(session);
   const canSeeSystems = me && (me.role === "admin" || me.role === "systems_manager" || me.role === "systems_executor");
+
+  useEffect(() => {
+    if (me && (me.role === "systems_manager" || me.role === "systems_executor") && nav !== "systems" && nav !== "training") {
+      setNav("systems");
+    }
+  }, [me, nav]);
 
   const tk = dark ? T.dark : T.light;
 
@@ -323,20 +330,26 @@ export default function BAMPortal() {
     settings: IconSettings,
   };
 
-  const navItems = [
-    { label: "Dashboard", key: "dashboard" },
-    { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
-    { label: "Tasks", key: "tasks", count: taskCount, alert: taskAlert },
-    { label: "Calendar", key: "calendar" },
-    { label: "Knowledge Base", key: "knowledge" },
-    { label: "Financials", key: "financials" },
-    { label: "Communication", key: "communication" },
-    ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
-    { label: "SM Training", key: "training", href: "/training" },
-  ];
+  const isSystemsTeam = me?.role === "systems_manager" || me?.role === "systems_executor";
+  const navItems = isSystemsTeam
+    ? [
+        { label: "Systems", key: "systems" },
+        { label: "SM Training", key: "training", href: "/training" },
+      ]
+    : [
+        { label: "Dashboard", key: "dashboard" },
+        { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
+        { label: "Tasks", key: "tasks", count: taskCount, alert: taskAlert },
+        { label: "Calendar", key: "calendar" },
+        { label: "Knowledge Base", key: "knowledge" },
+        { label: "Financials", key: "financials" },
+        ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
+        { label: "SM Training", key: "training", href: "/training" },
+      ];
 
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
+      <DevRoleSwitcher />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -450,6 +463,7 @@ export default function BAMPortal() {
             </div>
           </div>
 
+          {!isSystemsTeam && (
           <div style={{ padding: "0 24px 20px", borderTop: `1px solid ${tk.border}`, paddingTop: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: tk.textMute, marginBottom: 14, letterSpacing: "0.04em" }}>Portfolio</div>
             {[
@@ -463,6 +477,7 @@ export default function BAMPortal() {
               </div>
             ))}
           </div>
+          )}
 
           <div style={{ padding: "16px 24px 24px", borderTop: `1px solid ${tk.border}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
