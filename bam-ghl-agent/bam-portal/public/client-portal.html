@@ -1657,19 +1657,23 @@
     gap: 10px;
     padding: 10px 12px;
     margin-top: 8px;
-    background: transparent;
-    border: 1px solid var(--line);
+    margin-bottom: 24px;
+    background: rgba(245, 241, 232, 0.06);
+    border: 1px solid rgba(245, 241, 232, 0.18);
     border-radius: var(--radius-sm);
     cursor: pointer;
     font-family: var(--mono);
     font-size: 10px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    color: var(--text-mute);
+    color: var(--text);
     transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
-  .theme-toggle:hover { border-color: var(--line-str); color: var(--text-sub); background: var(--surface); }
-  .theme-toggle-icon { font-size: 13px; line-height: 1; }
+  .theme-toggle:hover { border-color: rgba(245, 241, 232, 0.32); background: rgba(245, 241, 232, 0.10); }
+  .theme-toggle-icon { font-size: 13px; line-height: 1; color: var(--gold, #E8C547); }
+  /* Light theme — invert tint so the button keeps standing out */
+  html[data-theme="light"] .theme-toggle { background: rgba(15,15,20,0.05); border-color: rgba(15,15,20,0.18); }
+  html[data-theme="light"] .theme-toggle:hover { background: rgba(15,15,20,0.10); border-color: rgba(15,15,20,0.32); }
 
   /* ── Light theme override ── */
   html[data-theme="light"] {
@@ -1726,15 +1730,8 @@
           </svg>
         </div>
         <div class="brand-text">
-          <div class="brand-name">BAM<em> ·</em> OS</div>
-          <div class="brand-sub">Client Portal</div>
+          <div class="brand-name" id="academyName">Loading…</div>
         </div>
-      </div>
-
-      <div class="client-selector">
-        <div class="client-dot"></div>
-        <div class="client-name">Elite Hoops Academy</div>
-        <div class="client-chevron">›</div>
       </div>
     </div>
 
@@ -1744,19 +1741,6 @@
       <div class="nav-item active" onclick="switchView('systems', this)">
         <span class="nav-icon">⚙️</span>
         Systems
-      </div>
-
-      <div class="nav-item" onclick="switchView('marketing', this)">
-        <span class="nav-icon">📣</span>
-        Marketing
-      </div>
-
-      <div class="nav-label">§ Command</div>
-
-      <div class="nav-item" onclick="switchView('chat', this)">
-        <span class="nav-icon">💬</span>
-        Chat
-        <span class="nav-badge">03</span>
       </div>
     </nav>
 
@@ -3419,6 +3403,15 @@ async function submitTicket(type) {
 }
 
 // Init
+async function loadAcademyName() {
+  const el = document.getElementById('academyName');
+  if (!el) return;
+  if (!CLIENT_ID) { el.textContent = 'No client'; return; }
+  const { data, error } = await _sb.from('clients').select('name').eq('id', CLIENT_ID).maybeSingle();
+  if (error || !data) { el.textContent = 'Unknown academy'; return; }
+  el.textContent = data.name;
+}
+loadAcademyName();
 loadTickets();
 _attachPasteHandler('error-where',  'error-files');
 _attachPasteHandler('error-should', 'error-files');
