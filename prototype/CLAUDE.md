@@ -3,18 +3,23 @@
 ## Project memory
 Notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first, then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
-## Memory upkeep
-Before every commit, run through:
-- Decision worth keeping? → save to `memories/` and add a line to `MEMORY.md`
-- File moved, created, or renamed? → update CLAUDE.md paths
-- A memory note stale or wrong? → update or delete it
-- Is `MEMORY.md` in sync with the files in the folder?
+## Memory upkeep — UPDATE IN REAL TIME, NOT JUST AT COMMIT
 
-Run `/memory-audit` periodically.
+Update memory **the moment** something changes, not at commit time.
 
----
+**Update memory IMMEDIATELY when:**
+- A schema or data shape changes → update the relevant note
+- A new file or component is wired up → update the project note
+- A workflow/integration changes → update or create a note
+- A decision lands → save it
+- A path moves → update CLAUDE.md
+- A gotcha is discovered (RLS rules, column case, env quirks) → save it
 
-The dream world front-end sandbox for FullControl OS. This is where every feature is designed, validated, and shown — before anything gets handed to a dev team. Auto-deploys to fullcontrol-prototype-six.vercel.app on every push to main.
+**Before commit, double-check:**
+- New note added to `memories/`? → add a line to `MEMORY.md`
+- `MEMORY.md` in sync with files in the folder?
+
+Run `/memory-audit` periodically. Memory drift wastes context.
 
 
 ## Structure

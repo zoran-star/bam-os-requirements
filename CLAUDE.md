@@ -3,14 +3,24 @@
 ## Project memory
 Team-shared project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
-## Memory upkeep
-Before every commit, run through:
-- Did a decision get made that future sessions will want? → save to `memories/` and add a line to `MEMORY.md`
-- Did a file move, get created, or get renamed? → update CLAUDE.md paths
-- Did a memory note become stale or wrong? → update or delete it
-- Is `MEMORY.md` still in sync with the `.md` files in the folder?
+## Memory upkeep — UPDATE IN REAL TIME, NOT JUST AT COMMIT
 
-Memory drift wastes context. Run `/memory-audit` periodically.
+Update memory **the moment** something changes, not at commit time.
+
+**Update memory IMMEDIATELY when:**
+- A schema or data shape changes → update the relevant note
+- A new file or component is wired up → update the project note
+- A workflow/integration changes → update or create a note
+- A decision lands → save it
+- A path moves → update CLAUDE.md
+- A gotcha is discovered (RLS rules, column case, env quirks) → save it
+
+**Before commit, double-check:**
+- New note added to `memories/`? → add a line to `MEMORY.md`
+- `MEMORY.md` in sync with files in the folder?
+
+Run `/memory-audit` periodically. Memory drift wastes context.
+
 
 ## Repo slash commands
 Skills available in this repo (in `.claude/commands/`, shared via git):

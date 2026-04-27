@@ -12,4 +12,5 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Player Intake Setup](project_player_intake_setup.md) — Phase 3 complete, SQL plan ready for Phase 4
 - [Training Onboarding Flow](project_training_onboarding.md) — 3-step standalone flow, all DB questions inserted
 - [Tasks System Pending Mike](project_tasks_pending_mike.md) — task unification on hold until Mike gives preferences
-- [Questions Database Schema](supabase_questions_db.md) — full schema, enums, valid Places Asked, insert rules, useful queries
+- [Questions Database Schema](supabase_questions_db.md) — full schema, enums, valid Places Asked, insert rules, **UUID→Question lookup pattern** for ticket field labels
+- [Local Dev Workflow](project_local_dev_workflow.md) — `npm run dev` hits prod Supabase; use test_business client (71d01c0f-...) for safe testing + cleanup query

@@ -3,18 +3,24 @@
 ## Project memory
 Notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first, then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
-## Memory upkeep
-Before every commit, run through:
-- Decision worth keeping? → save to `memories/` and add a line to `MEMORY.md`
-- File moved, created, or renamed? → update CLAUDE.md paths
-- A memory note stale or wrong? → update or delete it
-- Is `MEMORY.md` in sync with the files in the folder?
+## Memory upkeep — UPDATE IN REAL TIME, NOT JUST AT COMMIT
 
-Run `/memory-audit` periodically.
+Update memory **the moment** something changes, not at commit time.
 
----
+**Update memory IMMEDIATELY when:**
+- A schema or data shape changes → update the relevant note
+- A new file or component is wired up → update the project note
+- A workflow/integration changes → update or create a note
+- A decision lands → save it
+- A path moves → update CLAUDE.md
+- A gotcha is discovered (RLS rules, column case, env quirks) → save it
 
-Survey sent to basketball academy owners to collect market data and validate the FullControl concept. This is NOT the onboarding survey for new FullControl customers — it's a research instrument that has already been distributed. Mostly in reference/maintenance mode.
+**Before commit, double-check:**
+- New note added to `memories/`? → add a line to `MEMORY.md`
+- `MEMORY.md` in sync with files in the folder?
+
+Run `/memory-audit` periodically. Memory drift wastes context.
+
 
 ## What it collects
 Academy owner data: business size, current tools, pain points, willingness to pay, and reactions to the FullControl prototype (embedded in the survey so owners can see what they're reacting to).

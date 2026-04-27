@@ -9,6 +9,19 @@ originSessionId: 8ec70af4-b33d-4257-b78b-d8943bfc9426
 - Table: `Questions Database`
 - Anon key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2ptZm1wbnNmbXRxbXdob3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjI1ODQsImV4cCI6MjA5MDE5ODU4NH0.8vUj-MHg73yUtQR5i3VAbgrTyjvmTCMM6-U3mGxbGGo`
 - Access via: Supabase MCP (`execute_sql`, `apply_migration`) or Supabase JS CDN in client-portal.html
+- **Column name gotcha:** the question text column is `"Question"` (capital Q, must be quoted in SQL). `select question` errors; `select "Question"` works.
+
+## How tickets reference questions
+
+Tickets store form answers in `tickets.fields` (jsonb) as `{ question_uuid: answer }`. They do NOT store question text — the UUID is the foreign key into Questions Database.
+
+When rendering a ticket, the staff portal (SystemsView TicketModal) does:
+```js
+supabase.from("Questions Database").select('id, "Question"').in("id", uuids)
+```
+…and uses the result to render question text labels with UUID fallback. Code: `bam-ghl-agent/bam-portal/src/views/SystemsView.jsx` (questionMap useEffect, ~line 285).
+
+This means: if you rename a question in Questions Database, every existing ticket instantly displays the new text. Don't store question text in the ticket itself.
 
 ## Full Column Schema
 

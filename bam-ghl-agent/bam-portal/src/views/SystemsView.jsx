@@ -11,6 +11,7 @@ import {
   denyTicket,
 } from "../services/ticketsService";
 import AsanaImportView from "./AsanaImportView";
+import { supabase } from "../lib/supabase";
 
 const STATUS_LABEL = {
   open:             "New",
@@ -286,6 +287,25 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   const [showDeny, setShowDeny] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [questionMap, setQuestionMap] = useState({});
+
+  // Resolve field UUIDs → question text from Questions Database
+  useEffect(() => {
+    const ids = Object.keys(ticket.fields || {});
+    if (!ids.length) { setQuestionMap({}); return; }
+    let cancelled = false;
+    supabase
+      .from("Questions Database")
+      .select('id, "Question"')
+      .in("id", ids)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        const map = {};
+        data.forEach(r => { map[r.id] = r.Question; });
+        setQuestionMap(map);
+      });
+    return () => { cancelled = true; };
+  }, [ticket.id]);
 
   const canExec = isManager || ticket.assigned_to === me?.id;
 
@@ -338,7 +358,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
           {/* Submission fields */}
           <Section title="Submission" tokens={t}>
             {Object.entries(ticket.fields || {}).map(([k, v]) => (
-              <Row key={k} label={k} value={v} tokens={t} />
+              <Row key={k} label={questionMap[k] || k} value={v} tokens={t} />
             ))}
             {(ticket.files || []).length > 0 && (
               <Row label="Files" tokens={t} value={

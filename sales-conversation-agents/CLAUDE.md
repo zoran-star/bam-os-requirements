@@ -3,18 +3,24 @@
 ## Project memory
 Notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first, then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 
-## Memory upkeep
-Before every commit, run through:
-- Decision worth keeping? → save to `memories/` and add a line to `MEMORY.md`
-- File moved, created, or renamed? → update CLAUDE.md paths
-- A memory note stale or wrong? → update or delete it
-- Is `MEMORY.md` in sync with the files in the folder?
+## Memory upkeep — UPDATE IN REAL TIME, NOT JUST AT COMMIT
 
-Run `/memory-audit` periodically.
+Update memory **the moment** something changes, not at commit time.
 
----
+**Update memory IMMEDIATELY when:**
+- A schema or data shape changes → update the relevant note
+- A new file or component is wired up → update the project note
+- A workflow/integration changes → update or create a note
+- A decision lands → save it
+- A path moves → update CLAUDE.md
+- A gotcha is discovered (RLS rules, column case, env quirks) → save it
 
-System prompts and other building materials to set up the AI sales agents that run inside of Full Control. This is the "AI-native" layer that makes FullControl feel autonomous.
+**Before commit, double-check:**
+- New note added to `memories/`? → add a line to `MEMORY.md`
+- `MEMORY.md` in sync with files in the folder?
+
+Run `/memory-audit` periodically. Memory drift wastes context.
+
 
 ## Status
 Booking agent is being built for BAM GTA. Zoran is working with Danny on sourcing training data from the best sales academies in the BAM Business network to train the agent. Still early stage.
