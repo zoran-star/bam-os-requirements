@@ -3521,13 +3521,28 @@ async function signOut() {
   location.reload();
 }
 
-function showRecoveryForm() {
+function showRecoveryForm(flowType) {
   // Swap login card → recovery card
   const overlay = document.getElementById('login-overlay');
   overlay.style.display = 'flex';
   const loginCard = overlay.querySelector('.login-card:not(#recovery-card)');
   if (loginCard) loginCard.style.display = 'none';
   document.getElementById('recovery-card').style.display = 'block';
+
+  // Adapt copy for invite (first-time) vs recovery (password reset)
+  const titleEl = document.querySelector('#recovery-card .login-title');
+  const subEl = document.querySelector('#recovery-card .login-sub');
+  const btnEl = document.getElementById('rec-submit');
+  if (flowType === 'invite' || flowType === 'signup') {
+    if (titleEl) titleEl.textContent = 'Welcome — choose your password';
+    if (subEl) subEl.textContent = "Pick something you'll remember. 8+ characters. After this you'll log in with your email + password.";
+    if (btnEl) btnEl.textContent = 'Save & sign in →';
+  } else {
+    if (titleEl) titleEl.textContent = 'Set a new password';
+    if (subEl) subEl.textContent = "Pick something you'll remember. 8+ characters.";
+    if (btnEl) btnEl.textContent = 'Save password →';
+  }
+
   document.getElementById('rec-password')?.focus();
 }
 
@@ -3558,15 +3573,19 @@ async function loadAcademyName() {
 }
 
 async function boot() {
-  // Recovery flow: Supabase puts the access_token in the URL hash with type=recovery.
-  // The Supabase JS client picks it up automatically and creates a session, but we
-  // want to show the "set new password" form instead of the normal portal.
+  // Recovery / invite flow: Supabase puts the access_token in the URL hash with
+  // type=recovery (password reset) OR type=invite (first-time signup).
+  // Either way, we show the "set your password" form instead of the normal portal.
   const hash = (window.location.hash || '').replace(/^#/, '');
   const hashParams = new URLSearchParams(hash);
-  const isRecovery = hashParams.get('type') === 'recovery'
-    || new URLSearchParams(window.location.search).get('type') === 'recovery';
-  if (isRecovery) {
-    showRecoveryForm();
+  const search = new URLSearchParams(window.location.search);
+  // Query type wins (we control it via redirect_to). Hash type is set by
+  // Supabase's auth processor — for invites it'll say 'recovery' since the
+  // password-set page is the same machinery, but our query will say 'invite'.
+  const flowType = search.get('type') || hashParams.get('type');
+  const isInviteOrRecovery = flowType === 'recovery' || flowType === 'invite' || flowType === 'signup';
+  if (isInviteOrRecovery) {
+    showRecoveryForm(flowType);
     return;
   }
 

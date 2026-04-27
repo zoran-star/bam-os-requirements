@@ -149,51 +149,49 @@ export default async function handler(req, res) {
       const action = req.query.action;
 
       if (action === "setup-account") {
-        // Set up a portal login for an EXISTING client row (one that doesn't
-        // yet have an auth_user_id). Creates the Supabase auth user, then
-        // updates the row with owner_name + email + auth_user_id.
+        // Send an INVITE email to the client. They click the link to set their
+        // own password (never seen by us). Updates the clients row with
+        // owner_name + email + auth_user_id once the invite call succeeds.
         const body = req.body || {};
         const client_id = typeof body.client_id === "string" ? body.client_id : "";
         const owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
         const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-        const password = typeof body.password === "string" ? body.password : "";
 
         if (!client_id) return res.status(400).json({ error: "client_id required" });
         if (!owner_name) return res.status(400).json({ error: "owner name required" });
         if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
           return res.status(400).json({ error: "valid email required" });
         }
-        if (!password || password.length < 8) {
-          return res.status(400).json({ error: "password must be at least 8 characters" });
-        }
 
-        // Make sure the client exists and isn't already linked
         const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,name,auth_user_id`);
         if (!existing?.length) return res.status(404).json({ error: "client not found" });
         if (existing[0].auth_user_id) {
           return res.status(400).json({ error: "this client already has an account — use Reset password instead" });
         }
 
-        // Create the auth user
-        const createUserRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
+        // Send invite via Supabase admin endpoint — creates the auth user (no
+        // password) AND emails the invite link in one call
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/client-portal.html?type=invite`;
+        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
           method: "POST",
           headers: {
             apikey: SUPABASE_SERVICE_KEY,
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: newEmail, password, email_confirm: true }),
+          body: JSON.stringify({ email: newEmail, redirect_to: redirectTo }),
         });
-        if (!createUserRes.ok) {
-          const errText = await createUserRes.text();
-          const friendly = createUserRes.status === 422 || /already/i.test(errText)
+        if (!inviteRes.ok) {
+          const errText = await inviteRes.text();
+          const friendly = inviteRes.status === 422 || /already/i.test(errText)
             ? "an account with that email already exists"
-            : `auth: ${errText}`;
+            : `invite: ${errText}`;
           return res.status(400).json({ error: friendly });
         }
-        const newUser = await createUserRes.json();
-        const auth_user_id = newUser?.id;
-        if (!auth_user_id) return res.status(500).json({ error: "auth user created but id missing" });
+        const invited = await inviteRes.json();
+        const auth_user_id = invited?.id || invited?.user?.id;
+        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
 
         // Update the clients row
         try {
@@ -212,9 +210,8 @@ export default async function handler(req, res) {
           );
           if (!updateRes.ok) throw new Error(`Supabase ${updateRes.status}: ${await updateRes.text()}`);
           const rows = await updateRes.json();
-          return res.status(200).json({ id: client_id, name: rows?.[0]?.name, email: newEmail });
+          return res.status(200).json({ id: client_id, name: rows?.[0]?.name, email: newEmail, invited: true });
         } catch (updateErr) {
-          // Roll back the auth user
           await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
             method: "DELETE",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },

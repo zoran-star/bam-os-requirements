@@ -1521,29 +1521,13 @@ function ClientCard({ client, tokens, dark, index, isNotionMode, onClick, onRese
   );
 }
 
-// ─── Setup-account modal (creates a portal login for an existing client row) ───
+// ─── Setup-account modal (sends an invite email to a client) ───
 function SetupAccountModal({ tokens, client, onClose, onSuccess }) {
   const [ownerName, setOwnerName] = useState(client.owner_name || "");
   const [email, setEmail] = useState(client.email || "");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [created, setCreated] = useState(null);
-  const [copied, setCopied] = useState(false);
-
-  const generatePassword = () => {
-    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!#$%&";
-    let p = "";
-    const rnd = (window.crypto?.getRandomValues?.bind(window.crypto)) || null;
-    if (rnd) {
-      const bytes = new Uint32Array(14);
-      rnd(bytes);
-      for (let i = 0; i < 14; i++) p += chars[bytes[i] % chars.length];
-    } else {
-      for (let i = 0; i < 14; i++) p += chars[Math.floor(Math.random() * chars.length)];
-    }
-    setPassword(p);
-  };
+  const [sent, setSent] = useState(null);
 
   const submit = async () => {
     setBusy(true); setError("");
@@ -1552,18 +1536,13 @@ function SetupAccountModal({ tokens, client, onClose, onSuccess }) {
       const res = await fetch("/api/clients?action=setup-account", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ client_id: client.id, owner_name: ownerName, email, password }),
+        body: JSON.stringify({ client_id: client.id, owner_name: ownerName, email }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setError(json?.error || `HTTP ${res.status}`); setBusy(false); return; }
-      setCreated({ name: client.name, email, password });
+      setSent({ name: client.name, email });
       setBusy(false);
     } catch (e) { setError(e.message); setBusy(false); }
-  };
-
-  const copyCreds = async () => {
-    const text = `BAM Business portal\nURL: ${window.location.origin}/client-portal.html\nEmail: ${created.email}\nPassword: ${created.password}`;
-    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
   };
 
   const labelStyle = { fontSize: 11, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
@@ -1572,10 +1551,10 @@ function SetupAccountModal({ tokens, client, onClose, onSuccess }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
-        {!created ? (
+        {!sent ? (
           <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>Set up account — {client.name}</div>
-            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Creates a portal login linked to this existing client</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>Send invite — {client.name}</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>The client gets an email with a link. They'll choose their own password and log in. We never see it.</div>
 
             <label style={labelStyle}>Owner name</label>
             <input style={inputStyle} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Jordan Cole" />
@@ -1583,32 +1562,22 @@ function SetupAccountModal({ tokens, client, onClose, onSuccess }) {
             <label style={labelStyle}>Owner email</label>
             <input style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="owner@academy.com" type="email" />
 
-            <label style={labelStyle}>Password</label>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-              <input style={{ ...inputStyle, marginBottom: 0, flex: 1 }} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" type="text" />
-              <button onClick={generatePassword} style={{ padding: "0 14px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Generate</button>
-            </div>
-
             {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
               <button onClick={submit} disabled={busy} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: busy ? 0.6 : 1 }}>
-                {busy ? "Creating…" : "Create account"}
+                {busy ? "Sending…" : "Send invite"}
               </button>
             </div>
           </>
         ) : (
           <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>✓ Account created</div>
-            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Copy these credentials now — the password will not be shown again</div>
-            <div style={{ background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, padding: 16, fontFamily: "monospace", fontSize: 13, color: tokens.text, marginBottom: 16 }}>
-              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Academy:</span> {created.name}</div>
-              <div style={{ marginBottom: 6 }}><span style={{ color: tokens.textMute }}>Email:</span> {created.email}</div>
-              <div><span style={{ color: tokens.textMute }}>Password:</span> {created.password}</div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>✓ Invite sent</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>
+              {sent.name} will receive an email at <b style={{ color: tokens.text }}>{sent.email}</b> with a link to set their password and log in. The link expires in 24 hours; if they miss it, use <b style={{ color: tokens.text }}>Reset password</b> on the card to send a fresh one.
             </div>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={copyCreds} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>{copied ? "✓ Copied" : "Copy credentials"}</button>
               <button onClick={onSuccess} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Done</button>
             </div>
           </>

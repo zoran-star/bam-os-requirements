@@ -69,33 +69,44 @@ Form collects: academy name, owner name, owner email, password (or auto-generate
 
 UI then shows the email + password once, with a "Copy credentials" button — staff sends them to the client manually. Password never stored, never shown again.
 
-### B) Set up account for an existing client (Clients page → card → "✉ Set up account")
-Use for the 20+ clients seeded earlier without owner/email/auth_user_id. Each card shows one of two top-right pills:
+### B) Send invite to an existing client (Clients page → card → "✉ Set up account")
+Use for the 20+ clients seeded earlier without owner/email/auth_user_id. Each card shows one of two top-right pills (in the right column above the status pill):
 - **"✉ Set up account"** (green) when `auth_user_id is null`
 - **"🔑 Reset password"** (gold) when the account exists
 
-Clicking "Set up account" opens `SetupAccountModal` (pre-fills any existing owner_name/email). Submits to `POST /api/clients?action=setup-account` which:
-1. Verifies admin auth (same as path A)
-2. Validates client_id, owner_name, email, password (≥8)
-3. Confirms the client doesn't already have `auth_user_id` (otherwise rejects with "use Reset password instead")
-4. Creates the Supabase auth user (admin API)
-5. UPDATEs the clients row with owner_name + email + auth_user_id
-6. Rolls back the auth user if the UPDATE fails
+**Invite-based flow (client picks their own password, never visible to staff):**
 
-After success, the modal flips to the credentials display (same as path A) and the page reloads so the card flips to "🔑 Reset password".
+Clicking "Set up account" opens `SetupAccountModal` which collects only owner_name + email (no password). Submits to `POST /api/clients?action=setup-account` which:
+1. Verifies admin auth
+2. Validates client_id + owner_name + email
+3. Confirms the client doesn't already have `auth_user_id` (otherwise rejects)
+4. Calls Supabase `/auth/v1/invite` with `{ email, redirect_to: <origin>/client-portal.html?type=invite }` — this creates the auth user (no password) AND sends the invite email
+5. UPDATEs the clients row with owner_name + email + auth_user_id
+6. Rolls back the auth user (DELETE) if the UPDATE fails
+
+Modal then flips to a "✓ Invite sent" success view explaining what happens next. Page reloads — card flips to "🔑 Reset password".
+
+**Client receives:** standard Supabase invite email → clicks link → lands at `client-portal.html?type=invite#access_token=...` → portal detects `type=invite` and shows "Welcome — choose your password" form → submits via `_sb.auth.updateUser({ password })` → strips URL → reloads → normal logged-in portal. **The link expires in 24 hours**; if missed, click "Reset password" on the card to send a fresh one (same end-user experience).
+
+Path A (Settings → New client) still uses staff-typed password for now — the Settings flow assumes the staff member is admin-creating an account they'll use themselves for testing. Could be unified later.
 
 **Fallback (Supabase dashboard):** see `bam-ghl-agent/docs/client-account-setup.md`. Used for resets, deactivation, and one-off troubleshooting.
 
-## Password reset
+## Password reset (and invite — same machinery)
 
-**Staff-triggered reset** (preferred):
-- Each card on the Clients view has a "🔑 Reset password" action (top-right, only when `client.email` is present)
+**Staff-triggered** (only path for now — self-serve "Forgot password?" is a deferred TODO):
+- Each card with `auth_user_id` shows "🔑 Reset password" (gold) in the top-right of the card right column
 - Click → confirm → `POST /api/clients?action=reset-password` with `{ email }`
 - Server is admin-only, hits Supabase `/auth/v1/recover` with `redirect_to: <origin>/client-portal.html?type=recovery`
-- Client receives the standard Supabase recovery email
-- Click in email → lands at `client-portal.html#access_token=...&type=recovery`
-- Supabase JS picks up the recovery session automatically; `boot()` detects `type=recovery` in URL hash and shows the **"Set a new password"** card instead of the login overlay
-- `submitNewPassword()` validates (8+ chars, match), calls `_sb.auth.updateUser({ password })`, strips the recovery hash, reloads → normal login flow
+- Client gets a standard Supabase email → clicks → lands at `client-portal.html?type=recovery#access_token=...`
+
+**Same destination, different copy:**
+- `boot()` reads `type` from query (preferred) or hash (fallback)
+- Calls `showRecoveryForm(flowType)` which adapts the title/sub/button copy:
+  - `type=invite` → "Welcome — choose your password" / "Save & sign in →"
+  - `type=recovery` → "Set a new password" / "Save password →"
+- Supabase JS auto-creates a session from the access_token in the hash
+- `submitNewPassword()` validates (8+ chars, must match), calls `_sb.auth.updateUser({ password })`, `history.replaceState` strips the hash, `location.reload()` → normal logged-in portal (session persists in localStorage)
 
 **Required Supabase configuration:**
 - Authentication → URL Configuration → Redirect URLs must include `https://<portal-origin>/**` and `http://localhost:5173/**`
