@@ -638,11 +638,29 @@ function Section({ title, children, tokens: t }) {
 }
 
 function Row({ label, value, tokens: t }) {
+  // Coerce to a renderable form: strings/numbers pass through, React
+  // elements pass through, arrays/objects get readable serialization,
+  // null/undefined render as em-dash.
+  let rendered;
+  if (value == null || value === "") {
+    rendered = <span style={{ color: t.textMute }}>—</span>;
+  } else if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    rendered = String(value);
+  } else if (typeof value === "object" && !Array.isArray(value) && value.$$typeof) {
+    // React element (has $$typeof) — render as-is
+    rendered = value;
+  } else if (Array.isArray(value)) {
+    rendered = value.filter(v => v != null && v !== "").map(v => typeof v === "object" ? JSON.stringify(v) : String(v)).join(", ");
+  } else {
+    // Plain object — render as comma-separated key/value or JSON
+    const truthy = Object.entries(value).filter(([, v]) => v && v !== false).map(([k]) => k);
+    rendered = truthy.length ? truthy.join(", ") : JSON.stringify(value);
+  }
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
       <div style={{ minWidth: 140, fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "capitalize" }}>{label}</div>
       <div style={{ flex: 1, fontSize: 13, color: t.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-        {typeof value === "string" ? value : value}
+        {rendered}
       </div>
     </div>
   );
