@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { DEV_ROLE_PERSONAS } from "../hooks/useStaffMe";
 
-export default function DevRoleSwitcher() {
+export default function DevRoleSwitcher({ session }) {
   const [active, setActive] = useState(() => localStorage.getItem("dev_role") || "");
   const [open, setOpen] = useState(false);
 
-  if (typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)) {
-    return null;
-  }
+  // Only render for Zoran. Gate on the REAL session email (not the impersonated
+  // `me`) so swapping to a non-Zoran persona doesn't make the switcher
+  // disappear. Works on both localhost and prod.
+  const ZORAN_EMAIL = "zoran@byanymeansbball.com";
+  if (!session?.user?.email || session.user.email !== ZORAN_EMAIL) return null;
 
   const set = (key) => {
     if (key) localStorage.setItem("dev_role", key);

@@ -6,7 +6,8 @@ import { fetchChannels, fetchMessages } from "../services/slackService";
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { supabase } from '../lib/supabase';
 
-export default function ClientsView({ tokens, dark, onboardingClients, activeClients, onSelectClient }) {
+export default function ClientsView({ tokens, dark, me, onboardingClients, activeClients, onSelectClient }) {
+  const isAdmin = me?.role === "admin";
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("active");
   const [setupTarget, setSetupTarget] = useState(null);
@@ -608,7 +609,7 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
               index={i}
               isNotionMode={isNotionMode}
               onClick={() => handleCardClick(client)}
-              onResetPassword={async () => {
+              onResetPassword={isAdmin ? async () => {
                 if (!client.email) return alert("No email on file for this client.");
                 if (!confirm(`Send a password reset link to ${client.email}?`)) return;
                 try {
@@ -622,8 +623,8 @@ export default function ClientsView({ tokens, dark, onboardingClients, activeCli
                   if (!res.ok) alert("Failed: " + (json.error || res.status));
                   else alert(`Reset link sent to ${client.email}`);
                 } catch (e) { alert("Failed: " + e.message); }
-              }}
-              onSetupAccount={() => setSetupTarget(client)}
+              } : undefined}
+              onSetupAccount={isAdmin ? () => setSetupTarget(client) : undefined}
             />
           ))}
           {clients.length === 0 && (
