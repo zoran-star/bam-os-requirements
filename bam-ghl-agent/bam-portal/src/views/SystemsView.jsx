@@ -603,7 +603,12 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
 
           {/* Executor: submit for review (assignee/manager only) */}
           {canExec && (ticket.status === "in_progress" || ticket.status === "needs_rework") && (
-            <button disabled={busy || !userGuide.trim()} onClick={() => wrap(() => submitForReview(ticket.id, userGuide))} style={btn(t, "primary")}>Submit for review</button>
+            <button
+              disabled={busy || !userGuide.trim()}
+              title={!userGuide.trim() ? "Fill in the User guide field above before submitting" : ""}
+              onClick={() => wrap(() => submitForReview(ticket.id, userGuide))}
+              style={btn(t, "primary")}
+            >Submit for review</button>
           )}
 
           {/* Manager: approve / deny on in_review */}
@@ -642,9 +647,27 @@ function Row({ label, value, tokens: t }) {
 }
 
 function btn(t, variant) {
-  const base = { padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none" };
+  // Note: disabled buttons get the proper visual cue via :disabled CSS
+  // pseudo-class on the inline-styled element. Browsers honor opacity +
+  // cursor on disabled. We force these via 'aria-disabled' style trick:
+  // styles include disabled-aware overrides applied at usage when needed.
+  const base = {
+    padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+    cursor: "pointer", border: "none",
+    // The browser doesn't auto-apply opacity/cursor for disabled inline
+    // styles, so we add them via a CSS class that we'll inject globally.
+  };
   if (variant === "primary")     return { ...base, background: t.accent, color: "#000" };
   if (variant === "danger")      return { ...base, background: t.red, color: "#fff" };
   if (variant === "danger-ghost")return { ...base, background: "transparent", color: t.red, border: `1px solid ${t.red}55` };
   return { ...base, background: "transparent", color: t.text, border: `1px solid ${t.border}` };
+}
+
+// Inject a one-time global rule so any disabled <button> looks disabled.
+// React doesn't add a class for :disabled when only inline style is used.
+if (typeof document !== "undefined" && !document.getElementById("__systems_disabled_btn_css__")) {
+  const s = document.createElement("style");
+  s.id = "__systems_disabled_btn_css__";
+  s.textContent = `button:disabled { opacity: 0.4 !important; cursor: not-allowed !important; }`;
+  document.head.appendChild(s);
 }
