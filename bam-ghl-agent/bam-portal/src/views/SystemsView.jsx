@@ -361,6 +361,11 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   }, [ticket.id]);
 
   const canExec = isManager || ticket.assigned_to === me?.id;
+  // Any systems team member (manager or executor) can interact with clients
+  // — request action, cancel a request — regardless of who the ticket is
+  // assigned to. Other actions (start, submit, approve, deny) stay
+  // assignee/manager gated.
+  const canClientComm = !!me;
 
   const wrap = async (fn) => {
     setBusy(true);
@@ -438,7 +443,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
           {/* Client action thread (multi-round) */}
           {((ticket.messages || []).length > 0 || ticket.client_action_request || ticket.client_action_response) && (
             <Section title="Client conversation" tokens={t}>
-              {ticket.status === "awaiting_client" && canExec && (
+              {ticket.status === "awaiting_client" && canClientComm && (
                 <div style={{ marginBottom: 12, padding: 10, background: dark ? "rgba(232,191,96,0.08)" : "rgba(232,191,96,0.12)", border: `1px solid ${t.accent}33`, borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ fontSize: 12, color: t.text, fontWeight: 600 }}>⏳ Awaiting client response</div>
                   <button onClick={() => wrap(() => cancelClientRequest(ticket.id))} disabled={busy} style={btn(t, "ghost")}>Cancel request</button>
@@ -587,12 +592,18 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             <button disabled={busy} onClick={() => wrap(() => startTicket(ticket.id))} style={btn(t, "primary")}>Start work</button>
           )}
 
-          {/* Executor: request client action / submit review */}
+          {/* Anyone on systems team: request client action (works on any
+              non-final status, including while already awaiting_client —
+              supports multiple pending requests) */}
+          {canClientComm && !["done","approved","in_review"].includes(ticket.status) && !showRequest && (
+            <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>
+              {ticket.status === "awaiting_client" ? "Add another request" : "Request client action"}
+            </button>
+          )}
+
+          {/* Executor: submit for review (assignee/manager only) */}
           {canExec && (ticket.status === "in_progress" || ticket.status === "needs_rework") && (
-            <>
-              {!showRequest && <button disabled={busy} onClick={() => setShowRequest(true)} style={btn(t, "ghost")}>Request client action</button>}
-              <button disabled={busy || !userGuide.trim()} onClick={() => wrap(() => submitForReview(ticket.id, userGuide))} style={btn(t, "primary")}>Submit for review</button>
-            </>
+            <button disabled={busy || !userGuide.trim()} onClick={() => wrap(() => submitForReview(ticket.id, userGuide))} style={btn(t, "primary")}>Submit for review</button>
           )}
 
           {/* Manager: approve / deny on in_review */}

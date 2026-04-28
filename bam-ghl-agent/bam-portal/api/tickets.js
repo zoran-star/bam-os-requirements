@@ -194,7 +194,10 @@ export default async function handler(req, res) {
           break;
 
         case "request_client":
-          if (t.assigned_to !== me.id && !isManager(me)) return res.status(403).json({ error: "not your ticket" });
+          // Any systems-team member can send a client request (assignee
+          // restriction lifted). Multiple pending requests on the same
+          // ticket are supported — each appends a message; status stays
+          // awaiting_client until the client responds.
           update.client_action_request = body.client_action_request || "";
           update.status = "awaiting_client";
           update.messages = [
@@ -210,7 +213,7 @@ export default async function handler(req, res) {
           break;
 
         case "cancel_client_request":
-          if (t.assigned_to !== me.id && !isManager(me)) return res.status(403).json({ error: "not your ticket" });
+          // Any systems-team member can cancel a pending client request
           if (t.status !== "awaiting_client") return res.status(400).json({ error: "ticket not awaiting client" });
           update.client_action_request = "";
           update.status = "in_progress";
