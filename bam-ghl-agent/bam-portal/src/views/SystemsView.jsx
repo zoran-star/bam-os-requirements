@@ -604,8 +604,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
           {/* Executor: submit for review (assignee/manager only) */}
           {canExec && (ticket.status === "in_progress" || ticket.status === "needs_rework") && (
             <button
-              disabled={busy || !userGuide.trim()}
-              title={!userGuide.trim() ? "Fill in the User guide field above before submitting" : ""}
+              disabled={busy}
               onClick={() => wrap(() => submitForReview(ticket.id, userGuide))}
               style={btn(t, "primary")}
             >Submit for review</button>
