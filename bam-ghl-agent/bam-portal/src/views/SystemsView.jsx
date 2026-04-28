@@ -579,7 +579,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
                 style={{ padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13 }}
               >
                 <option value="">Choose executor…</option>
-                {pool.map(p => <option key={p.id} value={p.id}>{p.name} ({p.role === "systems_manager" ? "Mgr" : "Exec"})</option>)}
+                {(pool || []).map(p => <option key={p.id} value={p.id}>{p.name} ({p.role === "systems_manager" ? "Mgr" : "Exec"})</option>)}
               </select>
               <button disabled={!assignee || busy} onClick={() => wrap(() => delegateTicket(ticket.id, assignee))} style={btn(t, "primary")}>
                 {ticket.status === "open" ? "Delegate" : "Reassign"}
