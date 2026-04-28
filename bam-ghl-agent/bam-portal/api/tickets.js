@@ -193,6 +193,13 @@ export default async function handler(req, res) {
           update.staff_notes = body.staff_notes ?? t.staff_notes;
           break;
 
+        case "save_user_guide":
+          // Anyone authenticated can save the user guide. Frontend gates
+          // who sees the editable textarea (managers always; executors
+          // while assigned and pre-review).
+          update.user_guide = body.user_guide ?? t.user_guide;
+          break;
+
         case "request_client":
           // Any systems-team member can send a client request (assignee
           // restriction lifted). Multiple pending requests on the same

@@ -8,6 +8,7 @@ import {
   requestClientAction,
   cancelClientRequest,
   submitForReview,
+  saveUserGuide,
   approveTicket,
   denyTicket,
 } from "../services/ticketsService";
@@ -506,13 +507,15 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             />
           </Section>
 
-          {/* User guide (executor edits on submit-review) */}
-          {(ticket.status === "in_progress" || ticket.status === "needs_rework" || ticket.status === "in_review" || ticket.status === "done") && (
+          {/* User guide — managers can always edit; executors edit while
+              the ticket is theirs and not yet in_review/done */}
+          {(isManager || ticket.status === "in_progress" || ticket.status === "needs_rework" || ticket.status === "in_review" || ticket.status === "done") && (
             <Section title="User guide (shown to client on completion)" tokens={t}>
               <textarea
                 value={userGuide}
                 onChange={e => setUserGuide(e.target.value)}
-                disabled={ticket.status === "in_review" || ticket.status === "done" || !canExec}
+                onBlur={() => userGuide !== (ticket.user_guide || "") && wrap(() => saveUserGuide(ticket.id, userGuide))}
+                disabled={!isManager && (ticket.status === "in_review" || ticket.status === "done" || !canExec)}
                 placeholder="Explain to the client what happens in their GHL…"
                 style={{
                   width: "100%", minHeight: 80, padding: 12,
@@ -567,8 +570,8 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
 
         {/* Action bar */}
         <div style={{ padding: "16px 28px", borderTop: `1px solid ${t.border}`, display: "flex", gap: 8, flexWrap: "wrap", background: t.bg }}>
-          {/* Manager: delegate / reassign */}
-          {isManager && (ticket.status === "open" || ticket.status === "delegated") && (
+          {/* Manager: delegate / reassign — available on any non-final status */}
+          {isManager && !["done","approved"].includes(ticket.status) && (
             <>
               <select
                 value={assignee}
@@ -579,7 +582,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
                 {pool.map(p => <option key={p.id} value={p.id}>{p.name} ({p.role === "systems_manager" ? "Mgr" : "Exec"})</option>)}
               </select>
               <button disabled={!assignee || busy} onClick={() => wrap(() => delegateTicket(ticket.id, assignee))} style={btn(t, "primary")}>
-                {ticket.status === "delegated" ? "Reassign" : "Delegate"}
+                {ticket.status === "open" ? "Delegate" : "Reassign"}
               </button>
               {ticket.status === "open" && (
                 <button disabled={busy} onClick={() => wrap(() => delegateTicket(ticket.id, me.id))} style={btn(t, "ghost")}>Self-assign</button>

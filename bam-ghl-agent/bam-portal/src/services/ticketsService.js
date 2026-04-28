@@ -37,6 +37,7 @@ function patch(id, action, body) {
 export const delegateTicket       = (id, assigned_to)          => patch(id, "delegate", { assigned_to });
 export const startTicket          = (id)                       => patch(id, "start");
 export const saveTicketNotes      = (id, staff_notes)          => patch(id, "notes", { staff_notes });
+export const saveUserGuide        = (id, user_guide)           => patch(id, "save_user_guide", { user_guide });
 export const requestClientAction  = (id, client_action_request)=> patch(id, "request_client", { client_action_request });
 export const cancelClientRequest  = (id)                       => patch(id, "cancel_client_request");
 export const submitForReview      = (id, user_guide)           => patch(id, "submit_review", { user_guide });
