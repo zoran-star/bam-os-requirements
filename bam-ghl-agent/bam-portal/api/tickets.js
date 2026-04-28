@@ -162,6 +162,44 @@ export default async function handler(req, res) {
       return res.status(200).json({ data: enriched, me });
     }
 
+    if (req.method === "POST") {
+      // Staff creates a new ticket on behalf of a client. Available to any
+      // authenticated staff. Lands in 'open' status (delegation pool).
+      const body = req.body || {};
+      const client_id = typeof body.client_id === "string" ? body.client_id : "";
+      const type      = ["error","change","build"].includes(body.type) ? body.type : "";
+      const title     = typeof body.title === "string" ? body.title.trim() : "";
+      const description = typeof body.description === "string" ? body.description.trim() : "";
+      const priority  = ["standard","red_alert"].includes(body.priority) ? body.priority : "standard";
+
+      if (!client_id) return res.status(400).json({ error: "client_id required" });
+      if (!type)      return res.status(400).json({ error: "type must be error|change|build" });
+      if (!description) return res.status(400).json({ error: "description required" });
+
+      const fields = { description };
+      if (title) fields.title = title;
+
+      const inserted = await sb(`tickets`, {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          client_id,
+          type,
+          status: "open",
+          priority,
+          fields,
+          menu_item: type === "build" && title ? title : null,
+          files: [],
+          messages: [],
+          submitted_at: new Date().toISOString(),
+          // Tracks who created it server-side for audit
+          submitted_by_staff: me.id,
+        }),
+      });
+      const row = Array.isArray(inserted) ? inserted[0] : inserted;
+      return res.status(200).json({ data: row });
+    }
+
     if (req.method === "PATCH") {
       const { id, action } = req.query;
       if (!id || !action) return res.status(400).json({ error: "id and action required" });

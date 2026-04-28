@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { T, calcProgress } from './tokens/tokens';
 import { fetchActionItems } from './services/notionService';
+import { createTicket } from './services/ticketsService';
 import { fetchClients } from './services/clientsService';
 import { fetchTasks, fetchAllTeamTasks, createTask, updateTask } from './services/asanaService';
 import { fetchEvents } from './services/calendarService';
@@ -48,6 +49,7 @@ export default function BAMPortal() {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showNewTicket, setShowNewTicket] = useState(false);
 
   // ─ Auth ─
   useEffect(() => {
@@ -355,6 +357,30 @@ export default function BAMPortal() {
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
       <DevRoleSwitcher session={session} />
+
+      {/* Global FAB: New ticket — visible to any logged-in staff at all times */}
+      {me && (
+        <button
+          onClick={() => setShowNewTicket(true)}
+          title="Create a new support ticket"
+          style={{
+            position: "fixed", bottom: 24, right: 24, zIndex: 900,
+            padding: "14px 22px", borderRadius: 999,
+            background: tk.accent, color: "#0A0A0B",
+            border: 0, fontWeight: 700, fontSize: 14, cursor: "pointer",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            fontFamily: "inherit",
+          }}
+        >+ New ticket</button>
+      )}
+
+      {showNewTicket && (
+        <NewTicketModal
+          tokens={tk}
+          clients={[...onboardingClients, ...activeClients]}
+          onClose={() => setShowNewTicket(false)}
+        />
+      )}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
@@ -732,6 +758,81 @@ export default function BAMPortal() {
           backdropFilter: "blur(8px)",
         }}>{toast}</div>
       )}
+    </div>
+  );
+}
+
+// ─── Global "+ New ticket" modal ─────────────────────────────────────
+
+function NewTicketModal({ tokens, clients, onClose }) {
+  const [clientId, setClientId] = useState("");
+  const [type, setType] = useState("error");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState("standard");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const sortedClients = [...(clients || [])].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const submit = async () => {
+    setBusy(true); setError("");
+    const { data, error: err } = await createTicket({
+      client_id: clientId, type, title, description, priority,
+    });
+    setBusy(false);
+    if (err) { setError(err); return; }
+    onClose();
+  };
+
+  const labelStyle = { fontSize: 11, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
+  const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 520, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>New support ticket</div>
+        <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Lands in the delegation pool — a manager picks it up next.</div>
+
+        <label style={labelStyle}>Client</label>
+        <select style={inputStyle} value={clientId} onChange={e => setClientId(e.target.value)}>
+          <option value="">— select a client —</option>
+          {sortedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+
+        <label style={labelStyle}>Type</label>
+        <select style={inputStyle} value={type} onChange={e => setType(e.target.value)}>
+          <option value="error">Error — fix something broken</option>
+          <option value="change">Change — adjust something live</option>
+          <option value="build">Build — build something new</option>
+        </select>
+
+        <label style={labelStyle}>Title (optional)</label>
+        <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder={type === "build" ? "e.g. Internal Tournament" : "Short title for this ticket"} />
+
+        <label style={labelStyle}>Description</label>
+        <textarea
+          style={{ ...inputStyle, minHeight: 90, resize: "vertical" }}
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          placeholder="What needs to happen?"
+        />
+
+        <label style={labelStyle}>Priority</label>
+        <select style={inputStyle} value={priority} onChange={e => setPriority(e.target.value)}>
+          <option value="standard">Standard</option>
+          <option value="red_alert">🚨 Red alert (blocking)</option>
+        </select>
+
+        {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+          <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
+          <button onClick={submit} disabled={busy || !clientId || !description} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: (busy || !clientId || !description) ? 0.5 : 1 }}>
+            {busy ? "Creating…" : "Create ticket"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -19,6 +19,10 @@ export async function fetchTickets() {
   return req("/api/tickets?scope=all");
 }
 
+export async function createTicket(payload) {
+  return req("/api/tickets", { method: "POST", body: JSON.stringify(payload) });
+}
+
 export async function fetchTicket(id) {
   return req(`/api/tickets?id=${id}`);
 }
