@@ -343,20 +343,30 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   const [busy, setBusy] = useState(false);
   const [questionMap, setQuestionMap] = useState({});
 
-  // Resolve field UUIDs → question text from Questions Database
+  // Resolve field UUIDs → question text from Questions Database.
+  // Some keys are non-UUIDs (e.g. "<uuid>_custom" for free-text "other"
+  // answers). Including those in `.in("id", …)` would fail the whole
+  // query (Postgres can't cast _custom to uuid). Filter to canonical
+  // UUIDs first; non-UUID keys still render with a friendly fallback.
   useEffect(() => {
-    const ids = Object.keys(ticket.fields || {});
+    const allKeys = Object.keys(ticket.fields || {});
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const ids = allKeys.filter(k => UUID_RE.test(k));
     if (!ids.length) { setQuestionMap({}); return; }
     let cancelled = false;
     supabase
       .from("Questions Database")
       .select('id, "Question"')
-      .in("id", ids)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
+      .in("id", ids.map(s => s.toLowerCase()))
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.warn("Questions DB lookup failed:", error.message); return; }
         const map = {};
-        data.forEach(r => { map[r.id] = r.Question; });
-        setQuestionMap(map);
+        (data || []).forEach(r => { map[r.id] = r.Question; });
+        // Also key by the original (possibly mixed-case) form so render lookup hits
+        const byOriginal = {};
+        ids.forEach(orig => { byOriginal[orig] = map[orig.toLowerCase()]; });
+        setQuestionMap(byOriginal);
       });
     return () => { cancelled = true; };
   }, [ticket.id]);
@@ -416,9 +426,17 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
         <div style={{ padding: "24px 28px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Submission fields */}
           <Section title="Submission" tokens={t}>
-            {Object.entries(ticket.fields || {}).map(([k, v]) => (
-              <Row key={k} label={questionMap[k] || k} value={v} tokens={t} />
-            ))}
+            {Object.entries(ticket.fields || {}).map(([k, v]) => {
+              // Resolve label: real question text > custom-answer hint > raw key
+              let label = questionMap[k];
+              if (!label && k.endsWith("_custom")) {
+                const baseId = k.slice(0, -"_custom".length);
+                const base = questionMap[baseId];
+                label = base ? `${base} (other)` : "Other (custom answer)";
+              }
+              if (!label) label = k;
+              return <Row key={k} label={label} value={v} tokens={t} />;
+            })}
             {(ticket.files || []).length > 0 && (
               <Row label="Files" tokens={t} value={
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
