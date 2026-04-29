@@ -34,6 +34,7 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 - Prototype and Notion must stay in sync. If you change the prototype, update Notion. If Notion changes, check if the prototype needs updating.
 - Don't add features beyond what's been agreed in whiteboard sessions or confirmed by a human.
 - Use CSS modules — no inline styles, no Tailwind.
+- Brand guide: [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md) — colors, typography, spacing, component patterns. All new UI must follow it.
 - All new pages go in src/pages/, all shared UI in src/components/.
 
 ## Connects to

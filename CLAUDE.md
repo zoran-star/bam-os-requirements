@@ -42,6 +42,7 @@ When the user asks for something, route to the right folder. Each subfolder has 
 | Market research survey | `market-research/` |
 | AI sales agent prompts (booking / closing / rebooking) | `sales-conversation-agents/` |
 | Add or edit Notion business requirements | repo root (Notion MCP, no specific folder) |
+| Edit the brand guide / shared front-end resources | `front-end/` |
 | Add a new top-level project folder | repo root → run `/setup-project-memory <folder>` |
 | Audit memory health across projects | any folder → run `/memory-audit` |
 

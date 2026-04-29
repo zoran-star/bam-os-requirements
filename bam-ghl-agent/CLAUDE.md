@@ -217,7 +217,7 @@ bam-ghl-agent/
 
 ## Design standards
 
-All frontend work follows the **Full Control design system** at `docs/fullcontrol-brand.md`:
+All frontend work follows the **Full Control design system** at [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md) (repo root). **Exception: `bam-gta-staff/` keeps its own branding — do not apply FullControl design system there.**
 - Dark-first (ink surfaces); light mode via `data-theme="light"` toggle
 - Space Grotesk for display, Inter for body, JetBrains Mono for labels
 - Gold (`#E8C547`) is the only accent — one moment per screen

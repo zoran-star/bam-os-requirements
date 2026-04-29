@@ -38,5 +38,8 @@ Investor conversations, acquisition prep, business planning, partnership discuss
 - fc-landing/ — product landing page (reference design, not active)
 - repo-map.html — dark-theme visual repo overview
 
+## Brand guide
+Any HTML pages built here (investor deck, landing, etc.) should follow the Full Control design system at [`front-end/fullcontrol-brand.md`](../front-end/fullcontrol-brand.md).
+
 ## Key rule
 These docs are for external conversations. Keep them polished and up to date. If key metrics change (ARR, user counts, timeline), update the investor playbook immediately. Always confirm with the human when uploading these materials to the cloud.
