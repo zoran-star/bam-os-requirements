@@ -1,0 +1,700 @@
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --panel: #141414;
+    --panel-2: #1c1c1c;
+    --border: rgba(255,255,255,0.08);
+    --border-bright: rgba(255,255,255,0.16);
+    --text: #e8e6e1;
+    --text-muted: #8a8882;
+    --text-dim: #5a5854;
+    --accent: #ff4d2e;
+    --accent-dim: #c43918;
+    --gold: #d4a857;
+    --green: #4ade80;
+    --yellow: #facc15;
+    --red: #ef4444;
+  }
+  .fc-doc { font-family: 'Neue Haas Grotesk', 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; min-height: 100vh; }
+  .fc-doc * { box-sizing: border-box; }
+
+  /* ============ HEADER ============ */
+  .fc-header { padding: 72px 48px 56px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, rgba(255,77,46,0.05), transparent 70%); }
+  .fc-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+  .fc-brand-mark { width: 28px; height: 28px; background: var(--accent); border-radius: 4px; position: relative; }
+  .fc-brand-mark::after { content: ''; position: absolute; inset: 7px; border: 2px solid #0a0a0a; border-radius: 2px; }
+  .fc-brand-name { font-size: 13px; letter-spacing: 0.24em; text-transform: uppercase; font-weight: 500; }
+  .fc-doc-kicker { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 16px; }
+  .fc-doc-title { font-size: 64px; font-weight: 700; letter-spacing: -0.025em; line-height: 0.95; margin: 0 0 20px; max-width: 920px; }
+  .fc-doc-subtitle { font-size: 18px; color: var(--text-muted); line-height: 1.55; margin: 0 0 32px; max-width: 720px; font-weight: 300; }
+  .fc-doc-meta { display: flex; gap: 40px; padding: 20px 0 0; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; flex-wrap: wrap; }
+  .fc-doc-meta div strong { display: block; color: var(--text); font-size: 13px; letter-spacing: 0.04em; text-transform: none; margin-top: 4px; font-weight: 500; }
+
+  /* ============ NAV ============ */
+  .fc-nav { position: sticky; top: 0; z-index: 100; background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 48px; display: flex; gap: 28px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; overflow-x: auto; }
+  .fc-nav a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; white-space: nowrap; font-weight: 500; }
+  .fc-nav a:hover { color: var(--text); }
+  .fc-nav a.active { color: var(--accent); }
+
+  /* ============ SECTIONS ============ */
+  .fc-section { padding: 72px 48px; border-bottom: 1px solid var(--border); max-width: 1240px; margin: 0 auto; }
+  .fc-section-num { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 12px; }
+  .fc-section-title { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin: 0 0 20px; }
+  .fc-section-lead { font-size: 17px; color: var(--text-muted); line-height: 1.6; max-width: 720px; margin: 0 0 48px; }
+
+  .fc-h3 { font-size: 18px; font-weight: 500; margin: 48px 0 16px; color: var(--text); }
+  .fc-h3:first-child { margin-top: 0; }
+  .fc-p { font-size: 15px; line-height: 1.7; color: var(--text); margin: 0 0 16px; max-width: 760px; }
+  .fc-p.muted { color: var(--text-muted); }
+  .fc-p em { color: var(--gold); font-style: normal; font-weight: 500; }
+
+  /* ============ TIMELINE ============ */
+  .fc-timeline { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; margin: 32px 0 48px; border: 1px solid var(--border-bright); border-radius: 8px; overflow: hidden; }
+  .fc-tl-phase { padding: 24px 28px; border-right: 1px solid var(--border); position: relative; }
+  .fc-tl-phase:last-child { border-right: none; }
+  .fc-tl-months { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; font-weight: 500; }
+  .fc-tl-name { font-size: 20px; font-weight: 500; margin-bottom: 6px; letter-spacing: -0.01em; }
+  .fc-tl-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 16px; }
+  .fc-tl-stats { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .fc-tl-stat { display: flex; justify-content: space-between; color: var(--text-dim); }
+  .fc-tl-stat strong { color: var(--text); font-weight: 500; }
+  .fc-tl-phase.build { background: rgba(138, 136, 130, 0.04); }
+  .fc-tl-phase.soft { background: rgba(212, 168, 87, 0.06); }
+  .fc-tl-phase.hard { background: rgba(255, 77, 46, 0.06); }
+  .fc-tl-phase.build .fc-tl-name { color: var(--text-muted); }
+  .fc-tl-phase.soft .fc-tl-name { color: var(--gold); }
+  .fc-tl-phase.hard .fc-tl-name { color: var(--accent); }
+
+  /* ============ HERO NUMBER ============ */
+  .fc-hero-number { padding: 56px 48px; background: linear-gradient(135deg, rgba(255,77,46,0.10), rgba(212,168,87,0.05)); border: 1px solid var(--accent-dim); border-radius: 12px; text-align: center; margin: 0 0 56px; }
+  .fc-hero-number-label { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 20px; }
+  .fc-hero-number-value { font-size: 96px; font-weight: 700; letter-spacing: -0.03em; line-height: 0.95; margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+  .fc-hero-number-sub { font-size: 16px; color: var(--text-muted); max-width: 520px; margin: 0 auto; line-height: 1.55; }
+
+  /* ============ SCENARIO GRID ============ */
+  .fc-scenarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 24px 0 32px; }
+  .fc-scenario { padding: 28px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; transition: border-color 0.2s; }
+  .fc-scenario.base { border-color: var(--accent); background: linear-gradient(180deg, rgba(255,77,46,0.04), transparent); }
+  .fc-scenario-name { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin-bottom: 12px; }
+  .fc-scenario.base .fc-scenario-name { color: var(--accent); }
+  .fc-scenario-val { font-size: 42px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; margin-bottom: 8px; }
+  .fc-scenario-sub { font-size: 12px; color: var(--text-dim); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 16px; }
+  .fc-scenario-desc { font-size: 13px; color: var(--text-muted); line-height: 1.55; }
+
+  /* ============ TABLES ============ */
+  .fc-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 20px 0 32px; }
+  .fc-table th { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border-bright); color: var(--text-muted); font-weight: 500; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .fc-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; vertical-align: top; line-height: 1.5; }
+  .fc-table td.num { text-align: right; }
+  .fc-table td.label { color: var(--text-muted); }
+  .fc-table tr:hover td { background: var(--panel); }
+  .fc-table tr.total td { border-top: 1px solid var(--border-bright); border-bottom: none; font-weight: 500; color: var(--accent); padding-top: 18px; }
+  .fc-table tr.subtotal td { color: var(--text); font-weight: 500; background: rgba(255,255,255,0.02); }
+
+  /* ============ CALLOUT ============ */
+  .fc-callout { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 20px 28px; margin: 24px 0 32px; border-radius: 6px; }
+  .fc-callout-title { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); font-weight: 500; margin-bottom: 10px; }
+  .fc-callout-body { font-size: 15px; color: var(--text); line-height: 1.7; }
+  .fc-callout.gold { border-left-color: var(--gold); }
+  .fc-callout.gold .fc-callout-title { color: var(--gold); }
+  .fc-callout.warn { border-left-color: var(--yellow); }
+  .fc-callout.warn .fc-callout-title { color: var(--yellow); }
+  .fc-callout em { color: var(--gold); font-style: normal; font-weight: 500; }
+
+  /* ============ INPUT GRID ============ */
+  .fc-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 24px 0; }
+  .fc-input-card { padding: 18px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+  .fc-input-label { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  .fc-input-value { font-size: 22px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .fc-input-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ============ CHANNELS ============ */
+  .fc-channels { margin: 20px 0 32px; }
+  .fc-channel-row { display: grid; grid-template-columns: 180px 1fr 80px 100px; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .fc-channel-row:last-child { border-bottom: none; }
+  .fc-channel-name { font-size: 14px; font-weight: 500; }
+  .fc-channel-bar { background: var(--border); height: 8px; border-radius: 4px; overflow: hidden; position: relative; }
+  .fc-channel-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.5s ease; }
+  .fc-channel-bar-fill.bam { background: #5a9ecc; }
+  .fc-channel-bar-fill.yt { background: var(--gold); }
+  .fc-channel-bar-fill.paid { background: var(--accent); }
+  .fc-channel-bar-fill.amb { background: #a084dc; }
+  .fc-channel-bar-fill.out { background: #8a8882; }
+  .fc-channel-pct { font-size: 14px; font-weight: 500; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+  .fc-channel-cac { font-size: 14px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ============ MATH FLOW ============ */
+  .fc-math { display: flex; flex-direction: column; gap: 8px; margin: 20px 0 32px; }
+  .fc-math-step { display: grid; grid-template-columns: 32px 1fr auto; gap: 16px; align-items: center; padding: 14px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+  .fc-math-num { width: 28px; height: 28px; border-radius: 50%; background: var(--bg); border: 1px solid var(--border-bright); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: var(--text-muted); }
+  .fc-math-desc { font-size: 14px; color: var(--text); }
+  .fc-math-desc .op { color: var(--text-dim); margin: 0 6px; }
+  .fc-math-result { font-size: 16px; font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ============ PITCH ============ */
+  .fc-pitch { padding: 48px 56px; background: var(--panel); border: 1px solid var(--border-bright); border-radius: 12px; margin: 24px 0 32px; position: relative; }
+  .fc-pitch::before { content: '"'; position: absolute; top: 16px; left: 28px; font-size: 80px; color: var(--accent); line-height: 1; font-family: Georgia, serif; opacity: 0.5; }
+  .fc-pitch-body { font-size: 20px; line-height: 1.55; color: var(--text); font-weight: 300; letter-spacing: -0.005em; padding-left: 36px; max-width: 860px; }
+  .fc-pitch-body strong { color: var(--accent); font-weight: 500; }
+
+  /* ============ Q&A ============ */
+  .fc-qa { margin: 24px 0; }
+  .fc-qa-item { padding: 20px 0; border-bottom: 1px solid var(--border); }
+  .fc-qa-q { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 10px; display: flex; gap: 12px; }
+  .fc-qa-q::before { content: 'Q.'; color: var(--accent); font-weight: 600; font-size: 13px; letter-spacing: 0.1em; padding-top: 2px; }
+  .fc-qa-a { font-size: 14px; line-height: 1.7; color: var(--text-muted); padding-left: 28px; }
+  .fc-qa-a em { color: var(--text); font-style: normal; font-weight: 500; }
+
+  /* ============ COMPARISON BAR ============ */
+  .fc-compare { padding: 32px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin: 32px 0; }
+  .fc-compare-title { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 24px; }
+  .fc-compare-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .fc-compare-row:last-child { border-bottom: none; }
+  .fc-compare-row.header { border-bottom: 1px solid var(--border-bright); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-dim); padding-bottom: 12px; }
+  .fc-compare-label { font-size: 14px; color: var(--text); }
+  .fc-compare-val { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .fc-compare-val.old { color: var(--text-dim); text-decoration: line-through; }
+  .fc-compare-val.new { color: var(--accent); font-weight: 500; }
+
+  /* ============ FOOTER ============ */
+  .fc-footer { padding: 48px; text-align: center; color: var(--text-dim); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .fc-footer strong { color: var(--text); font-weight: 500; display: block; margin-bottom: 8px; font-size: 14px; text-transform: none; letter-spacing: -0.01em; }
+
+  @media (max-width: 900px) {
+    .fc-doc-title { font-size: 42px; }
+    .fc-section { padding: 48px 24px; }
+    .fc-header { padding: 48px 24px 40px; }
+    .fc-nav { padding: 12px 24px; gap: 20px; }
+    .fc-timeline { grid-template-columns: 1fr; }
+    .fc-scenarios { grid-template-columns: 1fr; }
+    .fc-hero-number-value { font-size: 64px; }
+    .fc-channel-row { grid-template-columns: 120px 1fr 60px; }
+    .fc-channel-row .fc-channel-cac { display: none; }
+    .fc-compare-row { grid-template-columns: 1fr; gap: 4px; }
+    .fc-pitch { padding: 32px 24px; }
+    .fc-pitch-body { padding-left: 20px; font-size: 17px; }
+  }
+</style>
+
+<div class="fc-doc">
+
+  <!-- ============ HEADER ============ -->
+  <div class="fc-header">
+    <div class="fc-brand">
+      <div class="fc-brand-mark"></div>
+      <div class="fc-brand-name">FullControl</div>
+    </div>
+    <div class="fc-doc-kicker">Internal memo · Coleman ↔ Zoran</div>
+    <h1 class="fc-doc-title">Sizing the raise.</h1>
+    <p class="fc-doc-subtitle">A complete summary of our pre-seed round: reasoning, inputs, math, scenarios, and the pitch. Everything we've concluded, in one place, ready for review before investor conversations.</p>
+    <div class="fc-doc-meta">
+      <div>Session date <strong>April 2026</strong></div>
+      <div>Target raise <strong>$550K base</strong></div>
+      <div>Runway <strong>21 months</strong></div>
+      <div>Pre-money cap <strong>$12M</strong></div>
+      <div>Structure <strong>SAFE · 15% discount</strong></div>
+    </div>
+  </div>
+
+  <!-- ============ NAV ============ -->
+  <nav class="fc-nav">
+    <a href="#summary">01 · Summary</a>
+    <a href="#timeline">02 · Timeline</a>
+    <a href="#target">03 · Milestone</a>
+    <a href="#channels">04 · GTM</a>
+    <a href="#budget">05 · Budget</a>
+    <a href="#raise">06 · Raise</a>
+    <a href="#scenarios">07 · Scenarios</a>
+    <a href="#pitch">08 · Pitch</a>
+    <a href="#qa">09 · Q&A</a>
+  </nav>
+
+  <!-- ============ 01 SUMMARY ============ -->
+  <section class="fc-section" id="summary">
+    <div class="fc-section-num">Section 01 · The bottom line</div>
+    <h2 class="fc-section-title">What we concluded.</h2>
+    <p class="fc-section-lead">After working through user targets, acquisition channels, CAC assumptions, and phase-based burn, here's the number — and the logic that gets us there.</p>
+
+    <div class="fc-hero-number">
+      <div class="fc-hero-number-label">Base raise target</div>
+      <div class="fc-hero-number-value">$550K</div>
+      <div class="fc-hero-number-sub">SAFE at $12M pre-money cap · 15% discount · 21-month runway to $43K MRR milestone · ~5.1% dilution at base</div>
+    </div>
+
+    <h3 class="fc-h3">The three scenarios we're carrying</h3>
+    <div class="fc-scenarios">
+      <div class="fc-scenario">
+        <div class="fc-scenario-name">Lean</div>
+        <div class="fc-scenario-val">$385K</div>
+        <div class="fc-scenario-sub">~3.6% dilution</div>
+        <div class="fc-scenario-desc">Fallback only. Requires cutting founder salary, reducing paid mix, or slowing dev hiring. Not the pitch — the backup if we can't raise the base.</div>
+      </div>
+      <div class="fc-scenario base">
+        <div class="fc-scenario-name">Base · Pitch this</div>
+        <div class="fc-scenario-val">$550K</div>
+        <div class="fc-scenario-sub">~5.1% dilution</div>
+        <div class="fc-scenario-desc">21 months of runway. Ships product, onboards 20 founding members, acquires 175 paying users at $250 ARPU, hits ~$43K MRR with proven unit economics.</div>
+      </div>
+      <div class="fc-scenario">
+        <div class="fc-scenario-name">Strong</div>
+        <div class="fc-scenario-val">$715K</div>
+        <div class="fc-scenario-sub">~6.6% dilution</div>
+        <div class="fc-scenario-desc">Strategic ceiling. Room for 1–2 NBA angels to take larger positions. Only accept if strategic partners bring material distribution value.</div>
+      </div>
+    </div>
+
+    <div class="fc-callout gold">
+      <div class="fc-callout-title">The logic in one line</div>
+      <div class="fc-callout-body">175 users × $250 ARPU = <em>$43K MRR</em>, which is solidly in "comfortable seed" territory for vertical B2B SaaS. Below that, we're begging. Above that, we're over-raising and over-diluting. <em>This number is defensible, not aspirational.</em></div>
+    </div>
+  </section>
+
+  <!-- ============ 02 TIMELINE ============ -->
+  <section class="fc-section" id="timeline">
+    <div class="fc-section-num">Section 02 · Timeline structure</div>
+    <h2 class="fc-section-title">Three phases, not one.</h2>
+    <p class="fc-section-lead">Our burn isn't linear. It's three regimes stacked end-to-end. Most SaaS models assume constant marketing spend — ours has near-zero marketing for the first six months, then ramps hard. The raise has to fund all three.</p>
+
+    <div class="fc-timeline">
+      <div class="fc-tl-phase build">
+        <div class="fc-tl-months">Months 1–4 · Build</div>
+        <div class="fc-tl-name">Pre-launch</div>
+        <div class="fc-tl-desc">Devs ship product. No paid marketing. Content + waitlist building only. Zero revenue.</div>
+        <div class="fc-tl-stats">
+          <div class="fc-tl-stat"><span>Marketing spend</span><strong>$3K/mo</strong></div>
+          <div class="fc-tl-stat"><span>Users</span><strong>0</strong></div>
+          <div class="fc-tl-stat"><span>Revenue</span><strong>$0</strong></div>
+        </div>
+      </div>
+      <div class="fc-tl-phase soft">
+        <div class="fc-tl-months">Months 4–6 · Soft launch</div>
+        <div class="fc-tl-name">20 founding members</div>
+        <div class="fc-tl-desc">BAM warm network onboards at 30% lifetime discount. Validate, gather feedback, no public acquisition.</div>
+        <div class="fc-tl-stats">
+          <div class="fc-tl-stat"><span>Marketing spend</span><strong>$5K/mo</strong></div>
+          <div class="fc-tl-stat"><span>Users</span><strong>20</strong></div>
+          <div class="fc-tl-stat"><span>Revenue</span><strong>~$3.5K/mo</strong></div>
+        </div>
+      </div>
+      <div class="fc-tl-phase hard">
+        <div class="fc-tl-months">Months 6–18 · Hard launch</div>
+        <div class="fc-tl-name">Acquire 175 users</div>
+        <div class="fc-tl-desc">Public launch. Paid + organic acquisition engine on. 12-month window to hit milestone MRR.</div>
+        <div class="fc-tl-stats">
+          <div class="fc-tl-stat"><span>Marketing spend</span><strong>~$11.5K/mo avg</strong></div>
+          <div class="fc-tl-stat"><span>Users</span><strong>20 → 175</strong></div>
+          <div class="fc-tl-stat"><span>Revenue</span><strong>ramping to $43K/mo</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fc-callout">
+      <div class="fc-callout-title">Why 21 months total runway</div>
+      <div class="fc-callout-body">We need <em>18 months to hit the milestone</em> (6 to build + 12 to acquire), plus <em>3 months of buffer to actually fundraise the seed round</em>. Standard seed fundraises take 2–4 months. Less buffer than that = we're pitching the seed with thin data; more than that = we're over-diluting now.</div>
+    </div>
+  </section>
+
+  <!-- ============ 03 TARGET ============ -->
+  <section class="fc-section" id="target">
+    <div class="fc-section-num">Section 03 · The milestone</div>
+    <h2 class="fc-section-title">175 users. $43K MRR. That's the bar.</h2>
+    <p class="fc-section-lead">Earlier we toyed with 200–400 users. After pressure-testing what actually makes a strong seed conversation for vertical B2B SaaS, we landed here.</p>
+
+    <h3 class="fc-h3">Why 175 and not 300</h3>
+    <p class="fc-p">Seed investors don't score on user count — they score on MRR × quality signals (retention, CAC payback, repeatability). For our category, the thresholds are:</p>
+
+    <table class="fc-table">
+      <thead><tr><th>Position</th><th>MRR floor</th><th class="num">Users @ $250 ARPU</th><th>What it unlocks</th></tr></thead>
+      <tbody>
+        <tr><td class="label">Bare minimum</td><td>$20–30K</td><td class="num">~100 users</td><td>Seed conversation possible, low leverage</td></tr>
+        <tr class="subtotal"><td>Comfortable seed</td><td>$40–50K</td><td class="num">~175 users</td><td><strong style="color:var(--accent)">Our target.</strong> Strong conversation, clean terms</td></tr>
+        <tr><td class="label">Strong position</td><td>$60K+</td><td class="num">~240 users</td><td>Premium valuation, multiple term sheets</td></tr>
+      </tbody>
+    </table>
+
+    <div class="fc-callout gold">
+      <div class="fc-callout-title">The sweet spot argument</div>
+      <div class="fc-callout-body">Over-targeting at 300 means raising more, diluting more, and being punished for missing. Under-targeting at 100 means no leverage at the seed. <em>175 is the sweet spot — defensible without being aggressive.</em> Investors get excited here because we have repeatability + retention data, not because we hit a vanity number.</div>
+    </div>
+
+    <h3 class="fc-h3">The committed inputs</h3>
+    <div class="fc-inputs">
+      <div class="fc-input-card">
+        <div class="fc-input-label">Month 18 user target</div>
+        <div class="fc-input-value">175</div>
+        <div class="fc-input-note">Inside 200–400 range we floated</div>
+      </div>
+      <div class="fc-input-card">
+        <div class="fc-input-label">Blended ARPU</div>
+        <div class="fc-input-value">$250</div>
+        <div class="fc-input-note">After founding-member discount mix</div>
+      </div>
+      <div class="fc-input-card">
+        <div class="fc-input-label">Monthly churn</div>
+        <div class="fc-input-value">4%</div>
+        <div class="fc-input-note">Realistic for warm B2B SaaS</div>
+      </div>
+      <div class="fc-input-card">
+        <div class="fc-input-label">Month 18 MRR</div>
+        <div class="fc-input-value">$43K</div>
+        <div class="fc-input-note">≈ $525K ARR run rate</div>
+      </div>
+      <div class="fc-input-card">
+        <div class="fc-input-label">Soft launch users</div>
+        <div class="fc-input-value">20</div>
+        <div class="fc-input-note">BAM warm network, founding members</div>
+      </div>
+      <div class="fc-input-card">
+        <div class="fc-input-label">Founding member discount</div>
+        <div class="fc-input-value">30%</div>
+        <div class="fc-input-note">Lifetime. Effective ARPU ~$175 on the 20</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 GTM ============ -->
+  <section class="fc-section" id="channels">
+    <div class="fc-section-num">Section 04 · GTM motion</div>
+    <h2 class="fc-section-title">The channel mix — and why it's honest.</h2>
+    <p class="fc-section-lead">Earlier we had paid ads at 35% of mix with $900 CAC. We revised: paid is actually 25% at $550 CAC because our BAM distribution moat is real, and we can't run paid like a generalist startup.</p>
+
+    <h3 class="fc-h3">Channel allocation (months 6–18)</h3>
+    <div class="fc-channels">
+      <div class="fc-channel-row">
+        <div class="fc-channel-name">BAM warm network</div>
+        <div class="fc-channel-bar"><div class="fc-channel-bar-fill bam" style="width: 30%"></div></div>
+        <div class="fc-channel-pct">30%</div>
+        <div class="fc-channel-cac">$50 CAC</div>
+      </div>
+      <div class="fc-channel-row">
+        <div class="fc-channel-name">YouTube / organic</div>
+        <div class="fc-channel-bar"><div class="fc-channel-bar-fill yt" style="width: 25%"></div></div>
+        <div class="fc-channel-pct">25%</div>
+        <div class="fc-channel-cac">$200 CAC</div>
+      </div>
+      <div class="fc-channel-row">
+        <div class="fc-channel-name">Paid ads</div>
+        <div class="fc-channel-bar"><div class="fc-channel-bar-fill paid" style="width: 25%"></div></div>
+        <div class="fc-channel-pct">25%</div>
+        <div class="fc-channel-cac">$550 CAC</div>
+      </div>
+      <div class="fc-channel-row">
+        <div class="fc-channel-name">Ambassador / partner</div>
+        <div class="fc-channel-bar"><div class="fc-channel-bar-fill amb" style="width: 15%"></div></div>
+        <div class="fc-channel-pct">15%</div>
+        <div class="fc-channel-cac">$400 CAC</div>
+      </div>
+      <div class="fc-channel-row">
+        <div class="fc-channel-name">Outbound sales</div>
+        <div class="fc-channel-bar"><div class="fc-channel-bar-fill out" style="width: 5%"></div></div>
+        <div class="fc-channel-pct">5%</div>
+        <div class="fc-channel-cac">$600 CAC</div>
+      </div>
+    </div>
+
+    <h3 class="fc-h3">Blended CAC math</h3>
+    <div class="fc-math">
+      <div class="fc-math-step">
+        <div class="fc-math-num">1</div>
+        <div class="fc-math-desc">BAM 30% × $50 <span class="op">+</span> YT 25% × $200 <span class="op">+</span> Paid 25% × $550 <span class="op">+</span> Amb 15% × $400 <span class="op">+</span> Out 5% × $600</div>
+        <div class="fc-math-result">$293 blended</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">2</div>
+        <div class="fc-math-desc">LTV: $250 × 24mo × 75% margin = $4,500 · LTV/CAC ratio</div>
+        <div class="fc-math-result">15.4x · excellent</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">3</div>
+        <div class="fc-math-desc">Payback period: $293 CAC ÷ ($250 × 75% margin)</div>
+        <div class="fc-math-result">1.6 months</div>
+      </div>
+    </div>
+
+    <div class="fc-callout">
+      <div class="fc-callout-title">Why this is defensible to investors</div>
+      <div class="fc-callout-body">A blended CAC of <em>$293</em> with <em>1.6-month payback</em> is exceptional for vertical SaaS. The reason it's not fantasy: 55% of our acquisitions come from BAM warm network or organic content we already produce for BAM Basketball (500K+ YT subs). Paid ads aren't doing the heavy lifting — distribution is.</div>
+    </div>
+
+    <h3 class="fc-h3">The riskiest assumption</h3>
+    <p class="fc-p">Paid CAC at $550 is the biggest unknown. We've never run paid SaaS acquisition for FullControl specifically. If actual CAC is $1000+, our model breaks and we'd need to shift more weight to organic or slow the ramp. <em>The 30% contingency buffer on paid exists for exactly this reason.</em></p>
+  </section>
+
+  <!-- ============ 05 BUDGET ============ -->
+  <section class="fc-section" id="budget">
+    <div class="fc-section-num">Section 05 · The budget build</div>
+    <h2 class="fc-section-title">Where every dollar goes.</h2>
+    <p class="fc-section-lead">Total burn over 21 months breaks into fixed costs (dev, legal, salaries, tools) and marketing. Marketing is the only variable we actively chose.</p>
+
+    <h3 class="fc-h3">Marketing by phase</h3>
+    <table class="fc-table">
+      <thead><tr><th>Phase</th><th>Months</th><th>Monthly</th><th class="num">Total</th><th>What it funds</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Build</strong></td><td>1–4</td><td>$3K/mo</td><td class="num">$12K</td><td class="label">Content production, waitlist warmup, brand/design</td></tr>
+        <tr><td><strong>Soft launch</strong></td><td>4–6</td><td>$5K/mo</td><td class="num">$10K</td><td class="label">Content + small paid creative testing</td></tr>
+        <tr><td><strong>Hard launch</strong></td><td>6–18</td><td>~$11.5K/mo avg</td><td class="num">$137K</td><td class="label">Paid acquisition + $4K/mo overhead + 30% contingency</td></tr>
+        <tr><td><strong>Buffer</strong></td><td>18–21</td><td>~$11.5K/mo</td><td class="num">$35K</td><td class="label">Sustained acquisition while fundraising seed</td></tr>
+        <tr class="total"><td colspan="3">21-month marketing total</td><td class="num">~$194K</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="fc-h3">Fixed costs by phase (from v5 model)</h3>
+    <table class="fc-table">
+      <thead><tr><th>Phase</th><th>Months</th><th>Monthly avg</th><th class="num">Total</th><th>Composition</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Build</strong></td><td>1–4</td><td>$25K/mo</td><td class="num">$100K</td><td class="label">Dev $16K + Legal $2K + Founders $4K + Tools $3K</td></tr>
+        <tr><td><strong>Soft launch</strong></td><td>4–6</td><td>$25K/mo</td><td class="num">$50K</td><td class="label">Same as build phase</td></tr>
+        <tr><td><strong>Hard launch early</strong></td><td>6–12</td><td>$30K/mo</td><td class="num">$180K</td><td class="label">Dev $18K + Legal $3K + Founders $6K + Tools $3K</td></tr>
+        <tr><td><strong>Hard launch late</strong></td><td>12–18</td><td>$31.5K/mo</td><td class="num">$189K</td><td class="label">Dev $19K + Legal $0.5K + Founders $9K + Tools $3K</td></tr>
+        <tr><td><strong>Buffer</strong></td><td>18–21</td><td>$31.5K/mo</td><td class="num">$94.5K</td><td class="label">Continuation at hard launch late rate</td></tr>
+        <tr class="total"><td colspan="3">21-month fixed total</td><td class="num">~$614K</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="fc-h3">Total burn</h3>
+    <div class="fc-math">
+      <div class="fc-math-step">
+        <div class="fc-math-num">A</div>
+        <div class="fc-math-desc">Fixed costs across 21 months</div>
+        <div class="fc-math-result">$614K</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">B</div>
+        <div class="fc-math-desc">Marketing across 21 months</div>
+        <div class="fc-math-result">$194K</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">=</div>
+        <div class="fc-math-desc"><strong>Total burn</strong></div>
+        <div class="fc-math-result">$808K</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 06 RAISE ============ -->
+  <section class="fc-section" id="raise">
+    <div class="fc-section-num">Section 06 · Sizing the raise</div>
+    <h2 class="fc-section-title">From burn to the ask.</h2>
+    <p class="fc-section-lead">Raise = burn − revenue offset (50% credit) − existing cash. The conservative 50% revenue credit is defensible to investors because projections always miss.</p>
+
+    <h3 class="fc-h3">Revenue offset calculation</h3>
+    <table class="fc-table">
+      <thead><tr><th>Phase</th><th>Users</th><th>ARPU</th><th>Months</th><th class="num">Revenue</th></tr></thead>
+      <tbody>
+        <tr><td>Soft launch</td><td>20</td><td>$175 (30% off)</td><td>2</td><td class="num">$7K</td></tr>
+        <tr><td>Hard launch</td><td>avg 97.5</td><td>$250</td><td>12</td><td class="num">$293K</td></tr>
+        <tr><td>Buffer</td><td>175</td><td>$250</td><td>3</td><td class="num">$131K</td></tr>
+        <tr class="subtotal"><td colspan="4">Total gross revenue (21mo)</td><td class="num">$431K</td></tr>
+        <tr class="total"><td colspan="4">50% credit applied to raise calculation</td><td class="num">$215K</td></tr>
+      </tbody>
+    </table>
+
+    <h3 class="fc-h3">The raise formula</h3>
+    <div class="fc-math">
+      <div class="fc-math-step">
+        <div class="fc-math-num">1</div>
+        <div class="fc-math-desc">Total 21-month burn</div>
+        <div class="fc-math-result">$808K</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">2</div>
+        <div class="fc-math-desc">Less: revenue offset at 50% credit</div>
+        <div class="fc-math-result">− $215K</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">3</div>
+        <div class="fc-math-desc">Less: existing cash reserves</div>
+        <div class="fc-math-result">− $20K</div>
+      </div>
+      <div class="fc-math-step">
+        <div class="fc-math-num">=</div>
+        <div class="fc-math-desc"><strong>Base raise</strong></div>
+        <div class="fc-math-result">~$550K</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 07 SCENARIOS ============ -->
+  <section class="fc-section" id="scenarios">
+    <div class="fc-section-num">Section 07 · Lean vs base vs strong</div>
+    <h2 class="fc-section-title">What each number actually buys.</h2>
+    <p class="fc-section-lead">The scenarios aren't just different dollar amounts — they represent different plans and different risk profiles. Here's what changes at each level.</p>
+
+    <table class="fc-table">
+      <thead><tr><th>Scenario</th><th class="num">Raise</th><th class="num">Dilution</th><th>Runway reality</th><th>Risk profile</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Lean</strong></td>
+          <td class="num">$385K</td>
+          <td class="num">~3.6%</td>
+          <td class="label">21mo only if we cut: founder salary to $0, overhead to $2K/mo, paid mix 25→10%. Or, keep plan but shrink runway to ~15mo.</td>
+          <td class="label" style="color: var(--yellow)">High. No room for error. Forced early seed fundraise at worse terms.</td>
+        </tr>
+        <tr class="subtotal">
+          <td><strong>Base</strong></td>
+          <td class="num">$550K</td>
+          <td class="num">~5.1%</td>
+          <td class="label"><strong>21mo full plan.</strong> Hits $43K MRR with 3mo buffer to fundraise seed.</td>
+          <td class="label" style="color: var(--green)">Balanced. Defensible, clean terms, room for one bad quarter.</td>
+        </tr>
+        <tr>
+          <td><strong>Strong</strong></td>
+          <td class="num">$715K</td>
+          <td class="num">~6.6%</td>
+          <td class="label">24–27mo runway. Room to accelerate hiring, test additional channels, or weather macro downturn.</td>
+          <td class="label" style="color: var(--gold)">Low. More dilution but total comfort. Only if strategic partners.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="fc-callout warn">
+      <div class="fc-callout-title">Our stance on lean</div>
+      <div class="fc-callout-body">The $165K difference between lean and base isn't meaningful dilution (1.5 percentage points at $12M cap). What it <em>is</em> is the difference between running a business with breathing room versus white-knuckling every month. <em>We pitch the base. We only accept lean if forced to.</em></div>
+    </div>
+
+    <h3 class="fc-h3">Pushback tradeoffs we evaluated</h3>
+    <div class="fc-compare">
+      <div class="fc-compare-title">Old vs new (after Coleman's pushback)</div>
+      <div class="fc-compare-row header">
+        <div>Input</div>
+        <div>Before</div>
+        <div>After</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">User target (month 18)</div>
+        <div class="fc-compare-val old">300</div>
+        <div class="fc-compare-val new">175</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Paid ad CAC</div>
+        <div class="fc-compare-val old">$900</div>
+        <div class="fc-compare-val new">$550</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Paid channel share</div>
+        <div class="fc-compare-val old">35%</div>
+        <div class="fc-compare-val new">25%</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">BAM warm share</div>
+        <div class="fc-compare-val old">20%</div>
+        <div class="fc-compare-val new">30%</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Hard launch overhead</div>
+        <div class="fc-compare-val old">$6K/mo</div>
+        <div class="fc-compare-val new">$4K/mo</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Runway</div>
+        <div class="fc-compare-val old">24mo</div>
+        <div class="fc-compare-val new">21mo</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Blended CAC</div>
+        <div class="fc-compare-val old">$485</div>
+        <div class="fc-compare-val new">$293</div>
+      </div>
+      <div class="fc-compare-row">
+        <div class="fc-compare-label">Base raise</div>
+        <div class="fc-compare-val old">$672K</div>
+        <div class="fc-compare-val new">$550K</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 08 PITCH ============ -->
+  <section class="fc-section" id="pitch">
+    <div class="fc-section-num">Section 08 · The pitch</div>
+    <h2 class="fc-section-title">How we present this.</h2>
+    <p class="fc-section-lead">One sentence for every angel conversation. This is what every number in this document serves.</p>
+
+    <div class="fc-pitch">
+      <div class="fc-pitch-body">We're raising <strong>$550K</strong> on a $12M cap, with room to expand to <strong>$715K</strong> for strategic partners. This funds <strong>21 months of runway</strong>: six months to ship and soft-launch with 20 founding members from the BAM network, twelve months to acquire <strong>175 paying academy operators</strong> at $250 ARPU, and three months of buffer to raise our seed at <strong>~$43K MRR</strong> with proven unit economics.</div>
+    </div>
+
+    <div class="fc-callout gold">
+      <div class="fc-callout-title">Why this works as a pitch</div>
+      <div class="fc-callout-body">It answers the five questions every angel asks: <em>how much · at what terms · what does it fund · what does it prove · what's next.</em> Every number is backed by real math, not spreadsheet wishful thinking. If an angel asks "why this number?" we have a 30-minute defense ready.</div>
+    </div>
+  </section>
+
+  <!-- ============ 09 Q&A ============ -->
+  <section class="fc-section" id="qa">
+    <div class="fc-section-num">Section 09 · Investor Q&A prep</div>
+    <h2 class="fc-section-title">What angels will ask. What we say.</h2>
+    <p class="fc-section-lead">Every question an angel asks tests one of our assumptions. Here are the ones we already stress-tested, with our answers.</p>
+
+    <div class="fc-qa">
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">Why 175 users and not 300?</div>
+        <div class="fc-qa-a">At $250 ARPU, 175 users = $43K MRR, which sits squarely in "comfortable seed" territory for vertical B2B SaaS. <em>Over-targeting creates downside risk without upside reward:</em> if we raise $700K for 300 users and only hit 200, we're punished. If we raise $550K for 175 users and hit 200, we're celebrated.</div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">Paid CAC at $550 — how do you know?</div>
+        <div class="fc-qa-a">Honestly, we don't yet. We've benchmarked against vertical SaaS at our ARPU range ($200–300/mo B2B) where CAC typically lands $400–800. We've budgeted at the middle, with a <em>30% contingency buffer on paid spend</em>. First action post-raise is 90 days of paid testing to validate this assumption.</div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">Why is blended CAC so low at $293?</div>
+        <div class="fc-qa-a">Because 55% of our acquisition comes from BAM warm network and organic content — channels we already own and operate. Coleman has 500K+ YouTube subs on BAM Basketball, 20+ BAM Business clients, and relationships across 35+ countries. <em>We're not a generalist startup running cold paid acquisition.</em> We're a distribution company extending into SaaS.</div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">What if you only hit 50% of the user target?</div>
+        <div class="fc-qa-a">100 users × $250 = $25K MRR. That's still bare-minimum seed territory. We'd raise a smaller bridge and reset, or use the remaining runway to double down on whichever channel worked best. The 21-month runway gives us <em>3 months to pivot and re-raise before running out of cash.</em></div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">Why angels and not a VC lead?</div>
+        <div class="fc-qa-a">At pre-seed, for a vertical SaaS that most generalist VCs don't understand, angels give us four things a VC can't: <em>speed</em> (days vs months), <em>right-sized checks</em> ($25–75K vs $500K+), <em>warm intros</em> to the exact operators who'll be customers, and <em>less distraction</em> from building. We plan to bring in a VC lead at seed, once we have the traction to command a priced round.</div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">Why a SAFE at $12M cap?</div>
+        <div class="fc-qa-a">$12M cap reflects the strength of the founding team (Coleman's 10+ years building BAM, Zoran's technical depth, Rex's CFO-level advisory), the distribution moat, and comparable pre-seed vertical SaaS rounds. The 15% discount is standard. <em>SAFE over priced round</em> because it's cheaper legally, faster to close, and doesn't require us to set a formal valuation this early.</div>
+      </div>
+
+      <div class="fc-qa-item">
+        <div class="fc-qa-q">What happens month 21 if you miss?</div>
+        <div class="fc-qa-a">Three options, in order of preference: (1) raise a small bridge from existing angels at the same cap, (2) take a down-round seed if traction justifies it, (3) slow burn to extend runway 3–6 months and re-attempt fundraise. <em>Our contingency is diversification</em> — Coleman's BAM Business income covers personal overhead, which means FullControl doesn't need to pay founders in a crisis.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <div class="fc-footer">
+    <strong>Ready for review.</strong>
+    Coleman ↔ Zoran · FullControl pre-seed planning · Internal
+  </div>
+
+</div>
+
+<script>
+  // Smooth scroll for nav
+  document.querySelectorAll('.fc-nav a').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // Active section highlighting on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('.fc-nav a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(link => {
+          link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' });
+
+  sections.forEach(section => observer.observe(section));
+</script>
