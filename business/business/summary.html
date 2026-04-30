@@ -425,7 +425,20 @@ footer {
 .gap-box svg { display: block; flex-shrink: 0; opacity: 0.6; }
 .gap-box h3 { font-size: 14px; font-weight: 600; color: var(--paper); margin: 0; }
 .gap-box p { font-size: 12px; color: rgba(245,241,232,0.45); line-height: 1.55; margin: 0; }
-@media(max-width:1024px){ .gap-grid { grid-template-columns: 1fr; grid-auto-rows: 76px; } .gap-box { padding: 10px 14px 16px; height: 76px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; } .gap-box-header { display: flex; align-items: center; gap: 10px; margin-bottom: 0; } .gap-box svg { width: 22px; height: 22px; flex-shrink: 0; display: block; } .gap-box h3 { font-size: 12px; line-height: 22px; margin: 0; } .gap-box p { font-size: 11px; line-height: 1.4; margin: 0; } .gap-box-last { max-width: 100% !important; width: 100%; } }
+@media(max-width:1024px){
+  .gap-grid { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 6px; }
+  .gap-box { padding: 12px 14px; height: auto; overflow: visible; display: block; }
+  .gap-box-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .gap-box svg { width: 22px; height: 22px; flex-shrink: 0; display: block; }
+  .gap-box h3 { font-size: 13px; line-height: 1.3; margin: 0; }
+  .gap-box p { font-size: 12px; line-height: 1.45; margin: 0; }
+  .gap-box-last { max-width: 100% !important; width: 100%; }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 0 20px; }
+  section { padding: 44px 0; }
+  .phase-row { flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+}
 
 /* Network stats */
 .net-stat { display: flex; align-items: center; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--line-dark); text-align: left; }
@@ -597,14 +610,14 @@ footer {
 <section style="padding-top:32px;padding-bottom:12px;border-bottom:none">
   <div class="section-kicker">The Gap</div>
   <h2 style="font-style:italic">&ldquo;Everything is all over the place.&rdquo;</h2>
-  <p style="margin-bottom:20px;font-family:var(--display);font-size:18px;font-weight:500;color:var(--paper);letter-spacing:-0.01em;line-height:1.4"><em>Every academy operator says it.</em> The chaos isn&rsquo;t a software problem. It&rsquo;s a control problem. <strong>FullControl is built to give it back.</strong></p>
-  <p>Six years ago, we opened our first of <a href="https://byanymeansbball.com/locations" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">six basketball academy franchises</a>. Over a year ago, our founders started <a href="https://byanymeansbusiness.com/" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">By Any Means Business</a>, running other operators&rsquo; marketing, sales, comms, and operations as a hands-on service. Average client growth: <strong>82% in the first six months</strong>.</p>
-  <p style="margin-top:14px">All along, we&rsquo;ve been obsessed with AI. We could see the writing on the wall years ago: eventually, most of this operational work would be automated for academy operators. Our business would die. The only question was who would build it. We decided it should be us.</p>
+  <p style="margin-bottom:18px">Every academy operator says it. The chaos isn&rsquo;t a software problem, it&rsquo;s a control problem, and FullControl is built to give it back.</p>
+  <p>Six years ago, we opened our first of <a href="https://byanymeansbball.com/locations" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">six basketball academy franchises</a>. Over a year ago, our founders started <a href="https://byanymeansbusiness.com/" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">By Any Means Business</a>, running other operators&rsquo; marketing, sales, comms, and operations as a hands-on service, with average client growth of <strong>82% in the first six months</strong>.</p>
+  <p style="margin-top:14px">All along, we&rsquo;ve been obsessed with AI, and could see the writing on the wall years ago: eventually, most of this operational work would be automated for academy operators. Our business would die. The only question was who would build it, and we decided it should be us.</p>
 </section>
 
 <!-- THE PROBLEM -->
 <section style="padding-top:0;border-top:none">
-  <p>We&rsquo;ve tried to duct tape every SaaS for too many years. <strong>Every one was built by software people, not operators.</strong> Yet, every new client, edge case, and problem solved brought us closer to FullControl.</p>
+  <p>We&rsquo;ve tried to duct tape every SaaS for too many years, and <strong>every one of them was built by software people, not operators</strong>. Yet every new client, edge case, and problem solved brought us closer to FullControl.</p>
 
   <div style="margin-top:40px;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
     <p style="text-align:center;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-0.01em;color:var(--paper);margin-bottom:20px">No software checks all six boxes:</p>
@@ -697,29 +710,25 @@ footer {
     <div class="net-desc"><strong>Academy operators served weekly</strong><span class="net-sub">Through By Any Means Business hands-on consulting across North America and Australia. These are our first FullControl customers.</span></div>
   </div>
 
-  <div style="margin-top:24px;padding:20px 22px;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px">
-    <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">A decade in this space</div>
-    <p style="font-size:13px;color:rgba(245,241,232,0.65);line-height:1.6;margin:0 0 10px">Sold-out coaching retreats. 140-participant training events. NBA player relationships built over years on the road.</p>
-    <p style="font-size:12px;color:rgba(245,241,232,0.5);line-height:1.55;margin:0">Listed by <strong style="color:var(--paper)">Verified Market Research</strong> as a major player in the basketball training service market, projected to grow from <strong style="color:var(--paper)">$8.5B in 2023 to $14.5B by 2031</strong> at 8.6% CAGR.</p>
-  </div>
+  <p style="margin-top:20px;font-size:13px;color:rgba(245,241,232,0.55);line-height:1.65">A decade in the space, with sold-out coaching retreats, 140-participant training events, and NBA player relationships. Verified Market Research lists By Any Means among major players in a basketball training market projected to grow from <strong>$8.5B today to $14.5B by 2031</strong>.</p>
 
   <div style="margin-top:32px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line-dark);border-radius:6px;overflow:hidden">
     <div style="padding:18px 20px;border-bottom:1px solid var(--line-dark)">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <div class="phase-row" style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase">Phase 1 &middot; Basketball</div>
         <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:rgba(232,197,71,0.7);text-transform:uppercase">Month 4-6</div>
       </div>
       <div style="font-size:13px;color:rgba(245,241,232,0.55);line-height:1.6">We launch where we already have trust. Complete product depth across every business model a basketball academy runs: training classes, memberships, team management, gym rental, internal leagues. AI workflows live. First cohort of real operators on the&nbsp;platform.</div>
     </div>
     <div style="padding:18px 20px;border-bottom:1px solid var(--line-dark)">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <div class="phase-row" style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase">Phase 2 &middot; Sports Performance</div>
         <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:rgba(232,197,71,0.7);text-transform:uppercase">Month 8-10</div>
       </div>
       <div style="font-size:13px;color:rgba(245,241,232,0.55);line-height:1.6">Expand into the performance facility vertical, the natural next step from basketball and the bridge into every other sport. Our network spans 100+ performance facilities across the globe. Training classes, facility rental, player feedback &amp; progression&nbsp;tracking.</div>
     </div>
     <div style="padding:18px 20px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+      <div class="phase-row" style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:6px">
         <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase">Phase 3+ &middot; Adjacent verticals</div>
         <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.14em;color:rgba(232,197,71,0.7);text-transform:uppercase">Year 2-3+</div>
       </div>
