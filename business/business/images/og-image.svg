@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A0A0B"/>
+      <stop offset="100%" stop-color="#131316"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- subtle grid lines -->
+  <line x1="0" y1="100" x2="1200" y2="100" stroke="#2A2A31" stroke-width="1" opacity="0.4"/>
+  <line x1="0" y1="530" x2="1200" y2="530" stroke="#2A2A31" stroke-width="1" opacity="0.4"/>
+
+  <!-- logo group, centered -->
+  <g transform="translate(600,260)">
+    <g transform="translate(-60,-60) scale(1.2)">
+      <circle cx="50" cy="50" r="44" fill="none" stroke="#E8C547" stroke-width="0.9" opacity="0.35"/>
+      <line x1="50" y1="2" x2="50" y2="9" stroke="#E8C547" stroke-width="0.9" opacity="0.35"/>
+      <line x1="50" y1="91" x2="50" y2="98" stroke="#E8C547" stroke-width="0.9" opacity="0.35"/>
+      <line x1="2" y1="50" x2="9" y2="50" stroke="#E8C547" stroke-width="0.9" opacity="0.35"/>
+      <line x1="91" y1="50" x2="98" y2="50" stroke="#E8C547" stroke-width="0.9" opacity="0.35"/>
+      <path d="M50,8 C48,36 36,48 8,50 C36,52 48,64 50,92 C52,64 64,52 92,50 C64,48 52,36 50,8Z" fill="#E8C547"/>
+      <circle cx="50" cy="50" r="3.5" fill="#0A0A0B"/>
+    </g>
+  </g>
+
+  <!-- wordmark -->
+  <text x="600" y="430" text-anchor="middle" font-family="'Space Grotesk', 'Inter', sans-serif" font-size="72" font-weight="600" letter-spacing="-1.5">
+    <tspan fill="#F5F1E8">Full</tspan><tspan fill="#E8C547">Control</tspan>
+  </text>
+
+  <!-- tagline -->
+  <text x="600" y="490" text-anchor="middle" font-family="'Inter', sans-serif" font-size="24" font-weight="400" fill="#8a8882" letter-spacing="0.5">
+    The AI command center for sports academy operators
+  </text>
+
+  <!-- bottom kicker -->
+  <text x="600" y="575" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="14" font-weight="500" fill="#E8C547" letter-spacing="3" opacity="0.7">
+    NAVIGATE &#xb7; COMMAND &#xb7; LEAD
+  </text>
+</svg>
