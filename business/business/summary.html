@@ -235,8 +235,11 @@ td:last-child { font-weight: 600; color: var(--gold); text-align: right; }
 .team-bio ul { padding-left: 0; margin: 0; list-style: none; }
 .team-bio ul li { padding: 4px 0 4px 20px; border-bottom: none; font-size: 14px; line-height: 1.5; text-wrap: pretty; }
 .team-bio ul li::before { top: 12px; }
-@media (max-width: 700px) {
+@media (max-width: 1024px) {
+  h1 { font-size: 34px; text-wrap: balance; }
   .team-entry { grid-template-columns: 1fr; gap: 12px; }
+  .team-card { width: 100%; min-height: 260px; }
+  .team-entry-featured .team-card { min-height: 300px; }
 }
 
 /* Q&A */
@@ -296,7 +299,7 @@ header {
 /* Two col */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line-dark); margin: 16px 0; border: 1px solid var(--line-dark); border-radius: 4px; overflow: hidden; }
 .two-col > * { background: var(--ink-2); }
-@media(max-width:600px){ .two-col, .stats { grid-template-columns: 1fr; } }
+@media(max-width:1024px){ .two-col, .stats { grid-template-columns: 1fr; } }
 
 /* Comp cards */
 .comp-card {
@@ -403,25 +406,27 @@ footer {
 .comp-grid .comp-card { margin-bottom: 0; }
 
 /* Gap boxes */
-.gap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
-.gap-box { background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 16px 18px; min-height: 130px; }
-.gap-box svg { display: block; margin-bottom: 12px; opacity: 0.6; }
-.gap-box h3 { font-size: 14px; font-weight: 600; color: var(--paper); margin-bottom: 6px; }
+.gap-grid { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 8px; margin-top: 20px; }
+.gap-box { background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 10px 14px; }
+.gap-box-header { display: flex; align-items: center; gap: 10px; margin-bottom: 3px; }
+.gap-box svg { display: block; flex-shrink: 0; opacity: 0.6; }
+.gap-box h3 { font-size: 14px; font-weight: 600; color: var(--paper); margin: 0; }
 .gap-box p { font-size: 12px; color: rgba(245,241,232,0.45); line-height: 1.55; margin: 0; }
-@media(max-width:600px){ .gap-grid { grid-template-columns: 1fr; } }
+@media(max-width:1024px){ .gap-grid { grid-template-columns: 1fr; grid-auto-rows: 76px; } .gap-box { padding: 10px 14px 16px; height: 76px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; } .gap-box-header { display: flex; align-items: center; gap: 10px; margin-bottom: 0; } .gap-box svg { width: 22px; height: 22px; flex-shrink: 0; display: block; } .gap-box h3 { font-size: 12px; line-height: 22px; margin: 0; } .gap-box p { font-size: 11px; line-height: 1.4; margin: 0; } .gap-box-last { max-width: 100% !important; width: 100%; } }
 
 /* Network stats */
-.net-stat { display: flex; align-items: baseline; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line-dark); }
+.net-stat { display: flex; align-items: center; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--line-dark); text-align: left; }
 .net-stat:last-child { border-bottom: none; }
-.net-num { font-family: var(--display); font-size: 52px; font-weight: 600; letter-spacing: -0.03em; color: var(--paper); line-height: 1; min-width: 160px; flex-shrink: 0; }
+.net-num { font-family: var(--display); font-size: 40px; font-weight: 600; letter-spacing: -0.03em; color: var(--paper); line-height: 1; width: 90px; flex-shrink: 0; text-align: right; }
 .net-num em { color: var(--gold); font-style: normal; }
-.net-desc { font-size: 14px; color: rgba(245,241,232,0.6); line-height: 1.6; }
-.net-desc strong { color: var(--paper); }
-@media(max-width:560px){ .net-stat { flex-direction: column; gap: 8px; } .net-num { font-size: 40px; min-width: unset; } }
+.net-desc { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.45; text-align: left; }
+.net-desc strong { color: var(--paper); display: block; margin-bottom: 1px; font-size: 14px; line-height: 1.2; }
+.net-sub { display: block; margin-top: 2px; }
+@media(max-width:1024px){ .net-stat { display: grid; grid-template-columns: 72px 1fr; column-gap: 28px; row-gap: 4px; padding: 14px 0; } .net-num { grid-column: 1; grid-row: 1; font-size: 42px; width: 72px; text-align: right; line-height: 1; align-self: start; } .net-desc { display: contents; } .net-desc strong { grid-column: 2; grid-row: 1; font-size: 19px; line-height: 21px; align-self: start; display: block; } .net-sub { grid-column: 1 / -1; grid-row: 2; font-size: 12px; line-height: 1.5; } }
 
 /* Numbered moats */
 .moat-list { margin: 24px 0; }
-.moat-item { display: flex; gap: 24px; padding: 24px 0; border-bottom: 1px solid var(--line-dark); align-items: flex-start; }
+.moat-item { display: flex; gap: 4px; padding: 24px 0; border-bottom: 1px solid var(--line-dark); align-items: center; }
 .moat-item:last-child { border-bottom: none; }
 .moat-num { font-family: var(--display); font-size: 48px; font-weight: 600; letter-spacing: -0.04em; color: var(--gold); line-height: 1; min-width: 56px; opacity: 0.7; flex-shrink: 0; }
 .moat-body h3 { font-size: 15px; font-weight: 600; color: var(--paper); margin-bottom: 6px; }
@@ -443,6 +448,13 @@ footer {
 .tl-tag { display:inline-block; margin-top:10px; font-family:var(--mono); font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--gold); background:rgba(232,197,71,0.08); border:1px solid rgba(232,197,71,0.2); border-radius:2px; padding:3px 8px; }
 .tl-note { display:flex; align-items:center; gap:10px; margin-top:28px; padding:14px 18px; background:var(--ink-2); border:1px solid var(--line-dark); border-radius:4px; }
 .tl-note-icon { font-size:16px; flex-shrink:0; }
+@media (max-width: 1024px) {
+  .tl-item { display: grid !important; grid-template-columns: auto 1fr; gap: 10px; padding: 20px 0 20px 20px; }
+  .tl-window { width: auto; min-width: 0; flex-shrink: 0; text-align: center; }
+  .tl-window-range { font-size: 22px; }
+  .tl-content { flex: unset; }
+  .tl-content p { text-wrap: pretty; }
+}
 .tl-note p { font-size:12px; color:rgba(245,241,232,0.5); line-height:1.55; margin:0; }
 .tl-note strong { color:var(--paper); }
 
@@ -450,7 +462,7 @@ footer {
 .proto-mobile-nudge { display: none; background: var(--ink-2); border: 1px solid var(--line-dark); border-radius: 4px; padding: 20px 24px; margin-top: 16px; text-align: center; }
 .proto-mobile-nudge p { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.6; margin: 0; }
 .proto-mobile-nudge strong { color: var(--paper); }
-@media(max-width:700px){ .proto-mobile-nudge { display: block; } .proto-frame { display: none; } }
+@media(max-width:1024px){ .proto-mobile-nudge { display: block; } .proto-frame { display: none; } }
 </style>
 </head>
 <body>
@@ -476,7 +488,7 @@ footer {
       <div class="logo-divider"></div>
       <span class="logo-wordmark"><span style="color:var(--paper)">Full</span><span style="color:var(--gold)">Control</span></span>
     </div>
-    <a href="mailto:hello@fullcontrol.io" class="btn-gold">Get in Touch</a>
+    <a href="sms:+12023555221" class="btn-gold">Text Coleman</a>
   </div>
 </header>
 
@@ -497,46 +509,56 @@ footer {
 <section style="padding-top:0;border-top:none">
   <p>We&rsquo;ve tried to duct tape every SaaS for too many years, and every new client, every new iteration brings us closer to Full Control.</p>
 
-  <div style="margin-top:40px">
-    <div class="section-kicker">The Gap</div>
-    <h2>No software checks all four boxes:</h2>
+  <div style="margin-top:40px;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
+    <p style="text-align:center;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-0.01em;color:var(--paper);margin-bottom:20px">No software checks all five boxes</p>
     <div class="gap-grid">
       <div class="gap-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4l6 16 3-6 6-3z"/><path d="M13.5 13.5L18 18"/>
-        </svg>
-        <h3>Intuitive UI</h3>
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4l6 16 3-6 6-3z"/><path d="M13.5 13.5L18 18"/>
+          </svg>
+          <h3>Intuitive UI</h3>
+        </div>
         <p>Coaches often need human assistance</p>
       </div>
       <div class="gap-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 11V8a1 1 0 011-1h12l4 4-4 4H4a1 1 0 01-1-1v-3z"/><line x1="8" y1="15" x2="8" y2="19"/><line x1="6" y1="19" x2="10" y2="19"/>
-        </svg>
-        <h3>Sufficient Marketing Workflows</h3>
-        <p>Usually a separate provider for services like Meta Ads and content design</p>
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11V8a1 1 0 011-1h12l4 4-4 4H4a1 1 0 01-1-1v-3z"/><line x1="8" y1="15" x2="8" y2="19"/><line x1="6" y1="19" x2="10" y2="19"/>
+          </svg>
+          <h3>Sufficient Marketing Workflows</h3>
+        </div>
+        <p>Operators are left on their own to get leads</p>
       </div>
       <div class="gap-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="7" y1="14" x2="9" y2="14"/><line x1="12" y1="14" x2="17" y2="14"/><line x1="7" y1="18" x2="9" y2="18"/><line x1="12" y1="18" x2="17" y2="18"/>
-        </svg>
-        <h3>Flexible Scheduling</h3>
-        <p>Businesses vary their offers, and our suppliers can't keep up</p>
-      </div>
-      <div class="gap-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 4h16l-3 7H7z"/><path d="M7 11l-2 8h14l-2-8"/><circle cx="12" cy="17" r="1.5" fill="#E8C547" stroke="none" opacity="0.6"/>
-        </svg>
-        <h3>Sales Conversion</h3>
-        <p>Leads fall through the cracks. No system to follow up, nurture, and close without manual effort every time</p>
-      </div>
-      <div class="gap-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/><path d="M13 12l2 2 4-4" stroke-width="1.5"/>
-        </svg>
-        <h3>Useful AI Features</h3>
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/><line x1="2" y1="2" x2="22" y2="22"/>
+          </svg>
+          <h3>Useful AI Features</h3>
+        </div>
         <p>No company brain, clients just use ChatGPT</p>
       </div>
+      <div class="gap-box">
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h16l-3 7H7z"/><path d="M7 11l-2 8h14l-2-8"/><circle cx="12" cy="17" r="1.5" fill="#E8C547" stroke="none" opacity="0.6"/>
+          </svg>
+          <h3>Sales Conversion</h3>
+        </div>
+        <p>Leads fall through the cracks</p>
+      </div>
+      <div class="gap-box gap-box-last" style="grid-column:1/-1;max-width:calc(50% - 4px);margin:0 auto">
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="7" y1="14" x2="9" y2="14"/><line x1="12" y1="14" x2="17" y2="14"/><line x1="7" y1="18" x2="9" y2="18"/><line x1="12" y1="18" x2="17" y2="18"/>
+          </svg>
+          <h3>Flexible Scheduling</h3>
+        </div>
+        <p>Businesses vary their offers, and the software can't keep up</p>
+      </div>
     </div>
+    <p style="margin-top:20px;font-size:13px;color:rgba(245,241,232,0.45);line-height:1.6;text-align:center">Every software we use for our clients is missing at least one of these. We keep finding ourselves duct taping a solution together, and so do they.</p>
   </div>
 </section>
 
@@ -548,15 +570,33 @@ footer {
 
   <div class="net-stat">
     <div class="net-num">1<em>M</em><span style="font-size:28px;color:var(--gold)">+</span></div>
-    <div class="net-desc"><strong>Supporters across all channels</strong><br>By Any Means Basketball is one of the most recognized basketball education brands globally Instagram, YouTube, TikTok, and podcast combined.</div>
+    <div class="net-desc"><strong>Supporters across all channels</strong><span class="net-sub">By Any Means Basketball is one of the most recognized basketball education brands globally Instagram, YouTube, TikTok, and podcast combined.</span></div>
   </div>
   <div class="net-stat">
     <div class="net-num">20<em>K</em><span style="font-size:28px;color:var(--gold)">+</span></div>
-    <div class="net-desc"><strong>Coaches on By Any Means Coaches</strong><br>A brand built specifically for basketball coaches. We run in-person coaches clinics around the world and are releasing a dedicated coaching platform to this audience.</div>
+    <div class="net-desc"><strong>Coaches on By Any Means Coaches</strong><span class="net-sub">A brand built specifically for basketball coaches. We run in-person coaches clinics around the world and are releasing a dedicated coaching platform to this audience.</span></div>
   </div>
   <div class="net-stat">
     <div class="net-num">30<span style="font-size:28px;color:var(--gold)">+</span></div>
-    <div class="net-desc"><strong>Academy operators served weekly</strong><br>Through By Any Means Business hands-on consulting across North America and Australia. These are our first FullControl customers.</div>
+    <div class="net-desc"><strong>Academy operators served weekly</strong><span class="net-sub">Through By Any Means Business hands-on consulting across North America and Australia. These are our first FullControl customers.</span></div>
+  </div>
+
+  <div style="margin-top:32px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line-dark);border-radius:6px;overflow:hidden">
+    <div style="padding:18px 20px;border-bottom:1px solid var(--line-dark)">
+      <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase;margin-bottom:6px">Phase 1</div>
+      <div style="font-size:14px;font-weight:600;color:var(--paper);margin-bottom:4px">Basketball</div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.55);line-height:1.6">We launch where we already have trust. Our network, our credibility, and our operator relationships give us a warm runway into the basketball industry that no competitor can&nbsp;replicate.</div>
+    </div>
+    <div style="padding:18px 20px;border-bottom:1px solid var(--line-dark)">
+      <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase;margin-bottom:6px">Phase 2</div>
+      <div style="font-size:14px;font-weight:600;color:var(--paper);margin-bottom:4px">Sports Performance</div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.55);line-height:1.6">Our network spans 100+ performance facilities across the globe, and attaining product-market fit for this industry will unlock other industries.</div>
+    </div>
+    <div style="padding:18px 20px">
+      <div style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:0.08em;color:var(--gold);text-transform:uppercase;margin-bottom:6px">Phase 3+</div>
+      <div style="font-size:14px;font-weight:600;color:var(--paper);margin-bottom:4px">Future Industry Flexibility</div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.55);line-height:1.6">By Phase 2, the product fits most sports and fitness businesses out of the box. We will use proven results from the previous industries, along with warm network introductions through multi-sport sports performance coaches to jump to other sports and fitness&nbsp;industries.</div>
+    </div>
   </div>
 </section>
 
@@ -567,7 +607,7 @@ footer {
 
     <div class="team-entry team-entry-featured">
       <div class="team-card">
-        <img class="team-card-bg" src="/business/business/images/zoran.jpg" alt="Zoran Savic">
+        <img class="team-card-bg" src="images/zoran.jpg" alt="Zoran Savic">
         <div class="team-card-overlay"></div>
         <div class="team-card-text">
           <div class="team-name">Zoran Savic</div>
@@ -577,10 +617,10 @@ footer {
       <div>
         <div class="team-bio">
           <ul>
-            <li>Double degree in Mathematics (Waterloo) and Business Administration (Laurier), varsity athlete at both institutions</li>
-            <li>Deloitte Payments Practice, worked closely with the planning and launch of two pieces of Canada&rsquo;s national payments infrastructure</li>
-            <li>Founded BAM GTA and scaled the academy to operate independently within 14 months</li>
-            <li>Redesigned operations across 30+ sports businesses and codified the work into repeatable playbooks</li>
+            <li>Double degree in Mathematics (Waterloo) and Business Administration (Laurier), varsity athlete at both&nbsp;institutions</li>
+            <li>Deloitte Payments Practice, worked closely with the planning and launch for two of Canada&rsquo;s national payments&nbsp;initiatives</li>
+            <li>Founded BAM GTA and scaled the academy to operate independently within 14&nbsp;months</li>
+            <li>Redesigned operations across 30+ sports businesses and codified the work into repeatable&nbsp;playbooks</li>
           </ul>
         </div>
       </div>
@@ -588,7 +628,7 @@ footer {
 
     <div class="team-entry team-entry-featured">
       <div class="team-card">
-        <img class="team-card-bg" src="/business/business/images/coleman.jpg" alt="Coleman Ayers">
+        <img class="team-card-bg" src="images/coleman.jpg" alt="Coleman Ayers">
         <div class="team-card-overlay"></div>
         <div class="team-card-text">
           <div class="team-name">Coleman Ayers</div>
@@ -598,10 +638,10 @@ footer {
       <div>
         <div class="team-bio">
           <ul>
-            <li>Founder of By Any Means Basketball, one of the most recognized basketball education brands online</li>
-            <li>Built a combined audience of over 700K followers across Instagram, YouTube, and TikTok</li>
-            <li>Hosted basketball camps and coaches clinics in 37+ countries and 100+ cities across six continents</li>
-            <li>Founded By Any Means Coaches, an education platform for basketball coaches (17K followers on Instagram)</li>
+            <li>Founder of By Any Means Basketball, one of the most recognized basketball education brands&nbsp;online</li>
+            <li>Built a combined audience of over 700K followers across Instagram, YouTube, and&nbsp;TikTok</li>
+            <li>Hosted basketball camps and coaches clinics in 37+ countries and 100+ cities across six&nbsp;continents</li>
+            <li>Founded By Any Means Coaches, an education platform for basketball coaches (17K followers on&nbsp;Instagram)</li>
           </ul>
         </div>
       </div>
@@ -609,59 +649,20 @@ footer {
 
     <div class="team-entry">
       <div class="team-card">
-        <img class="team-card-bg" src="/business/business/images/luka.jpg" alt="Luka" style="object-fit:contain;object-position:center top;background:var(--ink-2);">
+        <img class="team-card-bg" src="images/luka.jpg" alt="Luka" style="object-fit:cover;object-position:center 30%;">
         <div class="team-card-overlay"></div>
         <div class="team-card-text">
           <div class="team-name">Luka Mircetic</div>
-          <div class="team-tag">Software Engineering</div>
+          <div class="team-tag">Senior Engineer</div>
         </div>
       </div>
       <div>
         <div class="team-bio">
           <ul>
-            <li>Biomedical Engineering, McMaster University</li>
-            <li>Software Developer at Archon Systems</li>
-            <li>Previously a Software Engineer at Shopify</li>
-            <li>Former Data Engineer at Tesla (Palo Alto)</li>
-            <li>Leads AI architecture at FullControl</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="team-entry">
-      <div class="team-card team-card-placeholder">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Danny Liu</div>
-          <div class="team-tag">Developer<br>AI Architecture</div>
-        </div>
-      </div>
-      <div>
-        <div class="team-bio">
-          <ul>
-            <li>Computer Science graduate, University of Waterloo</li>
-            <li>Former Data Engineer and Engineering Manager at Uplift</li>
-            <li>Software Engineer at Upgrade</li>
-            <li>Leads AI architecture at FullControl</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="team-entry">
-      <div class="team-card team-card-placeholder">
-        <div class="team-card-overlay"></div>
-        <div class="team-card-text">
-          <div class="team-name">Jacky</div>
-          <div class="team-tag">Junior Software Developer</div>
-        </div>
-      </div>
-      <div>
-        <div class="team-bio">
-          <ul>
-            <li>Computer Science undergraduate at Trent University</li>
-            <li>Junior developer on the FullControl engineering team</li>
+            <li>Former Data Engineer at Tesla (Palo&nbsp;Alto)</li>
+            <li>Previously a Software Engineer at&nbsp;Shopify</li>
+            <li>Software Engineering &amp; Biomedical Engineering, McMaster&nbsp;University</li>
+            <li>Software Developer at Archon&nbsp;Systems</li>
           </ul>
         </div>
       </div>
@@ -669,7 +670,49 @@ footer {
 
     <div class="team-entry">
       <div class="team-card">
-        <img class="team-card-bg" src="/business/business/images/cam.jpg" alt="Cam">
+        <img class="team-card-bg" src="images/danny.jpg" alt="Danny Liu" style="object-fit:cover;object-position:center 75%;">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Danny Liu</div>
+          <div class="team-tag">Developer · AI Architecture</div>
+        </div>
+      </div>
+      <div>
+        <div class="team-bio">
+          <ul>
+            <li>Computer Science graduate, University of&nbsp;Waterloo</li>
+            <li>Data Engineering Manager at&nbsp;Uplift</li>
+            <li>Software Engineer, AI/ML Platform at&nbsp;Upgrade</li>
+            <li>Lead expansion of RiverPay WeChat/Alipay product in European&nbsp;Market</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-entry" style="padding:14px 0;align-items:center">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/jacky.png" alt="Jacky" style="object-fit:cover;object-position:center top;">
+        <div class="team-card-overlay"></div>
+        <div class="team-card-text">
+          <div class="team-name">Jacky</div>
+          <div class="team-tag">Junior Engineer</div>
+        </div>
+      </div>
+      <div>
+        <div class="team-bio">
+          <ul>
+            <li>Software Engineering student &amp; varsity volleyball athlete, Trent&nbsp;University</li>
+            <li>Former Software Engineer at Warner Bros. Discovery (CNN, HBO Max) and SickKids&nbsp;Foundation</li>
+            <li>Owned core CNN iOS features serving hundreds of thousands of&nbsp;users</li>
+            <li>Bet on athletic dreams over a conventional career path, and brings that same relentlessness to&nbsp;FullControl</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="team-entry">
+      <div class="team-card">
+        <img class="team-card-bg" src="images/cam.jpg" alt="Cam">
         <div class="team-card-overlay"></div>
         <div class="team-card-text">
           <div class="team-name">Cameron Wells</div>
@@ -679,9 +722,9 @@ footer {
       <div>
         <div class="team-bio">
           <ul>
-            <li>Former Strategy Consultant at KPMG</li>
-            <li>Content &amp; Branding Director for the By Any Means ecosystem</li>
-            <li>Content Director for professional athletes, including NBA player Myles Turner</li>
+            <li>Former Strategy Consultant at&nbsp;KPMG</li>
+            <li>Content &amp; Branding Director for the By Any Means&nbsp;ecosystem</li>
+            <li>Content Director for professional athletes, including NBA player Myles&nbsp;Turner</li>
           </ul>
         </div>
       </div>
@@ -689,7 +732,7 @@ footer {
 
     <div class="team-entry">
       <div class="team-card">
-        <img class="team-card-bg" src="/business/business/images/mike.jpg" alt="Mike" style="object-fit:cover;object-position:center 15%;">
+        <img class="team-card-bg" src="images/mike.jpg" alt="Mike" style="object-fit:cover;object-position:center 15%;">
         <div class="team-card-overlay"></div>
         <div class="team-card-text">
           <div class="team-name">Mike Eluki</div>
@@ -699,10 +742,10 @@ footer {
       <div>
         <div class="team-bio">
           <ul>
-            <li>Client Success Lead at By Any Means Business</li>
-            <li>Consulted 50+ sports businesses on a weekly basis</li>
-            <li>Lead operator of the BAM Miami ecosystem (gym, training, club teams)</li>
-            <li>Connected to hundreds of sports business owners across the globe</li>
+            <li>Client Success Lead at By Any Means&nbsp;Business</li>
+            <li>Consulted 50+ sports businesses on a weekly&nbsp;basis</li>
+            <li>Lead operator of the BAM Miami ecosystem (gym, training, club&nbsp;teams)</li>
+            <li>Connected to hundreds of sports business owners across the&nbsp;globe</li>
           </ul>
         </div>
       </div>
@@ -713,6 +756,7 @@ footer {
 
 <!-- SOLUTION -->
 <section>
+  <div class="section-kicker">The Prototype</div>
   <h2>One intelligent system that runs the business</h2>
   <div class="proto-frame">
     <div class="proto-topbar">
@@ -728,42 +772,6 @@ footer {
   </div>
 </section>
 
-<!-- GO TO MARKET -->
-<section>
-  <h2>Start where our network is. Let performance pull us into every sport.</h2>
-
-  <div class="phase" style="margin-top:24px">
-    <div class="phase-label">Phase 1 · Own Basketball</div>
-    <p>We start where we have the most operator relationships. Through By Any Means Business, we&rsquo;ve worked hands-on with <strong>30+ basketball academies across North America and Australia</strong>, and Coleman and Mike&rsquo;s combined network covers <strong>150+ operator contacts across 40+ countries and 100+ cities</strong>.</p>
-    <p style="margin-top:10px">Basketball is our proving ground   full product depth across every business model a basketball academy could run:</p>
-    <ul style="margin-top:8px;padding-left:20px;line-height:1.7">
-      <li>Training classes &amp; memberships</li>
-      <li>Team management</li>
-      <li>Gym rental</li>
-      <li>Internal leagues</li>
-      <li><span style="opacity:0.6">External leagues   under evaluation</span></li>
-    </ul>
-    <p style="margin-top:10px">Every feature, every AI workflow, every onboarding flow gets stress-tested against real academies first. We&rsquo;re not cold-starting   we&rsquo;re productizing relationships that already exist.</p>
-  </div>
-
-  <div class="phase">
-    <div class="phase-label">Phase 2 · Expand into Sports Performance</div>
-    <p>Sports performance is our second-deepest network and the natural next step. Because performance facilities serve athletes from across every major sport under one roof, expanding here <strong>opens the door into every other sport at once</strong>   and the feature investments we make for this vertical extend cleanly into the broader fitness industry.</p>
-    <p style="margin-top:10px">Product coverage:</p>
-    <ul style="margin-top:8px;padding-left:20px;line-height:1.7">
-      <li>Training classes &amp; memberships</li>
-      <li>Gym/facility rental</li>
-      <li>Player feedback &amp; progression tracking</li>
-    </ul>
-  </div>
-
-  <div class="phase">
-    <div class="phase-label">Phase 3 · Replicate into Other Sports &amp; Fitness</div>
-    <p>Once the basketball and performance playbook is proven, the performance-trainer network hands us warm connections into every other sport   soccer, baseball, volleyball, tennis, gymnastics, martial arts, and beyond   which we use to launch vertical by vertical.</p>
-    <p style="margin-top:10px">At the same scale, we extend into adjacent fitness industries that run on the same operational model as performance training. These adjacent verticals are a <strong>terminology and AI-prompt configuration on the same engine</strong>, not a rebuild.</p>
-    <p style="margin-top:10px">We satisfy product-market fit in one vertical before touching the next, and let each prior market do the cross-industry marketing for free.</p>
-  </div>
-</section>
 
 <!-- MOAT -->
 <section>
@@ -773,14 +781,14 @@ footer {
       <div class="moat-num">1</div>
       <div class="moat-body">
         <h3>Influencer-Backed Launch</h3>
-        <p>Through the credibility and network of By Any Means, we are connected to thousands of basketball and sports performance trainers and influencers across the globe.</p>
+        <p>Through the credibility and network of By Any Means, we are connected to thousands of basketball and sports performance trainers and influencers across the globe, allowing us to launch faster into our initial industries than any competitor could.</p>
       </div>
     </div>
     <div class="moat-item">
       <div class="moat-num">2</div>
       <div class="moat-body">
         <h3>The Embassy Strategy</h3>
-        <p>Integrate with as many competitors as possible, and take control of the home base.</p>
+        <p>Integrate with as many competitors as possible, take control of the home base, and discourage use of competitors.</p>
       </div>
     </div>
     <div class="moat-item">
@@ -794,11 +802,18 @@ footer {
       <div class="moat-num">4</div>
       <div class="moat-body">
         <h3>Constantly Improving Brain &amp; Memory</h3>
-        <p>Update knowledge bases with top-performing industry memory.</p>
+        <p>Update knowledge bases with top-performing industry data, and local context to maximize results and&nbsp;familiarity.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-num">5</div>
+      <div class="moat-body">
+        <h3>Product Stickiness</h3>
+        <p>Become the only software that operators rely on to run their business, and maximize familiarity with FC.</p>
       </div>
     </div>
   </div>
-  <p style="margin-top:8px;font-style:normal;color:rgba(245,241,232,0.45);font-size:13px;letter-spacing:0.01em;">Launch aggressively through the network, build aggressively with modern tools.</p>
+  <p style="margin-top:8px;font-style:normal;color:rgba(245,241,232,0.45);font-size:13px;letter-spacing:0.01em;">Launch aggressively through the network, build aggressively with modern tools, and become the only software operators will ever need.</p>
 </section>
 
 <!-- TIMELINE -->
@@ -816,8 +831,7 @@ footer {
       </div>
       <div class="tl-content">
         <h3>Full Basketball Launch</h3>
-        <p>Complete product depth across every business model a basketball academy runs training classes, memberships, team management, gym rental, internal leagues. AI workflows live. First cohort of real operators on the platform.</p>
-        <span class="tl-tag">Phase 1 complete</span>
+        <p>Complete product depth across every business model a basketball academy runs training classes, memberships, team management, gym rental, internal leagues. AI workflows live. First cohort of real operators on the&nbsp;platform.</p>
       </div>
     </div>
 
@@ -830,22 +844,39 @@ footer {
       </div>
       <div class="tl-content">
         <h3>Full Sports Performance Launch</h3>
-        <p>Expand into the performance facility vertical the natural next step from basketball, and the bridge into every other sport. Training classes, facility rental, player feedback &amp; progression tracking.</p>
-        <span class="tl-tag">Phase 2 complete</span>
+        <p>Expand into the performance facility vertical the natural next step from basketball, and the bridge into every other sport. Training classes, facility rental, player feedback &amp; progression&nbsp;tracking.</p>
       </div>
     </div>
   </div>
 
-  <div class="tl-note">
-    <div class="tl-note-icon">⚡</div>
-    <p><strong>Three developers.</strong> These timelines are built on a lean, modern stack no bloated team, no wasted runway. We move fast by design.</p>
-  </div>
-
-  <div style="margin-top:36px">
-    <a href="mailto:hello@fullcontrol.io" class="btn-gold">Get in Touch</a>
-  </div>
 </section>
 
+<!-- USE OF FUNDS -->
+<section>
+  <div class="section-kicker">Investment</div>
+  <h2>Where the money goes</h2>
+  <p style="margin-bottom:32px">This raise has one purpose: compress the hyper-launch timelines of phase 1 and 2.</p>
+
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;gap:20px;align-items:flex-start;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
+      <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">1</div>
+      <div>
+        <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Developer Capacity</h3>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">Jacky and Luka move to full-time. Right now, they're building around their schedules. This funding removes that constraint&nbsp;entirely.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;align-items:flex-start;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
+      <div style="font-family:var(--display);font-size:32px;font-weight:700;color:var(--gold);line-height:1;flex-shrink:0;min-width:32px">2</div>
+      <div>
+        <h3 style="font-size:16px;font-weight:600;color:var(--paper);margin:0 0 8px">Hyper-Launch Marketing</h3>
+        <p style="font-size:14px;color:rgba(245,241,232,0.6);line-height:1.65;margin:0">The network is already primed. This investment fuels the pre-launch build-up and the post-launch push so when we open the doors, we fill the room. One shot to make a first impression on one million people. We're not leaving that to chance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<div style="text-align:center;padding:40px 0 16px">
+  <a href="sms:+12023555221" class="btn-gold">Text Coleman</a>
+</div>
 <footer>&copy; 2026 FullControl &nbsp;·&nbsp; Navigate · Command · Lead</footer>
 
 </div>
