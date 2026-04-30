@@ -463,6 +463,89 @@ footer {
 .proto-mobile-nudge p { font-size: 13px; color: rgba(245,241,232,0.6); line-height: 1.6; margin: 0; }
 .proto-mobile-nudge strong { color: var(--paper); }
 @media(max-width:1024px){ .proto-mobile-nudge { display: block; } .proto-frame { display: none; } }
+
+/* BAM command demo (typing animation) */
+.bam-cmd-demo {
+  margin-top: 24px;
+  padding: 28px 24px;
+  background: linear-gradient(135deg, rgba(232,197,71,0.06) 0%, rgba(0,0,0,0) 65%), var(--ink);
+  border: 1px solid rgba(232,197,71,0.25);
+  border-radius: 6px;
+  text-align: center;
+}
+.bam-cmd-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.75;
+  margin-bottom: 12px;
+}
+.bam-cmd-headline {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  line-height: 1.35;
+  margin: 0 auto 22px;
+  max-width: 540px;
+}
+.bam-cmd-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--ink-3);
+  border: 1px solid var(--line-dark-2);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--paper);
+  min-height: 50px;
+  max-width: 540px;
+  margin: 0 auto;
+  text-align: left;
+}
+.bam-cmd-prompt {
+  color: var(--gold);
+  font-weight: 600;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.bam-cmd-text {
+  flex: 1;
+  word-break: break-word;
+  line-height: 1.4;
+}
+.bam-cmd-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--gold);
+  animation: bam-blink 0.85s step-end infinite;
+  flex-shrink: 0;
+}
+@keyframes bam-blink {
+  50% { opacity: 0; }
+}
+.bam-cmd-result {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--pace-go);
+  letter-spacing: 0.04em;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  height: 16px;
+}
+.bam-cmd-result.show { opacity: 1; }
+@media (max-width: 1024px) {
+  .bam-cmd-demo { padding: 22px 16px; }
+  .bam-cmd-headline { font-size: 16px; }
+  .bam-cmd-bar { font-size: 12px; padding: 12px 14px; }
+}
 </style>
 </head>
 <body>
@@ -494,23 +577,24 @@ footer {
 
 <!-- ONE-LINER -->
 <section>
-  <h1>The first all-in-one AI command center for sports &amp; fitness business operators.</h1>
-  <p>Being built to challenge an outdated industry and allow passionate coaches and trainers more time to spend on what they love.</p>
+  <h1>The first all-in-one AI command center for sports academy operators.</h1>
+  <p>We&rsquo;ve spent years running our own academies. FullControl is the operating system we automated to help passionate coaches and trainers spend more time on what they actually love.</p>
 </section>
 
 <!-- OUR STORY -->
 <section style="padding-top:32px;padding-bottom:12px;border-bottom:none">
   <div class="section-kicker">The Gap</div>
-  <h2>Our community is getting restless</h2>
-  <p>We started our own basketball academies, added <a href="https://byanymeansbball.com/locations" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">6 franchises</a>, and started an <a href="https://byanymeansbusiness.com/" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">all-around agency</a> for other academies, serving 30+ operators on a weekly basis.</p>
+  <h2>Academy software has been built by software people, not operators</h2>
+  <p>Six years ago, we opened our first of <a href="https://byanymeansbball.com/locations" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">six basketball academy franchises</a>. Over a year ago, our founders started <a href="https://byanymeansbusiness.com/" target="_blank" rel="noopener" style="color:var(--gold);border-bottom:1px solid rgba(232,197,71,0.3)">By Any Means Business</a>, running other operators&rsquo; marketing, sales, comms, and operations as a hands-on service. Average client growth: <strong>82% in the first six months</strong>.</p>
+  <p style="margin-top:14px">All along, we&rsquo;ve been obsessed with AI. We could see the writing on the wall years ago: eventually, most of this operational work would be automated for academy operators. Our business would die. The only question was who would build it. We decided it should be us.</p>
 </section>
 
 <!-- THE PROBLEM -->
 <section style="padding-top:0;border-top:none">
-  <p>We&rsquo;ve tried to duct tape every SaaS for too many years, and every new client, every new iteration brings us closer to Full Control.</p>
+  <p>We&rsquo;ve tried to duct tape every SaaS for too many years, and every new client, every new iteration brought us closer to FullControl.</p>
 
   <div style="margin-top:40px;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px;padding:24px">
-    <p style="text-align:center;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-0.01em;color:var(--paper);margin-bottom:20px">No software checks all five boxes</p>
+    <p style="text-align:center;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:-0.01em;color:var(--paper);margin-bottom:20px">No software checks all six boxes</p>
     <div class="gap-grid">
       <div class="gap-box">
         <div class="gap-box-header">
@@ -519,7 +603,7 @@ footer {
           </svg>
           <h3>Intuitive UI</h3>
         </div>
-        <p>Coaches often need human assistance</p>
+        <p>Coaches don&rsquo;t have time to learn complex CRMs</p>
       </div>
       <div class="gap-box">
         <div class="gap-box-header">
@@ -548,17 +632,35 @@ footer {
         </div>
         <p>Leads fall through the cracks</p>
       </div>
-      <div class="gap-box gap-box-last" style="grid-column:1/-1;max-width:calc(50% - 4px);margin:0 auto">
+      <div class="gap-box">
         <div class="gap-box-header">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="7" y1="14" x2="9" y2="14"/><line x1="12" y1="14" x2="17" y2="14"/><line x1="7" y1="18" x2="9" y2="18"/><line x1="12" y1="18" x2="17" y2="18"/>
           </svg>
           <h3>Flexible Scheduling</h3>
         </div>
-        <p>Businesses vary their offers, and the software can't keep up</p>
+        <p>Businesses vary their offers, and the software can&rsquo;t keep up</p>
+      </div>
+      <div class="gap-box">
+        <div class="gap-box-header">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E8C547" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M8 12h8"/><path d="M12 8v8"/><circle cx="12" cy="12" r="3" fill="#E8C547" fill-opacity="0.3" stroke="none"/>
+          </svg>
+          <h3>Edge Cases</h3>
+        </div>
+        <p>Every business is different. We&rsquo;ve mapped them by running academies ourselves.</p>
       </div>
     </div>
-    <p style="margin-top:20px;font-size:13px;color:rgba(245,241,232,0.45);line-height:1.6;text-align:center">Every software we use for our clients is missing at least one of these. We keep finding ourselves duct taping a solution together, and so do they.</p>
+    <div class="bam-cmd-demo">
+      <div class="bam-cmd-label">So we built FullControl</div>
+      <div class="bam-cmd-headline">A singular command center where you can talk to your business and it does anything you need.</div>
+      <div class="bam-cmd-bar">
+        <span class="bam-cmd-prompt">&rsaquo;</span>
+        <span class="bam-cmd-text"></span>
+        <span class="bam-cmd-cursor"></span>
+      </div>
+      <div class="bam-cmd-result">&rarr; Done.</div>
+    </div>
   </div>
 </section>
 
@@ -566,11 +668,12 @@ footer {
 <section>
   <div class="section-kicker">Distribution</div>
   <h2>The hyper-launch into the Basketball industry</h2>
-  <p style="margin-bottom:32px">We have built one of the largest basketball education brands in the world. The network is real, the trust is earned, and the launch is already in motion.</p>
+  <p style="margin-bottom:14px">We have built one of the largest basketball education brands in the world. The network is real, the trust is earned, and the launch is already in motion.</p>
+  <p style="margin-bottom:32px;font-size:13px;color:rgba(245,241,232,0.55);font-style:italic">Basketball is the wedge, not the ceiling. The architecture is sport-agnostic. Only the marketing wears a basketball jersey.</p>
 
   <div class="net-stat">
     <div class="net-num">1<em>M</em><span style="font-size:28px;color:var(--gold)">+</span></div>
-    <div class="net-desc"><strong>Supporters across all channels</strong><span class="net-sub">By Any Means Basketball is one of the most recognized basketball education brands globally Instagram, YouTube, TikTok, and podcast combined.</span></div>
+    <div class="net-desc"><strong>Supporters across all channels</strong><span class="net-sub">By Any Means Basketball is one of the most recognized basketball education brands globally, with audiences across Instagram, YouTube, TikTok, and podcast combined.</span></div>
   </div>
   <div class="net-stat">
     <div class="net-num">20<em>K</em><span style="font-size:28px;color:var(--gold)">+</span></div>
@@ -579,6 +682,12 @@ footer {
   <div class="net-stat">
     <div class="net-num">30<span style="font-size:28px;color:var(--gold)">+</span></div>
     <div class="net-desc"><strong>Academy operators served weekly</strong><span class="net-sub">Through By Any Means Business hands-on consulting across North America and Australia. These are our first FullControl customers.</span></div>
+  </div>
+
+  <div style="margin-top:24px;padding:20px 22px;background:var(--ink-2);border:1px solid var(--line-dark);border-radius:6px">
+    <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">A decade serving this community</div>
+    <p style="font-size:13px;color:rgba(245,241,232,0.65);line-height:1.6;margin:0 0 10px">We do this for coaches. Sold-out coaching retreats at 20 coaches per cohort. Training events with 140+ participants. NBA player relationships and a decade of respect in the space.</p>
+    <p style="font-size:12px;color:rgba(245,241,232,0.5);line-height:1.55;margin:0"><strong style="color:var(--paper)">Verified Market Research</strong> cites By Any Means Basketball alongside Pat The Roc, Abunassar Impact, Breakthrough Basketball, and NBC as a major player in the basketball training service market: <strong style="color:var(--paper)">$8.5B in 2023, projected to reach $14.5B by 2031</strong> at 8.6% CAGR.</p>
   </div>
 
   <div style="margin-top:32px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line-dark);border-radius:6px;overflow:hidden">
@@ -756,8 +865,34 @@ footer {
 
 <!-- SOLUTION -->
 <section>
-  <div class="section-kicker">The Prototype</div>
-  <h2>One intelligent system that runs the business</h2>
+  <div class="section-kicker">The Product</div>
+  <h2>Three things we can claim that no competitor can</h2>
+
+  <div class="moat-list" style="margin:24px 0 32px">
+    <div class="moat-item">
+      <div class="moat-num">1</div>
+      <div class="moat-body">
+        <h3>Talk to your business</h3>
+        <p>Voice or text as the interface to your entire operation. <em>&ldquo;Cancel tomorrow&rsquo;s session, give credits, and boost my ad spend while you&rsquo;re at it.&rdquo;</em> &rarr; Done. The system executes across scheduling, billing, comms, and ads in a single sentence.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-num">2</div>
+      <div class="moat-body">
+        <h3>It runs while you sleep</h3>
+        <p>Overnight agents do the operational work most operators do reactively. Conversational AI follows up with warm leads. Ad spend rebalances based on performance. Parent comms queue for approval. At-risk players are flagged with notes. You wake up to drafts, not a blank inbox.</p>
+      </div>
+    </div>
+    <div class="moat-item">
+      <div class="moat-num">3</div>
+      <div class="moat-body">
+        <h3>The more it learns, the more control you have</h3>
+        <p>FullControl personalizes to your specific academy over time. Your roster, your players, your communication style, your cadence. The longer you use it, the more leverage you get from it.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-kicker" style="margin-top:32px">See it in motion</div>
   <div class="proto-frame">
     <div class="proto-topbar">
       <span class="proto-dot"></span>
@@ -780,40 +915,40 @@ footer {
     <div class="moat-item">
       <div class="moat-num">1</div>
       <div class="moat-body">
-        <h3>Influencer-Backed Launch</h3>
-        <p>Through the credibility and network of By Any Means, we are connected to thousands of basketball and sports performance trainers and influencers across the globe, allowing us to launch faster into our initial industries than any competitor could.</p>
+        <h3>Network-Backed Launch</h3>
+        <p>Most SaaS founders pay for cold leads. We have warm introductions to thousands of basketball and sports performance operators through By Any Means. The acquisition curve doesn&rsquo;t exist for us.</p>
       </div>
     </div>
     <div class="moat-item">
       <div class="moat-num">2</div>
       <div class="moat-body">
-        <h3>The Embassy Strategy</h3>
-        <p>Integrate with as many competitors as possible, take control of the home base, and discourage use of competitors.</p>
+        <h3>Operator-Built Iteration</h3>
+        <p>We&rsquo;re not iterating on guesses. We&rsquo;re productizing playbooks BAM Business already runs by hand for dozens of academies. Modern AI tooling lets us ship operator-tested workflows weekly.</p>
       </div>
     </div>
     <div class="moat-item">
       <div class="moat-num">3</div>
       <div class="moat-body">
-        <h3>Iteration Speed</h3>
-        <p>Use modern tools to constantly adapt and serve as many variations of business models as possible.</p>
+        <h3>Compounding Intelligence</h3>
+        <p>The longer an academy uses FullControl, the more it learns <em>that specific business</em>. Switching cost grows every day. Marketing reinforces moat.</p>
       </div>
     </div>
     <div class="moat-item">
       <div class="moat-num">4</div>
       <div class="moat-body">
-        <h3>Constantly Improving Brain &amp; Memory</h3>
-        <p>Update knowledge bases with top-performing industry data, and local context to maximize results and&nbsp;familiarity.</p>
+        <h3>Workflow Lock-In</h3>
+        <p>When scheduling, billing, comms, marketing, and player development all live in one system, ripping out any one piece breaks the others. Stickiness isn&rsquo;t a feature. It&rsquo;s the architecture.</p>
       </div>
     </div>
     <div class="moat-item">
       <div class="moat-num">5</div>
       <div class="moat-body">
-        <h3>Product Stickiness</h3>
-        <p>Become the only software that operators rely on to run their business, and maximize familiarity with FC.</p>
+        <h3>Embassy &amp; Replacement</h3>
+        <p>Integrate with every competitor, become the home base operators log into first, then replace each integrated tool one workflow at a time. Competitors become features.</p>
       </div>
     </div>
   </div>
-  <p style="margin-top:8px;font-style:normal;color:rgba(245,241,232,0.45);font-size:13px;letter-spacing:0.01em;">Launch aggressively through the network, build aggressively with modern tools, and become the only software operators will ever need.</p>
+  <p style="margin-top:16px;font-style:normal;color:var(--paper);font-size:14px;line-height:1.6;letter-spacing:0.01em;"><strong>Competitors have to guess at what to build. We&rsquo;ve done the work by hand for a year. The AI is the productization, not the prediction.</strong></p>
 </section>
 
 <!-- TIMELINE -->
@@ -831,7 +966,7 @@ footer {
       </div>
       <div class="tl-content">
         <h3>Full Basketball Launch</h3>
-        <p>Complete product depth across every business model a basketball academy runs training classes, memberships, team management, gym rental, internal leagues. AI workflows live. First cohort of real operators on the&nbsp;platform.</p>
+        <p>Complete product depth across every business model a basketball academy runs: training classes, memberships, team management, gym rental, internal leagues. AI workflows live. First cohort of real operators on the&nbsp;platform.</p>
       </div>
     </div>
 
@@ -844,11 +979,57 @@ footer {
       </div>
       <div class="tl-content">
         <h3>Full Sports Performance Launch</h3>
-        <p>Expand into the performance facility vertical the natural next step from basketball, and the bridge into every other sport. Training classes, facility rental, player feedback &amp; progression&nbsp;tracking.</p>
+        <p>Expand into the performance facility vertical, the natural next step from basketball and the bridge into every other sport. Training classes, facility rental, player feedback &amp; progression&nbsp;tracking.</p>
       </div>
     </div>
   </div>
 
+</section>
+
+<!-- TRAJECTORY / PROJECTIONS -->
+<section>
+  <div class="section-kicker">Trajectory</div>
+  <h2>Where this goes</h2>
+
+  <div style="margin-top:24px;display:flex;flex-direction:column;gap:0;border:1px solid var(--line-dark);border-radius:6px;overflow:hidden">
+    <div style="padding:22px 22px;border-bottom:1px solid var(--line-dark);background:rgba(232,197,71,0.03)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">Today &middot; Validated demand</div>
+      <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex-shrink:0">
+          <span style="font-family:var(--display);font-size:32px;font-weight:600;color:var(--paper);letter-spacing:-0.02em">$20K+</span>
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--gold);text-transform:uppercase;margin-left:6px">MRR</span>
+        </div>
+        <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;flex:1;min-width:220px">By Any Means Business is supply-constrained because the work is delivered by humans. Demand exists. AI removes the bottleneck.</div>
+      </div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55">
+        <strong style="color:var(--paper)">30 academies</strong> would convert to paying FullControl customers on day one. <strong style="color:var(--paper)">1M+ supporter network</strong> primed for the public launch.
+      </div>
+    </div>
+
+    <div style="padding:22px 22px;border-bottom:1px solid var(--line-dark)">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">Year 1.5 &middot; Seed milestone</div>
+      <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px">
+        <div style="flex-shrink:0">
+          <span style="font-family:var(--display);font-size:32px;font-weight:600;color:var(--paper);letter-spacing:-0.02em">$43K</span>
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.12em;color:var(--gold);text-transform:uppercase;margin-left:6px">MRR</span>
+        </div>
+        <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;flex:1;min-width:220px">175 paying academies at $250 ARPU. ~$525K ARR run rate. The bar for a strong seed conversation.</div>
+      </div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55">
+        Blended CAC <strong style="color:var(--paper)">$293</strong>. LTV/CAC <strong style="color:var(--paper)">15.4x</strong>. Payback period <strong style="color:var(--paper)">1.6 months</strong>. Unit economics defensible because 55% of acquisition comes through warm network and organic content we already own.
+      </div>
+    </div>
+
+    <div style="padding:22px 22px">
+      <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;color:var(--gold);text-transform:uppercase;margin-bottom:10px;opacity:0.85">Year 2&ndash;3 &middot; Phase 2 expansion</div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55;margin-bottom:8px">
+        Sports performance vertical unlocked. <strong style="color:var(--paper)">100+ performance facilities</strong> in the warm network, served with the same playbook that worked in basketball.
+      </div>
+      <div style="font-size:13px;color:rgba(245,241,232,0.6);line-height:1.55">
+        Architecture stays sport-agnostic. Phase 2 is the proving ground for every adjacent vertical that follows.
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- USE OF FUNDS -->
@@ -880,5 +1061,55 @@ footer {
 <footer style="white-space:nowrap">&copy; 2026 FullControl &nbsp;·&nbsp; Navigate · Command · Lead</footer>
 
 </div>
+
+<script>
+  (function(){
+    var commands = [
+      "Cancel tomorrow's session, credit the parents, and boost my ad spend.",
+      "Draft tomorrow's parent comms based on this week's attendance.",
+      "Flag at-risk players from this week and pull up their notes."
+    ];
+    var elText = document.querySelector('.bam-cmd-text');
+    var elResult = document.querySelector('.bam-cmd-result');
+    if (!elText || !elResult) return;
+
+    var typeMs = 38, eraseMs = 18, holdMs = 1600, postMs = 1800;
+    var idx = 0;
+
+    function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+    async function run(){
+      while (true){
+        var cmd = commands[idx];
+        elResult.classList.remove('show');
+        for (var i = 0; i <= cmd.length; i++){
+          elText.textContent = cmd.slice(0, i);
+          await sleep(typeMs);
+        }
+        await sleep(holdMs);
+        elResult.classList.add('show');
+        await sleep(postMs);
+        for (var j = cmd.length; j >= 0; j--){
+          elText.textContent = cmd.slice(0, j);
+          await sleep(eraseMs);
+        }
+        elResult.classList.remove('show');
+        idx = (idx + 1) % commands.length;
+        await sleep(300);
+      }
+    }
+    if ('IntersectionObserver' in window){
+      var started = false;
+      var obs = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if (e.isIntersecting && !started){ started = true; run(); obs.disconnect(); }
+        });
+      }, { threshold: 0.2 });
+      obs.observe(document.querySelector('.bam-cmd-demo'));
+    } else {
+      run();
+    }
+  })();
+</script>
 </body>
 </html>
