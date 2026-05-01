@@ -9,3 +9,4 @@ Team-shared project notes. Read the relevant file when its topic comes up.
 - [Onboarding Data Points](project_onboarding_datapoints.md) — open items to detail for academy owner onboarding
 - [LLM Chat Collection](project_llm_chat_collection.md) — strategy data collected via guided LLM chat, not forms
 - [FullControl Brand Assets](project_fullcontrol_brand_assets.md) — logo system + 4 size-tiered variants, SVG extraction
+- [No Em Dashes](feedback_no_em_dashes.md) — Never use em dashes anywhere, in any copy or output
