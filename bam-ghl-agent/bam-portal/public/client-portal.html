@@ -3897,8 +3897,9 @@ function openContentTicketDetail(id) {
 
   // Header
   document.getElementById('reqDetailTitle').textContent = meta.label;
+  const lastBit = r.lastActivityAt ? `  ·  Last activity ${_formatRelative(r.lastActivityAt)}` : '';
   document.getElementById('reqDetailSub').textContent =
-    `${_ticketCode(r.id)}  ·  ${r.campaign || '(no campaign)'}  ·  Submitted ${r.submittedDateDisplay}`;
+    `${_ticketCode(r.id)}  ·  ${r.campaign || '(no campaign)'}  ·  Submitted ${r.submittedDateDisplay}${lastBit}`;
   const pill = document.getElementById('reqDetailStatusPill');
   const actionNeeded = r.clientActionStatus === 'requested';
   pill.className = 'status-pill ' + (actionNeeded ? 'needs-action' : 'in-progress');
@@ -4173,6 +4174,7 @@ function _ctkNormalizeForTracker(apiTicket) {
     submittedDateDisplay: submittedAt
       ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : '',
+    lastActivityAt: _lastActivityIso(apiTicket),
     updates: messages.map(m => ({
       who: m.author_name || (m.author_type === 'staff' ? 'Content team' : 'Client'),
       when: m.created_at ? new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
@@ -4182,6 +4184,29 @@ function _ctkNormalizeForTracker(apiTicket) {
     files: apiTicket.raw_files || [],
     rawTicket: apiTicket,
   };
+}
+
+// Pick the most-recent timestamp out of (latest message, updated_at, submitted_at)
+function _lastActivityIso(apiTicket) {
+  const msgs = Array.isArray(apiTicket.messages) ? apiTicket.messages : [];
+  const lastMsg = msgs.length ? msgs[msgs.length - 1]?.created_at : null;
+  return lastMsg || apiTicket.updated_at || apiTicket.submitted_at || null;
+}
+
+// "5 min ago", "2 hours ago", "yesterday", "Mar 14", etc.
+function _formatRelative(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = Date.now();
+  const diff = now - d.getTime();
+  const min = 60 * 1000, hr = 60 * min, day = 24 * hr;
+  if (diff < 60 * 1000) return 'just now';
+  if (diff < hr)  return Math.round(diff / min) + ' min ago';
+  if (diff < day) return Math.round(diff / hr) + ' hr ago';
+  if (diff < 2 * day) return 'yesterday';
+  if (diff < 7 * day) return Math.round(diff / day) + ' days ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function _mreqNormalize(apiTicket) {
@@ -4213,6 +4238,7 @@ function _mreqNormalize(apiTicket) {
     clientActionStatus: apiTicket.client_action_status,
     submittedDate: submittedAt ? submittedAt.split('T')[0] : '',
     submittedDateDisplay,
+    lastActivityAt: _lastActivityIso(apiTicket),
     updates: (apiTicket.messages || []).map(m => ({
       who: m.author_name || (m.author_type === 'staff' ? 'Staff' : 'Client'),
       when: m.created_at
@@ -4333,8 +4359,9 @@ function openMarketingRequest(id) {
   // Header
   document.getElementById('reqDetailTitle').textContent =
     r.creative ? `${meta.label} · ${r.creative}` : meta.label;
+  const lastBit = r.lastActivityAt ? `  ·  Last activity ${_formatRelative(r.lastActivityAt)}` : '';
   document.getElementById('reqDetailSub').textContent =
-    `${_ticketCode(r.id)}  ·  ${r.campaign || ''}  ·  Submitted ${r.submittedDateDisplay}`;
+    `${_ticketCode(r.id)}  ·  ${r.campaign || ''}  ·  Submitted ${r.submittedDateDisplay}${lastBit}`;
   const pill = document.getElementById('reqDetailStatusPill');
   // Action-needed marketing tickets get the gold pill (matches the row)
   const showActionPill = r.status === 'in-progress' && r.clientActionStatus === 'requested';

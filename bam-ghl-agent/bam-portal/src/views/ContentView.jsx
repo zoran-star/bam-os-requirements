@@ -541,6 +541,25 @@ function ctkCode(id) {
   return cleaned || "???";
 }
 
+function ctkLastActivityIso(ticket) {
+  const msgs = Array.isArray(ticket.messages) ? ticket.messages : [];
+  const lastMsg = msgs.length ? msgs[msgs.length - 1]?.created_at : null;
+  return lastMsg || ticket.updated_at || ticket.submitted_at || null;
+}
+function ctkFormatRelative(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  const min = 60_000, hr = 60 * min, day = 24 * hr;
+  if (diff < min)       return "just now";
+  if (diff < hr)        return Math.round(diff / min) + " min ago";
+  if (diff < day)       return Math.round(diff / hr) + " hr ago";
+  if (diff < 2 * day)   return "yesterday";
+  if (diff < 7 * day)   return Math.round(diff / day) + " days ago";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 const TYPE_META_CT = {
   graphic: { icon: "🖼", label: "Graphic" },
   video:   { icon: "🎬", label: "Video" },
@@ -828,6 +847,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
           </div>
           <div style={{ fontSize: 13, color: tk.textSub, marginTop: 4 }}>
             {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
+            {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
         </div>
         <StatusBadge ticket={ticket} tk={tk} />

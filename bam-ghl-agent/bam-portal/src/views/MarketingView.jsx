@@ -39,6 +39,24 @@ function formatDateShort(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
+function formatRelative(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  const min = 60_000, hr = 60 * min, day = 24 * hr;
+  if (diff < min)       return "just now";
+  if (diff < hr)        return Math.round(diff / min) + " min ago";
+  if (diff < day)       return Math.round(diff / hr) + " hr ago";
+  if (diff < 2 * day)   return "yesterday";
+  if (diff < 7 * day)   return Math.round(diff / day) + " days ago";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function lastActivityIso(apiTicket) {
+  const msgs = Array.isArray(apiTicket.messages) ? apiTicket.messages : [];
+  const lastMsg = msgs.length ? msgs[msgs.length - 1]?.created_at : null;
+  return lastMsg || apiTicket.updated_at || apiTicket.submitted_at || null;
+}
 
 // Map API ticket shape (Supabase columns) → flat shape this view renders
 function normalizeTicket(apiTicket) {
@@ -66,6 +84,7 @@ function normalizeTicket(apiTicket) {
     contentCheckStatus: apiTicket.content_check_status,
     clientActionStatus: apiTicket.client_action_status,
     submittedDate: formatDateLong(apiTicket.submitted_at),
+    lastActivityAt: lastActivityIso(apiTicket),
     updates: (apiTicket.messages || []).map(m => ({
       who: m.author_name || (m.author_type === "staff" ? "Staff" : "Client"),
       when: formatDateShort(m.created_at),
@@ -340,6 +359,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             </div>
             <div style={{ fontSize: 13, color: tk.textSub }}>
               {selected.academyName}  ·  {selected.campaignTitle}  ·  Submitted {selected.submittedDate}
+              {selected.lastActivityAt ? `  ·  Last activity ${formatRelative(selected.lastActivityAt)}` : ""}
             </div>
           </div>
           <StatusPills t={selected} tk={tk} size="large" />
