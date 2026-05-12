@@ -1,6 +1,12 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/marketing-tickets",      "destination": "/api/marketing?resource=tickets" },
+    { "source": "/api/marketing-tickets/(.*)", "destination": "/api/marketing?resource=tickets&path=$1" },
+    { "source": "/api/guide-cards",            "destination": "/api/marketing?resource=guide-cards" },
+    { "source": "/api/guide-cards/(.*)",       "destination": "/api/marketing?resource=guide-cards&path=$1" },
+    { "source": "/api/asana-import",           "destination": "/api/asana/tasks?import=1" },
+    { "source": "/api/asana-import/(.*)",      "destination": "/api/asana/tasks?import=1&path=$1" },
+    { "source": "/api/(.*)",                   "destination": "/api/$1" },
+    { "source": "/(.*)",                       "destination": "/index.html" }
   ]
 }
