@@ -438,6 +438,815 @@
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
+  /* ── Campaign cards (Marketing view) ── */
+  .campaign-card {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 24px 28px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+    transition: border-color 0.15s ease;
+  }
+  .campaign-card:hover { border-color: var(--line-str); }
+
+  .campaign-card-main {
+    flex: 1;
+    min-width: 220px;
+  }
+
+  .campaign-stats {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+
+  .campaign-stat-value {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .campaign-stat-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-top: 8px;
+  }
+
+  .btn-change-campaign {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 12px 22px;
+    background: transparent;
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+  }
+  .btn-change-campaign:hover {
+    background: var(--gold);
+    color: var(--ink);
+  }
+
+  .btn-add-campaign {
+    width: 100%;
+    margin-top: 24px;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 20px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-add-campaign:hover {
+    background: var(--gold-hi);
+  }
+
+  /* ── Change a campaign (detail) ── */
+  .spend-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    margin-bottom: 24px;
+    background: var(--ink);
+    border: 1px solid var(--gold-3);
+    border-radius: var(--radius);
+  }
+
+  .spend-bar-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+  }
+
+  .spend-bar-value {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .edit-pencil {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--gold);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    padding: 0;
+    margin-left: auto;
+  }
+  .edit-pencil:hover {
+    background: var(--gold);
+    color: var(--ink);
+    border-color: var(--gold);
+  }
+
+  /* Creative grid */
+  .creative-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .creative-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .creative-tile {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--ink);
+    border: 1px solid var(--line);
+    transition: border-color 0.15s ease;
+  }
+  .creative-tile:hover { border-color: var(--line-str); }
+
+  .creative-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .creative-edit {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    background: rgba(10,10,11,0.78);
+    border: 1px solid rgba(232,197,71,0.5);
+    color: var(--gold);
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    z-index: 2;
+  }
+  .creative-edit:hover {
+    background: var(--gold);
+    color: var(--ink);
+    border-color: var(--gold);
+  }
+
+  /* Selected state: dim the image, show action buttons */
+  .creative-actions {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(10,10,11,0.78);
+    backdrop-filter: blur(2px);
+    padding: 16px;
+    z-index: 1;
+  }
+  .creative-tile.selected .creative-actions {
+    display: flex;
+  }
+
+  .creative-action-btn {
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    min-width: 110px;
+    transition: background 0.15s ease;
+  }
+  .creative-action-btn:hover {
+    background: var(--gold-hi);
+  }
+
+  .btn-add-creative {
+    width: 100%;
+    margin-top: 8px;
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 18px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-add-creative:hover { background: var(--gold-hi); }
+
+  /* Detail back button (reuse if exists; otherwise create) */
+  .detail-back {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-mute);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .detail-back:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  /* ── Budget change modal ── */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,11,0.78);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 24px;
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--ink);
+    border: 1px solid var(--line-str);
+    border-radius: 10px;
+    padding: 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .modal-kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 8px;
+  }
+
+  .modal-title {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+  }
+
+  .modal-sub {
+    font-size: 13px;
+    color: var(--text-sub);
+    margin-bottom: 22px;
+    line-height: 1.5;
+  }
+
+  .modal-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin: 14px 0 6px;
+  }
+
+  .modal-current {
+    font-family: var(--display);
+    font-size: 20px;
+    color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+
+  .modal-input,
+  .modal-textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    transition: border-color 0.15s ease;
+  }
+  .modal-input:focus,
+  .modal-textarea:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .modal-textarea { min-height: 84px; resize: vertical; }
+
+  .modal-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 22px;
+  }
+
+  .btn-modal-secondary {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-sub);
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-modal-secondary:hover {
+    border-color: var(--text-mute);
+    color: var(--text);
+  }
+
+  .btn-modal-primary {
+    background: var(--gold);
+    color: var(--ink);
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-modal-primary:hover { background: var(--gold-hi); }
+
+  .btn-modal-danger {
+    background: #C7253E;
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-modal-danger:hover { background: #E03A53; }
+
+  /* ── New campaign wizard ── */
+  .wizard-progress {
+    height: 4px;
+    background: var(--line);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .wizard-progress-fill {
+    height: 100%;
+    background: var(--gold);
+    transition: width 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+
+  .wizard-step { display: none; }
+  .wizard-step.active { display: block; animation: fadeIn 0.25s ease both; }
+
+  .wizard-search {
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
+    transition: border-color 0.15s ease;
+  }
+  .wizard-search:focus { outline: none; border-color: var(--gold); }
+
+  .wizard-offer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .wizard-offer-card {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px 16px;
+    color: var(--text);
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+    text-align: left;
+  }
+  .wizard-offer-card:hover {
+    border-color: var(--gold);
+    background: rgba(232,197,71,0.04);
+    transform: translateY(-1px);
+  }
+  .wizard-offer-card.hidden { display: none; }
+
+  .wizard-new-offer-btn {
+    width: 100%;
+    margin-top: 22px;
+    background: transparent;
+    color: var(--gold);
+    border: 1.5px dashed rgba(232,197,71,0.45);
+    padding: 16px;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .wizard-new-offer-btn:hover {
+    border-color: var(--gold);
+    background: rgba(232,197,71,0.06);
+  }
+
+  /* Guide card sections */
+  .guide-section {
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .guide-section:last-child { border-bottom: none; }
+  .guide-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 8px;
+  }
+  .guide-value {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .guide-assets-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .guide-assets-grid img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+
+  /* Wizard file list (asset upload step) */
+  .wizard-files-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .wizard-file-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .wizard-file-thumb {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    object-fit: cover;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-mute);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .wizard-file-name {
+    flex: 1;
+    color: var(--text);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .wizard-file-size {
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+  .wizard-file-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-mute);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .wizard-file-remove:hover {
+    color: #C7253E;
+    background: rgba(199,37,62,0.08);
+  }
+
+  /* Disabled primary button (used in wizard) */
+  .btn-modal-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Marketing request row (extends ticket-row pattern) */
+  .mreq-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    transition: background 0.12s ease, padding 0.12s ease, border-color 0.12s ease;
+  }
+  .mreq-row:last-child { border-bottom: none; }
+  .mreq-row:hover {
+    background: var(--surface);
+    border-color: var(--line);
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .mreq-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: rgba(232,197,71,0.10);
+    border: 1px solid rgba(232,197,71,0.30);
+    flex-shrink: 0;
+  }
+  .mreq-title {
+    flex: 1;
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .mreq-date {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-sub);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding-left: 12px;
+    white-space: nowrap;
+  }
+
+  /* Marketing status pill colors (extend existing) */
+  .status-pill.pending      { color: var(--gold-2); }
+  .status-pill.needs-action { color: var(--pace-stop); }
+  .status-pill.completed    { color: var(--pace-go); }
+  .status-pill.cancelled    { color: var(--text-mute); }
+
+  /* Submitted-info detail rows */
+  .req-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .req-info-row:last-child { border-bottom: none; }
+  .req-info-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    width: 130px;
+    flex-shrink: 0;
+    padding-top: 4px;
+  }
+  .req-info-value {
+    flex: 1;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .req-info-thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+  }
+
+  /* Staff update entries */
+  .req-update-item {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .req-update-item:last-child { border-bottom: none; }
+  .req-update-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 6px;
+  }
+  .req-update-message {
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .req-empty {
+    padding: 16px 0;
+    text-align: center;
+    color: var(--text-sub);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* Confirmation success card */
+  .confirmation-card {
+    text-align: center;
+    max-width: 420px;
+  }
+  .confirmation-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(232,197,71,0.10);
+    border: 1.5px solid var(--gold);
+    color: var(--gold);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    line-height: 1;
+    margin: 0 auto 20px;
+    animation: confirm-pop 0.3s ease both;
+  }
+  @keyframes confirm-pop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+
+  /* Destructive variant on the in-tile Remove action */
+  .creative-action-btn-danger {
+    background: transparent;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.35);
+  }
+  .creative-action-btn-danger:hover {
+    background: #C7253E;
+    border-color: #C7253E;
+    color: #fff;
+  }
+
+  /* File-upload drop label */
+  .file-drop-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 28px 18px;
+    border: 1.5px dashed var(--line-str);
+    border-radius: 8px;
+    background: rgba(232,197,71,0.03);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    text-align: center;
+  }
+  .file-drop-label:hover {
+    border-color: var(--gold);
+    background: rgba(232,197,71,0.06);
+  }
+  .file-drop-icon {
+    font-size: 22px;
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .file-drop-text {
+    font-family: var(--display);
+    font-size: 14px;
+    color: var(--text);
+  }
+  .file-drop-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+  }
+  .file-name {
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-sub);
+    word-break: break-all;
+  }
+  .file-name.has-file {
+    color: var(--gold);
+  }
+
+  /* "Currently replacing" mini preview */
+  .replace-current {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 18px;
+  }
+  .replace-current-img {
+    width: 44px;
+    height: 44px;
+    object-fit: cover;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .replace-current-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+  }
+
   /* ── Stat card — the Full Control instrument tile ── */
   .stat-card {
     background: var(--ink);
@@ -1840,6 +2649,11 @@
         <span class="nav-icon">⚙️</span>
         Systems
       </div>
+
+      <div class="nav-item" onclick="switchView('marketing', this)">
+        <span class="nav-icon">📈</span>
+        Marketing
+      </div>
     </nav>
 
     <div class="sidebar-bottom">
@@ -2106,179 +2920,437 @@
          MARKETING VIEW
     ══════════════════════════════ -->
     <div class="view" id="view-marketing">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ 02 · Marketing</span>
-          <div class="topbar-title">Leads, funnels, signal.</div>
-          <div class="topbar-sub">Q2 · 2026 · Last sync 09:41</div>
-        </div>
-        <div class="topbar-actions">
-          <button class="btn btn-ghost">↓ Export</button>
-          <button class="btn btn-primary">+ New Campaign</button>
-        </div>
-      </div>
 
-      <div class="content">
-
-        <!-- Stats -->
-        <div class="grid-3 mb-24">
-          <div class="stat-card">
-            <div class="stat-value">142</div>
-            <div class="stat-label">New Leads This Month</div>
-            <div class="stat-change up">↑ 18% vs last month</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">38%</div>
-            <div class="stat-label">Trial Booking Rate</div>
-            <div class="stat-change up">↑ 5pts vs last month</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-value">$2,840</div>
-            <div class="stat-label">Revenue from Funnels</div>
-            <div class="stat-change up">↑ 12% vs last month</div>
+      <!-- ── LIST: campaigns overview ── -->
+      <div id="marketing-list">
+        <div class="topbar">
+          <div>
+            <span class="topbar-kicker">§ 02 · Marketing</span>
+            <div class="topbar-title">Campaigns.</div>
+            <div class="topbar-sub">Last calendar month</div>
           </div>
         </div>
 
-        <div class="grid-2 mb-24">
+        <div class="content">
 
-          <!-- Active Funnels -->
-          <div class="card">
-            <div class="flex-between mb-16">
-              <div class="card-title">Active Funnels</div>
-              <span class="pill green"><span class="pill-dot" style="background:var(--green)"></span>4 Live</span>
-            </div>
-            <div class="row-list">
-              <div class="row-item">
-                <div class="row-icon" style="background:var(--accent-ghost)">🏀</div>
-                <div class="row-info">
-                  <div class="row-title">Youth Academy — Main</div>
-                  <div class="row-sub">84 visitors · 32 leads this month</div>
+          <div class="section-label">Active Campaigns</div>
+
+          <!-- Campaign card 1 -->
+          <div class="campaign-card">
+            <div class="campaign-card-main">
+              <div class="card-title" style="margin-bottom:18px">Title of campaign 1</div>
+              <div class="campaign-stats">
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">$465</div>
+                  <div class="campaign-stat-label">Spend</div>
                 </div>
-                <div class="row-meta">
-                  <div style="font-size:15px;font-weight:700;color:var(--green)">38%</div>
-                  <div class="row-sub">conv.</div>
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">44</div>
+                  <div class="campaign-stat-label">Results</div>
                 </div>
-              </div>
-              <div class="row-item">
-                <div class="row-icon" style="background:var(--blue-soft)">🏠</div>
-                <div class="row-info">
-                  <div class="row-title">Gym Rental — Landing</div>
-                  <div class="row-sub">41 visitors · 18 leads this month</div>
-                </div>
-                <div class="row-meta">
-                  <div style="font-size:15px;font-weight:700;color:var(--green)">44%</div>
-                  <div class="row-sub">conv.</div>
-                </div>
-              </div>
-              <div class="row-item">
-                <div class="row-icon" style="background:var(--green-soft)">⛺</div>
-                <div class="row-info">
-                  <div class="row-title">Summer Camp — Waitlist</div>
-                  <div class="row-sub">203 visitors · 67 signups</div>
-                </div>
-                <div class="row-meta">
-                  <div style="font-size:15px;font-weight:700;color:var(--amber)">33%</div>
-                  <div class="row-sub">conv.</div>
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">$10.57</div>
+                  <div class="campaign-stat-label">Cost / Result</div>
                 </div>
               </div>
             </div>
+            <button class="btn-change-campaign" onclick="openCampaignDetail('campaign-1', 'Title of campaign 1', { spend: '$465', results: 44, cpr: '$10.57' })">Change Campaign</button>
           </div>
 
-          <!-- Lead sources -->
-          <div class="card">
-            <div class="flex-between mb-16">
-              <div class="card-title">Lead Sources</div>
-              <span class="pill accent">This Month</span>
+          <!-- Campaign card 2 -->
+          <div class="campaign-card">
+            <div class="campaign-card-main">
+              <div class="card-title" style="margin-bottom:18px">Title of campaign 2</div>
+              <div class="campaign-stats">
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">$200</div>
+                  <div class="campaign-stat-label">Spend</div>
+                </div>
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">20</div>
+                  <div class="campaign-stat-label">Results</div>
+                </div>
+                <div class="campaign-stat">
+                  <div class="campaign-stat-value">$10.00</div>
+                  <div class="campaign-stat-label">Cost / Result</div>
+                </div>
+              </div>
             </div>
-            <div class="row-list">
-              <div class="row-item" style="border:none;padding-bottom:10px">
-                <div class="row-info">
-                  <div class="flex-between mb-8">
-                    <div class="row-title" style="font-size:13px">Instagram</div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text)">58 leads</div>
-                  </div>
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width:72%;background:var(--accent)"></div>
-                  </div>
-                </div>
+            <button class="btn-change-campaign" onclick="openCampaignDetail('campaign-2', 'Title of campaign 2', { spend: '$200', results: 20, cpr: '$10.00' })">Change Campaign</button>
+          </div>
+
+          <!-- Add new campaign -->
+          <button class="btn-add-campaign" onclick="openNewCampaignWizard()">+ Add New Campaign</button>
+
+          <!-- ── Track what's in flight ── -->
+          <div class="readout" style="margin: 36px 0 12px;">Track what's in flight</div>
+          <div class="card" style="padding-top:8px">
+            <div class="tab-row">
+              <div class="tab active" data-mtab="pending" onclick="switchMarketingTab('pending', this)">Pending</div>
+              <div class="tab" data-mtab="completed" onclick="switchMarketingTab('completed', this)">Completed</div>
+            </div>
+
+            <div id="marketing-request-list-pending"></div>
+            <div id="marketing-request-list-completed" style="display:none"></div>
+
+            <button class="load-more" onclick="alert('Load more — hook this to backend later')">Load more · ↓</button>
+          </div>
+
+        </div>
+      </div><!-- /#marketing-list -->
+
+      <!-- ── DETAIL: change a campaign ── -->
+      <div id="marketing-detail" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:20px">
+          <div style="display:flex;align-items:flex-start;gap:18px;width:100%">
+            <button class="detail-back" onclick="closeCampaignDetail()" aria-label="Back">←</button>
+            <div>
+              <span class="topbar-kicker">§ 02 · Marketing</span>
+              <div class="topbar-title">Change a campaign.</div>
+              <div class="topbar-sub" id="detail-campaign-title">Title of campaign 1</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:40px;align-items:flex-end">
+              <div style="text-align:right">
+                <div id="detail-results" style="font-family:var(--display);font-size:30px;font-weight:600;color:var(--text);line-height:1">44</div>
+                <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-mute);margin-top:6px">Results</div>
               </div>
-              <div class="row-item" style="border:none;padding-bottom:10px">
-                <div class="row-info">
-                  <div class="flex-between mb-8">
-                    <div class="row-title" style="font-size:13px">Google Search</div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text)">41 leads</div>
-                  </div>
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width:51%;background:var(--blue)"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="row-item" style="border:none;padding-bottom:10px">
-                <div class="row-info">
-                  <div class="flex-between mb-8">
-                    <div class="row-title" style="font-size:13px">Referral</div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text)">28 leads</div>
-                  </div>
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width:35%;background:var(--green)"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="row-item" style="border:none">
-                <div class="row-info">
-                  <div class="flex-between mb-8">
-                    <div class="row-title" style="font-size:13px">Word of Mouth</div>
-                    <div style="font-size:13px;font-weight:600;color:var(--text)">15 leads</div>
-                  </div>
-                  <div class="progress-bar">
-                    <div class="progress-fill" style="width:19%;background:var(--amber)"></div>
-                  </div>
-                </div>
+              <div style="text-align:right">
+                <div id="detail-cpr" style="font-family:var(--display);font-size:30px;font-weight:600;color:var(--text);line-height:1">$10.57</div>
+                <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--text-mute);margin-top:6px">Cost / Result</div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Campaigns -->
-        <div class="section-label">Campaigns</div>
-        <div class="card">
-          <div class="row-list">
-            <div class="row-item">
-              <div class="row-icon" style="background:var(--green-soft)">📧</div>
-              <div class="row-info">
-                <div class="row-title">Summer Camp Announcement</div>
-                <div class="row-sub">Email · Sent Apr 14 · 847 contacts</div>
-              </div>
-              <div class="row-meta">
-                <span class="pill green">42% open</span>
-                <div class="row-sub" style="margin-top:4px">18% click</div>
+        <div class="content">
+
+          <!-- Spend bar with edit affordance -->
+          <div class="spend-bar">
+            <span class="spend-bar-label">Spend</span>
+            <span class="spend-bar-value" id="detail-spend">$465</span>
+            <button class="edit-pencil" onclick="openBudgetModal()" title="Edit spend" aria-label="Edit spend">
+              <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Creative grid (8 placeholder creatives) -->
+          <div class="creative-grid">
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam1/400/400" alt="Creative 1" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
               </div>
             </div>
-            <div class="row-item">
-              <div class="row-icon" style="background:var(--blue-soft)">📱</div>
-              <div class="row-info">
-                <div class="row-title">Trial Reminder — April Batch</div>
-                <div class="row-sub">SMS · Sent Apr 12 · 124 contacts</div>
-              </div>
-              <div class="row-meta">
-                <span class="pill green">91% delivered</span>
-                <div class="row-sub" style="margin-top:4px">24% replied</div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam2/400/400" alt="Creative 2" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
               </div>
             </div>
-            <div class="row-item">
-              <div class="row-icon" style="background:var(--amber-soft)">📣</div>
-              <div class="row-info">
-                <div class="row-title">Spring Promo — Gym Rental</div>
-                <div class="row-sub">Email · Scheduled Apr 22 · 312 contacts</div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam3/400/400" alt="Creative 3" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
               </div>
-              <div class="row-meta">
-                <span class="pill amber">Scheduled</span>
+            </div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam4/400/400" alt="Creative 4" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
               </div>
+            </div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam5/400/400" alt="Creative 5" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
+              </div>
+            </div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam6/400/400" alt="Creative 6" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
+              </div>
+            </div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam7/400/400" alt="Creative 7" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
+              </div>
+            </div>
+            <div class="creative-tile">
+              <img class="creative-img" src="https://picsum.photos/seed/bam8/400/400" alt="Creative 8" />
+              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+                </svg>
+              </button>
+              <div class="creative-actions">
+                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
+                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add new creative -->
+          <button class="btn-add-creative" onclick="openAddCreativeModal()">+ Add New Creative</button>
+
+        </div>
+      </div><!-- /#marketing-detail -->
+
+      <!-- ── REQUEST DETAIL ── -->
+      <div id="marketing-request-detail" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:20px">
+          <div style="display:flex;align-items:flex-start;gap:18px;width:100%">
+            <button class="detail-back" onclick="closeMarketingRequest()" aria-label="Back">←</button>
+            <div>
+              <span class="topbar-kicker">§ 02 · Marketing · Request</span>
+              <div class="topbar-title" id="reqDetailTitle">Request detail.</div>
+              <div class="topbar-sub" id="reqDetailSub">Submitted —</div>
+            </div>
+            <div style="margin-left:auto">
+              <span id="reqDetailStatusPill" class="status-pill in-progress">In Progress</span>
             </div>
           </div>
         </div>
 
-      </div>
+        <div class="content">
+
+          <div class="section-label">What you submitted</div>
+          <div class="card" id="reqDetailSubmittedCard" style="margin-bottom:24px">
+            <!-- rendered by JS -->
+          </div>
+
+          <div class="section-label">Updates from your account manager</div>
+          <div class="card" id="reqDetailUpdatesCard" style="margin-bottom:28px">
+            <!-- rendered by JS -->
+          </div>
+
+          <div id="reqDetailActions" style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn-modal-secondary" onclick="editMarketingRequest()">Edit Request</button>
+            <button class="btn-modal-danger" onclick="openCancelRequestModal()">Cancel Request</button>
+          </div>
+
+        </div>
+      </div><!-- /#marketing-request-detail -->
+
+      <!-- ── NEW CAMPAIGN WIZARD ── -->
+      <div id="marketing-new-campaign" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:18px">
+          <div style="display:flex;align-items:flex-start;gap:18px;width:100%">
+            <button class="detail-back" onclick="closeNewCampaignWizard()" aria-label="Back to campaigns">←</button>
+            <div style="flex:1">
+              <span class="topbar-kicker">§ 02 · Marketing</span>
+              <div class="topbar-title">Launch a new campaign.</div>
+              <div class="topbar-sub" id="wizardStepLabel">Step 1 of 5 · Pick an offer</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content">
+
+          <div class="wizard-progress">
+            <div class="wizard-progress-fill" id="wizardProgressFill" style="width:20%"></div>
+          </div>
+
+          <!-- Step: offer-select -->
+          <div class="wizard-step active" data-wstep="offer-select">
+            <div class="section-label">How to submit new ads</div>
+            <div class="card" style="margin-bottom:28px">
+              <div class="card-title" style="margin-bottom:12px">Quick guide</div>
+              <p style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:10px">
+                Picking the right offer below will pull up a guide card with the exact info we need from you.
+                That guide will walk you through what kind of photos, video, and copy makes a great ad for that offer.
+              </p>
+              <p style="color:var(--text-sub);font-size:14px;line-height:1.6">
+                After you upload your assets, set a monthly spend and (optionally) link a landing page. Your account
+                manager will review, build the campaign in Meta, and launch it within 1-2 business days.
+              </p>
+              <p style="color:var(--text-mute);font-size:12px;font-style:italic;margin-top:14px">
+                Placeholder content. Cam will replace this with the final guide.
+              </p>
+            </div>
+
+            <div class="section-label">Pick an offer</div>
+            <input type="text" class="wizard-search" id="wizardOfferSearch" placeholder="Search offers…" oninput="filterWizardOffers(this.value)" autocomplete="off" />
+
+            <div class="wizard-offer-grid" id="wizardOfferGrid">
+              <button class="wizard-offer-card" data-offer="Camps" onclick="wizardSelectOffer('Camps')">Camps</button>
+              <button class="wizard-offer-card" data-offer="Internal tournament" onclick="wizardSelectOffer('Internal tournament')">Internal tournament</button>
+              <button class="wizard-offer-card" data-offer="Internal league" onclick="wizardSelectOffer('Internal league')">Internal league</button>
+              <button class="wizard-offer-card" data-offer="Gym rental" onclick="wizardSelectOffer('Gym rental')">Gym rental</button>
+              <button class="wizard-offer-card" data-offer="Youth academy" onclick="wizardSelectOffer('Youth academy')">Youth academy</button>
+              <button class="wizard-offer-card" data-offer="Training" onclick="wizardSelectOffer('Training')">Training</button>
+              <button class="wizard-offer-card" data-offer="Tryouts" onclick="wizardSelectOffer('Tryouts')">Tryouts</button>
+              <button class="wizard-offer-card" data-offer="General teams" onclick="wizardSelectOffer('General teams')">General teams</button>
+              <button class="wizard-offer-card" data-offer="New hire" onclick="wizardSelectOffer('New hire')">New hire</button>
+              <button class="wizard-offer-card" data-offer="Promo" onclick="wizardSelectOffer('Promo')">Promo</button>
+            </div>
+            <div id="wizardOfferEmpty" class="req-empty" style="display:none">No offers match. Create a new one below.</div>
+
+            <button class="wizard-new-offer-btn" onclick="wizardGoToNewOfferForm()">+ Create a new offer</button>
+          </div>
+
+          <!-- Step: new-offer-form -->
+          <div class="wizard-step" data-wstep="new-offer-form">
+            <div class="section-label">Create a new offer</div>
+            <div class="card">
+              <label class="modal-label" for="wizardNewOfferName">Offer name</label>
+              <input type="text" id="wizardNewOfferName" class="modal-input" placeholder="e.g. Summer Tournament Series" />
+
+              <label class="modal-label" for="wizardNewOfferDesc">Description</label>
+              <textarea id="wizardNewOfferDesc" class="modal-textarea" placeholder="What is this offer about? Who is it for? What outcome should the ad drive?"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+              <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
+              <button class="btn-modal-primary" onclick="wizardSubmitNewOfferForm()">Continue →</button>
+            </div>
+          </div>
+
+          <!-- Step: guide-card -->
+          <div class="wizard-step" data-wstep="guide-card">
+            <div class="section-label">Creation guide</div>
+            <div class="card" style="margin-bottom:18px">
+              <div class="card-title" id="wizardGuideOfferTitle" style="margin-bottom:20px;text-transform:uppercase;letter-spacing:0.04em">Offer</div>
+
+              <div class="guide-section">
+                <div class="guide-label">Purpose</div>
+                <div class="guide-value">[Cam will fill this in. Why does this offer exist? Who's the audience? What action do we want them to take?]</div>
+              </div>
+              <div class="guide-section">
+                <div class="guide-label">Filming / creation tips</div>
+                <div class="guide-value">[Cam will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]</div>
+              </div>
+              <div class="guide-section">
+                <div class="guide-label">Example script</div>
+                <div class="guide-value" style="white-space:pre-line">[Cam will fill this in.
+"Hook line in the first 3 seconds.
+Then the offer pitch.
+Then the call to action."]</div>
+              </div>
+              <div class="guide-section">
+                <div class="guide-label">Example assets</div>
+                <div class="guide-assets-grid">
+                  <img src="https://picsum.photos/seed/eg1/200/200" alt="Example 1" />
+                  <img src="https://picsum.photos/seed/eg2/200/200" alt="Example 2" />
+                  <img src="https://picsum.photos/seed/eg3/200/200" alt="Example 3" />
+                  <img src="https://picsum.photos/seed/eg4/200/200" alt="Example 4" />
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+              <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
+              <button class="btn-modal-primary" onclick="wizardGoToStep('asset-upload')">Ready to input assets? →</button>
+            </div>
+          </div>
+
+          <!-- Step: asset-upload -->
+          <div class="wizard-step" data-wstep="asset-upload">
+            <div class="section-label">Upload assets (up to 10)</div>
+            <label for="wizardAssetInput" class="file-drop-label" style="padding:48px 18px;margin-bottom:16px">
+              <span class="file-drop-icon">↑</span>
+              <span class="file-drop-text">Click to upload images or videos</span>
+              <span class="file-drop-meta">JPG · PNG · MP4 · MOV · up to 10 files</span>
+            </label>
+            <input type="file" id="wizardAssetInput" accept="image/*,video/*" multiple style="display:none" onchange="wizardAddFiles(this.files)" />
+
+            <div class="wizard-files-list" id="wizardFilesList"></div>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+              <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
+              <button class="btn-modal-primary" id="wizardAssetsContinueBtn" onclick="wizardGoToStep('budget')" disabled>All assets uploaded</button>
+            </div>
+          </div>
+
+          <!-- Step: budget -->
+          <div class="wizard-step" data-wstep="budget">
+            <div class="section-label">Monthly spend</div>
+            <div class="card">
+              <label class="modal-label" for="wizardBudgetInput">How much do you want to spend each month?</label>
+              <input type="text" id="wizardBudgetInput" class="modal-input" placeholder="e.g. $500" inputmode="decimal" />
+              <div style="color:var(--text-mute);font-size:12px;margin-top:2px">
+                Total monthly spend across this campaign. You can adjust later from the campaign card.
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+              <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
+              <button class="btn-modal-primary" onclick="wizardSubmitBudget()">Continue →</button>
+            </div>
+          </div>
+
+          <!-- Step: landing-page (optional) -->
+          <div class="wizard-step" data-wstep="landing-page">
+            <div class="section-label">Landing page (optional)</div>
+            <div class="card">
+              <label class="modal-label" for="wizardLandingInput">Where should clicks go?</label>
+              <input type="text" id="wizardLandingInput" class="modal-input" placeholder="https://yourwebsite.com/camps" />
+              <div style="color:var(--text-mute);font-size:12px;margin-top:2px">
+                If you leave this blank, we'll send leads to your default funnel. You can change this later.
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+              <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
+              <button class="btn-modal-secondary" onclick="wizardSubmitFinal(true)">Skip</button>
+              <button class="btn-modal-primary" onclick="wizardSubmitFinal(false)">Submit Request</button>
+            </div>
+          </div>
+
+          <!-- Step: success -->
+          <div class="wizard-step" data-wstep="success">
+            <div style="text-align:center;padding:40px 20px;max-width:480px;margin:0 auto">
+              <div class="confirmation-icon" style="margin-bottom:24px">✓</div>
+              <div style="font-family:var(--display);font-size:24px;font-weight:500;color:var(--text);margin-bottom:8px;letter-spacing:-0.01em" id="wizardSuccessTitle">Campaign request submitted</div>
+              <div style="color:var(--text-sub);font-size:14px;line-height:1.6;margin-bottom:28px" id="wizardSuccessSub">Your account manager will build the campaign and launch it within 1-2 business days.</div>
+              <button class="btn-modal-primary" onclick="closeNewCampaignWizard()">Back to campaigns</button>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /#marketing-new-campaign -->
+
     </div>
 
     <!-- ══════════════════════════════
@@ -2428,6 +3500,709 @@ function switchView(name, el) {
   // Update views
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
+
+  // When leaving Marketing, reset to list view
+  if (name !== 'marketing') closeCampaignDetail();
+}
+
+/* ════════════════════════════════
+   MARKETING — campaign detail
+   ════════════════════════════════ */
+
+function openCampaignDetail(campaignId, title, stats) {
+  document.getElementById('marketing-list').style.display = 'none';
+  document.getElementById('marketing-detail').style.display = 'block';
+  document.getElementById('detail-campaign-title').textContent = title;
+  document.getElementById('detail-spend').textContent = stats.spend;
+  document.getElementById('detail-results').textContent = stats.results;
+  document.getElementById('detail-cpr').textContent = stats.cpr;
+  // Reset any selected creatives
+  document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
+  window.scrollTo(0, 0);
+}
+
+function closeCampaignDetail() {
+  const detail = document.getElementById('marketing-detail');
+  const reqDetail = document.getElementById('marketing-request-detail');
+  const wizard = document.getElementById('marketing-new-campaign');
+  const list = document.getElementById('marketing-list');
+  if (detail) detail.style.display = 'none';
+  if (reqDetail) reqDetail.style.display = 'none';
+  if (wizard) wizard.style.display = 'none';
+  if (list) list.style.display = 'block';
+  document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
+}
+
+function toggleCreativeActions(tileEl) {
+  const wasSelected = tileEl.classList.contains('selected');
+  // Single-select: clear all, then toggle this one
+  document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
+  if (!wasSelected) tileEl.classList.add('selected');
+}
+
+function openBudgetModal() {
+  const modal = document.getElementById('budgetModal');
+  if (!modal) return;
+  // Prefill current spend
+  const current = document.getElementById('detail-spend')?.textContent || '';
+  const currentEl = document.getElementById('budgetModalCurrent');
+  if (currentEl) currentEl.textContent = current;
+  modal.style.display = 'flex';
+  setTimeout(() => document.getElementById('budgetModalInput')?.focus(), 50);
+}
+
+function closeBudgetModal() {
+  const modal = document.getElementById('budgetModal');
+  if (modal) modal.style.display = 'none';
+  const input = document.getElementById('budgetModalInput');
+  const reason = document.getElementById('budgetModalReason');
+  if (input) input.value = '';
+  if (reason) reason.value = '';
+}
+
+function submitBudgetChange() {
+  const newBudget = document.getElementById('budgetModalInput')?.value?.trim();
+  if (!newBudget) {
+    alert('Enter a new monthly spend.');
+    return;
+  }
+  closeBudgetModal();
+  showConfirmation(
+    'Budget change requested',
+    'Your account manager will review and update your campaign within 1 business day.'
+  );
+}
+
+/* ── Generic confirmation popup ── */
+function showConfirmation(title, subtitle) {
+  const titleEl = document.getElementById('confirmationTitle');
+  const subEl   = document.getElementById('confirmationSub');
+  const modal   = document.getElementById('confirmationModal');
+  if (titleEl) titleEl.textContent = title || 'Request submitted';
+  if (subEl)   subEl.textContent   = subtitle || 'Your account manager will follow up shortly.';
+  if (modal)   modal.style.display = 'flex';
+}
+function closeConfirmationModal() {
+  const modal = document.getElementById('confirmationModal');
+  if (modal) modal.style.display = 'none';
+}
+
+/* ── Replace / Remove / Add creative modals ── */
+
+let _pendingCreative = null; // { name, src }
+
+function _findTileFromBtn(btn) {
+  return btn.closest('.creative-tile');
+}
+
+function _readCreativeFromTile(tile) {
+  const img = tile?.querySelector('.creative-img');
+  return { name: img?.alt || 'Creative', src: img?.src || '' };
+}
+
+function _onFileSelected(input, displayElId) {
+  const display = document.getElementById(displayElId);
+  if (!display) return;
+  if (input.files && input.files[0]) {
+    display.textContent = '✓ ' + input.files[0].name;
+    display.classList.add('has-file');
+  } else {
+    display.textContent = '';
+    display.classList.remove('has-file');
+  }
+}
+
+// REPLACE
+function openReplaceModal(btn) {
+  const tile = _findTileFromBtn(btn);
+  _pendingCreative = _readCreativeFromTile(tile);
+  document.getElementById('replaceCurrentImg').src = _pendingCreative.src;
+  document.getElementById('replaceCurrentName').textContent = 'Replacing ' + _pendingCreative.name;
+  document.getElementById('replaceModal').style.display = 'flex';
+}
+
+function closeReplaceModal() {
+  document.getElementById('replaceModal').style.display = 'none';
+  const input = document.getElementById('replaceFileInput');
+  const name = document.getElementById('replaceFileName');
+  const note = document.getElementById('replaceNote');
+  if (input) input.value = '';
+  if (name) { name.textContent = ''; name.classList.remove('has-file'); }
+  if (note) note.value = '';
+  _pendingCreative = null;
+}
+
+function submitReplace() {
+  const file = document.getElementById('replaceFileInput')?.files?.[0];
+  if (!file) {
+    alert('Choose a file to upload.');
+    return;
+  }
+  const creativeName = _pendingCreative?.name || 'creative';
+  closeReplaceModal();
+  showConfirmation(
+    'Replace requested',
+    'We received ' + file.name + '. Your account manager will swap it in for ' + creativeName + ' within 1 business day.'
+  );
+}
+
+// REMOVE
+function openRemoveModal(btn) {
+  const tile = _findTileFromBtn(btn);
+  _pendingCreative = _readCreativeFromTile(tile);
+  document.getElementById('removeCurrentImg').src = _pendingCreative.src;
+  document.getElementById('removeCurrentName').textContent = _pendingCreative.name;
+  document.getElementById('removeModal').style.display = 'flex';
+}
+
+function closeRemoveModal() {
+  document.getElementById('removeModal').style.display = 'none';
+  _pendingCreative = null;
+}
+
+function confirmRemove() {
+  const creativeName = _pendingCreative?.name || 'creative';
+  closeRemoveModal();
+  showConfirmation(
+    'Remove requested',
+    'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.'
+  );
+}
+
+// ADD NEW CREATIVE
+function openAddCreativeModal() {
+  document.getElementById('addCreativeModal').style.display = 'flex';
+}
+
+function closeAddCreativeModal() {
+  document.getElementById('addCreativeModal').style.display = 'none';
+  const input = document.getElementById('addCreativeFileInput');
+  const name = document.getElementById('addCreativeFileName');
+  const note = document.getElementById('addCreativeNote');
+  if (input) input.value = '';
+  if (name) { name.textContent = ''; name.classList.remove('has-file'); }
+  if (note) note.value = '';
+}
+
+function submitAddCreative() {
+  const file = document.getElementById('addCreativeFileInput')?.files?.[0];
+  if (!file) {
+    alert('Choose a file to upload.');
+    return;
+  }
+  closeAddCreativeModal();
+  showConfirmation(
+    'New creative requested',
+    'We received ' + file.name + '. Your account manager will add it to your campaign within 1 business day.'
+  );
+}
+
+/* ════════════════════════════════
+   MARKETING — Track what's in flight
+   ════════════════════════════════ */
+
+const MARKETING_REQUEST_META = {
+  replace:         { icon: '🔄', label: 'Replace creative'   },
+  add:             { icon: '➕', label: 'Add new creative'   },
+  remove:          { icon: '🗑',  label: 'Remove creative'    },
+  budget:          { icon: '💰', label: 'Budget change'      },
+  'campaign-create': { icon: '🚀', label: 'New campaign'      },
+};
+
+const MARKETING_STATUS_LABEL = {
+  'pending':      'Pending',
+  'in-progress':  'In Progress',
+  'needs-action': 'Action Needed',
+  'completed':    'Completed',
+  'cancelled':    'Cancelled',
+};
+
+// Sample data — replace with backend later
+let MARKETING_REQUESTS = [
+  {
+    id: 'mreq-001',
+    type: 'replace',
+    campaign: 'Title of campaign 1',
+    creative: 'Creative 3',
+    fileName: 'summer-trial-v2.jpg',
+    fileUrl: 'https://picsum.photos/seed/upload1/120/120',
+    note: 'This one isn\'t getting many clicks. Trying a brighter version.',
+    status: 'in-progress',
+    submittedDate: '2026-05-08',
+    submittedDateDisplay: 'May 8',
+    updates: [
+      { who: 'Coleman', when: 'May 9', message: 'Looks good — uploading to Meta tonight.' },
+    ],
+  },
+  {
+    id: 'mreq-002',
+    type: 'add',
+    campaign: 'Title of campaign 2',
+    fileName: 'gym-rental-promo.mp4',
+    fileUrl: 'https://picsum.photos/seed/upload2/120/120',
+    note: 'New 15-second promo for gym rental.',
+    status: 'in-progress',
+    submittedDate: '2026-05-06',
+    submittedDateDisplay: 'May 6',
+    updates: [],
+  },
+  {
+    id: 'mreq-003',
+    type: 'budget',
+    campaign: 'Title of campaign 1',
+    currentSpend: '$465',
+    newSpend: '$600',
+    note: 'Cost per result is solid, want to scale.',
+    status: 'in-progress',
+    submittedDate: '2026-05-04',
+    submittedDateDisplay: 'May 4',
+    updates: [
+      { who: 'Coleman', when: 'May 5', message: 'Can you confirm the $600 is the new daily or monthly target?' },
+    ],
+  },
+  {
+    id: 'mreq-004',
+    type: 'replace',
+    campaign: 'Title of campaign 1',
+    creative: 'Creative 5',
+    fileName: 'court-action-shot.jpg',
+    fileUrl: 'https://picsum.photos/seed/upload3/120/120',
+    note: '',
+    status: 'completed',
+    submittedDate: '2026-04-22',
+    submittedDateDisplay: 'Apr 22',
+    updates: [
+      { who: 'Coleman', when: 'Apr 23', message: 'Swapped in. Performance is already up 8%.' },
+    ],
+  },
+  {
+    id: 'mreq-005',
+    type: 'budget',
+    campaign: 'Title of campaign 2',
+    currentSpend: '$150',
+    newSpend: '$200',
+    note: '',
+    status: 'completed',
+    submittedDate: '2026-04-14',
+    submittedDateDisplay: 'Apr 14',
+    updates: [
+      { who: 'Coleman', when: 'Apr 15', message: 'Budget updated.' },
+    ],
+  },
+];
+
+let _activeRequestId = null;
+
+function renderMarketingRequests() {
+  const pendingEl = document.getElementById('marketing-request-list-pending');
+  const completedEl = document.getElementById('marketing-request-list-completed');
+  if (!pendingEl || !completedEl) return;
+
+  const pending = MARKETING_REQUESTS.filter(r => r.status === 'in-progress');
+  const completed = MARKETING_REQUESTS.filter(r => r.status === 'completed' || r.status === 'cancelled');
+
+  pendingEl.innerHTML = pending.length
+    ? pending.map(_mreqRowHTML).join('')
+    : '<div class="req-empty">No pending requests. Use the campaign cards above to submit one.</div>';
+
+  completedEl.innerHTML = completed.length
+    ? completed.map(_mreqRowHTML).join('')
+    : '<div class="req-empty">No completed requests yet.</div>';
+}
+
+function _mreqRowHTML(r) {
+  const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
+  const statusLabel = MARKETING_STATUS_LABEL[r.status] || r.status;
+  const titleBit = r.creative ? `${meta.label} · ${r.creative}` : meta.label;
+  const subBit = r.campaign ? ` — ${r.campaign}` : '';
+  return `
+    <div class="mreq-row" onclick="openMarketingRequest('${r.id}')">
+      <div class="mreq-icon">${meta.icon}</div>
+      <div class="mreq-title">${escapeHTML(titleBit + subBit)}</div>
+      <span class="status-pill ${r.status}">${escapeHTML(statusLabel)}</span>
+      <div class="mreq-date">${escapeHTML(r.submittedDateDisplay)}</div>
+    </div>`;
+}
+
+function switchMarketingTab(tab, el) {
+  document.querySelectorAll('#marketing-list .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('marketing-request-list-pending').style.display   = (tab === 'pending'   ? 'block' : 'none');
+  document.getElementById('marketing-request-list-completed').style.display = (tab === 'completed' ? 'block' : 'none');
+}
+
+function openMarketingRequest(id) {
+  const r = MARKETING_REQUESTS.find(x => x.id === id);
+  if (!r) return;
+  _activeRequestId = id;
+
+  const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
+  const statusLabel = MARKETING_STATUS_LABEL[r.status] || r.status;
+
+  // Header
+  document.getElementById('reqDetailTitle').textContent =
+    r.creative ? `${meta.label} · ${r.creative}` : meta.label;
+  document.getElementById('reqDetailSub').textContent =
+    `${r.campaign || ''}  ·  Submitted ${r.submittedDateDisplay}`;
+  const pill = document.getElementById('reqDetailStatusPill');
+  pill.className = 'status-pill ' + r.status;
+  pill.textContent = statusLabel;
+
+  // "What you submitted" card
+  const submitted = document.getElementById('reqDetailSubmittedCard');
+  let html = '';
+  if (r.type === 'replace') {
+    html += `<div class="req-info-row"><div class="req-info-label">Replacing</div><div class="req-info-value">${escapeHTML(r.creative || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">File uploaded</div><div class="req-info-value" style="display:flex;align-items:center;gap:12px"><img class="req-info-thumb" src="${r.fileUrl}" alt="${escapeHTML(r.fileName)}"/><span>${escapeHTML(r.fileName)}</span></div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Note</div><div class="req-info-value">${r.note ? escapeHTML(r.note) : '<span style="color:var(--text-mute)">No note</span>'}</div></div>`;
+  } else if (r.type === 'add') {
+    html += `<div class="req-info-row"><div class="req-info-label">Campaign</div><div class="req-info-value">${escapeHTML(r.campaign || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">File uploaded</div><div class="req-info-value" style="display:flex;align-items:center;gap:12px"><img class="req-info-thumb" src="${r.fileUrl}" alt="${escapeHTML(r.fileName)}"/><span>${escapeHTML(r.fileName)}</span></div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Note</div><div class="req-info-value">${r.note ? escapeHTML(r.note) : '<span style="color:var(--text-mute)">No note</span>'}</div></div>`;
+  } else if (r.type === 'remove') {
+    html += `<div class="req-info-row"><div class="req-info-label">Removing</div><div class="req-info-value">${escapeHTML(r.creative || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Campaign</div><div class="req-info-value">${escapeHTML(r.campaign || '')}</div></div>`;
+  } else if (r.type === 'budget') {
+    html += `<div class="req-info-row"><div class="req-info-label">Campaign</div><div class="req-info-value">${escapeHTML(r.campaign || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Current spend</div><div class="req-info-value">${escapeHTML(r.currentSpend || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">New spend</div><div class="req-info-value" style="color:var(--gold);font-weight:600">${escapeHTML(r.newSpend || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Reason</div><div class="req-info-value">${r.note ? escapeHTML(r.note) : '<span style="color:var(--text-mute)">Not provided</span>'}</div></div>`;
+  } else if (r.type === 'campaign-create') {
+    html += `<div class="req-info-row"><div class="req-info-label">Offer</div><div class="req-info-value">${escapeHTML(r.offer || '')}${r.isNewOffer ? ' <span style="color:var(--gold);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin-left:6px">New offer</span>' : ''}</div></div>`;
+    if (r.isNewOffer && r.newOfferDescription) {
+      html += `<div class="req-info-row"><div class="req-info-label">Description</div><div class="req-info-value">${escapeHTML(r.newOfferDescription)}</div></div>`;
+    }
+    html += `<div class="req-info-row"><div class="req-info-label">Monthly spend</div><div class="req-info-value" style="color:var(--gold);font-weight:600">${escapeHTML(r.budget || '')}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Landing page</div><div class="req-info-value">${r.landingPage ? `<a href="${escapeHTML(r.landingPage)}" target="_blank" style="color:var(--gold);text-decoration:none">${escapeHTML(r.landingPage)} ↗</a>` : '<span style="color:var(--text-mute)">Using default funnel</span>'}</div></div>`;
+    const filesList = (r.fileNames || []).length
+      ? r.fileNames.map(n => escapeHTML(n)).join('<br>')
+      : '<span style="color:var(--text-mute)">No files</span>';
+    html += `<div class="req-info-row"><div class="req-info-label">Assets</div><div class="req-info-value">${filesList}</div></div>`;
+  }
+  submitted.innerHTML = html;
+
+  // "Updates" card
+  const updatesEl = document.getElementById('reqDetailUpdatesCard');
+  updatesEl.innerHTML = r.updates && r.updates.length
+    ? r.updates.map(u => `
+        <div class="req-update-item">
+          <div class="req-update-meta">${escapeHTML(u.when)} · ${escapeHTML(u.who)}</div>
+          <div class="req-update-message">${escapeHTML(u.message)}</div>
+        </div>`).join('')
+    : '<div class="req-empty">No updates yet — your account manager will respond shortly.</div>';
+
+  // Hide Edit + Cancel buttons for completed/cancelled requests
+  const actionsBar = document.getElementById('reqDetailActions');
+  if (actionsBar) {
+    actionsBar.style.display = (r.status === 'completed' || r.status === 'cancelled') ? 'none' : 'flex';
+  }
+
+  // Show detail, hide list and campaign detail
+  document.getElementById('marketing-list').style.display = 'none';
+  document.getElementById('marketing-detail').style.display = 'none';
+  document.getElementById('marketing-request-detail').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+
+function closeMarketingRequest() {
+  _activeRequestId = null;
+  document.getElementById('marketing-request-detail').style.display = 'none';
+  document.getElementById('marketing-detail').style.display = 'none';
+  document.getElementById('marketing-list').style.display = 'block';
+}
+
+function editMarketingRequest() {
+  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
+  if (!r) return;
+  if (r.type === 'budget') {
+    openBudgetModal();
+    // Prefill current with the original current spend
+    const cur = document.getElementById('budgetModalCurrent');
+    const input = document.getElementById('budgetModalInput');
+    const reason = document.getElementById('budgetModalReason');
+    if (cur) cur.textContent = r.currentSpend || '';
+    if (input) input.value = (r.newSpend || '').replace(/^\$/, '');
+    if (reason) reason.value = r.note || '';
+  } else if (r.type === 'replace') {
+    document.getElementById('replaceCurrentImg').src = r.fileUrl || '';
+    document.getElementById('replaceCurrentName').textContent = 'Editing replacement for ' + (r.creative || 'creative');
+    const note = document.getElementById('replaceNote');
+    if (note) note.value = r.note || '';
+    document.getElementById('replaceModal').style.display = 'flex';
+  } else if (r.type === 'add') {
+    const note = document.getElementById('addCreativeNote');
+    if (note) note.value = r.note || '';
+    document.getElementById('addCreativeModal').style.display = 'flex';
+  } else {
+    showConfirmation('Edit not available', 'This request type can\'t be edited. To make changes, cancel it and submit a new one.');
+  }
+}
+
+/* Cancel request flow */
+function openCancelRequestModal() {
+  document.getElementById('cancelRequestModal').style.display = 'flex';
+}
+function closeCancelRequestModal() {
+  document.getElementById('cancelRequestModal').style.display = 'none';
+}
+/* ════════════════════════════════
+   MARKETING — New campaign wizard
+   ════════════════════════════════ */
+
+const WIZARD_PATH_PREDEFINED = ['offer-select', 'guide-card', 'asset-upload', 'budget', 'landing-page', 'success'];
+const WIZARD_PATH_NEW_OFFER  = ['offer-select', 'new-offer-form', 'asset-upload', 'budget', 'landing-page', 'success'];
+
+let _wizard = null;
+
+function _wizardInitState() {
+  _wizard = {
+    path: WIZARD_PATH_PREDEFINED,
+    stepIdx: 0,
+    selectedOffer: null,
+    newOfferName: '',
+    newOfferDescription: '',
+    files: [],
+    budget: '',
+    landingPage: '',
+  };
+}
+
+function openNewCampaignWizard() {
+  _wizardInitState();
+  document.getElementById('marketing-list').style.display = 'none';
+  document.getElementById('marketing-detail').style.display = 'none';
+  document.getElementById('marketing-request-detail').style.display = 'none';
+  document.getElementById('marketing-new-campaign').style.display = 'block';
+  _renderWizardStep();
+  // Reset form fields
+  const offerSearch = document.getElementById('wizardOfferSearch');
+  const newName = document.getElementById('wizardNewOfferName');
+  const newDesc = document.getElementById('wizardNewOfferDesc');
+  const budgetInput = document.getElementById('wizardBudgetInput');
+  const landingInput = document.getElementById('wizardLandingInput');
+  const filesList = document.getElementById('wizardFilesList');
+  const assetInput = document.getElementById('wizardAssetInput');
+  if (offerSearch) offerSearch.value = '';
+  if (newName) newName.value = '';
+  if (newDesc) newDesc.value = '';
+  if (budgetInput) budgetInput.value = '';
+  if (landingInput) landingInput.value = '';
+  if (filesList) filesList.innerHTML = '';
+  if (assetInput) assetInput.value = '';
+  filterWizardOffers('');
+  window.scrollTo(0, 0);
+}
+
+function closeNewCampaignWizard() {
+  document.getElementById('marketing-new-campaign').style.display = 'none';
+  document.getElementById('marketing-list').style.display = 'block';
+  _wizard = null;
+}
+
+function _renderWizardStep() {
+  if (!_wizard) return;
+  const currentStep = _wizard.path[_wizard.stepIdx];
+  document.querySelectorAll('#marketing-new-campaign .wizard-step').forEach(el => {
+    el.classList.toggle('active', el.dataset.wstep === currentStep);
+  });
+
+  // Progress (1-indexed for display, but progress fill includes success step)
+  const totalSteps = _wizard.path.length - 1; // exclude success from progress
+  const stepDisplayIdx = Math.min(_wizard.stepIdx + 1, totalSteps);
+  const pct = Math.min(100, Math.round((_wizard.stepIdx / Math.max(1, totalSteps - 1)) * 100));
+  const fill = document.getElementById('wizardProgressFill');
+  if (fill) fill.style.width = (currentStep === 'success' ? 100 : pct) + '%';
+
+  const STEP_LABELS = {
+    'offer-select':   'Pick an offer',
+    'new-offer-form': 'New offer details',
+    'guide-card':     'Creation guide',
+    'asset-upload':   'Upload assets',
+    'budget':         'Monthly spend',
+    'landing-page':   'Landing page',
+    'success':        'Submitted',
+  };
+  const stepLabel = document.getElementById('wizardStepLabel');
+  if (stepLabel) {
+    if (currentStep === 'success') {
+      stepLabel.textContent = '✓ Done';
+    } else {
+      stepLabel.textContent = `Step ${stepDisplayIdx} of ${totalSteps} · ${STEP_LABELS[currentStep] || ''}`;
+    }
+  }
+  window.scrollTo(0, 0);
+}
+
+function wizardGoToStep(stepName) {
+  if (!_wizard) return;
+  const idx = _wizard.path.indexOf(stepName);
+  if (idx === -1) return;
+  _wizard.stepIdx = idx;
+  _renderWizardStep();
+}
+
+function wizardGoBack() {
+  if (!_wizard) return;
+  if (_wizard.stepIdx > 0) {
+    _wizard.stepIdx--;
+    _renderWizardStep();
+  } else {
+    closeNewCampaignWizard();
+  }
+}
+
+function filterWizardOffers(query) {
+  const q = (query || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#wizardOfferGrid .wizard-offer-card');
+  let visible = 0;
+  cards.forEach(c => {
+    const offer = (c.dataset.offer || '').toLowerCase();
+    const match = !q || offer.includes(q);
+    c.classList.toggle('hidden', !match);
+    if (match) visible++;
+  });
+  const empty = document.getElementById('wizardOfferEmpty');
+  if (empty) empty.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function wizardSelectOffer(offerName) {
+  if (!_wizard) return;
+  _wizard.path = WIZARD_PATH_PREDEFINED;
+  _wizard.selectedOffer = offerName;
+  _wizard.newOfferName = '';
+  _wizard.newOfferDescription = '';
+  // Populate guide card with offer title
+  const titleEl = document.getElementById('wizardGuideOfferTitle');
+  if (titleEl) titleEl.textContent = offerName;
+  wizardGoToStep('guide-card');
+}
+
+function wizardGoToNewOfferForm() {
+  if (!_wizard) return;
+  _wizard.path = WIZARD_PATH_NEW_OFFER;
+  _wizard.selectedOffer = null;
+  wizardGoToStep('new-offer-form');
+}
+
+function wizardSubmitNewOfferForm() {
+  if (!_wizard) return;
+  const name = (document.getElementById('wizardNewOfferName')?.value || '').trim();
+  const desc = (document.getElementById('wizardNewOfferDesc')?.value || '').trim();
+  if (!name) { alert('Give your new offer a name.'); return; }
+  if (!desc) { alert('Add a short description so your account manager has context.'); return; }
+  _wizard.newOfferName = name;
+  _wizard.newOfferDescription = desc;
+  wizardGoToStep('asset-upload');
+}
+
+function wizardAddFiles(filesList) {
+  if (!_wizard) return;
+  const incoming = Array.from(filesList || []);
+  if (!incoming.length) return;
+  const room = 10 - _wizard.files.length;
+  if (room <= 0) {
+    alert('You can upload up to 10 files. Remove one to add another.');
+    return;
+  }
+  if (incoming.length > room) {
+    alert(`You can upload up to 10 files total. Adding the first ${room}.`);
+  }
+  _wizard.files = _wizard.files.concat(incoming.slice(0, room));
+  _renderWizardFilesList();
+  // Reset input so the same file can be re-selected later if removed
+  const input = document.getElementById('wizardAssetInput');
+  if (input) input.value = '';
+}
+
+function wizardRemoveFile(idx) {
+  if (!_wizard) return;
+  _wizard.files.splice(idx, 1);
+  _renderWizardFilesList();
+}
+
+function _renderWizardFilesList() {
+  const listEl = document.getElementById('wizardFilesList');
+  const continueBtn = document.getElementById('wizardAssetsContinueBtn');
+  if (!listEl || !_wizard) return;
+  if (!_wizard.files.length) {
+    listEl.innerHTML = '';
+    if (continueBtn) continueBtn.disabled = true;
+    return;
+  }
+  listEl.innerHTML = _wizard.files.map((f, i) => {
+    const isImage = (f.type || '').startsWith('image/');
+    const thumb = isImage
+      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+      : `<div class="wizard-file-thumb">🎬</div>`;
+    const sizeKB = (f.size / 1024).toFixed(0);
+    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+    return `
+      <div class="wizard-file-item">
+        ${thumb}
+        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+        <div class="wizard-file-size">${sizeLabel}</div>
+        <button class="wizard-file-remove" onclick="wizardRemoveFile(${i})" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+  if (continueBtn) continueBtn.disabled = false;
+}
+
+function wizardSubmitBudget() {
+  if (!_wizard) return;
+  const value = (document.getElementById('wizardBudgetInput')?.value || '').trim();
+  if (!value) { alert('Enter a monthly spend.'); return; }
+  _wizard.budget = value.startsWith('$') ? value : ('$' + value.replace(/[^0-9.,]/g, ''));
+  wizardGoToStep('landing-page');
+}
+
+function wizardSubmitFinal(skipped) {
+  if (!_wizard) return;
+  const landingVal = (document.getElementById('wizardLandingInput')?.value || '').trim();
+  _wizard.landingPage = skipped ? '' : landingVal;
+
+  const offerLabel = _wizard.selectedOffer || _wizard.newOfferName || 'New offer';
+  const newReq = {
+    id: 'mreq-' + Date.now(),
+    type: 'campaign-create',
+    campaign: offerLabel,
+    offer: offerLabel,
+    isNewOffer: !_wizard.selectedOffer,
+    newOfferDescription: _wizard.newOfferDescription || '',
+    fileNames: _wizard.files.map(f => f.name),
+    budget: _wizard.budget,
+    landingPage: _wizard.landingPage,
+    note: '',
+    status: 'in-progress',
+    submittedDate: _todayISO(),
+    submittedDateDisplay: _todayDisplay(),
+    updates: [],
+  };
+  MARKETING_REQUESTS.unshift(newReq);
+  renderMarketingRequests();
+
+  // Update success copy
+  const t = document.getElementById('wizardSuccessTitle');
+  const s = document.getElementById('wizardSuccessSub');
+  if (t) t.textContent = 'Campaign request submitted';
+  if (s) s.textContent = `Your account manager will build the "${offerLabel}" campaign and launch it within 1-2 business days. Track progress in "What's in flight" on the campaigns page.`;
+
+  wizardGoToStep('success');
+}
+
+function _todayISO() {
+  return new Date().toISOString().split('T')[0];
+}
+function _todayDisplay() {
+  return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function confirmCancelRequest() {
+  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
+  if (r) r.status = 'cancelled';
+  closeCancelRequestModal();
+  closeMarketingRequest();
+  renderMarketingRequests();
+  showConfirmation('Request cancelled', 'Your account manager has been notified to stop work on this request.');
 }
 
 /* ════════════════════════════════
@@ -3631,6 +5406,7 @@ _sb.auth.onAuthStateChange((event, _session) => {
 });
 
 boot();
+renderMarketingRequests();
 _attachPasteHandler('error-where',  'error-files');
 _attachPasteHandler('error-should', 'error-files');
 _attachPasteHandler('change-what',  'change-files');
@@ -3661,6 +5437,130 @@ function toggleTheme() {
   document.getElementById('themeToggleLabel').textContent = isLight ? 'Light mode' : 'Dark mode';
 }
 </script>
+
+<!-- ── Cancel request confirmation ── -->
+<div id="cancelRequestModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeCancelRequestModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Confirm</div>
+    <div class="modal-title">Cancel this request?</div>
+    <div class="modal-sub">Your account manager will be told to stop work on this. You can always submit a new request later.</div>
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeCancelRequestModal()">Keep it</button>
+      <button class="btn-modal-danger" onclick="confirmCancelRequest()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirmation popup (reused by all 4 actions) ── -->
+<div id="confirmationModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeConfirmationModal()">
+  <div class="modal-card confirmation-card" onclick="event.stopPropagation()">
+    <div class="confirmation-icon">✓</div>
+    <div class="modal-title" id="confirmationTitle">Request submitted</div>
+    <div class="modal-sub" id="confirmationSub" style="margin-bottom:0">Your account manager will follow up shortly.</div>
+    <div class="modal-footer" style="justify-content:center;margin-top:22px">
+      <button class="btn-modal-primary" onclick="closeConfirmationModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Replace creative modal ── -->
+<div id="replaceModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeReplaceModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Request</div>
+    <div class="modal-title">Replace creative</div>
+    <div class="modal-sub">Your account manager will upload the new file and swap it into your campaign.</div>
+
+    <div class="replace-current">
+      <img id="replaceCurrentImg" class="replace-current-img" src="" alt="" />
+      <div class="replace-current-name" id="replaceCurrentName">Replacing creative</div>
+    </div>
+
+    <label class="modal-label">Upload replacement</label>
+    <label for="replaceFileInput" class="file-drop-label">
+      <span class="file-drop-icon">↑</span>
+      <span class="file-drop-text">Click to upload an image or video</span>
+      <span class="file-drop-meta">JPG · PNG · MP4 · MOV</span>
+    </label>
+    <input type="file" id="replaceFileInput" accept="image/*,video/*" style="display:none" onchange="_onFileSelected(this, 'replaceFileName')" />
+    <div class="file-name" id="replaceFileName"></div>
+
+    <label class="modal-label" for="replaceNote">Note (optional)</label>
+    <textarea id="replaceNote" class="modal-textarea" placeholder="Any context for your account manager?"></textarea>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeReplaceModal()">Cancel</button>
+      <button class="btn-modal-primary" onclick="submitReplace()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Remove creative modal ── -->
+<div id="removeModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeRemoveModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Confirm</div>
+    <div class="modal-title">Remove this creative?</div>
+    <div class="modal-sub">This creative will stop running in your campaign. Your account manager will action this within 1 business day. This can be undone.</div>
+
+    <div class="replace-current">
+      <img id="removeCurrentImg" class="replace-current-img" src="" alt="" />
+      <div class="replace-current-name" id="removeCurrentName">Creative</div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeRemoveModal()">Cancel</button>
+      <button class="btn-modal-danger" onclick="confirmRemove()">Yes, Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add new creative modal ── -->
+<div id="addCreativeModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeAddCreativeModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Request</div>
+    <div class="modal-title">Add new creative</div>
+    <div class="modal-sub">Upload a new image or video. Your account manager will add it to your campaign.</div>
+
+    <label class="modal-label">Upload creative</label>
+    <label for="addCreativeFileInput" class="file-drop-label">
+      <span class="file-drop-icon">↑</span>
+      <span class="file-drop-text">Click to upload an image or video</span>
+      <span class="file-drop-meta">JPG · PNG · MP4 · MOV</span>
+    </label>
+    <input type="file" id="addCreativeFileInput" accept="image/*,video/*" style="display:none" onchange="_onFileSelected(this, 'addCreativeFileName')" />
+    <div class="file-name" id="addCreativeFileName"></div>
+
+    <label class="modal-label" for="addCreativeNote">Note (optional)</label>
+    <textarea id="addCreativeNote" class="modal-textarea" placeholder="Any context for your account manager?"></textarea>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeAddCreativeModal()">Cancel</button>
+      <button class="btn-modal-primary" onclick="submitAddCreative()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Budget change modal ── -->
+<div id="budgetModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeBudgetModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Request</div>
+    <div class="modal-title">Change monthly spend</div>
+    <div class="modal-sub">Your account manager will review and update the campaign for you. No change happens automatically.</div>
+
+    <label class="modal-label">Current monthly spend</label>
+    <div class="modal-current" id="budgetModalCurrent">$465</div>
+
+    <label class="modal-label" for="budgetModalInput">New monthly spend</label>
+    <input type="text" id="budgetModalInput" class="modal-input" placeholder="e.g. $600" autocomplete="off" />
+
+    <label class="modal-label" for="budgetModalReason">Reason (optional)</label>
+    <textarea id="budgetModalReason" class="modal-textarea" placeholder="Why are you changing the budget?"></textarea>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeBudgetModal()">Cancel</button>
+      <button class="btn-modal-primary" onclick="submitBudgetChange()">Submit Request</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

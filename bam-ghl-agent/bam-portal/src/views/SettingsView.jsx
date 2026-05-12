@@ -4,6 +4,7 @@ import { fetchSlackStatus, disconnectSlack, getSlackOAuthUrl } from "../services
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useStaffMe } from '../hooks/useStaffMe';
 import { supabase } from '../lib/supabase';
+import { NewStaffModal } from '../components/StaffModals';
 
 const INTEGRATIONS = [
   { key: "ghl", label: "GoHighLevel", desc: "CRM, contacts, pipelines, conversations", endpoint: "/api/ghl?action=locations" },
@@ -26,6 +27,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
   const isMobile = useIsMobile();
   const me = useStaffMe(session);
   const [showNewClient, setShowNewClient] = useState(false);
+  const [showNewStaff, setShowNewStaff] = useState(false);
   // ─── Integration status ───
   const [integrationStatus, setIntegrationStatus] = useState({});
 
@@ -191,6 +193,22 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
               onClick={() => setShowNewClient(true)}
               style={{ padding: "8px 14px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
             >+ New client</button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Team (admin only) ═══ */}
+      {me?.role === "admin" && (
+        <div style={{ ...sectionStyle, animationDelay: "70ms" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+            <div>
+              <div style={sectionTitle}>Team</div>
+              <div style={{ fontSize: 13, color: tokens.textMute }}>Add new staff members and assign their role</div>
+            </div>
+            <button
+              onClick={() => setShowNewStaff(true)}
+              style={{ padding: "8px 14px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+            >+ Add staff member</button>
           </div>
         </div>
       )}
@@ -381,6 +399,14 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
           onClose={() => setShowNewClient(false)}
         />
       )}
+
+      {showNewStaff && (
+        <NewStaffModal
+          tokens={tokens}
+          session={session}
+          onClose={() => setShowNewStaff(false)}
+        />
+      )}
     </div>
   );
 }
@@ -470,3 +496,4 @@ function NewClientModal({ tokens, session, onClose }) {
     </div>
   );
 }
+

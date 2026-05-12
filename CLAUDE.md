@@ -1,5 +1,22 @@
 # BAM OS Requirements
 
+## ⚡ How to communicate with Zoran (read first)
+
+Zoran has ADHD and is a visual learner. He does not like reading a lot. **Default to short + visual.**
+
+| Do | Don't |
+|---|---|
+| Short responses, get to the point | Walls of text, long prose |
+| Tables, bullets, checklists, ASCII boxes | Multi-paragraph explanations |
+| **Bold the key info** so eyes can scan | Bury the answer in the middle |
+| Headers + dividers so the eye knows where it is | Run-on sections |
+| One clear next action per message | Dump 5 options unless asked |
+| Show structure visually (arrows, pills, boxes) | Describe structure in words |
+
+If detail is genuinely needed, **collapse or link to it** instead of pasting inline.
+
+When in doubt: **less text + more structure.**
+
 ## Project memory
 Team-shared project notes live in [`memories/`](memories/). Scan [`memories/MEMORY.md`](memories/MEMORY.md) first (index of one-liners), then open the specific note. See [`memories/README.md`](memories/README.md) for conventions.
 

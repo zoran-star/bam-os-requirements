@@ -9,6 +9,8 @@ const DEV_PERSONAS = {
   manager:  { id: "4fe042f4-d890-45c3-a55f-8d18423373dd", name: "Rosano (systems_manager)", role: "systems_manager",   email: "rarandila@gmail.com" },
   executor: { id: "6e876f7f-6e17-443d-a032-5f28fa0c908b", name: "Chris (systems_executor)", role: "systems_executor",  email: "mcdelostrinos@gmail.com" },
   jenny:    { id: "98694d3f-ad3c-4607-85a3-f3900789970a", name: "Jenny (systems_executor)", role: "systems_executor",  email: "jennybabeco@gmail.com" },
+  mkt_mgr:  { id: "dev-mkt-mgr",                           name: "Marketing Manager (dev)",  role: "marketing_manager", email: "marketing@bam.dev" },
+  mkt_exec: { id: "dev-mkt-exec",                          name: "Marketing Executor (dev)", role: "marketing_executor", email: "marketing-exec@bam.dev" },
 };
 
 export function useStaffMe(session) {

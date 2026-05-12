@@ -19,6 +19,9 @@ import CommunicationView from './views/CommunicationView';
 import SearchOverlay from './components/overlays/SearchOverlay';
 import SettingsView from './views/SettingsView';
 import SystemsView from './views/SystemsView';
+import MarketingView from './views/MarketingView';
+import TeamView from './views/TeamView';
+import ContentView from './views/ContentView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -71,6 +74,9 @@ export default function BAMPortal() {
 
   const me = useStaffMe(session);
   const canSeeSystems = me && (me.role === "admin" || me.role === "systems_manager" || me.role === "systems_executor");
+  const canSeeMarketing = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeTeam = me && me.role === "admin";
+  const canSeeContent = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
 
   useEffect(() => {
     if (me && (me.role === "systems_manager" || me.role === "systems_executor") && nav !== "systems" && nav !== "training") {
@@ -320,6 +326,9 @@ export default function BAMPortal() {
     financials: ["Financials", "BAM internal finances"],
     communication: ["Communication", "Slack channels & messages"],
     systems: ["Systems", "Ticket delegation & execution"],
+    marketing: ["Marketing", "Client ad-campaign tickets"],
+    content: ["Content", "Guide cards & ad creative content"],
+    team: ["Team", "Staff members & roles"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -333,6 +342,9 @@ export default function BAMPortal() {
     financials: IconFinancials,
     communication: IconMessage,
     systems: IconTasks,
+    marketing: IconFinancials,
+    content: IconKnowledge,
+    team: IconClients,
     training: IconTraining,
     settings: IconSettings,
   };
@@ -351,6 +363,9 @@ export default function BAMPortal() {
         { label: "Knowledge Base", key: "knowledge" },
         { label: "Financials", key: "financials" },
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
+        ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
+        ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
+        ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
 
@@ -358,8 +373,8 @@ export default function BAMPortal() {
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
       <DevRoleSwitcher session={session} />
 
-      {/* Global FAB: New ticket — visible to any logged-in staff at all times */}
-      {me && (
+      {/* FAB: New ticket — only visible on the Systems page */}
+      {me && nav === "systems" && (
         <button
           onClick={() => setShowNewTicket(true)}
           title="Create a new support ticket"
@@ -737,6 +752,15 @@ export default function BAMPortal() {
 
             {/* SYSTEMS */}
             {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
+
+            {/* MARKETING */}
+            {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} />}
+
+            {/* TEAM */}
+            {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
+
+            {/* CONTENT */}
+            {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
