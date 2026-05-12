@@ -49,16 +49,18 @@ async function resolveUser(req) {
   const user = await userRes.json();
   if (!user?.id) return { error: { status: 401, message: "invalid token" } };
 
-  const staffRows = await sb(`staff?user_id=eq.${user.id}&select=id,name,role,email`);
-  const staffRow = Array.isArray(staffRows) && staffRows[0];
-
-  let clientRow = null;
-  if (!staffRow) {
-    const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,name`);
-    clientRow = Array.isArray(clientRows) && clientRows[0];
+  // Resolve staff: try user_id first, fall back to email
+  let staffRows = await sb(`staff?user_id=eq.${user.id}&select=id,name,role,email,user_id`);
+  if ((!staffRows || !staffRows[0]) && user.email) {
+    staffRows = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role,email,user_id`);
   }
+  const staffRow = Array.isArray(staffRows) && staffRows[0] ? staffRows[0] : null;
 
-  return { user, staff: staffRow || null, client: clientRow || null };
+  // Always also resolve client (a user can be both)
+  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,name`);
+  const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
+
+  return { user, staff: staffRow, client: clientRow };
 }
 
 function canWrite(staff) {

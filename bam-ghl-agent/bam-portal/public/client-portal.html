@@ -3821,7 +3821,7 @@ async function _mreqPatchTicket(id, body) {
 
 async function _mreqFetchAll() {
   const token = await _mreqAuthToken();
-  const res = await fetch('/api/marketing-tickets', {
+  const res = await fetch('/api/marketing-tickets?scope=client', {
     headers: { 'Authorization': 'Bearer ' + token },
   });
   const json = await res.json();

@@ -58,18 +58,18 @@ async function resolveUser(req) {
   const user = await userRes.json();
   if (!user?.id) return { error: { status: 401, message: "invalid token" } };
 
-  // Resolve staff role
-  const staffRows = await sb(`staff?user_id=eq.${user.id}&select=id,name,role,email`);
-  const staffRow = Array.isArray(staffRows) && staffRows[0];
-
-  // Resolve client (if not staff)
-  let clientRow = null;
-  if (!staffRow) {
-    const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,name`);
-    clientRow = Array.isArray(clientRows) && clientRows[0];
+  // Resolve staff: try user_id first, fall back to email (handles legacy rows)
+  let staffRows = await sb(`staff?user_id=eq.${user.id}&select=id,name,role,email,user_id`);
+  if ((!staffRows || !staffRows[0]) && user.email) {
+    staffRows = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role,email,user_id`);
   }
+  const staffRow = Array.isArray(staffRows) && staffRows[0] ? staffRows[0] : null;
 
-  return { user, staff: staffRow || null, client: clientRow || null };
+  // Always also resolve client (a user can be both — used for client-context actions)
+  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,name`);
+  const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
+
+  return { user, staff: staffRow, client: clientRow };
 }
 
 async function enrichWithClient(tickets) {
@@ -104,23 +104,36 @@ export default async function handler(req, res) {
 
     // ─── GET ─────────────────────────────────────────────────────
     if (req.method === "GET") {
+      // Scope resolves which "view" we return when a user is dual-role.
+      // ?scope=staff  → return all (requires staff role)
+      // ?scope=client → return only own (requires client role)
+      // (no scope)    → default: staff if pure staff; otherwise client
+      const scope = req.query.scope;
+      let asStaff;
+      if (scope === "staff")  asStaff = isStaff;
+      else if (scope === "client") asStaff = false;
+      else                    asStaff = isStaff && !isClient;
+
       if (id) {
         const rows = await sb(`marketing_tickets?id=eq.${id}&select=*`);
         const ticket = rows?.[0];
         if (!ticket) return res.status(404).json({ error: "not found" });
-        if (isClient && ticket.client_id !== ctx.client.id) {
+        if (!asStaff && (!isClient || ticket.client_id !== ctx.client.id)) {
           return res.status(403).json({ error: "not your ticket" });
         }
-        const enriched = isStaff ? (await enrichWithClient([ticket]))[0] : ticket;
+        const enriched = asStaff ? (await enrichWithClient([ticket]))[0] : ticket;
         return res.status(200).json({ ticket: enriched });
       }
 
-      const filter = isStaff
-        ? ""
-        : `&client_id=eq.${ctx.client.id}`;
-      const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc${filter}`);
-      const out = isStaff ? await enrichWithClient(tickets || []) : (tickets || []);
-      return res.status(200).json({ tickets: out });
+      if (asStaff) {
+        const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc`);
+        const out = await enrichWithClient(tickets || []);
+        return res.status(200).json({ tickets: out });
+      }
+
+      if (!isClient) return res.status(403).json({ error: "not authorized for this scope" });
+      const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc&client_id=eq.${ctx.client.id}`);
+      return res.status(200).json({ tickets: tickets || [] });
     }
 
     // ─── POST (client creates) ───────────────────────────────────

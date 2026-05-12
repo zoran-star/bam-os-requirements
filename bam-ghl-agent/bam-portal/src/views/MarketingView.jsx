@@ -191,7 +191,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
       setFetchError("");
       try {
         const token = session?.access_token;
-        const res = await fetch("/api/marketing-tickets", {
+        const res = await fetch("/api/marketing-tickets?scope=staff", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json();
