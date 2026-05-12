@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const TYPE_META = {
-  replace: { icon: "🔄", label: "Replace creative" },
-  add:     { icon: "➕", label: "Add new creative" },
-  remove:  { icon: "🗑",  label: "Remove creative" },
-  budget:  { icon: "💰", label: "Budget change" },
+  replace:           { icon: "🔄", label: "Replace creative" },
+  add:               { icon: "➕", label: "Add new creative" },
+  remove:            { icon: "🗑",  label: "Remove creative" },
+  budget:            { icon: "💰", label: "Budget change" },
+  "campaign-create": { icon: "🚀", label: "New campaign" },
 };
 
 const STATUS_META = {
@@ -20,8 +21,56 @@ function needsContentCheckByType(type) {
   return CONTENT_TYPES.has(type);
 }
 
-// Sample tickets — mirrors the client portal data. Replace with Supabase fetch later.
-const SAMPLE_TICKETS = [
+// ─── Date formatters ───
+function formatDateLong(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function formatDateShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// Map API ticket shape (Supabase columns) → flat shape this view renders
+function normalizeTicket(apiTicket) {
+  const fields = apiTicket.fields || {};
+  const files = Array.isArray(apiTicket.files) ? apiTicket.files : [];
+  return {
+    id: apiTicket.id,
+    academyName: apiTicket.client?.name || "—",
+    campaignTitle: fields.campaign_title || "",
+    type: apiTicket.type,
+    creative: fields.creative_name,
+    fileName: files[0]?.name,
+    fileUrl: files[0]?.url,
+    fileNames: files.map(f => f.name).filter(Boolean),
+    files,
+    note: fields.note || "",
+    currentSpend: fields.current_spend,
+    newSpend: fields.new_spend,
+    offer: fields.offer,
+    isNewOffer: fields.is_new_offer,
+    newOfferDescription: fields.new_offer_description,
+    budget: fields.monthly_spend,
+    landingPage: fields.landing_page,
+    status: apiTicket.status,
+    contentCheckStatus: apiTicket.content_check_status,
+    clientActionStatus: apiTicket.client_action_status,
+    submittedDate: formatDateLong(apiTicket.submitted_at),
+    updates: (apiTicket.messages || []).map(m => ({
+      who: m.author_name || (m.author_type === "staff" ? "Staff" : "Client"),
+      when: formatDateShort(m.created_at),
+      message: m.body || "",
+      isActionRequest: !!m.is_action_request,
+    })),
+    _raw: apiTicket,
+  };
+}
+
+// Reference data only — replaced by live API fetch
+const SAMPLE_TICKETS_UNUSED_ = [
   {
     id: "mt-001",
     academyName: "BAM GTA",
@@ -123,13 +172,41 @@ const SAMPLE_TICKETS = [
   },
 ];
 
-export default function MarketingView({ tokens: tk, dark, me }) {
+export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [tab, setTab] = useState("active"); // active | content-check | client-action | completed
-  const [tickets, setTickets] = useState(SAMPLE_TICKETS);
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
   const [banner, setBanner] = useState(null); // { type, text }
+
+  // ─── Fetch tickets on mount ───
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setFetchError("");
+      try {
+        const token = session?.access_token;
+        const res = await fetch("/api/marketing-tickets", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        if (!cancelled) {
+          setTickets((json.tickets || []).map(normalizeTicket));
+        }
+      } catch (e) {
+        if (!cancelled) setFetchError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
 
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
@@ -149,37 +226,64 @@ export default function MarketingView({ tokens: tk, dark, me }) {
     setTimeout(() => setBanner(null), 3500);
   };
 
-  const markCompleted = () => {
-    if (!selected) return;
-    setTickets(prev => prev.map(t => t.id === selected.id ? {
-      ...t,
-      status: "completed",
-      updates: [...(t.updates || []), { who: me?.name || "Staff", when: "Just now", message: "Marked completed." }],
-    } : t));
-    setSelectedId(null);
-    showBanner("success", `Ticket for ${selected.academyName} marked completed.`);
+  const _patchTicket = async (id, body) => {
+    const token = session?.access_token;
+    const res = await fetch(`/api/marketing-tickets?id=${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return normalizeTicket({ ...json.ticket, client: selected._raw?.client || null });
   };
 
-  const approveContent = () => {
-    if (!selected) return;
-    setTickets(prev => prev.map(t => t.id === selected.id ? {
-      ...t,
-      contentCheckStatus: "approved",
-      updates: [...(t.updates || []), { who: me?.name || "Staff", when: "Just now", message: "Content approved." }],
-    } : t));
-    showBanner("success", `Content approved for ${selected.academyName}.`);
+  const markCompleted = async () => {
+    if (!selected || actionBusy) return;
+    setActionBusy(true);
+    try {
+      const updated = await _patchTicket(selected.id, { action: "mark-completed" });
+      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
+      setSelectedId(null);
+      showBanner("success", `Ticket for ${selected.academyName} marked completed.`);
+    } catch (e) {
+      showBanner("error", "Mark completed failed: " + e.message);
+    } finally {
+      setActionBusy(false);
+    }
   };
 
-  const submitActionRequest = () => {
-    if (!selected || !actionMessage.trim()) return;
-    setTickets(prev => prev.map(t => t.id === selected.id ? {
-      ...t,
-      clientActionStatus: "requested",
-      updates: [...(t.updates || []), { who: me?.name || "Staff", when: "Just now", message: actionMessage.trim(), isActionRequest: true }],
-    } : t));
-    setActionMessage("");
-    setActionModalOpen(false);
-    showBanner("success", `Action request sent to ${selected.academyName}.`);
+  const approveContent = async () => {
+    if (!selected || actionBusy) return;
+    setActionBusy(true);
+    try {
+      const updated = await _patchTicket(selected.id, { action: "approve-content" });
+      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
+      showBanner("success", `Content approved for ${selected.academyName}.`);
+    } catch (e) {
+      showBanner("error", "Approve failed: " + e.message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const submitActionRequest = async () => {
+    if (!selected || !actionMessage.trim() || actionBusy) return;
+    setActionBusy(true);
+    try {
+      const updated = await _patchTicket(selected.id, {
+        action: "request-client-action",
+        message: actionMessage.trim(),
+      });
+      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
+      setActionMessage("");
+      setActionModalOpen(false);
+      showBanner("success", `Action request sent to ${selected.academyName}.`);
+    } catch (e) {
+      showBanner("error", "Send failed: " + e.message);
+    } finally {
+      setActionBusy(false);
+    }
   };
 
   // ─────────────────────── Detail view ───────────────────────
@@ -330,9 +434,17 @@ export default function MarketingView({ tokens: tk, dark, me }) {
 
       {/* Rows */}
       <Card tk={tk} style={{ padding: "4px 0" }}>
-        {rows.length === 0 ? (
+        {loading ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13 }}>
+            Loading marketing tickets…
+          </div>
+        ) : fetchError ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.red || "#ED7969", fontSize: 13 }}>
+            ⚠ {fetchError}
+          </div>
+        ) : rows.length === 0 ? (
           <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13, fontStyle: "italic" }}>
-            No {tab === "active" ? "active" : "completed"} tickets.
+            No tickets in this view.
           </div>
         ) : rows.map(t => {
           const typeMeta = TYPE_META[t.type] || { icon: "•", label: "Request" };
@@ -486,6 +598,24 @@ function renderSubmittedInfo(t, tk) {
     rows.push(["Current spend", t.currentSpend || ""]);
     rows.push(["New spend", <span style={{ color: tk.accent, fontWeight: 600 }}>{t.newSpend || ""}</span>]);
     rows.push(["Reason", t.note ? t.note : <span style={{ color: tk.textMute }}>Not provided</span>]);
+  } else if (t.type === "campaign-create") {
+    rows.push(["Offer", <span>{t.offer || ""}{t.isNewOffer ? <span style={{ marginLeft: 8, color: tk.accent, fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase" }}>New offer</span> : null}</span>]);
+    if (t.isNewOffer && t.newOfferDescription) {
+      rows.push(["Description", t.newOfferDescription]);
+    }
+    rows.push(["Monthly spend", <span style={{ color: tk.accent, fontWeight: 600 }}>{t.budget || ""}</span>]);
+    rows.push(["Landing page", t.landingPage
+      ? <a href={t.landingPage} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.landingPage} ↗</a>
+      : <span style={{ color: tk.textMute }}>Using default funnel</span>]);
+    rows.push(["Files", t.files && t.files.length
+      ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {t.files.map((f, i) => (
+            <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: tk.text, fontSize: 12, padding: "4px 10px", borderRadius: 6, background: tk.surfaceHov || "rgba(255,255,255,0.04)", textDecoration: "none" }}>{f.name} ↗</a>
+          ))}
+        </div>
+      )
+      : <span style={{ color: tk.textMute }}>No files</span>]);
   }
 
   return rows.map(([label, value], i) => (

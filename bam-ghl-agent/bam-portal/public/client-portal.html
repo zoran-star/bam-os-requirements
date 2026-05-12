@@ -3170,7 +3170,6 @@
           </div>
 
           <div id="reqDetailActions" style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn-modal-secondary" onclick="editMarketingRequest()">Edit Request</button>
             <button class="btn-modal-danger" onclick="openCancelRequestModal()">Cancel Request</button>
           </div>
 
@@ -3503,6 +3502,9 @@ function switchView(name, el) {
 
   // When leaving Marketing, reset to list view
   if (name !== 'marketing') closeCampaignDetail();
+
+  // When entering Marketing, refresh tickets from the API
+  if (name === 'marketing') fetchAndRenderMarketingRequests();
 }
 
 /* ════════════════════════════════
@@ -3560,17 +3562,33 @@ function closeBudgetModal() {
   if (reason) reason.value = '';
 }
 
-function submitBudgetChange() {
-  const newBudget = document.getElementById('budgetModalInput')?.value?.trim();
-  if (!newBudget) {
-    alert('Enter a new monthly spend.');
-    return;
+async function submitBudgetChange() {
+  const newBudgetRaw = document.getElementById('budgetModalInput')?.value?.trim();
+  const reason = document.getElementById('budgetModalReason')?.value?.trim() || '';
+  if (!newBudgetRaw) { alert('Enter a new monthly spend.'); return; }
+  const newBudget = newBudgetRaw.startsWith('$') ? newBudgetRaw : ('$' + newBudgetRaw.replace(/[^0-9.,]/g, ''));
+  const currentSpend = document.getElementById('budgetModalCurrent')?.textContent?.trim() || '';
+  const submitBtn = document.querySelector('#budgetModal .btn-modal-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
+  try {
+    await _mreqCreateTicket({
+      type: 'budget',
+      fields: {
+        campaign_title: _detailCampaignTitle(),
+        current_spend: currentSpend,
+        new_spend: newBudget,
+        note: reason,
+      },
+      files: [],
+    });
+    closeBudgetModal();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Budget change requested', 'Your account manager will review and update your campaign within 1 business day.');
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
   }
-  closeBudgetModal();
-  showConfirmation(
-    'Budget change requested',
-    'Your account manager will review and update your campaign within 1 business day.'
-  );
 }
 
 /* ── Generic confirmation popup ── */
@@ -3632,18 +3650,32 @@ function closeReplaceModal() {
   _pendingCreative = null;
 }
 
-function submitReplace() {
+async function submitReplace() {
   const file = document.getElementById('replaceFileInput')?.files?.[0];
-  if (!file) {
-    alert('Choose a file to upload.');
-    return;
-  }
+  const note = document.getElementById('replaceNote')?.value?.trim() || '';
+  if (!file) { alert('Choose a file to upload.'); return; }
   const creativeName = _pendingCreative?.name || 'creative';
-  closeReplaceModal();
-  showConfirmation(
-    'Replace requested',
-    'We received ' + file.name + '. Your account manager will swap it in for ' + creativeName + ' within 1 business day.'
-  );
+  const submitBtn = document.querySelector('#replaceModal .btn-modal-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Uploading…'; }
+  try {
+    const uploaded = await _mreqUploadFiles([file]);
+    await _mreqCreateTicket({
+      type: 'replace',
+      fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName, note },
+      files: uploaded,
+    });
+    closeReplaceModal();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Replace requested', 'We received ' + file.name + '. Your account manager will swap it in for ' + creativeName + ' within 1 business day.');
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
+  }
+}
+
+function _detailCampaignTitle() {
+  return document.getElementById('detail-campaign-title')?.textContent?.trim() || '';
 }
 
 // REMOVE
@@ -3660,13 +3692,24 @@ function closeRemoveModal() {
   _pendingCreative = null;
 }
 
-function confirmRemove() {
+async function confirmRemove() {
   const creativeName = _pendingCreative?.name || 'creative';
-  closeRemoveModal();
-  showConfirmation(
-    'Remove requested',
-    'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.'
-  );
+  const removeBtn = document.querySelector('#removeModal .btn-modal-danger');
+  if (removeBtn) { removeBtn.disabled = true; removeBtn.textContent = 'Submitting…'; }
+  try {
+    await _mreqCreateTicket({
+      type: 'remove',
+      fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName },
+      files: [],
+    });
+    closeRemoveModal();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Remove requested', 'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.');
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    if (removeBtn) { removeBtn.disabled = false; removeBtn.textContent = 'Yes, Remove'; }
+  }
 }
 
 // ADD NEW CREATIVE
@@ -3684,17 +3727,27 @@ function closeAddCreativeModal() {
   if (note) note.value = '';
 }
 
-function submitAddCreative() {
+async function submitAddCreative() {
   const file = document.getElementById('addCreativeFileInput')?.files?.[0];
-  if (!file) {
-    alert('Choose a file to upload.');
-    return;
+  const note = document.getElementById('addCreativeNote')?.value?.trim() || '';
+  if (!file) { alert('Choose a file to upload.'); return; }
+  const submitBtn = document.querySelector('#addCreativeModal .btn-modal-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Uploading…'; }
+  try {
+    const uploaded = await _mreqUploadFiles([file]);
+    await _mreqCreateTicket({
+      type: 'add',
+      fields: { campaign_title: _detailCampaignTitle(), note },
+      files: uploaded,
+    });
+    closeAddCreativeModal();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('New creative requested', 'We received ' + file.name + '. Your account manager will add it to your campaign within 1 business day.');
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
   }
-  closeAddCreativeModal();
-  showConfirmation(
-    'New creative requested',
-    'We received ' + file.name + '. Your account manager will add it to your campaign within 1 business day.'
-  );
 }
 
 /* ════════════════════════════════
@@ -3717,79 +3770,119 @@ const MARKETING_STATUS_LABEL = {
   'cancelled':    'Cancelled',
 };
 
-// Sample data — replace with backend later
-let MARKETING_REQUESTS = [
-  {
-    id: 'mreq-001',
-    type: 'replace',
-    campaign: 'Title of campaign 1',
-    creative: 'Creative 3',
-    fileName: 'summer-trial-v2.jpg',
-    fileUrl: 'https://picsum.photos/seed/upload1/120/120',
-    note: 'This one isn\'t getting many clicks. Trying a brighter version.',
-    status: 'in-progress',
-    submittedDate: '2026-05-08',
-    submittedDateDisplay: 'May 8',
-    updates: [
-      { who: 'Coleman', when: 'May 9', message: 'Looks good — uploading to Meta tonight.' },
-    ],
-  },
-  {
-    id: 'mreq-002',
-    type: 'add',
-    campaign: 'Title of campaign 2',
-    fileName: 'gym-rental-promo.mp4',
-    fileUrl: 'https://picsum.photos/seed/upload2/120/120',
-    note: 'New 15-second promo for gym rental.',
-    status: 'in-progress',
-    submittedDate: '2026-05-06',
-    submittedDateDisplay: 'May 6',
-    updates: [],
-  },
-  {
-    id: 'mreq-003',
-    type: 'budget',
-    campaign: 'Title of campaign 1',
-    currentSpend: '$465',
-    newSpend: '$600',
-    note: 'Cost per result is solid, want to scale.',
-    status: 'in-progress',
-    submittedDate: '2026-05-04',
-    submittedDateDisplay: 'May 4',
-    updates: [
-      { who: 'Coleman', when: 'May 5', message: 'Can you confirm the $600 is the new daily or monthly target?' },
-    ],
-  },
-  {
-    id: 'mreq-004',
-    type: 'replace',
-    campaign: 'Title of campaign 1',
-    creative: 'Creative 5',
-    fileName: 'court-action-shot.jpg',
-    fileUrl: 'https://picsum.photos/seed/upload3/120/120',
-    note: '',
-    status: 'completed',
-    submittedDate: '2026-04-22',
-    submittedDateDisplay: 'Apr 22',
-    updates: [
-      { who: 'Coleman', when: 'Apr 23', message: 'Swapped in. Performance is already up 8%.' },
-    ],
-  },
-  {
-    id: 'mreq-005',
-    type: 'budget',
-    campaign: 'Title of campaign 2',
-    currentSpend: '$150',
-    newSpend: '$200',
-    note: '',
-    status: 'completed',
-    submittedDate: '2026-04-14',
-    submittedDateDisplay: 'Apr 14',
-    updates: [
-      { who: 'Coleman', when: 'Apr 15', message: 'Budget updated.' },
-    ],
-  },
-];
+// ── API helpers (live from /api/marketing-tickets) ──
+async function _mreqAuthToken() {
+  const { data: { session } } = await _sb.auth.getSession();
+  if (!session?.access_token) throw new Error('Not signed in.');
+  return session.access_token;
+}
+
+async function _mreqUploadFiles(files) {
+  if (!files || !files.length) return [];
+  const out = [];
+  for (const file of files) {
+    const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `marketing-tickets/${uid}-${safe}`;
+    const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
+      contentType: file.type || 'application/octet-stream',
+      cacheControl: '3600',
+    });
+    if (upErr) throw new Error(upErr.message);
+    const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
+    out.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || '' });
+  }
+  return out;
+}
+
+async function _mreqCreateTicket(payload) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/marketing-tickets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json.ticket;
+}
+
+async function _mreqPatchTicket(id, body) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/marketing-tickets?id=' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json.ticket;
+}
+
+async function _mreqFetchAll() {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/marketing-tickets', {
+    headers: { 'Authorization': 'Bearer ' + token },
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json.tickets || [];
+}
+
+function _mreqNormalize(apiTicket) {
+  const fields = apiTicket.fields || {};
+  const files = Array.isArray(apiTicket.files) ? apiTicket.files : [];
+  const submittedAt = apiTicket.submitted_at;
+  const submittedDateDisplay = submittedAt
+    ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : '';
+  return {
+    id: apiTicket.id,
+    type: apiTicket.type,
+    campaign: fields.campaign_title || fields.offer || '',
+    creative: fields.creative_name,
+    fileName: files[0]?.name,
+    fileUrl: files[0]?.url,
+    fileNames: files.map(f => f.name).filter(Boolean),
+    files,
+    note: fields.note || '',
+    currentSpend: fields.current_spend,
+    newSpend: fields.new_spend,
+    offer: fields.offer,
+    isNewOffer: fields.is_new_offer,
+    newOfferDescription: fields.new_offer_description,
+    budget: fields.monthly_spend,
+    landingPage: fields.landing_page,
+    status: apiTicket.status,
+    contentCheckStatus: apiTicket.content_check_status,
+    clientActionStatus: apiTicket.client_action_status,
+    submittedDate: submittedAt ? submittedAt.split('T')[0] : '',
+    submittedDateDisplay,
+    updates: (apiTicket.messages || []).map(m => ({
+      who: m.author_name || (m.author_type === 'staff' ? 'Staff' : 'Client'),
+      when: m.created_at
+        ? new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : '',
+      message: m.body || '',
+      isActionRequest: !!m.is_action_request,
+    })),
+  };
+}
+
+async function fetchAndRenderMarketingRequests() {
+  try {
+    const apiTickets = await _mreqFetchAll();
+    MARKETING_REQUESTS = apiTickets.map(_mreqNormalize);
+    renderMarketingRequests();
+  } catch (e) {
+    console.error('Failed to fetch marketing tickets:', e.message);
+    // Keep whatever's in MARKETING_REQUESTS so UI still works
+  }
+}
+
+// Starts empty; populated by fetchAndRenderMarketingRequests().
+// Falls back to seed data if user hasn't loaded the API yet.
+let MARKETING_REQUESTS = [];
 
 let _activeRequestId = null;
 
@@ -4155,38 +4248,50 @@ function wizardSubmitBudget() {
   wizardGoToStep('landing-page');
 }
 
-function wizardSubmitFinal(skipped) {
+async function wizardSubmitFinal(skipped) {
   if (!_wizard) return;
   const landingVal = (document.getElementById('wizardLandingInput')?.value || '').trim();
   _wizard.landingPage = skipped ? '' : landingVal;
 
   const offerLabel = _wizard.selectedOffer || _wizard.newOfferName || 'New offer';
-  const newReq = {
-    id: 'mreq-' + Date.now(),
-    type: 'campaign-create',
-    campaign: offerLabel,
-    offer: offerLabel,
-    isNewOffer: !_wizard.selectedOffer,
-    newOfferDescription: _wizard.newOfferDescription || '',
-    fileNames: _wizard.files.map(f => f.name),
-    budget: _wizard.budget,
-    landingPage: _wizard.landingPage,
-    note: '',
-    status: 'in-progress',
-    submittedDate: _todayISO(),
-    submittedDateDisplay: _todayDisplay(),
-    updates: [],
-  };
-  MARKETING_REQUESTS.unshift(newReq);
-  renderMarketingRequests();
 
-  // Update success copy
-  const t = document.getElementById('wizardSuccessTitle');
-  const s = document.getElementById('wizardSuccessSub');
-  if (t) t.textContent = 'Campaign request submitted';
-  if (s) s.textContent = `Your account manager will build the "${offerLabel}" campaign and launch it within 1-2 business days. Track progress in "What's in flight" on the campaigns page.`;
+  // Disable the buttons during submit
+  const submitBtns = document.querySelectorAll('#marketing-new-campaign [data-wstep="landing-page"] .btn-modal-primary, #marketing-new-campaign [data-wstep="landing-page"] .btn-modal-secondary');
+  submitBtns.forEach(b => b.disabled = true);
 
-  wizardGoToStep('success');
+  try {
+    // Upload files to Supabase Storage
+    const uploaded = await _mreqUploadFiles(_wizard.files);
+
+    // Create the ticket
+    await _mreqCreateTicket({
+      type: 'campaign-create',
+      fields: {
+        offer: offerLabel,
+        is_new_offer: !_wizard.selectedOffer,
+        new_offer_description: _wizard.newOfferDescription || '',
+        monthly_spend: _wizard.budget,
+        landing_page: _wizard.landingPage,
+        note: '',
+      },
+      files: uploaded,
+    });
+
+    // Refresh the list so it shows in "Track what's in flight"
+    await fetchAndRenderMarketingRequests();
+
+    // Update success copy
+    const t = document.getElementById('wizardSuccessTitle');
+    const s = document.getElementById('wizardSuccessSub');
+    if (t) t.textContent = 'Campaign request submitted';
+    if (s) s.textContent = `Your account manager will build the "${offerLabel}" campaign and launch it within 1-2 business days. Track progress in "What's in flight" on the campaigns page.`;
+
+    wizardGoToStep('success');
+  } catch (e) {
+    alert('Submit failed: ' + e.message);
+  } finally {
+    submitBtns.forEach(b => b.disabled = false);
+  }
 }
 
 function _todayISO() {
@@ -4196,13 +4301,21 @@ function _todayDisplay() {
   return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function confirmCancelRequest() {
-  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
-  if (r) r.status = 'cancelled';
-  closeCancelRequestModal();
-  closeMarketingRequest();
-  renderMarketingRequests();
-  showConfirmation('Request cancelled', 'Your account manager has been notified to stop work on this request.');
+async function confirmCancelRequest() {
+  if (!_activeRequestId) { closeCancelRequestModal(); return; }
+  const cancelBtn = document.querySelector('#cancelRequestModal .btn-modal-danger');
+  if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelling…'; }
+  try {
+    await _mreqPatchTicket(_activeRequestId, { action: 'cancel' });
+    closeCancelRequestModal();
+    closeMarketingRequest();
+    await fetchAndRenderMarketingRequests();
+    showConfirmation('Request cancelled', 'Your account manager has been notified to stop work on this request.');
+  } catch (e) {
+    alert('Cancel failed: ' + e.message);
+  } finally {
+    if (cancelBtn) { cancelBtn.disabled = false; cancelBtn.textContent = 'Yes, Cancel'; }
+  }
 }
 
 /* ════════════════════════════════
@@ -5406,7 +5519,9 @@ _sb.auth.onAuthStateChange((event, _session) => {
 });
 
 boot();
-renderMarketingRequests();
+renderMarketingRequests();  // initial empty render
+// Fetch real tickets in the background once the page is up
+setTimeout(() => fetchAndRenderMarketingRequests(), 100);
 _attachPasteHandler('error-where',  'error-files');
 _attachPasteHandler('error-should', 'error-files');
 _attachPasteHandler('change-what',  'change-files');

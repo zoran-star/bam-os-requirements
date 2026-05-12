@@ -1,67 +1,100 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 
-const DEFAULT_OFFERS = [
-  "Camps",
-  "Internal tournament",
-  "Internal league",
-  "Gym rental",
-  "Youth academy",
-  "Training",
-  "Tryouts",
-  "General teams",
-  "New hire",
-  "Promo",
-];
+const STORAGE_BUCKET = "ticket-files";
+const STORAGE_FOLDER = "guide-cards";
 
-// Pre-seeded guide cards — one per offer, with placeholder copy Cam will overwrite.
-const SAMPLE_GUIDES = DEFAULT_OFFERS.map((name, i) => ({
-  id: `guide-${i + 1}`,
-  title: name,
-  purpose: "",
-  filmingTips: "",
-  exampleScript: "",
-  exampleAssets: [
-    `https://picsum.photos/seed/${name.replace(/\s/g, "")}-1/200/200`,
-    `https://picsum.photos/seed/${name.replace(/\s/g, "")}-2/200/200`,
-  ],
-  updatedAt: null,
-}));
-
-export default function ContentView({ tokens: tk, dark, me }) {
-  const [guides, setGuides]   = useState(SAMPLE_GUIDES);
-  const [editingId, setEditingId] = useState(null); // null = list view
+export default function ContentView({ tokens: tk, dark, me, session }) {
+  const [guides, setGuides]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [editingId, setEditingId] = useState(null);
   const [creating, setCreating]   = useState(false);
   const [banner, setBanner]       = useState(null);
+  const [error, setError]         = useState("");
 
   const isEditing = editingId !== null || creating;
   const editing = editingId ? guides.find(g => g.id === editingId) : null;
+
+  // ─────────────────── Fetch on mount ───────────────────
+  useEffect(() => {
+    fetchGuides();
+  }, []);
+
+  const fetchGuides = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = session?.access_token;
+      const res = await fetch("/api/guide-cards", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setGuides(json.cards || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const showBanner = (text) => {
     setBanner(text);
     setTimeout(() => setBanner(null), 3500);
   };
 
-  const handleSave = (saved) => {
-    if (creating) {
-      const id = `guide-${Date.now()}`;
-      setGuides(prev => [...prev, { ...saved, id, updatedAt: new Date().toISOString() }]);
-      showBanner(`Created "${saved.title}".`);
-    } else {
-      setGuides(prev => prev.map(g => g.id === editingId ? { ...saved, id: editingId, updatedAt: new Date().toISOString() } : g));
-      showBanner(`Saved "${saved.title}".`);
+  const handleSave = async (formData) => {
+    const token = session?.access_token;
+    try {
+      if (creating) {
+        const res = await fetch("/api/guide-cards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(formData),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        setGuides(prev => [...prev, json.card]);
+        showBanner(`Created "${json.card.title}".`);
+      } else {
+        const res = await fetch(`/api/guide-cards?id=${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(formData),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        setGuides(prev => prev.map(g => g.id === editingId ? json.card : g));
+        showBanner(`Saved "${json.card.title}".`);
+      }
+      setEditingId(null);
+      setCreating(false);
+    } catch (e) {
+      alert("Save failed: " + e.message);
     }
-    setEditingId(null);
-    setCreating(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!editingId) return;
     const target = guides.find(g => g.id === editingId);
     if (!target) return;
     if (!confirm(`Delete the guide card for "${target.title}"? This can't be undone.`)) return;
-    setGuides(prev => prev.filter(g => g.id !== editingId));
-    setEditingId(null);
-    showBanner(`Deleted "${target.title}".`);
+    const token = session?.access_token;
+    try {
+      const res = await fetch(`/api/guide-cards?id=${editingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      setGuides(prev => prev.filter(g => g.id !== editingId));
+      setEditingId(null);
+      showBanner(`Deleted "${target.title}".`);
+    } catch (e) {
+      alert("Delete failed: " + e.message);
+    }
   };
 
   // ─────────────────── Edit view ───────────────────
@@ -71,7 +104,7 @@ export default function ContentView({ tokens: tk, dark, me }) {
         {banner && <Banner banner={banner} tk={tk} />}
         <GuideEditor
           tk={tk}
-          initial={editing || { title: "", purpose: "", filmingTips: "", exampleScript: "", exampleAssets: [] }}
+          initial={editing || { title: "", purpose: "", filming_tips: "", example_script: "", example_assets: [], example_links: [] }}
           isNew={creating}
           onCancel={() => { setEditingId(null); setCreating(false); }}
           onSave={handleSave}
@@ -91,8 +124,9 @@ export default function ContentView({ tokens: tk, dark, me }) {
           <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content</div>
           <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Guide Cards</div>
           <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
-            {guides.length} card{guides.length === 1 ? "" : "s"}. These guide cards appear in clients' "+ Add New Campaign" wizard.
+            {loading ? "Loading…" : `${guides.length} card${guides.length === 1 ? "" : "s"}. These guide cards appear in clients' "+ Add New Campaign" wizard.`}
           </div>
+          {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginTop: 8 }}>⚠ {error}</div>}
         </div>
         <button
           onClick={() => { setCreating(true); setEditingId(null); }}
@@ -103,7 +137,11 @@ export default function ContentView({ tokens: tk, dark, me }) {
         >+ New guide card</button>
       </div>
 
-      {guides.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
+          Loading guide cards…
+        </div>
+      ) : guides.length === 0 ? (
         <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
           No guide cards yet. Click "+ New guide card" to create one.
         </div>
@@ -114,7 +152,9 @@ export default function ContentView({ tokens: tk, dark, me }) {
           gap: 14,
         }}>
           {guides.map(g => {
-            const isComplete = g.purpose && g.filmingTips && g.exampleScript;
+            const assets = Array.isArray(g.example_assets) ? g.example_assets : [];
+            const links  = Array.isArray(g.example_links)  ? g.example_links  : [];
+            const isComplete = g.purpose && g.filming_tips && g.example_script;
             return (
               <div
                 key={g.id}
@@ -154,26 +194,36 @@ export default function ContentView({ tokens: tk, dark, me }) {
                   {g.purpose ? truncate(g.purpose, 90) : <span style={{ color: tk.textMute, fontStyle: "italic" }}>No purpose set yet.</span>}
                 </div>
 
-                {/* Asset thumbnails */}
-                {g.exampleAssets && g.exampleAssets.length > 0 ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {g.exampleAssets.slice(0, 4).map((url, i) => (
-                      <img key={i} src={url} alt="" style={{
-                        width: 42, height: 42, borderRadius: 6, objectFit: "cover",
-                        border: `1px solid ${tk.border}`,
-                      }} />
-                    ))}
-                    {g.exampleAssets.length > 4 && (
-                      <div style={{
-                        width: 42, height: 42, borderRadius: 6, border: `1px solid ${tk.border}`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        color: tk.textMute, fontSize: 11, fontWeight: 600,
-                      }}>+{g.exampleAssets.length - 4}</div>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: tk.textMute, fontStyle: "italic" }}>No example assets</div>
-                )}
+                {/* Asset thumbnails + link count */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {assets.length > 0 ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {assets.slice(0, 3).map((a, i) => (
+                        <img key={i} src={a.url || a} alt="" style={{
+                          width: 38, height: 38, borderRadius: 6, objectFit: "cover",
+                          border: `1px solid ${tk.border}`,
+                        }} />
+                      ))}
+                      {assets.length > 3 && (
+                        <div style={{
+                          width: 38, height: 38, borderRadius: 6, border: `1px solid ${tk.border}`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: tk.textMute, fontSize: 11, fontWeight: 600,
+                        }}>+{assets.length - 3}</div>
+                      )}
+                    </div>
+                  ) : null}
+                  {links.length > 0 && (
+                    <div style={{
+                      fontSize: 11, color: tk.textMute,
+                      padding: "4px 10px", borderRadius: 999,
+                      border: `1px solid ${tk.border}`,
+                    }}>🔗 {links.length}</div>
+                  )}
+                  {assets.length === 0 && links.length === 0 && (
+                    <div style={{ fontSize: 11, color: tk.textMute, fontStyle: "italic" }}>No example content yet</div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -187,12 +237,14 @@ export default function ContentView({ tokens: tk, dark, me }) {
 // Edit/create form
 // ─────────────────────────────────────────────────────────
 function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
-  const [title, setTitle]     = useState(initial.title || "");
-  const [purpose, setPurpose] = useState(initial.purpose || "");
-  const [tips, setTips]       = useState(initial.filmingTips || "");
-  const [script, setScript]   = useState(initial.exampleScript || "");
-  const [assets, setAssets]   = useState(initial.exampleAssets || []);
-  const [error, setError]     = useState("");
+  const [title, setTitle]       = useState(initial.title || "");
+  const [purpose, setPurpose]   = useState(initial.purpose || "");
+  const [tips, setTips]         = useState(initial.filming_tips || "");
+  const [script, setScript]     = useState(initial.example_script || "");
+  const [assets, setAssets]     = useState(Array.isArray(initial.example_assets) ? initial.example_assets : []);
+  const [links, setLinks]       = useState(Array.isArray(initial.example_links)  ? initial.example_links  : []);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError]       = useState("");
   const fileInputRef = useRef(null);
 
   const labelStyle = { fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
@@ -203,16 +255,37 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
   };
   const textareaStyle = { ...inputStyle, minHeight: 100, resize: "vertical", lineHeight: 1.5 };
 
-  const addFiles = (filesList) => {
+  // ─ Upload to Supabase Storage ─
+  const uploadFiles = async (filesList) => {
     const incoming = Array.from(filesList || []);
     if (!incoming.length) return;
-    const urls = incoming.map(f => URL.createObjectURL(f));
-    setAssets(prev => [...prev, ...urls]);
+    setUploading(true);
+    setError("");
+    try {
+      const uploads = await Promise.all(incoming.map(async (file) => {
+        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${STORAGE_FOLDER}/${uid}-${safeName}`;
+        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+        });
+        if (upErr) throw new Error(upErr.message);
+        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+        return { name: file.name, url: urlData.publicUrl, type: file.type || "" };
+      }));
+      setAssets(prev => [...prev, ...uploads]);
+    } catch (e) {
+      setError("Upload failed: " + e.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
-  const removeAsset = (idx) => {
-    setAssets(prev => prev.filter((_, i) => i !== idx));
-  };
+  const removeAsset = (idx) => setAssets(prev => prev.filter((_, i) => i !== idx));
+  const addLinkRow  = () => setLinks(prev => [...prev, { url: "", label: "" }]);
+  const updateLink  = (idx, key, value) => setLinks(prev => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l));
+  const removeLink  = (idx) => setLinks(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = () => {
     setError("");
@@ -220,12 +293,15 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
       setError("Title is required.");
       return;
     }
+    // Filter out blank link rows
+    const cleanLinks = links.filter(l => (l.url || "").trim());
     onSave({
       title: title.trim(),
       purpose: purpose.trim(),
-      filmingTips: tips.trim(),
-      exampleScript: script.trim(),
-      exampleAssets: assets,
+      filming_tips: tips.trim(),
+      example_script: script.trim(),
+      example_assets: assets,
+      example_links: cleanLinks,
     });
   };
 
@@ -256,15 +332,15 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
       <label style={labelStyle}>Example script</label>
       <textarea style={textareaStyle} value={script} onChange={e => setScript(e.target.value)} placeholder={"Hook line in the first 3 seconds.\nThen the offer pitch.\nThen the call to action."} />
 
-      <label style={labelStyle}>Example assets</label>
+      <label style={labelStyle}>Example assets {uploading && <span style={{ color: tk.accent, marginLeft: 8 }}>(uploading…)</span>}</label>
       <div style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-        gap: 8, marginBottom: 12,
+        gap: 8, marginBottom: 6,
       }}>
-        {assets.map((url, i) => (
+        {assets.map((a, i) => (
           <div key={i} style={{ position: "relative" }}>
-            <img src={url} alt="" style={{
+            <img src={a.url || a} alt={a.name || ""} style={{
               width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
               borderRadius: 8, border: `1px solid ${tk.border}`, display: "block",
             }} />
@@ -290,11 +366,12 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
             borderRadius: 8,
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            cursor: "pointer", color: tk.textMute,
+            cursor: uploading ? "wait" : "pointer", color: tk.textMute,
             fontSize: 13, gap: 4,
             transition: "border-color 0.15s ease, color 0.15s ease",
+            opacity: uploading ? 0.5 : 1,
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = tk.accent; e.currentTarget.style.color = tk.accent; }}
+          onMouseEnter={e => { if (!uploading) { e.currentTarget.style.borderColor = tk.accent; e.currentTarget.style.color = tk.accent; } }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = tk.borderStr || tk.border; e.currentTarget.style.color = tk.textMute; }}
         >
           <div style={{ fontSize: 22, lineHeight: 1 }}>+</div>
@@ -306,13 +383,56 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
           type="file"
           accept="image/*,video/*"
           multiple
+          disabled={uploading}
           style={{ display: "none" }}
-          onChange={e => { addFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+          onChange={e => { uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ""; }}
         />
       </div>
       <div style={{ fontSize: 12, color: tk.textMute, marginBottom: 22 }}>
-        {assets.length} asset{assets.length === 1 ? "" : "s"} · Clients see these as examples when picking this offer.
+        {assets.length} asset{assets.length === 1 ? "" : "s"} · Files persist in Supabase Storage.
       </div>
+
+      <label style={labelStyle}>Example links</label>
+      <div style={{ marginBottom: 6, display: "flex", flexDirection: "column", gap: 8 }}>
+        {links.length === 0 && (
+          <div style={{ fontSize: 12, color: tk.textMute, fontStyle: "italic", padding: "6px 0" }}>No links yet. Add ones to inspiration, references, or example ads.</div>
+        )}
+        {links.map((l, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              style={{ ...inputStyle, marginBottom: 0, flex: 2, padding: "8px 10px" }}
+              value={l.url || ""}
+              onChange={e => updateLink(i, "url", e.target.value)}
+              placeholder="https://example.com/inspiration"
+            />
+            <input
+              style={{ ...inputStyle, marginBottom: 0, flex: 1, padding: "8px 10px" }}
+              value={l.label || ""}
+              onChange={e => updateLink(i, "label", e.target.value)}
+              placeholder="Label (optional)"
+            />
+            <button
+              onClick={() => removeLink(i)}
+              style={{
+                width: 32, height: 32, flexShrink: 0,
+                background: "transparent", border: `1px solid ${tk.border}`, borderRadius: 6,
+                color: tk.textMute, cursor: "pointer", fontSize: 16,
+              }}
+              aria-label="Remove link"
+            >×</button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={addLinkRow}
+        style={{
+          padding: "8px 14px", marginBottom: 22,
+          background: "transparent", color: tk.accent,
+          border: `1px dashed ${tk.accent}`, borderRadius: 8,
+          fontSize: 12, fontWeight: 600, cursor: "pointer",
+          letterSpacing: "0.05em",
+        }}
+      >+ Add link</button>
 
       {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
 
@@ -332,9 +452,11 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
             border: `1px solid ${tk.border}`, borderRadius: 8,
             color: tk.text, cursor: "pointer", fontSize: 13,
           }}>Cancel</button>
-          <button onClick={handleSave} style={{
+          <button onClick={handleSave} disabled={uploading} style={{
             padding: "10px 22px", background: tk.accent, color: "#0A0A0B",
-            border: 0, borderRadius: 8, fontWeight: 700, cursor: "pointer", fontSize: 13,
+            border: 0, borderRadius: 8, fontWeight: 700,
+            cursor: uploading ? "wait" : "pointer", fontSize: 13,
+            opacity: uploading ? 0.5 : 1,
           }}>{isNew ? "Create guide card" : "Save changes"}</button>
         </div>
       </div>

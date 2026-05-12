@@ -754,13 +754,13 @@ export default function BAMPortal() {
             {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
 
             {/* MARKETING */}
-            {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} />}
+            {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
 
             {/* TEAM */}
             {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
 
             {/* CONTENT */}
-            {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} />}
+            {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
