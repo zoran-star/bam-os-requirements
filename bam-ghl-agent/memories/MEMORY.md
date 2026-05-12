@@ -14,6 +14,7 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Tasks System Pending Mike](project_tasks_pending_mike.md) — task unification on hold until Mike gives preferences
 - [Questions Database Schema](supabase_questions_db.md) — full schema, enums, valid Places Asked, insert rules, **UUID→Question lookup pattern** for ticket field labels
 - [Local Dev Workflow](project_local_dev_workflow.md) — `npm run dev` hits prod Supabase; use test_business client (71d01c0f-...) for safe testing + cleanup query
+- [Marketing + Content Workflow](project_marketing_content_flow.md) — two-stage ticket flow (client → content team → marketing team), `content_tickets` + `marketing_tickets` schema, single `api/marketing.js`, full UI map on both portals
 - [Client Action Thread](project_client_action_thread.md) — multi-round chat between staff & client on a ticket: `tickets.messages` jsonb, state machine, API actions, UI mapping
 - [Client Action Notifications (TODO)](project_client_action_notifications_todo.md) — deferred: Slack/email/SMS notifications when staff requests action or client responds
 - [Client Portal Auth](project_client_auth.md) — email + password login, 1 user per client via `clients.auth_user_id`, manual provisioning, RLS-scoped queries; URL `?client_id=` flow removed
