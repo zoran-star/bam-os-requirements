@@ -471,8 +471,8 @@ async function handleContentTickets(req, res) {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const { type, notes, raw_files, context } = body;
     if (!type) return res.status(400).json({ error: "type is required" });
-    if (!["graphic", "video"].includes(type)) {
-      return res.status(400).json({ error: "type must be 'graphic' or 'video'" });
+    if (!["graphic", "video", "mixed"].includes(type)) {
+      return res.status(400).json({ error: "type must be 'graphic', 'video', or 'mixed'" });
     }
 
     const inserted = await sb("content_tickets", {
