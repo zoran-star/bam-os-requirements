@@ -5,12 +5,31 @@ const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
 
 export default function ContentView({ tokens: tk, dark, me, session }) {
+  const [mainTab, setMainTab]     = useState("guides"); // guides | tickets
   const [guides, setGuides]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [creating, setCreating]   = useState(false);
   const [banner, setBanner]       = useState(null);
   const [error, setError]         = useState("");
+
+  // ─── Top-level tab bar (Guide cards | Tickets) ───
+  const renderMainTabs = () => (
+    <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
+      <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
+      <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
+    </div>
+  );
+
+  // If the user is on the Tickets tab, hand off to the dedicated component
+  if (mainTab === "tickets") {
+    return (
+      <div style={{ padding: "24px 28px", color: tk.text }}>
+        {renderMainTabs()}
+        <ContentTicketsTab tk={tk} session={session} me={me} />
+      </div>
+    );
+  }
 
   const isEditing = editingId !== null || creating;
   const editing = editingId ? guides.find(g => g.id === editingId) : null;
@@ -101,6 +120,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   if (isEditing) {
     return (
       <div style={{ padding: "24px 28px", color: tk.text }}>
+        {renderMainTabs()}
         {banner && <Banner banner={banner} tk={tk} />}
         <GuideEditor
           tk={tk}
@@ -117,11 +137,12 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   // ─────────────────── List view ───────────────────
   return (
     <div style={{ padding: "24px 28px", color: tk.text }}>
+      {renderMainTabs()}
       {banner && <Banner banner={banner} tk={tk} />}
 
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content</div>
+          <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content · Guides</div>
           <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Guide Cards</div>
           <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
             {loading ? "Loading…" : `${guides.length} card${guides.length === 1 ? "" : "s"}. These guide cards appear in clients' "+ Add New Campaign" wizard.`}
@@ -478,4 +499,613 @@ function Banner({ banner, tk }) {
 function truncate(s, max) {
   if (!s) return "";
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+// ─────────────────────────────────────────────────────────
+// MainTab — top-level tab pill used on Content page
+// ─────────────────────────────────────────────────────────
+function MainTab({ label, active, onClick, tk }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: "12px 18px",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        color: active ? tk.accent : tk.textSub,
+        borderBottom: active ? `2px solid ${tk.accent}` : "2px solid transparent",
+        marginBottom: -1,
+        transition: "color 0.15s ease",
+      }}
+    >{label}</div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// CONTENT TICKETS TAB
+// ─────────────────────────────────────────────────────────
+const TICKET_STORAGE_FOLDER = "content-tickets";
+
+const TYPE_META_CT = {
+  graphic: { icon: "🖼", label: "Graphic" },
+  video:   { icon: "🎬", label: "Video" },
+  mixed:   { icon: "✦",  label: "Mixed" },
+};
+
+function ContentTicketsTab({ tk, session, me }) {
+  const [subTab, setSubTab] = useState("active"); // active | client-dependent | completed
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedId, setSelectedId] = useState(null);
+  const [banner, setBanner] = useState(null);
+
+  const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
+
+  useEffect(() => { refetch(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  async function refetch() {
+    setLoading(true);
+    setError("");
+    try {
+      const token = session?.access_token;
+      const res = await fetch("/api/marketing?resource=content-tickets&scope=staff", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setTickets(json.tickets || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function patchTicket(id, body) {
+    const token = session?.access_token;
+    const res = await fetch(`/api/marketing?resource=content-tickets&id=${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+    return json.ticket;
+  }
+
+  // Filter rows by sub-tab; sort oldest first per spec
+  const active     = tickets.filter(t => t.status === "active");
+  const clientDep  = tickets.filter(t => t.status === "client-dependent");
+  const completed  = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
+  const visible =
+    subTab === "active"           ? active
+    : subTab === "client-dependent" ? clientDep
+                                    : completed;
+
+  const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
+
+  // ─────────────────── Detail view ───────────────────
+  if (selected) {
+    return (
+      <ContentTicketDetail
+        tk={tk}
+        session={session}
+        ticket={selected}
+        onBack={() => setSelectedId(null)}
+        onRefetch={refetch}
+        patchTicket={patchTicket}
+        showBanner={showBanner}
+      />
+    );
+  }
+
+  // ─────────────────── List view ───────────────────
+  return (
+    <div>
+      {banner && (
+        <div style={{
+          position: "fixed", top: 24, left: "50%", transform: "translateX(-50%)",
+          background: tk.green, color: "#fff",
+          padding: "12px 22px", borderRadius: 999, fontSize: 13, fontWeight: 600,
+          zIndex: 9999, boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+        }}>{banner}</div>
+      )}
+
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content · Tickets</div>
+        <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Tickets queue</div>
+        <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
+          Raw assets submitted by clients. Make the creative, upload it, then click "Send to Marketing".
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 18, overflowX: "auto" }}>
+        <SubTab label={`Active (${active.length})`}             active={subTab === "active"}            onClick={() => setSubTab("active")}            tk={tk} />
+        <SubTab label={`Client Dependent (${clientDep.length})`} active={subTab === "client-dependent"} onClick={() => setSubTab("client-dependent")} tk={tk} red={clientDep.length > 0} />
+        <SubTab label={`Completed (${completed.length})`}        active={subTab === "completed"}         onClick={() => setSubTab("completed")}         tk={tk} />
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "1.2fr 1.5fr 0.8fr 1fr",
+        gap: 16,
+        padding: "8px 16px",
+        fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
+      }}>
+        <div>Academy</div>
+        <div>Notes / context</div>
+        <div>Type</div>
+        <div style={{ textAlign: "right" }}>Submitted</div>
+      </div>
+
+      <div style={{ background: tk.surface, border: `1px solid ${tk.border}`, borderRadius: 10, padding: "4px 0" }}>
+        {loading ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13 }}>Loading content tickets…</div>
+        ) : error ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.red || "#ED7969", fontSize: 13 }}>⚠ {error}</div>
+        ) : visible.length === 0 ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: tk.textSub, fontSize: 13, fontStyle: "italic" }}>
+            No tickets in this view.
+          </div>
+        ) : visible.map(t => {
+          const meta = TYPE_META_CT[t.type] || { icon: "•", label: t.type };
+          const academyName = t.client?.name || "—";
+          const previewNotes = (t.notes || "").split("\n").filter(Boolean).slice(0, 1).join(" ").slice(0, 110) || "(no notes)";
+          const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+          return (
+            <div
+              key={t.id}
+              onClick={() => setSelectedId(t.id)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.2fr 1.5fr 0.8fr 1fr",
+                gap: 16,
+                padding: "14px 16px",
+                borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
+                cursor: "pointer",
+                alignItems: "center",
+                transition: "background 0.12s ease",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14 }}>{academyName}</div>
+              <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
+              <div style={{ color: tk.textSub, fontSize: 13 }}>
+                <span style={{ marginRight: 6 }}>{meta.icon}</span>{meta.label}
+              </div>
+              <div style={{ color: tk.textMute, fontSize: 12, fontFamily: "monospace", letterSpacing: "0.05em", textAlign: "right" }}>{dateStr}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SubTab({ label, active, onClick, tk, red }) {
+  const inactiveColor = red ? (tk.red || "#ED7969") : tk.textSub;
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: "12px 18px",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        fontSize: 13, fontWeight: active ? 600 : 500,
+        color: active ? tk.accent : inactiveColor,
+        borderBottom: active ? `2px solid ${tk.accent}` : "2px solid transparent",
+        marginBottom: -1,
+        transition: "color 0.15s ease",
+      }}
+    >{label}</div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// Detail view — review raw assets, upload finals, ship
+// ─────────────────────────────────────────────────────────
+function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTicket, showBanner }) {
+  const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
+  const [uploading, setUploading] = useState(false);
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [actionMsg, setActionMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const meta = TYPE_META_CT[ticket.type] || { icon: "•", label: ticket.type };
+  const academyName = ticket.client?.name || "—";
+
+  const finalsExisting = Array.isArray(ticket.final_files) ? ticket.final_files : [];
+
+  // ── Upload selected finals to Supabase Storage and persist on ticket ──
+  async function commitFinals() {
+    if (!finalsToUpload.length) return;
+    setUploading(true);
+    try {
+      const uploaded = [];
+      for (const file of finalsToUpload) {
+        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${TICKET_STORAGE_FOLDER}/${ticket.id}/${uid}-${safe}`;
+        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+          cacheControl: "3600",
+        });
+        if (upErr) throw new Error(upErr.message);
+        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+        uploaded.push({ name: file.name, url: urlData.publicUrl, size: file.size || 0, mime: file.type || "" });
+      }
+      await patchTicket(ticket.id, { action: "upload-final", final_files: uploaded });
+      setFinalsToUpload([]);
+      await onRefetch();
+      showBanner(`Uploaded ${uploaded.length} final file${uploaded.length === 1 ? "" : "s"}.`);
+    } catch (e) {
+      alert("Upload failed: " + e.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function sendToMarketing() {
+    if (busy) return;
+    if (!finalsExisting.length) {
+      alert("Upload at least one final creative before sending to marketing.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "send-to-marketing" });
+      showBanner(`Sent ${academyName} content to marketing.`);
+      onBack();
+      await onRefetch();
+    } catch (e) {
+      alert("Send to marketing failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitActionRequest() {
+    if (!actionMsg.trim() || busy) return;
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "request-client-action", message: actionMsg.trim() });
+      setActionMsg("");
+      setActionModalOpen(false);
+      showBanner(`Action request sent to ${academyName}.`);
+      await onRefetch();
+      onBack();
+    } catch (e) {
+      alert("Send failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <button onClick={onBack} style={{
+          background: "transparent", border: `1px solid ${tk.border}`, color: tk.textMute,
+          width: 38, height: 38, borderRadius: 8, cursor: "pointer", fontSize: 18,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+        }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
+            § Content · Ticket
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
+            {meta.icon}  {meta.label}{ticket.type === "mixed" ? " bundle" : ""}
+          </div>
+          <div style={{ fontSize: 13, color: tk.textSub, marginTop: 4 }}>
+            {academyName} · Submitted {ticket.submitted_at ? new Date(ticket.submitted_at).toLocaleString() : "—"}
+          </div>
+        </div>
+        <StatusBadge ticket={ticket} tk={tk} />
+      </div>
+
+      {/* Client inputs */}
+      <SectionLabel tk={tk}>What the client submitted</SectionLabel>
+      <Card tk={tk} style={{ marginBottom: 22 }}>
+        <ClientInputs ticket={ticket} tk={tk} />
+      </Card>
+
+      {/* Finals (current + new upload) */}
+      <SectionLabel tk={tk}>Finals</SectionLabel>
+      <Card tk={tk} style={{ marginBottom: 22 }}>
+        {finalsExisting.length === 0 ? (
+          <div style={{ padding: 8, color: tk.textSub, fontSize: 13, fontStyle: "italic", marginBottom: 12 }}>
+            No final creatives uploaded yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10, marginBottom: 14 }}>
+            {finalsExisting.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} />)}
+          </div>
+        )}
+
+        {/* Stage new finals */}
+        {finalsToUpload.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+            {finalsToUpload.map((f, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "8px 12px", borderRadius: 6,
+                background: "rgba(232,197,71,0.08)", border: `1px solid ${tk.accentBorder || tk.accent}`,
+              }}>
+                <div style={{ fontSize: 18 }}>{(f.type || "").startsWith("image/") ? "🖼" : (f.type || "").startsWith("video/") ? "🎬" : "📄"}</div>
+                <div style={{ flex: 1, fontSize: 13, color: tk.text }}>{f.name}</div>
+                <button onClick={() => setFinalsToUpload(prev => prev.filter((_, j) => j !== i))} style={{
+                  background: "transparent", border: 0, color: tk.textMute, cursor: "pointer", fontSize: 16,
+                }}>×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <label htmlFor="finals-input" style={{
+            padding: "10px 18px", background: "transparent",
+            border: `1.5px dashed ${tk.borderStr || tk.border}`, borderRadius: 8,
+            color: tk.textMute, cursor: "pointer", fontSize: 13, fontWeight: 500,
+          }}>+ Add final files</label>
+          <input
+            id="finals-input"
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={e => {
+              const arr = Array.from(e.target.files || []);
+              if (arr.length) setFinalsToUpload(prev => [...prev, ...arr]);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+          />
+          {finalsToUpload.length > 0 && (
+            <button onClick={commitFinals} disabled={uploading} style={{
+              padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
+              border: 0, borderRadius: 8, fontWeight: 700, cursor: uploading ? "wait" : "pointer", fontSize: 13,
+              opacity: uploading ? 0.6 : 1,
+            }}>{uploading ? "Uploading…" : `Upload ${finalsToUpload.length} file${finalsToUpload.length === 1 ? "" : "s"}`}</button>
+          )}
+        </div>
+      </Card>
+
+      {/* Activity */}
+      <SectionLabel tk={tk}>Activity</SectionLabel>
+      <Card tk={tk} style={{ marginBottom: 24 }}>
+        {ticket.messages && ticket.messages.length ? ticket.messages.map((u, i) => (
+          <div key={i} style={{
+            padding: "10px 0",
+            borderBottom: i < ticket.messages.length - 1 ? `1px solid ${tk.borderSoft || tk.border}` : "none",
+          }}>
+            <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 4 }}>
+              {u.created_at ? new Date(u.created_at).toLocaleString() : ""} · {u.author_name || u.author_type}
+              {u.is_action_request ? "  ·  Action Requested" : ""}
+            </div>
+            <div style={{ fontSize: 14, color: tk.text, lineHeight: 1.5 }}>{u.body}</div>
+          </div>
+        )) : (
+          <div style={{ padding: 12, textAlign: "center", color: tk.textSub, fontSize: 13, fontStyle: "italic" }}>No activity yet.</div>
+        )}
+      </Card>
+
+      {/* Actions */}
+      {ticket.status !== "completed" && ticket.status !== "cancelled" && (
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <button onClick={() => setActionModalOpen(true)} style={{
+            background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+            padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+          }}>Request Client Action</button>
+          <button onClick={sendToMarketing} disabled={busy || !finalsExisting.length} style={{
+            background: tk.accent, color: "#0A0A0B", border: 0,
+            padding: "10px 22px", borderRadius: 8,
+            cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 700,
+            opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
+          }}>📤  Send to Marketing</button>
+        </div>
+      )}
+
+      {actionModalOpen && (
+        <div onClick={() => setActionModalOpen(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(10,10,11,0.78)",
+          backdropFilter: "blur(8px)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 460,
+            background: tk.bg, border: `1px solid ${tk.borderStrong || tk.border}`,
+            borderRadius: 12, padding: 28,
+          }}>
+            <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 8 }}>§ Action Request</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: tk.text, marginBottom: 6 }}>What do you need from the client?</div>
+            <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 18, lineHeight: 1.5 }}>
+              {academyName} will see this on their portal and be prompted to respond.
+            </div>
+            <textarea autoFocus value={actionMsg} onChange={e => setActionMsg(e.target.value)}
+              placeholder="e.g. Could you send a higher-res version of the logo? The current one is pixelating."
+              style={{
+                width: "100%", minHeight: 110,
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${tk.border}`, borderRadius: 6,
+                color: tk.text, fontFamily: "inherit", fontSize: 14,
+                padding: "10px 12px", resize: "vertical",
+              }}
+            />
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+              <button onClick={() => { setActionModalOpen(false); setActionMsg(""); }} style={{
+                background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+                padding: "10px 18px", borderRadius: 6, cursor: "pointer",
+                fontFamily: "inherit", fontSize: 12, fontWeight: 500,
+              }}>Cancel</button>
+              <button onClick={submitActionRequest} disabled={!actionMsg.trim() || busy} style={{
+                background: actionMsg.trim() ? tk.accent : tk.border, color: "#0A0A0B", border: 0,
+                padding: "10px 20px", borderRadius: 6,
+                cursor: actionMsg.trim() && !busy ? "pointer" : "not-allowed",
+                fontFamily: "inherit", fontSize: 12, fontWeight: 700,
+                opacity: actionMsg.trim() && !busy ? 1 : 0.6,
+              }}>Send Request</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ ticket, tk }) {
+  let label, color;
+  if (ticket.status === "completed") { label = "Completed"; color = tk.green || "#7ED996"; }
+  else if (ticket.status === "cancelled") { label = "Cancelled"; color = tk.textMute; }
+  else if (ticket.status === "client-dependent") { label = "Awaiting client"; color = tk.red || "#ED7969"; }
+  else { label = "Active"; color = tk.accent; }
+  return (
+    <span style={{
+      color, fontSize: 11, fontWeight: 600, letterSpacing: "0.15em",
+      textTransform: "uppercase", padding: "5px 11px", borderRadius: 999,
+      border: `1px solid ${color}`, background: `${color}15`, whiteSpace: "nowrap",
+    }}>{label}</span>
+  );
+}
+
+function ClientInputs({ ticket, tk }) {
+  const ctx = ticket.context || {};
+  const raw = Array.isArray(ticket.raw_files) ? ticket.raw_files : [];
+  const subCreatives = Array.isArray(ctx.creatives) ? ctx.creatives : null;
+
+  const row = (label, value) => (
+    <div key={label} style={{
+      display: "flex", alignItems: "flex-start", gap: 16,
+      padding: "10px 0",
+      borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
+    }}>
+      <div style={{
+        fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
+        width: 150, flexShrink: 0, paddingTop: 4,
+      }}>{label}</div>
+      <div style={{ flex: 1, color: tk.text, fontSize: 14, lineHeight: 1.5 }}>{value}</div>
+    </div>
+  );
+
+  return (
+    <>
+      {ctx.source === "new-campaign" && (
+        <>
+          {row("Source", <span><span style={{ color: tk.accent }}>📦 New campaign</span> · offer: <b>{ctx.offer || "—"}</b></span>)}
+          {ctx.is_new_offer && row("New offer description", ctx.new_offer_description || "—")}
+          {row("Monthly spend", <span style={{ color: tk.accent, fontWeight: 600 }}>{ctx.monthly_spend || "—"}</span>)}
+          {row("Landing page", ctx.landing_page ? <a href={ctx.landing_page} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{ctx.landing_page} ↗</a> : <span style={{ color: tk.textMute }}>(default funnel)</span>)}
+        </>
+      )}
+      {ctx.source === "add-creative" && row("Source", <span>Add-creative on <b>{ctx.campaign_title || "(unspecified)"}</b></span>)}
+      {ctx.source === "marketing-revision" && row("Source", <span style={{ color: tk.red || "#ED7969" }}>↩ Revision requested by marketing</span>)}
+
+      {subCreatives ? (
+        <div style={{ padding: "10px 0" }}>
+          <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
+            Creatives ({subCreatives.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {subCreatives.map((c, i) => (
+              <div key={i} style={{
+                padding: 14, background: "rgba(255,255,255,0.02)",
+                border: `1px solid ${tk.borderSoft || tk.border}`, borderRadius: 8,
+              }}>
+                <div style={{ fontWeight: 600, color: tk.text, marginBottom: 8 }}>
+                  Creative {i + 1} · {(TYPE_META_CT[c.type] || {}).label || c.type}
+                </div>
+                <div style={{ fontSize: 13, color: tk.text, marginBottom: 10, whiteSpace: "pre-wrap" }}>
+                  {c.notes || <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 8 }}>
+                  {(c.raw_files || []).map((f, fi) => <FilePreviewTile key={fi} file={f} tk={tk} compact />)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {row("Notes", ticket.notes
+            ? <span style={{ whiteSpace: "pre-wrap" }}>{ticket.notes}</span>
+            : <span style={{ color: tk.textMute, fontStyle: "italic" }}>(no notes)</span>)}
+          <div style={{ padding: "10px 0" }}>
+            <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: 10 }}>
+              Raw files ({raw.length})
+            </div>
+            {raw.length ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+                {raw.map((f, i) => <FilePreviewTile key={i} file={f} tk={tk} />)}
+              </div>
+            ) : (
+              <div style={{ color: tk.textMute, fontSize: 13, fontStyle: "italic" }}>None</div>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function FilePreviewTile({ file, tk, compact }) {
+  const isImage = (file.mime || "").startsWith("image/");
+  const isVideo = (file.mime || "").startsWith("video/");
+  const icon = isImage ? "🖼" : isVideo ? "🎬" : "📄";
+  return (
+    <a href={file.url} target="_blank" rel="noreferrer" download={file.name} style={{
+      display: "flex", flexDirection: "column", gap: 6,
+      padding: 10, borderRadius: 8,
+      background: tk.surface, border: `1px solid ${tk.border}`,
+      textDecoration: "none", color: tk.text,
+      transition: "border-color 0.15s ease",
+    }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = tk.accent}
+      onMouseLeave={e => e.currentTarget.style.borderColor = tk.border}
+    >
+      {isImage ? (
+        <img src={file.url} alt={file.name} style={{
+          width: "100%", aspectRatio: "1 / 1", objectFit: "cover",
+          borderRadius: 4, background: tk.surfaceHov,
+        }} />
+      ) : (
+        <div style={{
+          width: "100%", aspectRatio: "1 / 1",
+          background: tk.surfaceHov, borderRadius: 4,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: compact ? 28 : 36, color: tk.textMute,
+        }}>{icon}</div>
+      )}
+      <div style={{ fontSize: compact ? 11 : 12, color: tk.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {file.name}
+      </div>
+      <div style={{ fontSize: 10, color: tk.accent, letterSpacing: "0.05em" }}>Download ↓</div>
+    </a>
+  );
+}
+
+function SectionLabel({ children, tk }) {
+  return (
+    <div style={{
+      fontSize: 10, color: tk.textMute, letterSpacing: "0.22em",
+      textTransform: "uppercase", marginBottom: 10,
+    }}>{children}</div>
+  );
+}
+
+function Card({ children, tk, style }) {
+  return (
+    <div style={{
+      background: tk.surface,
+      border: `1px solid ${tk.border}`,
+      borderRadius: 10,
+      padding: 18,
+      ...style,
+    }}>{children}</div>
+  );
 }

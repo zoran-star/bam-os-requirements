@@ -211,13 +211,11 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
   const active        = tickets.filter(t => t.status === "in-progress");
-  const contentCheck  = active.filter(t => t.contentCheckStatus === "pending");
   const clientAction  = active.filter(t => t.clientActionStatus === "requested");
   const completed     = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
 
   const rows =
     tab === "active"         ? active
-    : tab === "content-check" ? contentCheck
     : tab === "client-action" ? clientAction
                               : completed;
 
@@ -253,15 +251,25 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     }
   };
 
-  const approveContent = async () => {
+  const requestContentRevision = async () => {
     if (!selected || actionBusy) return;
+    const msg = prompt(
+      "What needs to be revised? This will spawn a new content ticket with these notes.",
+      ""
+    );
+    if (!msg || !msg.trim()) return;
     setActionBusy(true);
     try {
-      const updated = await _patchTicket(selected.id, { action: "approve-content" });
-      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
-      showBanner("success", `Content approved for ${selected.academyName}.`);
+      // Guess the type from existing fields/files (basic heuristic: video if any video mime)
+      const hasVideo = (selected.files || []).some(f => (f.mime || "").startsWith("video/"));
+      await _patchTicket(selected.id, {
+        action: "request-content-revision",
+        message: msg.trim(),
+        type: hasVideo ? "video" : "graphic",
+      });
+      showBanner("success", `Revision request sent to content team for ${selected.academyName}.`);
     } catch (e) {
-      showBanner("error", "Approve failed: " + e.message);
+      showBanner("error", "Revision request failed: " + e.message);
     } finally {
       setActionBusy(false);
     }
@@ -348,15 +356,16 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         {/* Action buttons */}
         {selected.status === "in-progress" && (
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-            {selected.contentCheckStatus === "pending" && (
+            {/* "Request Content Revision" only shows up when finals exist (i.e. ticket came from content team) */}
+            {(selected.files && selected.files.length > 0) && (
               <button
-                onClick={approveContent}
+                onClick={requestContentRevision}
                 style={{
                   background: "transparent", border: `1px solid ${tk.amber || "#E8A547"}`, color: tk.amber || "#E8A547",
                   padding: "10px 20px", borderRadius: 8, cursor: "pointer",
                   fontFamily: "inherit", fontSize: 13, fontWeight: 600,
                 }}
-              >✓  Approve Content</button>
+              >↩  Request Content Revision</button>
             )}
             <button
               onClick={() => setActionModalOpen(true)}
@@ -409,10 +418,9 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs (Content Check Required tab removed — content production now lives on Content page) */}
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 20, overflowX: "auto" }}>
         <Tab label={`Active (${active.length})`}                       active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} />
-        <Tab label={`Content Check Required (${contentCheck.length})`} active={tab === "content-check"} onClick={() => setTab("content-check")} tk={tk} amber={contentCheck.length > 0} />
         <Tab label={`Client Action Required (${clientAction.length})`} active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientAction.length > 0} />
         <Tab label={`Completed (${completed.length})`}                 active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
       </div>
@@ -522,11 +530,6 @@ function StatusPills({ t, tk, size = "small" }) {
     pills.push({ label: "Cancelled", color: tk.textMute });
   }
 
-  // Content check signal — only while active
-  if (t.status === "in-progress" && t.contentCheckStatus === "pending") {
-    pills.push({ label: "Content check pending", color: tk.amber || "#E8A547" });
-  }
-
   // Client action signal — only while active
   if (t.status === "in-progress" && t.clientActionStatus === "requested") {
     pills.push({ label: "Awaiting client", color: tk.red || "#ED7969" });
@@ -575,22 +578,37 @@ function renderSubmittedInfo(t, tk) {
   rows.push(["Academy", t.academyName]);
   rows.push(["Campaign", t.campaignTitle]);
 
+  // Helper to render a download grid for the attached final creatives
+  const filesGrid = (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {(t.files || []).map((f, i) => {
+        const isImage = (f.mime || "").startsWith("image/");
+        return (
+          <a key={i} href={f.url} target="_blank" rel="noreferrer" download={f.name} style={{
+            display: "flex", flexDirection: "column", gap: 4, alignItems: "center",
+            padding: 8, borderRadius: 8,
+            background: tk.surfaceHov || "rgba(255,255,255,0.04)",
+            border: `1px solid ${tk.border}`,
+            textDecoration: "none", color: tk.text, fontSize: 11, maxWidth: 120,
+          }}>
+            {isImage
+              ? <img src={f.url} alt={f.name} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 4 }} />
+              : <div style={{ width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4, background: tk.surface, fontSize: 22, color: tk.textMute }}>{(f.mime || "").startsWith("video/") ? "🎬" : "📄"}</div>
+            }
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}>{f.name}</span>
+            <span style={{ color: tk.accent, fontSize: 10, letterSpacing: "0.05em" }}>Download ↓</span>
+          </a>
+        );
+      })}
+    </div>
+  );
+
   if (t.type === "replace") {
     rows.push(["Replacing", t.creative || ""]);
-    rows.push(["New file", (
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {t.fileUrl && <img src={t.fileUrl} alt={t.fileName || ""} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1px solid ${tk.border}` }} />}
-        <span>{t.fileName || "—"}</span>
-      </div>
-    )]);
+    rows.push(["Final creatives", t.files && t.files.length ? filesGrid : <span style={{ color: tk.textMute }}>No files</span>]);
     rows.push(["Note", t.note ? t.note : <span style={{ color: tk.textMute }}>No note</span>]);
   } else if (t.type === "add") {
-    rows.push(["New file", (
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {t.fileUrl && <img src={t.fileUrl} alt={t.fileName || ""} style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 6, border: `1px solid ${tk.border}` }} />}
-        <span>{t.fileName || "—"}</span>
-      </div>
-    )]);
+    rows.push(["Final creatives", t.files && t.files.length ? filesGrid : <span style={{ color: tk.textMute }}>No files</span>]);
     rows.push(["Note", t.note ? t.note : <span style={{ color: tk.textMute }}>No note</span>]);
   } else if (t.type === "remove") {
     rows.push(["Removing", t.creative || ""]);

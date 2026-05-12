@@ -628,6 +628,66 @@
     border-color: var(--gold);
   }
 
+  /* Binary toggle (Graphic / Video) — used in Input assets modal */
+  .binary-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255,255,255,0.02);
+  }
+  .binary-toggle-opt {
+    background: transparent;
+    border: 0;
+    padding: 12px 14px;
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .binary-toggle-opt:not(:last-child) {
+    border-right: 1px solid var(--line);
+  }
+  .binary-toggle-opt:hover {
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+  }
+  .binary-toggle-opt.active {
+    background: rgba(232,197,71,0.10);
+    color: var(--gold);
+  }
+
+  /* X-delete button on each creative tile (new workflow) */
+  .creative-delete {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    background: rgba(10,10,11,0.78);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.85);
+    border-radius: 50%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    backdrop-filter: blur(6px);
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    z-index: 2;
+  }
+  .creative-delete:hover {
+    background: #C7253E;
+    color: #fff;
+    border-color: #C7253E;
+  }
+
   /* Selected state: dim the image, show action buttons */
   .creative-actions {
     position: absolute;
@@ -3039,99 +3099,67 @@
           <div class="creative-grid">
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam1/400/400" alt="Creative 1" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam2/400/400" alt="Creative 2" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam3/400/400" alt="Creative 3" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam4/400/400" alt="Creative 4" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam5/400/400" alt="Creative 5" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam6/400/400" alt="Creative 6" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam7/400/400" alt="Creative 7" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
             <div class="creative-tile">
               <img class="creative-img" src="https://picsum.photos/seed/bam8/400/400" alt="Creative 8" />
-              <button class="creative-edit" onclick="toggleCreativeActions(this.parentElement)" title="Edit" aria-label="Edit creative">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M11.5 1.5l3 3-9 9H2.5V10.5l9-9z"/>
+              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 3L13 13M13 3L3 13"/>
                 </svg>
               </button>
-              <div class="creative-actions">
-                <button class="creative-action-btn" onclick="openReplaceModal(this)">Replace</button>
-                <button class="creative-action-btn creative-action-btn-danger" onclick="openRemoveModal(this)">Remove</button>
-              </div>
             </div>
           </div>
 
@@ -3286,21 +3314,23 @@ Then the call to action."]</div>
             </div>
           </div>
 
-          <!-- Step: asset-upload -->
+          <!-- Step: input-assets — submit raw assets per creative for the content team -->
           <div class="wizard-step" data-wstep="asset-upload">
-            <div class="section-label">Upload assets (up to 10)</div>
-            <label for="wizardAssetInput" class="file-drop-label" style="padding:48px 18px;margin-bottom:16px">
-              <span class="file-drop-icon">↑</span>
-              <span class="file-drop-text">Click to upload images or videos</span>
-              <span class="file-drop-meta">JPG · PNG · MP4 · MOV · up to 10 files</span>
-            </label>
-            <input type="file" id="wizardAssetInput" accept="image/*,video/*" multiple style="display:none" onchange="wizardAddFiles(this.files)" />
+            <div class="section-label">Input assets</div>
+            <div style="color:var(--text-sub);font-size:13px;line-height:1.5;margin-bottom:14px">
+              For each creative you want, submit your raw assets and notes.
+              Our content team will turn them into the finished creative and add them to your campaign.
+            </div>
 
-            <div class="wizard-files-list" id="wizardFilesList"></div>
+            <div id="wizardCreativesList"></div>
+
+            <button class="wizard-new-offer-btn" onclick="wizardAddCreativeBlock()" style="margin-top:14px;margin-bottom:6px">
+              + Add another creative
+            </button>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
               <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
-              <button class="btn-modal-primary" id="wizardAssetsContinueBtn" onclick="wizardGoToStep('budget')" disabled>All assets uploaded</button>
+              <button class="btn-modal-primary" id="wizardAssetsContinueBtn" onclick="wizardGoToStep('budget')" disabled>Continue →</button>
             </div>
           </div>
 
@@ -3605,9 +3635,10 @@ function closeConfirmationModal() {
   if (modal) modal.style.display = 'none';
 }
 
-/* ── Replace / Remove / Add creative modals ── */
+/* ── Delete / Input-assets modals ── */
 
 let _pendingCreative = null; // { name, src }
+let _inputAssetsState = { type: 'graphic', files: [] };
 
 function _findTileFromBtn(btn) {
   return btn.closest('.creative-tile');
@@ -3618,67 +3649,11 @@ function _readCreativeFromTile(tile) {
   return { name: img?.alt || 'Creative', src: img?.src || '' };
 }
 
-function _onFileSelected(input, displayElId) {
-  const display = document.getElementById(displayElId);
-  if (!display) return;
-  if (input.files && input.files[0]) {
-    display.textContent = '✓ ' + input.files[0].name;
-    display.classList.add('has-file');
-  } else {
-    display.textContent = '';
-    display.classList.remove('has-file');
-  }
-}
-
-// REPLACE
-function openReplaceModal(btn) {
-  const tile = _findTileFromBtn(btn);
-  _pendingCreative = _readCreativeFromTile(tile);
-  document.getElementById('replaceCurrentImg').src = _pendingCreative.src;
-  document.getElementById('replaceCurrentName').textContent = 'Replacing ' + _pendingCreative.name;
-  document.getElementById('replaceModal').style.display = 'flex';
-}
-
-function closeReplaceModal() {
-  document.getElementById('replaceModal').style.display = 'none';
-  const input = document.getElementById('replaceFileInput');
-  const name = document.getElementById('replaceFileName');
-  const note = document.getElementById('replaceNote');
-  if (input) input.value = '';
-  if (name) { name.textContent = ''; name.classList.remove('has-file'); }
-  if (note) note.value = '';
-  _pendingCreative = null;
-}
-
-async function submitReplace() {
-  const file = document.getElementById('replaceFileInput')?.files?.[0];
-  const note = document.getElementById('replaceNote')?.value?.trim() || '';
-  if (!file) { alert('Choose a file to upload.'); return; }
-  const creativeName = _pendingCreative?.name || 'creative';
-  const submitBtn = document.querySelector('#replaceModal .btn-modal-primary');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Uploading…'; }
-  try {
-    const uploaded = await _mreqUploadFiles([file]);
-    await _mreqCreateTicket({
-      type: 'replace',
-      fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName, note },
-      files: uploaded,
-    });
-    closeReplaceModal();
-    await fetchAndRenderMarketingRequests();
-    showConfirmation('Replace requested', 'We received ' + file.name + '. Your account manager will swap it in for ' + creativeName + ' within 1 business day.');
-  } catch (e) {
-    alert('Submit failed: ' + e.message);
-  } finally {
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
-  }
-}
-
 function _detailCampaignTitle() {
   return document.getElementById('detail-campaign-title')?.textContent?.trim() || '';
 }
 
-// REMOVE
+// ── X-icon → confirm delete (existing creative removed from campaign) ──
 function openRemoveModal(btn) {
   const tile = _findTileFromBtn(btn);
   _pendingCreative = _readCreativeFromTile(tile);
@@ -3695,8 +3670,9 @@ function closeRemoveModal() {
 async function confirmRemove() {
   const creativeName = _pendingCreative?.name || 'creative';
   const removeBtn = document.querySelector('#removeModal .btn-modal-danger');
-  if (removeBtn) { removeBtn.disabled = true; removeBtn.textContent = 'Submitting…'; }
+  if (removeBtn) { removeBtn.disabled = true; removeBtn.textContent = 'Deleting…'; }
   try {
+    // Remove (delete creative) goes STRAIGHT to marketing, not content
     await _mreqCreateTicket({
       type: 'remove',
       fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName },
@@ -3704,50 +3680,118 @@ async function confirmRemove() {
     });
     closeRemoveModal();
     await fetchAndRenderMarketingRequests();
-    showConfirmation('Remove requested', 'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.');
+    showConfirmation('Delete requested', 'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.');
   } catch (e) {
     alert('Submit failed: ' + e.message);
   } finally {
-    if (removeBtn) { removeBtn.disabled = false; removeBtn.textContent = 'Yes, Remove'; }
+    if (removeBtn) { removeBtn.disabled = false; removeBtn.textContent = 'Yes, Delete'; }
   }
 }
 
-// ADD NEW CREATIVE
+// ── Input assets modal (raw assets → goes to content team) ──
 function openAddCreativeModal() {
-  document.getElementById('addCreativeModal').style.display = 'flex';
+  // Kept name for backward compat with the existing button onclick
+  _inputAssetsState = { type: 'graphic', files: [] };
+  _selectInputAssetsType('graphic');
+  _renderInputAssetsFilesList();
+  const notes = document.getElementById('inputAssetsNotes');
+  if (notes) notes.value = '';
+  document.getElementById('inputAssetsModal').style.display = 'flex';
 }
 
-function closeAddCreativeModal() {
-  document.getElementById('addCreativeModal').style.display = 'none';
-  const input = document.getElementById('addCreativeFileInput');
-  const name = document.getElementById('addCreativeFileName');
-  const note = document.getElementById('addCreativeNote');
+function closeInputAssetsModal() {
+  document.getElementById('inputAssetsModal').style.display = 'none';
+  _inputAssetsState = { type: 'graphic', files: [] };
+  const input = document.getElementById('inputAssetsFileInput');
   if (input) input.value = '';
-  if (name) { name.textContent = ''; name.classList.remove('has-file'); }
-  if (note) note.value = '';
 }
 
-async function submitAddCreative() {
-  const file = document.getElementById('addCreativeFileInput')?.files?.[0];
-  const note = document.getElementById('addCreativeNote')?.value?.trim() || '';
-  if (!file) { alert('Choose a file to upload.'); return; }
-  const submitBtn = document.querySelector('#addCreativeModal .btn-modal-primary');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Uploading…'; }
+function _selectInputAssetsType(t) {
+  _inputAssetsState.type = t;
+  document.querySelectorAll('#inputAssetsTypeToggle .binary-toggle-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.value === t);
+  });
+}
+
+function _inputAssetsAddFiles(filesList) {
+  const incoming = Array.from(filesList || []);
+  if (!incoming.length) return;
+  _inputAssetsState.files = _inputAssetsState.files.concat(incoming);
+  _renderInputAssetsFilesList();
+  const input = document.getElementById('inputAssetsFileInput');
+  if (input) input.value = '';
+}
+
+function _inputAssetsRemoveFile(idx) {
+  _inputAssetsState.files.splice(idx, 1);
+  _renderInputAssetsFilesList();
+}
+
+function _renderInputAssetsFilesList() {
+  const listEl = document.getElementById('inputAssetsFilesList');
+  if (!listEl) return;
+  if (!_inputAssetsState.files.length) {
+    listEl.innerHTML = '';
+    return;
+  }
+  listEl.innerHTML = _inputAssetsState.files.map((f, i) => {
+    const isImage = (f.type || '').startsWith('image/');
+    const thumb = isImage
+      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+      : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+    const sizeKB = (f.size / 1024).toFixed(0);
+    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+    return `
+      <div class="wizard-file-item">
+        ${thumb}
+        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+        <div class="wizard-file-size">${sizeLabel}</div>
+        <button class="wizard-file-remove" onclick="_inputAssetsRemoveFile(${i})" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+}
+
+async function submitInputAssets() {
+  if (!_inputAssetsState.files.length) {
+    alert('Add at least one file to submit.');
+    return;
+  }
+  const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
+  const btn = document.getElementById('inputAssetsSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
   try {
-    const uploaded = await _mreqUploadFiles([file]);
-    await _mreqCreateTicket({
-      type: 'add',
-      fields: { campaign_title: _detailCampaignTitle(), note },
-      files: uploaded,
+    const uploaded = await _mreqUploadFiles(_inputAssetsState.files);
+    await _ctkCreateTicket({
+      type: _inputAssetsState.type,
+      notes,
+      raw_files: uploaded,
+      context: {
+        source: 'add-creative',
+        campaign_title: _detailCampaignTitle(),
+      },
     });
-    closeAddCreativeModal();
+    closeInputAssetsModal();
     await fetchAndRenderMarketingRequests();
-    showConfirmation('New creative requested', 'We received ' + file.name + '. Your account manager will add it to your campaign within 1 business day.');
+    showConfirmation('Assets received',
+      'We got your ' + _inputAssetsState.type + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
   } catch (e) {
     alert('Submit failed: ' + e.message);
   } finally {
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
   }
+}
+
+// ── Content-tickets API helper (creates content_tickets row) ──
+async function _ctkCreateTicket(payload) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/marketing?resource=content-tickets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json.ticket;
 }
 
 /* ════════════════════════════════
@@ -4054,7 +4098,8 @@ function _wizardInitState() {
     selectedOffer: null,
     newOfferName: '',
     newOfferDescription: '',
-    files: [],
+    // Each creative block: { id, type: 'graphic'|'video', files: [File], notes: '' }
+    creatives: [],
     budget: '',
     landingPage: '',
   };
@@ -4062,26 +4107,25 @@ function _wizardInitState() {
 
 function openNewCampaignWizard() {
   _wizardInitState();
+  // Seed with one initial creative block so the user has somewhere to drop files
+  wizardAddCreativeBlock();
   document.getElementById('marketing-list').style.display = 'none';
   document.getElementById('marketing-detail').style.display = 'none';
   document.getElementById('marketing-request-detail').style.display = 'none';
   document.getElementById('marketing-new-campaign').style.display = 'block';
   _renderWizardStep();
+  _renderWizardCreatives();
   // Reset form fields
   const offerSearch = document.getElementById('wizardOfferSearch');
   const newName = document.getElementById('wizardNewOfferName');
   const newDesc = document.getElementById('wizardNewOfferDesc');
   const budgetInput = document.getElementById('wizardBudgetInput');
   const landingInput = document.getElementById('wizardLandingInput');
-  const filesList = document.getElementById('wizardFilesList');
-  const assetInput = document.getElementById('wizardAssetInput');
   if (offerSearch) offerSearch.value = '';
   if (newName) newName.value = '';
   if (newDesc) newDesc.value = '';
   if (budgetInput) budgetInput.value = '';
   if (landingInput) landingInput.value = '';
-  if (filesList) filesList.innerHTML = '';
-  if (assetInput) assetInput.value = '';
   filterWizardOffers('');
   window.scrollTo(0, 0);
 }
@@ -4188,56 +4232,118 @@ function wizardSubmitNewOfferForm() {
   wizardGoToStep('asset-upload');
 }
 
-function wizardAddFiles(filesList) {
+// ── Multi-creative input-assets management for the wizard ──
+let _wizardCreativeSeq = 0;
+
+function wizardAddCreativeBlock() {
   if (!_wizard) return;
+  _wizardCreativeSeq += 1;
+  _wizard.creatives.push({ id: 'c' + _wizardCreativeSeq, type: 'graphic', files: [], notes: '' });
+  _renderWizardCreatives();
+}
+
+function wizardRemoveCreativeBlock(id) {
+  if (!_wizard) return;
+  _wizard.creatives = _wizard.creatives.filter(c => c.id !== id);
+  _renderWizardCreatives();
+}
+
+function wizardSetCreativeType(id, type) {
+  const c = _wizard?.creatives.find(x => x.id === id);
+  if (!c) return;
+  c.type = type;
+  _renderWizardCreatives();
+}
+
+function wizardCreativeAddFiles(id, filesList) {
+  const c = _wizard?.creatives.find(x => x.id === id);
+  if (!c) return;
   const incoming = Array.from(filesList || []);
   if (!incoming.length) return;
-  const room = 10 - _wizard.files.length;
-  if (room <= 0) {
-    alert('You can upload up to 10 files. Remove one to add another.');
-    return;
-  }
-  if (incoming.length > room) {
-    alert(`You can upload up to 10 files total. Adding the first ${room}.`);
-  }
-  _wizard.files = _wizard.files.concat(incoming.slice(0, room));
-  _renderWizardFilesList();
-  // Reset input so the same file can be re-selected later if removed
-  const input = document.getElementById('wizardAssetInput');
+  c.files = c.files.concat(incoming);
+  _renderWizardCreatives();
+  // reset input so user can re-add same file
+  const input = document.getElementById('wizardFiles_' + id);
   if (input) input.value = '';
 }
 
-function wizardRemoveFile(idx) {
-  if (!_wizard) return;
-  _wizard.files.splice(idx, 1);
-  _renderWizardFilesList();
+function wizardCreativeRemoveFile(id, idx) {
+  const c = _wizard?.creatives.find(x => x.id === id);
+  if (!c) return;
+  c.files.splice(idx, 1);
+  _renderWizardCreatives();
 }
 
-function _renderWizardFilesList() {
-  const listEl = document.getElementById('wizardFilesList');
-  const continueBtn = document.getElementById('wizardAssetsContinueBtn');
-  if (!listEl || !_wizard) return;
-  if (!_wizard.files.length) {
-    listEl.innerHTML = '';
-    if (continueBtn) continueBtn.disabled = true;
+function wizardSetCreativeNotes(id, value) {
+  const c = _wizard?.creatives.find(x => x.id === id);
+  if (c) c.notes = value;
+  _updateWizardContinueBtn();
+}
+
+function _renderWizardCreatives() {
+  const list = document.getElementById('wizardCreativesList');
+  if (!list || !_wizard) return;
+
+  if (!_wizard.creatives.length) {
+    list.innerHTML = `
+      <div style="padding:24px;border:1.5px dashed var(--line-str);border-radius:8px;text-align:center;color:var(--text-mute)">
+        No creatives yet. Click "+ Add another creative" below to start.
+      </div>`;
+    _updateWizardContinueBtn();
     return;
   }
-  listEl.innerHTML = _wizard.files.map((f, i) => {
-    const isImage = (f.type || '').startsWith('image/');
-    const thumb = isImage
-      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
-      : `<div class="wizard-file-thumb">🎬</div>`;
-    const sizeKB = (f.size / 1024).toFixed(0);
-    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
-    return `
-      <div class="wizard-file-item">
-        ${thumb}
-        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
-        <div class="wizard-file-size">${sizeLabel}</div>
-        <button class="wizard-file-remove" onclick="wizardRemoveFile(${i})" aria-label="Remove">×</button>
-      </div>`;
-  }).join('');
-  if (continueBtn) continueBtn.disabled = false;
+
+  list.innerHTML = _wizard.creatives.map((c, idx) => `
+    <div class="card" style="margin-bottom:14px;position:relative">
+      <button onclick="wizardRemoveCreativeBlock('${c.id}')" title="Remove this creative" aria-label="Remove" style="position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text-mute);cursor:pointer;font-size:14px">×</button>
+
+      <div class="card-title" style="margin-bottom:14px;font-size:15px">Creative ${idx + 1}</div>
+
+      <label class="modal-label">Asset type</label>
+      <div class="binary-toggle" style="margin-bottom:14px">
+        <button type="button" class="binary-toggle-opt ${c.type === 'graphic' ? 'active' : ''}" onclick="wizardSetCreativeType('${c.id}','graphic')">🖼 Graphic</button>
+        <button type="button" class="binary-toggle-opt ${c.type === 'video' ? 'active' : ''}" onclick="wizardSetCreativeType('${c.id}','video')">🎬 Video</button>
+      </div>
+
+      <label class="modal-label">Raw files</label>
+      <label for="wizardFiles_${c.id}" class="file-drop-label" style="padding:18px;margin-bottom:8px">
+        <span class="file-drop-icon">↑</span>
+        <span class="file-drop-text">Click to upload (multiple OK)</span>
+        <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
+      </label>
+      <input type="file" id="wizardFiles_${c.id}" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="wizardCreativeAddFiles('${c.id}', this.files)" />
+      <div class="wizard-files-list">
+        ${c.files.map((f, fi) => {
+          const isImage = (f.type || '').startsWith('image/');
+          const thumb = isImage
+            ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+            : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+          const sizeKB = (f.size / 1024).toFixed(0);
+          const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+          return `
+            <div class="wizard-file-item">
+              ${thumb}
+              <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+              <div class="wizard-file-size">${sizeLabel}</div>
+              <button class="wizard-file-remove" onclick="wizardCreativeRemoveFile('${c.id}', ${fi})" aria-label="Remove">×</button>
+            </div>`;
+        }).join('')}
+      </div>
+
+      <label class="modal-label" style="margin-top:12px">Notes</label>
+      <textarea class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Anything special the team should know?" oninput="wizardSetCreativeNotes('${c.id}', this.value)">${escapeHTML(c.notes)}</textarea>
+    </div>
+  `).join('');
+
+  _updateWizardContinueBtn();
+}
+
+function _updateWizardContinueBtn() {
+  const btn = document.getElementById('wizardAssetsContinueBtn');
+  if (!btn || !_wizard) return;
+  // Enable when at least one creative block has at least one file
+  const ok = _wizard.creatives.some(c => c.files.length > 0);
+  btn.disabled = !ok;
 }
 
 function wizardSubmitBudget() {
@@ -4260,31 +4366,66 @@ async function wizardSubmitFinal(skipped) {
   submitBtns.forEach(b => b.disabled = true);
 
   try {
-    // Upload files to Supabase Storage
-    const uploaded = await _mreqUploadFiles(_wizard.files);
+    // Upload every file across every creative block, build serializable creatives array.
+    // Each block ends up with its own uploaded-file list so the content team can keep them grouped.
+    const creativesPayload = [];
+    let totalFiles = 0;
+    for (const c of _wizard.creatives) {
+      if (!c.files.length) continue; // skip empty blocks
+      const uploaded = await _mreqUploadFiles(c.files);
+      creativesPayload.push({
+        local_id: c.id,
+        type: c.type,
+        notes: c.notes || '',
+        raw_files: uploaded,
+      });
+      totalFiles += uploaded.length;
+    }
+    if (!creativesPayload.length) {
+      alert('Add at least one creative with at least one file.');
+      submitBtns.forEach(b => b.disabled = false);
+      return;
+    }
 
-    // Create the ticket
-    await _mreqCreateTicket({
-      type: 'campaign-create',
-      fields: {
+    // Determine the row's overall type for the constraint:
+    //   single creative → that creative's type
+    //   multiple        → 'mixed'
+    const overallType =
+      creativesPayload.length === 1 ? creativesPayload[0].type : 'mixed';
+
+    // Flatten all raw files into the row's raw_files for downloadable convenience,
+    // while the per-creative grouping lives in context.creatives.
+    const flatRaw = creativesPayload.flatMap(c => c.raw_files);
+
+    // Bundled notes for searchability
+    const bundledNotes = creativesPayload
+      .map((c, i) => `[Creative ${i + 1} · ${c.type}]\n${c.notes || '(no notes)'}`)
+      .join('\n\n');
+
+    // Single mega content ticket — content team will spawn the marketing ticket later via "Send to Marketing".
+    await _ctkCreateTicket({
+      type: overallType,
+      notes: bundledNotes,
+      raw_files: flatRaw,
+      context: {
+        source: 'new-campaign',
         offer: offerLabel,
         is_new_offer: !_wizard.selectedOffer,
         new_offer_description: _wizard.newOfferDescription || '',
         monthly_spend: _wizard.budget,
         landing_page: _wizard.landingPage,
-        note: '',
+        campaign_title: offerLabel,
+        creatives: creativesPayload,
       },
-      files: uploaded,
     });
-
-    // Refresh the list so it shows in "Track what's in flight"
-    await fetchAndRenderMarketingRequests();
 
     // Update success copy
     const t = document.getElementById('wizardSuccessTitle');
     const s = document.getElementById('wizardSuccessSub');
     if (t) t.textContent = 'Campaign request submitted';
-    if (s) s.textContent = `Your account manager will build the "${offerLabel}" campaign and launch it within 1-2 business days. Track progress in "What's in flight" on the campaigns page.`;
+    if (s) s.textContent =
+      `We received your ${creativesPayload.length} creative request${creativesPayload.length === 1 ? '' : 's'} (${totalFiles} file${totalFiles === 1 ? '' : 's'}). ` +
+      `Our content team will craft the creatives and our account manager will launch the "${offerLabel}" campaign within 1-2 business days.`;
 
     wizardGoToStep('success');
   } catch (e) {
@@ -5579,41 +5720,11 @@ function toggleTheme() {
 </div>
 
 <!-- ── Replace creative modal ── -->
-<div id="replaceModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeReplaceModal()">
-  <div class="modal-card" onclick="event.stopPropagation()">
-    <div class="modal-kicker">§ Request</div>
-    <div class="modal-title">Replace creative</div>
-    <div class="modal-sub">Your account manager will upload the new file and swap it into your campaign.</div>
-
-    <div class="replace-current">
-      <img id="replaceCurrentImg" class="replace-current-img" src="" alt="" />
-      <div class="replace-current-name" id="replaceCurrentName">Replacing creative</div>
-    </div>
-
-    <label class="modal-label">Upload replacement</label>
-    <label for="replaceFileInput" class="file-drop-label">
-      <span class="file-drop-icon">↑</span>
-      <span class="file-drop-text">Click to upload an image or video</span>
-      <span class="file-drop-meta">JPG · PNG · MP4 · MOV</span>
-    </label>
-    <input type="file" id="replaceFileInput" accept="image/*,video/*" style="display:none" onchange="_onFileSelected(this, 'replaceFileName')" />
-    <div class="file-name" id="replaceFileName"></div>
-
-    <label class="modal-label" for="replaceNote">Note (optional)</label>
-    <textarea id="replaceNote" class="modal-textarea" placeholder="Any context for your account manager?"></textarea>
-
-    <div class="modal-footer">
-      <button class="btn-modal-secondary" onclick="closeReplaceModal()">Cancel</button>
-      <button class="btn-modal-primary" onclick="submitReplace()">Submit Request</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── Remove creative modal ── -->
+<!-- ── Remove creative modal (delete-only via X icon) ── -->
 <div id="removeModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeRemoveModal()">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-kicker">§ Confirm</div>
-    <div class="modal-title">Remove this creative?</div>
+    <div class="modal-title">Delete this creative?</div>
     <div class="modal-sub">This creative will stop running in your campaign. Your account manager will action this within 1 business day. This can be undone.</div>
 
     <div class="replace-current">
@@ -5623,33 +5734,39 @@ function toggleTheme() {
 
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeRemoveModal()">Cancel</button>
-      <button class="btn-modal-danger" onclick="confirmRemove()">Yes, Remove</button>
+      <button class="btn-modal-danger" onclick="confirmRemove()">Yes, Delete</button>
     </div>
   </div>
 </div>
 
-<!-- ── Add new creative modal ── -->
-<div id="addCreativeModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeAddCreativeModal()">
-  <div class="modal-card" onclick="event.stopPropagation()">
+<!-- ── Input assets modal (was: Add new creative) ── -->
+<div id="inputAssetsModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeInputAssetsModal()">
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px">
     <div class="modal-kicker">§ Request</div>
-    <div class="modal-title">Add new creative</div>
-    <div class="modal-sub">Upload a new image or video. Your account manager will add it to your campaign.</div>
+    <div class="modal-title">Input assets</div>
+    <div class="modal-sub">Submit raw assets here. Our content team will turn them into a finished creative and add it to your campaign.</div>
 
-    <label class="modal-label">Upload creative</label>
-    <label for="addCreativeFileInput" class="file-drop-label">
+    <label class="modal-label">Asset type</label>
+    <div class="binary-toggle" id="inputAssetsTypeToggle">
+      <button type="button" class="binary-toggle-opt active" data-value="graphic" onclick="_selectInputAssetsType('graphic')">🖼 Graphic</button>
+      <button type="button" class="binary-toggle-opt" data-value="video" onclick="_selectInputAssetsType('video')">🎬 Video</button>
+    </div>
+
+    <label class="modal-label" style="margin-top:18px">Raw files</label>
+    <label for="inputAssetsFileInput" class="file-drop-label">
       <span class="file-drop-icon">↑</span>
-      <span class="file-drop-text">Click to upload an image or video</span>
-      <span class="file-drop-meta">JPG · PNG · MP4 · MOV</span>
+      <span class="file-drop-text">Click to upload (you can pick multiple)</span>
+      <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI</span>
     </label>
-    <input type="file" id="addCreativeFileInput" accept="image/*,video/*" style="display:none" onchange="_onFileSelected(this, 'addCreativeFileName')" />
-    <div class="file-name" id="addCreativeFileName"></div>
+    <input type="file" id="inputAssetsFileInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_inputAssetsAddFiles(this.files)" />
+    <div id="inputAssetsFilesList" class="wizard-files-list" style="margin-top:8px"></div>
 
-    <label class="modal-label" for="addCreativeNote">Note (optional)</label>
-    <textarea id="addCreativeNote" class="modal-textarea" placeholder="Any context for your account manager?"></textarea>
+    <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
+    <textarea id="inputAssetsNotes" class="modal-textarea" placeholder="What's the vibe? Hook? Key copy? Brand colors? Anything special the team should know?"></textarea>
 
     <div class="modal-footer">
-      <button class="btn-modal-secondary" onclick="closeAddCreativeModal()">Cancel</button>
-      <button class="btn-modal-primary" onclick="submitAddCreative()">Submit Request</button>
+      <button class="btn-modal-secondary" onclick="closeInputAssetsModal()">Cancel</button>
+      <button class="btn-modal-primary" onclick="submitInputAssets()" id="inputAssetsSubmitBtn">Submit</button>
     </div>
   </div>
 </div>
