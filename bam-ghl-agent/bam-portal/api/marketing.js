@@ -268,12 +268,12 @@ async function handleMarketingTickets(req, res) {
       });
     } else if (action === "request-content-revision") {
       // Marketing wants the content team to redo the creative.
-      // Spawn a new content_ticket carrying the revision notes + original final
-      // files (for reference) + the same campaign context.
+      // 1. Spawn a new content_ticket linked back to this marketing ticket
+      // 2. Flip marketing.awaiting_revision = true so it leaves Active
       const message = (body.message || "").trim();
       if (!message) return res.status(400).json({ error: "revision notes are required" });
 
-      const revisionType = body.type || "graphic"; // default; UI should pass through
+      const revisionType = body.type || "graphic";
       const originalFields = ticket.fields || {};
       const newContextNotes = `Revision requested by marketing.\n\n${message}`;
 
@@ -286,13 +286,14 @@ async function handleMarketingTickets(req, res) {
           status: "active",
           client_action_status: "none",
           notes: newContextNotes,
-          raw_files: ticket.files || [],     // pass previous finals as starting point
+          raw_files: ticket.files || [],
           context: {
             source: "marketing-revision",
             campaign_title: originalFields.campaign_title || "",
             related_creative_name: originalFields.creative_name || "",
             originated_from_marketing_ticket_id: ticket.id,
           },
+          marketing_ticket_id: ticket.id, // direct link back so we know to UPDATE not INSERT on send-to-marketing
           messages: [{
             author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
             body: `Revision requested: ${message}`,
@@ -302,10 +303,10 @@ async function handleMarketingTickets(req, res) {
         }]),
       });
 
-      // Mark the marketing ticket as awaiting revision (just leaves a message; doesn't change status)
+      patch.awaiting_revision = true;
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
-        body: `Sent back to content for revision. Tracking: ${contentInsert?.[0]?.id || ""}`,
+        body: `Sent back to content for revision: "${message}". Tracking content ticket ${contentInsert?.[0]?.id || ""}.`,
         is_action_request: false,
       });
     }
@@ -532,66 +533,100 @@ async function handleContentTickets(req, res) {
       });
 
     } else if (action === "send-to-marketing") {
-      // Spawn the downstream marketing ticket carrying the finals + context.
+      // 1. Validate
       if (!ticket.final_files || !ticket.final_files.length) {
         return res.status(409).json({ error: "upload at least one final creative before sending to marketing" });
       }
 
+      const marketingNotes = (body.marketing_notes || "").trim();
       const ctxObj = ticket.context || {};
       const source = ctxObj.source || "add-creative";
 
-      // Determine marketing ticket type from source
-      const mktType =
-        source === "new-campaign" ? "campaign-create" :
-        source === "change-campaign" || source === "add-creative" ? "add" :
-        "add";
+      // 2. Are we updating an existing marketing ticket (revision round-trip) or inserting?
+      const linkedMarketingId = ticket.marketing_ticket_id || null;
 
-      // Build marketing ticket fields
-      const mktFields = {
-        campaign_title: ctxObj.campaign_title || "",
-        note: ctxObj.note || "",
-      };
-      if (mktType === "campaign-create") {
-        mktFields.offer = ctxObj.offer || "";
-        mktFields.is_new_offer = !!ctxObj.is_new_offer;
-        mktFields.new_offer_description = ctxObj.new_offer_description || "";
-        mktFields.monthly_spend = ctxObj.monthly_spend || "";
-        mktFields.landing_page = ctxObj.landing_page || "";
-      }
-      if (ctxObj.related_creative_name) {
-        mktFields.creative_name = ctxObj.related_creative_name;
-      }
-
-      // Insert marketing ticket
-      const marketingInsert = await sb("marketing_tickets", {
-        method: "POST",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify([{
-          client_id: ticket.client_id,
-          type: mktType,
-          status: "in-progress",
-          content_check_status: "not-required",
-          client_action_status: "none",
-          fields: mktFields,
-          files: ticket.final_files,
-          messages: [{
+      if (linkedMarketingId) {
+        // ── Revision round-trip — UPDATE the original marketing ticket ──
+        // Pull current to merge messages cleanly
+        const cur = await sb(`marketing_tickets?id=eq.${linkedMarketingId}&select=*`);
+        const orig = cur?.[0];
+        if (orig) {
+          const newMessages = appendMessage(orig.messages, {
             author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
-            body: `Sent from content ticket (${ticket.type}).`,
+            body: marketingNotes
+              ? `Revision uploaded. Notes for marketing: "${marketingNotes}"`
+              : "Revision uploaded by content team.",
             is_action_request: false,
-            created_at: nowIso(),
-          }],
-          originated_from_content_ticket_id: ticket.id,
-        }]),
-      });
-      const spawnedId = marketingInsert?.[0]?.id;
+          });
+          await sb(`marketing_tickets?id=eq.${linkedMarketingId}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify({
+              files: ticket.final_files,
+              awaiting_revision: false,
+              messages: newMessages,
+            }),
+          });
+        }
+        patch.marketing_ticket_id = linkedMarketingId;
+      } else {
+        // ── Fresh spawn — INSERT a new marketing ticket ──
+        const mktType =
+          source === "new-campaign" ? "campaign-create" :
+          source === "change-campaign" || source === "add-creative" ? "add" :
+          "add";
+
+        const mktFields = {
+          campaign_title: ctxObj.campaign_title || "",
+          note: ctxObj.note || "",
+        };
+        if (mktType === "campaign-create") {
+          mktFields.offer = ctxObj.offer || "";
+          mktFields.is_new_offer = !!ctxObj.is_new_offer;
+          mktFields.new_offer_description = ctxObj.new_offer_description || "";
+          mktFields.monthly_spend = ctxObj.monthly_spend || "";
+          mktFields.landing_page = ctxObj.landing_page || "";
+        }
+        if (ctxObj.related_creative_name) {
+          mktFields.creative_name = ctxObj.related_creative_name;
+        }
+
+        const initialMessage = {
+          author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
+          body: marketingNotes
+            ? `Sent from content ticket (${ticket.type}). Notes for marketing: "${marketingNotes}"`
+            : `Sent from content ticket (${ticket.type}).`,
+          is_action_request: false,
+          created_at: nowIso(),
+        };
+
+        const marketingInsert = await sb("marketing_tickets", {
+          method: "POST",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify([{
+            client_id: ticket.client_id,
+            type: mktType,
+            status: "in-progress",
+            content_check_status: "not-required",
+            client_action_status: "none",
+            fields: mktFields,
+            files: ticket.final_files,
+            messages: [initialMessage],
+            originated_from_content_ticket_id: ticket.id,
+          }]),
+        });
+        patch.marketing_ticket_id = marketingInsert?.[0]?.id || null;
+      }
 
       patch.status = "completed";
       patch.sent_to_marketing_at = nowIso();
       patch.resolved_at = nowIso();
-      patch.marketing_ticket_id = spawnedId || null;
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
-        body: "Sent to marketing.", is_action_request: false,
+        body: marketingNotes
+          ? `Sent to marketing. Notes: "${marketingNotes}"`
+          : "Sent to marketing.",
+        is_action_request: false,
       });
 
     } else if (action === "request-client-action") {

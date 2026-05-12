@@ -1196,6 +1196,20 @@
     font-style: italic;
   }
 
+  /* Loading spinner used by the loadingOverlay modal */
+  .loading-spinner {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 3px solid rgba(232,197,71,0.18);
+    border-top-color: var(--gold);
+    margin: 0 auto;
+    animation: loading-spin 0.8s linear infinite;
+  }
+  @keyframes loading-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* Confirmation success card */
   .confirmation-card {
     text-align: center;
@@ -3362,7 +3376,6 @@ Then the call to action."]</div>
             </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
               <button class="btn-modal-secondary" onclick="wizardGoBack()">Back</button>
-              <button class="btn-modal-secondary" onclick="wizardSubmitFinal(true)">Skip</button>
               <button class="btn-modal-primary" onclick="wizardSubmitFinal(false)">Submit Request</button>
             </div>
           </div>
@@ -3598,8 +3611,8 @@ async function submitBudgetChange() {
   if (!newBudgetRaw) { alert('Enter a new monthly spend.'); return; }
   const newBudget = newBudgetRaw.startsWith('$') ? newBudgetRaw : ('$' + newBudgetRaw.replace(/[^0-9.,]/g, ''));
   const currentSpend = document.getElementById('budgetModalCurrent')?.textContent?.trim() || '';
-  const submitBtn = document.querySelector('#budgetModal .btn-modal-primary');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting…'; }
+  closeBudgetModal();
+  showLoading('Submitting budget change…', 'Just a moment.');
   try {
     await _mreqCreateTicket({
       type: 'budget',
@@ -3611,14 +3624,27 @@ async function submitBudgetChange() {
       },
       files: [],
     });
-    closeBudgetModal();
     await fetchAndRenderMarketingRequests();
+    hideLoading();
     showConfirmation('Budget change requested', 'Your account manager will review and update your campaign within 1 business day.');
   } catch (e) {
+    hideLoading();
     alert('Submit failed: ' + e.message);
-  } finally {
-    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Request'; }
   }
+}
+
+/* ── Loading overlay (shown during slow operations like uploads) ── */
+function showLoading(title, subtitle) {
+  const t = document.getElementById('loadingTitle');
+  const s = document.getElementById('loadingSub');
+  const modal = document.getElementById('loadingOverlay');
+  if (t) t.textContent = title || 'Submitting…';
+  if (s) s.textContent = subtitle || "This can take a minute for video files. Don't close this tab.";
+  if (modal) modal.style.display = 'flex';
+}
+function hideLoading() {
+  const modal = document.getElementById('loadingOverlay');
+  if (modal) modal.style.display = 'none';
 }
 
 /* ── Generic confirmation popup ── */
@@ -3669,8 +3695,8 @@ function closeRemoveModal() {
 
 async function confirmRemove() {
   const creativeName = _pendingCreative?.name || 'creative';
-  const removeBtn = document.querySelector('#removeModal .btn-modal-danger');
-  if (removeBtn) { removeBtn.disabled = true; removeBtn.textContent = 'Deleting…'; }
+  closeRemoveModal();
+  showLoading('Submitting delete request…', 'Just a moment.');
   try {
     // Remove (delete creative) goes STRAIGHT to marketing, not content
     await _mreqCreateTicket({
@@ -3678,13 +3704,12 @@ async function confirmRemove() {
       fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName },
       files: [],
     });
-    closeRemoveModal();
     await fetchAndRenderMarketingRequests();
+    hideLoading();
     showConfirmation('Delete requested', 'Your account manager will remove ' + creativeName + ' from your campaign within 1 business day.');
   } catch (e) {
+    hideLoading();
     alert('Submit failed: ' + e.message);
-  } finally {
-    if (removeBtn) { removeBtn.disabled = false; removeBtn.textContent = 'Yes, Delete'; }
   }
 }
 
@@ -3757,8 +3782,12 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
-  const btn = document.getElementById('inputAssetsSubmitBtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Uploading…'; }
+  const fileCount = _inputAssetsState.files.length;
+  closeInputAssetsModal();
+  showLoading(
+    `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…`,
+    "This can take a minute for video. Don't close this tab."
+  );
   try {
     const uploaded = await _mreqUploadFiles(_inputAssetsState.files);
     await _ctkCreateTicket({
@@ -3770,14 +3799,13 @@ async function submitInputAssets() {
         campaign_title: _detailCampaignTitle(),
       },
     });
-    closeInputAssetsModal();
     await fetchAndRenderMarketingRequests();
+    hideLoading();
     showConfirmation('Assets received',
       'We got your ' + _inputAssetsState.type + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
   } catch (e) {
+    hideLoading();
     alert('Submit failed: ' + e.message);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
   }
 }
 
@@ -3794,16 +3822,65 @@ async function _ctkCreateTicket(payload) {
   return json.ticket;
 }
 
+async function _ctkPatchTicket(id, body) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/marketing?resource=content-tickets&id=' + encodeURIComponent(id), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json.ticket;
+}
+
+// ── Respond to a content-team action request ──
+let _pendingContentActionId = null;
+function openContentActionRespond(id) {
+  const r = MARKETING_REQUESTS.find(x => x.id === id);
+  if (!r) return;
+  _pendingContentActionId = id;
+  // Find last action-request message body to show as context
+  const ctx = (r.updates || []).filter(u => u.isActionRequest).slice(-1)[0];
+  const ctxBody = ctx ? ctx.message : '';
+  document.getElementById('contentRespondContext').textContent = ctxBody || '(no message)';
+  document.getElementById('contentRespondInput').value = '';
+  document.getElementById('contentRespondModal').style.display = 'flex';
+}
+
+function closeContentRespondModal() {
+  document.getElementById('contentRespondModal').style.display = 'none';
+  _pendingContentActionId = null;
+}
+
+async function submitContentResponse() {
+  const message = document.getElementById('contentRespondInput')?.value?.trim();
+  if (!message) { alert('Type your response first.'); return; }
+  if (!_pendingContentActionId) { closeContentRespondModal(); return; }
+  closeContentRespondModal();
+  showLoading('Sending your response…', 'Just a moment.');
+  try {
+    await _ctkPatchTicket(_pendingContentActionId, { action: 'respond', message });
+    await fetchAndRenderMarketingRequests();
+    hideLoading();
+    showConfirmation('Response sent', 'The content team has your response and will keep building.');
+  } catch (e) {
+    hideLoading();
+    alert('Send failed: ' + e.message);
+  }
+}
+
 /* ════════════════════════════════
    MARKETING — Track what's in flight
    ════════════════════════════════ */
 
 const MARKETING_REQUEST_META = {
-  replace:         { icon: '🔄', label: 'Replace creative'   },
-  add:             { icon: '➕', label: 'Add new creative'   },
-  remove:          { icon: '🗑',  label: 'Remove creative'    },
-  budget:          { icon: '💰', label: 'Budget change'      },
-  'campaign-create': { icon: '🚀', label: 'New campaign'      },
+  replace:           { icon: '🔄', label: 'Replace creative'             },
+  add:               { icon: '➕', label: 'Add new creative'             },
+  remove:            { icon: '🗑',  label: 'Remove creative'              },
+  budget:            { icon: '💰', label: 'Budget change'                },
+  'campaign-create': { icon: '🚀', label: 'New campaign'                 },
+  'content-action':  { icon: '⏰', label: 'Content team needs your input' },
 };
 
 const MARKETING_STATUS_LABEL = {
@@ -3873,6 +3950,54 @@ async function _mreqFetchAll() {
   return json.tickets || [];
 }
 
+// Fetch only the content tickets the content team is currently asking the
+// client to act on. These surface alongside marketing tickets in the tracker.
+async function _ctkFetchActionRequested() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await res.json();
+    if (!res.ok) return [];
+    return json.tickets || [];
+  } catch (_) {
+    return [];
+  }
+}
+
+// Normalize a content ticket (with action requested) into the same render shape
+// the marketing-requests tracker uses, but tagged as kind='content-action'.
+function _ctkNormalizeForTracker(apiTicket) {
+  const ctx = apiTicket.context || {};
+  // Pull the most recent action-request message body so the row is informative
+  const messages = Array.isArray(apiTicket.messages) ? apiTicket.messages : [];
+  const lastActionReq = [...messages].reverse().find(m => m.is_action_request);
+  const submittedAt = apiTicket.submitted_at;
+  return {
+    id: apiTicket.id,
+    _kind: 'content-action',
+    type: 'content-action',
+    campaign: ctx.campaign_title || ctx.offer || '',
+    creative: ctx.related_creative_name || '',
+    note: lastActionReq?.body || '',
+    contentTicketType: apiTicket.type,
+    status: 'in-progress',
+    contentCheckStatus: 'not-required',
+    clientActionStatus: 'requested',
+    submittedDate: submittedAt ? submittedAt.split('T')[0] : '',
+    submittedDateDisplay: submittedAt
+      ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : '',
+    updates: messages.map(m => ({
+      who: m.author_name || (m.author_type === 'staff' ? 'Content team' : 'Client'),
+      when: m.created_at ? new Date(m.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+      message: m.body || '',
+      isActionRequest: !!m.is_action_request,
+    })),
+  };
+}
+
 function _mreqNormalize(apiTicket) {
   const fields = apiTicket.fields || {};
   const files = Array.isArray(apiTicket.files) ? apiTicket.files : [];
@@ -3915,12 +4040,18 @@ function _mreqNormalize(apiTicket) {
 
 async function fetchAndRenderMarketingRequests() {
   try {
-    const apiTickets = await _mreqFetchAll();
-    MARKETING_REQUESTS = apiTickets.map(_mreqNormalize);
+    const [marketingTickets, contentActionTickets] = await Promise.all([
+      _mreqFetchAll(),
+      _ctkFetchActionRequested(),
+    ]);
+    const m = marketingTickets.map(_mreqNormalize).map(t => ({ ...t, _kind: 'marketing' }));
+    const c = contentActionTickets.map(_ctkNormalizeForTracker);
+    // Content-team action requests sit at the top — those are the ones the
+    // client most needs to act on.
+    MARKETING_REQUESTS = [...c, ...m];
     renderMarketingRequests();
   } catch (e) {
-    console.error('Failed to fetch marketing tickets:', e.message);
-    // Keep whatever's in MARKETING_REQUESTS so UI still works
+    console.error('Failed to fetch tickets:', e.message);
   }
 }
 
@@ -3949,14 +4080,23 @@ function renderMarketingRequests() {
 
 function _mreqRowHTML(r) {
   const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
-  const statusLabel = MARKETING_STATUS_LABEL[r.status] || r.status;
-  const titleBit = r.creative ? `${meta.label} · ${r.creative}` : meta.label;
-  const subBit = r.campaign ? ` — ${r.campaign}` : '';
+  const isContentAction = r._kind === 'content-action';
+  // Pick the right click handler depending on kind
+  const onClickAttr = isContentAction
+    ? `openContentActionRespond('${r.id}')`
+    : `openMarketingRequest('${r.id}')`;
+  const titleBit = isContentAction
+    ? `${meta.label}${r.campaign ? ' — ' + r.campaign : ''}`
+    : (r.creative ? `${meta.label} · ${r.creative}` : meta.label) + (r.campaign ? ` — ${r.campaign}` : '');
+  const pillClass = isContentAction ? 'needs-action' : r.status;
+  const pillLabel = isContentAction
+    ? 'Action needed'
+    : (MARKETING_STATUS_LABEL[r.status] || r.status);
   return `
-    <div class="mreq-row" onclick="openMarketingRequest('${r.id}')">
+    <div class="mreq-row" onclick="${onClickAttr}"${isContentAction ? ' style="background:rgba(232,191,96,0.07);border-left:3px solid var(--gold);padding-left:9px"' : ''}>
       <div class="mreq-icon">${meta.icon}</div>
-      <div class="mreq-title">${escapeHTML(titleBit + subBit)}</div>
-      <span class="status-pill ${r.status}">${escapeHTML(statusLabel)}</span>
+      <div class="mreq-title">${escapeHTML(titleBit)}</div>
+      <span class="status-pill ${pillClass}">${escapeHTML(pillLabel)}</span>
       <div class="mreq-date">${escapeHTML(r.submittedDateDisplay)}</div>
     </div>`;
 }
@@ -4365,6 +4505,13 @@ async function wizardSubmitFinal(skipped) {
   const submitBtns = document.querySelectorAll('#marketing-new-campaign [data-wstep="landing-page"] .btn-modal-primary, #marketing-new-campaign [data-wstep="landing-page"] .btn-modal-secondary');
   submitBtns.forEach(b => b.disabled = true);
 
+  // Loading overlay — counts files across all creative blocks
+  const _totalFiles = _wizard.creatives.reduce((n, c) => n + c.files.length, 0);
+  showLoading(
+    `Uploading ${_totalFiles} file${_totalFiles === 1 ? '' : 's'}…`,
+    "This can take a minute for video. Don't close this tab."
+  );
+
   try {
     // Upload every file across every creative block, build serializable creatives array.
     // Each block ends up with its own uploaded-file list so the content team can keep them grouped.
@@ -4427,8 +4574,10 @@ async function wizardSubmitFinal(skipped) {
       `We received your ${creativesPayload.length} creative request${creativesPayload.length === 1 ? '' : 's'} (${totalFiles} file${totalFiles === 1 ? '' : 's'}). ` +
       `Our content team will craft the creatives and our account manager will launch the "${offerLabel}" campaign within 1-2 business days.`;
 
+    hideLoading();
     wizardGoToStep('success');
   } catch (e) {
+    hideLoading();
     alert('Submit failed: ' + e.message);
   } finally {
     submitBtns.forEach(b => b.disabled = false);
@@ -5704,6 +5853,32 @@ function toggleTheme() {
       <button class="btn-modal-secondary" onclick="closeCancelRequestModal()">Keep it</button>
       <button class="btn-modal-danger" onclick="confirmCancelRequest()">Yes, Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Content-team action response modal ── -->
+<div id="contentRespondModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeContentRespondModal()">
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:480px">
+    <div class="modal-kicker">§ Respond</div>
+    <div class="modal-title">Content team needs your input</div>
+    <div class="modal-sub" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:12px 14px;border-radius:6px;color:var(--text);font-style:italic" id="contentRespondContext">—</div>
+
+    <label class="modal-label" for="contentRespondInput" style="margin-top:18px">Your response</label>
+    <textarea id="contentRespondInput" class="modal-textarea" placeholder="Reply here so the content team can keep moving"></textarea>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeContentRespondModal()">Cancel</button>
+      <button class="btn-modal-primary" onclick="submitContentResponse()">Send Response</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Loading overlay (shown during long-running submits like file uploads) ── -->
+<div id="loadingOverlay" class="modal-backdrop" style="display:none">
+  <div class="modal-card confirmation-card" style="max-width:340px">
+    <div class="loading-spinner"></div>
+    <div class="modal-title" id="loadingTitle" style="margin-top:18px">Submitting…</div>
+    <div class="modal-sub" id="loadingSub" style="margin-bottom:0">This can take a minute for video files. Don't close this tab.</div>
   </div>
 </div>
 

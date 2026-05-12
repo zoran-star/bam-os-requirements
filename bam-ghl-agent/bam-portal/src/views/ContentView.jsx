@@ -5,7 +5,7 @@ const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
 
 export default function ContentView({ tokens: tk, dark, me, session }) {
-  const [mainTab, setMainTab]     = useState("guides"); // guides | tickets
+  const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
   const [guides, setGuides]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -714,6 +714,8 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
   const [uploading, setUploading] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendNotes, setSendNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -751,7 +753,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     }
   }
 
-  async function sendToMarketing() {
+  async function sendToMarketing(marketingNotes) {
     if (busy) return;
     if (!finalsExisting.length) {
       alert("Upload at least one final creative before sending to marketing.");
@@ -759,8 +761,10 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     }
     setBusy(true);
     try {
-      await patchTicket(ticket.id, { action: "send-to-marketing" });
+      await patchTicket(ticket.id, { action: "send-to-marketing", marketing_notes: marketingNotes || "" });
       showBanner(`Sent ${academyName} content to marketing.`);
+      setSendModalOpen(false);
+      setSendNotes("");
       onBack();
       await onRefetch();
     } catch (e) {
@@ -904,13 +908,66 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             padding: "10px 20px", borderRadius: 8, cursor: "pointer",
             fontFamily: "inherit", fontSize: 13, fontWeight: 500,
           }}>Request Client Action</button>
-          <button onClick={sendToMarketing} disabled={busy || !finalsExisting.length} style={{
+          <button onClick={() => setSendModalOpen(true)} disabled={busy || !finalsExisting.length} style={{
             background: tk.accent, color: "#0A0A0B", border: 0,
             padding: "10px 22px", borderRadius: 8,
             cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
             fontFamily: "inherit", fontSize: 13, fontWeight: 700,
             opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
           }}>📤  Send to Marketing</button>
+        </div>
+      )}
+
+      {sendModalOpen && (
+        <div onClick={() => !busy && setSendModalOpen(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(10,10,11,0.78)",
+          backdropFilter: "blur(8px)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 480,
+            background: tk.bg, border: `1px solid ${tk.borderStrong || tk.border}`,
+            borderRadius: 12, padding: 28,
+          }}>
+            <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 8 }}>§ Confirm</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: tk.text, marginBottom: 6 }}>
+              Send to marketing?
+            </div>
+            <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 18, lineHeight: 1.5 }}>
+              {finalsExisting.length} final file{finalsExisting.length === 1 ? "" : "s"} will be handed off to the marketing team. Optionally leave them a note.
+            </div>
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
+              Notes for marketing (optional)
+            </label>
+            <textarea
+              value={sendNotes}
+              onChange={e => setSendNotes(e.target.value)}
+              placeholder="e.g. The 16:9 version is the hero. Variants are sized for IG story and feed."
+              style={{
+                width: "100%", minHeight: 100,
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${tk.border}`, borderRadius: 6,
+                color: tk.text, fontFamily: "inherit", fontSize: 14,
+                padding: "10px 12px", resize: "vertical",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
+              <button onClick={() => setSendModalOpen(false)} disabled={busy} style={{
+                background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+                padding: "10px 18px", borderRadius: 6, cursor: busy ? "wait" : "pointer",
+                fontFamily: "inherit", fontSize: 12, fontWeight: 500, opacity: busy ? 0.6 : 1,
+              }}>Cancel</button>
+              <button onClick={() => sendToMarketing(sendNotes)} disabled={busy} style={{
+                background: tk.accent, color: "#0A0A0B", border: 0,
+                padding: "10px 20px", borderRadius: 6,
+                cursor: busy ? "wait" : "pointer",
+                fontFamily: "inherit", fontSize: 12, fontWeight: 700,
+                opacity: busy ? 0.6 : 1,
+              }}>{busy ? "Sending…" : "Send to Marketing"}</button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -180,6 +180,8 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [selectedId, setSelectedId] = useState(null);
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
+  const [revisionModalOpen, setRevisionModalOpen] = useState(false);
+  const [revisionMessage, setRevisionMessage] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [banner, setBanner] = useState(null); // { type, text }
 
@@ -210,13 +212,18 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
 
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
-  const active        = tickets.filter(t => t.status === "in-progress");
-  const clientAction  = active.filter(t => t.clientActionStatus === "requested");
-  const completed     = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
+  const inProgress = tickets.filter(t => t.status === "in-progress");
+  // "Awaiting revision" tickets (returned by marketing to content team) are also
+  // hidden from Active since the ball is no longer in marketing's court.
+  const awaitingRev = inProgress.filter(t => t._raw?.awaiting_revision);
+  const clientDep   = inProgress.filter(t => t.clientActionStatus === "requested");
+  // Active = in-progress, not awaiting client, not awaiting content revision
+  const active      = inProgress.filter(t => t.clientActionStatus !== "requested" && !t._raw?.awaiting_revision);
+  const completed   = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
 
   const rows =
     tab === "active"         ? active
-    : tab === "client-action" ? clientAction
+    : tab === "client-action" ? clientDep
                               : completed;
 
   const showBanner = (type, text) => {
@@ -251,22 +258,26 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     }
   };
 
-  const requestContentRevision = async () => {
-    if (!selected || actionBusy) return;
-    const msg = prompt(
-      "What needs to be revised? This will spawn a new content ticket with these notes.",
-      ""
-    );
-    if (!msg || !msg.trim()) return;
+  const submitRevisionRequest = async (msg) => {
+    if (!selected || !msg || !msg.trim() || actionBusy) return;
     setActionBusy(true);
     try {
-      // Guess the type from existing fields/files (basic heuristic: video if any video mime)
       const hasVideo = (selected.files || []).some(f => (f.mime || "").startsWith("video/"));
       await _patchTicket(selected.id, {
         action: "request-content-revision",
         message: msg.trim(),
         type: hasVideo ? "video" : "graphic",
       });
+      // Pull fresh data so this ticket disappears from Active
+      try {
+        const token = session?.access_token;
+        const res = await fetch("/api/marketing-tickets?scope=staff", { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (res.ok) setTickets((json.tickets || []).map(normalizeTicket));
+      } catch (_) { /* swallow */ }
+      setSelectedId(null);
+      setRevisionModalOpen(false);
+      setRevisionMessage("");
       showBanner("success", `Revision request sent to content team for ${selected.academyName}.`);
     } catch (e) {
       showBanner("error", "Revision request failed: " + e.message);
@@ -359,7 +370,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             {/* "Request Content Revision" only shows up when finals exist (i.e. ticket came from content team) */}
             {(selected.files && selected.files.length > 0) && (
               <button
-                onClick={requestContentRevision}
+                onClick={() => setRevisionModalOpen(true)}
                 style={{
                   background: "transparent", border: `1px solid ${tk.amber || "#E8A547"}`, color: tk.amber || "#E8A547",
                   padding: "10px 20px", borderRadius: 8, cursor: "pointer",
@@ -396,6 +407,17 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
             academyName={selected.academyName}
           />
         )}
+
+        {revisionModalOpen && (
+          <RevisionRequestModal
+            tk={tk}
+            value={revisionMessage}
+            onChange={setRevisionMessage}
+            onCancel={() => { setRevisionModalOpen(false); setRevisionMessage(""); }}
+            onSubmit={() => submitRevisionRequest(revisionMessage)}
+            busy={actionBusy}
+          />
+        )}
       </div>
     );
   }
@@ -418,11 +440,11 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
         </div>
       </div>
 
-      {/* Tabs (Content Check Required tab removed — content production now lives on Content page) */}
+      {/* Tabs */}
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 20, overflowX: "auto" }}>
-        <Tab label={`Active (${active.length})`}                       active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} />
-        <Tab label={`Client Action Required (${clientAction.length})`} active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientAction.length > 0} />
-        <Tab label={`Completed (${completed.length})`}                 active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
+        <Tab label={`Active (${active.length})`}                  active={tab === "active"}         onClick={() => setTab("active")}         tk={tk} />
+        <Tab label={`Client Dependent (${clientDep.length})`}     active={tab === "client-action"} onClick={() => setTab("client-action")} tk={tk} red={clientDep.length > 0} />
+        <Tab label={`Completed (${completed.length})`}            active={tab === "completed"}     onClick={() => setTab("completed")}     tk={tk} />
       </div>
 
       {/* Column headers */}
@@ -649,6 +671,70 @@ function renderSubmittedInfo(t, tk) {
       <div style={{ flex: 1, color: tk.text, fontSize: 14, lineHeight: 1.5 }}>{value}</div>
     </div>
   ));
+}
+
+function RevisionRequestModal({ tk, value, onChange, onCancel, onSubmit, busy }) {
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(10,10,11,0.78)",
+        backdropFilter: "blur(8px)", zIndex: 9999,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 480,
+          background: tk.bg, border: `1px solid ${tk.borderStrong || tk.border}`,
+          borderRadius: 12, padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        }}
+      >
+        <div style={{ fontSize: 10, color: tk.textMute, letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 8 }}>
+          § Revision Request
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 500, color: tk.text, marginBottom: 6 }}>
+          What needs to be revised?
+        </div>
+        <div style={{ fontSize: 13, color: tk.textSub, marginBottom: 18, lineHeight: 1.5 }}>
+          This spawns a new content ticket with these notes. The ticket leaves the Active tab until content sends the revision back.
+        </div>
+
+        <textarea
+          autoFocus
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="e.g. The hook is too slow. Cut the first 2 seconds and add a stronger opener."
+          style={{
+            width: "100%", minHeight: 120,
+            background: "rgba(255,255,255,0.03)",
+            border: `1px solid ${tk.border}`, borderRadius: 6,
+            color: tk.text, fontFamily: "inherit", fontSize: 14,
+            padding: "10px 12px", resize: "vertical",
+          }}
+        />
+
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22 }}>
+          <button onClick={onCancel} disabled={busy} style={{
+            background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+            padding: "10px 18px", borderRadius: 6,
+            cursor: busy ? "wait" : "pointer",
+            fontFamily: "inherit", fontSize: 12, fontWeight: 500,
+            opacity: busy ? 0.6 : 1,
+          }}>Cancel</button>
+          <button onClick={onSubmit} disabled={!value.trim() || busy} style={{
+            background: value.trim() && !busy ? (tk.amber || "#E8A547") : tk.border,
+            color: "#0A0A0B", border: 0,
+            padding: "10px 20px", borderRadius: 6,
+            cursor: value.trim() && !busy ? "pointer" : "not-allowed",
+            fontFamily: "inherit", fontSize: 12, fontWeight: 700,
+            opacity: value.trim() && !busy ? 1 : 0.6,
+          }}>{busy ? "Sending…" : "Send Revision Request"}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ActionRequestModal({ tk, value, onChange, onCancel, onSubmit, academyName }) {
