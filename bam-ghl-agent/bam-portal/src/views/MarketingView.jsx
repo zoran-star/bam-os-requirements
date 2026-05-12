@@ -21,6 +21,13 @@ function needsContentCheckByType(type) {
   return CONTENT_TYPES.has(type);
 }
 
+// 3-letter test-tracking code prefix derived from the ticket UUID
+function ticketCode(id) {
+  if (!id) return "???";
+  const cleaned = String(id).replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase();
+  return cleaned || "???";
+}
+
 // ─── Date formatters ───
 function formatDateLong(iso) {
   if (!iso) return "";
@@ -326,7 +333,7 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
           >←</button>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
-              Marketing Ticket · {selected.id}
+              Marketing Ticket · {ticketCode(selected.id)} · {selected.id.slice(0, 8)}
             </div>
             <div style={{ fontSize: 26, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em", marginBottom: 4 }}>
               {typeMeta.icon}  {typeMeta.label}{selected.creative ? ` · ${selected.creative}` : ""}
@@ -495,7 +502,14 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
               onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
-              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14 }}>{t.academyName}</div>
+              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
+                  color: tk.textMute, padding: "2px 6px", borderRadius: 4,
+                  background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
+                }}>{ticketCode(t.id)}</span>
+                <span>{t.academyName}</span>
+              </div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>{t.campaignTitle}</div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>
                 <span style={{ marginRight: 6 }}>{typeMeta.icon}</span>{typeMeta.label}

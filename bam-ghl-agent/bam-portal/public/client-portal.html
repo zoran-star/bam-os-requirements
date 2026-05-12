@@ -1082,6 +1082,20 @@
     cursor: not-allowed;
   }
 
+  /* 3-letter test-tracking code chip prefixed to ticket titles */
+  .ticket-code {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--text-mute);
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--line);
+    margin-right: 8px;
+    vertical-align: 1px;
+  }
+
   /* Marketing request row (extends ticket-row pattern) */
   .mreq-row {
     display: flex;
@@ -3206,13 +3220,34 @@
             <!-- rendered by JS -->
           </div>
 
-          <div class="section-label">Updates from your account manager</div>
+          <div class="section-label" id="reqDetailUpdatesLabel">Updates from your account manager</div>
           <div class="card" id="reqDetailUpdatesCard" style="margin-bottom:28px">
             <!-- rendered by JS -->
           </div>
 
+          <!-- Inline respond form — visible only when staff/content team has requested action -->
+          <div id="reqDetailRespondSection" style="display:none;margin-bottom:24px">
+            <div class="section-label">Respond</div>
+            <div class="card">
+              <label class="modal-label" for="reqDetailRespondInput">Your message</label>
+              <textarea id="reqDetailRespondInput" class="modal-textarea" placeholder="Type your response so the team can keep moving"></textarea>
+
+              <label class="modal-label" style="margin-top:14px">Attach files (optional)</label>
+              <label for="reqDetailRespondFiles" class="file-drop-label" style="padding:18px">
+                <span class="file-drop-icon">↑</span>
+                <span class="file-drop-text">Click to add files</span>
+                <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
+              </label>
+              <input type="file" id="reqDetailRespondFiles" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_reqDetailRespondAddFiles(this.files)" />
+              <div class="wizard-files-list" id="reqDetailRespondFilesList" style="margin-top:8px"></div>
+
+              <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+                <button class="btn-modal-primary" id="reqDetailRespondSubmitBtn" onclick="submitReqDetailResponse()">Send response</button>
+              </div>
+            </div>
+          </div>
+
           <div id="reqDetailActions" style="display:flex;gap:10px;justify-content:flex-end">
-            <button id="reqDetailRespondBtn" class="btn-modal-primary" onclick="openMarketingActionRespond()" style="display:none">Respond to request</button>
             <button class="btn-modal-danger" onclick="openCancelRequestModal()">Cancel Request</button>
           </div>
 
@@ -3610,7 +3645,12 @@ async function submitBudgetChange() {
   const newBudgetRaw = document.getElementById('budgetModalInput')?.value?.trim();
   const reason = document.getElementById('budgetModalReason')?.value?.trim() || '';
   if (!newBudgetRaw) { alert('Enter a new monthly spend.'); return; }
-  const newBudget = newBudgetRaw.startsWith('$') ? newBudgetRaw : ('$' + newBudgetRaw.replace(/[^0-9.,]/g, ''));
+  const numeric = parseFloat(newBudgetRaw.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(numeric) || numeric < 1) {
+    alert('Monthly spend must be at least $1.');
+    return;
+  }
+  const newBudget = '$' + numeric.toString();
   const currentSpend = document.getElementById('budgetModalCurrent')?.textContent?.trim() || '';
   closeBudgetModal();
   showLoading('Submitting budget change…', 'Just a moment.');
@@ -3691,18 +3731,21 @@ function openRemoveModal(btn) {
 
 function closeRemoveModal() {
   document.getElementById('removeModal').style.display = 'none';
+  const note = document.getElementById('removeNote');
+  if (note) note.value = '';
   _pendingCreative = null;
 }
 
 async function confirmRemove() {
   const creativeName = _pendingCreative?.name || 'creative';
+  const note = document.getElementById('removeNote')?.value?.trim() || '';
   closeRemoveModal();
   showLoading('Submitting delete request…', 'Just a moment.');
   try {
     // Remove (delete creative) goes STRAIGHT to marketing, not content
     await _mreqCreateTicket({
       type: 'remove',
-      fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName },
+      fields: { campaign_title: _detailCampaignTitle(), creative_name: creativeName, note },
       files: [],
     });
     await fetchAndRenderMarketingRequests();
@@ -3818,7 +3861,7 @@ async function _ctkCreateTicket(payload) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(payload),
   });
-  const json = await res.json();
+  const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json.ticket;
 }
@@ -3830,78 +3873,161 @@ async function _ctkPatchTicket(id, body) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(body),
   });
-  const json = await res.json();
+  const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json.ticket;
 }
 
-// ── Respond to a MARKETING-team action request (from the detail view) ──
-function openMarketingActionRespond() {
-  if (!_activeRequestId) return;
-  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
-  if (!r) return;
-  // Reuse the content-respond modal but route submit to the marketing endpoint.
-  _pendingMarketingActionId = _activeRequestId;
-  _pendingContentActionId = null;
-  const ctx = (r.updates || []).filter(u => u.isActionRequest).slice(-1)[0];
-  document.getElementById('contentRespondContext').textContent = ctx ? ctx.message : '(no message)';
-  document.getElementById('contentRespondInput').value = '';
-  document.getElementById('contentRespondModal').style.display = 'flex';
-}
+// ── Unified content-ticket detail view ──
+// Both action-needed and in-production content tickets open here so the user
+// sees the full ticket (not a popup) and can respond inline with file drops.
 
-let _pendingMarketingActionId = null;
-async function _submitMarketingResponse(message) {
-  if (!_pendingMarketingActionId) return;
-  const id = _pendingMarketingActionId;
-  closeContentRespondModal();
-  showLoading('Sending your response…', 'Just a moment.');
-  try {
-    await _mreqPatchTicket(id, { action: 'respond', message });
-    await fetchAndRenderMarketingRequests();
-    closeMarketingRequest();
-    hideLoading();
-    showConfirmation('Response sent', 'Your account manager has your response.');
-  } catch (e) {
-    hideLoading();
-    alert('Send failed: ' + e.message);
-  }
-}
+let _reqDetailKind = null;        // 'marketing' | 'content'
+let _reqDetailRespondFiles = [];  // staged File objects for the inline respond form
 
-// ── Respond to a content-team action request ──
-let _pendingContentActionId = null;
-function openContentActionRespond(id) {
+function openContentTicketDetail(id) {
   const r = MARKETING_REQUESTS.find(x => x.id === id);
   if (!r) return;
-  _pendingContentActionId = id;
-  // Find last action-request message body to show as context
-  const ctx = (r.updates || []).filter(u => u.isActionRequest).slice(-1)[0];
-  const ctxBody = ctx ? ctx.message : '';
-  document.getElementById('contentRespondContext').textContent = ctxBody || '(no message)';
-  document.getElementById('contentRespondInput').value = '';
-  document.getElementById('contentRespondModal').style.display = 'flex';
+
+  _activeRequestId = id;
+  _reqDetailKind = 'content';
+  _reqDetailRespondFiles = [];
+
+  const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
+
+  // Header
+  document.getElementById('reqDetailTitle').textContent = meta.label;
+  document.getElementById('reqDetailSub').textContent =
+    `${_ticketCode(r.id)}  ·  ${r.campaign || '(no campaign)'}  ·  Submitted ${r.submittedDateDisplay}`;
+  const pill = document.getElementById('reqDetailStatusPill');
+  const actionNeeded = r.clientActionStatus === 'requested';
+  pill.className = 'status-pill ' + (actionNeeded ? 'needs-action' : 'in-progress');
+  pill.textContent = actionNeeded ? 'Action needed' : 'In production';
+
+  // "What you submitted" — show raw files + last action-request prompt
+  const submitted = document.getElementById('reqDetailSubmittedCard');
+  const raw = r.files || [];
+  const actionReq = (r.updates || []).filter(u => u.isActionRequest).slice(-1)[0];
+  let html = '';
+  html += `<div class="req-info-row"><div class="req-info-label">Type</div><div class="req-info-value">${escapeHTML(r.contentTicketType || '')}</div></div>`;
+  if (r.campaign) {
+    html += `<div class="req-info-row"><div class="req-info-label">Campaign</div><div class="req-info-value">${escapeHTML(r.campaign)}</div></div>`;
+  }
+  if (raw.length) {
+    const fileLines = raw.map(f => `<a href="${escapeHTML(f.url)}" target="_blank" rel="noreferrer" style="color:var(--gold);text-decoration:none;display:inline-block;margin-right:10px">${escapeHTML(f.name)} ↗</a>`).join('');
+    html += `<div class="req-info-row"><div class="req-info-label">Files</div><div class="req-info-value">${fileLines}</div></div>`;
+  }
+  if (actionReq) {
+    html += `<div class="req-info-row"><div class="req-info-label">Action requested</div><div class="req-info-value" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;font-style:italic">${escapeHTML(actionReq.message)}</div></div>`;
+  }
+  submitted.innerHTML = html;
+
+  // Updates label is content-flavoured
+  const updatesLabel = document.getElementById('reqDetailUpdatesLabel');
+  if (updatesLabel) updatesLabel.textContent = 'Activity';
+
+  // Render activity feed
+  _renderReqDetailUpdates(r);
+
+  // Show respond section if action is needed
+  const respondSection = document.getElementById('reqDetailRespondSection');
+  if (respondSection) respondSection.style.display = actionNeeded ? 'block' : 'none';
+  if (actionNeeded) {
+    document.getElementById('reqDetailRespondInput').value = '';
+    _renderReqDetailRespondFilesList();
+  }
+
+  // Cancel button only on active tickets where client owns the cancellation flow
+  const actionsBar = document.getElementById('reqDetailActions');
+  if (actionsBar) actionsBar.style.display = 'flex';
+
+  document.getElementById('marketing-list').style.display = 'none';
+  document.getElementById('marketing-detail').style.display = 'none';
+  document.getElementById('marketing-new-campaign').style.display = 'none';
+  document.getElementById('marketing-request-detail').style.display = 'block';
+  window.scrollTo(0, 0);
 }
 
-function closeContentRespondModal() {
-  document.getElementById('contentRespondModal').style.display = 'none';
-  _pendingContentActionId = null;
+// Shared "updates feed" renderer used by both detail flows
+function _renderReqDetailUpdates(r) {
+  const updatesEl = document.getElementById('reqDetailUpdatesCard');
+  updatesEl.innerHTML = r.updates && r.updates.length
+    ? r.updates.map(u => `
+        <div class="req-update-item">
+          <div class="req-update-meta">${escapeHTML(u.when)} · ${escapeHTML(u.who)}${u.isActionRequest ? '  ·  Action requested' : ''}</div>
+          <div class="req-update-message">${escapeHTML(u.message)}</div>
+        </div>`).join('')
+    : '<div class="req-empty">No activity yet.</div>';
 }
 
-async function submitContentResponse() {
-  const message = document.getElementById('contentRespondInput')?.value?.trim();
-  if (!message) { alert('Type your response first.'); return; }
-  // Same modal is reused for marketing action requests — route accordingly
-  if (_pendingMarketingActionId) {
-    await _submitMarketingResponse(message);
+// ── Inline respond form (used by both marketing + content detail views) ──
+function _reqDetailRespondAddFiles(filesList) {
+  const incoming = Array.from(filesList || []);
+  if (!incoming.length) return;
+  _reqDetailRespondFiles = _reqDetailRespondFiles.concat(incoming);
+  _renderReqDetailRespondFilesList();
+  const input = document.getElementById('reqDetailRespondFiles');
+  if (input) input.value = '';
+}
+
+function _reqDetailRespondRemoveFile(idx) {
+  _reqDetailRespondFiles.splice(idx, 1);
+  _renderReqDetailRespondFilesList();
+}
+
+function _renderReqDetailRespondFilesList() {
+  const listEl = document.getElementById('reqDetailRespondFilesList');
+  if (!listEl) return;
+  if (!_reqDetailRespondFiles.length) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = _reqDetailRespondFiles.map((f, i) => {
+    const isImage = (f.type || '').startsWith('image/');
+    const thumb = isImage
+      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+      : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+    const sizeKB = (f.size / 1024).toFixed(0);
+    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+    return `
+      <div class="wizard-file-item">
+        ${thumb}
+        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+        <div class="wizard-file-size">${sizeLabel}</div>
+        <button class="wizard-file-remove" onclick="_reqDetailRespondRemoveFile(${i})" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+}
+
+async function submitReqDetailResponse() {
+  const message = document.getElementById('reqDetailRespondInput')?.value?.trim();
+  if (!message && !_reqDetailRespondFiles.length) {
+    alert('Type a response or attach at least one file.');
     return;
   }
-  if (!_pendingContentActionId) { closeContentRespondModal(); return; }
-  closeContentRespondModal();
-  showLoading('Sending your response…', 'Just a moment.');
+  if (!_activeRequestId) return;
+  const id = _activeRequestId;
+  const kind = _reqDetailKind;
+  const filesToUpload = _reqDetailRespondFiles.slice();
+  showLoading('Sending your response…', filesToUpload.length ? "Uploading files — don't close this tab." : 'Just a moment.');
   try {
-    await _ctkPatchTicket(_pendingContentActionId, { action: 'respond', message });
+    // Upload any attached files first
+    const uploaded = filesToUpload.length ? await _mreqUploadFiles(filesToUpload) : [];
+    // Build message body that includes file references
+    const fileNote = uploaded.length
+      ? '\n\nAttached:\n' + uploaded.map(f => `• ${f.name} — ${f.url}`).join('\n')
+      : '';
+    const fullBody = (message || '') + fileNote;
+
+    if (kind === 'content') {
+      await _ctkPatchTicket(id, { action: 'respond', message: fullBody });
+    } else {
+      await _mreqPatchTicket(id, { action: 'respond', message: fullBody });
+    }
+    _reqDetailRespondFiles = [];
+    closeMarketingRequest();
     await fetchAndRenderMarketingRequests();
     hideLoading();
-    showConfirmation('Response sent', 'The content team has your response and will keep building.');
+    showConfirmation('Response sent', kind === 'content'
+      ? 'The content team has your response and will keep building.'
+      : 'Your account manager has your response.');
   } catch (e) {
     hideLoading();
     alert('Send failed: ' + e.message);
@@ -3913,12 +4039,13 @@ async function submitContentResponse() {
    ════════════════════════════════ */
 
 const MARKETING_REQUEST_META = {
-  replace:           { icon: '🔄', label: 'Replace creative'             },
-  add:               { icon: '➕', label: 'Add new creative'             },
-  remove:            { icon: '🗑',  label: 'Remove creative'              },
-  budget:            { icon: '💰', label: 'Budget change'                },
-  'campaign-create': { icon: '🚀', label: 'New campaign'                 },
-  'content-action':  { icon: '⏰', label: 'Content team needs your input' },
+  replace:                    { icon: '🔄', label: 'Replace creative'             },
+  add:                        { icon: '➕', label: 'Add new creative'             },
+  remove:                     { icon: '🗑',  label: 'Remove creative'              },
+  budget:                     { icon: '💰', label: 'Budget change'                },
+  'campaign-create':          { icon: '🚀', label: 'New campaign'                 },
+  'content-action-needed':    { icon: '⏰', label: 'Content team needs your input' },
+  'content-in-production':    { icon: '🎨', label: 'In production'                },
 };
 
 const MARKETING_STATUS_LABEL = {
@@ -3954,6 +4081,17 @@ async function _mreqUploadFiles(files) {
   return out;
 }
 
+async function _safeJson(res) {
+  // Tolerate HTML/empty bodies (Vercel 500 pages, etc.) so we can still
+  // surface a useful error to the user.
+  const text = await res.text();
+  if (!text) return {};
+  try { return JSON.parse(text); }
+  catch (_) {
+    return { error: `HTTP ${res.status} — ${text.slice(0, 200).replace(/<[^>]*>/g, '').trim()}` };
+  }
+}
+
 async function _mreqCreateTicket(payload) {
   const token = await _mreqAuthToken();
   const res = await fetch('/api/marketing-tickets', {
@@ -3961,7 +4099,7 @@ async function _mreqCreateTicket(payload) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(payload),
   });
-  const json = await res.json();
+  const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json.ticket;
 }
@@ -3973,7 +4111,7 @@ async function _mreqPatchTicket(id, body) {
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
     body: JSON.stringify(body),
   });
-  const json = await res.json();
+  const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json.ticket;
 }
@@ -3983,46 +4121,54 @@ async function _mreqFetchAll() {
   const res = await fetch('/api/marketing-tickets?scope=client', {
     headers: { 'Authorization': 'Bearer ' + token },
   });
-  const json = await res.json();
+  const json = await _safeJson(res);
   if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
   return json.tickets || [];
 }
 
-// Fetch only the content tickets the content team is currently asking the
-// client to act on. These surface alongside marketing tickets in the tracker.
-async function _ctkFetchActionRequested() {
+// Fetch the client's content tickets so they appear in the tracker.
+// We include all that are still in flight (active / client-dependent).
+// Completed/cancelled content tickets are NOT shown — when they complete
+// via "Send to marketing", a spawned marketing ticket takes their place.
+async function _ctkFetchForClient() {
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/marketing?resource=content-tickets&scope=client', {
+    const res = await fetch('/api/marketing?resource=content-tickets&scope=client&all=1', {
       headers: { 'Authorization': 'Bearer ' + token },
     });
-    const json = await res.json();
+    const json = await _safeJson(res);
     if (!res.ok) return [];
-    return json.tickets || [];
+    const tickets = json.tickets || [];
+    return tickets.filter(t => t.status === 'active' || t.status === 'client-dependent');
   } catch (_) {
     return [];
   }
 }
 
-// Normalize a content ticket (with action requested) into the same render shape
-// the marketing-requests tracker uses, but tagged as kind='content-action'.
+// Normalize a content ticket into the tracker render shape.
+// The _kind tells the renderer how to display + which API to call on click:
+//   content-action-needed → client needs to respond (content_action_status=requested)
+//   content-in-production → content team is still building, no action needed
 function _ctkNormalizeForTracker(apiTicket) {
   const ctx = apiTicket.context || {};
-  // Pull the most recent action-request message body so the row is informative
   const messages = Array.isArray(apiTicket.messages) ? apiTicket.messages : [];
   const lastActionReq = [...messages].reverse().find(m => m.is_action_request);
   const submittedAt = apiTicket.submitted_at;
+  const actionNeeded = apiTicket.client_action_status === 'requested';
+  // For the campaign-create mega-ticket, ctx.offer is the campaign name
+  const campaignName = ctx.campaign_title || ctx.offer || '';
   return {
     id: apiTicket.id,
-    _kind: 'content-action',
-    type: 'content-action',
-    campaign: ctx.campaign_title || ctx.offer || '',
+    _kind: actionNeeded ? 'content-action-needed' : 'content-in-production',
+    type: actionNeeded ? 'content-action-needed' : 'content-in-production',
+    campaign: campaignName,
     creative: ctx.related_creative_name || '',
     note: lastActionReq?.body || '',
     contentTicketType: apiTicket.type,
+    contentTicketSource: ctx.source || '',
     status: 'in-progress',
     contentCheckStatus: 'not-required',
-    clientActionStatus: 'requested',
+    clientActionStatus: actionNeeded ? 'requested' : 'none',
     submittedDate: submittedAt ? submittedAt.split('T')[0] : '',
     submittedDateDisplay: submittedAt
       ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -4033,6 +4179,8 @@ function _ctkNormalizeForTracker(apiTicket) {
       message: m.body || '',
       isActionRequest: !!m.is_action_request,
     })),
+    files: apiTicket.raw_files || [],
+    rawTicket: apiTicket,
   };
 }
 
@@ -4078,15 +4226,20 @@ function _mreqNormalize(apiTicket) {
 
 async function fetchAndRenderMarketingRequests() {
   try {
-    const [marketingTickets, contentActionTickets] = await Promise.all([
+    const [marketingTickets, contentTickets] = await Promise.all([
       _mreqFetchAll(),
-      _ctkFetchActionRequested(),
+      _ctkFetchForClient(),
     ]);
     const m = marketingTickets.map(_mreqNormalize).map(t => ({ ...t, _kind: 'marketing' }));
-    const c = contentActionTickets.map(_ctkNormalizeForTracker);
-    // Content-team action requests sit at the top — those are the ones the
-    // client most needs to act on.
-    MARKETING_REQUESTS = [...c, ...m];
+    const c = contentTickets.map(_ctkNormalizeForTracker);
+    // Sort: action-needed (content team waiting on client) first, then everything else by submitted date desc
+    MARKETING_REQUESTS = [...c, ...m].sort((a, b) => {
+      const aActionNeeded = a._kind === 'content-action-needed' ? 1 : 0;
+      const bActionNeeded = b._kind === 'content-action-needed' ? 1 : 0;
+      if (aActionNeeded !== bActionNeeded) return bActionNeeded - aActionNeeded;
+      // newest first
+      return new Date(b.submittedDate || 0) - new Date(a.submittedDate || 0);
+    });
     renderMarketingRequests();
   } catch (e) {
     console.error('Failed to fetch tickets:', e.message);
@@ -4116,19 +4269,33 @@ function renderMarketingRequests() {
     : '<div class="req-empty">No completed requests yet.</div>';
 }
 
+// 3-letter code prefix derived from the ticket UUID, for cross-portal tracking
+// during testing. e.g. uuid "e1fffaa8-…" → "E1F"
+function _ticketCode(id) {
+  if (!id) return '???';
+  const cleaned = String(id).replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase();
+  return cleaned || '???';
+}
+
 function _mreqRowHTML(r) {
   const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
-  const isContentAction = r._kind === 'content-action';
+  const isCompleted = r.status === 'completed' || r.status === 'cancelled';
+  const isContentAction = r._kind === 'content-action-needed';
+  const isContentProduction = r._kind === 'content-in-production';
   // A marketing ticket where staff requested client action also needs the
   // "action needed" treatment so clients see it on the list (not just inside).
-  const isMarketingActionNeeded = !isContentAction && r.clientActionStatus === 'requested';
-  const needsAction = isContentAction || isMarketingActionNeeded;
+  // BUT completed/cancelled tickets never show action-needed.
+  const isMarketingActionNeeded = r._kind === 'marketing' && r.clientActionStatus === 'requested' && !isCompleted;
+  const needsAction = !isCompleted && (isContentAction || isMarketingActionNeeded);
 
-  // Pick the right click handler depending on kind
-  const onClickAttr = isContentAction
-    ? `openContentActionRespond('${r.id}')`
+  // All content-ticket rows open the unified content-ticket detail view.
+  // Marketing-ticket rows open the existing marketing detail view.
+  const onClickAttr = (isContentAction || isContentProduction)
+    ? `openContentTicketDetail('${r.id}')`
     : `openMarketingRequest('${r.id}')`;
-  const titleBit = isContentAction
+
+  const codePrefix = `<span class="ticket-code">${_ticketCode(r.id)}</span>`;
+  const titleBit = (isContentAction || isContentProduction)
     ? `${meta.label}${r.campaign ? ' — ' + r.campaign : ''}`
     : (r.creative ? `${meta.label} · ${r.creative}` : meta.label) + (r.campaign ? ` — ${r.campaign}` : '');
 
@@ -4140,7 +4307,7 @@ function _mreqRowHTML(r) {
   return `
     <div class="mreq-row" onclick="${onClickAttr}"${needsAction ? ' style="background:rgba(232,191,96,0.07);border-left:3px solid var(--gold);padding-left:9px"' : ''}>
       <div class="mreq-icon">${meta.icon}</div>
-      <div class="mreq-title">${escapeHTML(titleBit)}</div>
+      <div class="mreq-title">${codePrefix} ${escapeHTML(titleBit)}</div>
       <span class="status-pill ${pillClass}">${escapeHTML(pillLabel)}</span>
       <div class="mreq-date">${escapeHTML(r.submittedDateDisplay)}</div>
     </div>`;
@@ -4157,6 +4324,8 @@ function openMarketingRequest(id) {
   const r = MARKETING_REQUESTS.find(x => x.id === id);
   if (!r) return;
   _activeRequestId = id;
+  _reqDetailKind = 'marketing';
+  _reqDetailRespondFiles = [];
 
   const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
   const statusLabel = MARKETING_STATUS_LABEL[r.status] || r.status;
@@ -4165,10 +4334,16 @@ function openMarketingRequest(id) {
   document.getElementById('reqDetailTitle').textContent =
     r.creative ? `${meta.label} · ${r.creative}` : meta.label;
   document.getElementById('reqDetailSub').textContent =
-    `${r.campaign || ''}  ·  Submitted ${r.submittedDateDisplay}`;
+    `${_ticketCode(r.id)}  ·  ${r.campaign || ''}  ·  Submitted ${r.submittedDateDisplay}`;
   const pill = document.getElementById('reqDetailStatusPill');
-  pill.className = 'status-pill ' + r.status;
-  pill.textContent = statusLabel;
+  // Action-needed marketing tickets get the gold pill (matches the row)
+  const showActionPill = r.status === 'in-progress' && r.clientActionStatus === 'requested';
+  pill.className = 'status-pill ' + (showActionPill ? 'needs-action' : r.status);
+  pill.textContent = showActionPill ? 'Action needed' : statusLabel;
+
+  // Updates label is marketing-flavoured
+  const updatesLabel = document.getElementById('reqDetailUpdatesLabel');
+  if (updatesLabel) updatesLabel.textContent = 'Updates from your account manager';
 
   // "What you submitted" card
   const submitted = document.getElementById('reqDetailSubmittedCard');
@@ -4213,21 +4388,25 @@ function openMarketingRequest(id) {
         </div>`).join('')
     : '<div class="req-empty">No updates yet — your account manager will respond shortly.</div>';
 
-  // Hide Edit + Cancel buttons for completed/cancelled requests
+  // Hide Cancel button for completed/cancelled requests
   const actionsBar = document.getElementById('reqDetailActions');
   if (actionsBar) {
     actionsBar.style.display = (r.status === 'completed' || r.status === 'cancelled') ? 'none' : 'flex';
   }
 
-  // Show "Respond to request" only when staff has requested action
-  const respondBtn = document.getElementById('reqDetailRespondBtn');
-  if (respondBtn) {
-    respondBtn.style.display = (r.status === 'in-progress' && r.clientActionStatus === 'requested') ? '' : 'none';
+  // Inline respond form: visible only when staff has requested action
+  const respondSection = document.getElementById('reqDetailRespondSection');
+  const showRespond = r.status === 'in-progress' && r.clientActionStatus === 'requested';
+  if (respondSection) respondSection.style.display = showRespond ? 'block' : 'none';
+  if (showRespond) {
+    document.getElementById('reqDetailRespondInput').value = '';
+    _renderReqDetailRespondFilesList();
   }
 
   // Show detail, hide list and campaign detail
   document.getElementById('marketing-list').style.display = 'none';
   document.getElementById('marketing-detail').style.display = 'none';
+  document.getElementById('marketing-new-campaign').style.display = 'none';
   document.getElementById('marketing-request-detail').style.display = 'block';
   window.scrollTo(0, 0);
 }
@@ -4539,9 +4718,15 @@ function _updateWizardContinueBtn() {
 
 function wizardSubmitBudget() {
   if (!_wizard) return;
-  const value = (document.getElementById('wizardBudgetInput')?.value || '').trim();
-  if (!value) { alert('Enter a monthly spend.'); return; }
-  _wizard.budget = value.startsWith('$') ? value : ('$' + value.replace(/[^0-9.,]/g, ''));
+  const raw = (document.getElementById('wizardBudgetInput')?.value || '').trim();
+  if (!raw) { alert('Enter a monthly spend.'); return; }
+  // Strip currency / commas, parse number
+  const numeric = parseFloat(raw.replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(numeric) || numeric < 1) {
+    alert('Monthly spend must be at least $1.');
+    return;
+  }
+  _wizard.budget = '$' + numeric.toString();
   wizardGoToStep('landing-page');
 }
 
@@ -5907,23 +6092,6 @@ function toggleTheme() {
   </div>
 </div>
 
-<!-- ── Content-team action response modal ── -->
-<div id="contentRespondModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeContentRespondModal()">
-  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:480px">
-    <div class="modal-kicker">§ Respond</div>
-    <div class="modal-title">Content team needs your input</div>
-    <div class="modal-sub" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:12px 14px;border-radius:6px;color:var(--text);font-style:italic" id="contentRespondContext">—</div>
-
-    <label class="modal-label" for="contentRespondInput" style="margin-top:18px">Your response</label>
-    <textarea id="contentRespondInput" class="modal-textarea" placeholder="Reply here so the content team can keep moving"></textarea>
-
-    <div class="modal-footer">
-      <button class="btn-modal-secondary" onclick="closeContentRespondModal()">Cancel</button>
-      <button class="btn-modal-primary" onclick="submitContentResponse()">Send Response</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── Loading overlay (shown during long-running submits like file uploads) ── -->
 <div id="loadingOverlay" class="modal-backdrop" style="display:none">
   <div class="modal-card confirmation-card" style="max-width:340px">
@@ -5957,6 +6125,9 @@ function toggleTheme() {
       <img id="removeCurrentImg" class="replace-current-img" src="" alt="" />
       <div class="replace-current-name" id="removeCurrentName">Creative</div>
     </div>
+
+    <label class="modal-label" for="removeNote" style="margin-top:14px">Note (optional)</label>
+    <textarea id="removeNote" class="modal-textarea" placeholder="Why are you deleting this? Any context for your account manager."></textarea>
 
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeRemoveModal()">Cancel</button>

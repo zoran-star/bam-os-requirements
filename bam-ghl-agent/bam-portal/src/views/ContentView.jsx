@@ -534,6 +534,13 @@ function MainTab({ label, active, onClick, tk }) {
 // ─────────────────────────────────────────────────────────
 const TICKET_STORAGE_FOLDER = "content-tickets";
 
+// 3-letter test-tracking code from ticket UUID
+function ctkCode(id) {
+  if (!id) return "???";
+  const cleaned = String(id).replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase();
+  return cleaned || "???";
+}
+
 const TYPE_META_CT = {
   graphic: { icon: "🖼", label: "Graphic" },
   video:   { icon: "🎬", label: "Video" },
@@ -678,7 +685,14 @@ function ContentTicketsTab({ tk, session, me }) {
               onMouseEnter={e => e.currentTarget.style.background = tk.surfaceHov}
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
-              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14 }}>{academyName}</div>
+              <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
+                  color: tk.textMute, padding: "2px 6px", borderRadius: 4,
+                  background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
+                }}>{ctkCode(t.id)}</span>
+                <span>{academyName}</span>
+              </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
               <div style={{ color: tk.textSub, fontSize: 13 }}>
                 <span style={{ marginRight: 6 }}>{meta.icon}</span>{meta.label}
@@ -807,7 +821,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
         }}>←</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
-            § Content · Ticket
+            § Content · Ticket · {ctkCode(ticket.id)}
           </div>
           <div style={{ fontSize: 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
             {meta.icon}  {meta.label}{ticket.type === "mixed" ? " bundle" : ""}
