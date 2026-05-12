@@ -3212,6 +3212,7 @@
           </div>
 
           <div id="reqDetailActions" style="display:flex;gap:10px;justify-content:flex-end">
+            <button id="reqDetailRespondBtn" class="btn-modal-primary" onclick="openMarketingActionRespond()" style="display:none">Respond to request</button>
             <button class="btn-modal-danger" onclick="openCancelRequestModal()">Cancel Request</button>
           </div>
 
@@ -3834,6 +3835,38 @@ async function _ctkPatchTicket(id, body) {
   return json.ticket;
 }
 
+// ── Respond to a MARKETING-team action request (from the detail view) ──
+function openMarketingActionRespond() {
+  if (!_activeRequestId) return;
+  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
+  if (!r) return;
+  // Reuse the content-respond modal but route submit to the marketing endpoint.
+  _pendingMarketingActionId = _activeRequestId;
+  _pendingContentActionId = null;
+  const ctx = (r.updates || []).filter(u => u.isActionRequest).slice(-1)[0];
+  document.getElementById('contentRespondContext').textContent = ctx ? ctx.message : '(no message)';
+  document.getElementById('contentRespondInput').value = '';
+  document.getElementById('contentRespondModal').style.display = 'flex';
+}
+
+let _pendingMarketingActionId = null;
+async function _submitMarketingResponse(message) {
+  if (!_pendingMarketingActionId) return;
+  const id = _pendingMarketingActionId;
+  closeContentRespondModal();
+  showLoading('Sending your response…', 'Just a moment.');
+  try {
+    await _mreqPatchTicket(id, { action: 'respond', message });
+    await fetchAndRenderMarketingRequests();
+    closeMarketingRequest();
+    hideLoading();
+    showConfirmation('Response sent', 'Your account manager has your response.');
+  } catch (e) {
+    hideLoading();
+    alert('Send failed: ' + e.message);
+  }
+}
+
 // ── Respond to a content-team action request ──
 let _pendingContentActionId = null;
 function openContentActionRespond(id) {
@@ -3856,6 +3889,11 @@ function closeContentRespondModal() {
 async function submitContentResponse() {
   const message = document.getElementById('contentRespondInput')?.value?.trim();
   if (!message) { alert('Type your response first.'); return; }
+  // Same modal is reused for marketing action requests — route accordingly
+  if (_pendingMarketingActionId) {
+    await _submitMarketingResponse(message);
+    return;
+  }
   if (!_pendingContentActionId) { closeContentRespondModal(); return; }
   closeContentRespondModal();
   showLoading('Sending your response…', 'Just a moment.');
@@ -4081,6 +4119,11 @@ function renderMarketingRequests() {
 function _mreqRowHTML(r) {
   const meta = MARKETING_REQUEST_META[r.type] || { icon: '•', label: 'Request' };
   const isContentAction = r._kind === 'content-action';
+  // A marketing ticket where staff requested client action also needs the
+  // "action needed" treatment so clients see it on the list (not just inside).
+  const isMarketingActionNeeded = !isContentAction && r.clientActionStatus === 'requested';
+  const needsAction = isContentAction || isMarketingActionNeeded;
+
   // Pick the right click handler depending on kind
   const onClickAttr = isContentAction
     ? `openContentActionRespond('${r.id}')`
@@ -4088,12 +4131,14 @@ function _mreqRowHTML(r) {
   const titleBit = isContentAction
     ? `${meta.label}${r.campaign ? ' — ' + r.campaign : ''}`
     : (r.creative ? `${meta.label} · ${r.creative}` : meta.label) + (r.campaign ? ` — ${r.campaign}` : '');
-  const pillClass = isContentAction ? 'needs-action' : r.status;
-  const pillLabel = isContentAction
+
+  const pillClass = needsAction ? 'needs-action' : r.status;
+  const pillLabel = needsAction
     ? 'Action needed'
     : (MARKETING_STATUS_LABEL[r.status] || r.status);
+
   return `
-    <div class="mreq-row" onclick="${onClickAttr}"${isContentAction ? ' style="background:rgba(232,191,96,0.07);border-left:3px solid var(--gold);padding-left:9px"' : ''}>
+    <div class="mreq-row" onclick="${onClickAttr}"${needsAction ? ' style="background:rgba(232,191,96,0.07);border-left:3px solid var(--gold);padding-left:9px"' : ''}>
       <div class="mreq-icon">${meta.icon}</div>
       <div class="mreq-title">${escapeHTML(titleBit)}</div>
       <span class="status-pill ${pillClass}">${escapeHTML(pillLabel)}</span>
@@ -4172,6 +4217,12 @@ function openMarketingRequest(id) {
   const actionsBar = document.getElementById('reqDetailActions');
   if (actionsBar) {
     actionsBar.style.display = (r.status === 'completed' || r.status === 'cancelled') ? 'none' : 'flex';
+  }
+
+  // Show "Respond to request" only when staff has requested action
+  const respondBtn = document.getElementById('reqDetailRespondBtn');
+  if (respondBtn) {
+    respondBtn.style.display = (r.status === 'in-progress' && r.clientActionStatus === 'requested') ? '' : 'none';
   }
 
   // Show detail, hide list and campaign detail

@@ -13,34 +13,10 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   const [banner, setBanner]       = useState(null);
   const [error, setError]         = useState("");
 
-  // ─── Fetch guides on mount. Must run BEFORE any conditional return
-  //     so React's hook order stays stable across renders. ───
-  useEffect(() => {
-    fetchGuides();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ─── Top-level tab bar (Guide cards | Tickets) ───
-  const renderMainTabs = () => (
-    <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
-      <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
-      <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
-    </div>
-  );
-
-  // If the user is on the Tickets tab, hand off to the dedicated component
-  if (mainTab === "tickets") {
-    return (
-      <div style={{ padding: "24px 28px", color: tk.text }}>
-        {renderMainTabs()}
-        <ContentTicketsTab tk={tk} session={session} me={me} />
-      </div>
-    );
-  }
-
-  const isEditing = editingId !== null || creating;
-  const editing = editingId ? guides.find(g => g.id === editingId) : null;
-
+  // ─── fetchGuides must be defined BEFORE the useEffect that calls it
+  //     (it's an arrow-function const, not a hoisted function declaration).
+  //     And both must live ABOVE any conditional return so the hook order
+  //     stays stable across re-renders. ───
   const fetchGuides = async () => {
     setLoading(true);
     setError("");
@@ -117,6 +93,35 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       alert("Delete failed: " + e.message);
     }
   };
+
+  // ─── Fetch guides on mount — useEffect must come AFTER fetchGuides so
+  //     the closure can see it, and BEFORE any conditional return so the
+  //     hook order stays stable across re-renders. ───
+  useEffect(() => {
+    fetchGuides();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Top-level tab bar (Guide cards | Tickets) ───
+  const renderMainTabs = () => (
+    <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 24 }}>
+      <MainTab label="Tickets" active={mainTab === "tickets"} onClick={() => setMainTab("tickets")} tk={tk} />
+      <MainTab label="Guide cards" active={mainTab === "guides"} onClick={() => setMainTab("guides")} tk={tk} />
+    </div>
+  );
+
+  // If the user is on the Tickets tab, hand off to the dedicated component
+  if (mainTab === "tickets") {
+    return (
+      <div style={{ padding: "24px 28px", color: tk.text }}>
+        {renderMainTabs()}
+        <ContentTicketsTab tk={tk} session={session} me={me} />
+      </div>
+    );
+  }
+
+  const isEditing = editingId !== null || creating;
+  const editing = editingId ? guides.find(g => g.id === editingId) : null;
 
   // ─────────────────── Edit view ───────────────────
   if (isEditing) {
