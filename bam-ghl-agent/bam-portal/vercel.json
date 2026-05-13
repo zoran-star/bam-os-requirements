@@ -6,6 +6,10 @@
     { "source": "/api/guide-cards/(.*)",       "destination": "/api/marketing?resource=guide-cards&path=$1" },
     { "source": "/api/asana-import",           "destination": "/api/asana/tasks?import=1" },
     { "source": "/api/asana-import/(.*)",      "destination": "/api/asana/tasks?import=1&path=$1" },
+    { "source": "/api/auth/meta/start",        "destination": "/api/marketing?resource=meta-auth&step=start" },
+    { "source": "/api/auth/meta/callback",     "destination": "/api/marketing?resource=meta-auth&step=callback" },
+    { "source": "/api/meta/campaigns",         "destination": "/api/marketing?resource=meta-campaigns" },
+    { "source": "/api/meta/adaccounts",        "destination": "/api/marketing?resource=meta-adaccounts" },
     { "source": "/api/(.*)",                   "destination": "/api/$1" },
     { "source": "/(.*)",                       "destination": "/index.html" }
   ]

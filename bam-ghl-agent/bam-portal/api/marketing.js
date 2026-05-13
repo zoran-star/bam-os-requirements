@@ -105,7 +105,16 @@ export default async function handler(req, res) {
     if (resource === "content-tickets") {
       return handleContentTickets(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets')" });
+    if (resource === "meta-auth") {
+      return handleMetaAuth(req, res);
+    }
+    if (resource === "meta-adaccounts") {
+      return handleMetaAdAccounts(req, res);
+    }
+    if (resource === "meta-campaigns") {
+      return handleMetaCampaigns(req, res);
+    }
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -743,4 +752,233 @@ async function handleContentTickets(req, res) {
   }
 
   return res.status(405).json({ error: "method not allowed" });
+}
+
+// ─────────────────────────────────────────────────────────
+// META OAUTH + API
+// ─────────────────────────────────────────────────────────
+// Client (academy owner) connects their own Meta ad account.
+// Token stored in client_meta_tokens, scoped via RLS to that client.
+
+const crypto = require("crypto");
+const META_API_VERSION = "v22.0";
+const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
+const META_OAUTH_SCOPES = ["ads_read", "public_profile"];
+
+function metaGetOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
+function metaRedirectUri(req) {
+  return `${metaGetOrigin(req)}/api/auth/meta/callback`;
+}
+
+function metaSignState(payload) {
+  const secret = process.env.META_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY;
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = crypto.createHmac("sha256", secret).update(data).digest("base64url");
+  return `${data}.${sig}`;
+}
+
+function metaVerifyState(state) {
+  if (typeof state !== "string" || !state.includes(".")) throw new Error("invalid state format");
+  const [data, sig] = state.split(".");
+  const secret = process.env.META_OAUTH_STATE_SECRET || SUPABASE_SERVICE_KEY;
+  const expected = crypto.createHmac("sha256", secret).update(data).digest("base64url");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    throw new Error("bad signature");
+  }
+  const payload = JSON.parse(Buffer.from(data, "base64url").toString());
+  if (typeof payload.exp !== "number" || Date.now() > payload.exp) throw new Error("state expired");
+  return payload;
+}
+
+function metaRedirect(res, status, msg) {
+  const params = new URLSearchParams({ meta: status });
+  if (msg) params.set("msg", msg);
+  res.setHeader("Location", `/client-portal.html?${params.toString()}`);
+  return res.status(302).end();
+}
+
+async function handleMetaAuth(req, res) {
+  const step = req.query.step;
+
+  // step = prepare: POST, authenticated client, returns Facebook OAuth URL
+  if (step === "prepare") {
+    if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+    const ctx = await resolveUser(req);
+    if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+    if (!ctx.client) return res.status(403).json({ error: "client only" });
+
+    const appId = process.env.META_APP_ID;
+    if (!appId) return res.status(500).json({ error: "META_APP_ID not configured" });
+
+    const state = metaSignState({
+      client_id: ctx.client.id,
+      exp: Date.now() + 5 * 60 * 1000,
+      nonce: crypto.randomBytes(8).toString("hex"),
+    });
+
+    const params = new URLSearchParams({
+      client_id: appId,
+      redirect_uri: metaRedirectUri(req),
+      scope: META_OAUTH_SCOPES.join(","),
+      response_type: "code",
+      state,
+    });
+
+    return res.status(200).json({
+      redirect_url: `https://www.facebook.com/${META_API_VERSION}/dialog/oauth?${params.toString()}`,
+    });
+  }
+
+  // step = callback: GET from Facebook with ?code + ?state; exchange + store + redirect.
+  if (step === "callback") {
+    if (req.method !== "GET") return res.status(405).end();
+
+    const { code, state, error: fbError, error_description } = req.query;
+    if (fbError) return metaRedirect(res, "error", error_description || String(fbError));
+    if (!code || !state) return metaRedirect(res, "error", "missing code or state");
+
+    let payload;
+    try { payload = metaVerifyState(state); }
+    catch (e) { return metaRedirect(res, "error", `state: ${e.message}`); }
+
+    const appId = process.env.META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    if (!appId || !appSecret) return metaRedirect(res, "error", "Meta app not configured");
+
+    const shortUrl = `${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: metaRedirectUri(req),
+      code,
+    });
+    const shortRes = await fetch(shortUrl);
+    const shortJson = await shortRes.json();
+    if (!shortRes.ok || !shortJson.access_token) {
+      return metaRedirect(res, "error", shortJson?.error?.message || "token exchange failed");
+    }
+
+    const longUrl = `${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      grant_type: "fb_exchange_token",
+      client_id: appId,
+      client_secret: appSecret,
+      fb_exchange_token: shortJson.access_token,
+    });
+    const longRes = await fetch(longUrl);
+    const longJson = await longRes.json();
+    const accessToken = longJson.access_token || shortJson.access_token;
+    const expiresIn = longJson.expires_in || shortJson.expires_in || 60 * 60;
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    const meRes = await fetch(`${META_GRAPH}/me?` + new URLSearchParams({
+      fields: "id,name",
+      access_token: accessToken,
+    }));
+    const me = await meRes.json();
+    if (!meRes.ok || !me.id) {
+      return metaRedirect(res, "error", me?.error?.message || "could not fetch FB user");
+    }
+
+    await sb(`client_meta_tokens?on_conflict=client_id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([{
+        client_id: payload.client_id,
+        fb_user_id: me.id,
+        fb_user_name: me.name || null,
+        access_token: accessToken,
+        expires_at: expiresAt,
+        scopes: META_OAUTH_SCOPES,
+        updated_at: nowIso(),
+      }]),
+    });
+
+    return metaRedirect(res, "connected");
+  }
+
+  return res.status(400).json({ error: "unknown step (expected 'prepare' or 'callback')" });
+}
+
+async function handleMetaAdAccounts(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client) return res.status(403).json({ error: "client only" });
+
+  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token,expires_at`);
+  const tok = tokRows?.[0];
+  if (!tok) return res.status(404).json({ error: "Meta not connected" });
+
+  const fbRes = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
+    fields: "id,account_id,name,currency,account_status",
+    access_token: tok.access_token,
+  }));
+  const fbJson = await fbRes.json();
+  if (!fbRes.ok) {
+    return res.status(fbRes.status).json({ error: fbJson?.error?.message || "Meta API error" });
+  }
+  return res.status(200).json({ ad_accounts: fbJson.data || [] });
+}
+
+async function handleMetaCampaigns(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client) return res.status(403).json({ error: "client only" });
+
+  const clientRows = await sb(`clients?id=eq.${ctx.client.id}&select=id,meta_ad_account_id`);
+  const clientFull = clientRows?.[0];
+  if (!clientFull?.meta_ad_account_id) {
+    return res.status(200).json({ campaigns: [], reason: "no_ad_account" });
+  }
+
+  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token`);
+  const tok = tokRows?.[0];
+  if (!tok) return res.status(200).json({ campaigns: [], reason: "not_connected" });
+
+  const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
+    ? clientFull.meta_ad_account_id
+    : `act_${clientFull.meta_ad_account_id}`;
+
+  const cRes = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
+    fields: "id,name,status,objective,insights.date_preset(last_30d){spend,actions,cost_per_action_type,results}",
+    access_token: tok.access_token,
+    limit: "50",
+  }));
+  const cJson = await cRes.json();
+  if (!cRes.ok) {
+    return res.status(cRes.status).json({ error: cJson?.error?.message || "Meta API error" });
+  }
+
+  const campaigns = (cJson.data || []).map(c => {
+    const ins = c.insights?.data?.[0] || {};
+    const spend = parseFloat(ins.spend || "0");
+    let resultsCount = 0;
+    if (Array.isArray(ins.results) && ins.results[0]?.values?.[0]?.value) {
+      resultsCount = parseInt(ins.results[0].values[0].value, 10) || 0;
+    } else if (Array.isArray(ins.actions)) {
+      const link = ins.actions.find(a => a.action_type === "link_click");
+      resultsCount = link ? parseInt(link.value, 10) || 0 : 0;
+    }
+    const cpr = resultsCount > 0 ? spend / resultsCount : 0;
+    return {
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      objective: c.objective,
+      spend,
+      spend_display: `$${spend.toFixed(2)}`,
+      results: resultsCount,
+      cpr,
+      cpr_display: resultsCount > 0 ? `$${cpr.toFixed(2)}` : "—",
+    };
+  });
+
+  return res.status(200).json({ campaigns });
 }
