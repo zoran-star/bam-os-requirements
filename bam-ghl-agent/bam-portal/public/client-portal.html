@@ -3952,6 +3952,10 @@ function openContentTicketDetail(id) {
   if (raw.length) {
     html += `<div class="req-info-row"><div class="req-info-label">Files</div><div class="req-info-value" id="reqDetailContentRawFilesRow"></div></div>`;
   }
+  if (r.contentTicketNotes) {
+    const notesHtml = escapeHTML(r.contentTicketNotes).replace(/\n/g, '<br>');
+    html += `<div class="req-info-row"><div class="req-info-label">Your notes</div><div class="req-info-value" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;font-style:italic;white-space:pre-wrap">${notesHtml}</div></div>`;
+  }
   if (actionReq) {
     html += `<div class="req-info-row"><div class="req-info-label">Action requested</div><div class="req-info-value" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;font-style:italic">${escapeHTML(actionReq.message)}</div></div>`;
   }
@@ -4372,6 +4376,7 @@ function _ctkNormalizeForTracker(apiTicket) {
     note: lastActionReq?.body || '',
     contentTicketType: apiTicket.type,
     contentTicketSource: ctx.source || '',
+    contentTicketNotes: apiTicket.notes || '',
     status: 'in-progress',
     contentCheckStatus: 'not-required',
     clientActionStatus: actionNeeded ? 'requested' : 'none',

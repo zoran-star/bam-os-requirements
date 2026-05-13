@@ -127,17 +127,54 @@
     color: var(--fg-2);
     text-align: center;
   }
+  .success-card {
+    display: none;
+    text-align: left;
+  }
+  .success-card.show { display: block; }
+  .success-card .check {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(232,197,71,0.12);
+    border: 1px solid var(--gold);
+    color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .success-card h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px; font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .success-card .em {
+    color: var(--gold);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .success-card ol {
+    margin-top: 20px;
+    padding-left: 18px;
+    color: var(--fg-1);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .success-card ol li::marker { color: var(--gold); font-weight: 600; }
 </style>
 </head>
 <body>
   <form class="card" id="onboardForm">
     <div class="kicker">BAM Business</div>
     <h1>Get started</h1>
-    <p class="sub">Spin up your support portal in seconds. We'll get your account ready and drop you straight in.</p>
+    <p class="sub">Spin up your support portal in a minute. We'll email you a secure link to set your password.</p>
 
     <div class="field">
       <label for="name">Business name</label>
       <input id="name" name="name" type="text" placeholder="e.g. Elite Hoops Academy" required autocomplete="organization" />
+    </div>
+
+    <div class="field">
+      <label for="ownerName">Your name</label>
+      <input id="ownerName" name="ownerName" type="text" placeholder="First Last" required autocomplete="name" />
     </div>
 
     <div class="field">
@@ -149,6 +186,19 @@
     <p id="errorBox" class="error"></p>
     <p class="footer">By Any Means Basketball</p>
   </form>
+
+  <div class="card success-card" id="successCard">
+    <div class="check">✓</div>
+    <div class="kicker">BAM Business</div>
+    <h2>You're in. Check your inbox.</h2>
+    <p class="sub">We sent a secure invite link to <span class="em" id="successEmail"></span>. Click it to set your password and access your portal.</p>
+    <ol>
+      <li>Open the email from BAM Business (check spam if it's not there in 60s)</li>
+      <li>Click the invite link</li>
+      <li>Set a password and you're in</li>
+    </ol>
+    <p class="footer" style="margin-top:28px">Didn't get the email? Reply to <a href="mailto:support@byanymeansbball.com" style="color:var(--gold);text-decoration:none">support@byanymeansbball.com</a> and we'll resend.</p>
+  </div>
 
 <script>
   
@@ -170,8 +220,9 @@
     clearError();
 
     const name = document.getElementById('name').value.trim();
+    const owner_name = document.getElementById('ownerName').value.trim();
     const email = document.getElementById('email').value.trim();
-    if (!name || !email) { showError('Please fill out both fields.'); return; }
+    if (!name || !owner_name || !email) { showError('Please fill out all fields.'); return; }
 
     btn.disabled = true;
     btn.textContent = 'Creating…';
@@ -180,15 +231,17 @@
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, owner_name, email }),
       });
       const data = await res.json();
       if (!res.ok || !data.id) {
         throw new Error(data.error || 'Something went wrong. Please try again.');
       }
 
-      localStorage.setItem('bam_client_id', data.id);
-      window.location.href = `./client-portal.html?client_id=${encodeURIComponent(data.id)}`;
+      // Replace form with success card — invite email is on its way
+      document.getElementById('successEmail').textContent = email;
+      form.style.display = 'none';
+      document.getElementById('successCard').classList.add('show');
     } catch (err) {
       showError(err.message || 'Something went wrong.');
       btn.disabled = false;
