@@ -906,14 +906,42 @@ async function handleMetaAuth(req, res) {
 }
 
 async function handleMetaAdAccounts(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   if (!ctx.client) return res.status(403).json({ error: "client only" });
 
-  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token,expires_at`);
+  // POST → set the chosen ad account
+  if (req.method === "POST") {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const chosen = typeof body.ad_account_id === "string" ? body.ad_account_id.trim() : "";
+    if (!chosen) return res.status(400).json({ error: "ad_account_id required" });
+    await sb(`clients?id=eq.${ctx.client.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ meta_ad_account_id: chosen, updated_at: nowIso() }),
+    });
+    return res.status(200).json({ ok: true, meta_ad_account_id: chosen });
+  }
+
+  // DELETE → unset (also disconnect Meta if requested)
+  if (req.method === "DELETE") {
+    await sb(`clients?id=eq.${ctx.client.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ meta_ad_account_id: null, updated_at: nowIso() }),
+    });
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method !== "GET") return res.status(405).json({ error: "GET, POST, or DELETE" });
+
+  // GET → list ad accounts the client has access to + show currently picked one
+  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token,expires_at,fb_user_name`);
   const tok = tokRows?.[0];
   if (!tok) return res.status(404).json({ error: "Meta not connected" });
+
+  const clientRows = await sb(`clients?id=eq.${ctx.client.id}&select=meta_ad_account_id`);
+  const picked = clientRows?.[0]?.meta_ad_account_id || null;
 
   const fbRes = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
     fields: "id,account_id,name,currency,account_status",
@@ -923,7 +951,11 @@ async function handleMetaAdAccounts(req, res) {
   if (!fbRes.ok) {
     return res.status(fbRes.status).json({ error: fbJson?.error?.message || "Meta API error" });
   }
-  return res.status(200).json({ ad_accounts: fbJson.data || [] });
+  return res.status(200).json({
+    ad_accounts: fbJson.data || [],
+    picked_ad_account_id: picked,
+    fb_user_name: tok.fb_user_name || null,
+  });
 }
 
 async function handleMetaCampaigns(req, res) {

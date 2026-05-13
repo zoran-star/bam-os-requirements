@@ -3032,48 +3032,9 @@
 
           <div class="section-label">Active Campaigns</div>
 
-          <!-- Campaign card 1 -->
-          <div class="campaign-card">
-            <div class="campaign-card-main">
-              <div class="card-title" style="margin-bottom:18px">Title of campaign 1</div>
-              <div class="campaign-stats">
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">$465</div>
-                  <div class="campaign-stat-label">Spend</div>
-                </div>
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">44</div>
-                  <div class="campaign-stat-label">Results</div>
-                </div>
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">$10.57</div>
-                  <div class="campaign-stat-label">Cost / Result</div>
-                </div>
-              </div>
-            </div>
-            <button class="btn-change-campaign" onclick="openCampaignDetail('campaign-1', 'Title of campaign 1', { spend: '$465', results: 44, cpr: '$10.57' })">Change Campaign</button>
-          </div>
-
-          <!-- Campaign card 2 -->
-          <div class="campaign-card">
-            <div class="campaign-card-main">
-              <div class="card-title" style="margin-bottom:18px">Title of campaign 2</div>
-              <div class="campaign-stats">
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">$200</div>
-                  <div class="campaign-stat-label">Spend</div>
-                </div>
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">20</div>
-                  <div class="campaign-stat-label">Results</div>
-                </div>
-                <div class="campaign-stat">
-                  <div class="campaign-stat-value">$10.00</div>
-                  <div class="campaign-stat-label">Cost / Result</div>
-                </div>
-              </div>
-            </div>
-            <button class="btn-change-campaign" onclick="openCampaignDetail('campaign-2', 'Title of campaign 2', { spend: '$200', results: 20, cpr: '$10.00' })">Change Campaign</button>
+          <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
+          <div id="marketing-campaigns-container">
+            <div class="req-empty" style="padding:20px 0">Loading campaigns…</div>
           </div>
 
           <!-- Add new campaign -->
@@ -4480,6 +4441,189 @@ async function fetchAndRenderMarketingRequests() {
   } catch (e) {
     console.error('Failed to fetch tickets:', e.message);
   }
+  // Independently render real Meta campaigns (or connect/picker states).
+  _renderMarketingCampaigns();
+}
+
+// ── Meta campaigns + connect flow ─────────────────────────────────────
+// Renders the Active Campaigns section based on the client's Meta connection state.
+//   not connected  → "Connect Meta" CTA
+//   connected, no ad account chosen → ad-account picker
+//   connected, has ad account, 0 campaigns → empty state
+//   connected, has ad account, N campaigns → real campaign cards
+async function _renderMarketingCampaigns() {
+  const containerEl = document.getElementById('marketing-campaigns-container');
+  if (!containerEl) return;
+
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/campaigns', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+
+    if (json.reason === 'not_connected') {
+      containerEl.innerHTML = _metaConnectPromptHTML();
+      return;
+    }
+    if (json.reason === 'no_ad_account') {
+      // Trigger ad-account picker render
+      await _metaRenderAdAccountPicker(containerEl);
+      return;
+    }
+    const campaigns = json.campaigns || [];
+    if (!campaigns.length) {
+      containerEl.innerHTML = `
+        <div class="req-empty" style="padding:18px 0">No active campaigns yet. Use "+ Add new campaign" below to launch your first.</div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase">Meta connected</div>`;
+      return;
+    }
+    containerEl.innerHTML = campaigns.map(_metaCampaignCardHTML).join('');
+  } catch (e) {
+    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _metaConnectPromptHTML() {
+  return `
+    <div class="card" style="padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:8px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px">📊</div>
+        <div>
+          <div class="card-title" style="margin:0">Connect Meta to see your campaigns</div>
+          <div style="font-size:13px;color:var(--text-sub);margin-top:4px">We'll show real spend, results, and cost per result for every active ad campaign.</div>
+        </div>
+      </div>
+      <button class="btn-add-campaign" style="background:var(--gold);color:var(--ink-0);width:auto;padding:10px 20px;margin-top:8px" onclick="_metaConnectStart()">Connect Meta →</button>
+    </div>`;
+}
+
+function _metaCampaignCardHTML(c) {
+  const data = { id: c.id, name: c.name, spend: c.spend_display, results: c.results, cpr: c.cpr_display };
+  const dataAttr = encodeURIComponent(JSON.stringify(data));
+  return `
+    <div class="campaign-card">
+      <div class="campaign-card-main">
+        <div class="card-title" style="margin-bottom:18px">${escapeHTML(c.name || '(unnamed)')}</div>
+        <div class="campaign-stats">
+          <div class="campaign-stat">
+            <div class="campaign-stat-value">${escapeHTML(c.spend_display)}</div>
+            <div class="campaign-stat-label">Spend</div>
+          </div>
+          <div class="campaign-stat">
+            <div class="campaign-stat-value">${c.results}</div>
+            <div class="campaign-stat-label">Results</div>
+          </div>
+          <div class="campaign-stat">
+            <div class="campaign-stat-value">${escapeHTML(c.cpr_display)}</div>
+            <div class="campaign-stat-label">Cost / Result</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-change-campaign" onclick='openCampaignDetail("${c.id}", ${JSON.stringify(c.name || "")}, { spend: ${JSON.stringify(c.spend_display)}, results: ${c.results}, cpr: ${JSON.stringify(c.cpr_display)} })'>Change Campaign</button>
+    </div>`;
+}
+
+async function _metaConnectStart() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/auth/meta/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: '{}',
+    });
+    const json = await _safeJson(res);
+    if (!res.ok || !json.redirect_url) {
+      alert('Could not start Meta connect: ' + (json.error || 'unknown error'));
+      return;
+    }
+    window.location.href = json.redirect_url;
+  } catch (e) {
+    alert('Failed to connect Meta: ' + e.message);
+  }
+}
+
+async function _metaRenderAdAccountPicker(containerEl) {
+  containerEl.innerHTML = '<div class="req-empty" style="padding:18px 0">Loading your ad accounts…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/adaccounts', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load ad accounts: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    const accounts = json.ad_accounts || [];
+    if (!accounts.length) {
+      containerEl.innerHTML = `
+        <div class="card" style="padding:20px">
+          <div class="card-title" style="margin-bottom:8px">No ad accounts found</div>
+          <div style="font-size:13px;color:var(--text-sub)">The Meta account you connected doesn't have access to any ad accounts. Reconnect with a different account, or contact support.</div>
+          <button class="btn-add-campaign" style="background:transparent;border:1px solid var(--line);color:var(--text);margin-top:14px;width:auto;padding:8px 16px" onclick="_metaConnectStart()">Reconnect Meta</button>
+        </div>`;
+      return;
+    }
+    const fbName = json.fb_user_name ? `Meta connected as ${escapeHTML(json.fb_user_name)}. ` : '';
+    const rows = accounts.map(a => `
+      <button class="campaign-card" style="text-align:left;cursor:pointer;width:100%;background:transparent;border:1px solid var(--line);padding:14px 18px;border-radius:6px;margin-bottom:10px"
+              onclick="_metaPickAdAccount('${escapeHTML(a.id)}', '${escapeHTML(a.name || '')}')">
+        <div style="display:flex;align-items:center;gap:12px;flex:1">
+          <div style="flex:1">
+            <div class="card-title" style="margin:0">${escapeHTML(a.name || '(unnamed account)')}</div>
+            <div style="font-size:11px;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase;margin-top:4px">${escapeHTML(a.id)} · ${escapeHTML(a.currency || '')}</div>
+          </div>
+          <div style="color:var(--gold)">→</div>
+        </div>
+      </button>
+    `).join('');
+    containerEl.innerHTML = `
+      <div class="card" style="padding:18px;margin-bottom:14px">
+        <div class="card-title" style="margin-bottom:8px">Pick which ad account to track</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-bottom:14px">${fbName}Your campaigns will pull from the ad account you pick.</div>
+        ${rows}
+      </div>`;
+  } catch (e) {
+    containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Failed to load ad accounts: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _metaPickAdAccount(adAccountId, name) {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/adaccounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ad_account_id: adAccountId }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      alert('Could not save selection: ' + (json.error || ('HTTP ' + res.status)));
+      return;
+    }
+    // Re-render campaigns with the chosen account
+    await _renderMarketingCampaigns();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  }
+}
+
+// Handles ?meta=connected / ?meta=error redirected from the OAuth callback.
+// Strips the params from the URL so refreshes don't re-toast.
+function _handleMetaCallbackParams() {
+  const url = new URL(window.location.href);
+  const status = url.searchParams.get('meta');
+  if (!status) return;
+  const msg = url.searchParams.get('msg') || '';
+  if (status === 'connected') {
+    showConfirmation('Meta connected ✓', 'Now pick which ad account to track.');
+  } else if (status === 'error') {
+    showConfirmation('Couldn\'t connect Meta', msg || 'Please try again, or contact support if this persists.');
+  }
+  url.searchParams.delete('meta');
+  url.searchParams.delete('msg');
+  window.history.replaceState({}, document.title, url.pathname + (url.search ? '?' + url.searchParams.toString() : '') + url.hash);
 }
 
 // Starts empty; populated by fetchAndRenderMarketingRequests().
@@ -6299,8 +6443,10 @@ _sb.auth.onAuthStateChange((event, _session) => {
 
 boot();
 renderMarketingRequests();  // initial empty render
-// Fetch real tickets in the background once the page is up
+// Fetch real tickets + campaigns in the background once the page is up
 setTimeout(() => fetchAndRenderMarketingRequests(), 100);
+// Surface OAuth callback feedback (?meta=connected|error)
+_handleMetaCallbackParams();
 _attachPasteHandler('error-where',  'error-files');
 _attachPasteHandler('error-should', 'error-files');
 _attachPasteHandler('change-what',  'change-files');
