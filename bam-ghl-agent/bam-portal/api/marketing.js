@@ -114,7 +114,10 @@ export default async function handler(req, res) {
     if (resource === "meta-campaigns") {
       return handleMetaCampaigns(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns')" });
+    if (resource === "onboarding") {
+      return handleOnboarding(req, res);
+    }
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -910,7 +913,7 @@ async function handleMetaAdAccounts(req, res) {
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   if (!ctx.client) return res.status(403).json({ error: "client only" });
 
-  // POST → set the chosen ad account
+  // POST → set the chosen ad account (and auto-complete onboarding)
   if (req.method === "POST") {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const chosen = typeof body.ad_account_id === "string" ? body.ad_account_id.trim() : "";
@@ -918,7 +921,11 @@ async function handleMetaAdAccounts(req, res) {
     await sb(`clients?id=eq.${ctx.client.id}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ meta_ad_account_id: chosen, updated_at: nowIso() }),
+      body: JSON.stringify({
+        meta_ad_account_id: chosen,
+        onboarding_completed_at: nowIso(),
+        updated_at: nowIso(),
+      }),
     });
     return res.status(200).json({ ok: true, meta_ad_account_id: chosen });
   }
@@ -956,6 +963,34 @@ async function handleMetaAdAccounts(req, res) {
     picked_ad_account_id: picked,
     fb_user_name: tok.fb_user_name || null,
   });
+}
+
+// GET → returns onboarding state for the current client.
+// POST → marks onboarding complete (used by Skip / Done in the wizard).
+async function handleOnboarding(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client) return res.status(403).json({ error: "client only" });
+
+  if (req.method === "GET") {
+    const rows = await sb(`clients?id=eq.${ctx.client.id}&select=onboarding_completed_at,meta_ad_account_id`);
+    const r = rows?.[0] || {};
+    return res.status(200).json({
+      onboarding_completed_at: r.onboarding_completed_at || null,
+      meta_ad_account_id: r.meta_ad_account_id || null,
+    });
+  }
+
+  if (req.method === "POST") {
+    await sb(`clients?id=eq.${ctx.client.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ onboarding_completed_at: nowIso(), updated_at: nowIso() }),
+    });
+    return res.status(200).json({ ok: true });
+  }
+
+  return res.status(405).json({ error: "GET or POST" });
 }
 
 async function handleMetaCampaigns(req, res) {

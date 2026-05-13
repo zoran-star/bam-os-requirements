@@ -4614,16 +4614,150 @@ async function _metaPickAdAccount(adAccountId, name) {
 function _handleMetaCallbackParams() {
   const url = new URL(window.location.href);
   const status = url.searchParams.get('meta');
-  if (!status) return;
+  if (!status) {
+    // No callback param — still check if the first-run wizard should show
+    _wizardMaybeShow();
+    return;
+  }
   const msg = url.searchParams.get('msg') || '';
   if (status === 'connected') {
-    showConfirmation('Meta connected ✓', 'Now pick which ad account to track.');
+    // Don't double-toast — if the wizard is going to show, the wizard handles the success state
+    _wizardMaybeShow({ forceConnectedStep: true });
   } else if (status === 'error') {
     showConfirmation('Couldn\'t connect Meta', msg || 'Please try again, or contact support if this persists.');
+    _wizardMaybeShow();
   }
   url.searchParams.delete('meta');
   url.searchParams.delete('msg');
   window.history.replaceState({}, document.title, url.pathname + (url.search ? '?' + url.searchParams.toString() : '') + url.hash);
+}
+
+// ── First-run onboarding wizard ─────────────────────────────────────
+// Decides whether to show, which step, and handles state transitions.
+async function _wizardMaybeShow(opts = {}) {
+  const forceConnectedStep = !!opts.forceConnectedStep;
+  // Session-level skip flag — if user dismissed earlier in this session, don't re-show
+  // (DB skip via onboarding_completed_at also blocks re-show; this is just belt-and-suspenders)
+  if (sessionStorage.getItem('bam_wizard_skipped_session') === '1' && !forceConnectedStep) {
+    return;
+  }
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=onboarding', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;  // silently skip on error — wizard is optional
+    const json = await res.json();
+    const alreadyComplete = !!json.onboarding_completed_at;
+    if (alreadyComplete && !forceConnectedStep) return;
+
+    // Show the wizard
+    const overlay = document.getElementById('onboardingWizard');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+
+    if (forceConnectedStep || json.meta_ad_account_id) {
+      // If they have a token but no ad account picked, OR they just OAuth'd back, go straight to step 2
+      _wizardShowStep('connected');
+      _wizardLoadAdAccounts();
+    } else {
+      _wizardShowStep('welcome');
+    }
+  } catch (_) {
+    // silent — wizard is optional
+  }
+}
+
+function _wizardShowStep(name) {
+  const overlay = document.getElementById('onboardingWizard');
+  if (!overlay) return;
+  overlay.querySelectorAll('[data-wstep]').forEach(el => {
+    el.style.display = (el.dataset.wstep === name) ? 'block' : 'none';
+  });
+}
+
+function _wizardClickConnect() {
+  // Reuses the existing OAuth start handler. Facebook will redirect us back
+  // to /client-portal.html?meta=connected, which re-triggers _wizardMaybeShow
+  // with forceConnectedStep=true.
+  _metaConnectStart();
+}
+
+async function _wizardLoadAdAccounts() {
+  const listEl = document.getElementById('wizardAdAccountsList');
+  const subEl = document.getElementById('wizardConnectedSub');
+  if (!listEl) return;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/adaccounts', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      listEl.innerHTML = `<div class="req-empty">Couldn't load ad accounts: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    if (subEl && json.fb_user_name) {
+      subEl.textContent = `Meta connected as ${json.fb_user_name}. Pick which ad account to track:`;
+    }
+    const accounts = json.ad_accounts || [];
+    if (!accounts.length) {
+      listEl.innerHTML = `
+        <div class="req-empty" style="padding:14px 0">No ad accounts found on this Meta account. You can <a href="#" onclick="_wizardClickConnect();return false" style="color:var(--gold)">reconnect with a different account</a> or skip for now.</div>`;
+      return;
+    }
+    listEl.innerHTML = accounts.map(a => `
+      <button onclick="_wizardPickAdAccount('${escapeHTML(a.id)}', '${escapeHTML(a.name || '')}')"
+              style="display:block;width:100%;text-align:left;cursor:pointer;background:transparent;border:1px solid var(--line);padding:12px 16px;border-radius:6px;margin-bottom:8px;color:var(--text);font-family:inherit">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="flex:1">
+            <div style="font-family:var(--display);font-size:14px;font-weight:500">${escapeHTML(a.name || '(unnamed account)')}</div>
+            <div style="font-size:10px;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">${escapeHTML(a.id)}${a.currency ? ' · ' + escapeHTML(a.currency) : ''}</div>
+          </div>
+          <div style="color:var(--gold)">→</div>
+        </div>
+      </button>
+    `).join('');
+  } catch (e) {
+    listEl.innerHTML = `<div class="req-empty">Failed: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _wizardPickAdAccount(adAccountId, name) {
+  // Calls the existing pick endpoint which ALSO auto-sets onboarding_completed_at.
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/adaccounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ad_account_id: adAccountId }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      alert('Could not save selection: ' + (json.error || ('HTTP ' + res.status)));
+      return;
+    }
+    _wizardShowStep('done');
+    // Refresh the Marketing tab campaigns in the background so when they hit Done, real data is ready
+    _renderMarketingCampaigns();
+  } catch (e) {
+    alert('Save failed: ' + e.message);
+  }
+}
+
+async function _wizardSkip() {
+  // Mark onboarding complete on the server so it never shows again, then close.
+  sessionStorage.setItem('bam_wizard_skipped_session', '1');
+  try {
+    const token = await _mreqAuthToken();
+    await fetch('/api/marketing?resource=onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: '{}',
+    });
+  } catch (_) {}
+  _wizardClose();
+}
+
+function _wizardClose() {
+  const overlay = document.getElementById('onboardingWizard');
+  if (overlay) overlay.style.display = 'none';
 }
 
 // Starts empty; populated by fetchAndRenderMarketingRequests().
@@ -6586,6 +6720,58 @@ function toggleTheme() {
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeBudgetModal()">Cancel</button>
       <button class="btn-modal-primary" onclick="submitBudgetChange()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── First-run onboarding wizard ── -->
+<!-- Shown once after first login (when clients.onboarding_completed_at is null
+     AND meta_ad_account_id is null). Three sub-steps:
+       welcome → connected (after OAuth) → done (after ad-account pick)
+     User can Skip at any step; Skip also marks onboarding complete so
+     it never shows again. -->
+<div id="onboardingWizard" class="modal-backdrop" style="display:none">
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:520px">
+    <button onclick="_wizardSkip()" aria-label="Close"
+            style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1">×</button>
+
+    <!-- Step 1: welcome -->
+    <div data-wstep="welcome">
+      <div class="modal-kicker">§ Set up your portal</div>
+      <div class="modal-title" style="margin-top:6px">Let's connect your Meta ad account</div>
+      <div class="modal-sub">We'll pull real campaign data (spend, results, cost per result) directly into your portal so you can track everything in one place.</div>
+      <div style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:14px 16px;border-radius:6px;margin:20px 0;font-size:13px;color:var(--text-sub);line-height:1.6">
+        You'll be redirected to Facebook to log in and approve. We only request <strong style="color:var(--text)">read access to ads</strong> — we never post or change anything without your explicit approval.
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-secondary" onclick="_wizardSkip()">Skip for now</button>
+        <button class="btn-modal-primary" onclick="_wizardClickConnect()">Connect Meta →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: connected — pick ad account -->
+    <div data-wstep="connected" style="display:none">
+      <div class="modal-kicker" style="color:var(--pace-go)">§ Connected ✓</div>
+      <div class="modal-title" style="margin-top:6px">Pick your ad account</div>
+      <div class="modal-sub" id="wizardConnectedSub">Meta connected. Your campaigns will pull from the ad account you pick below.</div>
+      <div id="wizardAdAccountsList" style="margin-top:18px;max-height:280px;overflow-y:auto">
+        <div class="req-empty" style="padding:14px 0">Loading your ad accounts…</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-modal-secondary" onclick="_wizardSkip()">Skip for now</button>
+      </div>
+    </div>
+
+    <!-- Step 3: done -->
+    <div data-wstep="done" style="display:none">
+      <div style="text-align:center;padding:14px 0">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(232,197,71,0.12);border:1px solid var(--gold);color:var(--gold);display:inline-flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:14px">✓</div>
+        <div class="modal-title">You're all set!</div>
+        <div class="modal-sub">Real campaign data is now wired into your portal. Open the Marketing tab anytime to see live spend and results.</div>
+      </div>
+      <div class="modal-footer" style="justify-content:center;margin-top:18px">
+        <button class="btn-modal-primary" onclick="_wizardClose()">Take me to my portal →</button>
+      </div>
     </div>
   </div>
 </div>
