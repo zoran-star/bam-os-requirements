@@ -22,6 +22,7 @@ import SystemsView from './views/SystemsView';
 import MarketingView from './views/MarketingView';
 import TeamView from './views/TeamView';
 import ContentView from './views/ContentView';
+import ChannelView from './views/ChannelView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -77,6 +78,8 @@ export default function BAMPortal() {
   const canSeeMarketing = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && me.role === "admin";
   const canSeeContent = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const CHANNEL_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com"];
+  const canSeeChannel = !!session && CHANNEL_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
 
   useEffect(() => {
     if (me && (me.role === "systems_manager" || me.role === "systems_executor") && nav !== "systems" && nav !== "training") {
@@ -324,6 +327,7 @@ export default function BAMPortal() {
     calendar: ["Calendar", "Your schedule"],
     knowledge: ["Knowledge Base", "SOPs & Solutions"],
     financials: ["Financials", "BAM internal finances"],
+    channel: ["Channel", "Basketball acquisition channel test"],
     communication: ["Communication", "Slack channels & messages"],
     systems: ["Systems", "Ticket delegation & execution"],
     marketing: ["Marketing", "Client ad-campaign tickets"],
@@ -340,6 +344,7 @@ export default function BAMPortal() {
     calendar: IconCalendar,
     knowledge: IconKnowledge,
     financials: IconFinancials,
+    channel: IconFinancials,
     communication: IconMessage,
     systems: IconTasks,
     marketing: IconFinancials,
@@ -362,6 +367,7 @@ export default function BAMPortal() {
         { label: "Calendar", key: "calendar" },
         { label: "Knowledge Base", key: "knowledge" },
         { label: "Financials", key: "financials" },
+        ...(canSeeChannel ? [{ label: "Channel", key: "channel" }] : []),
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
@@ -746,6 +752,13 @@ export default function BAMPortal() {
 
             {/* FINANCIALS */}
             {nav === "financials" && <FinancialsView tokens={tk} dark={dark} />}
+
+            {nav === "channel" && canSeeChannel && <ChannelView tokens={tk} session={session} me={me} />}
+            {nav === "channel" && !canSeeChannel && (
+              <div style={{ padding: 24, color: tk.textSub, fontFamily: "'DM Mono', monospace" }}>
+                <strong style={{ color: tk.amber }}>No access.</strong> Channel dashboard is restricted to Cole, Mike, and Zoran.
+              </div>
+            )}
 
             {/* COMMUNICATION */}
             {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
