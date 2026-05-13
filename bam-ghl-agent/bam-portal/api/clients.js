@@ -125,6 +125,68 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
+      // ── Public self-serve signup path ──
+      // /onboarding.html posts {name, owner_name, email} with no auth header.
+      // Treat as a public signup (creates client + auth user via Supabase invite).
+      // Detected by: no Authorization header AND no ?action= AND body has the
+      // signup shape. Anything else falls through to the admin path below.
+      const hasAuth = (req.headers.authorization || "").startsWith("Bearer ");
+      const action = req.query.action;
+      const body = req.body || {};
+      const isPublicSignup = !hasAuth && !action
+        && typeof body.name === "string"
+        && typeof body.owner_name === "string"
+        && typeof body.email === "string";
+
+      if (isPublicSignup) {
+        const name = body.name.trim();
+        const owner_name = body.owner_name.trim();
+        const email = body.email.trim().toLowerCase();
+        if (!name) return res.status(400).json({ error: "academy name required" });
+        if (!owner_name) return res.status(400).json({ error: "owner name required" });
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return res.status(400).json({ error: "valid email required" });
+        }
+
+        // Send invite (creates auth user with no password + emails the link)
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/client-portal.html?type=invite`;
+        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, redirect_to: redirectTo }),
+        });
+        if (!inviteRes.ok) {
+          const errText = await inviteRes.text();
+          const friendly = inviteRes.status === 422 || /already/i.test(errText)
+            ? "an account with that email already exists — try signing in instead"
+            : `invite: ${errText}`;
+          return res.status(400).json({ error: friendly });
+        }
+        const invited = await inviteRes.json();
+        const auth_user_id = invited?.id || invited?.user?.id;
+        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
+
+        try {
+          const rows = await supabaseInsert("clients", {
+            name, owner_name, email, status: "onboarding", auth_user_id,
+          });
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return res.status(200).json({ id: row?.id, name: row?.name, email, invited: true });
+        } catch (insertErr) {
+          // Roll back the auth user if the clients insert fails so they don't get orphaned
+          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
+            method: "DELETE",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+          }).catch(() => {});
+          return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
+        }
+      }
+
       // ── Staff auth (admin only) ──
       const auth = req.headers.authorization || "";
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
