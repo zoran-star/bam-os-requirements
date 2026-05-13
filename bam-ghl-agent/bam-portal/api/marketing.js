@@ -245,15 +245,28 @@ async function handleMarketingTickets(req, res) {
       if (ticket.status !== "in-progress") {
         return res.status(409).json({ error: "ticket is not active" });
       }
+      const summaryParts = [];
       if (body.fields && typeof body.fields === "object") {
         patch.fields = { ...(ticket.fields || {}), ...body.fields };
+        summaryParts.push("Updated request details");
       }
       if (Array.isArray(body.files)) {
         patch.files = body.files;
+        summaryParts.push("Updated files");
+      }
+      const noteText = (body.note || "").trim();
+      if (!summaryParts.length && !noteText) {
+        return res.status(400).json({ error: "nothing to update" });
+      }
+      let messageBody = summaryParts.join(", ") || "Added a note";
+      if (noteText) {
+        messageBody = summaryParts.length
+          ? `${messageBody}. Note: "${noteText}"`
+          : `Added a note: "${noteText}"`;
       }
       patch.messages = appendMessage(ticket.messages, {
         author_type: "client", author_name: authorName,
-        body: "Updated the request.", is_action_request: false,
+        body: messageBody, is_action_request: false,
       });
     } else if (action === "respond") {
       const message = (body.message || "").trim();
@@ -509,7 +522,7 @@ async function handleContentTickets(req, res) {
       "request-client-action", "mark-completed",
       "assign", "edit-context",
     ]);
-    const clientActions = new Set(["cancel", "respond"]);
+    const clientActions = new Set(["cancel", "respond", "edit"]);
 
     if (staffActions.has(action)) {
       if (!isStaff) return res.status(403).json({ error: "staff only" });
@@ -523,7 +536,41 @@ async function handleContentTickets(req, res) {
     let patch = {};
     const authorName = isStaff ? ctx.staff.name : (ctx.client.name || "Client");
 
-    if (action === "upload-final") {
+    if (action === "edit") {
+      if (ticket.status !== "active") {
+        return res.status(409).json({ error: "ticket is not active" });
+      }
+      const newRawFiles = Array.isArray(body.raw_files) ? body.raw_files : null;
+      const noteText = (body.note || "").trim();
+      const summaryParts = [];
+
+      if (newRawFiles) {
+        const oldRaw = ticket.raw_files || [];
+        const oldUrls = new Set(oldRaw.map(f => f.url));
+        const newUrls = new Set(newRawFiles.map(f => f.url));
+        const added = newRawFiles.filter(f => !oldUrls.has(f.url));
+        const removed = oldRaw.filter(f => !newUrls.has(f.url));
+        if (added.length) summaryParts.push(`Added ${added.length} file${added.length === 1 ? "" : "s"}`);
+        if (removed.length) summaryParts.push(`Removed ${removed.length} file${removed.length === 1 ? "" : "s"}`);
+        patch.raw_files = newRawFiles;
+      }
+
+      if (!summaryParts.length && !noteText) {
+        return res.status(400).json({ error: "nothing to update" });
+      }
+
+      let messageBody = summaryParts.join(", ") || "Added a note";
+      if (noteText) {
+        messageBody = summaryParts.length
+          ? `${messageBody}. Note: "${noteText}"`
+          : `Added a note: "${noteText}"`;
+      }
+      patch.messages = appendMessage(ticket.messages, {
+        author_type: "client", author_name: authorName,
+        body: messageBody, is_action_request: false,
+      });
+
+    } else if (action === "upload-final") {
       const finals = Array.isArray(body.final_files) ? body.final_files : [];
       patch.final_files = [...(ticket.final_files || []), ...finals];
       patch.messages = appendMessage(ticket.messages, {
@@ -589,6 +636,13 @@ async function handleContentTickets(req, res) {
         }
         if (ctxObj.related_creative_name) {
           mktFields.creative_name = ctxObj.related_creative_name;
+        }
+
+        // Pass client's original notes through so the marketing team
+        // sees what the client actually said (not just what content retyped).
+        const clientNotesRaw = (ticket.notes || "").trim();
+        if (clientNotesRaw) {
+          mktFields.client_notes = clientNotesRaw;
         }
 
         const initialMessage = {

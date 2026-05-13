@@ -1142,6 +1142,15 @@
     text-transform: uppercase;
     padding-left: 12px;
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  .mreq-date .mreq-date-activity {
+    color: var(--text-mute);
+    font-size: 9px;
+    letter-spacing: 0.08em;
   }
 
   /* Marketing status pill colors (extend existing) */
@@ -3247,6 +3256,32 @@
             </div>
           </div>
 
+          <!-- Always-on edit form — visible on any active ticket so client can add notes / files anytime -->
+          <div id="reqDetailEditSection" style="display:none;margin-bottom:24px">
+            <div class="section-label">Add a note or files</div>
+            <div class="card">
+              <label class="modal-label" for="reqDetailEditNoteInput">Note (optional)</label>
+              <textarea id="reqDetailEditNoteInput" class="modal-textarea" placeholder="Add context, instructions, or a quick update"></textarea>
+
+              <div id="reqDetailEditFilesGroup">
+                <label class="modal-label" style="margin-top:14px">Add files (optional)</label>
+                <label for="reqDetailEditFilesInput" class="file-drop-label" style="padding:18px">
+                  <span class="file-drop-icon">↑</span>
+                  <span class="file-drop-text">Click to add files</span>
+                  <span class="file-drop-meta">JPG · PNG · MP4 · MOV · PSD · AI · ZIP</span>
+                </label>
+                <input type="file" id="reqDetailEditFilesInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_reqDetailEditAddFiles(this.files)" />
+                <div class="wizard-files-list" id="reqDetailEditFilesList" style="margin-top:8px"></div>
+              </div>
+
+              <div id="reqDetailEditPendingRemovals" style="display:none;margin-top:14px;padding:10px 12px;background:rgba(255,107,107,0.08);border-left:3px solid var(--pace-stop);border-radius:6px;font-size:13px;color:var(--text-sub)"></div>
+
+              <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+                <button class="btn-modal-primary" id="reqDetailEditSubmitBtn" onclick="submitReqDetailEdit()">Save changes</button>
+              </div>
+            </div>
+          </div>
+
           <div id="reqDetailActions" style="display:flex;gap:10px;justify-content:flex-end">
             <button class="btn-modal-danger" onclick="openCancelRequestModal()">Cancel Request</button>
           </div>
@@ -3915,8 +3950,7 @@ function openContentTicketDetail(id) {
     html += `<div class="req-info-row"><div class="req-info-label">Campaign</div><div class="req-info-value">${escapeHTML(r.campaign)}</div></div>`;
   }
   if (raw.length) {
-    const fileLines = raw.map(f => `<a href="${escapeHTML(f.url)}" target="_blank" rel="noreferrer" style="color:var(--gold);text-decoration:none;display:inline-block;margin-right:10px">${escapeHTML(f.name)} ↗</a>`).join('');
-    html += `<div class="req-info-row"><div class="req-info-label">Files</div><div class="req-info-value">${fileLines}</div></div>`;
+    html += `<div class="req-info-row"><div class="req-info-label">Files</div><div class="req-info-value" id="reqDetailContentRawFilesRow"></div></div>`;
   }
   if (actionReq) {
     html += `<div class="req-info-row"><div class="req-info-label">Action requested</div><div class="req-info-value" style="background:rgba(232,197,71,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:6px;font-style:italic">${escapeHTML(actionReq.message)}</div></div>`;
@@ -3937,6 +3971,18 @@ function openContentTicketDetail(id) {
     document.getElementById('reqDetailRespondInput').value = '';
     _renderReqDetailRespondFilesList();
   }
+
+  // Always-on edit section — visible on active content tickets, supports raw file add/remove + note
+  const isActive = r.status === 'in-progress' || r.status === 'active';
+  const editSection = document.getElementById('reqDetailEditSection');
+  if (editSection) editSection.style.display = isActive ? 'block' : 'none';
+  if (isActive) {
+    _reqDetailEditConfigure({ allowFiles: true });
+    _reqDetailEditReset();
+  }
+
+  // Render the raw-files row (with ✕ buttons when active)
+  if (raw.length) _reqDetailRerenderContentRawFiles();
 
   // Cancel button only on active tickets where client owns the cancellation flow
   const actionsBar = document.getElementById('reqDetailActions');
@@ -3994,6 +4040,165 @@ function _renderReqDetailRespondFilesList() {
         <div class="wizard-file-size">${sizeLabel}</div>
         <button class="wizard-file-remove" onclick="_reqDetailRespondRemoveFile(${i})" aria-label="Remove">×</button>
       </div>`;
+  }).join('');
+}
+
+// ── Inline EDIT form (always visible on active tickets) ──
+// Lets the client add a note / add files / remove raw files at any time,
+// independent of the action-requested respond flow.
+let _reqDetailEditFiles = [];          // new File objects to upload
+let _reqDetailEditRemoveUrls = new Set();   // urls of existing raw files marked for removal
+let _reqDetailEditAllowFiles = false;  // false for marketing tickets (notes-only)
+
+function _reqDetailEditReset() {
+  _reqDetailEditFiles = [];
+  _reqDetailEditRemoveUrls = new Set();
+  const noteEl = document.getElementById('reqDetailEditNoteInput');
+  if (noteEl) noteEl.value = '';
+  const input = document.getElementById('reqDetailEditFilesInput');
+  if (input) input.value = '';
+  _renderReqDetailEditFilesList();
+  _renderReqDetailEditPendingRemovals();
+}
+
+function _reqDetailEditConfigure(opts) {
+  _reqDetailEditAllowFiles = !!opts.allowFiles;
+  const group = document.getElementById('reqDetailEditFilesGroup');
+  if (group) group.style.display = _reqDetailEditAllowFiles ? 'block' : 'none';
+}
+
+function _reqDetailEditAddFiles(filesList) {
+  const incoming = Array.from(filesList || []);
+  if (!incoming.length) return;
+  _reqDetailEditFiles = _reqDetailEditFiles.concat(incoming);
+  _renderReqDetailEditFilesList();
+  const input = document.getElementById('reqDetailEditFilesInput');
+  if (input) input.value = '';
+}
+
+function _reqDetailEditRemoveStagedFile(idx) {
+  _reqDetailEditFiles.splice(idx, 1);
+  _renderReqDetailEditFilesList();
+}
+
+function _renderReqDetailEditFilesList() {
+  const listEl = document.getElementById('reqDetailEditFilesList');
+  if (!listEl) return;
+  if (!_reqDetailEditFiles.length) { listEl.innerHTML = ''; return; }
+  listEl.innerHTML = _reqDetailEditFiles.map((f, i) => {
+    const isImage = (f.type || '').startsWith('image/');
+    const thumb = isImage
+      ? `<img class="wizard-file-thumb" src="${URL.createObjectURL(f)}" alt="${escapeHTML(f.name)}" />`
+      : `<div class="wizard-file-thumb">${(f.type || '').startsWith('video/') ? '🎬' : '📄'}</div>`;
+    const sizeKB = (f.size / 1024).toFixed(0);
+    const sizeLabel = sizeKB < 1024 ? sizeKB + ' KB' : (sizeKB / 1024).toFixed(1) + ' MB';
+    return `
+      <div class="wizard-file-item">
+        ${thumb}
+        <div class="wizard-file-name">${escapeHTML(f.name)}</div>
+        <div class="wizard-file-size">${sizeLabel}</div>
+        <button class="wizard-file-remove" onclick="_reqDetailEditRemoveStagedFile(${i})" aria-label="Remove">×</button>
+      </div>`;
+  }).join('');
+}
+
+function _reqDetailEditMarkRawForRemoval(url) {
+  _reqDetailEditRemoveUrls.add(url);
+  _renderReqDetailEditPendingRemovals();
+  // Re-render the raw files list in the submitted card to strikethrough this one
+  if (_reqDetailKind === 'content') {
+    _reqDetailRerenderContentRawFiles();
+  }
+}
+
+function _reqDetailEditUndoRawRemoval(url) {
+  _reqDetailEditRemoveUrls.delete(url);
+  _renderReqDetailEditPendingRemovals();
+  if (_reqDetailKind === 'content') {
+    _reqDetailRerenderContentRawFiles();
+  }
+}
+
+function _renderReqDetailEditPendingRemovals() {
+  const el = document.getElementById('reqDetailEditPendingRemovals');
+  if (!el) return;
+  const count = _reqDetailEditRemoveUrls.size;
+  if (!count) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = `<strong style="color:var(--pace-stop)">${count} file${count === 1 ? '' : 's'}</strong> marked for removal — will be removed on Save.`;
+}
+
+async function submitReqDetailEdit() {
+  const note = document.getElementById('reqDetailEditNoteInput')?.value?.trim() || '';
+  const hasNewFiles = _reqDetailEditFiles.length > 0;
+  const hasRemovals = _reqDetailEditRemoveUrls.size > 0;
+  if (!note && !hasNewFiles && !hasRemovals) {
+    alert('Add a note, add a file, or remove a file before saving.');
+    return;
+  }
+  if (!_activeRequestId) return;
+  const id = _activeRequestId;
+  const kind = _reqDetailKind;
+
+  const submitBtn = document.getElementById('reqDetailEditSubmitBtn');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving…'; }
+  showLoading('Saving changes…', hasNewFiles ? "Uploading files — don't close this tab." : 'Just a moment.');
+
+  try {
+    const r = MARKETING_REQUESTS.find(x => x.id === id);
+    const existingRaw = (r && r.files) ? r.files : [];
+
+    // Upload any new files first
+    let uploaded = [];
+    if (hasNewFiles) {
+      uploaded = await _mreqUploadFiles(_reqDetailEditFiles.slice());
+    }
+
+    if (kind === 'content') {
+      // Build the new raw_files array = (existing - removed) + uploaded
+      const kept = existingRaw.filter(f => !_reqDetailEditRemoveUrls.has(f.url));
+      const newRawFiles = kept.concat(uploaded.map(u => ({ name: u.name, url: u.url })));
+      const payload = { action: 'edit' };
+      if (hasNewFiles || hasRemovals) payload.raw_files = newRawFiles;
+      if (note) payload.note = note;
+      await _ctkPatchTicket(id, payload);
+    } else {
+      // Marketing tickets: notes only (no file editing here)
+      await _mreqPatchTicket(id, { action: 'edit', note });
+    }
+
+    _reqDetailEditReset();
+    closeMarketingRequest();
+    await fetchAndRenderMarketingRequests();
+    hideLoading();
+    showConfirmation('Changes saved', 'Your update has been added to the ticket.');
+  } catch (e) {
+    hideLoading();
+    alert('Save failed: ' + e.message);
+  } finally {
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Save changes'; }
+  }
+}
+
+// Re-render the "What you submitted" raw files row in the content detail
+// to reflect _reqDetailEditRemoveUrls (strikethrough for marked items).
+function _reqDetailRerenderContentRawFiles() {
+  const r = MARKETING_REQUESTS.find(x => x.id === _activeRequestId);
+  if (!r) return;
+  const rowEl = document.getElementById('reqDetailContentRawFilesRow');
+  if (!rowEl) return;
+  const raw = r.files || [];
+  if (!raw.length) { rowEl.innerHTML = ''; return; }
+  const ticketActive = r.status === 'in-progress' || r.status === 'active';
+  rowEl.innerHTML = raw.map(f => {
+    const marked = _reqDetailEditRemoveUrls.has(f.url);
+    const style = marked ? 'text-decoration:line-through;opacity:0.5;' : '';
+    const action = ticketActive
+      ? (marked
+          ? `<button class="raw-file-undo" onclick="_reqDetailEditUndoRawRemoval('${escapeHTML(f.url)}')" title="Undo removal" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:11px;margin-left:6px">undo</button>`
+          : `<button class="raw-file-remove" onclick="_reqDetailEditMarkRawForRemoval('${escapeHTML(f.url)}')" title="Remove this file" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:14px;line-height:1;margin-left:4px">×</button>`)
+      : '';
+    return `<span style="display:inline-flex;align-items:center;margin-right:14px;${style}"><a href="${escapeHTML(f.url)}" target="_blank" rel="noreferrer" style="color:var(--gold);text-decoration:none">${escapeHTML(f.name)} ↗</a>${action}</span>`;
   }).join('');
 }
 
@@ -4330,12 +4535,19 @@ function _mreqRowHTML(r) {
     ? 'Action needed'
     : (MARKETING_STATUS_LABEL[r.status] || r.status);
 
+  const activityBit = r.lastActivityAt
+    ? `<div class="mreq-date-activity">${escapeHTML(_formatRelative(r.lastActivityAt))}</div>`
+    : '';
+
   return `
     <div class="mreq-row" onclick="${onClickAttr}"${needsAction ? ' style="background:rgba(232,191,96,0.07);border-left:3px solid var(--gold);padding-left:9px"' : ''}>
       <div class="mreq-icon">${meta.icon}</div>
       <div class="mreq-title">${codePrefix} ${escapeHTML(titleBit)}</div>
       <span class="status-pill ${pillClass}">${escapeHTML(pillLabel)}</span>
-      <div class="mreq-date">${escapeHTML(r.submittedDateDisplay)}</div>
+      <div class="mreq-date">
+        <div>${escapeHTML(r.submittedDateDisplay)}</div>
+        ${activityBit}
+      </div>
     </div>`;
 }
 
@@ -4428,6 +4640,15 @@ function openMarketingRequest(id) {
   if (showRespond) {
     document.getElementById('reqDetailRespondInput').value = '';
     _renderReqDetailRespondFilesList();
+  }
+
+  // Always-on edit section — marketing tickets get notes-only (no file editing here)
+  const mktActive = r.status === 'in-progress';
+  const editSection = document.getElementById('reqDetailEditSection');
+  if (editSection) editSection.style.display = mktActive ? 'block' : 'none';
+  if (mktActive) {
+    _reqDetailEditConfigure({ allowFiles: false });
+    _reqDetailEditReset();
   }
 
   // Show detail, hide list and campaign detail

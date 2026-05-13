@@ -73,6 +73,7 @@ function normalizeTicket(apiTicket) {
     fileNames: files.map(f => f.name).filter(Boolean),
     files,
     note: fields.note || "",
+    clientNotes: fields.client_notes || "",
     currentSpend: fields.current_spend,
     newSpend: fields.new_spend,
     offer: fields.offer,
@@ -690,6 +691,21 @@ function renderSubmittedInfo(t, tk) {
         </div>
       )
       : <span style={{ color: tk.textMute }}>No files</span>]);
+  }
+
+  // Client's original notes (passed through from the content ticket when content
+  // team hit "Send to Marketing"). Surfaces what the academy actually said.
+  if (t.clientNotes) {
+    rows.push(["Client said", (
+      <div style={{
+        background: "rgba(232,197,71,0.06)",
+        borderLeft: `3px solid ${tk.accent}`,
+        padding: "10px 12px",
+        borderRadius: 6,
+        fontStyle: "italic",
+        whiteSpace: "pre-wrap",
+      }}>{t.clientNotes}</div>
+    )]);
   }
 
   return rows.map(([label, value], i) => (
