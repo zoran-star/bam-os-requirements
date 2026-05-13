@@ -44,19 +44,19 @@ App stays in Development mode (no review needed) for BAM staff testing. Review r
 
 ## What's done in code
 
-- `api/marketing.js` — handleMetaAuth (prepare + callback), handleMetaAdAccounts, handleMetaCampaigns
+Through commit `313f9e6`:
+- `api/marketing.js` — handleMetaAuth (prepare + callback), handleMetaAdAccounts (GET list / POST pick / DELETE unset), handleMetaCampaigns
 - `vercel.json` — rewrites for clean Meta URLs
-
-Code references `clients.meta_ad_account_id` which doesn't exist yet — the campaigns endpoint will return `{ campaigns: [], reason: "no_ad_account" }` until the column lands.
+- `clients.meta_ad_account_id` column added (migration `add_meta_ad_account_id_to_clients`)
+- `public/client-portal.html` — Marketing tab Active Campaigns section is now dynamic with 4 states (not connected / no ad account / empty campaigns / has campaigns). Connect Meta CTA, ad-account picker, real campaign cards. OAuth callback toast on page load (`?meta=connected|error`).
 
 ## What's left
 
-1. Add `clients.meta_ad_account_id` column (DDL, needs approval).
-2. Build "Connect Meta" button on client portal (Marketing tab).
-3. Add "Connect Meta" step to `/onboarding.html` (after password-set).
-4. Build ad-account picker UI (calls `/api/meta/adaccounts`, saves to `clients.meta_ad_account_id`).
-5. Replace hardcoded "Title of campaign 1/2" cards with fetch from `/api/meta/campaigns` + zero state.
-6. BAM GTA re-onboards as the end-to-end test client.
+1. **Zoran's Meta dashboard side** — add Facebook Login product to the app; configure Valid OAuth Redirect URI: `https://bam-portal-tawny.vercel.app/api/auth/meta/callback`. Until this lands, clicking "Connect Meta" fails at Facebook with 'redirect URI not whitelisted'.
+2. Add "Connect Meta" step to `/onboarding.html` (after password-set / before first portal entry).
+3. Wire the campaign DETAIL view's creative grid (currently 8 hardcoded Picsum images) to Meta `/adcreatives` for real ad creatives. Out of scope for the current Phase 6.
+4. Token refresh: today the long-lived token (60 days) is stored but no auto-refresh exists. If a token 401s, we should surface "reconnect" cleanly in the UI. Currently campaigns endpoint will just error out.
+5. BAM GTA re-onboards as the end-to-end test client.
 
 ## Why client-side (not staff-side)
 
