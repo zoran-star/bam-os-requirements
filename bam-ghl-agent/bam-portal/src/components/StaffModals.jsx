@@ -1,9 +1,12 @@
 import { useState } from "react";
 
+// Canonical staff role allow-list. Keep in sync with VALID_STAFF_ROLES
+// in api/clients.js (invite-staff) and the canSee* role checks in App.jsx.
 export const STAFF_ROLES = [
-  { value: "systems_executor",   label: "Systems Executor" },
-  { value: "systems_manager",    label: "Systems Manager" },
   { value: "admin",              label: "Admin" },
+  { value: "systems_manager",    label: "Systems Manager" },
+  { value: "systems_executor",   label: "Systems Executor" },
+  { value: "marketing_manager",  label: "Marketing Manager" },
   { value: "marketing_executor", label: "Marketing Executor" },
   { value: "scaling_manager",    label: "Scaling Manager" },
 ];

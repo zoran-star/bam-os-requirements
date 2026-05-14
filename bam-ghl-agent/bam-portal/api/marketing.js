@@ -26,7 +26,9 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 const CONTENT_TYPES = new Set(["replace", "add", "campaign-create"]);
-const GUIDE_WRITE_ROLES = new Set(["admin", "marketing", "marketing_manager", "marketing_executor"]);
+// Who can create/edit/delete guide cards. Keep in sync with the canonical
+// STAFF_ROLES list (no bare "marketing" — it's not a real role).
+const GUIDE_WRITE_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
 
 // ─────────────────────────────────────────────────────────
 // Shared helpers
