@@ -938,22 +938,38 @@ async function handleMetaAdAccounts(req, res) {
   }
 
   // POST → set a client's chosen ad account (staff assigning on behalf of client)
+  // Optionally also accepts campaign_ids[] to filter what the client sees
+  // when wired to a SHARED ad account (e.g. BAM's "all academies" account).
   if (req.method === "POST") {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
     const targetClientId = typeof body.client_id === "string" ? body.client_id.trim() : "";
     const chosen = typeof body.ad_account_id === "string" ? body.ad_account_id.trim() : "";
     if (!targetClientId) return res.status(400).json({ error: "client_id required" });
     if (!chosen) return res.status(400).json({ error: "ad_account_id required" });
+    const patch = {
+      meta_ad_account_id: chosen,
+      onboarding_completed_at: nowIso(),
+      updated_at: nowIso(),
+    };
+    // campaign_ids: optional array of strings. null/empty array = no filter
+    // (client sees all campaigns in the ad account).
+    if (Array.isArray(body.campaign_ids)) {
+      const cleaned = body.campaign_ids
+        .map(c => (typeof c === "string" ? c.trim() : ""))
+        .filter(Boolean);
+      patch.meta_campaign_ids = cleaned.length ? cleaned : null;
+    }
     await sb(`clients?id=eq.${targetClientId}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({
-        meta_ad_account_id: chosen,
-        onboarding_completed_at: nowIso(),
-        updated_at: nowIso(),
-      }),
+      body: JSON.stringify(patch),
     });
-    return res.status(200).json({ ok: true, client_id: targetClientId, meta_ad_account_id: chosen });
+    return res.status(200).json({
+      ok: true,
+      client_id: targetClientId,
+      meta_ad_account_id: chosen,
+      meta_campaign_ids: patch.meta_campaign_ids ?? null,
+    });
   }
 
   // DELETE → unset a client's ad account
@@ -1030,6 +1046,11 @@ async function handleMetaCampaigns(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  // staff_picker=1 mode: staff is browsing all campaigns in a client's ad
+  // account to decide which ones to associate. Bypasses the meta_campaign_ids
+  // filter that would otherwise hide some. Requires staff auth + ?client_id=.
+  const isStaffPicker = req.query.staff_picker === "1" && ctx.staff;
+
   // Both clients (viewing their own portal) and staff (debugging/preview) can call this.
   // For client requests, scope to the client. For staff requests, expect ?client_id=...
   let targetClientId = null;
@@ -1037,7 +1058,7 @@ async function handleMetaCampaigns(req, res) {
   else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
-  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
+  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
   const clientFull = clientRows?.[0];
   if (!clientFull?.meta_ad_account_id) {
     return res.status(200).json({ campaigns: [], reason: "no_ad_account" });
@@ -1090,7 +1111,20 @@ async function handleMetaCampaigns(req, res) {
     };
   });
 
-  return res.status(200).json({ campaigns });
+  // Filter: if meta_campaign_ids is set on the client, only return those.
+  // staff_picker=1 mode bypasses this filter so staff can pick from all.
+  let filtered = campaigns;
+  const associated = Array.isArray(clientFull.meta_campaign_ids) ? clientFull.meta_campaign_ids : null;
+  if (!isStaffPicker && associated && associated.length) {
+    const allow = new Set(associated);
+    filtered = campaigns.filter(c => allow.has(c.id));
+  }
+
+  return res.status(200).json({
+    campaigns: filtered,
+    // Only echo the filter list to staff (clients don't need to know about it)
+    ...(isStaffPicker ? { meta_campaign_ids: associated || [] } : {}),
+  });
 }
 
 // GET ?resource=meta-creatives&campaign_id=<id>
