@@ -36,6 +36,7 @@ export default function BAMPortal() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = not authed
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [accessChecking, setAccessChecking] = useState(false);
   const [dark, setDark] = useState(true);
   const [nav, setNav] = useState("dashboard");
   const [selected, setSelected] = useState(null);
@@ -72,6 +73,35 @@ export default function BAMPortal() {
     await supabase.auth.signOut();
     setSession(null);
   };
+
+  // Defense: if a CLIENT user lands on the staff portal (e.g. Supabase invite
+  // redirect_to was overridden by Site URL settings), redirect them to
+  // /client-portal.html. Preserves any ?type=invite/recovery flag so the
+  // password-set form still kicks in there.
+  useEffect(() => {
+    if (!session?.user?.id || !session?.user?.email) return;
+    setAccessChecking(true);
+    let cancelled = false;
+    (async () => {
+      const [clientRes, staffRes] = await Promise.all([
+        supabase.from("clients").select("id").eq("auth_user_id", session.user.id).maybeSingle(),
+        supabase.from("staff").select("id").eq("email", session.user.email).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const isClient = !!clientRes?.data?.id;
+      const isStaff = !!staffRes?.data?.id;
+      if (isClient && !isStaff) {
+        const url = new URL(window.location.href);
+        const hashParams = new URLSearchParams((url.hash || "").replace(/^#/, ""));
+        const flowType = url.searchParams.get("type") || hashParams.get("type");
+        const params = flowType ? `?type=${encodeURIComponent(flowType)}` : "";
+        window.location.replace("/client-portal.html" + params);
+        return;
+      }
+      setAccessChecking(false);
+    })();
+    return () => { cancelled = true; };
+  }, [session?.user?.id, session?.user?.email]);
 
   const me = useStaffMe(session);
   const canSeeSystems = me && (me.role === "admin" || me.role === "systems_manager" || me.role === "systems_executor");
@@ -281,7 +311,7 @@ export default function BAMPortal() {
   }, []);
 
   // ─ Auth gate (after all hooks) ─
-  if (authLoading) {
+  if (authLoading || accessChecking) {
     return (
       <div style={{
         minHeight: "100vh", background: "#000000",
