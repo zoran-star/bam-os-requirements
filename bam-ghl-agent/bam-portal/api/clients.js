@@ -131,9 +131,9 @@ export default async function handler(req, res) {
       // Detected by: no Authorization header AND no ?action= AND body has the
       // signup shape. Anything else falls through to the admin path below.
       const hasAuth = (req.headers.authorization || "").startsWith("Bearer ");
-      const action = req.query.action;
+      const publicSignupAction = req.query.action;
       const body = req.body || {};
-      const isPublicSignup = !hasAuth && !action
+      const isPublicSignup = !hasAuth && !publicSignupAction
         && typeof body.name === "string"
         && typeof body.owner_name === "string"
         && typeof body.email === "string";
