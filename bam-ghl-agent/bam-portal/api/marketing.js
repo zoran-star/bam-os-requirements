@@ -1014,8 +1014,12 @@ async function handleMetaCampaigns(req, res) {
     ? clientFull.meta_ad_account_id
     : `act_${clientFull.meta_ad_account_id}`;
 
+  // Only return campaigns that are actually running. effective_status
+  // covers nuances like CAMPAIGN_PAUSED, ADSET_PAUSED, DISAPPROVED — we want
+  // strictly ACTIVE (delivering ads right now).
   const cRes = await fetch(`${META_GRAPH}/${adAcct}/campaigns?` + new URLSearchParams({
-    fields: "id,name,status,objective,insights.date_preset(last_30d){spend,actions,cost_per_action_type,results}",
+    fields: "id,name,status,effective_status,objective,insights.date_preset(last_30d){spend,actions,cost_per_action_type,results}",
+    filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
     access_token: tok.access_token,
     limit: "50",
   }));
