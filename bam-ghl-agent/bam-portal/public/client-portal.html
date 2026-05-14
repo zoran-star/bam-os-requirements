@@ -6272,6 +6272,22 @@ async function boot() {
   const { data: clientRow } = await _sb.from('clients')
     .select('id').eq('auth_user_id', session.user.id).maybeSingle();
   if (!clientRow) {
+    // Defensive: if this is actually a STAFF user (e.g. they clicked a staff
+    // invite link but Supabase Site URL routed them here), bounce them to
+    // the staff portal. Preserves any ?type=invite query so they can set
+    // their password on the staff side.
+    const email = session.user.email || '';
+    if (email) {
+      const { data: staffRow } = await _sb.from('staff')
+        .select('id').eq('email', email).maybeSingle();
+      if (staffRow) {
+        const url = new URL(window.location.href);
+        const flowType = url.searchParams.get('type') || (new URLSearchParams(url.hash.replace(/^#/, ''))).get('type');
+        const params = flowType ? `?type=${encodeURIComponent(flowType)}` : '';
+        window.location.replace('/' + params);
+        return;
+      }
+    }
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('login-error').textContent =
       'Your account is not linked to a client. Contact BAM support.';
