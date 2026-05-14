@@ -1145,9 +1145,10 @@ async function handleMetaCreatives(req, res) {
   const tok = { access_token: staffToken };
 
   // Get all ACTIVE ads in this campaign, expanding to creative + image fields.
-  // image_url / thumbnail_url are the rendered assets the user sees in the feed.
+  // For carousels, image data lives inside object_story_spec.link_data.child_attachments,
+  // not at the top of the creative — so we expand that too.
   const adsRes = await fetch(`${META_GRAPH}/${encodeURIComponent(campaignId)}/ads?` + new URLSearchParams({
-    fields: "id,name,status,effective_status,creative{id,name,image_url,thumbnail_url,image_hash,object_type,video_id}",
+    fields: "id,name,status,effective_status,creative{id,name,image_url,thumbnail_url,image_hash,object_type,video_id,object_story_spec,asset_feed_spec,effective_object_story_id}",
     filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
     access_token: tok.access_token,
     limit: "50",
@@ -1157,9 +1158,32 @@ async function handleMetaCreatives(req, res) {
     return res.status(adsRes.status).json({ error: adsJson?.error?.message || "Meta API error" });
   }
 
+  // Extract the best representative image we can find for this creative.
+  // Order of preference: direct image_url → thumbnail_url → first carousel
+  // slide's picture → first asset_feed image. For carousels we also flag
+  // is_carousel so the UI can show a hint.
+  function extractCreativeAssets(c) {
+    let imageUrl = c.image_url || c.thumbnail_url || null;
+    let isCarousel = false;
+    const childAttachments = c.object_story_spec?.link_data?.child_attachments;
+    if (Array.isArray(childAttachments) && childAttachments.length) {
+      isCarousel = true;
+      if (!imageUrl) {
+        // each child has .picture (or .image_hash). Use first child's picture.
+        const firstWithPic = childAttachments.find(a => a.picture);
+        if (firstWithPic) imageUrl = firstWithPic.picture;
+      }
+    }
+    // Asset feed (dynamic creative) fallback
+    if (!imageUrl && Array.isArray(c.asset_feed_spec?.images) && c.asset_feed_spec.images.length) {
+      imageUrl = c.asset_feed_spec.images[0].url || null;
+    }
+    return { imageUrl, isCarousel };
+  }
+
   const creatives = (adsJson.data || []).map(ad => {
     const c = ad.creative || {};
-    const imageUrl = c.image_url || c.thumbnail_url || null;
+    const { imageUrl, isCarousel } = extractCreativeAssets(c);
     const isVideo = c.object_type === "VIDEO" || !!c.video_id;
     return {
       ad_id: ad.id,
@@ -1168,9 +1192,13 @@ async function handleMetaCreatives(req, res) {
       creative_name: c.name || ad.name || "",
       image_url: imageUrl,
       is_video: isVideo,
+      is_carousel: isCarousel,
       video_id: c.video_id || null,
+      effective_object_story_id: c.effective_object_story_id || null,
     };
-  }).filter(c => c.image_url || c.is_video);
+  });
+  // No filter — show every active ad, even if we couldn't find an image.
+  // Empty-image creatives still render as a tile placeholder.
 
   // For video creatives, fetch source + permalink in parallel so the client
   // can render an embedded player (or fall back to Facebook permalink).
