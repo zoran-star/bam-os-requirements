@@ -286,6 +286,41 @@ export default async function handler(req, res) {
         }
       }
 
+      // ── action=update-fields ──
+      // Admin-only. Inline-edit owner_name / email on an existing client
+      // from the Client Setup page. Doesn't send an invite.
+      if (action === "update-fields") {
+        const body = req.body || {};
+        const client_id = typeof body.client_id === "string" ? body.client_id : "";
+        if (!client_id) return res.status(400).json({ error: "client_id required" });
+        const patch = {};
+        if (typeof body.owner_name === "string") patch.owner_name = body.owner_name.trim() || null;
+        if (typeof body.email === "string") {
+          const newEmail = body.email.trim().toLowerCase();
+          if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+            return res.status(400).json({ error: "invalid email format" });
+          }
+          patch.email = newEmail || null;
+        }
+        if (!Object.keys(patch).length) return res.status(400).json({ error: "nothing to update" });
+        patch.updated_at = new Date().toISOString();
+        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`, {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify(patch),
+        });
+        if (!res2.ok) {
+          const errText = await res2.text();
+          return res.status(500).json({ error: `update failed: ${errText}` });
+        }
+        return res.status(200).json({ ok: true, ...patch });
+      }
+
       if (action === "setup-account") {
         // Send an INVITE email to the client. They click the link to set their
         // own password (never seen by us). Updates the clients row with

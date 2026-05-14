@@ -23,6 +23,7 @@ import MarketingView from './views/MarketingView';
 import TeamView from './views/TeamView';
 import ContentView from './views/ContentView';
 import ChannelView from './views/ChannelView';
+import ClientSetupView from './views/ClientSetupView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -363,6 +364,7 @@ export default function BAMPortal() {
     marketing: ["Marketing", "Client ad-campaign tickets"],
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
+    "client-setup": ["Client Setup", "Bulk wire-up: ad accounts + invites"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -402,6 +404,7 @@ export default function BAMPortal() {
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
+        ...(me?.role === "admin" ? [{ label: "Client Setup", key: "client-setup" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
 
@@ -804,6 +807,9 @@ export default function BAMPortal() {
 
             {/* CONTENT */}
             {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
+
+            {/* CLIENT SETUP — admin-only bulk wire-up page */}
+            {nav === "client-setup" && me?.role === "admin" && <ClientSetupView tokens={tk} session={session} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
