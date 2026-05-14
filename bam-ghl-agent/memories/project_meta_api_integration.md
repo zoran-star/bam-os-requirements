@@ -50,13 +50,27 @@ Through commit `313f9e6`:
 - `clients.meta_ad_account_id` column added (migration `add_meta_ad_account_id_to_clients`)
 - `public/client-portal.html` — Marketing tab Active Campaigns section is now dynamic with 4 states (not connected / no ad account / empty campaigns / has campaigns). Connect Meta CTA, ad-account picker, real campaign cards. OAuth callback toast on page load (`?meta=connected|error`).
 
-## What's left
+## What's left (post-2026-05-14 end-to-end test)
 
-1. **Zoran's Meta dashboard side** — add Facebook Login product to the app; configure Valid OAuth Redirect URI: `https://bam-portal-tawny.vercel.app/api/auth/meta/callback`. Until this lands, clicking "Connect Meta" fails at Facebook with 'redirect URI not whitelisted'.
-2. Add "Connect Meta" step to `/onboarding.html` (after password-set / before first portal entry).
-3. Wire the campaign DETAIL view's creative grid (currently 8 hardcoded Picsum images) to Meta `/adcreatives` for real ad creatives. Out of scope for the current Phase 6.
-4. Token refresh: today the long-lived token (60 days) is stored but no auto-refresh exists. If a token 401s, we should surface "reconnect" cleanly in the UI. Currently campaigns endpoint will just error out.
-5. BAM GTA re-onboards as the end-to-end test client.
+**FULL FLOW WORKS:** Zoran successfully onboarded BAM GTA from scratch on 2026-05-14, set password, OAuth'd Meta, picked ad account, saw real campaigns in the Marketing tab. Phase 7 complete.
+
+Remaining (out of scope for this goal, follow-up tasks):
+1. **Staff invite backend** — UI exists in `StaffModals.jsx` but POSTs to non-existent `/api/staff`. Wire a real handler (bundle into marketing.js as `?resource=staff-invite` or fold into clients.js as `?action=invite-staff`). Different `redirect_to` from client invite (root, not /client-portal.html).
+2. **Campaign DETAIL creative grid** still hardcoded to 8 Picsum images. Wire to Meta `/adcreatives` for real ad creatives. ~1hr.
+3. **Token refresh on 401** — today the 60-day long-lived token has no auto-refresh. If it expires (or is revoked), campaigns endpoint will 401 silently. Surface a "Reconnect Meta" CTA on the Marketing tab when this happens.
+4. **App Review submission** — for non-developer Meta users to be able to connect, the BAMPORTAL Meta app needs ads_read approved via Meta's App Review. Currently in Development mode (only BAM staff + invited testers can use it). When ready to expand, submit.
+
+## Bugs found + fixed during the end-to-end test (2026-05-14)
+
+Documented here so they don't recur:
+
+1. **/api/clients 'auth required'** — public onboarding form was blocked by admin-only auth check. Fix: added public signup path detection in clients.js (commit 3b1ea4a).
+2. **`const action` duplicate declaration** in clients.js — caused FUNCTION_INVOCATION_FAILED. Fix: renamed to publicSignupAction (commit 66b1a15).
+3. **`const body` duplicate declaration** in clients.js — same issue, second variable. Fix: renamed to signupBody (commit 8d89551). Lesson: run `node --check` on edited files BEFORE pushing.
+4. **Invite redirect went to staff portal** — Supabase Site URL was `/` (staff portal). Two-part fix: (a) Zoran changed Supabase Site URL to `/client-portal.html`, (b) added defensive redirect in App.jsx that bounces client users to /client-portal.html (commit 196ba8c).
+5. **`require("crypto")` in ESM module** — marketing.js is `export default` ESM but I added `const crypto = require(...)` which is CJS. Caused 500 on every /api/marketing call. Fix: moved to top-of-file `import crypto from "node:crypto"` (commit 9d85628).
+6. **vercel.json rewrite step=start vs handler step=prepare** — wizard hit /api/auth/meta/start which routed but the step param didn't match handler's expected value. Fix: changed rewrite to step=prepare (commit 37a9107).
+7. **Vercel env vars stored with trailing \n** — `echo "value" | vercel env add` appended a newline that became part of the stored value. Facebook OAuth rejected "Invalid App ID" because client_id had %0A appended. Fix: removed + re-added all 3 META_* env vars using `printf` instead of `echo`. Lesson saved as feedback memory.
 
 ## Why client-side (not staff-side)
 
