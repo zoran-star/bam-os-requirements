@@ -1102,5 +1102,26 @@ async function handleMetaCreatives(req, res) {
     };
   }).filter(c => c.image_url || c.is_video);
 
+  // For video creatives, fetch source + permalink in parallel so the client
+  // can render an embedded player (or fall back to Facebook permalink).
+  // Also fetch picture for video poster.
+  const videos = creatives.filter(c => c.video_id);
+  if (videos.length) {
+    await Promise.all(videos.map(async (c) => {
+      try {
+        const vRes = await fetch(`${META_GRAPH}/${encodeURIComponent(c.video_id)}?` + new URLSearchParams({
+          fields: "source,permalink_url,picture,thumbnails",
+          access_token: tok.access_token,
+        }));
+        if (vRes.ok) {
+          const v = await vRes.json();
+          c.video_source_url = v.source || null;
+          c.video_permalink_url = v.permalink_url ? `https://www.facebook.com${v.permalink_url.startsWith("/") ? v.permalink_url : "/" + v.permalink_url}` : null;
+          if (!c.image_url && v.picture) c.image_url = v.picture;
+        }
+      } catch (_) { /* leave fields null on failure */ }
+    }));
+  }
+
   return res.status(200).json({ creatives });
 }

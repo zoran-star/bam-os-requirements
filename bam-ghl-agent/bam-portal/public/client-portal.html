@@ -3537,6 +3537,64 @@ function openCampaignDetail(campaignId, title, stats) {
   window.scrollTo(0, 0);
 }
 
+// Opens an inline video player for the clicked video creative.
+// Uses Meta's video.source URL if available; falls back to a "Open on Facebook"
+// link via permalink_url. Source URLs sometimes require the user to be logged
+// in to Facebook in the browser — the fallback always works.
+function _openCreativeVideo(idx) {
+  const c = (window._campaignCreativesCache || [])[idx];
+  if (!c || !c.is_video) return;
+  const modal = document.getElementById('creativeVideoModal');
+  const titleEl = document.getElementById('creativeVideoTitle');
+  const playerWrap = document.getElementById('creativeVideoPlayerWrap');
+  const fallbackEl = document.getElementById('creativeVideoFallback');
+  if (!modal || !playerWrap) return;
+
+  titleEl.textContent = c.creative_name || c.ad_name || 'Video creative';
+  fallbackEl.style.display = 'none';
+  fallbackEl.innerHTML = '';
+
+  if (c.video_source_url) {
+    playerWrap.innerHTML = `
+      <video controls autoplay playsinline preload="metadata"
+             ${c.image_url ? `poster="${escapeHTML(c.image_url)}"` : ''}
+             style="width:100%;height:100%;background:#000;display:block">
+        <source src="${escapeHTML(c.video_source_url)}" type="video/mp4">
+        Your browser can't play this video.
+      </video>`;
+    if (c.video_permalink_url) {
+      fallbackEl.style.display = 'block';
+      fallbackEl.innerHTML = `Trouble playing? <a href="${escapeHTML(c.video_permalink_url)}" target="_blank" rel="noreferrer" style="color:var(--gold)">Open on Facebook ↗</a>`;
+    }
+  } else if (c.video_permalink_url) {
+    playerWrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:24px;text-align:center">
+        <div style="font-size:36px">🎬</div>
+        <div style="color:var(--text-sub);font-size:13px">Video preview not available inline.</div>
+        <a href="${escapeHTML(c.video_permalink_url)}" target="_blank" rel="noreferrer"
+           style="background:var(--gold);color:var(--ink-0);padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
+          Open on Facebook ↗
+        </a>
+      </div>`;
+  } else {
+    playerWrap.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;padding:24px;text-align:center">
+        <div style="font-size:36px">🎬</div>
+        <div style="color:var(--text-sub);font-size:13px">Couldn't load this video. Contact your account manager.</div>
+      </div>`;
+  }
+  modal.style.display = 'flex';
+}
+
+function _closeCreativeVideo() {
+  const modal = document.getElementById('creativeVideoModal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  // Stop any playing video so audio doesn't keep going
+  const wrap = document.getElementById('creativeVideoPlayerWrap');
+  if (wrap) wrap.innerHTML = '';
+}
+
 // Pulls live ad creatives (image/video assets) for a campaign and renders them
 // into the creative grid. Replaces the old hardcoded Picsum placeholders.
 async function _renderCampaignCreatives(campaignId) {
@@ -3558,24 +3616,26 @@ async function _renderCampaignCreatives(campaignId) {
       gridEl.innerHTML = '<div class="req-empty" style="grid-column:1/-1;padding:18px 0">No active creatives in this campaign yet.</div>';
       return;
     }
-    gridEl.innerHTML = creatives.map(c => {
+    // Stash for later (video player opens from the campaign creative list)
+    window._campaignCreativesCache = creatives;
+    gridEl.innerHTML = creatives.map((c, idx) => {
       const label = escapeHTML(c.creative_name || c.ad_name || 'Creative');
-      if (c.image_url) {
-        return `
-          <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}">
-            <img class="creative-img" src="${escapeHTML(c.image_url)}" alt="${label}" />
-            <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 3L13 13M13 3L3 13"/>
-              </svg>
-            </button>
-          </div>`;
-      }
-      // Video creative (no image_url) — show a placeholder with the video icon
+      const isVideo = !!c.is_video;
+      const poster = c.image_url ? escapeHTML(c.image_url) : '';
+      const clickHandler = isVideo ? `onclick="_openCreativeVideo(${idx})"` : '';
+      const cursor = isVideo ? 'cursor:pointer' : '';
+      const playOverlay = isVideo ? `
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);pointer-events:none">
+          <div style="width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div>
+        </div>` : '';
+      const imgInner = poster
+        ? `<img class="creative-img" src="${poster}" alt="${label}" />`
+        : `<div class="creative-img" style="display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--text-mute);font-size:30px">${isVideo ? '🎬' : '📄'}</div>`;
       return `
-        <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}">
-          <div class="creative-img" style="display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--text-mute);font-size:30px">🎬</div>
-          <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+        <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}" style="position:relative;${cursor}" ${clickHandler}>
+          ${imgInner}
+          ${playOverlay}
+          <button class="creative-delete" onclick="event.stopPropagation();openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
             <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 3L13 13M13 3L3 13"/>
             </svg>
@@ -6710,6 +6770,23 @@ function toggleTheme() {
       <button class="btn-modal-secondary" onclick="closeBudgetModal()">Cancel</button>
       <button class="btn-modal-primary" onclick="submitBudgetChange()">Submit Request</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Creative video player modal ── -->
+<!-- Shown when the client clicks a video creative tile in the campaign detail.
+     Plays the Meta-hosted mp4 inline; falls back to a 'Open on Facebook' link
+     if the source URL isn't accessible. -->
+<div id="creativeVideoModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)_closeCreativeVideo()">
+  <div class="modal-card" onclick="event.stopPropagation()" style="max-width:720px;width:100%">
+    <button onclick="_closeCreativeVideo()" aria-label="Close"
+            style="position:absolute;top:14px;right:14px;background:transparent;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;z-index:2">×</button>
+    <div class="modal-kicker" id="creativeVideoKicker" style="margin-bottom:8px">§ Creative</div>
+    <div class="modal-title" id="creativeVideoTitle" style="margin-bottom:16px">Video creative</div>
+    <div id="creativeVideoPlayerWrap" style="width:100%;background:#000;border-radius:8px;overflow:hidden;aspect-ratio:16/9">
+      <!-- player injected by JS -->
+    </div>
+    <div id="creativeVideoFallback" style="display:none;margin-top:12px;font-size:13px;color:var(--text-sub)"></div>
   </div>
 </div>
 
