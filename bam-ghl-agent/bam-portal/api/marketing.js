@@ -116,10 +116,13 @@ export default async function handler(req, res) {
     if (resource === "meta-campaigns") {
       return handleMetaCampaigns(req, res);
     }
+    if (resource === "meta-creatives") {
+      return handleMetaCreatives(req, res);
+    }
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1053,4 +1056,51 @@ async function handleMetaCampaigns(req, res) {
   });
 
   return res.status(200).json({ campaigns });
+}
+
+// GET ?resource=meta-creatives&campaign_id=<id>
+// Returns the live ad creatives in a campaign (image/video assets the
+// audience actually sees). Filtered to ACTIVE ads only.
+async function handleMetaCreatives(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client) return res.status(403).json({ error: "client only" });
+
+  const campaignId = (req.query.campaign_id || "").trim();
+  if (!campaignId) return res.status(400).json({ error: "campaign_id required" });
+
+  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token`);
+  const tok = tokRows?.[0];
+  if (!tok) return res.status(200).json({ creatives: [], reason: "not_connected" });
+
+  // Get all ACTIVE ads in this campaign, expanding to creative + image fields.
+  // image_url / thumbnail_url are the rendered assets the user sees in the feed.
+  const adsRes = await fetch(`${META_GRAPH}/${encodeURIComponent(campaignId)}/ads?` + new URLSearchParams({
+    fields: "id,name,status,effective_status,creative{id,name,image_url,thumbnail_url,image_hash,object_type,video_id}",
+    filtering: JSON.stringify([{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }]),
+    access_token: tok.access_token,
+    limit: "50",
+  }));
+  const adsJson = await adsRes.json();
+  if (!adsRes.ok) {
+    return res.status(adsRes.status).json({ error: adsJson?.error?.message || "Meta API error" });
+  }
+
+  const creatives = (adsJson.data || []).map(ad => {
+    const c = ad.creative || {};
+    const imageUrl = c.image_url || c.thumbnail_url || null;
+    const isVideo = c.object_type === "VIDEO" || !!c.video_id;
+    return {
+      ad_id: ad.id,
+      ad_name: ad.name || "",
+      creative_id: c.id || null,
+      creative_name: c.name || ad.name || "",
+      image_url: imageUrl,
+      is_video: isVideo,
+      video_id: c.video_id || null,
+    };
+  }).filter(c => c.image_url || c.is_video);
+
+  return res.status(200).json({ creatives });
 }

@@ -3093,72 +3093,9 @@
             </button>
           </div>
 
-          <!-- Creative grid (8 placeholder creatives) -->
-          <div class="creative-grid">
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam1/400/400" alt="Creative 1" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam2/400/400" alt="Creative 2" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam3/400/400" alt="Creative 3" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam4/400/400" alt="Creative 4" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam5/400/400" alt="Creative 5" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam6/400/400" alt="Creative 6" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam7/400/400" alt="Creative 7" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
-            <div class="creative-tile">
-              <img class="creative-img" src="https://picsum.photos/seed/bam8/400/400" alt="Creative 8" />
-              <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
-                <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3L13 13M13 3L3 13"/>
-                </svg>
-              </button>
-            </div>
+          <!-- Creative grid — populated from Meta /adcreatives for the open campaign -->
+          <div class="creative-grid" id="campaign-creative-grid">
+            <div class="req-empty" style="grid-column:1/-1;padding:18px 0">Loading creatives…</div>
           </div>
 
           <!-- Add new creative -->
@@ -3595,7 +3532,59 @@ function openCampaignDetail(campaignId, title, stats) {
   document.getElementById('detail-cpr').textContent = stats.cpr;
   // Reset any selected creatives
   document.querySelectorAll('.creative-tile.selected').forEach(t => t.classList.remove('selected'));
+  // Fetch real ad creatives for this campaign in the background
+  _renderCampaignCreatives(campaignId);
   window.scrollTo(0, 0);
+}
+
+// Pulls live ad creatives (image/video assets) for a campaign and renders them
+// into the creative grid. Replaces the old hardcoded Picsum placeholders.
+async function _renderCampaignCreatives(campaignId) {
+  const gridEl = document.getElementById('campaign-creative-grid');
+  if (!gridEl) return;
+  gridEl.innerHTML = '<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Loading creatives…</div>';
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/creatives?campaign_id=' + encodeURIComponent(campaignId), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Couldn't load creatives: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    const creatives = json.creatives || [];
+    if (!creatives.length) {
+      gridEl.innerHTML = '<div class="req-empty" style="grid-column:1/-1;padding:18px 0">No active creatives in this campaign yet.</div>';
+      return;
+    }
+    gridEl.innerHTML = creatives.map(c => {
+      const label = escapeHTML(c.creative_name || c.ad_name || 'Creative');
+      if (c.image_url) {
+        return `
+          <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}">
+            <img class="creative-img" src="${escapeHTML(c.image_url)}" alt="${label}" />
+            <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+              <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3L13 13M13 3L3 13"/>
+              </svg>
+            </button>
+          </div>`;
+      }
+      // Video creative (no image_url) — show a placeholder with the video icon
+      return `
+        <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}">
+          <div class="creative-img" style="display:flex;align-items:center;justify-content:center;background:var(--surface);color:var(--text-mute);font-size:30px">🎬</div>
+          <button class="creative-delete" onclick="openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
+            <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3L13 13M13 3L3 13"/>
+            </svg>
+          </button>
+        </div>`;
+    }).join('');
+  } catch (e) {
+    gridEl.innerHTML = `<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Failed: ${escapeHTML(e.message)}</div>`;
+  }
 }
 
 function closeCampaignDetail() {
