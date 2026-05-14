@@ -1108,18 +1108,34 @@ async function handleMetaCreatives(req, res) {
   const videos = creatives.filter(c => c.video_id);
   if (videos.length) {
     await Promise.all(videos.map(async (c) => {
+      // Always include a hardcoded fallback Facebook URL so the client always has
+      // somewhere to send the user even if /{video_id} returns nothing useful.
+      c.video_fb_url = `https://www.facebook.com/${encodeURIComponent(c.video_id)}`;
       try {
         const vRes = await fetch(`${META_GRAPH}/${encodeURIComponent(c.video_id)}?` + new URLSearchParams({
-          fields: "source,permalink_url,picture,thumbnails",
+          fields: "source,permalink_url,picture,embed_html",
           access_token: tok.access_token,
         }));
-        if (vRes.ok) {
-          const v = await vRes.json();
+        const vText = await vRes.text();
+        let v = null;
+        try { v = JSON.parse(vText); } catch (_) {}
+        if (!vRes.ok || !v) {
+          c.video_fetch_error = vText.slice(0, 200);
+        } else if (v.error) {
+          c.video_fetch_error = v.error.message || JSON.stringify(v.error).slice(0, 200);
+        } else {
           c.video_source_url = v.source || null;
-          c.video_permalink_url = v.permalink_url ? `https://www.facebook.com${v.permalink_url.startsWith("/") ? v.permalink_url : "/" + v.permalink_url}` : null;
+          if (v.permalink_url) {
+            c.video_permalink_url = v.permalink_url.startsWith("http")
+              ? v.permalink_url
+              : `https://www.facebook.com${v.permalink_url.startsWith("/") ? v.permalink_url : "/" + v.permalink_url}`;
+          }
+          c.video_embed_html = v.embed_html || null;
           if (!c.image_url && v.picture) c.image_url = v.picture;
         }
-      } catch (_) { /* leave fields null on failure */ }
+      } catch (e) {
+        c.video_fetch_error = e.message;
+      }
     }));
   }
 

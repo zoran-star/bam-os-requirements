@@ -3554,6 +3554,7 @@ function _openCreativeVideo(idx) {
   fallbackEl.style.display = 'none';
   fallbackEl.innerHTML = '';
 
+  const fbUrl = c.video_permalink_url || c.video_fb_url;
   if (c.video_source_url) {
     playerWrap.innerHTML = `
       <video controls autoplay playsinline preload="metadata"
@@ -3562,16 +3563,19 @@ function _openCreativeVideo(idx) {
         <source src="${escapeHTML(c.video_source_url)}" type="video/mp4">
         Your browser can't play this video.
       </video>`;
-    if (c.video_permalink_url) {
+    if (fbUrl) {
       fallbackEl.style.display = 'block';
-      fallbackEl.innerHTML = `Trouble playing? <a href="${escapeHTML(c.video_permalink_url)}" target="_blank" rel="noreferrer" style="color:var(--gold)">Open on Facebook ↗</a>`;
+      fallbackEl.innerHTML = `Trouble playing? <a href="${escapeHTML(fbUrl)}" target="_blank" rel="noreferrer" style="color:var(--gold)">Open on Facebook ↗</a>`;
     }
-  } else if (c.video_permalink_url) {
+  } else if (c.video_embed_html) {
+    // Use Meta's official embed iframe — always works for the asset owner
+    playerWrap.innerHTML = c.video_embed_html;
+  } else if (fbUrl) {
     playerWrap.innerHTML = `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:24px;text-align:center">
         <div style="font-size:36px">🎬</div>
         <div style="color:var(--text-sub);font-size:13px">Video preview not available inline.</div>
-        <a href="${escapeHTML(c.video_permalink_url)}" target="_blank" rel="noreferrer"
+        <a href="${escapeHTML(fbUrl)}" target="_blank" rel="noreferrer"
            style="background:var(--gold);color:var(--ink-0);padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
           Open on Facebook ↗
         </a>
@@ -3582,6 +3586,9 @@ function _openCreativeVideo(idx) {
         <div style="font-size:36px">🎬</div>
         <div style="color:var(--text-sub);font-size:13px">Couldn't load this video. Contact your account manager.</div>
       </div>`;
+  }
+  if (c.video_fetch_error) {
+    console.warn('Video fetch error:', c.video_fetch_error);
   }
   modal.style.display = 'flex';
 }
