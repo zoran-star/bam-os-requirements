@@ -14,6 +14,7 @@
     { "source": "/api/auth/staff-meta/start",  "destination": "/api/marketing?resource=meta-staff-auth&step=prepare" },
     { "source": "/api/auth/staff-meta/callback", "destination": "/api/marketing?resource=meta-staff-auth&step=callback" },
     { "source": "/api/meta/staff-status",      "destination": "/api/marketing?resource=meta-staff-status" },
+    { "source": "/api/staff",                  "destination": "/api/clients?action=invite-staff" },
     { "source": "/api/(.*)",                   "destination": "/api/$1" },
     { "source": "/(.*)",                       "destination": "/index.html" }
   ]

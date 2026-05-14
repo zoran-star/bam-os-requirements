@@ -210,6 +210,82 @@ export default async function handler(req, res) {
       // (no action)              → create a new client (default)
       const action = req.query.action;
 
+      // ── action=invite-staff ──
+      // Admin-only. Inserts a row into the `staff` table and sends a
+      // Supabase invite email so the new staff can set their password.
+      // Redirect goes to the staff portal root (NOT /client-portal.html).
+      if (action === "invite-staff") {
+        const VALID_STAFF_ROLES = new Set([
+          "admin",
+          "systems_manager",
+          "systems_executor",
+          "marketing_manager",
+          "marketing_executor",
+          "scaling_manager",
+        ]);
+        const body = req.body || {};
+        const newName = typeof body.name === "string" ? body.name.trim() : "";
+        const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const newRole = typeof body.role === "string" ? body.role.trim() : "";
+
+        if (!newName) return res.status(400).json({ error: "name required" });
+        if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          return res.status(400).json({ error: "valid email required" });
+        }
+        if (!VALID_STAFF_ROLES.has(newRole)) {
+          return res.status(400).json({ error: `invalid role (must be one of: ${[...VALID_STAFF_ROLES].join(", ")})` });
+        }
+
+        // Refuse if a staff row with this email already exists
+        const dup = await supabaseSelect(`staff?email=eq.${encodeURIComponent(newEmail)}&select=id`);
+        if (dup?.length) {
+          return res.status(409).json({ error: "a staff member with that email already exists" });
+        }
+
+        // Send Supabase invite — creates auth user, emails the password-set link.
+        // Redirect goes to staff portal root so they land in the right app.
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/?type=invite`;
+        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: newEmail, redirect_to: redirectTo }),
+        });
+        if (!inviteRes.ok) {
+          const errText = await inviteRes.text();
+          const friendly = inviteRes.status === 422 || /already/i.test(errText)
+            ? "an account with that email already exists in auth"
+            : `invite: ${errText}`;
+          return res.status(400).json({ error: friendly });
+        }
+        const invited = await inviteRes.json();
+        const auth_user_id = invited?.id || invited?.user?.id;
+        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no auth user id returned" });
+
+        // Insert the staff row
+        try {
+          const rows = await supabaseInsert("staff", {
+            name: newName,
+            email: newEmail,
+            role: newRole,
+            user_id: auth_user_id,
+          });
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return res.status(200).json({ id: row?.id, name: newName, email: newEmail, role: newRole, invited: true });
+        } catch (insertErr) {
+          // Roll back the auth user if the staff insert fails so we don't orphan
+          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
+            method: "DELETE",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+          }).catch(() => {});
+          return res.status(500).json({ error: `staff insert failed: ${insertErr.message}` });
+        }
+      }
+
       if (action === "setup-account") {
         // Send an INVITE email to the client. They click the link to set their
         // own password (never seen by us). Updates the clients row with

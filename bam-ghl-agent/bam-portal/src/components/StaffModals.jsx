@@ -39,26 +39,17 @@ export function NewStaffModal({ tokens, session, onClose, onCreated }) {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 404) {
-          // Backend endpoint not built yet — treat as success for now
-          const member = { id: `mock-${Date.now()}`, name: name.trim(), email: email.trim(), role };
-          onCreated?.(member);
-          setSent({ name, email, role });
-        } else {
-          setError(json?.error || `HTTP ${res.status}`);
-        }
+        setError(json?.error || `HTTP ${res.status}`);
         setBusy(false);
         return;
       }
-      const member = { id: json.id || `mock-${Date.now()}`, name: name.trim(), email: email.trim(), role };
+      // Real success — staff row was inserted + invite email sent
+      const member = { id: json.id, name: name.trim(), email: email.trim(), role };
       onCreated?.(member);
       setSent({ name, email, role });
       setBusy(false);
     } catch (e) {
-      // Network failure — graceful fallback (backend not built yet)
-      const member = { id: `mock-${Date.now()}`, name: name.trim(), email: email.trim(), role };
-      onCreated?.(member);
-      setSent({ name, email, role });
+      setError(e?.message || "Network error. Try again.");
       setBusy(false);
     }
   };
