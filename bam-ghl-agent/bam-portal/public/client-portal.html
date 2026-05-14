@@ -3566,13 +3566,22 @@ async function _renderCampaignCreatives(campaignId) {
       const isCarousel = !!c.is_carousel;
       const isPrivacyLocked = !!c.is_privacy_locked;
       const poster = c.image_url ? escapeHTML(c.image_url) : '';
-      // Video tile click → opens the Facebook video URL in a new tab.
-      // Inline preview requires elevated Meta permissions we don't have.
-      const fbUrl = c.video_permalink_url || c.video_fb_url || '';
-      const clickHandler = isVideo && fbUrl
+      // Build a Facebook preview URL for ANY ad type (image, video, carousel).
+      // Priority: explicit video URL → effective_object_story_id (the FB post
+      // the ad promotes) → constructed video URL → null (no link).
+      let fbUrl = c.video_permalink_url || c.video_fb_url || '';
+      if (!fbUrl && c.effective_object_story_id) {
+        fbUrl = `https://www.facebook.com/${c.effective_object_story_id}`;
+      }
+      if (!fbUrl && c.video_id) {
+        fbUrl = `https://www.facebook.com/${c.video_id}`;
+      }
+      // Privacy-locked ads still try to link to the source post — sometimes
+      // works to give context, but Meta may still block the page.
+      const clickHandler = fbUrl
         ? `onclick="window.open('${escapeHTML(fbUrl)}', '_blank', 'noopener,noreferrer')"`
         : '';
-      const cursor = isVideo && fbUrl ? 'cursor:pointer' : '';
+      const cursor = fbUrl ? 'cursor:pointer' : '';
       const playOverlay = isVideo ? `
         <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);pointer-events:none">
           <div style="width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px">▶</div>
@@ -3602,10 +3611,10 @@ async function _renderCampaignCreatives(campaignId) {
       const titleAttr = isVideo
         ? 'Click to watch on Facebook'
         : isPrivacyLocked
-          ? 'Meta privacy-locked this preview — ad is still active'
+          ? (fbUrl ? 'Open source post on Facebook (preview locked here)' : 'Meta privacy-locked — ad is still active')
           : isCarousel
-            ? 'Carousel ad — first slide shown'
-            : '';
+            ? (fbUrl ? 'Click to view carousel on Facebook' : 'Carousel ad — first slide shown')
+            : (fbUrl ? 'Click to view ad on Facebook' : '');
       return `
         <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}" style="position:relative;${cursor}" ${clickHandler} title="${titleAttr}">
           ${imgInner}
