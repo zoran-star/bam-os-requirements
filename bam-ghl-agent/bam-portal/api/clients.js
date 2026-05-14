@@ -132,16 +132,16 @@ export default async function handler(req, res) {
       // signup shape. Anything else falls through to the admin path below.
       const hasAuth = (req.headers.authorization || "").startsWith("Bearer ");
       const publicSignupAction = req.query.action;
-      const body = req.body || {};
+      const signupBody = req.body || {};
       const isPublicSignup = !hasAuth && !publicSignupAction
-        && typeof body.name === "string"
-        && typeof body.owner_name === "string"
-        && typeof body.email === "string";
+        && typeof signupBody.name === "string"
+        && typeof signupBody.owner_name === "string"
+        && typeof signupBody.email === "string";
 
       if (isPublicSignup) {
-        const name = body.name.trim();
-        const owner_name = body.owner_name.trim();
-        const email = body.email.trim().toLowerCase();
+        const name = signupBody.name.trim();
+        const owner_name = signupBody.owner_name.trim();
+        const email = signupBody.email.trim().toLowerCase();
         if (!name) return res.status(400).json({ error: "academy name required" });
         if (!owner_name) return res.status(400).json({ error: "owner name required" });
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
