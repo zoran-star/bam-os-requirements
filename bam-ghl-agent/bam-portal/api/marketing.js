@@ -926,10 +926,16 @@ async function handleMetaAuth(req, res) {
 //
 // POST also accepts client_id+ad_account_id to wire a client's ad account
 // without that client ever logging into Facebook.
+//
+// Restricted to admin + marketing roles (the people who actually wire up ads).
+const META_OPS_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+  if (!META_OPS_ROLES.has(ctx.staff.role)) {
+    return res.status(403).json({ error: "admin or marketing role required" });
+  }
 
   // POST → set a client's chosen ad account (staff assigning on behalf of client)
   if (req.method === "POST") {
@@ -1202,6 +1208,9 @@ async function handleStaffMetaAuth(req, res) {
     const ctx = await resolveUser(req);
     if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
     if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+    if (!META_OPS_ROLES.has(ctx.staff.role)) {
+      return res.status(403).json({ error: "admin or marketing role required" });
+    }
 
     const appId = process.env.META_APP_ID;
     if (!appId) return res.status(500).json({ error: "META_APP_ID not configured" });

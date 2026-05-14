@@ -203,12 +203,24 @@ export default async function handler(req, res) {
         `staff?email=eq.${encodeURIComponent(user.email)}&select=role`
       );
       const role = staffRows?.[0]?.role;
-      if (role !== "admin") return res.status(403).json({ error: "admin only" });
-
-      // ── Action router ──
-      // ?action=reset-password   → send a password-reset email to a client
-      // (no action)              → create a new client (default)
       const action = req.query.action;
+
+      // Per-action role gating.
+      // - invite-staff + creating new clients (no action) = admin only
+      // - setup-account / update-fields / reset-password = admin + marketing roles
+      //   (so Ximena and other marketing staff can run the Client Setup page)
+      const MARKETING_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff"]);
+      const MARKETING_OK_ACTIONS = new Set(["setup-account", "update-fields", "reset-password"]);
+
+      if (ADMIN_ONLY_ACTIONS.has(action)) {
+        if (role !== "admin") return res.status(403).json({ error: "admin only" });
+      } else if (MARKETING_OK_ACTIONS.has(action)) {
+        if (!MARKETING_ROLES.has(role)) return res.status(403).json({ error: "admin or marketing role required" });
+      } else {
+        // Default: creating a new client (no action). Admin only.
+        if (role !== "admin") return res.status(403).json({ error: "admin only" });
+      }
 
       // ── action=invite-staff ──
       // Admin-only. Inserts a row into the `staff` table and sends a

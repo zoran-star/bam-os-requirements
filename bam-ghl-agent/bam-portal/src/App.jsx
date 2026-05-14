@@ -109,6 +109,12 @@ export default function BAMPortal() {
   const canSeeMarketing = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && me.role === "admin";
   const canSeeContent = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  // Admin sees Financials. Marketing roles (incl. Ximena) do not — they're
+  // ad-ops focused. Systems/scaling roles also blocked for now.
+  const canSeeFinancials = me && me.role === "admin";
+  // Client Setup (bulk wire-up): admin + marketing roles can do this since
+  // it's the page they need to assign ad accounts and send client invites.
+  const canSeeClientSetup = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const CHANNEL_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com"];
   const canSeeChannel = !!session && CHANNEL_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
 
@@ -398,13 +404,13 @@ export default function BAMPortal() {
         { label: "Tasks", key: "tasks", count: taskCount, alert: taskAlert },
         { label: "Calendar", key: "calendar" },
         { label: "Knowledge Base", key: "knowledge" },
-        { label: "Financials", key: "financials" },
+        ...(canSeeFinancials ? [{ label: "Financials", key: "financials" }] : []),
         ...(canSeeChannel ? [{ label: "Channel", key: "channel" }] : []),
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
-        ...(me?.role === "admin" ? [{ label: "Client Setup", key: "client-setup" }] : []),
+        ...(canSeeClientSetup ? [{ label: "Client Setup", key: "client-setup" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
 
@@ -784,7 +790,7 @@ export default function BAMPortal() {
             {nav === "knowledge" && <KnowledgeBaseView tokens={tk} dark={dark} />}
 
             {/* FINANCIALS */}
-            {nav === "financials" && <FinancialsView tokens={tk} dark={dark} />}
+            {nav === "financials" && canSeeFinancials && <FinancialsView tokens={tk} dark={dark} />}
 
             {nav === "channel" && canSeeChannel && <ChannelView tokens={tk} session={session} me={me} />}
             {nav === "channel" && !canSeeChannel && (
@@ -808,8 +814,8 @@ export default function BAMPortal() {
             {/* CONTENT */}
             {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
 
-            {/* CLIENT SETUP — admin-only bulk wire-up page */}
-            {nav === "client-setup" && me?.role === "admin" && <ClientSetupView tokens={tk} session={session} />}
+            {/* CLIENT SETUP — admin + marketing roles */}
+            {nav === "client-setup" && canSeeClientSetup && <ClientSetupView tokens={tk} session={session} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
