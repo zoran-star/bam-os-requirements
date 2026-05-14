@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
 //
 // One file routed by ?resource=… because the Hobby plan caps us at 12 functions.
@@ -763,7 +765,6 @@ async function handleContentTickets(req, res) {
 // Client (academy owner) connects their own Meta ad account.
 // Token stored in client_meta_tokens, scoped via RLS to that client.
 
-const crypto = require("crypto");
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
 const META_OAUTH_SCOPES = ["ads_read", "public_profile"];
