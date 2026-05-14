@@ -3569,9 +3569,22 @@ async function _renderCampaignCreatives(campaignId) {
       // Build a Facebook preview URL for ANY ad type (image, video, carousel).
       // Priority: explicit video URL → effective_object_story_id (the FB post
       // the ad promotes) → constructed video URL → null (no link).
+      // effective_object_story_id has format "pageId_postId" — split it and
+      // use the canonical /{pageId}/posts/{postId} URL which resolves
+      // reliably even when not logged in.
       let fbUrl = c.video_permalink_url || c.video_fb_url || '';
       if (!fbUrl && c.effective_object_story_id) {
-        fbUrl = `https://www.facebook.com/${c.effective_object_story_id}`;
+        const eosid = String(c.effective_object_story_id);
+        if (eosid.includes('_')) {
+          const [pageId, postId] = eosid.split('_', 2);
+          if (pageId && postId) {
+            fbUrl = `https://www.facebook.com/${pageId}/posts/${postId}`;
+          } else {
+            fbUrl = `https://www.facebook.com/${eosid}`;
+          }
+        } else {
+          fbUrl = `https://www.facebook.com/${eosid}`;
+        }
       }
       if (!fbUrl && c.video_id) {
         fbUrl = `https://www.facebook.com/${c.video_id}`;
