@@ -119,10 +119,16 @@ export default async function handler(req, res) {
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
+    if (resource === "meta-staff-auth") {
+      return handleStaffMetaAuth(req, res);
+    }
+    if (resource === "meta-staff-status") {
+      return handleStaffMetaStatus(req, res);
+    }
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -912,17 +918,25 @@ async function handleMetaAuth(req, res) {
   return res.status(400).json({ error: "unknown step (expected 'prepare' or 'callback')" });
 }
 
+// Staff-side ad account picker. Lists ad accounts the LOGGED-IN STAFF has
+// access to (via user-role or BAM-BM partner connections). Used by the staff
+// portal when assigning a meta_ad_account_id to a specific client.
+//
+// POST also accepts client_id+ad_account_id to wire a client's ad account
+// without that client ever logging into Facebook.
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
-  if (!ctx.client) return res.status(403).json({ error: "client only" });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
 
-  // POST → set the chosen ad account (and auto-complete onboarding)
+  // POST → set a client's chosen ad account (staff assigning on behalf of client)
   if (req.method === "POST") {
     const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const targetClientId = typeof body.client_id === "string" ? body.client_id.trim() : "";
     const chosen = typeof body.ad_account_id === "string" ? body.ad_account_id.trim() : "";
+    if (!targetClientId) return res.status(400).json({ error: "client_id required" });
     if (!chosen) return res.status(400).json({ error: "ad_account_id required" });
-    await sb(`clients?id=eq.${ctx.client.id}`, {
+    await sb(`clients?id=eq.${targetClientId}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({
@@ -931,12 +945,14 @@ async function handleMetaAdAccounts(req, res) {
         updated_at: nowIso(),
       }),
     });
-    return res.status(200).json({ ok: true, meta_ad_account_id: chosen });
+    return res.status(200).json({ ok: true, client_id: targetClientId, meta_ad_account_id: chosen });
   }
 
-  // DELETE → unset (also disconnect Meta if requested)
+  // DELETE → unset a client's ad account
   if (req.method === "DELETE") {
-    await sb(`clients?id=eq.${ctx.client.id}`, {
+    const targetClientId = (req.query.client_id || "").trim();
+    if (!targetClientId) return res.status(400).json({ error: "client_id required" });
+    await sb(`clients?id=eq.${targetClientId}`, {
       method: "PATCH",
       headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ meta_ad_account_id: null, updated_at: nowIso() }),
@@ -946,17 +962,16 @@ async function handleMetaAdAccounts(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "GET, POST, or DELETE" });
 
-  // GET → list ad accounts the client has access to + show currently picked one
-  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token,expires_at,fb_user_name`);
+  // GET → list every ad account the LOGGED-IN STAFF has access to.
+  // Uses that staff's own token (they connected via "Connect Meta" on staff portal).
+  const tokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
   const tok = tokRows?.[0];
-  if (!tok) return res.status(404).json({ error: "Meta not connected" });
-
-  const clientRows = await sb(`clients?id=eq.${ctx.client.id}&select=meta_ad_account_id`);
-  const picked = clientRows?.[0]?.meta_ad_account_id || null;
+  if (!tok) return res.status(404).json({ error: "Meta not connected. Connect your Meta on the staff portal first." });
 
   const fbRes = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
     fields: "id,account_id,name,currency,account_status",
     access_token: tok.access_token,
+    limit: "200",
   }));
   const fbJson = await fbRes.json();
   if (!fbRes.ok) {
@@ -964,9 +979,15 @@ async function handleMetaAdAccounts(req, res) {
   }
   return res.status(200).json({
     ad_accounts: fbJson.data || [],
-    picked_ad_account_id: picked,
     fb_user_name: tok.fb_user_name || null,
   });
+}
+
+// Picks any valid staff token to query Meta on behalf of clients. Falls back
+// to most-recently-updated token. Returns null if no staff has connected yet.
+async function getAnyStaffMetaToken() {
+  const rows = await sb(`staff_meta_tokens?select=access_token&order=updated_at.desc&limit=1`);
+  return rows?.[0]?.access_token || null;
 }
 
 // GET → returns onboarding state for the current client.
@@ -1001,17 +1022,23 @@ async function handleMetaCampaigns(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
-  if (!ctx.client) return res.status(403).json({ error: "client only" });
+  // Both clients (viewing their own portal) and staff (debugging/preview) can call this.
+  // For client requests, scope to the client. For staff requests, expect ?client_id=...
+  let targetClientId = null;
+  if (ctx.client) targetClientId = ctx.client.id;
+  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
-  const clientRows = await sb(`clients?id=eq.${ctx.client.id}&select=id,meta_ad_account_id`);
+  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
   const clientFull = clientRows?.[0];
   if (!clientFull?.meta_ad_account_id) {
     return res.status(200).json({ campaigns: [], reason: "no_ad_account" });
   }
 
-  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token`);
-  const tok = tokRows?.[0];
-  if (!tok) return res.status(200).json({ campaigns: [], reason: "not_connected" });
+  // Use any valid staff token (BAM is partner-connected; one token covers all clients).
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ campaigns: [], reason: "no_staff_token" });
+  const tok = { access_token: staffToken };
 
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id
@@ -1065,14 +1092,15 @@ async function handleMetaCreatives(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
-  if (!ctx.client) return res.status(403).json({ error: "client only" });
+  if (!ctx.client && !ctx.staff) return res.status(403).json({ error: "client or staff required" });
 
   const campaignId = (req.query.campaign_id || "").trim();
   if (!campaignId) return res.status(400).json({ error: "campaign_id required" });
 
-  const tokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token`);
-  const tok = tokRows?.[0];
-  if (!tok) return res.status(200).json({ creatives: [], reason: "not_connected" });
+  // Use any valid staff token; same partner-share strategy as campaigns.
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ creatives: [], reason: "no_staff_token" });
+  const tok = { access_token: staffToken };
 
   // Get all ACTIVE ads in this campaign, expanding to creative + image fields.
   // image_url / thumbnail_url are the rendered assets the user sees in the feed.
@@ -1140,4 +1168,147 @@ async function handleMetaCreatives(req, res) {
   }
 
   return res.status(200).json({ creatives });
+}
+
+// ─────────────────────────────────────────────────────────
+// STAFF-SIDE META OAUTH
+// ─────────────────────────────────────────────────────────
+// Staff (BAM admins, marketing team) connect their own Meta account.
+// Their token gives access to every ad account they have access to via
+// user-role or partner-share (e.g. Ximena has access to all academy
+// ad accounts via BAM's BM partnerships). That token then powers the
+// campaigns + creatives endpoints for ALL clients.
+
+function metaStaffRedirectUri(req) {
+  return `${metaGetOrigin(req)}/api/auth/staff-meta/callback`;
+}
+
+function metaStaffRedirect(res, status, msg) {
+  const params = new URLSearchParams({ meta_staff: status });
+  if (msg) params.set("msg", msg);
+  // Staff portal lives at root, not /client-portal.html
+  res.setHeader("Location", `/?${params.toString()}`);
+  return res.status(302).end();
+}
+
+async function handleStaffMetaAuth(req, res) {
+  const step = req.query.step;
+
+  // step = prepare: POST, authenticated staff, returns Facebook OAuth URL
+  if (step === "prepare") {
+    if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+    const ctx = await resolveUser(req);
+    if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+    if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+
+    const appId = process.env.META_APP_ID;
+    if (!appId) return res.status(500).json({ error: "META_APP_ID not configured" });
+
+    const state = metaSignState({
+      staff_user_id: ctx.user.id,
+      exp: Date.now() + 5 * 60 * 1000,
+      nonce: crypto.randomBytes(8).toString("hex"),
+    });
+
+    const params = new URLSearchParams({
+      client_id: appId,
+      redirect_uri: metaStaffRedirectUri(req),
+      scope: META_OAUTH_SCOPES.join(","),
+      response_type: "code",
+      state,
+    });
+
+    return res.status(200).json({
+      redirect_url: `https://www.facebook.com/${META_API_VERSION}/dialog/oauth?${params.toString()}`,
+    });
+  }
+
+  // step = callback: GET from Facebook with code+state. Exchange + store + redirect.
+  if (step === "callback") {
+    if (req.method !== "GET") return res.status(405).end();
+
+    const { code, state, error: fbError, error_description } = req.query;
+    if (fbError) return metaStaffRedirect(res, "error", error_description || String(fbError));
+    if (!code || !state) return metaStaffRedirect(res, "error", "missing code or state");
+
+    let payload;
+    try { payload = metaVerifyState(state); }
+    catch (e) { return metaStaffRedirect(res, "error", `state: ${e.message}`); }
+    if (!payload.staff_user_id) return metaStaffRedirect(res, "error", "state missing staff_user_id");
+
+    const appId = process.env.META_APP_ID;
+    const appSecret = process.env.META_APP_SECRET;
+    if (!appId || !appSecret) return metaStaffRedirect(res, "error", "Meta app not configured");
+
+    // Code → short-lived token
+    const shortRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      redirect_uri: metaStaffRedirectUri(req),
+      code,
+    }));
+    const shortJson = await shortRes.json();
+    if (!shortRes.ok || !shortJson.access_token) {
+      return metaStaffRedirect(res, "error", shortJson?.error?.message || "token exchange failed");
+    }
+
+    // Short → long-lived (60 days)
+    const longRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      grant_type: "fb_exchange_token",
+      client_id: appId,
+      client_secret: appSecret,
+      fb_exchange_token: shortJson.access_token,
+    }));
+    const longJson = await longRes.json();
+    const accessToken = longJson.access_token || shortJson.access_token;
+    const expiresIn = longJson.expires_in || shortJson.expires_in || 60 * 60;
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    const meRes = await fetch(`${META_GRAPH}/me?` + new URLSearchParams({
+      fields: "id,name",
+      access_token: accessToken,
+    }));
+    const me = await meRes.json();
+    if (!meRes.ok || !me.id) {
+      return metaStaffRedirect(res, "error", me?.error?.message || "could not fetch FB user");
+    }
+
+    await sb(`staff_meta_tokens?on_conflict=staff_user_id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([{
+        staff_user_id: payload.staff_user_id,
+        fb_user_id: me.id,
+        fb_user_name: me.name || null,
+        access_token: accessToken,
+        expires_at: expiresAt,
+        scopes: META_OAUTH_SCOPES,
+        updated_at: nowIso(),
+      }]),
+    });
+
+    return metaStaffRedirect(res, "connected");
+  }
+
+  return res.status(400).json({ error: "unknown step (expected 'prepare' or 'callback')" });
+}
+
+// GET ?resource=meta-staff-status
+// Lets the staff portal show "Meta connected as X" or "Connect Meta" button.
+async function handleStaffMetaStatus(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+
+  const rows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=fb_user_name,expires_at,created_at,updated_at`);
+  const tok = rows?.[0];
+  if (!tok) return res.status(200).json({ connected: false });
+  return res.status(200).json({
+    connected: true,
+    fb_user_name: tok.fb_user_name || null,
+    expires_at: tok.expires_at,
+    connected_at: tok.created_at,
+    updated_at: tok.updated_at,
+  });
 }

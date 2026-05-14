@@ -11,6 +11,9 @@
     { "source": "/api/meta/campaigns",         "destination": "/api/marketing?resource=meta-campaigns" },
     { "source": "/api/meta/adaccounts",        "destination": "/api/marketing?resource=meta-adaccounts" },
     { "source": "/api/meta/creatives",         "destination": "/api/marketing?resource=meta-creatives" },
+    { "source": "/api/auth/staff-meta/start",  "destination": "/api/marketing?resource=meta-staff-auth&step=prepare" },
+    { "source": "/api/auth/staff-meta/callback", "destination": "/api/marketing?resource=meta-staff-auth&step=callback" },
+    { "source": "/api/meta/staff-status",      "destination": "/api/marketing?resource=meta-staff-status" },
     { "source": "/api/(.*)",                   "destination": "/api/$1" },
     { "source": "/(.*)",                       "destination": "/index.html" }
   ]
