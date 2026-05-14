@@ -4482,7 +4482,31 @@ async function _renderMarketingCampaigns() {
         <div style="margin-top:10px;font-size:11px;color:var(--text-mute);font-family:var(--mono);letter-spacing:0.08em;text-transform:uppercase">Meta connected</div>`;
       return;
     }
-    containerEl.innerHTML = campaigns.map(_metaCampaignCardHTML).join('');
+    containerEl.innerHTML = campaigns.map(c => {
+      const safeName = (c.name || '').replace(/"/g, '&quot;');
+      const stats = `{ spend: ${JSON.stringify(c.spend_display)}, results: ${c.results}, cpr: ${JSON.stringify(c.cpr_display)} }`;
+      return `
+        <div class="campaign-card">
+          <div class="campaign-card-main">
+            <div class="card-title" style="margin-bottom:18px">${escapeHTML(c.name || '(unnamed)')}</div>
+            <div class="campaign-stats">
+              <div class="campaign-stat">
+                <div class="campaign-stat-value">${escapeHTML(c.spend_display)}</div>
+                <div class="campaign-stat-label">Spend</div>
+              </div>
+              <div class="campaign-stat">
+                <div class="campaign-stat-value">${c.results}</div>
+                <div class="campaign-stat-label">Results</div>
+              </div>
+              <div class="campaign-stat">
+                <div class="campaign-stat-value">${escapeHTML(c.cpr_display)}</div>
+                <div class="campaign-stat-label">Cost / Result</div>
+              </div>
+            </div>
+          </div>
+          <button class="btn-change-campaign" onclick='openCampaignDetail(${JSON.stringify(c.id)}, ${JSON.stringify(c.name || "")}, ${stats})'>Change Campaign</button>
+        </div>`;
+    }).join('');
   } catch (e) {
     containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(e.message)}</div>`;
   }
