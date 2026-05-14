@@ -49,6 +49,13 @@ export default function ClientSetupView({ tokens, session }) {
   const [pickerSelected, setPickerSelected] = useState(new Set()); // Set of campaign IDs
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerError, setPickerError] = useState("");
+  // Add-new-client modal state
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addOwnerName, setAddOwnerName] = useState("");
+  const [addEmail, setAddEmail] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
 
   const tk = tokens;
 
@@ -173,6 +180,48 @@ export default function ClientSetupView({ tokens, session }) {
     setPickerCampaigns([]);
     setPickerSelected(new Set());
     setPickerError("");
+  }
+
+  function openAddClient() {
+    setAddName("");
+    setAddOwnerName("");
+    setAddEmail("");
+    setAddError("");
+    setAddOpen(true);
+  }
+  function closeAddClient() {
+    setAddOpen(false);
+    setAddError("");
+  }
+
+  async function submitNewClient() {
+    setAddError("");
+    if (!addName.trim()) { setAddError("Business name is required."); return; }
+    if (addEmail && !/^\S+@\S+\.\S+$/.test(addEmail.trim())) {
+      setAddError("Email format invalid (or leave blank)."); return;
+    }
+    setAddSaving(true);
+    try {
+      const tok = session?.access_token;
+      const r = await fetch("/api/clients?action=create-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({
+          name: addName.trim(),
+          owner_name: addOwnerName.trim() || undefined,
+          email: addEmail.trim() || undefined,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      // Success — reload the table
+      closeAddClient();
+      await load();
+    } catch (e) {
+      setAddError(e.message || "Failed to create client");
+    } finally {
+      setAddSaving(false);
+    }
   }
 
   async function saveRow(client) {
@@ -428,6 +477,97 @@ export default function ClientSetupView({ tokens, session }) {
           </tbody>
         </table>
       </div>
+
+      {/* Add new client button — below the table */}
+      <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-start" }}>
+        <button
+          onClick={openAddClient}
+          style={{
+            fontSize: 13, fontWeight: 600, padding: "10px 18px", borderRadius: 8,
+            border: `1px dashed ${tk.border}`, background: "transparent", color: tk.text,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >+ New client</button>
+      </div>
+
+      {/* Add-new-client modal */}
+      {addOpen && (
+        <div
+          onClick={closeAddClient}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.7)", display: "flex",
+            alignItems: "center", justifyContent: "center",
+            padding: 24, backdropFilter: "blur(6px)",
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 460,
+              background: tk.surface, border: `1px solid ${tk.border}`,
+              borderRadius: 12, padding: 28,
+            }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 6 }}>
+              § Add Client
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 600, color: tk.text, marginBottom: 4 }}>
+              New client
+            </div>
+            <div style={{ fontSize: 13, color: tk.textMute, marginBottom: 18 }}>
+              Just create the row for now. You can wire up the ad account, campaigns, and send the invite afterwards from the table.
+            </div>
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
+              Business name <span style={{ color: tk.red }}>*</span>
+            </label>
+            <input
+              autoFocus
+              value={addName}
+              onChange={e => setAddName(e.target.value)}
+              placeholder="e.g. Elite Hoops Academy"
+              style={{ width: "100%", padding: "10px 12px", marginBottom: 14, background: tk.bg, border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.text, fontSize: 14, fontFamily: "inherit" }}
+            />
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
+              Owner name <span style={{ color: tk.textMute, fontWeight: 500 }}>(optional)</span>
+            </label>
+            <input
+              value={addOwnerName}
+              onChange={e => setAddOwnerName(e.target.value)}
+              placeholder="First Last"
+              style={{ width: "100%", padding: "10px 12px", marginBottom: 14, background: tk.bg, border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.text, fontSize: 14, fontFamily: "inherit" }}
+            />
+
+            <label style={{ fontSize: 11, fontWeight: 700, color: tk.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" }}>
+              Owner email <span style={{ color: tk.textMute, fontWeight: 500 }}>(optional)</span>
+            </label>
+            <input
+              type="email"
+              value={addEmail}
+              onChange={e => setAddEmail(e.target.value)}
+              placeholder="owner@academy.com"
+              style={{ width: "100%", padding: "10px 12px", marginBottom: 14, background: tk.bg, border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.text, fontSize: 14, fontFamily: "inherit" }}
+            />
+
+            {addError && (
+              <div style={{ color: tk.red, fontSize: 13, marginBottom: 12 }}>⚠ {addError}</div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+              <button onClick={closeAddClient} style={{
+                padding: "10px 16px", background: "transparent",
+                border: `1px solid ${tk.border}`, borderRadius: 8, color: tk.text,
+                cursor: "pointer", fontSize: 13,
+              }}>Cancel</button>
+              <button onClick={submitNewClient} disabled={addSaving} style={{
+                padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
+                border: 0, borderRadius: 8, fontWeight: 600, fontSize: 13,
+                cursor: addSaving ? "wait" : "pointer", opacity: addSaving ? 0.6 : 1,
+              }}>{addSaving ? "Creating…" : "Create client"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Campaign picker modal */}
       {pickerClient && (

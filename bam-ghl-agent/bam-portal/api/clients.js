@@ -211,7 +211,7 @@ export default async function handler(req, res) {
       //   (so Ximena and other marketing staff can run the Client Setup page)
       const MARKETING_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
       const ADMIN_ONLY_ACTIONS = new Set(["invite-staff"]);
-      const MARKETING_OK_ACTIONS = new Set(["setup-account", "update-fields", "reset-password"]);
+      const MARKETING_OK_ACTIONS = new Set(["setup-account", "update-fields", "reset-password", "create-client"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
         if (role !== "admin") return res.status(403).json({ error: "admin only" });
@@ -295,6 +295,32 @@ export default async function handler(req, res) {
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
           }).catch(() => {});
           return res.status(500).json({ error: `staff insert failed: ${insertErr.message}` });
+        }
+      }
+
+      // ── action=create-client ──
+      // Admin + marketing roles. Insert an EMPTY-ish client row from the
+      // Client Setup page so staff can wire it up (ad account, campaigns,
+      // owner email) before sending the invite. No auth user created here —
+      // Send Invite later via ?action=setup-account.
+      if (action === "create-client") {
+        const body = req.body || {};
+        const newName = typeof body.name === "string" ? body.name.trim() : "";
+        const newOwnerName = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
+        const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        if (!newName) return res.status(400).json({ error: "business name required" });
+        if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          return res.status(400).json({ error: "email format invalid (or leave blank)" });
+        }
+        const insertBody = { name: newName, status: "onboarding" };
+        if (newOwnerName) insertBody.owner_name = newOwnerName;
+        if (newEmail) insertBody.email = newEmail;
+        try {
+          const rows = await supabaseInsert("clients", insertBody);
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return res.status(200).json({ id: row?.id, name: row?.name, created: true });
+        } catch (insertErr) {
+          return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
         }
       }
 
