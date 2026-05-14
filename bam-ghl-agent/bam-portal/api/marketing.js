@@ -1185,6 +1185,12 @@ async function handleMetaCreatives(req, res) {
     const c = ad.creative || {};
     const { imageUrl, isCarousel } = extractCreativeAssets(c);
     const isVideo = c.object_type === "VIDEO" || !!c.video_id;
+    // Meta returns object_type="PRIVACY_CHECK_FAIL" when the creative's
+    // source post has restricted privacy — we can't preview it even though
+    // the ad is still running. Flag it so the UI shows the right tile.
+    const isPrivacyLocked = c.object_type === "PRIVACY_CHECK_FAIL";
+    // Detect carousel by name when child_attachments is unavailable
+    const inferredCarousel = isCarousel || /carrousel|carousel/i.test((ad.name || "") + " " + (c.name || ""));
     return {
       ad_id: ad.id,
       ad_name: ad.name || "",
@@ -1192,7 +1198,8 @@ async function handleMetaCreatives(req, res) {
       creative_name: c.name || ad.name || "",
       image_url: imageUrl,
       is_video: isVideo,
-      is_carousel: isCarousel,
+      is_carousel: inferredCarousel,
+      is_privacy_locked: isPrivacyLocked,
       video_id: c.video_id || null,
       effective_object_story_id: c.effective_object_story_id || null,
     };
