@@ -148,7 +148,10 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "valid email required" });
         }
 
-        // Send invite (creates auth user with no password + emails the link)
+        // Send invite (creates auth user with no password + emails the link).
+        // user_metadata.needs_password=true is a defensive marker: the client portal
+        // checks this on boot and forces the password-set form even if redirect query
+        // params get stripped. Cleared on first successful password update.
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=invite`;
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
@@ -158,7 +161,7 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email, redirect_to: redirectTo }),
+          body: JSON.stringify({ email, redirect_to: redirectTo, data: { needs_password: true } }),
         });
         if (!inviteRes.ok) {
           const errText = await inviteRes.text();
@@ -388,7 +391,9 @@ export default async function handler(req, res) {
         }
 
         // Send invite via Supabase admin endpoint — creates the auth user (no
-        // password) AND emails the invite link in one call
+        // password) AND emails the invite link in one call.
+        // user_metadata.needs_password=true is a defensive marker so the client portal
+        // forces the password-set form even if redirect query params get stripped.
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=invite`;
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
@@ -398,7 +403,7 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: newEmail, redirect_to: redirectTo }),
+          body: JSON.stringify({ email: newEmail, redirect_to: redirectTo, data: { needs_password: true } }),
         });
         if (!inviteRes.ok) {
           const errText = await inviteRes.text();

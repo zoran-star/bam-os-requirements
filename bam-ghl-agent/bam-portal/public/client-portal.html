@@ -6454,7 +6454,12 @@ async function submitNewPassword() {
   if (!p1 || p1.length < 8) { err.textContent = 'Password must be at least 8 characters'; return; }
   if (p1 !== p2) { err.textContent = 'Passwords do not match'; return; }
   btn.disabled = true; btn.textContent = 'Saving…';
-  const { error } = await _sb.auth.updateUser({ password: p1 });
+  // Also clears the needs_password flag in user_metadata so subsequent
+  // sign-ins don't keep forcing the password-set form.
+  const { error } = await _sb.auth.updateUser({
+    password: p1,
+    data: { needs_password: false },
+  });
   btn.disabled = false; btn.textContent = 'Save password →';
   if (error) { err.textContent = error.message; return; }
   // Strip the recovery hash + reload into normal logged-in flow
@@ -6491,6 +6496,14 @@ async function boot() {
   const { data: { session } } = await _sb.auth.getSession();
   if (!session) {
     document.getElementById('login-overlay').style.display = 'flex';
+    return;
+  }
+  // Defensive: if the server flagged this user as needing to set their password
+  // (set on invite via /api/clients?action=setup-account or public signup),
+  // force the password-set form even if the URL didn't carry ?type=invite.
+  // This survives Supabase Site URL strip of query params.
+  if (session.user?.user_metadata?.needs_password === true) {
+    showRecoveryForm('invite');
     return;
   }
   // Resolve client_id from authed user
