@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   fetchTickets,
+  fetchTicket,
   fetchDelegationPool,
   delegateTicket,
   startTicket,
@@ -342,6 +343,23 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   const [showRequest, setShowRequest] = useState(false);
   const [busy, setBusy] = useState(false);
   const [questionMap, setQuestionMap] = useState({});
+
+  // Auto-refresh the ticket from the server when the modal opens, so we
+  // pick up any client responses that landed after the list was loaded.
+  // Without this, staff sees a stale snapshot and misses new messages.
+  useEffect(() => {
+    let cancelled = false;
+    fetchTicket(initial.id).then(res => {
+      if (cancelled) return;
+      if (res?.data) {
+        setTicket(res.data);
+        setNotes(res.data.staff_notes || "");
+        setUserGuide(res.data.user_guide || "");
+        setAssignee(res.data.assigned_to || "");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [initial.id]);
 
   // Resolve field UUIDs → question text from Questions Database.
   // Some keys are non-UUIDs (e.g. "<uuid>_custom" for free-text "other"
