@@ -3628,11 +3628,24 @@ async function _renderCampaignCreatives(campaignId) {
           : isCarousel
             ? (fbUrl ? 'Click to view carousel on Facebook' : 'Carousel ad — first slide shown')
             : (fbUrl ? 'Click to view ad on Facebook' : '');
+      // Discrete "open on Facebook" arrow button bottom-right of every tile
+      // that has a URL. Tile-level click stays as a convenience; this button
+      // is the explicit affordance for clients who'd otherwise miss it.
+      const openBtn = fbUrl ? `
+        <a href="${escapeHTML(fbUrl)}" target="_blank" rel="noopener noreferrer"
+           onclick="event.stopPropagation()"
+           title="Open on Facebook"
+           aria-label="Open on Facebook"
+           style="position:absolute;bottom:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:13px;font-weight:600;line-height:1;backdrop-filter:blur(4px)">
+          ↗
+        </a>` : '';
+
       return `
         <div class="creative-tile" data-ad-id="${escapeHTML(c.ad_id)}" style="position:relative;${cursor}" ${clickHandler} title="${titleAttr}">
           ${imgInner}
           ${playOverlay}
           ${carouselBadge}
+          ${openBtn}
           <button class="creative-delete" onclick="event.stopPropagation();openRemoveModal(this)" title="Delete creative" aria-label="Delete creative">
             <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 3L13 13M13 3L3 13"/>

@@ -1172,23 +1172,32 @@ async function handleMetaCreatives(req, res) {
     return res.status(adsRes.status).json({ error: adsJson?.error?.message || "Meta API error" });
   }
 
+  // Meta's CDN URLs include size hints. The default thumbnail_url is 64x64
+  // which looks terrible in our tiles. If the URL has a `p64x64` or
+  // similar token, rewrite it to a larger size. This works on most
+  // scontent.*.fna.fbcdn.net URLs.
+  function upscaleMetaImageUrl(url) {
+    if (!url || typeof url !== "string") return url;
+    // Replace `p<w>x<h>` size token with p640x640 (or larger)
+    return url
+      .replace(/p\d+x\d+/g, "p640x640")
+      .replace(/stp=c[\d.]+x[\d.]+f_dst-emg0_p\d+x\d+_q\d+_tt\d+/g, "stp=dst-jpg_p640x640");
+  }
+
   // Extract the best representative image we can find for this creative.
-  // Order of preference: direct image_url → thumbnail_url → first carousel
-  // slide's picture → first asset_feed image. For carousels we also flag
-  // is_carousel so the UI can show a hint.
+  // Order of preference: image_url → thumbnail_url (upscaled) → first
+  // carousel slide's picture → first asset_feed image.
   function extractCreativeAssets(c) {
-    let imageUrl = c.image_url || c.thumbnail_url || null;
+    let imageUrl = c.image_url || upscaleMetaImageUrl(c.thumbnail_url) || null;
     let isCarousel = false;
     const childAttachments = c.object_story_spec?.link_data?.child_attachments;
     if (Array.isArray(childAttachments) && childAttachments.length) {
       isCarousel = true;
       if (!imageUrl) {
-        // each child has .picture (or .image_hash). Use first child's picture.
         const firstWithPic = childAttachments.find(a => a.picture);
-        if (firstWithPic) imageUrl = firstWithPic.picture;
+        if (firstWithPic) imageUrl = upscaleMetaImageUrl(firstWithPic.picture);
       }
     }
-    // Asset feed (dynamic creative) fallback
     if (!imageUrl && Array.isArray(c.asset_feed_spec?.images) && c.asset_feed_spec.images.length) {
       imageUrl = c.asset_feed_spec.images[0].url || null;
     }
@@ -1232,7 +1241,7 @@ async function handleMetaCreatives(req, res) {
       c.video_fb_url = `https://www.facebook.com/${encodeURIComponent(c.video_id)}`;
       try {
         const vRes = await fetch(`${META_GRAPH}/${encodeURIComponent(c.video_id)}?` + new URLSearchParams({
-          fields: "source,permalink_url,picture,embed_html",
+          fields: "source,permalink_url,picture,thumbnails,embed_html",
           access_token: tok.access_token,
         }));
         const vText = await vRes.text();
@@ -1250,7 +1259,21 @@ async function handleMetaCreatives(req, res) {
               : `https://www.facebook.com${v.permalink_url.startsWith("/") ? v.permalink_url : "/" + v.permalink_url}`;
           }
           c.video_embed_html = v.embed_html || null;
-          if (!c.image_url && v.picture) c.image_url = v.picture;
+          // Pick the BEST poster image available, in order:
+          //   1. preferred thumbnail from /video?fields=thumbnails (highest res)
+          //   2. video's `picture` field (full-quality poster)
+          //   3. existing c.image_url (creative-level)
+          //   4. fall back to c.thumbnail_url (often tiny 64x64)
+          let bestPoster = null;
+          const thumbs = Array.isArray(v.thumbnails?.data) ? v.thumbnails.data : [];
+          if (thumbs.length) {
+            // Sort by width desc, prefer is_preferred=true
+            const preferred = thumbs.find(t => t.is_preferred);
+            const sorted = [...thumbs].sort((a, b) => (b.width || 0) - (a.width || 0));
+            bestPoster = (preferred?.uri) || sorted[0]?.uri || null;
+          }
+          if (!bestPoster && v.picture) bestPoster = v.picture;
+          if (bestPoster) c.image_url = bestPoster;
         }
       } catch (e) {
         c.video_fetch_error = e.message;
