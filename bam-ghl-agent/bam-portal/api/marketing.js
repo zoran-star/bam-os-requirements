@@ -986,10 +986,23 @@ async function handleMetaAdAccounts(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "GET, POST, or DELETE" });
 
-  // GET → list every ad account the LOGGED-IN STAFF has access to.
-  // Uses that staff's own token (they connected via "Connect Meta" on staff portal).
-  const tokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
-  const tok = tokRows?.[0];
+  // GET → list every ad account accessible to the team's Meta connection.
+  // First tries the LOGGED-IN staff's own token; falls back to any valid
+  // team token (most-recently-updated). This way any admin/marketing role
+  // can use Client Setup without needing to connect Meta personally — they
+  // share Ximena's (or whoever connected) token for read-only ad account
+  // browsing.
+  let tok = null;
+  let usingOwnToken = false;
+  const ownTokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
+  if (ownTokRows?.[0]) {
+    tok = ownTokRows[0];
+    usingOwnToken = true;
+  } else {
+    // Fall back to any team token (most recent)
+    const teamRows = await sb(`staff_meta_tokens?select=access_token,expires_at,fb_user_name&order=updated_at.desc&limit=1`);
+    if (teamRows?.[0]) tok = teamRows[0];
+  }
   if (!tok) return res.status(404).json({ error: "Meta not connected. Connect your Meta on the staff portal first." });
 
   const fbRes = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
@@ -1004,6 +1017,7 @@ async function handleMetaAdAccounts(req, res) {
   return res.status(200).json({
     ad_accounts: fbJson.data || [],
     fb_user_name: tok.fb_user_name || null,
+    using_team_token: !usingOwnToken,
   });
 }
 
@@ -1381,14 +1395,21 @@ async function handleStaffMetaStatus(req, res) {
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   if (!ctx.staff) return res.status(403).json({ error: "staff only" });
 
-  const rows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=fb_user_name,expires_at,created_at,updated_at`);
-  const tok = rows?.[0];
-  if (!tok) return res.status(200).json({ connected: false });
+  // Logged-in staff's own connection
+  const ownRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=fb_user_name,expires_at,created_at,updated_at`);
+  const own = ownRows?.[0];
+
+  // Team-wide connection (anyone on staff connected — token shared for read ops)
+  const teamRows = await sb(`staff_meta_tokens?select=fb_user_name,updated_at&order=updated_at.desc&limit=1`);
+  const team = teamRows?.[0];
+
   return res.status(200).json({
-    connected: true,
-    fb_user_name: tok.fb_user_name || null,
-    expires_at: tok.expires_at,
-    connected_at: tok.created_at,
-    updated_at: tok.updated_at,
+    connected: !!own,
+    fb_user_name: own?.fb_user_name || null,
+    expires_at: own?.expires_at || null,
+    connected_at: own?.created_at || null,
+    updated_at: own?.updated_at || null,
+    team_connected: !!team,
+    team_fb_user_name: team?.fb_user_name || null,
   });
 }

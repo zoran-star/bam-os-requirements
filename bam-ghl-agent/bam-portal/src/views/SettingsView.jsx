@@ -343,13 +343,15 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
             display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
             borderRadius: 10, background: tokens.surface, border: `1px solid ${tokens.border}`,
           }}>
-            <StatusDot status={metaLoading ? "checking" : metaStatus.connected ? "connected" : "disconnected"} tokens={tokens} />
+            <StatusDot status={metaLoading ? "checking" : (metaStatus.connected || metaStatus.team_connected) ? "connected" : "disconnected"} tokens={tokens} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>Meta (Facebook Ads)</div>
               <div style={{ fontSize: 12, color: tokens.textMute }}>
                 {metaStatus.connected
                   ? `Connected${metaStatus.fb_user_name ? ` as ${metaStatus.fb_user_name}` : ""} — powers real campaign data for client portals`
-                  : "Connect your Meta to give clients real ad data (no setup on their side)"}
+                  : metaStatus.team_connected
+                    ? `Team is connected${metaStatus.team_fb_user_name ? ` via ${metaStatus.team_fb_user_name}` : ""} — connect your own to enable additional ad accounts you have access to`
+                    : "Connect your Meta to give clients real ad data (no setup on their side)"}
               </div>
               {metaToast && (
                 <div style={{ fontSize: 11, marginTop: 6, color: metaToast.kind === 'success' ? tokens.green : tokens.red }}>
