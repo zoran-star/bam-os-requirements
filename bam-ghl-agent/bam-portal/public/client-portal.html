@@ -6483,6 +6483,25 @@ async function boot() {
   const hash = (window.location.hash || '').replace(/^#/, '');
   const hashParams = new URLSearchParams(hash);
   const search = new URLSearchParams(window.location.search);
+
+  // If the URL carries an auth callback (PKCE `?code=...` or implicit
+  // `#access_token=...`), the SDK is processing it asynchronously. Wait
+  // for the session to land before we decide what to render — otherwise
+  // getSession() returns null and we'd flash the Sign In screen at users
+  // who just clicked an invite or recovery link.
+  const hasAuthCallback = search.has('code') || hashParams.has('access_token');
+  if (hasAuthCallback) {
+    await new Promise((resolve) => {
+      let resolved = false;
+      const finish = () => { if (!resolved) { resolved = true; resolve(); } };
+      const { data: sub } = _sb.auth.onAuthStateChange((event, session) => {
+        if (session) { sub.subscription.unsubscribe(); finish(); }
+      });
+      // Safety net: never hang forever
+      setTimeout(finish, 3000);
+    });
+  }
+
   // Query type wins (we control it via redirect_to). Hash type is set by
   // Supabase's auth processor — for invites it'll say 'recovery' since the
   // password-set page is the same machinery, but our query will say 'invite'.
