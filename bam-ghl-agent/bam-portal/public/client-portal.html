@@ -3066,6 +3066,7 @@
               <span class="topbar-kicker">§ 02 · Marketing</span>
               <div class="topbar-title">Change a campaign.</div>
               <div class="topbar-sub" id="detail-campaign-title">Title of campaign 1</div>
+              <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-top:4px">Stats: last 30 days</div>
             </div>
             <div style="margin-left:auto;display:flex;gap:40px;align-items:flex-end">
               <div style="text-align:right">
@@ -4554,7 +4555,8 @@ async function _renderMarketingCampaigns() {
       return `
         <div class="campaign-card">
           <div class="campaign-card-main">
-            <div class="card-title" style="margin-bottom:18px">${escapeHTML(c.name || '(unnamed)')}</div>
+            <div class="card-title" style="margin-bottom:6px">${escapeHTML(c.name || '(unnamed)')}</div>
+            <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">Last 30 days</div>
             <div class="campaign-stats">
               <div class="campaign-stat">
                 <div class="campaign-stat-value">${escapeHTML(c.spend_display)}</div>
