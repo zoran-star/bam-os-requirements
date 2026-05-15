@@ -3894,16 +3894,21 @@ async function submitInputAssets() {
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
-  const fileCount = _inputAssetsState.files.length;
+  // Snapshot files + type BEFORE closing the modal — closeInputAssetsModal()
+  // resets _inputAssetsState to { files: [] } which would otherwise wipe the
+  // upload list and silently submit a ticket with no files attached.
+  const filesToUpload = _inputAssetsState.files.slice();
+  const assetType = _inputAssetsState.type;
+  const fileCount = filesToUpload.length;
   closeInputAssetsModal();
   showLoading(
     `Uploading ${fileCount} file${fileCount === 1 ? '' : 's'}…`,
     "This can take a minute for video. Don't close this tab."
   );
   try {
-    const uploaded = await _mreqUploadFiles(_inputAssetsState.files);
+    const uploaded = await _mreqUploadFiles(filesToUpload);
     await _ctkCreateTicket({
-      type: _inputAssetsState.type,
+      type: assetType,
       notes,
       raw_files: uploaded,
       context: {
@@ -3914,7 +3919,7 @@ async function submitInputAssets() {
     await fetchAndRenderMarketingRequests();
     hideLoading();
     showConfirmation('Assets received',
-      'We got your ' + _inputAssetsState.type + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
+      'We got your ' + assetType + ' assets. Our content team will craft the creative and add it to your campaign within 1-2 business days.');
   } catch (e) {
     hideLoading();
     alert('Submit failed: ' + e.message);
