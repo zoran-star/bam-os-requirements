@@ -340,6 +340,13 @@ export default async function handler(req, res) {
           }
           patch.email = newEmail || null;
         }
+        if (typeof body.slack_channel_id === "string") {
+          const ch = body.slack_channel_id.trim();
+          // Accept C... (public/private channel) or G... (legacy group) IDs;
+          // empty string clears it. Don't validate strictly — Slack IDs can
+          // start with C, G, or D (DMs); just trim.
+          patch.slack_channel_id = ch || null;
+        }
         if (!Object.keys(patch).length) return res.status(400).json({ error: "nothing to update" });
         patch.updated_at = new Date().toISOString();
         const res2 = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`, {

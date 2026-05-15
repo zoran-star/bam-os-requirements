@@ -84,6 +84,50 @@ function appendMessage(existing, msg) {
   return [...arr, { ...msg, created_at: nowIso() }];
 }
 
+// ─────────────────────────────────────────────────────────
+// Slack client-channel notifications
+// ─────────────────────────────────────────────────────────
+// Posts to the client's dedicated Slack channel via the BAM Portal
+// bot token. Fire-and-forget — never blocks the API response. Quietly
+// no-ops if the client doesn't have slack_channel_id set or the bot
+// token is missing.
+function clientPortalLinkForTicket(req, kind, ticketId) {
+  const origin = (req.headers["x-forwarded-host"] && `https://${req.headers["x-forwarded-host"]}`)
+    || (req.headers.origin)
+    || `https://${req.headers.host}`;
+  // We don't have deep-links to a specific ticket yet — Marketing tab on
+  // the client portal is the right landing for now.
+  return `${origin}/client-portal.html`;
+}
+
+async function postClientSlackNotification(clientId, text, req) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token) return; // not configured — silent skip
+    if (!clientId || !text) return;
+    const rows = await sb(`clients?id=eq.${clientId}&select=slack_channel_id,name`);
+    const r = rows?.[0];
+    if (!r?.slack_channel_id) return; // no channel mapped — silent skip
+    const portalLink = clientPortalLinkForTicket(req);
+    const body = `${text}\n→ ${portalLink}`;
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: r.slack_channel_id,
+        text: body,
+        unfurl_links: false,
+      }),
+    });
+  } catch (err) {
+    // Don't let Slack failures break the staff action. Log + move on.
+    console.error("Slack notify failed:", err?.message || err);
+  }
+}
+
 async function enrichWithClient(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
@@ -354,6 +398,18 @@ async function handleMarketingTickets(req, res) {
       headers: { Prefer: "return=representation" },
       body: JSON.stringify(patch),
     });
+
+    // Slack notify (fire-and-forget) on action-request or completion.
+    // We don't await — keeps the API snappy and Slack errors don't break us.
+    if (action === "request-client-action") {
+      const ask = (body.message || "").trim();
+      postClientSlackNotification(ticket.client_id,
+        `🔔 *Action requested* by ${authorName}\n_${ask}_`, req);
+    } else if (action === "mark-completed") {
+      postClientSlackNotification(ticket.client_id,
+        `✅ Marketing ticket completed by ${authorName}`, req);
+    }
+
     return res.status(200).json({ ticket: updated?.[0] || null });
   }
 
@@ -764,6 +820,17 @@ async function handleContentTickets(req, res) {
       headers: { Prefer: "return=representation" },
       body: JSON.stringify(patch),
     });
+
+    // Slack notify on action-request or completion (fire-and-forget)
+    if (action === "request-client-action") {
+      const ask = (body.message || "").trim();
+      postClientSlackNotification(ticket.client_id,
+        `🔔 *Action requested* by ${authorName} (content team)\n_${ask}_`, req);
+    } else if (action === "mark-completed") {
+      postClientSlackNotification(ticket.client_id,
+        `✅ Content ticket completed by ${authorName}`, req);
+    }
+
     return res.status(200).json({ ticket: updated?.[0] || null });
   }
 

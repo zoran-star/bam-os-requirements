@@ -66,7 +66,7 @@ export default function ClientSetupView({ tokens, session }) {
     // 1. Clients
     const { data: clientRows } = await supabase
       .from("clients")
-      .select("id,name,owner_name,email,auth_user_id,meta_ad_account_id,meta_campaign_ids,status,created_at")
+      .select("id,name,owner_name,email,auth_user_id,meta_ad_account_id,meta_campaign_ids,slack_channel_id,status,created_at")
       .order("name");
     const cs = clientRows || [];
     setClients(cs);
@@ -97,6 +97,7 @@ export default function ClientSetupView({ tokens, session }) {
       rs[c.id] = {
         owner_name: c.owner_name || "",
         email: c.email || "",
+        slack_channel_id: c.slack_channel_id || "",
         ad_account_id: c.meta_ad_account_id || suggested || "",
         campaign_ids: Array.isArray(c.meta_campaign_ids) ? c.meta_campaign_ids.slice() : [],
         message: "",
@@ -230,14 +231,20 @@ export default function ClientSetupView({ tokens, session }) {
     try {
       const tok = session?.access_token;
 
-      // 1. Update email / owner_name if changed
+      // 1. Update email / owner_name / slack_channel_id if changed
       const emailChanged = (state.email || "") !== (client.email || "");
       const ownerChanged = (state.owner_name || "") !== (client.owner_name || "");
-      if (emailChanged || ownerChanged) {
+      const slackChanged = (state.slack_channel_id || "") !== (client.slack_channel_id || "");
+      if (emailChanged || ownerChanged || slackChanged) {
         const r = await fetch("/api/clients?action=update-fields", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-          body: JSON.stringify({ client_id: client.id, email: state.email, owner_name: state.owner_name }),
+          body: JSON.stringify({
+            client_id: client.id,
+            email: state.email,
+            owner_name: state.owner_name,
+            slack_channel_id: state.slack_channel_id,
+          }),
         });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
@@ -359,8 +366,9 @@ export default function ClientSetupView({ tokens, session }) {
               <th style={{ ...headStyle, textAlign: "left", width: 180 }}>Client</th>
               <th style={{ ...headStyle, textAlign: "left", width: 160 }}>Owner name</th>
               <th style={{ ...headStyle, textAlign: "left", width: 220 }}>Email</th>
-              <th style={{ ...headStyle, textAlign: "left", width: 230 }}>Meta ad account</th>
-              <th style={{ ...headStyle, textAlign: "left", width: 180 }}>Campaigns shown to client</th>
+              <th style={{ ...headStyle, textAlign: "left", width: 220 }}>Meta ad account</th>
+              <th style={{ ...headStyle, textAlign: "left", width: 170 }}>Campaigns shown</th>
+              <th style={{ ...headStyle, textAlign: "left", width: 150 }}>Slack channel</th>
               <th style={{ ...headStyle, textAlign: "left", width: 100 }}>Status</th>
               <th style={{ ...headStyle, textAlign: "right", width: 200 }}>Actions</th>
             </tr>
@@ -440,6 +448,20 @@ export default function ClientSetupView({ tokens, session }) {
                       {(s.campaign_ids && s.campaign_ids.length)
                         ? "Only these visible to client"
                         : "Client sees every active campaign"}
+                    </div>
+                  </td>
+                  <td style={cellStyle}>
+                    {/* Slack channel ID — bot must be invited to this channel */}
+                    <input
+                      style={{ ...inputStyle, fontFamily: "monospace" }}
+                      value={s.slack_channel_id || ""}
+                      onChange={e => update(c.id, { slack_channel_id: e.target.value })}
+                      placeholder="C01ABC123"
+                    />
+                    <div style={{ fontSize: 10, color: tk.textMute, marginTop: 4, lineHeight: 1.3 }}>
+                      {s.slack_channel_id
+                        ? "Notifications on"
+                        : "Paste channel ID — invite @BAM Portal bot first"}
                     </div>
                   </td>
                   <td style={cellStyle}>
