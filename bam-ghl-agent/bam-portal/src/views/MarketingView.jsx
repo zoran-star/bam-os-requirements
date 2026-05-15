@@ -285,6 +285,22 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     }
   };
 
+  const cancelTicket = async () => {
+    if (!selected || actionBusy) return;
+    if (!window.confirm(`Cancel this ticket for ${selected.academyName}? This cannot be undone.`)) return;
+    setActionBusy(true);
+    try {
+      const updated = await _patchTicket(selected.id, { action: "cancel" });
+      setTickets(prev => prev.map(t => t.id === selected.id ? updated : t));
+      setSelectedId(null);
+      showBanner("success", `Ticket for ${selected.academyName} cancelled.`);
+    } catch (e) {
+      showBanner("error", "Cancel failed: " + e.message);
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const submitRevisionRequest = async (msg) => {
     if (!selected || !msg || !msg.trim() || actionBusy) return;
     setActionBusy(true);
@@ -406,6 +422,15 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
                 }}
               >↩  Request Content Revision</button>
             )}
+            <button
+              onClick={cancelTicket}
+              disabled={actionBusy}
+              style={{
+                background: "transparent", border: `1px solid ${tk.red || "#E55"}`, color: tk.red || "#E55",
+                padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+                fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+              }}
+            >✕  Cancel</button>
             <button
               onClick={() => setActionModalOpen(true)}
               style={{

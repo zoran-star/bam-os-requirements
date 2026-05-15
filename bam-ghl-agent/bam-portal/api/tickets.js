@@ -29,6 +29,44 @@ async function sbPatch(path, body) {
   });
 }
 
+// ─────────────────────────────────────────────────────────
+// Slack client-channel notifications
+// ─────────────────────────────────────────────────────────
+// Mirrors postClientSlackNotification in api/marketing.js. Fire-and-forget,
+// silently no-ops if SLACK_BOT_TOKEN unset or client has no slack_channel_id.
+function clientPortalLink(req) {
+  const origin = (req.headers["x-forwarded-host"] && `https://${req.headers["x-forwarded-host"]}`)
+    || (req.headers.origin)
+    || `https://${req.headers.host}`;
+  return `${origin}/client-portal.html`;
+}
+
+async function postClientSlackNotification(clientId, text, req) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token) return;
+    if (!clientId || !text) return;
+    const rows = await sb(`clients?id=eq.${clientId}&select=slack_channel_id`);
+    const r = rows?.[0];
+    if (!r?.slack_channel_id) return;
+    const body = `${text}\n→ ${clientPortalLink(req)}`;
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: r.slack_channel_id,
+        text: body,
+        unfurl_links: false,
+      }),
+    });
+  } catch (err) {
+    console.error("Slack notify failed:", err?.message || err);
+  }
+}
+
 async function verifyStaff(req) {
   const auth = req.headers.authorization || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
@@ -299,6 +337,22 @@ export default async function handler(req, res) {
 
       const updated = await sbPatch(`tickets?id=eq.${id}`, update);
       const enriched = await enrichTickets(updated || []);
+
+      // Slack notify (fire-and-forget) on client-facing actions only.
+      // Uniform template: {emoji} {Action} — {Type} [{CODE}] + optional body.
+      const code = String(t.id || "").slice(0, 3).toUpperCase();
+      if (action === "request_client") {
+        const ask = (body.client_action_request || "").trim();
+        postClientSlackNotification(t.client_id,
+          `🔔 Action requested — Systems [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+      } else if (action === "cancel_client_request") {
+        postClientSlackNotification(t.client_id,
+          `↩️ Request withdrawn — Systems [${code}]`, req);
+      } else if (action === "approve") {
+        postClientSlackNotification(t.client_id,
+          `✅ Completed — Systems [${code}]`, req);
+      }
+
       return res.status(200).json({ data: enriched[0] });
     }
 

@@ -84,6 +84,14 @@ function appendMessage(existing, msg) {
   return [...arr, { ...msg, created_at: nowIso() }];
 }
 
+// Strip messages flagged internal:true before returning to clients.
+// Keeps staff-only chatter (revision handoffs, content team upload notes,
+// internal marketing_notes) out of the client conversation thread.
+function stripInternalMessages(ticket) {
+  if (!ticket || !Array.isArray(ticket.messages)) return ticket;
+  return { ...ticket, messages: ticket.messages.filter(m => !m?.internal) };
+}
+
 // ─────────────────────────────────────────────────────────
 // Slack client-channel notifications
 // ─────────────────────────────────────────────────────────
@@ -209,7 +217,7 @@ async function handleMarketingTickets(req, res) {
       if (!asStaff && (!isClient || ticket.client_id !== ctx.client.id)) {
         return res.status(403).json({ error: "not your ticket" });
       }
-      const enriched = asStaff ? (await enrichWithClient([ticket]))[0] : ticket;
+      const enriched = asStaff ? (await enrichWithClient([ticket]))[0] : stripInternalMessages(ticket);
       return res.status(200).json({ ticket: enriched });
     }
 
@@ -221,7 +229,7 @@ async function handleMarketingTickets(req, res) {
 
     if (!isClient) return res.status(403).json({ error: "not authorized for this scope" });
     const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc&client_id=eq.${ctx.client.id}`);
-    return res.status(200).json({ tickets: tickets || [] });
+    return res.status(200).json({ tickets: (tickets || []).map(stripInternalMessages) });
   }
 
   if (req.method === "POST") {
@@ -284,6 +292,7 @@ async function handleMarketingTickets(req, res) {
       patch.messages = appendMessage(ticket.messages, {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: "Content approved.", is_action_request: false,
+        internal: true,
       });
     } else if (action === "request-client-action") {
       const message = (body.message || "").trim();
@@ -307,8 +316,11 @@ async function handleMarketingTickets(req, res) {
       patch.status = "cancelled";
       patch.resolved_at = nowIso();
       patch.messages = appendMessage(ticket.messages, {
-        author_type: "client", author_name: authorName,
-        body: "Cancelled by client.", is_action_request: false,
+        author_type: isStaff ? "staff" : "client",
+        author_id: isStaff ? ctx.staff.id : undefined,
+        author_name: authorName,
+        body: isStaff ? `Cancelled by ${authorName}.` : "Cancelled by client.",
+        is_action_request: false,
       });
     } else if (action === "edit") {
       if (ticket.status !== "in-progress") {
@@ -380,6 +392,7 @@ async function handleMarketingTickets(req, res) {
             author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
             body: `Revision requested: ${message}`,
             is_action_request: false,
+            internal: true,
             created_at: nowIso(),
           }],
         }]),
@@ -390,6 +403,7 @@ async function handleMarketingTickets(req, res) {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: `Sent back to content for revision: "${message}". Tracking content ticket ${contentInsert?.[0]?.id || ""}.`,
         is_action_request: false,
+        internal: true,
       });
     }
 
@@ -401,13 +415,17 @@ async function handleMarketingTickets(req, res) {
 
     // Slack notify (fire-and-forget) on action-request or completion.
     // We don't await — keeps the API snappy and Slack errors don't break us.
+    const code = String(ticket.id || "").slice(0, 3).toUpperCase();
     if (action === "request-client-action") {
       const ask = (body.message || "").trim();
       postClientSlackNotification(ticket.client_id,
-        `🔔 *Action requested* by ${authorName}\n_${ask}_`, req);
+        `🔔 Action requested — Marketing [${code}]${ask ? `\n_${ask}_` : ""}`, req);
     } else if (action === "mark-completed") {
       postClientSlackNotification(ticket.client_id,
-        `✅ Marketing ticket completed by ${authorName}`, req);
+        `✅ Completed — Marketing [${code}]`, req);
+    } else if (action === "cancel") {
+      postClientSlackNotification(ticket.client_id,
+        `❌ Cancelled — Marketing [${code}]`, req);
     }
 
     return res.status(200).json({ ticket: updated?.[0] || null });
@@ -539,7 +557,7 @@ async function handleContentTickets(req, res) {
       if (!asStaff && (!isClient || ticket.client_id !== ctx.client.id)) {
         return res.status(403).json({ error: "not your ticket" });
       }
-      const enriched = asStaff ? (await enrichWithClient([ticket]))[0] : ticket;
+      const enriched = asStaff ? (await enrichWithClient([ticket]))[0] : stripInternalMessages(ticket);
       return res.status(200).json({ ticket: enriched });
     }
 
@@ -557,7 +575,7 @@ async function handleContentTickets(req, res) {
       ? `&client_action_status=eq.requested`
       : "";
     const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}&order=submitted_at.desc`);
-    return res.status(200).json({ tickets: tickets || [] });
+    return res.status(200).json({ tickets: (tickets || []).map(stripInternalMessages) });
   }
 
   // ─── POST (client creates) ─────────────────────────────────
@@ -658,6 +676,7 @@ async function handleContentTickets(req, res) {
         author_type: "staff", author_id: ctx.staff.id, author_name: authorName,
         body: `Uploaded ${finals.length} final file${finals.length === 1 ? "" : "s"}.`,
         is_action_request: false,
+        internal: true,
       });
 
     } else if (action === "send-to-marketing") {
@@ -685,6 +704,7 @@ async function handleContentTickets(req, res) {
               ? `Revision uploaded. Notes for marketing: "${marketingNotes}"`
               : "Revision uploaded by content team.",
             is_action_request: false,
+            internal: true,
           });
           await sb(`marketing_tickets?id=eq.${linkedMarketingId}`, {
             method: "PATCH",
@@ -732,6 +752,7 @@ async function handleContentTickets(req, res) {
             ? `Sent from content ticket (${ticket.type}). Notes for marketing: "${marketingNotes}"`
             : `Sent from content ticket (${ticket.type}).`,
           is_action_request: false,
+          internal: true,
           created_at: nowIso(),
         };
 
@@ -762,6 +783,7 @@ async function handleContentTickets(req, res) {
           ? `Sent to marketing. Notes: "${marketingNotes}"`
           : "Sent to marketing.",
         is_action_request: false,
+        internal: true,
       });
 
     } else if (action === "request-client-action") {
@@ -797,8 +819,11 @@ async function handleContentTickets(req, res) {
       patch.status = "cancelled";
       patch.resolved_at = nowIso();
       patch.messages = appendMessage(ticket.messages, {
-        author_type: "client", author_name: authorName,
-        body: "Cancelled by client.", is_action_request: false,
+        author_type: isStaff ? "staff" : "client",
+        author_id: isStaff ? ctx.staff.id : undefined,
+        author_name: authorName,
+        body: isStaff ? `Cancelled by ${authorName}.` : "Cancelled by client.",
+        is_action_request: false,
       });
 
     } else if (action === "respond") {
@@ -821,14 +846,18 @@ async function handleContentTickets(req, res) {
       body: JSON.stringify(patch),
     });
 
-    // Slack notify on action-request or completion (fire-and-forget)
+    // Slack notify (fire-and-forget) — uniform template across all ticket types
+    const code = String(ticket.id || "").slice(0, 3).toUpperCase();
     if (action === "request-client-action") {
       const ask = (body.message || "").trim();
       postClientSlackNotification(ticket.client_id,
-        `🔔 *Action requested* by ${authorName} (content team)\n_${ask}_`, req);
+        `🔔 Action requested — Content [${code}]${ask ? `\n_${ask}_` : ""}`, req);
     } else if (action === "mark-completed") {
       postClientSlackNotification(ticket.client_id,
-        `✅ Content ticket completed by ${authorName}`, req);
+        `✅ Completed — Content [${code}]`, req);
+    } else if (action === "cancel") {
+      postClientSlackNotification(ticket.client_id,
+        `❌ Cancelled — Content [${code}]`, req);
     }
 
     return res.status(200).json({ ticket: updated?.[0] || null });

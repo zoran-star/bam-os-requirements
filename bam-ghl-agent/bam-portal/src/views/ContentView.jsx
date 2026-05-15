@@ -829,6 +829,22 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
     }
   }
 
+  async function cancelTicket() {
+    if (busy) return;
+    if (!window.confirm(`Cancel this content ticket for ${academyName}? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await patchTicket(ticket.id, { action: "cancel" });
+      showBanner(`Content ticket for ${academyName} cancelled.`);
+      await onRefetch();
+      onBack();
+    } catch (e) {
+      alert("Cancel failed: " + e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -942,6 +958,11 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
       {/* Actions */}
       {ticket.status !== "completed" && ticket.status !== "cancelled" && (
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <button onClick={cancelTicket} disabled={busy} style={{
+            background: "transparent", border: `1px solid ${tk.red || "#E55"}`, color: tk.red || "#E55",
+            padding: "10px 20px", borderRadius: 8, cursor: "pointer",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+          }}>✕  Cancel</button>
           <button onClick={() => setActionModalOpen(true)} style={{
             background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
             padding: "10px 20px", borderRadius: 8, cursor: "pointer",

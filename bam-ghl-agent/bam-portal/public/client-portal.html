@@ -5283,7 +5283,11 @@ async function confirmCancelRequest() {
   const cancelBtn = document.querySelector('#cancelRequestModal .btn-modal-danger');
   if (cancelBtn) { cancelBtn.disabled = true; cancelBtn.textContent = 'Cancelling…'; }
   try {
-    await _mreqPatchTicket(_activeRequestId, { action: 'cancel' });
+    if (_reqDetailKind === 'content') {
+      await _ctkPatchTicket(_activeRequestId, { action: 'cancel' });
+    } else {
+      await _mreqPatchTicket(_activeRequestId, { action: 'cancel' });
+    }
     closeCancelRequestModal();
     closeMarketingRequest();
     await fetchAndRenderMarketingRequests();
