@@ -22,7 +22,6 @@ import SystemsView from './views/SystemsView';
 import MarketingView from './views/MarketingView';
 import TeamView from './views/TeamView';
 import ContentView from './views/ContentView';
-import ChannelView from './views/ChannelView';
 import ClientSetupView from './views/ClientSetupView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
@@ -115,8 +114,8 @@ export default function BAMPortal() {
   // Client Setup (bulk wire-up): admin + marketing roles can do this since
   // it's the page they need to assign ad accounts and send client invites.
   const canSeeClientSetup = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
-  const CHANNEL_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com"];
-  const canSeeChannel = !!session && CHANNEL_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
+  // Channel dashboard hidden from portal (Cole's basketball acquisition
+  // test page). View + backend code preserved in repo; just removed from nav.
 
   useEffect(() => {
     if (me && (me.role === "systems_manager" || me.role === "systems_executor") && nav !== "systems" && nav !== "training") {
@@ -364,7 +363,6 @@ export default function BAMPortal() {
     calendar: ["Calendar", "Your schedule"],
     knowledge: ["Knowledge Base", "SOPs & Solutions"],
     financials: ["Financials", "BAM internal finances"],
-    channel: ["Channel", "Basketball acquisition channel test"],
     communication: ["Communication", "Slack channels & messages"],
     systems: ["Systems", "Ticket delegation & execution"],
     marketing: ["Marketing", "Client ad-campaign tickets"],
@@ -405,7 +403,6 @@ export default function BAMPortal() {
         { label: "Calendar", key: "calendar" },
         { label: "Knowledge Base", key: "knowledge" },
         ...(canSeeFinancials ? [{ label: "Financials", key: "financials" }] : []),
-        ...(canSeeChannel ? [{ label: "Channel", key: "channel" }] : []),
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
@@ -791,13 +788,6 @@ export default function BAMPortal() {
 
             {/* FINANCIALS */}
             {nav === "financials" && canSeeFinancials && <FinancialsView tokens={tk} dark={dark} />}
-
-            {nav === "channel" && canSeeChannel && <ChannelView tokens={tk} session={session} me={me} />}
-            {nav === "channel" && !canSeeChannel && (
-              <div style={{ padding: 24, color: tk.textSub, fontFamily: "'DM Mono', monospace" }}>
-                <strong style={{ color: tk.amber }}>No access.</strong> Channel dashboard is restricted to Cole, Mike, and Zoran.
-              </div>
-            )}
 
             {/* COMMUNICATION */}
             {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
