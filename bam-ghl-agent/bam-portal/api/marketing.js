@@ -1172,30 +1172,19 @@ async function handleMetaCreatives(req, res) {
     return res.status(adsRes.status).json({ error: adsJson?.error?.message || "Meta API error" });
   }
 
-  // Meta's CDN URLs include size hints. The default thumbnail_url is 64x64
-  // which looks terrible in our tiles. If the URL has a `p64x64` or
-  // similar token, rewrite it to a larger size. This works on most
-  // scontent.*.fna.fbcdn.net URLs.
-  function upscaleMetaImageUrl(url) {
-    if (!url || typeof url !== "string") return url;
-    // Replace `p<w>x<h>` size token with p640x640 (or larger)
-    return url
-      .replace(/p\d+x\d+/g, "p640x640")
-      .replace(/stp=c[\d.]+x[\d.]+f_dst-emg0_p\d+x\d+_q\d+_tt\d+/g, "stp=dst-jpg_p640x640");
-  }
-
   // Extract the best representative image we can find for this creative.
-  // Order of preference: image_url → thumbnail_url (upscaled) → first
-  // carousel slide's picture → first asset_feed image.
+  // Order of preference: image_url → thumbnail_url → first carousel
+  // slide's picture → first asset_feed image. Don't rewrite URLs —
+  // Meta CDN URLs are cryptographically signed; mangling breaks them.
   function extractCreativeAssets(c) {
-    let imageUrl = c.image_url || upscaleMetaImageUrl(c.thumbnail_url) || null;
+    let imageUrl = c.image_url || c.thumbnail_url || null;
     let isCarousel = false;
     const childAttachments = c.object_story_spec?.link_data?.child_attachments;
     if (Array.isArray(childAttachments) && childAttachments.length) {
       isCarousel = true;
       if (!imageUrl) {
         const firstWithPic = childAttachments.find(a => a.picture);
-        if (firstWithPic) imageUrl = upscaleMetaImageUrl(firstWithPic.picture);
+        if (firstWithPic) imageUrl = firstWithPic.picture;
       }
     }
     if (!imageUrl && Array.isArray(c.asset_feed_spec?.images) && c.asset_feed_spec.images.length) {
