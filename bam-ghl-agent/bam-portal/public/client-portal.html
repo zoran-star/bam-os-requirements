@@ -3267,28 +3267,38 @@
             <div class="card" style="margin-bottom:18px">
               <div class="card-title" id="wizardGuideOfferTitle" style="margin-bottom:20px;text-transform:uppercase;letter-spacing:0.04em">Offer</div>
 
+              <!-- Populated by _populateGuideCard() with the real card from
+                   /api/guide-cards matching the picked offer. Placeholder
+                   copy shows if no card exists yet. -->
               <div class="guide-section">
                 <div class="guide-label">Purpose</div>
-                <div class="guide-value">[Cam will fill this in. Why does this offer exist? Who's the audience? What action do we want them to take?]</div>
+                <div class="guide-value" id="wizardGuidePurpose">[Your account manager will fill this in. Why does this offer exist? Who's the audience? What action do we want them to take?]</div>
               </div>
               <div class="guide-section">
                 <div class="guide-label">Filming / creation tips</div>
-                <div class="guide-value">[Cam will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]</div>
+                <div class="guide-value" id="wizardGuideFilming">[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]</div>
               </div>
               <div class="guide-section">
                 <div class="guide-label">Example script</div>
-                <div class="guide-value" style="white-space:pre-line">[Cam will fill this in.
+                <div class="guide-value" id="wizardGuideScript" style="white-space:pre-line">[Your account manager will fill this in.
 "Hook line in the first 3 seconds.
 Then the offer pitch.
 Then the call to action."]</div>
               </div>
-              <div class="guide-section">
+              <div class="guide-section" id="wizardGuideAssetsSection">
                 <div class="guide-label">Example assets</div>
-                <div class="guide-assets-grid">
+                <div class="guide-assets-grid" id="wizardGuideAssets">
+                  <!-- populated dynamically; falls back to placeholders -->
                   <img src="https://picsum.photos/seed/eg1/200/200" alt="Example 1" />
                   <img src="https://picsum.photos/seed/eg2/200/200" alt="Example 2" />
                   <img src="https://picsum.photos/seed/eg3/200/200" alt="Example 3" />
                   <img src="https://picsum.photos/seed/eg4/200/200" alt="Example 4" />
+                </div>
+              </div>
+              <div class="guide-section" id="wizardGuideLinksSection" style="display:none">
+                <div class="guide-label">Example links</div>
+                <div class="guide-value" id="wizardGuideLinks">
+                  <!-- populated dynamically; hidden when no links -->
                 </div>
               </div>
             </div>
@@ -4958,10 +4968,71 @@ function wizardSelectOffer(offerName) {
   _wizard.selectedOffer = offerName;
   _wizard.newOfferName = '';
   _wizard.newOfferDescription = '';
-  // Populate guide card with offer title
+  // Populate guide card with offer title + fetch real guide card data
   const titleEl = document.getElementById('wizardGuideOfferTitle');
   if (titleEl) titleEl.textContent = offerName;
+  _populateGuideCard(offerName);
   wizardGoToStep('guide-card');
+}
+
+// Fetch the guide card for this offer and populate the Purpose / Filming
+// tips / Example script / assets / links sections. Falls back to the
+// hardcoded placeholders if no matching card is found.
+async function _populateGuideCard(offerName) {
+  const setText = (id, val, placeholder) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = (val && String(val).trim()) ? val : placeholder;
+    el.style.opacity = (val && String(val).trim()) ? '1' : '0.55';
+  };
+  // Defaults (in case fetch fails or no match)
+  setText('wizardGuidePurpose', null, '[Your account manager will fill this in. Why does this offer exist? Who\'s the audience? What action do we want them to take?]');
+  setText('wizardGuideFilming', null, '[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]');
+  setText('wizardGuideScript', null, '[Your account manager will fill this in.\n"Hook line in the first 3 seconds.\nThen the offer pitch.\nThen the call to action."]');
+  // Hide links by default
+  const linksSection = document.getElementById('wizardGuideLinksSection');
+  if (linksSection) linksSection.style.display = 'none';
+
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/guide-cards', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return;
+    const json = await _safeJson(res);
+    const cards = json.guide_cards || json.cards || json || [];
+    const match = (Array.isArray(cards) ? cards : []).find(c => {
+      const t = (c.title || '').toLowerCase().trim();
+      return t === (offerName || '').toLowerCase().trim();
+    });
+    if (!match) return;
+
+    setText('wizardGuidePurpose', match.purpose, document.getElementById('wizardGuidePurpose').textContent);
+    setText('wizardGuideFilming', match.filming_tips, document.getElementById('wizardGuideFilming').textContent);
+    setText('wizardGuideScript', match.example_script, document.getElementById('wizardGuideScript').textContent);
+
+    // Assets — array of { url, name } from staff content editor
+    const assets = Array.isArray(match.example_assets) ? match.example_assets : [];
+    const assetsEl = document.getElementById('wizardGuideAssets');
+    if (assetsEl && assets.length) {
+      assetsEl.innerHTML = assets.map(a => {
+        const url = escapeHTML(a.url || a);
+        const name = escapeHTML(a.name || 'Example');
+        return `<img src="${url}" alt="${name}" />`;
+      }).join('');
+    }
+
+    // Links — array of { url, label } or plain strings
+    const links = Array.isArray(match.example_links) ? match.example_links : [];
+    const linksEl = document.getElementById('wizardGuideLinks');
+    if (linksSection && linksEl && links.length) {
+      linksSection.style.display = '';
+      linksEl.innerHTML = links.map(l => {
+        const url = escapeHTML(typeof l === 'string' ? l : (l.url || ''));
+        const label = escapeHTML(typeof l === 'string' ? l : (l.label || l.name || l.url || ''));
+        if (!url) return '';
+        return `<div style="margin-bottom:6px"><a href="${url}" target="_blank" rel="noreferrer" style="color:var(--gold);text-decoration:none">${label} ↗</a></div>`;
+      }).join('');
+    }
+  } catch (_) { /* silent — placeholders stay */ }
 }
 
 function wizardGoToNewOfferForm() {
