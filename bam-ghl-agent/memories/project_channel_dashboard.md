@@ -4,6 +4,8 @@ description: Internal-only dashboard tracking the 6-week basketball channel test
 type: project
 ---
 
+> **Status (2026-05-15):** Dormant. Nav tile removed from staff portal in commit `477b81b`. Code (`src/views/ChannelView.jsx`, `src/services/channelService.js`, `api/stripe/overview.js?section=channel-ingest`) and Supabase tables retained — feature can be revived by re-adding the nav entry.
+
 ## Why it exists
 
 Six-week test on the new offer stack (SS Full / SS Partner / SS Core downsell) using paid Meta ads as acquisition channel. Dashboard exists so the three of us see results in real time and **pre-commit to decision rules at Day 42** instead of relitigating strategy every week.

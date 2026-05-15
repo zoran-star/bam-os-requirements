@@ -9,7 +9,7 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [BAM Onboarding Checkpoints](project_bam_onboarding_checkpoints.md) — current 14-step sheet checklist, baseline for Supabase redesign
 - [Slack Onboarding Automation](project_slack_onboarding_automation.md) — auto-create Slack channels for new clients
 - [iOS Push via PWA](project_ios_push_pwa.md) — deferred PWA + Web Push plan for iPhone client notifications
-- [Player Intake Setup](project_player_intake_setup.md) — Phase 3 complete, SQL plan ready for Phase 4
+- [Menu Items Complete](project_menu_items_complete.md) — All portal menu items run through setup-menu-item phases; no pending work
 - [Training Onboarding Flow](project_training_onboarding.md) — 3-step standalone flow, all DB questions inserted
 - [Tasks System Pending Mike](project_tasks_pending_mike.md) — task unification on hold until Mike gives preferences
 - [Questions Database Schema](supabase_questions_db.md) — full schema, enums, valid Places Asked, insert rules, **UUID→Question lookup pattern** for ticket field labels
@@ -20,4 +20,4 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Client Portal Auth](project_client_auth.md) — email + password login, 1 user per client via `clients.auth_user_id`, manual provisioning, RLS-scoped queries; URL `?client_id=` flow removed
 - [Pre-Launch Checklist](project_pre_launch_checklist.md) — everything intentionally deferred during dev: SMTP for prod email, branded templates, signed URLs, notifications, audit trail, etc. Walk through 🔴 items before first real client.
 - [Channel Dashboard](project_channel_dashboard.md) — internal-only dashboard for the 6-week basketball acquisition test (Cole/Mike/Zoran only). Tables `bam_channel_snapshots` + `bam_channel_settings`, ingest folded into `api/stripe/overview.js?section=channel-ingest`. Manual funnel edit until Meta API lands.
-- [Meta API Integration](project_meta_api_integration.md) — client-side OAuth (each academy connects own Meta), `client_meta_tokens` table, `/api/auth/meta/*` endpoints bundled in marketing.js, replaces hardcoded campaign cards.
+- [Meta API Integration](project_meta_api_integration.md) — staff-side OAuth (one BAM staff token powers all clients), `staff_meta_tokens` table, Client Setup page for bulk wire-up. Pivoted from client-side in commit b59cea3.

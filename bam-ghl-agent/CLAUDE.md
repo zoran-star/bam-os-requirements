@@ -96,41 +96,30 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 
 ## Current phase (what we're working on NOW)
 
-**Status as of 2026-04-24 — reconnecting bam-portal backend with Zoran's own keys.**
+**Status as of 2026-05-15 — portal is live in production, focus is hardening + new features.**
 
-### What's wired up
-- **Supabase** — project ref `jnojmfmpnsfmtqmwhopz` (By Any Means Basketball Pro). Tables: `Questions Database` (202 rows, source of truth for all form questions), `user_slack_tokens` (RLS enabled), `clients` (created empty, schema below).
-- **Vercel env vars** — all 10 integrations configured on bam-portal project (Supabase, Anthropic, Asana, Google OAuth, Google Calendar, Google Sheets, GHL, Notion, Slack, Stripe).
-- **Slack** — new BAM Portal app created by Zoran (Client ID `9371199551328.10970298548951`). OAuth end-to-end working, writes to `user_slack_tokens` via upsert.
-- **GHL** — 13 sub-accounts wired via `GHL_LOCATIONS_JSON` (BAM Business, BAM GTA, BAM NY, BAM San Jose, BAM Mountain State, Basketball+, DA Hoops, Danny Cooper Basketball, Johnson Basketball Training, Elite-Smart Athletes, ProBound, DETAIL SD, ADAPT SF). Agency key in Vercel.
-- **Stripe** — BAM Business account confirmed (mike@byanymeansbball.com, $17.7k MRR, 56 subs).
-- **Asana** — workspace GID 1201652590043795 confirmed, Mike Eluki + Coleman visible.
-- **Notion** — 10 SOP pages return metadata but 0 child pages (integration lacks page access). Waiting on Cole to make Zoran workspace owner, then enable workspace-wide integration access.
+### What's live end-to-end
+- **bam-portal-tawny.vercel.app** — staff + client portals deployed on Vercel Pro (no fn cap).
+- **Supabase** — project ref `jnojmfmpnsfmtqmwhopz`. Tables: `clients` (13 GHL locations seeded), `staff`, `marketing_tickets`, `content_tickets`, `staff_meta_tokens`, `client_meta_tokens` (legacy), `Questions Database` (202 rows), plus auth.
+- **Meta API (staff-side)** — one BAM staff token powers every client's campaigns + creatives. Client Setup page bulk-wires clients to ad accounts. See `[[project_meta_api_integration]]`.
+- **Marketing/content two-stage flow** — clients submit raw assets, content team produces finals, marketing team launches. See `[[project_marketing_content_flow]]`.
+- **Slack** — staff-level OAuth + per-client channel notifications on action requests + ticket completion.
+- **Stripe, GHL, Asana, Anthropic, Notion** — all 10 integrations wired.
+- **Onboarding** — public self-serve signup flow for new clients (first-run wizard).
+- **Permissions** — admin / marketing / content roles; Financials admin-only, Client Setup open to marketing.
 
-### `clients` table schema (Supabase)
-```sql
-clients (
-  id uuid pk, name text, status text check in (onboarding|active|paused|churned),
-  ghl_location_id text unique, slack_channel_id, stripe_customer_id, notion_page_id, asana_project_id,
-  created_at, updated_at
-)
-```
-RLS enabled, staff read/write policies live. Does ONE job: join client record → integration IDs. Checkpoints/alerts deferred until client-portal.html scope is locked in (it may handle some onboarding tasks itself, changing what staff needs to track).
+### What's actively pending
+1. **Email/SMS ticket notifications** — Slack ✅; email/SMS still needed for clients without Slack.
+2. **Supabase Realtime subscriptions** — portals refresh without manual reload.
+3. **Per-client signed URLs** on `ticket-files` bucket (currently public).
+4. **Meta token refresh on 401** — 60-day token has no auto-refresh; surface "Reconnect Meta" CTA.
+5. **App Review (Meta)** — only if non-BAM-staff Meta users will ever connect (currently dev mode is fine).
 
-### Next steps (in order)
-1. Seed `clients` table with 13 GHL locations
-2. Build `/api/clients.js` to replace `/api/sheets/onboarding.js`
-3. Update `App.jsx` to load clients from new endpoint (currently uses Google Sheets)
-4. Fix client name parsing in Notion `all_clients` endpoint (names return as "?")
-5. Wait for Cole → enable workspace-wide Notion integration
-6. Later: per-user Google Calendar OAuth flow
-7. Later: customer-portal-to-Slack mirroring (Option B for client comms)
-8. Later: revisit checkpoints/alerts once client-portal.html scope is final
-
-### TBD / will figure out later
-- How onboarding flow is triggered (entry URL)
-- Asana ticket schema (same for onboarding + support, or separate?)
-- Submit destination for each form
+### Deferred / will figure out later
+- Per-user Google Calendar OAuth flow
+- Customer-portal-to-Slack mirroring (Option B for client comms)
+- Onboarding checkpoints/alerts (waiting for client-portal.html scope to fully settle)
+- Cleanup legacy `client_meta_tokens` code paths in marketing.js
 
 ### Two-path setup (IMPORTANT — causes confusion)
 Project files live in TWO places:
@@ -184,7 +173,7 @@ bam-ghl-agent/
 │   └── parent-onboarding.html      ← onboarding step 3
 │
 ├── STAFF-FACING
-│   └── bam-portal/                 ← React/Vite staff portal (deployed, broken, reconnecting)
+│   └── bam-portal/                 ← React/Vite staff portal (deployed, live in production)
 │
 ├── LEGACY / STATUS UNKNOWN         ← may be deprecated; confirm before editing
 │   ├── dashboard.html

@@ -104,10 +104,15 @@ Upload paths:
 - Content ticket finals: `content-tickets/{ticket_id}/...`
 - Guide card example assets: `guide-cards/...`
 
+## Shipped since round 1
+
+- ✅ **Client-side edit of active tickets** (commit `9f0db36`) — click active ticket, edit fields, changes show in activity feed.
+- ✅ **Slack notifs on action request + ticket completion** (commit `02b7a0a`) — staff notified in client Slack channel.
+- ✅ **Load More pagination** on client-side tickets + marketing requests lists (commit `7e978f1`).
+
 ## Pending (round 2)
 
-- **Client-side edit of active tickets**: click an active ticket → edit all fields → changes show in activity feed. API already supports `action: 'edit'`. UI not wired yet.
-- **Email/SMS notifications** when ticket state changes (Slack DM staff, email client). Pre-launch checklist.
+- **Email/SMS notifications** when ticket state changes (email client on respond/complete). Slack side ✅ done; email/SMS still needed. Pre-launch checklist.
 - **Real-time updates**: ticket changes don't push to either portal — relies on user refresh or navigation. Could use Supabase Realtime subscriptions later.
 - **Per-client storage isolation** (signed URLs). Bucket is public; URL paths random UUIDs. Tighten before scaling.
 

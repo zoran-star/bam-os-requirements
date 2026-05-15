@@ -1,77 +1,74 @@
 ---
 name: Meta Marketing API integration
-description: Architecture + state for the real Meta campaigns integration in bam-portal-tawny. Client-side OAuth (each academy connects their own ad account).
+description: Real Meta campaigns wired into bam-portal-tawny via staff-side OAuth (one BAM staff token powers every client's campaigns).
 type: project
 ---
 
 ## TL;DR
 
-Each academy (client) connects their own Meta ad account. Tokens stored per client in `client_meta_tokens`. Replaces hardcoded "Title of campaign 1" fake cards with real data.
+**Staff-side OAuth.** A BAM staff member (admin or marketing role) connects their Meta account once. That single token is used to query campaigns + ad creatives for every client whose ad account the staff has access to. Clients themselves never touch Meta.
+
+**Pivoted away from client-side OAuth** in commit `b59cea3` (2026-05-14). The earlier design (each academy connects their own Meta) was scrapped because Meta App Review is a hard blocker for non-developer users, and BAM staff already have access to client ad accounts. One staff token = all clients = no per-client onboarding friction.
 
 ## Database
 
-- `client_meta_tokens` — created 2026-05-13. Schema: id, client_id (UNIQUE FK → clients), fb_user_id, fb_user_name, access_token, expires_at, scopes[], timestamps. RLS: client reads own row.
-- `clients.meta_ad_account_id` — text, nullable. **Not yet added** as of this note. Required before `/api/meta/campaigns` will succeed.
+- `staff_meta_tokens` — primary. Schema: id, staff_user_id (UNIQUE FK → auth.users), fb_user_id, fb_user_name, access_token, expires_at, scopes[], timestamps. Any staff token can query any client's ad account (shared across admin/marketing roles).
+- `client_meta_tokens` — legacy from the client-side OAuth attempt. Code references remain in `api/marketing.js` (lines 844, 970) but are no longer the active flow. Safe to ignore.
+- `clients.meta_ad_account_id` — text, nullable. Set by staff via Client Setup page; required for `/api/meta/campaigns` to return real data.
+- `clients.meta_campaign_ids` — array, filters which campaigns surface on the client portal (so clients don't see staff's experimental campaigns).
 
 ## Env vars (Vercel `bam-portal` production)
 
 - `META_APP_ID = 2059912628202822` (public)
-- `META_APP_SECRET = encrypted` (set via CLI)
-- `META_OAUTH_STATE_SECRET = encrypted` (random 32 bytes for HMAC state signing)
+- `META_APP_SECRET = encrypted`
+- `META_OAUTH_STATE_SECRET = encrypted` (HMAC state signing)
 
-## Endpoints (bundled in `api/marketing.js` to stay under 12-fn Hobby cap)
+## Endpoints (all bundled in `api/marketing.js`)
 
 Clean URLs via `vercel.json` rewrites:
-- `POST /api/auth/meta/start` — auth'd client, returns Facebook OAuth URL with signed state
-- `GET /api/auth/meta/callback` — Facebook returns here; we exchange code → short token → 60-day long-lived token; upsert into `client_meta_tokens`; redirect to `/client-portal.html?meta=connected|error`
-- `GET /api/meta/adaccounts` — lists FB ad accounts the connected client has access to (for the ad-account picker)
-- `GET /api/meta/campaigns` — real campaigns + insights for the client's ad account (last 30d). Returns `{ campaigns: [], reason }` when not wired
 
-OAuth state: HMAC-SHA256, 5-min expiry, nonce. Verified with `timingSafeEqual`.
+**Staff-side (active):**
+- `POST /api/marketing?resource=meta-staff-auth&step=prepare` — staff initiates OAuth
+- `GET  /api/auth/meta/callback` — Meta returns here; upsert into `staff_meta_tokens`
+- `GET  /api/marketing?resource=meta-staff-status` — is staff connected?
+- `GET  /api/meta/adaccounts` — list ad accounts the connected staff has access to
+- `POST /api/meta/adaccounts` — staff picks an ad account for a client (writes `clients.meta_ad_account_id` + `clients.meta_campaign_ids`)
+- `GET  /api/meta/campaigns?client_id=...` — real campaigns + insights, last 30d
+- `GET  /api/meta/campaigns?client_id=...&staff_picker=1` — staff-only mode that bypasses `meta_campaign_ids` filter (for picking which campaigns to surface)
+- `GET  /api/marketing?resource=meta-creatives&campaign_id=...` — real ad creatives for a campaign
 
-## Meta dashboard (Zoran's manual steps)
+**Client-side (legacy, code retained but flow inactive):**
+- `POST /api/auth/meta/start`, `GET /api/auth/meta/callback` for `client_meta_tokens`
 
-| Step | Status |
-|---|---|
-| Create Meta Developer App (Business type) | ✅ |
-| Add Marketing API use case | ✅ |
-| Paste App ID + Secret to Vercel | ✅ via CLI |
-| Add Facebook Login product to app | ❌ pending |
-| Add Valid OAuth Redirect URI: `https://bam-portal-tawny.vercel.app/api/auth/meta/callback` | ❌ pending |
-| Add Mike + Coleman as app developers | ⏳ optional |
+## UI surfaces
 
-App stays in Development mode (no review needed) for BAM staff testing. Review required only when non-staff Meta users connect.
+- **Staff portal → Client Setup page** (`src/views/ClientSetupView.jsx`) — bulk-wire all 13 clients with their ad accounts + invite client portal users. Replaces manual SQL.
+- **Staff portal → MarketingView** — campaign cards, creative grid, Facebook preview links.
+- **Client portal → Marketing tab** — active campaign cards with real Meta data; creative tiles open Facebook for the post.
 
-## What's done in code
+## What works end-to-end (verified 2026-05-14, expanded 2026-05-15)
 
-Through commit `313f9e6`:
-- `api/marketing.js` — handleMetaAuth (prepare + callback), handleMetaAdAccounts (GET list / POST pick / DELETE unset), handleMetaCampaigns
-- `vercel.json` — rewrites for clean Meta URLs
-- `clients.meta_ad_account_id` column added (migration `add_meta_ad_account_id_to_clients`)
-- `public/client-portal.html` — Marketing tab Active Campaigns section is now dynamic with 4 states (not connected / no ad account / empty campaigns / has campaigns). Connect Meta CTA, ad-account picker, real campaign cards. OAuth callback toast on page load (`?meta=connected|error`).
+- ✅ Staff Meta OAuth + shared token across all marketing/admin staff
+- ✅ Client Setup bulk wire-up
+- ✅ Real ACTIVE-only Meta campaigns on client portal
+- ✅ Real ad creatives in campaign detail (image + video + carousel)
+- ✅ Facebook preview links (canonical `/pageId/posts/postId` for image/carousel; direct `open on Facebook` for video)
+- ✅ Privacy-locked carousel graceful handling
 
-## What's left (post-2026-05-14 end-to-end test)
+## What's left
 
-**FULL FLOW WORKS:** Zoran successfully onboarded BAM GTA from scratch on 2026-05-14, set password, OAuth'd Meta, picked ad account, saw real campaigns in the Marketing tab. Phase 7 complete.
+1. **Token refresh on Meta 401** — 60-day long-lived token has no auto-refresh. If it expires/revokes, campaigns endpoint 401s silently. Need a "Reconnect Meta" CTA when this happens.
+2. **App Review submission** — currently in Meta Development mode. Required only if non-BAM-staff Meta users will ever connect. Today: not needed (staff-only flow).
+3. **Cleanup legacy `client_meta_tokens` code paths** — references in marketing.js are dead code. Low priority but worth removing for clarity.
 
-Remaining (out of scope for this goal, follow-up tasks):
-1. **Staff invite backend** — UI exists in `StaffModals.jsx` but POSTs to non-existent `/api/staff`. Wire a real handler (bundle into marketing.js as `?resource=staff-invite` or fold into clients.js as `?action=invite-staff`). Different `redirect_to` from client invite (root, not /client-portal.html).
-2. **Campaign DETAIL creative grid** still hardcoded to 8 Picsum images. Wire to Meta `/adcreatives` for real ad creatives. ~1hr.
-3. **Token refresh on 401** — today the 60-day long-lived token has no auto-refresh. If it expires (or is revoked), campaigns endpoint will 401 silently. Surface a "Reconnect Meta" CTA on the Marketing tab when this happens.
-4. **App Review submission** — for non-developer Meta users to be able to connect, the BAMPORTAL Meta app needs ads_read approved via Meta's App Review. Currently in Development mode (only BAM staff + invited testers can use it). When ready to expand, submit.
+## Lessons (from end-to-end testing)
 
-## Bugs found + fixed during the end-to-end test (2026-05-14)
+1. Run `node --check` on edited files BEFORE pushing — duplicate `const` declarations in clients.js caused multiple FUNCTION_INVOCATION_FAILED rounds (commits 66b1a15, 8d89551).
+2. `require()` in ESM module breaks Vercel. Use `import crypto from "node:crypto"` (commit 9d85628).
+3. `echo "value" | vercel env add` stores a trailing `\n`. Use `printf` instead. See `feedback_vercel_env_no_newline.md`.
+4. Don't blindly upscale Meta CDN URLs — they're signed and reject modified params (commit b573dd1).
 
-Documented here so they don't recur:
+## Related notes
 
-1. **/api/clients 'auth required'** — public onboarding form was blocked by admin-only auth check. Fix: added public signup path detection in clients.js (commit 3b1ea4a).
-2. **`const action` duplicate declaration** in clients.js — caused FUNCTION_INVOCATION_FAILED. Fix: renamed to publicSignupAction (commit 66b1a15).
-3. **`const body` duplicate declaration** in clients.js — same issue, second variable. Fix: renamed to signupBody (commit 8d89551). Lesson: run `node --check` on edited files BEFORE pushing.
-4. **Invite redirect went to staff portal** — Supabase Site URL was `/` (staff portal). Two-part fix: (a) Zoran changed Supabase Site URL to `/client-portal.html`, (b) added defensive redirect in App.jsx that bounces client users to /client-portal.html (commit 196ba8c).
-5. **`require("crypto")` in ESM module** — marketing.js is `export default` ESM but I added `const crypto = require(...)` which is CJS. Caused 500 on every /api/marketing call. Fix: moved to top-of-file `import crypto from "node:crypto"` (commit 9d85628).
-6. **vercel.json rewrite step=start vs handler step=prepare** — wizard hit /api/auth/meta/start which routed but the step param didn't match handler's expected value. Fix: changed rewrite to step=prepare (commit 37a9107).
-7. **Vercel env vars stored with trailing \n** — `echo "value" | vercel env add` appended a newline that became part of the stored value. Facebook OAuth rejected "Invalid App ID" because client_id had %0A appended. Fix: removed + re-added all 3 META_* env vars using `printf` instead of `echo`. Lesson saved as feedback memory.
-
-## Why client-side (not staff-side)
-
-Earlier draft built `staff_meta_tokens` (BAM staff connect once, query many academies). Dropped after Zoran clarified the pattern: **each academy owns their Meta connection**. Reasons: clean ownership, no staff lock-in, transferable when academy changes hands, scales without depending on BAM staff being added to each ad account.
+- [[project_marketing_content_flow]] — marketing/content ticket flow that consumes Meta campaign data
+- [[project_pre_launch_checklist]] — pre-launch items including Meta token refresh
