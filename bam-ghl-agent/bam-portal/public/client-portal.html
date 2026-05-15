@@ -3560,7 +3560,10 @@ async function _renderCampaignCreatives(campaignId) {
       return;
     }
     gridEl.innerHTML = creatives.map((c) => {
-      const label = escapeHTML(c.creative_name || c.ad_name || 'Creative');
+      // Prefer the ad_name (clean human label like "B - Graphic") over the
+      // creative_name (often a Meta dynamic-creative template like
+      // "{{product.name}} 2026-03-09-...")
+      const label = escapeHTML(c.ad_name || c.creative_name || 'Creative');
       const adNameLabel = escapeHTML(c.ad_name || c.creative_name || 'Creative');
       const isVideo = !!c.is_video;
       const isCarousel = !!c.is_carousel;
@@ -3604,9 +3607,15 @@ async function _renderCampaignCreatives(campaignId) {
       const placeholderIcon = isVideo ? '🎬' : isCarousel ? '🎠' : isPrivacyLocked ? '🔒' : '📄';
       // Privacy-locked ads: explicit placeholder so the client knows the ad
       // is running but preview is restricted by Meta
+      // Build a placeholder-on-error fallback so broken Meta URLs don't show
+      // ugly broken-image icons. If the image errors, swap to a clean tile
+      // showing the ad name. (Meta thumbnail URLs are signed and occasionally
+      // expire or fail to load from the browser context.)
+      const placeholderHtml = `<div class=&quot;creative-img&quot; style=&quot;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text-mute);padding:8px;text-align:center;gap:6px&quot;><div style=&quot;font-size:30px&quot;>${isVideo ? '🎬' : (isCarousel ? '🎠' : '🖼️')}</div><div style=&quot;font-size:8px;line-height:1.2;color:var(--text-mute);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap&quot;>${adNameLabel}</div></div>`;
+      const onErr = `this.outerHTML='${placeholderHtml}'`;
       let imgInner;
       if (poster) {
-        imgInner = `<img class="creative-img" src="${poster}" alt="${label}" />`;
+        imgInner = `<img class="creative-img" src="${poster}" alt="${label}" onerror="${onErr}" />`;
       } else if (isPrivacyLocked) {
         imgInner = `
           <div class="creative-img" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);color:var(--text-mute);padding:8px;text-align:center;gap:6px">
