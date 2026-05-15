@@ -2815,7 +2815,7 @@
           <div id="ticket-list-live"></div>
           <div id="ticket-list-approved" style="display:none"></div>
 
-          <button class="load-more" onclick="alert('Load more — hook this to backend later')">Load more · ↓</button>
+          <button class="load-more" id="tickets-load-more" style="display:none" onclick="loadMoreTickets()">Load more · ↓</button>
         </div>
 
         </div><!-- /.content -->
@@ -3051,7 +3051,7 @@
             <div id="marketing-request-list-pending"></div>
             <div id="marketing-request-list-completed" style="display:none"></div>
 
-            <button class="load-more" onclick="alert('Load more — hook this to backend later')">Load more · ↓</button>
+            <button class="load-more" id="mreq-load-more" style="display:none" onclick="loadMoreMarketingRequests()">Load more · ↓</button>
           </div>
 
         </div>
@@ -4587,21 +4587,45 @@ let MARKETING_REQUESTS = [];
 
 let _activeRequestId = null;
 
+// Same client-side pagination pattern as the support tickets list.
+const MREQ_PAGE_SIZE = 10;
+let _mreqShown = MREQ_PAGE_SIZE;
+let _mreqActiveTab = 'pending';
+
 function renderMarketingRequests() {
   const pendingEl = document.getElementById('marketing-request-list-pending');
   const completedEl = document.getElementById('marketing-request-list-completed');
+  const loadMoreBtn = document.getElementById('mreq-load-more');
   if (!pendingEl || !completedEl) return;
 
   const pending = MARKETING_REQUESTS.filter(r => r.status === 'in-progress');
   const completed = MARKETING_REQUESTS.filter(r => r.status === 'completed' || r.status === 'cancelled');
+  const pendingVisible = pending.slice(0, _mreqShown);
+  const completedVisible = completed.slice(0, _mreqShown);
 
   pendingEl.innerHTML = pending.length
-    ? pending.map(_mreqRowHTML).join('')
+    ? pendingVisible.map(_mreqRowHTML).join('')
     : '<div class="req-empty">No pending requests. Use the campaign cards above to submit one.</div>';
 
   completedEl.innerHTML = completed.length
-    ? completed.map(_mreqRowHTML).join('')
+    ? completedVisible.map(_mreqRowHTML).join('')
     : '<div class="req-empty">No completed requests yet.</div>';
+
+  const totalForActive = _mreqActiveTab === 'completed' ? completed.length : pending.length;
+  if (loadMoreBtn) {
+    if (totalForActive > _mreqShown) {
+      loadMoreBtn.style.display = 'block';
+      const remaining = totalForActive - _mreqShown;
+      loadMoreBtn.textContent = `Load more · ↓ (${remaining})`;
+    } else {
+      loadMoreBtn.style.display = 'none';
+    }
+  }
+}
+
+function loadMoreMarketingRequests() {
+  _mreqShown += MREQ_PAGE_SIZE;
+  renderMarketingRequests();
 }
 
 // 3-letter code prefix derived from the ticket UUID, for cross-portal tracking
@@ -4660,6 +4684,10 @@ function switchMarketingTab(tab, el) {
   el.classList.add('active');
   document.getElementById('marketing-request-list-pending').style.display   = (tab === 'pending'   ? 'block' : 'none');
   document.getElementById('marketing-request-list-completed').style.display = (tab === 'completed' ? 'block' : 'none');
+  // Reset pagination so each tab starts at page 1
+  _mreqActiveTab = tab;
+  _mreqShown = MREQ_PAGE_SIZE;
+  renderMarketingRequests();
 }
 
 function openMarketingRequest(id) {
@@ -5301,23 +5329,49 @@ async function loadTickets() {
 }
 
 // ── Renderers ────────────────────────
+// Client-side pagination: render first N rows, "Load more" reveals the next N.
+// State is on window so the button's onclick can read/mutate it.
+const TICKETS_PAGE_SIZE = 10;
+let _ticketsShown = TICKETS_PAGE_SIZE;
+let _ticketsActiveTab = 'live';
+
 function renderTicketLists() {
   const liveEl = document.getElementById('ticket-list-live');
   const approvedEl = document.getElementById('ticket-list-approved');
+  const loadMoreBtn = document.getElementById('tickets-load-more');
   if (!CLIENT_ID) {
     const msg = '<div style="padding:24px;text-align:center;color:var(--text-sub);font-size:13px">Portal link missing client ID — contact BAM for your personalized link.</div>';
     liveEl.innerHTML = msg;
     approvedEl.innerHTML = msg;
+    if (loadMoreBtn) loadMoreBtn.style.display = 'none';
     return;
   }
   const live = tickets.filter(t => t.status !== 'approved');
   const approved = tickets.filter(t => t.status === 'approved');
+  const liveVisible = live.slice(0, _ticketsShown);
+  const approvedVisible = approved.slice(0, _ticketsShown);
   liveEl.innerHTML = live.length
-    ? live.map(rowHTML).join('')
+    ? liveVisible.map(rowHTML).join('')
     : '<div style="padding:24px;text-align:center;color:var(--text-sub);font-size:13px">No live tickets. Submit a new one above.</div>';
   approvedEl.innerHTML = approved.length
-    ? approved.map(rowHTML).join('')
+    ? approvedVisible.map(rowHTML).join('')
     : '<div style="padding:24px;text-align:center;color:var(--text-sub);font-size:13px">No approved tickets yet.</div>';
+  // Show "Load more" only if the active tab has more rows than currently shown
+  const totalForActive = _ticketsActiveTab === 'approved' ? approved.length : live.length;
+  if (loadMoreBtn) {
+    if (totalForActive > _ticketsShown) {
+      loadMoreBtn.style.display = 'block';
+      const remaining = totalForActive - _ticketsShown;
+      loadMoreBtn.textContent = `Load more · ↓ (${remaining})`;
+    } else {
+      loadMoreBtn.style.display = 'none';
+    }
+  }
+}
+
+function loadMoreTickets() {
+  _ticketsShown += TICKETS_PAGE_SIZE;
+  renderTicketLists();
 }
 
 function rowHTML(t) {
@@ -5343,6 +5397,10 @@ function switchTicketTab(tab, el) {
   el.classList.add('active');
   document.getElementById('ticket-list-live').style.display     = (tab === 'live' ? 'block' : 'none');
   document.getElementById('ticket-list-approved').style.display = (tab === 'approved' ? 'block' : 'none');
+  // Reset pagination when switching tabs so each tab starts at page 1
+  _ticketsActiveTab = tab;
+  _ticketsShown = TICKETS_PAGE_SIZE;
+  renderTicketLists();
 }
 
 // ── Detail view ──────────────────────
