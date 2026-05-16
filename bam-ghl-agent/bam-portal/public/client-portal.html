@@ -4577,10 +4577,101 @@ async function fetchAndRenderMarketingRequests() {
   _renderMarketingCampaigns();
 }
 
+// Sample campaign data shown when the client has no real campaigns wired —
+// either because Meta isn't connected yet or no ad account has been chosen.
+// Keeps the Marketing tab demo-able for testers signing up at /onboarding.html.
+const _DEMO_CAMPAIGNS = [
+  { id: 'demo_1', name: 'Spring Free Trial — Lead Gen',  spend: 1247.36, results: 84,  cpr: 14.85 },
+  { id: 'demo_2', name: 'Summer Camp Awareness',         spend: 892.10,  results: 53,  cpr: 16.83 },
+  { id: 'demo_3', name: 'Player Intake — Q1 Retarget',   spend: 2104.00, results: 117, cpr: 17.98 },
+  { id: 'demo_4', name: 'Coach Showcase Reel Boost',     spend: 456.20,  results: 19,  cpr: 24.01 },
+];
+
+function _buildDemoCampaignsHTML(metaConnected) {
+  const banner = `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.3);border-radius:8px">
+      <div style="font-size:18px">✨</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--text)">Sample data shown below</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${metaConnected
+          ? "Your Meta account is connected but no ad account is selected yet. Pick one to see your real campaigns."
+          : "Connect your Meta ad account to see your real campaigns and performance."}</div>
+      </div>
+      <button onclick="${metaConnected ? '_openMetaAdAccountPicker()' : '_startClientMetaConnect()'}" style="background:var(--gold);color:#0A0A0B;border:0;padding:8px 14px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;white-space:nowrap">
+        ${metaConnected ? 'Pick ad account →' : 'Connect Meta →'}
+      </button>
+    </div>`;
+  const cards = _DEMO_CAMPAIGNS.map(c => `
+    <div class="campaign-card" style="opacity:0.85">
+      <div class="campaign-card-main">
+        <div class="card-title" style="margin-bottom:6px">${escapeHTML(c.name)} <span style="font-size:10px;color:var(--text-mute);font-weight:500;margin-left:6px">SAMPLE</span></div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">Last 30 days</div>
+        <div class="campaign-stats">
+          <div class="campaign-stat"><div class="campaign-stat-value">$${c.spend.toFixed(2)}</div><div class="campaign-stat-label">Spend</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">${c.results}</div><div class="campaign-stat-label">Results</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">$${c.cpr.toFixed(2)}</div><div class="campaign-stat-label">Cost / Result</div></div>
+        </div>
+      </div>
+    </div>`).join('');
+  return banner + cards;
+}
+
+// Kicks off the client-side Meta OAuth flow.
+// Backend (POST /api/auth/meta/start) returns a Facebook OAuth URL; we
+// navigate the whole tab there. After approval, /api/auth/meta/callback
+// stores client_meta_tokens and redirects back to /client-portal.html?meta=connected.
+async function _startClientMetaConnect() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/auth/meta/start', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok || !json.redirect_url) {
+      alert('Couldn\'t start Meta connect: ' + (json.error || `HTTP ${res.status}`));
+      return;
+    }
+    window.location.href = json.redirect_url;
+  } catch (e) {
+    alert('Couldn\'t start Meta connect: ' + e.message);
+  }
+}
+
+// Opens a simple picker so the client (once Meta is connected) can choose
+// which of their ad accounts to surface in this portal. Uses native prompt
+// for now — minimum viable; can polish to a real modal later.
+async function _openMetaAdAccountPicker() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/adaccounts', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    if (!res.ok) { alert('Couldn\'t load ad accounts: ' + (json.error || `HTTP ${res.status}`)); return; }
+    const accts = json.ad_accounts || [];
+    if (!accts.length) { alert('No ad accounts found on your Meta account. Make sure you have advertiser access to at least one ad account.'); return; }
+    const list = accts.map((a, i) => `${i + 1}. ${a.name || a.id} (${a.id})`).join('\n');
+    const choice = prompt(`Which ad account should we pull campaigns from?\n\n${list}\n\nType the number (1-${accts.length}):`);
+    const idx = parseInt(choice, 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= accts.length) return;
+    const pick = accts[idx];
+    const saveRes = await fetch('/api/meta/adaccounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ad_account_id: pick.id }),
+    });
+    const saveJson = await _safeJson(saveRes);
+    if (!saveRes.ok) { alert('Couldn\'t save selection: ' + (saveJson.error || `HTTP ${saveRes.status}`)); return; }
+    showConfirmation('Ad account saved ✅', `Showing campaigns from ${pick.name || pick.id}.`);
+    await _renderMarketingCampaigns();
+  } catch (e) {
+    alert('Ad account picker failed: ' + e.message);
+  }
+}
+
 // ── Meta campaigns + connect flow ─────────────────────────────────────
 // Renders the Active Campaigns section based on the client's Meta connection state.
-//   not connected  → "Connect Meta" CTA
-//   connected, no ad account chosen → ad-account picker
+//   not connected  → demo data + "Connect Meta" CTA
+//   connected, no ad account chosen → demo data + "Pick ad account" CTA
 //   connected, has ad account, 0 campaigns → empty state
 //   connected, has ad account, N campaigns → real campaign cards
 async function _renderMarketingCampaigns() {
@@ -4596,20 +4687,12 @@ async function _renderMarketingCampaigns() {
       return;
     }
 
-    // Meta is wired entirely on the staff side. If the server says we don't
-    // have a token or this client doesn't have an ad account assigned yet,
-    // show a friendly "BAM is setting this up" message — not a connect button.
+    // No real campaigns available (Meta not connected, no ad account picked,
+    // or no staff token). Show sample data + a Connect Meta CTA so the tab
+    // is demo-able and testers see the full UI.
     if (json.reason === 'no_staff_token' || json.reason === 'not_connected' || json.reason === 'no_ad_account') {
-      containerEl.innerHTML = `
-        <div class="card" style="padding:24px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:36px;height:36px;border-radius:8px;background:rgba(232,197,71,0.12);border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:18px">⚙️</div>
-            <div>
-              <div class="card-title" style="margin:0">Campaigns wiring up</div>
-              <div style="font-size:13px;color:var(--text-sub);margin-top:4px">Your BAM account manager is connecting your Meta ads to this portal. Real campaign data will appear here within 24 hours.</div>
-            </div>
-          </div>
-        </div>`;
+      const metaConnected = json.meta_connected === true;
+      containerEl.innerHTML = _buildDemoCampaignsHTML(metaConnected);
       return;
     }
     const campaigns = json.campaigns || [];
@@ -6648,6 +6731,20 @@ async function boot() {
 
   await loadAcademyName();
   await loadTickets();
+
+  // OAuth callback handler: when /api/auth/meta/callback finishes it
+  // redirects back here with ?meta=connected (or ?meta=error). Surface a
+  // toast + auto-open the ad-account picker so the user can finish wiring
+  // their account in one flow.
+  const metaParam = new URLSearchParams(window.location.search).get('meta');
+  if (metaParam === 'connected') {
+    history.replaceState(null, '', window.location.pathname);
+    showConfirmation('Meta connected ✅', 'Now pick which ad account to show in this portal.');
+    setTimeout(() => { _openMetaAdAccountPicker(); }, 600);
+  } else if (metaParam === 'error') {
+    history.replaceState(null, '', window.location.pathname);
+    alert('Meta connection failed. Try again or contact BAM support.');
+  }
 }
 
 // Allow Enter to submit
