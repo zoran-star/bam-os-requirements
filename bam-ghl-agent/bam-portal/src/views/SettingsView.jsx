@@ -26,7 +26,6 @@ function StatusDot({ status, tokens }) {
 export default function SettingsView({ tokens, dark, setDark, userName, session }) {
   const isMobile = useIsMobile();
   const me = useStaffMe(session);
-  const [showNewClient, setShowNewClient] = useState(false);
   const [showNewStaff, setShowNewStaff] = useState(false);
   // ─── Integration status ───
   const [integrationStatus, setIntegrationStatus] = useState({});
@@ -246,22 +245,6 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
           </div>
         </div>
       </div>
-
-      {/* ═══ Clients (admin only) ═══ */}
-      {me?.role === "admin" && (
-        <div style={{ ...sectionStyle, animationDelay: "60ms" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-            <div>
-              <div style={sectionTitle}>Clients</div>
-              <div style={{ fontSize: 13, color: tokens.textMute }}>Create and manage client portal logins</div>
-            </div>
-            <button
-              onClick={() => setShowNewClient(true)}
-              style={{ padding: "8px 14px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-            >+ New client</button>
-          </div>
-        </div>
-      )}
 
       {/* ═══ Team (admin only) ═══ */}
       {me?.role === "admin" && (
@@ -498,14 +481,6 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
         )}
       </div>
 
-      {showNewClient && (
-        <NewClientModal
-          tokens={tokens}
-          session={session}
-          onClose={() => setShowNewClient(false)}
-        />
-      )}
-
       {showNewStaff && (
         <NewStaffModal
           tokens={tokens}
@@ -513,92 +488,6 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
           onClose={() => setShowNewStaff(false)}
         />
       )}
-    </div>
-  );
-}
-
-// ─── New client modal ───────────────────────────────────────────────
-function NewClientModal({ tokens, session, onClose }) {
-  const [name, setName] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState("onboarding");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [sent, setSent] = useState(null); // { name, email } once invite is sent
-
-  const submit = async () => {
-    setBusy(true); setError("");
-    try {
-      const token = session?.access_token;
-      const res = await fetch("/api/clients", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name, owner_name: ownerName, email, status }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(json?.error || `HTTP ${res.status}`);
-        setBusy(false);
-        return;
-      }
-      setSent({ name, email });
-      setBusy(false);
-    } catch (e) {
-      setError(e.message);
-      setBusy(false);
-    }
-  };
-
-  const labelStyle = { fontSize: 11, fontWeight: 700, color: tokens.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, display: "block" };
-  const inputStyle = { width: "100%", padding: "10px 12px", marginBottom: 14, background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, fontSize: 14, fontFamily: "inherit" };
-
-  return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(8px)" }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 480, background: tokens.surface, border: `1px solid ${tokens.border}`, borderRadius: 12, padding: 28 }}>
-        {!sent ? (
-          <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>New client</div>
-            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>Creates a client row + sends them an invite email. They'll choose their own password.</div>
-
-            <label style={labelStyle}>Academy name</label>
-            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Elite Hoops Academy" />
-
-            <label style={labelStyle}>Owner name</label>
-            <input style={inputStyle} value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Jordan Cole" />
-
-            <label style={labelStyle}>Owner email</label>
-            <input style={inputStyle} value={email} onChange={e => setEmail(e.target.value)} placeholder="owner@academy.com" type="email" />
-
-            <label style={labelStyle}>Status</label>
-            <select style={inputStyle} value={status} onChange={e => setStatus(e.target.value)}>
-              <option value="onboarding">Onboarding</option>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-              <option value="churned">Churned</option>
-            </select>
-
-            {error && <div style={{ color: tokens.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
-
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-              <button onClick={onClose} style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${tokens.border}`, borderRadius: 8, color: tokens.text, cursor: "pointer", fontSize: 13 }}>Cancel</button>
-              <button onClick={submit} disabled={busy} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: busy ? "wait" : "pointer", fontSize: 13, opacity: busy ? 0.6 : 1 }}>
-                {busy ? "Sending…" : "Create + send invite"}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 18, fontWeight: 600, color: tokens.text, marginBottom: 4 }}>✓ Client created — invite sent</div>
-            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 20 }}>
-              {sent.name} will receive an email at <b style={{ color: tokens.text }}>{sent.email}</b> with a link to set their password and log in. The link expires in 24 hours; if they miss it, use <b style={{ color: tokens.text }}>Reset password</b> on the card to send a fresh one.
-            </div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button onClick={onClose} style={{ padding: "10px 18px", background: tokens.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Done</button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }
