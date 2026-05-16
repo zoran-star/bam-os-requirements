@@ -5772,6 +5772,11 @@ function closeIntake() {
   document.getElementById('systems-intake').style.display = 'none';
   document.getElementById('systems-list').style.display   = 'block';
   resetIntake();
+  // Defensive: also refresh tickets when the user lands back on the list.
+  // submitTicket() already awaits loadTickets() before navigating, but if
+  // closeIntake is reached another way (e.g. cancel from the intake form),
+  // we still want the list to reflect anything that landed in the meantime.
+  loadTickets();
 }
 
 function resetIntake() {
@@ -6475,8 +6480,10 @@ async function submitTicket(type) {
     return;
   }
 
-  // Refresh the live tickets list so the new ticket appears
-  loadTickets();
+  // Refresh the live tickets list so the new ticket appears immediately
+  // when the client clicks "Back to systems". Awaited so the list isn't
+  // mid-fetch when the user navigates back.
+  await loadTickets();
   showScreen('screen-confirm');
 }
 

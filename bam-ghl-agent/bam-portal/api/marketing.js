@@ -371,6 +371,29 @@ async function handleMarketingTickets(req, res) {
       const originalFields = ticket.fields || {};
       const newContextNotes = `Revision requested by marketing.\n\n${message}`;
 
+      // Pull the original raw files the client uploaded from the content
+      // ticket that spawned this marketing ticket (if any). The content team
+      // needs those, not just the polished creative — without them they're
+      // working blind. Merge with the current marketing-side files so the
+      // revision ticket carries every asset the content team might need.
+      let originalRawFiles = [];
+      if (ticket.originated_from_content_ticket_id) {
+        try {
+          const originRows = await sb(`content_tickets?id=eq.${ticket.originated_from_content_ticket_id}&select=raw_files`);
+          if (Array.isArray(originRows?.[0]?.raw_files)) originalRawFiles = originRows[0].raw_files;
+        } catch (_) { /* swallow — fall back to marketing files only */ }
+      }
+      const currentFiles = Array.isArray(ticket.files) ? ticket.files : [];
+      const mergedFiles = (() => {
+        const seen = new Set();
+        const out = [];
+        for (const f of [...originalRawFiles, ...currentFiles]) {
+          const key = (f && f.url) || JSON.stringify(f);
+          if (key && !seen.has(key)) { seen.add(key); out.push(f); }
+        }
+        return out;
+      })();
+
       const contentInsert = await sb("content_tickets", {
         method: "POST",
         headers: { Prefer: "return=representation" },
@@ -380,7 +403,7 @@ async function handleMarketingTickets(req, res) {
           status: "active",
           client_action_status: "none",
           notes: newContextNotes,
-          raw_files: ticket.files || [],
+          raw_files: mergedFiles,
           context: {
             source: "marketing-revision",
             campaign_title: originalFields.campaign_title || "",
