@@ -247,7 +247,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
       </div>
 
       {/* ═══ Team (admin only) ═══ */}
-      {me?.role === "admin" && (
+      {(me?.role === "admin" || me?.role === "scaling_manager") && (
         <div style={{ ...sectionStyle, animationDelay: "70ms" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <div>

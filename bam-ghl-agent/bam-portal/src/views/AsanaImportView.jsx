@@ -69,7 +69,7 @@ export default function AsanaImportView({ tokens: t, dark }) {
     if (mapped) return mapped.skip ? "__skip__" : (mapped.client_id || "");
     // Normalized name match
     const nk = norm(key);
-    const hit = clients.find(c => norm(c.name) === nk);
+    const hit = clients.find(c => norm(c.business_name) === nk);
     return hit ? hit.id : "";
   }, [current, mapping, clients]);
 
@@ -166,7 +166,7 @@ export default function AsanaImportView({ tokens: t, dark }) {
 
     const s = new Set(imported); s.add(idx); setImported(s);
     setAlreadyImported(alreadyImported + 1);
-    flash(`Imported → ${clients.find(c => c.id === clientId)?.name || "client"}`);
+    flash(`Imported → ${clients.find(c => c.id === clientId)?.business_name || "client"}`);
     advance();
   };
 
@@ -297,7 +297,7 @@ function TicketCard({
                   onChange={e => setClientId(e.target.value)}
                   style={selectStyle(t)}>
             <option value="">— pick a client —</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {clients.map(c => <option key={c.id} value={c.id}>{c.business_name}</option>)}
           </select>
           <label style={{ fontSize: 12, color: t.textSub, display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
             <input type="checkbox" checked={markNotClient} onChange={e => setMarkNotClient(e.target.checked)} />

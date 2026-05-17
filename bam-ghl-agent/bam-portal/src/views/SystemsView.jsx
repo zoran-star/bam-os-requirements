@@ -97,7 +97,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     });
 
   const academyOptions = Array.from(
-    new Map(tickets.filter(x => x.client?.id).map(x => [x.client.id, x.client.name])).entries()
+    new Map(tickets.filter(x => x.client?.id).map(x => [x.client.id, x.client.business_name])).entries()
   ).sort((a, b) => (a[1] || "").localeCompare(b[1] || ""));
 
   const completedCount = tickets.filter(x => x.status === "done" || x.status === "approved").length;
@@ -324,7 +324,7 @@ function TicketCard({ ticket, tokens: t, onOpen }) {
       </div>
       <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
       <div style={{ fontSize: 13, color: t.textMute, marginBottom: 8 }}>
-        {ticket.client?.name || "Unknown client"}
+        {ticket.client?.business_name || "Unknown client"}
         {ticket.assignee && <> · assigned to <b style={{ color: t.textSub }}>{ticket.assignee.name}</b></>}
       </div>
       {preview && <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.4 }}>{preview}</div>}
@@ -434,7 +434,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             {ticket.menu_item || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request")}
           </h2>
           <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6 }}>
-            <span>{ticket.client?.name || "Unknown client"}</span>
+            <span>{ticket.client?.business_name || "Unknown client"}</span>
             <span>Submitted {formatDate(ticket.submitted_at)}</span>
             {ticket.assignee && <span>Assigned to {ticket.assignee.name}</span>}
           </div>

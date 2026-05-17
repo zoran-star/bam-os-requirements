@@ -72,7 +72,7 @@ async function resolveUser(req) {
   const staffRow = Array.isArray(staffRows) && staffRows[0] ? staffRows[0] : null;
 
   // Always also resolve client (a user can be both)
-  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,name`);
+  const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id,business_name`);
   const clientRow = Array.isArray(clientRows) && clientRows[0] ? clientRows[0] : null;
 
   return { user, staff: staffRow, client: clientRow };
@@ -113,7 +113,7 @@ async function postClientSlackNotification(clientId, text, req) {
     const token = process.env.SLACK_BOT_TOKEN;
     if (!token) return; // not configured — silent skip
     if (!clientId || !text) return;
-    const rows = await sb(`clients?id=eq.${clientId}&select=slack_channel_id,name`);
+    const rows = await sb(`clients?id=eq.${clientId}&select=slack_channel_id,business_name`);
     const r = rows?.[0];
     if (!r?.slack_channel_id) return; // no channel mapped — silent skip
     const portalLink = clientPortalLinkForTicket(req);
@@ -140,7 +140,7 @@ async function enrichWithClient(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
   if (!clientIds.length) return tickets;
-  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,name`);
+  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`);
   const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]));
   return tickets.map(t => ({ ...t, client: clientMap[t.client_id] || null }));
 }
@@ -282,7 +282,7 @@ async function handleMarketingTickets(req, res) {
     }
 
     let patch = {};
-    const authorName = isStaff ? ctx.staff.name : (ctx.client.name || "Client");
+    const authorName = isStaff ? ctx.staff.name : (ctx.client.business_name || "Client");
 
     if (action === "approve-content") {
       if (ticket.content_check_status !== "pending") {
@@ -656,7 +656,7 @@ async function handleContentTickets(req, res) {
     }
 
     let patch = {};
-    const authorName = isStaff ? ctx.staff.name : (ctx.client.name || "Client");
+    const authorName = isStaff ? ctx.staff.name : (ctx.client.business_name || "Client");
 
     if (action === "edit") {
       if (ticket.status !== "active") {

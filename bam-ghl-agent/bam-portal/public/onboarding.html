@@ -219,10 +219,10 @@
     e.preventDefault();
     clearError();
 
-    const name = document.getElementById('name').value.trim();
+    const business_name = document.getElementById('name').value.trim();
     const owner_name = document.getElementById('ownerName').value.trim();
     const email = document.getElementById('email').value.trim();
-    if (!name || !owner_name || !email) { showError('Please fill out all fields.'); return; }
+    if (!business_name || !owner_name || !email) { showError('Please fill out all fields.'); return; }
 
     btn.disabled = true;
     btn.textContent = 'Creating…';
@@ -231,7 +231,7 @@
       const res = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, owner_name, email }),
+        body: JSON.stringify({ business_name, owner_name, email }),
       });
       const data = await res.json();
       if (!res.ok || !data.id) {

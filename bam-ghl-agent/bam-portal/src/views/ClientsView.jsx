@@ -1,19 +1,21 @@
 import { useState, useEffect } from "react";
-import { fetchAllClients } from "../services/notionService";
-// Mock data imports removed — always use live API
+// Mock data imports removed — always use live API.
+// Clients list is now driven entirely by Supabase props (see App.jsx fetchClients).
+// Notion is only consulted inside ClientModal for the human-notes side (latestUpdate, callLog).
 import { fetchPipelines, fetchConversations, fetchContact, fetchConversationMessages } from "../services/ghlService";
 import { fetchChannels, fetchMessages } from "../services/slackService";
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { supabase } from '../lib/supabase';
 
 export default function ClientsView({ tokens, dark, me, onboardingClients, activeClients, onSelectClient }) {
-  const isAdmin = me?.role === "admin";
+  const isAdmin = me?.role === "admin" || me?.role === "scaling_manager";
   const isMobile = useIsMobile();
   const [tab, setTab] = useState("active");
   const [setupTarget, setSetupTarget] = useState(null);
   const [setupRefreshKey, setSetupRefreshKey] = useState(0);
-  const [notionClients, setNotionClients] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Staff lookup for resolving scaling_manager_id → display name on the cards
+  const [staffMap, setStaffMap] = useState({});
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Leads state
@@ -38,16 +40,16 @@ export default function ClientsView({ tokens, dark, me, onboardingClients, activ
   const [expandedConvo, setExpandedConvo] = useState(null);
   const [msgSource, setMsgSource] = useState("all"); // "all" | "ghl" | "slack"
 
+  // Load staff once on mount so we can resolve scaling_manager_id → name on the cards
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    fetchAllClients().then(({ data }) => {
-      if (!cancelled) {
-        setNotionClients(data);
-        setLoading(false);
-      }
-    });
+    supabase
+      .from("staff")
+      .select("id,name,role")
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setStaffMap(Object.fromEntries(data.map(s => [s.id, s])));
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -236,31 +238,31 @@ export default function ClientsView({ tokens, dark, me, onboardingClients, activ
     return () => { cancelled = true; };
   }, []);
 
-  // Build unified client list — merge Notion data with prop data when available
+  // Build unified client list from Supabase prop data.
+  // Normalize Supabase fields into the shape downstream UI expects
+  // (businessName, clientName, manager, pageId, profileStatus).
   const buildClients = () => {
-    if (notionClients && notionClients.length > 0) {
-      const filtered = notionClients.filter(c => c.profileStatus === tab);
-      // Overlay with prop data where names match
-      const propMap = {};
-      [...onboardingClients, ...activeClients].forEach(c => {
-        const key = (c.businessName || c.name || "").toLowerCase();
-        if (key) propMap[key] = c;
-      });
-      return filtered.map(nc => {
-        const key = (nc.businessName || nc.title || "").toLowerCase();
-        const propMatch = propMap[key];
-        return { ...nc, _propData: propMatch || null };
-      });
-    }
-    // Fallback: use prop data
-    if (tab === "onboarding") {
-      return onboardingClients.map(c => ({ ...c, _source: "props", profileStatus: "onboarding" }));
-    }
-    return activeClients.map(c => ({ ...c, _source: "props", profileStatus: "active" }));
+    const source = tab === "onboarding" ? onboardingClients : activeClients;
+    return (source || []).map(c => {
+      const mgr = c.scaling_manager_id ? staffMap[c.scaling_manager_id] : null;
+      return {
+        ...c,
+        businessName: c.business_name || c.name || "",
+        title: c.business_name || c.name || "",
+        clientName: c.owner_name || "",
+        owner: c.owner_name || "",
+        manager: mgr ? mgr.name : "",
+        pageId: c.notion_page_id || null,
+        profileStatus: c.status === "onboarding" ? "onboarding" : "active",
+        _source: "supabase",
+      };
+    });
   };
 
   const clientsUnfiltered = (tab !== "leads" && tab !== "messages") ? buildClients() : [];
-  const isNotionMode = notionClients && notionClients.length > 0;
+  // isNotionMode kept as a constant for backwards-compat with downstream JSX checks,
+  // but the ClientsView itself no longer reads from Notion.
+  const isNotionMode = false;
 
   // Apply search filter for clients
   const clients = searchQuery
@@ -370,8 +372,8 @@ export default function ClientsView({ tokens, dark, me, onboardingClients, activ
 
   // Tab counts for the toggle
   const getTabCount = (t) => {
-    if (t === "active") return isNotionMode ? notionClients.filter(c => c.profileStatus === "active").length : activeClients.length;
-    if (t === "onboarding") return isNotionMode ? notionClients.filter(c => c.profileStatus === "onboarding").length : onboardingClients.length;
+    if (t === "active") return activeClients.length;
+    if (t === "onboarding") return onboardingClients.length;
     if (t === "leads") return leadsCount;
     if (t === "messages") return allMessages.length;
     return 0;
@@ -450,7 +452,6 @@ export default function ClientsView({ tokens, dark, me, onboardingClients, activ
         display: "flex", alignItems: "center", gap: 40, padding: "18px 28px",
         background: tokens.surfaceEl, borderRadius: 14, marginBottom: 32,
         border: `1px solid ${tokens.border}`,
-        ...((!isNotionMode && !loading && tab !== "leads" && tab !== "messages") ? { opacity: 0.6 } : {}),
       }}>
         {tab === "messages" ? (
           <>

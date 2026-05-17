@@ -104,16 +104,14 @@ export default function BAMPortal() {
   }, [session?.user?.id, session?.user?.email]);
 
   const me = useStaffMe(session);
-  const canSeeSystems = me && (me.role === "admin" || me.role === "systems_manager" || me.role === "systems_executor");
-  const canSeeMarketing = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
-  const canSeeTeam = me && me.role === "admin";
-  const canSeeContent = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
-  // Admin sees Financials. Marketing roles (incl. Ximena) do not — they're
-  // ad-ops focused. Systems/scaling roles also blocked for now.
-  const canSeeFinancials = me && me.role === "admin";
+  const canSeeSystems = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager" || me.role === "systems_executor");
+  const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
+  const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   // Client Setup (bulk wire-up): admin + marketing roles can do this since
   // it's the page they need to assign ad accounts and send client invites.
-  const canSeeClientSetup = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
+  const canSeeClientSetup = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 

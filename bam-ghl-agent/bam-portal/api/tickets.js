@@ -82,13 +82,13 @@ async function verifyStaff(req) {
   const rows = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role,email,user_id`);
   const me = Array.isArray(rows) && rows[0];
   if (!me) return null;
-  const systemsRoles = ["admin", "systems_manager", "systems_executor", "systems"];
+  const systemsRoles = ["admin", "scaling_manager", "systems_manager", "systems_executor", "systems"];
   if (!systemsRoles.includes(me.role)) return null;
   return me;
 }
 
 function isManager(me) {
-  return me && (me.role === "admin" || me.role === "systems_manager");
+  return me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager");
 }
 
 async function enrichTickets(tickets) {
@@ -100,7 +100,7 @@ async function enrichTickets(tickets) {
 
   const [clients, staff] = await Promise.all([
     clientIds.length
-      ? sb(`clients?id=in.(${clientIds.join(",")})&select=id,name`)
+      ? sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name`)
       : Promise.resolve([]),
     staffIds.length
       ? sb(`staff?id=in.(${staffIds.join(",")})&select=id,name,role`)

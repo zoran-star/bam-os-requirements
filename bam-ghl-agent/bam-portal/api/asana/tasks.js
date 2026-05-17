@@ -384,7 +384,7 @@ async function importHandler(req, res) {
 
       const [mapping, clients, staff] = await Promise.all([
         loadMapping(),
-        sb(`clients?select=id,name&order=name.asc`),
+        sb(`clients?select=id,business_name&order=business_name.asc`),
         sb(`staff?role=in.(systems_manager,systems_executor,admin)&select=id,name,role,email`),
       ]);
 

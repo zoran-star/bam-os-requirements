@@ -684,7 +684,7 @@ function ContentTicketsTab({ tk, session, me }) {
           </div>
         ) : visible.map(t => {
           const meta = TYPE_META_CT[t.type] || { icon: "•", label: t.type };
-          const academyName = t.client?.name || "—";
+          const academyName = t.client?.business_name || "—";
           const previewNotes = (t.notes || "").split("\n").filter(Boolean).slice(0, 1).join(" ").slice(0, 110) || "(no notes)";
           const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
           return (
@@ -758,7 +758,7 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
   const fileInputRef = useRef(null);
 
   const meta = TYPE_META_CT[ticket.type] || { icon: "•", label: ticket.type };
-  const academyName = ticket.client?.name || "—";
+  const academyName = ticket.client?.business_name || "—";
 
   const finalsExisting = Array.isArray(ticket.final_files) ? ticket.final_files : [];
 

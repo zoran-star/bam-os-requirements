@@ -208,7 +208,7 @@ export default function ClientSetupView({ tokens, session }) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
         body: JSON.stringify({
-          name: addName.trim(),
+          business_name: addName.trim(),
           owner_name: addOwnerName.trim() || undefined,
           email: addEmail.trim() || undefined,
         }),

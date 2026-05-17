@@ -64,7 +64,7 @@ function normalizeTicket(apiTicket) {
   const files = Array.isArray(apiTicket.files) ? apiTicket.files : [];
   return {
     id: apiTicket.id,
-    academyName: apiTicket.client?.name || "—",
+    academyName: apiTicket.client?.business_name || "—",
     campaignTitle: fields.campaign_title || "",
     type: apiTicket.type,
     creative: fields.creative_name,

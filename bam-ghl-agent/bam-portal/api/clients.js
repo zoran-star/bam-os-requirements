@@ -63,7 +63,11 @@ async function getStripeRevenue(customerId) {
 function shapeClient(row, revenue) {
   return {
     id: row.id,
-    name: row.name,
+    business_name: row.business_name,
+    // Legacy alias: many UI files still read `client.name`. Mirroring business_name
+    // here keeps them working during the gradual rename. Safe to drop after every
+    // `client.name` / `c.name` UI reference is migrated to `business_name`.
+    name: row.business_name,
     owner_name: row.owner_name || null,
     email: row.email || null,
     auth_user_id: row.auth_user_id || null,
@@ -73,6 +77,7 @@ function shapeClient(row, revenue) {
     stripe_customer_id: row.stripe_customer_id || null,
     notion_page_id: row.notion_page_id || null,
     asana_project_id: row.asana_project_id || null,
+    scaling_manager_id: row.scaling_manager_id || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
 
@@ -126,7 +131,7 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       // ── Public self-serve signup path ──
-      // /onboarding.html posts {name, owner_name, email} with no auth header.
+      // /onboarding.html posts {business_name, owner_name, email} with no auth header.
       // Treat as a public signup (creates client + auth user via Supabase invite).
       // Detected by: no Authorization header AND no ?action= AND body has the
       // signup shape. Anything else falls through to the admin path below.
@@ -134,15 +139,15 @@ export default async function handler(req, res) {
       const publicSignupAction = req.query.action;
       const signupBody = req.body || {};
       const isPublicSignup = !hasAuth && !publicSignupAction
-        && typeof signupBody.name === "string"
+        && typeof signupBody.business_name === "string"
         && typeof signupBody.owner_name === "string"
         && typeof signupBody.email === "string";
 
       if (isPublicSignup) {
-        const name = signupBody.name.trim();
+        const business_name = signupBody.business_name.trim();
         const owner_name = signupBody.owner_name.trim();
         const email = signupBody.email.trim().toLowerCase();
-        if (!name) return res.status(400).json({ error: "academy name required" });
+        if (!business_name) return res.status(400).json({ error: "business name required" });
         if (!owner_name) return res.status(400).json({ error: "owner name required" });
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return res.status(400).json({ error: "valid email required" });
@@ -176,10 +181,10 @@ export default async function handler(req, res) {
 
         try {
           const rows = await supabaseInsert("clients", {
-            name, owner_name, email, status: "onboarding", auth_user_id,
+            business_name, owner_name, email, status: "onboarding", auth_user_id,
           });
           const row = Array.isArray(rows) ? rows[0] : rows;
-          return res.status(200).json({ id: row?.id, name: row?.name, email, invited: true });
+          return res.status(200).json({ id: row?.id, business_name: row?.business_name, email, invited: true });
         } catch (insertErr) {
           // Roll back the auth user if the clients insert fails so they don't get orphaned
           await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
@@ -212,17 +217,18 @@ export default async function handler(req, res) {
       // - invite-staff + creating new clients (no action) = admin only
       // - setup-account / update-fields / reset-password = admin + marketing roles
       //   (so Ximena and other marketing staff can run the Client Setup page)
-      const MARKETING_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
+      const ADMIN_LIKE_ROLES = new Set(["admin", "scaling_manager"]);
+      const MARKETING_ROLES = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor"]);
       const ADMIN_ONLY_ACTIONS = new Set(["invite-staff"]);
       const MARKETING_OK_ACTIONS = new Set(["setup-account", "update-fields", "reset-password", "create-client"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
-        if (role !== "admin") return res.status(403).json({ error: "admin only" });
+        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin only" });
       } else if (MARKETING_OK_ACTIONS.has(action)) {
         if (!MARKETING_ROLES.has(role)) return res.status(403).json({ error: "admin or marketing role required" });
       } else {
-        // Default: creating a new client (no action). Admin only.
-        if (role !== "admin") return res.status(403).json({ error: "admin only" });
+        // Default: creating a new client (no action). Admin-level only.
+        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin only" });
       }
 
       // ── action=invite-staff ──
@@ -308,20 +314,20 @@ export default async function handler(req, res) {
       // Send Invite later via ?action=setup-account.
       if (action === "create-client") {
         const body = req.body || {};
-        const newName = typeof body.name === "string" ? body.name.trim() : "";
+        const newBusinessName = typeof body.business_name === "string" ? body.business_name.trim() : "";
         const newOwnerName = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
         const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-        if (!newName) return res.status(400).json({ error: "business name required" });
+        if (!newBusinessName) return res.status(400).json({ error: "business name required" });
         if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
           return res.status(400).json({ error: "email format invalid (or leave blank)" });
         }
-        const insertBody = { name: newName, status: "onboarding" };
+        const insertBody = { business_name: newBusinessName, status: "onboarding" };
         if (newOwnerName) insertBody.owner_name = newOwnerName;
         if (newEmail) insertBody.email = newEmail;
         try {
           const rows = await supabaseInsert("clients", insertBody);
           const row = Array.isArray(rows) ? rows[0] : rows;
-          return res.status(200).json({ id: row?.id, name: row?.name, created: true });
+          return res.status(200).json({ id: row?.id, business_name: row?.business_name, created: true });
         } catch (insertErr) {
           return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
         }
@@ -384,7 +390,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "valid email required" });
         }
 
-        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,name,auth_user_id`);
+        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,business_name,auth_user_id`);
         if (!existing?.length) return res.status(404).json({ error: "client not found" });
         if (existing[0].auth_user_id) {
           return res.status(400).json({ error: "this client already has an account — use Reset password instead" });
@@ -433,7 +439,7 @@ export default async function handler(req, res) {
           );
           if (!updateRes.ok) throw new Error(`Supabase ${updateRes.status}: ${await updateRes.text()}`);
           const rows = await updateRes.json();
-          return res.status(200).json({ id: client_id, name: rows?.[0]?.name, email: newEmail, invited: true });
+          return res.status(200).json({ id: client_id, business_name: rows?.[0]?.business_name, email: newEmail, invited: true });
         } catch (updateErr) {
           await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
             method: "DELETE",
@@ -469,12 +475,12 @@ export default async function handler(req, res) {
 
       // ── Validate inputs (no password — invite flow) ──
       const body = req.body || {};
-      const name       = typeof body.name === "string" ? body.name.trim() : "";
-      const owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
-      const email      = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-      const status     = typeof body.status === "string" && ["onboarding","active","paused","churned"].includes(body.status) ? body.status : "onboarding";
+      const business_name = typeof body.business_name === "string" ? body.business_name.trim() : "";
+      const owner_name    = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
+      const email         = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+      const status        = typeof body.status === "string" && ["onboarding","active","paused","churned"].includes(body.status) ? body.status : "onboarding";
 
-      if (!name)       return res.status(400).json({ error: "academy name required" });
+      if (!business_name) return res.status(400).json({ error: "business name required" });
       if (!owner_name) return res.status(400).json({ error: "owner name required" });
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "valid email required" });
@@ -506,10 +512,10 @@ export default async function handler(req, res) {
       // ── Insert the clients row, linked to the new auth user ──
       try {
         const rows = await supabaseInsert("clients", {
-          name, owner_name, email, status, auth_user_id,
+          business_name, owner_name, email, status, auth_user_id,
         });
         const row = Array.isArray(rows) ? rows[0] : rows;
-        return res.status(200).json({ id: row?.id, name: row?.name, email, invited: true });
+        return res.status(200).json({ id: row?.id, business_name: row?.business_name, email, invited: true });
       } catch (insertErr) {
         // Roll back the auth user if the clients insert fails so they don't get orphaned
         await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
@@ -530,7 +536,7 @@ export default async function handler(req, res) {
     const id = req.query.id;
     const path = id
       ? `clients?id=eq.${encodeURIComponent(id)}&select=*`
-      : `clients?select=*&order=name.asc`;
+      : `clients?select=*&order=business_name.asc`;
 
     const rows = await supabaseSelect(path);
 
