@@ -106,15 +106,22 @@ Upload paths:
 
 ## Shipped since round 1
 
-- ✅ **Client-side edit of active tickets** (commit `9f0db36`) — click active ticket, edit fields, changes show in activity feed.
-- ✅ **Slack notifs on action request + ticket completion** (commit `02b7a0a`) — staff notified in client Slack channel.
-- ✅ **Load More pagination** on client-side tickets + marketing requests lists (commit `7e978f1`).
+- ✅ **Client-side edit of active tickets** (commit `9f0db36`)
+- ✅ **Load More pagination** on tickets + marketing requests (commit `7e978f1`)
+- ✅ **Uniform Slack notifs** across marketing + content + systems — 9 triggers, `{emoji} {Action} — {Type} [CODE]` template (commits `02b7a0a`, `b554c98`)
+- ✅ **Internal message filter** — staff-team chatter (revision handoffs, upload-final, send-to-marketing notes) flagged `internal: true` and filtered out on client GET (commit `b554c98`)
+- ✅ **500MB upload guard + Google Drive link fallback** — clients pick over-limit files → popup + Drive link input. Synthetic `{name: 'Google Drive link', mime: 'text/uri-list'}` entry in raw_files (commit `a109348`)
+- ✅ **Revision tickets carry original raw_files** — when marketing requests revision, the spawned content ticket merges parent content ticket's raw_files with the marketing creative (commit `085d443`)
+- ✅ **Snapshot files before modal close** (bug: `closeInputAssetsModal()` was wiping `_inputAssetsState.files` before upload — commit `9f2f42e`)
+- ✅ **Systems modal refetches on open** so staff sees fresh client replies (commit `19cc6e2`)
+- ✅ **Public self-serve onboarding** at `/onboarding.html` — see `[[project_public_onboarding]]`
 
 ## Pending (round 2)
 
-- **Email/SMS notifications** when ticket state changes (email client on respond/complete). Slack side ✅ done; email/SMS still needed. Pre-launch checklist.
-- **Real-time updates**: ticket changes don't push to either portal — relies on user refresh or navigation. Could use Supabase Realtime subscriptions later.
-- **Per-client storage isolation** (signed URLs). Bucket is public; URL paths random UUIDs. Tighten before scaling.
+- **Email/SMS notifications** when ticket state changes. Slack ✅ done; email/SMS still needed for clients without Slack. Pre-launch checklist.
+- **Real-time updates** (Supabase Realtime subscriptions) so both portals refresh without manual reload.
+- **Per-client storage isolation** (signed URLs) on `ticket-files` bucket — currently public.
+- **Cleanup orphaned test tickets/files** for DETAIL Miami (~4 empty content tickets, ~8 orphan files from Mike's testing 2026-05-15).
 
 ## Test data
 

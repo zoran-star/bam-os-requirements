@@ -96,7 +96,9 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 
 ## Current phase (what we're working on NOW)
 
-**Status as of 2026-05-15 — portal is live in production, focus is hardening + new features.**
+**Status as of 2026-05-17 — portal is live in production, public onboarding URL is shareable, focus is hardening + filling round-3 gaps.**
+
+**Shareable signup URL:** `https://bam-portal-tawny.vercel.app/onboarding.html` — new clients/testers sign up there. See [[memories/project_public_onboarding.md]] for the flow.
 
 ### What's live end-to-end
 - **bam-portal-tawny.vercel.app** — staff + client portals deployed on Vercel Pro (no fn cap).
@@ -108,12 +110,15 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 - **Onboarding** — public self-serve signup flow for new clients (first-run wizard).
 - **Permissions** — admin / marketing / content roles; Financials admin-only, Client Setup open to marketing.
 
-### What's actively pending
+### What's actively pending (round 3)
 1. **Email/SMS ticket notifications** — Slack ✅; email/SMS still needed for clients without Slack.
 2. **Supabase Realtime subscriptions** — portals refresh without manual reload.
 3. **Per-client signed URLs** on `ticket-files` bucket (currently public).
 4. **Meta token refresh on 401** — 60-day token has no auto-refresh; surface "Reconnect Meta" CTA.
-5. **App Review (Meta)** — only if non-BAM-staff Meta users will ever connect (currently dev mode is fine).
+5. **End-to-end test of client-side Meta OAuth** — added 2026-05-16, untested with a non-staff Meta account.
+6. **Polish ad-account picker UI** — currently a native `prompt()`. Upgrade to a real modal.
+7. **App Review (Meta)** — required before non-tester Meta users can complete client-side OAuth.
+8. **Cleanup orphan test tickets/files** for DETAIL Miami (Mike's 4 empty content tickets + ~8 orphan files).
 
 ### Deferred / will figure out later
 - Per-user Google Calendar OAuth flow

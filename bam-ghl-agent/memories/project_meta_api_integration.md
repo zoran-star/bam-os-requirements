@@ -1,20 +1,25 @@
 ---
 name: Meta Marketing API integration
-description: Real Meta campaigns wired into bam-portal-tawny via staff-side OAuth (one BAM staff token powers every client's campaigns).
+description: Real Meta campaigns wired into bam-portal-tawny via HYBRID OAuth — either a BAM staff token (shared across all clients) OR the client's own connected Meta token. Plus sample-data fallback when neither is wired so the Marketing tab is demo-able.
 type: project
 ---
 
-## TL;DR
+## TL;DR — hybrid as of 2026-05-16
 
-**Staff-side OAuth.** A BAM staff member (admin or marketing role) connects their Meta account once. That single token is used to query campaigns + ad creatives for every client whose ad account the staff has access to. Clients themselves never touch Meta.
+The Meta integration supports BOTH:
 
-**Pivoted away from client-side OAuth** in commit `b59cea3` (2026-05-14). The earlier design (each academy connects their own Meta) was scrapped because Meta App Review is a hard blocker for non-developer users, and BAM staff already have access to client ad accounts. One staff token = all clients = no per-client onboarding friction.
+1. **Staff-side token** (primary path for existing managed clients). A BAM staff member with admin or marketing role connects their personal Meta once. That one token queries campaigns + ad creatives for every client whose ad account they have access to.
+2. **Client-side OAuth** (optional for self-serve signups via `/onboarding.html`). The client clicks "Connect Meta" on their portal, OAuths their own account, and picks one of their ad accounts. Their token is preferred over the staff token when both exist.
+
+`handleMetaCampaigns` looks up `client_meta_tokens` for the target client FIRST, falls back to `getAnyStaffMetaToken()` second. The frontend handles `reason: 'no_ad_account'` (with `meta_connected: true|false`) by showing 4 sample demo campaigns + a "Connect Meta" or "Pick ad account" CTA.
+
+**Architecture history:** client-side OAuth → pivoted to staff-side in `b59cea3` (2026-05-14) → reintroduced as optional alongside staff-side in `f28f31e` (2026-05-16) so testers landing on the public onboarding URL see a populated Marketing tab.
 
 ## Database
 
-- `staff_meta_tokens` — primary. Schema: id, staff_user_id (UNIQUE FK → auth.users), fb_user_id, fb_user_name, access_token, expires_at, scopes[], timestamps. Any staff token can query any client's ad account (shared across admin/marketing roles).
-- `client_meta_tokens` — legacy from the client-side OAuth attempt. Code references remain in `api/marketing.js` (lines 844, 970) but are no longer the active flow. Safe to ignore.
-- `clients.meta_ad_account_id` — text, nullable. Set by staff via Client Setup page; required for `/api/meta/campaigns` to return real data.
+- `staff_meta_tokens` — active. Schema: id, staff_user_id (UNIQUE FK → auth.users), fb_user_id, fb_user_name, access_token, expires_at, scopes[], timestamps. Any staff token can query any client's ad account.
+- `client_meta_tokens` — also active (revived 2026-05-16). Same schema scoped to client_id. Set when client OAuths via `/api/auth/meta/start` from their portal. Preferred over staff token in `handleMetaCampaigns` when both exist.
+- `clients.meta_ad_account_id` — text, nullable. Required for real campaigns. Settable by staff (via Client Setup) OR by the client themselves (via the native-prompt picker after connecting their own Meta).
 - `clients.meta_campaign_ids` — array, filters which campaigns surface on the client portal (so clients don't see staff's experimental campaigns).
 
 ## Env vars (Vercel `bam-portal` production)
@@ -37,8 +42,11 @@ Clean URLs via `vercel.json` rewrites:
 - `GET  /api/meta/campaigns?client_id=...&staff_picker=1` — staff-only mode that bypasses `meta_campaign_ids` filter (for picking which campaigns to surface)
 - `GET  /api/marketing?resource=meta-creatives&campaign_id=...` — real ad creatives for a campaign
 
-**Client-side (legacy, code retained but flow inactive):**
-- `POST /api/auth/meta/start`, `GET /api/auth/meta/callback` for `client_meta_tokens`
+**Client-side (active again as of 2026-05-16):**
+- `POST /api/auth/meta/start&step=prepare` — auth'd client kicks off OAuth, gets back a Facebook OAuth URL
+- `GET  /api/auth/meta/callback&step=callback` — Meta returns here; upserts into `client_meta_tokens`, redirects to `/client-portal.html?meta=connected|error`
+- `GET  /api/meta/adaccounts` — when called as client, lists ad accounts on THEIR token (was staff-only; opened to clients in `f28f31e`)
+- `POST /api/meta/adaccounts` — when called as client, scopes to `ctx.client.id` (ignores body.client_id, no need to pass it)
 
 ## UI surfaces
 
@@ -46,20 +54,23 @@ Clean URLs via `vercel.json` rewrites:
 - **Staff portal → MarketingView** — campaign cards, creative grid, Facebook preview links.
 - **Client portal → Marketing tab** — active campaign cards with real Meta data; creative tiles open Facebook for the post.
 
-## What works end-to-end (verified 2026-05-14, expanded 2026-05-15)
+## What works end-to-end
 
-- ✅ Staff Meta OAuth + shared token across all marketing/admin staff
+- ✅ Staff Meta OAuth + shared token across all marketing/admin staff (verified 2026-05-14)
+- ✅ Client-side Meta OAuth alongside staff-side; client token preferred when both exist (added 2026-05-16, untested end-to-end with a real client)
 - ✅ Client Setup bulk wire-up
 - ✅ Real ACTIVE-only Meta campaigns on client portal
 - ✅ Real ad creatives in campaign detail (image + video + carousel)
 - ✅ Facebook preview links (canonical `/pageId/posts/postId` for image/carousel; direct `open on Facebook` for video)
 - ✅ Privacy-locked carousel graceful handling
+- ✅ Sample-data fallback when no Meta wired — 4 demo campaign cards + "Connect Meta" CTA so /onboarding.html testers see a populated Marketing tab
 
 ## What's left
 
-1. **Token refresh on Meta 401** — 60-day long-lived token has no auto-refresh. If it expires/revokes, campaigns endpoint 401s silently. Need a "Reconnect Meta" CTA when this happens.
-2. **App Review submission** — currently in Meta Development mode. Required only if non-BAM-staff Meta users will ever connect. Today: not needed (staff-only flow).
-3. **Cleanup legacy `client_meta_tokens` code paths** — references in marketing.js are dead code. Low priority but worth removing for clarity.
+1. **End-to-end test of client-side OAuth** — added in `f28f31e` but never run with a non-staff Meta account (Meta still in dev mode, so testers must be added as Meta app developers/testers).
+2. **Polish ad-account picker** — currently a native `prompt()` listing `1. Account A (act_...)` etc. Works but ugly. Upgrade to a real modal.
+3. **Token refresh on Meta 401** — 60-day long-lived token has no auto-refresh. If it expires/revokes, campaigns endpoint 401s silently. Need a "Reconnect Meta" CTA when this happens.
+4. **App Review submission** — currently in Meta Development mode. Required before non-tester Meta users can complete the client-side OAuth.
 
 ## Lessons (from end-to-end testing)
 
