@@ -618,16 +618,79 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
 }
 
 // ─── MARKETING tab (Meta) ───────────────────────────────────────────────────
+function fuzzyScore(a, b) {
+  if (!a || !b) return 0;
+  const x = a.toLowerCase().trim();
+  const y = b.toLowerCase().trim();
+  if (x === y) return 100;
+  if (y.includes(x) || x.includes(y)) return 60;
+  const xw = x.split(/[\s\-_/.,&]+/).filter(w => w.length > 2);
+  const yw = y.split(/[\s\-_/.,&]+/).filter(w => w.length > 2);
+  let common = 0;
+  for (const w of xw) if (yw.includes(w)) common++;
+  return common * 15;
+}
+function suggestAdAccount(clientName, adAccounts) {
+  let best = null, bestScore = 0;
+  for (const a of adAccounts) {
+    const s = fuzzyScore(clientName, a.name || "");
+    if (s > bestScore) { best = a; bestScore = s; }
+  }
+  return bestScore >= 15 ? best : null;
+}
+
 function MarketingTab({ client, tokens, role, session }) {
   const t = tokens;
-  const [campaigns, setCampaigns] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState(null);
+  const canEdit = ROLES.canEditMeta(role);
 
+  // Setup state
+  const [adAccounts, setAdAccounts] = useState([]);
+  const [metaConnected, setMetaConnected] = useState(null); // null=loading
+  const [pickedAdAccount, setPickedAdAccount] = useState(client.meta_ad_account_id || "");
+  const [pickedCampaigns, setPickedCampaigns] = useState(Array.isArray(client.meta_campaign_ids) ? client.meta_campaign_ids : []);
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupMsg, setSetupMsg] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Campaign picker modal state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCampaigns, setPickerCampaigns] = useState([]);
+  const [pickerSelected, setPickerSelected] = useState(new Set());
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerError, setPickerError] = useState("");
+
+  // Display state — active campaigns shown below
+  const [campaigns, setCampaigns] = useState(null);
+  const [campaignsLoading, setCampaignsLoading] = useState(true);
+  const [campaignsErr, setCampaignsErr] = useState(null);
+
+  // Load ad accounts on mount (requires Meta connected staff-side)
   useEffect(() => {
-    if (!client.meta_ad_account_id) { setLoading(false); return; }
     let cancelled = false;
-    setLoading(true);
+    (async () => {
+      try {
+        const tok = session?.access_token;
+        const res = await fetch("/api/meta/adaccounts", { headers: { Authorization: `Bearer ${tok}` } });
+        if (cancelled) return;
+        if (res.ok) {
+          const j = await res.json();
+          setAdAccounts(j.ad_accounts || []);
+          setMetaConnected(true);
+        } else {
+          setMetaConnected(false);
+        }
+      } catch {
+        if (!cancelled) setMetaConnected(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  // Load currently-active campaigns for display
+  useEffect(() => {
+    if (!client.meta_ad_account_id) { setCampaigns(null); setCampaignsLoading(false); return; }
+    let cancelled = false;
+    setCampaignsLoading(true);
     fetch(`/api/meta/campaigns?client_id=${client.id}`, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     })
@@ -635,33 +698,220 @@ function MarketingTab({ client, tokens, role, session }) {
       .then(data => {
         if (cancelled) return;
         setCampaigns(data?.campaigns || []);
-        setLoading(false);
+        setCampaignsLoading(false);
       })
-      .catch(e => { if (!cancelled) { setErr(e.message); setLoading(false); } });
+      .catch(e => { if (!cancelled) { setCampaignsErr(e.message); setCampaignsLoading(false); } });
     return () => { cancelled = true; };
-  }, [client.id, client.meta_ad_account_id, session]);
+  }, [client.id, client.meta_ad_account_id, session, refreshKey]);
 
-  if (!client.meta_ad_account_id) {
-    return (
-      <div style={{ padding: 24, background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6 }}>
-        <div style={{ fontSize: 14, color: t.text, marginBottom: 8 }}>No Meta ad account linked.</div>
-        <div style={{ fontSize: 13, color: t.textSub }}>
-          Go to the <b>Setup</b> tab → wire a Meta ad account via the existing Client Setup flow.
-          (Bulk wire-up is still on the legacy Client Setup page — being migrated here next.)
-        </div>
-      </div>
-    );
+  // Auto-suggest an ad account if none picked yet and we have ad accounts
+  const suggested = useMemo(() => {
+    if (pickedAdAccount || !adAccounts.length) return null;
+    return suggestAdAccount(client.business_name, adAccounts);
+  }, [client.business_name, adAccounts, pickedAdAccount]);
+
+  async function openPicker() {
+    if (!pickedAdAccount) {
+      setSetupMsg({ kind: "err", text: "Save an ad account first, then pick campaigns." });
+      return;
+    }
+    if (pickedAdAccount !== (client.meta_ad_account_id || "")) {
+      setSetupMsg({ kind: "err", text: "Save the ad account change first, then pick campaigns." });
+      return;
+    }
+    setPickerOpen(true);
+    setPickerLoading(true);
+    setPickerError("");
+    setPickerSelected(new Set(pickedCampaigns));
+    try {
+      const tok = session?.access_token;
+      const r = await fetch(`/api/meta/campaigns?staff_picker=1&client_id=${encodeURIComponent(client.id)}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      if (j.reason === "no_ad_account") {
+        setPickerError("Save the ad account first, then re-open this picker.");
+      } else if (j.reason === "no_staff_token") {
+        setPickerError("Meta not connected. Go to Settings → Connect Meta.");
+      } else {
+        setPickerCampaigns(j.campaigns || []);
+        if (Array.isArray(j.meta_campaign_ids)) setPickerSelected(new Set(j.meta_campaign_ids));
+      }
+    } catch (e) {
+      setPickerError(e.message || "Failed to load campaigns");
+    }
+    setPickerLoading(false);
   }
 
+  function togglePickerCampaign(id) {
+    setPickerSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+  function applyPicker() {
+    setPickedCampaigns(Array.from(pickerSelected));
+    setPickerOpen(false);
+  }
+
+  async function saveSetup() {
+    setSetupSaving(true); setSetupMsg(null);
+    try {
+      const tok = session?.access_token;
+      const adChanged = (pickedAdAccount || "") !== (client.meta_ad_account_id || "");
+      const oldCamp = Array.isArray(client.meta_campaign_ids) ? client.meta_campaign_ids : [];
+      const campsChanged = oldCamp.length !== pickedCampaigns.length || oldCamp.some(id => !pickedCampaigns.includes(id));
+      if (!adChanged && !campsChanged) {
+        setSetupMsg({ kind: "info", text: "No changes to save." });
+        setSetupSaving(false); return;
+      }
+      if (pickedAdAccount) {
+        const r = await fetch("/api/meta/adaccounts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ client_id: client.id, ad_account_id: pickedAdAccount, campaign_ids: pickedCampaigns }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      } else if (adChanged) {
+        // Clearing ad account
+        const r = await fetch(`/api/meta/adaccounts?client_id=${encodeURIComponent(client.id)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${tok}` },
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error(j.error || `HTTP ${r.status}`);
+        }
+      }
+      setSetupMsg({ kind: "ok", text: "Saved ✓" });
+      setRefreshKey(x => x + 1);
+    } catch (err) {
+      setSetupMsg({ kind: "err", text: err.message });
+    } finally {
+      setSetupSaving(false);
+    }
+  }
+
+  const hasUnsaved = (pickedAdAccount || "") !== (client.meta_ad_account_id || "") ||
+    (function () {
+      const oldCamp = Array.isArray(client.meta_campaign_ids) ? client.meta_campaign_ids : [];
+      return oldCamp.length !== pickedCampaigns.length || oldCamp.some(id => !pickedCampaigns.includes(id));
+    })();
+
   return (
-    <div>
-      <SectionTitle>Active campaigns</SectionTitle>
-      {loading && <div style={{ color: t.textMute, padding: 12 }}>Loading…</div>}
-      {err && <div style={{ color: t.red, padding: 12 }}>Error: {err}</div>}
-      {!loading && !err && campaigns?.length === 0 && (
+    <div style={{ maxWidth: 880 }}>
+      {/* Meta connection status */}
+      <div style={{
+        padding: "12px 16px", marginBottom: 22, borderRadius: 6,
+        background: t.surfaceEl, border: `1px solid ${t.border}`,
+        display: "flex", alignItems: "center", gap: 12, fontSize: 13,
+      }}>
+        {metaConnected === null && <span style={{ color: t.textMute }}>Checking Meta connection…</span>}
+        {metaConnected === true && (
+          <>
+            <span style={{ color: t.green, fontWeight: 600 }}>● Meta connected</span>
+            <span style={{ color: t.textSub }}>{adAccounts.length} ad accounts available on your staff token</span>
+          </>
+        )}
+        {metaConnected === false && (
+          <>
+            <span style={{ color: t.red, fontWeight: 600 }}>● Meta not connected</span>
+            <span style={{ color: t.textSub }}>Go to <b style={{ color: t.text }}>Settings → Connect Meta</b> to load ad accounts.</span>
+          </>
+        )}
+      </div>
+
+      {/* Setup: ad account + campaign picker */}
+      {canEdit && (
+        <>
+          <SectionTitle>Meta setup</SectionTitle>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+              Ad account
+            </label>
+            <select
+              value={pickedAdAccount}
+              onChange={e => setPickedAdAccount(e.target.value)}
+              disabled={!metaConnected}
+              style={{
+                width: "100%", padding: "9px 12px", background: t.surface,
+                border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13,
+              }}
+            >
+              <option value="">{metaConnected ? "(none — pick one)" : "Meta not connected"}</option>
+              {adAccounts.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.name || "(unnamed)"} · {a.id}
+                </option>
+              ))}
+            </select>
+            {suggested && (
+              <div style={{ fontSize: 11, color: t.textMute, marginTop: 6 }}>
+                Suggested: <button
+                  onClick={() => setPickedAdAccount(suggested.id)}
+                  style={{ background: "transparent", color: t.gold, border: "none", padding: 0, fontWeight: 600, cursor: "pointer", fontSize: 11 }}
+                >{suggested.name} · {suggested.id}</button>
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+              Campaigns to surface ({pickedCampaigns.length} selected)
+            </label>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button onClick={openPicker} style={btnStyle(t, "secondary")}>
+                {pickedCampaigns.length ? `Edit selection (${pickedCampaigns.length})` : "Pick campaigns"}
+              </button>
+              <span style={{ fontSize: 11, color: t.textMute }}>
+                {pickedCampaigns.length === 0 ? "Empty = show all active campaigns" : `${pickedCampaigns.length} campaign(s) will be shown to this client`}
+              </span>
+            </div>
+          </div>
+
+          {/* Save bar */}
+          <div style={{ display: "flex", gap: 12, marginTop: 12, alignItems: "center" }}>
+            <button
+              onClick={saveSetup}
+              disabled={!hasUnsaved || setupSaving}
+              style={{
+                padding: "9px 18px", background: hasUnsaved ? t.gold : t.surfaceEl,
+                color: hasUnsaved ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
+                fontSize: 13, fontWeight: 600, cursor: hasUnsaved ? "pointer" : "not-allowed",
+              }}
+            >{setupSaving ? "Saving…" : "Save Meta setup"}</button>
+            {hasUnsaved && !setupSaving && (
+              <button
+                onClick={() => {
+                  setPickedAdAccount(client.meta_ad_account_id || "");
+                  setPickedCampaigns(Array.isArray(client.meta_campaign_ids) ? client.meta_campaign_ids : []);
+                  setSetupMsg(null);
+                }}
+                style={btnStyle(t, "secondary")}
+              >Discard</button>
+            )}
+            {setupMsg && (
+              <span style={{ fontSize: 13, color: setupMsg.kind === "ok" ? t.green : setupMsg.kind === "err" ? t.red : t.textSub, fontWeight: 600 }}>
+                {setupMsg.text}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Active campaigns display */}
+      <SectionTitle style={{ marginTop: 32 }}>Active campaigns</SectionTitle>
+      {!client.meta_ad_account_id && (
+        <div style={{ color: t.textMute, padding: 12, fontSize: 13, fontStyle: "italic" }}>
+          No ad account linked yet. {canEdit ? "Pick one above and save to see campaigns." : "Ask an admin or scaling manager to wire one up."}
+        </div>
+      )}
+      {client.meta_ad_account_id && campaignsLoading && <div style={{ color: t.textMute, padding: 12 }}>Loading campaigns…</div>}
+      {client.meta_ad_account_id && campaignsErr && <div style={{ color: t.red, padding: 12 }}>Error: {campaignsErr}</div>}
+      {client.meta_ad_account_id && !campaignsLoading && !campaignsErr && campaigns?.length === 0 && (
         <div style={{ color: t.textMute, padding: 12, fontStyle: "italic" }}>No active campaigns.</div>
       )}
-      {!loading && campaigns?.length > 0 && (
+      {client.meta_ad_account_id && !campaignsLoading && campaigns?.length > 0 && (
         <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden" }}>
           {campaigns.map(c => (
             <a
@@ -683,6 +933,69 @@ function MarketingTab({ client, tokens, role, session }) {
           ))}
         </div>
       )}
+
+      {/* Campaign picker modal */}
+      {pickerOpen && (
+        <CampaignPickerModal
+          campaigns={pickerCampaigns}
+          selected={pickerSelected}
+          loading={pickerLoading}
+          error={pickerError}
+          onToggle={togglePickerCampaign}
+          onSelectAll={() => setPickerSelected(new Set(pickerCampaigns.map(c => c.id)))}
+          onClear={() => setPickerSelected(new Set())}
+          onApply={applyPicker}
+          onClose={() => setPickerOpen(false)}
+          tokens={t}
+        />
+      )}
+    </div>
+  );
+}
+
+function CampaignPickerModal({ campaigns, selected, loading, error, onToggle, onSelectAll, onClear, onApply, onClose, tokens }) {
+  const t = tokens;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, padding: 0, maxWidth: 720, width: "100%", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "18px 22px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: t.text }}>Pick campaigns to surface</div>
+            <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>Only the selected campaigns will appear on this client's portal.</div>
+          </div>
+          <button onClick={onClose} style={btnStyle(t, "secondary")}>✕ Close</button>
+        </div>
+        <div style={{ padding: "12px 22px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 8 }}>
+          <button onClick={onSelectAll} style={btnStyle(t, "secondary")}>Select all</button>
+          <button onClick={onClear} style={btnStyle(t, "secondary")}>Clear</button>
+          <div style={{ marginLeft: "auto", fontSize: 12, color: t.textMute, alignSelf: "center" }}>
+            {selected.size} of {campaigns.length} selected
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+          {loading && <div style={{ padding: 24, color: t.textMute, textAlign: "center" }}>Loading…</div>}
+          {error && <div style={{ padding: 24, color: t.red }}>{error}</div>}
+          {!loading && !error && campaigns.length === 0 && (
+            <div style={{ padding: 24, color: t.textMute, textAlign: "center", fontStyle: "italic" }}>No campaigns in this ad account.</div>
+          )}
+          {campaigns.map(c => {
+            const checked = selected.has(c.id);
+            return (
+              <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 22px", cursor: "pointer", borderBottom: `1px solid ${t.border}` }}>
+                <input type="checkbox" checked={checked} onChange={() => onToggle(c.id)} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, color: t.text, fontWeight: 500 }}>{c.name}</div>
+                  <div style={{ fontSize: 11, color: t.textMute, fontFamily: "JetBrains Mono, monospace" }}>{c.id} · {c.status || "active"}</div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+        <div style={{ padding: "14px 22px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={btnStyle(t, "secondary")}>Cancel</button>
+          <button onClick={onApply} style={btnStyle(t, "primary")}>Apply selection</button>
+        </div>
+      </div>
     </div>
   );
 }

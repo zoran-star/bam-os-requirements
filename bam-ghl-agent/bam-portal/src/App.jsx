@@ -22,7 +22,6 @@ import SystemsView from './views/SystemsView';
 import MarketingView from './views/MarketingView';
 import TeamView from './views/TeamView';
 import ContentView from './views/ContentView';
-import ClientSetupView from './views/ClientSetupView';
 import ClientsCombinedView from './views/ClientsCombinedView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
@@ -110,9 +109,6 @@ export default function BAMPortal() {
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
-  // Client Setup (bulk wire-up): admin + marketing roles can do this since
-  // it's the page they need to assign ad accounts and send client invites.
-  const canSeeClientSetup = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 
@@ -367,7 +363,6 @@ export default function BAMPortal() {
     marketing: ["Marketing", "Client ad-campaign tickets"],
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
-    "client-setup": ["Client Setup", "Bulk wire-up: ad accounts + invites"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -406,7 +401,6 @@ export default function BAMPortal() {
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
-        ...(canSeeClientSetup ? [{ label: "Client Setup", key: "client-setup" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
 
@@ -798,9 +792,6 @@ export default function BAMPortal() {
 
             {/* CONTENT */}
             {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
-
-            {/* CLIENT SETUP — admin + marketing roles */}
-            {nav === "client-setup" && canSeeClientSetup && <ClientSetupView tokens={tk} session={session} />}
 
             {/* SETTINGS */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
