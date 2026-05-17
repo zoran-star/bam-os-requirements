@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Combined Clients Page — Layout Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --bg-el: #131318;
+    --bg-el-hover: #1A1A21;
+    --bg-card: #16161C;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #F5F5F7;
+    --text-sub: #B0B0BA;
+    --text-mute: #6E6E78;
+    --gold: #E8C547;
+    --green: #4ADE80;
+    --red: #ED7969;
+    --amber: #F5A524;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .page { max-width: 1280px; margin: 0 auto; padding: 48px 24px 96px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 14px; line-height: 1.1; }
+  .sub { font-size: 14px; color: var(--text-sub); margin: 0 0 32px; line-height: 1.55; max-width: 720px; }
+
+  .layout-grid { display: grid; grid-template-columns: 1fr; gap: 48px; margin-top: 32px; }
+
+  .layout-card { background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .layout-header { padding: 22px 26px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+  .layout-letter { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; color: var(--gold); }
+  .layout-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .layout-sub { font-size: 13px; color: var(--text-sub); margin-top: 4px; }
+
+  .mockup { padding: 26px; background: #08080A; border-top: 1px solid var(--border); }
+  .browser-frame { background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+  .browser-chrome { background: var(--bg-el); padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-mute); }
+  .browser-chrome::before { content: "● ● ●"; color: var(--text-mute); letter-spacing: 4px; }
+  .browser-url { flex: 1; text-align: center; font-family: 'JetBrains Mono', monospace; }
+
+  .mock-app { display: grid; grid-template-columns: 220px 1fr; min-height: 540px; }
+  .mock-sidebar { background: #0F0F14; border-right: 1px solid var(--border); padding: 18px 14px; font-size: 12px; }
+  .mock-nav-item { padding: 7px 10px; border-radius: 4px; color: var(--text-mute); margin-bottom: 2px; }
+  .mock-nav-item.active { background: rgba(232,197,71,0.12); color: var(--gold); font-weight: 600; }
+  .mock-body { padding: 24px; overflow: hidden; }
+
+  /* Layout A: list + side panel */
+  .layout-a-body { display: grid; grid-template-columns: 320px 1fr; gap: 16px; height: 100%; }
+  .mock-list { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 14px; overflow-y: auto; max-height: 520px; }
+  .mock-list-header { display: flex; gap: 6px; margin-bottom: 12px; }
+  .mock-list-search { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-size: 11px; color: var(--text-sub); }
+  .mock-list-filters { display: flex; gap: 4px; margin-bottom: 10px; }
+  .mock-pill { font-size: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.04); color: var(--text-sub); border: 1px solid var(--border); }
+  .mock-pill.active { background: var(--gold); color: #000; font-weight: 600; border-color: var(--gold); }
+  .mock-list-item { padding: 9px 10px; border-radius: 4px; margin-bottom: 2px; font-size: 12px; cursor: pointer; }
+  .mock-list-item.selected { background: rgba(232,197,71,0.08); border-left: 2px solid var(--gold); }
+  .mock-list-item .name { font-weight: 600; color: var(--text); }
+  .mock-list-item .meta { font-size: 10px; color: var(--text-mute); margin-top: 2px; }
+
+  .mock-detail { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 20px; overflow-y: auto; max-height: 520px; }
+  .mock-detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .mock-detail-name { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; }
+  .mock-detail-status { font-size: 10px; padding: 3px 8px; border-radius: 999px; background: rgba(74,222,128,0.15); color: var(--green); font-weight: 600; }
+  .mock-section-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; margin-top: 18px; }
+  .mock-field { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .mock-field .k { color: var(--text-mute); }
+  .mock-field .v { color: var(--text); font-weight: 500; }
+  .mock-integrations { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .mock-integ { padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; }
+  .mock-integ .status { font-size: 9px; padding: 2px 6px; border-radius: 999px; background: rgba(74,222,128,0.15); color: var(--green); }
+  .mock-integ .status.off { background: rgba(255,255,255,0.05); color: var(--text-mute); }
+
+  /* Layout B: list + modal */
+  .layout-b-list { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 16px; }
+  .mock-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .mock-card { padding: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+  .mock-card .name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .mock-card .owner { font-size: 10px; color: var(--text-sub); margin-bottom: 6px; }
+  .mock-card .mgr { font-size: 9px; color: var(--text-mute); }
+  .mock-modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 30px; }
+  .mock-modal { background: var(--bg-el); border: 1px solid var(--border-strong); border-radius: 8px; width: 100%; max-width: 600px; padding: 22px; max-height: 480px; overflow-y: auto; }
+
+  /* Layout C: tabbed full page */
+  .mock-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+  .mock-tab { padding: 10px 18px; font-size: 12px; color: var(--text-mute); cursor: pointer; border-bottom: 2px solid transparent; }
+  .mock-tab.active { color: var(--gold); border-bottom-color: var(--gold); font-weight: 600; }
+  .mock-tabs-content { font-size: 12px; color: var(--text-sub); padding: 8px; }
+
+  .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 20px 26px; background: #0A0A0E; border-top: 1px solid var(--border); }
+  .pros-cons h4 { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; }
+  .pros h4 { color: var(--green); }
+  .cons h4 { color: var(--red); }
+  .pros-cons ul { margin: 0; padding-left: 18px; font-size: 12px; color: var(--text-sub); line-height: 1.6; }
+
+  .my-pick { display: inline-block; font-size: 10px; padding: 3px 8px; border-radius: 999px; background: var(--gold); color: #000; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Planning · 2026-05-17 · Combined Clients Page</div>
+  <h1>Layout mockups — pick one</h1>
+  <p class="sub">Three concrete layouts to choose from. Eyeball them, pick the one that fits how you actually work. (The mockup data is fake — just for shape.)</p>
+
+  <div class="layout-grid">
+
+    <!-- ─────────── LAYOUT A: list + side panel ─────────── -->
+    <div class="layout-card">
+      <div class="layout-header">
+        <div class="layout-letter">A</div>
+        <div>
+          <div class="layout-title">List + side panel<span class="my-pick">My pick</span></div>
+          <div class="layout-sub">Left column is the searchable list. Right column shows the full detail for whoever's selected. Click another client, the panel swaps. Like Gmail / Linear / Notion.</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="browser-frame">
+          <div class="browser-chrome"><div class="browser-url">localhost:5173/clients</div></div>
+          <div class="mock-app">
+            <div class="mock-sidebar">
+              <div class="mock-nav-item">Dashboard</div>
+              <div class="mock-nav-item active">Clients</div>
+              <div class="mock-nav-item">Tasks</div>
+              <div class="mock-nav-item">Calendar</div>
+              <div class="mock-nav-item">Marketing</div>
+              <div class="mock-nav-item">Systems</div>
+            </div>
+            <div class="mock-body">
+              <div class="layout-a-body">
+                <div class="mock-list">
+                  <div class="mock-list-header">
+                    <input class="mock-list-search" placeholder="Search clients..." />
+                  </div>
+                  <div class="mock-list-filters">
+                    <span class="mock-pill active">Active 15</span>
+                    <span class="mock-pill">Onboarding 6</span>
+                    <span class="mock-pill">All 25</span>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">ACTIV8</div>
+                    <div class="meta">TJ &amp; Jana Moreno · Alex Silva</div>
+                  </div>
+                  <div class="mock-list-item selected">
+                    <div class="name">Major Hoops</div>
+                    <div class="meta">Jeremy Major · Mike Eluki</div>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">Basketball+</div>
+                    <div class="meta">Jake Russell · Mike Eluki</div>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">Prime By Design</div>
+                    <div class="meta">Josh Mercado · Mike Eluki</div>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">D.A. Hoops Academy</div>
+                    <div class="meta">David Avak · Mike Eluki</div>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">Out Work</div>
+                    <div class="meta">Niko Brooks · Mike Eluki</div>
+                  </div>
+                  <div class="mock-list-item">
+                    <div class="name">The Basketball Lab</div>
+                    <div class="meta">Jayden Hodgson · Mike Eluki</div>
+                  </div>
+                </div>
+                <div class="mock-detail">
+                  <div class="mock-detail-header">
+                    <div>
+                      <div class="mock-detail-name">Major Hoops</div>
+                      <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">Jeremy Major · jeremy@majorhoops.com</div>
+                    </div>
+                    <span class="mock-detail-status">Active</span>
+                  </div>
+
+                  <div class="mock-section-title">Profile</div>
+                  <div class="mock-field"><span class="k">Scaling Manager</span><span class="v">Mike Eluki</span></div>
+                  <div class="mock-field"><span class="k">Status</span><span class="v">Active</span></div>
+                  <div class="mock-field"><span class="k">MRR (Stripe)</span><span class="v">$840/mo</span></div>
+
+                  <div class="mock-section-title">Integrations</div>
+                  <div class="mock-integrations">
+                    <div class="mock-integ"><span>Meta Ads</span><span class="status">Connected</span></div>
+                    <div class="mock-integ"><span>Slack</span><span class="status">#major-hoops</span></div>
+                    <div class="mock-integ"><span>Stripe</span><span class="status">Active</span></div>
+                    <div class="mock-integ"><span>GHL</span><span class="status">Major Hoops</span></div>
+                    <div class="mock-integ"><span>Notion</span><span class="status">Linked</span></div>
+                    <div class="mock-integ"><span>Asana</span><span class="status off">Not set</span></div>
+                  </div>
+
+                  <div class="mock-section-title">Recent activity</div>
+                  <div style="font-size:11px; color:var(--text-sub); line-height:1.7;">
+                    • Build ticket submitted 2h ago<br/>
+                    • Last call: 2026-05-11 (Notion)<br/>
+                    • Campaign launched 3d ago<br/>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>+ Pros</h4>
+          <ul>
+            <li>Switch between clients in 1 click — fastest for browsing</li>
+            <li>Edits stay in one place; no modal pop-in/pop-out</li>
+            <li>Industry-standard pattern (Gmail/Linear/Slack)</li>
+            <li>Search list while detail stays open</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>− Cons</h4>
+          <ul>
+            <li>Detail column is narrower than a modal/full page</li>
+            <li>Mobile needs a separate stacked view</li>
+            <li>Can feel cluttered when detail has many sections</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── LAYOUT B: list + modal ─────────── -->
+    <div class="layout-card">
+      <div class="layout-header">
+        <div class="layout-letter">B</div>
+        <div>
+          <div class="layout-title">Card grid + big modal</div>
+          <div class="layout-sub">Today's Clients-tab UI: card grid up front. Clicking a card opens a wide modal with everything — overview, edits, integrations, activity, notes.</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="browser-frame">
+          <div class="browser-chrome"><div class="browser-url">localhost:5173/clients</div></div>
+          <div class="mock-app">
+            <div class="mock-sidebar">
+              <div class="mock-nav-item">Dashboard</div>
+              <div class="mock-nav-item active">Clients</div>
+              <div class="mock-nav-item">Tasks</div>
+              <div class="mock-nav-item">Calendar</div>
+              <div class="mock-nav-item">Marketing</div>
+              <div class="mock-nav-item">Systems</div>
+            </div>
+            <div class="mock-body" style="position:relative;">
+              <div class="layout-b-list">
+                <div class="mock-list-filters" style="margin-bottom:14px;">
+                  <span class="mock-pill active">Active 15</span>
+                  <span class="mock-pill">Onboarding 6</span>
+                  <span class="mock-pill">All 25</span>
+                  <input class="mock-list-search" style="margin-left:auto; max-width:200px;" placeholder="Search..." />
+                </div>
+                <div class="mock-cards">
+                  <div class="mock-card"><div class="name">ACTIV8</div><div class="owner">TJ &amp; Jana Moreno</div><div class="mgr">Alex Silva</div></div>
+                  <div class="mock-card"><div class="name">Major Hoops</div><div class="owner">Jeremy Major</div><div class="mgr">Mike Eluki</div></div>
+                  <div class="mock-card"><div class="name">Basketball+</div><div class="owner">Jake Russell</div><div class="mgr">Mike Eluki</div></div>
+                  <div class="mock-card"><div class="name">Prime By Design</div><div class="owner">Josh Mercado</div><div class="mgr">Mike Eluki</div></div>
+                  <div class="mock-card"><div class="name">D.A. Hoops</div><div class="owner">David Avak</div><div class="mgr">Mike Eluki</div></div>
+                  <div class="mock-card"><div class="name">Out Work</div><div class="owner">Niko Brooks</div><div class="mgr">Mike Eluki</div></div>
+                </div>
+              </div>
+              <div class="mock-modal-overlay">
+                <div class="mock-modal">
+                  <div class="mock-detail-header">
+                    <div>
+                      <div class="mock-detail-name">Major Hoops</div>
+                      <div style="font-size:11px; color:var(--text-sub); margin-top:2px;">Jeremy Major · jeremy@majorhoops.com</div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                      <span class="mock-detail-status">Active</span>
+                      <span style="color:var(--text-mute); cursor:pointer;">✕</span>
+                    </div>
+                  </div>
+                  <div class="mock-section-title">Profile</div>
+                  <div class="mock-field"><span class="k">Manager</span><span class="v">Mike Eluki</span></div>
+                  <div class="mock-field"><span class="k">MRR</span><span class="v">$840/mo</span></div>
+                  <div class="mock-section-title">Integrations</div>
+                  <div class="mock-integrations">
+                    <div class="mock-integ"><span>Meta Ads</span><span class="status">Connected</span></div>
+                    <div class="mock-integ"><span>Slack</span><span class="status">#major-hoops</span></div>
+                    <div class="mock-integ"><span>Stripe</span><span class="status">Active</span></div>
+                    <div class="mock-integ"><span>GHL</span><span class="status">Major Hoops</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>+ Pros</h4>
+          <ul>
+            <li>Modal feels focused — no distractions</li>
+            <li>Roomier than a side panel (uses more screen)</li>
+            <li>Minimal change from today's Clients tab</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>− Cons</h4>
+          <ul>
+            <li>Have to close + reopen to switch between clients</li>
+            <li>Card grid wastes screen for the list view itself</li>
+            <li>Modal-fatigue for heavy operations (Meta setup)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─────────── LAYOUT C: tabbed full page ─────────── -->
+    <div class="layout-card">
+      <div class="layout-header">
+        <div class="layout-letter">C</div>
+        <div>
+          <div class="layout-title">Dedicated client page with tabs</div>
+          <div class="layout-sub">List page is just a list. Click a client → navigate to <code>/clients/major-hoops</code> with tabs (Overview / Setup / Integrations / Activity / Notes). Full page per client.</div>
+        </div>
+      </div>
+      <div class="mockup">
+        <div class="browser-frame">
+          <div class="browser-chrome"><div class="browser-url">localhost:5173/clients/major-hoops</div></div>
+          <div class="mock-app">
+            <div class="mock-sidebar">
+              <div class="mock-nav-item">Dashboard</div>
+              <div class="mock-nav-item active">Clients</div>
+              <div class="mock-nav-item">Tasks</div>
+              <div class="mock-nav-item">Calendar</div>
+              <div class="mock-nav-item">Marketing</div>
+            </div>
+            <div class="mock-body">
+              <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-mute); margin-bottom:8px;">
+                <span>← Clients</span><span>/</span><span style="color:var(--text);">Major Hoops</span>
+              </div>
+              <div class="mock-detail-header" style="margin-bottom:0; padding-bottom:14px;">
+                <div>
+                  <div class="mock-detail-name" style="font-size:22px;">Major Hoops</div>
+                  <div style="font-size:12px; color:var(--text-sub); margin-top:4px;">Jeremy Major · jeremy@majorhoops.com · Manager: Mike Eluki</div>
+                </div>
+                <span class="mock-detail-status">Active</span>
+              </div>
+              <div class="mock-tabs">
+                <div class="mock-tab active">Overview</div>
+                <div class="mock-tab">Setup</div>
+                <div class="mock-tab">Integrations</div>
+                <div class="mock-tab">Activity</div>
+                <div class="mock-tab">Notes</div>
+              </div>
+              <div class="mock-tabs-content">
+                <div class="mock-section-title" style="margin-top:0;">Profile</div>
+                <div class="mock-field"><span class="k">Business Name</span><span class="v">Major Hoops</span></div>
+                <div class="mock-field"><span class="k">Owner</span><span class="v">Jeremy Major</span></div>
+                <div class="mock-field"><span class="k">Email</span><span class="v">jeremy@majorhoops.com</span></div>
+                <div class="mock-field"><span class="k">Manager</span><span class="v">Mike Eluki</span></div>
+                <div class="mock-field"><span class="k">Status</span><span class="v">Active</span></div>
+                <div class="mock-field"><span class="k">MRR (Stripe)</span><span class="v">$840/mo</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>+ Pros</h4>
+          <ul>
+            <li>Most screen real estate per client</li>
+            <li>Shareable URLs per client (deep links)</li>
+            <li>Tabs cleanly separate concerns (setup vs activity)</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>− Cons</h4>
+          <ul>
+            <li>Slowest to switch between clients (back/forward navigation)</li>
+            <li>Tabs hide functionality you might want to see at once</li>
+            <li>Most code to build (routing, multiple tabbed views)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:48px; padding:24px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px;">
+    <h2 style="font-family:'Space Grotesk',sans-serif; font-size:18px; margin:0 0 12px;">My recommendation: A (list + side panel)</h2>
+    <p style="font-size:13px; color:var(--text-sub); line-height:1.6; margin:0 0 14px;">You said you want one place to view AND edit. A keeps editing in flow (no modal pop-out). Switching clients is 1 click. Activity timeline + integrations fit on one screen. Fastest for the daily-use case of "scan clients, fix one thing on each."</p>
+    <p style="font-size:13px; color:var(--text-sub); line-height:1.6; margin:0;">B is fine if you do deep work on one client at a time. C is overkill for what we're building unless you're going to add a LOT more per-client data later (call logs, tasks, leads, etc. embedded inline).</p>
+  </div>
+</div>
+</body>
+</html>

@@ -23,6 +23,7 @@ import MarketingView from './views/MarketingView';
 import TeamView from './views/TeamView';
 import ContentView from './views/ContentView';
 import ClientSetupView from './views/ClientSetupView';
+import ClientsCombinedView from './views/ClientsCombinedView';
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -748,18 +749,14 @@ export default function BAMPortal() {
             {/* DASHBOARD */}
             {nav === "dashboard" && <DashboardView tokens={tk} dark={dark} onboardingClients={onboardingClients} activeClients={activeClients} allReminders={allReminders} tasks={tasks} calendarEvents={calendarEvents} financialAlerts={financialAlerts} onNavigate={setNav} loading={dashboardLoading} onUpdateTask={handleUpdateTask} onSelectClient={(client, isOnboarding) => { setSelected(client); setIsOnboardingModal(isOnboarding); }} userName={userName} />}
 
-            {/* CLIENTS */}
+            {/* CLIENTS — combined view (list + per-client detail with tabs).
+                Merges the old Clients tab + Client Setup tab into one place. */}
             {nav === "clients" && (
-              <ClientsView
+              <ClientsCombinedView
                 tokens={tk}
                 dark={dark}
                 me={me}
-                onboardingClients={onboardingClients}
-                activeClients={activeClients}
-                onSelectClient={(client, isOnboarding) => {
-                  setSelected(client);
-                  setIsOnboardingModal(isOnboarding);
-                }}
+                session={session}
               />
             )}
 

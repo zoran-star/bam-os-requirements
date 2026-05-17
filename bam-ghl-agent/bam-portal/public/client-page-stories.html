@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Combined Clients Page — User Stories Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --bg-el: #131318;
+    --bg-el-hover: #1A1A21;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #F5F5F7;
+    --text-sub: #B0B0BA;
+    --text-mute: #6E6E78;
+    --gold: #E8C547;
+    --green: #4ADE80;
+    --red: #ED7969;
+    --amber: #F5A524;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 56px 24px 96px; }
+  .header { margin-bottom: 40px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 14px; line-height: 1.1; }
+  .sub { font-size: 15px; color: var(--text-sub); margin: 0 0 32px; line-height: 1.55; max-width: 720px; }
+  .toolbar { display: flex; gap: 12px; margin-bottom: 40px; padding: 20px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; flex-wrap: wrap; align-items: center; }
+  .toolbar .stats { font-size: 13px; color: var(--text-sub); margin-right: auto; }
+  .toolbar .stats b { color: var(--text); }
+  button { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 6px; cursor: pointer; transition: all 0.15s ease; border: 1px solid transparent; }
+  .btn-primary { background: var(--gold); color: #0B0B0D; border-color: var(--gold); }
+  .btn-primary:hover { background: #F5D85E; }
+  .btn-secondary { background: transparent; color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--bg-el-hover); }
+  .btn-danger { background: transparent; color: var(--red); border-color: rgba(237,121,105,0.4); }
+  .btn-danger:hover { background: rgba(237,121,105,0.1); }
+
+  .category { margin-bottom: 48px; }
+  .category-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .category-icon { font-size: 24px; }
+  .category-title { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .category-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-mute); font-weight: 500; }
+
+  .story { background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; padding: 18px 22px; margin-bottom: 12px; transition: border-color 0.15s ease; }
+  .story.approved { border-left: 3px solid var(--green); }
+  .story.rejected { border-left: 3px solid var(--red); opacity: 0.6; }
+  .story.feedback { border-left: 3px solid var(--amber); }
+
+  .story-header { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .story-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-mute); font-weight: 500; min-width: 56px; }
+  .story-text { flex: 1; font-size: 14px; line-height: 1.5; }
+  .story-text .as { font-weight: 600; color: var(--gold); }
+  .story-text .want { color: var(--text); }
+  .story-text .so { color: var(--text-sub); }
+
+  .actions { display: flex; gap: 8px; margin-top: 14px; align-items: flex-start; }
+  .action-btn { font-size: 12px; padding: 7px 14px; min-width: 80px; text-align: center; }
+  .action-btn.active.approve { background: var(--green); color: #0B0B0D; border-color: var(--green); }
+  .action-btn.active.reject { background: var(--red); color: #0B0B0D; border-color: var(--red); }
+  .feedback-input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; padding: 8px 12px; font-family: 'Inter', sans-serif; font-size: 13px; resize: vertical; min-height: 36px; }
+  .feedback-input:focus { outline: none; border-color: var(--gold); }
+
+  .export-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; padding: 24px; }
+  .export-modal.open { display: flex; }
+  .export-content { background: var(--bg-el); border: 1px solid var(--border-strong); border-radius: 6px; max-width: 800px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; }
+  .export-header { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .export-header h2 { font-family: 'Space Grotesk', sans-serif; margin: 0; font-size: 20px; }
+  .export-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+  .export-textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; min-height: 400px; resize: vertical; line-height: 1.6; }
+  .export-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+  .progress-pill { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-sub); font-weight: 600; }
+  .progress-pill b { color: var(--text); }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-el); border: 1px solid var(--border-strong); border-radius: 6px; padding: 12px 20px; font-size: 13px; font-weight: 600; z-index: 200; opacity: 0; transition: opacity 0.2s ease; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="eyebrow">Planning · 2026-05-17 · Combined Clients Page</div>
+    <h1>User Stories Review</h1>
+    <p class="sub">For each story, hit <b style="color:var(--green)">✓ Approve</b>, <b style="color:var(--red)">✕ Reject</b>, or type feedback in the box. Mix freely. When you're done, click <b>Export</b> at the bottom — copy the output and paste it back in Claude. Total: <b id="totalCount">0</b> stories.</p>
+  </div>
+
+  <div class="toolbar">
+    <div class="stats">
+      <span class="progress-pill">✓ <b id="approvedCount">0</b> approved</span>
+      &nbsp;<span class="progress-pill" style="color:var(--amber)">✎ <b id="feedbackCount">0</b> feedback</span>
+      &nbsp;<span class="progress-pill" style="color:var(--red)">✕ <b id="rejectedCount">0</b> rejected</span>
+      &nbsp;<span class="progress-pill">○ <b id="pendingCount">0</b> pending</span>
+    </div>
+    <button class="btn-secondary" onclick="approveAll()">Approve all</button>
+    <button class="btn-secondary" onclick="clearAll()">Clear all</button>
+    <button class="btn-primary" onclick="openExport()">Export ↗</button>
+  </div>
+
+  <div id="storiesRoot"></div>
+
+  <div style="text-align: center; margin-top: 56px;">
+    <button class="btn-primary" onclick="openExport()" style="padding: 14px 28px; font-size: 14px;">Export &amp; copy ↗</button>
+  </div>
+</div>
+
+<div class="export-modal" id="exportModal">
+  <div class="export-content">
+    <div class="export-header">
+      <h2>Export — paste this back into Claude</h2>
+      <button class="btn-secondary" onclick="closeExport()">✕ Close</button>
+    </div>
+    <div class="export-body">
+      <p style="font-size:13px; color:var(--text-sub); margin: 0 0 14px;">Click "Copy to clipboard", then paste into Claude. I'll process the decisions and move to UI planning.</p>
+      <textarea class="export-textarea" id="exportText" readonly></textarea>
+    </div>
+    <div class="export-footer">
+      <button class="btn-secondary" onclick="closeExport()">Close</button>
+      <button class="btn-primary" onclick="copyExport()">📋 Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CATEGORIES = [
+  {
+    id: "browse", icon: "🔍", title: "Browse & find",
+    stories: [
+      { id: "BR-1", as: "Staff", want: "see ALL clients in one list (active + onboarding)", so: "stop hunting between two tabs" },
+      { id: "BR-2", as: "Staff", want: "filter by status (Active, Onboarding, Paused, Churned)", so: "focus on relevant clients" },
+      { id: "BR-3", as: "Staff", want: "search by business name, owner name, email", so: "find a specific client fast" },
+      { id: "BR-4", as: "Staff", want: "sort by recently added / alphabetical / MRR / health", so: "scan the way I'm thinking" },
+      { id: "BR-5", as: "Staff", want: "see key counts at the top (total, active, onboarding, MRR)", so: "get a pulse without drilling in" },
+    ],
+  },
+  {
+    id: "view", icon: "👁", title: "View one client",
+    stories: [
+      { id: "VW-1", as: "Staff", want: "see business name, owner name, email, status", so: "know who they are" },
+      { id: "VW-2", as: "Staff", want: "see their scaling manager (with photo if available)", so: "know who owns the relationship" },
+      { id: "VW-3", as: "Staff", want: "see live Stripe MRR + billing status", so: "know if they're paying" },
+      { id: "VW-4", as: "Staff", want: "see Meta connection status + ad spend", so: "know if marketing is live" },
+      { id: "VW-5", as: "Staff", want: "see a Slack channel link (opens Slack)", so: "jump to their channel" },
+      { id: "VW-6", as: "Staff", want: "see a GHL location link (opens GHL)", so: "jump to their CRM" },
+      { id: "VW-7", as: "Staff", want: "see a Notion profile link (opens Notion for human notes)", so: "read call log / latest update" },
+      { id: "VW-8", as: "Staff", want: "see an Asana project link", so: "see ongoing tasks" },
+      { id: "VW-9", as: "Staff", want: "see auth status (invited / active / never logged in)", so: "know if they can log into portal" },
+    ],
+  },
+  {
+    id: "edit", icon: "✏️", title: "Edit client info",
+    stories: [
+      { id: "ED-1", as: "Admin/Scaling Manager", want: "edit business_name", so: "fix typos, rebrands" },
+      { id: "ED-2", as: "Admin/Scaling Manager", want: "edit owner_name", so: "update contact name" },
+      { id: "ED-3", as: "Admin/Scaling Manager", want: "edit email (re-invite logic kicks in)", so: "change login email" },
+      { id: "ED-4", as: "Admin/Scaling Manager", want: "change scaling manager via dropdown", so: "reassign relationships" },
+      { id: "ED-5", as: "Admin/Scaling Manager", want: "change status (active / onboarding / paused / churned)", so: "lifecycle changes" },
+      { id: "ED-6", as: "Marketing", want: "edit slack_channel_id", so: "wire notifications" },
+      { id: "ED-7", as: "Admin", want: "edit ghl_location_id", so: "link CRM" },
+      { id: "ED-8", as: "Admin", want: "edit stripe_customer_id", so: "link billing" },
+      { id: "ED-9", as: "Admin", want: "edit notion_page_id", so: "link the relationship notes" },
+      { id: "ED-10", as: "Admin", want: "edit asana_project_id", so: "link project board" },
+    ],
+  },
+  {
+    id: "auth", icon: "🔐", title: "Account management",
+    stories: [
+      { id: "AU-1", as: "Admin/Marketing", want: "send portal invite", so: "onboard a new client" },
+      { id: "AU-2", as: "Admin/Marketing", want: "resend invite (if first one expired)", so: "recover stalled signups" },
+      { id: "AU-3", as: "Admin/Marketing", want: "send password reset", so: "help locked-out clients" },
+      { id: "AU-4", as: "Admin", want: "disconnect a client's auth account", so: "revoke access (security)" },
+      { id: "AU-5", as: "Staff", want: "see last-login timestamp", so: "know if client is engaged" },
+    ],
+  },
+  {
+    id: "meta", icon: "📈", title: "Meta marketing setup",
+    stories: [
+      { id: "MT-1", as: "Marketing", want: "connect a Meta ad account to a client", so: "surface their real campaigns" },
+      { id: "MT-2", as: "Marketing", want: "pick which campaigns to show", so: "hide experimental ones" },
+      { id: "MT-3", as: "Marketing", want: "see 'Meta connection expired' + reconnect CTA", so: "fix 401s when they happen" },
+      { id: "MT-4", as: "Marketing", want: "see current ad spend at a glance", so: "spot under/over-spending" },
+      { id: "MT-5", as: "Client (via portal)", want: "connect their own Meta (hybrid path)", so: "bring their own ad account" },
+    ],
+  },
+  {
+    id: "lifecycle", icon: "➕", title: "Add / remove clients",
+    stories: [
+      { id: "LC-1", as: "Admin", want: "add a new client without inviting yet", so: "set up profile before going live" },
+      { id: "LC-2", as: "Admin", want: "add + invite a new client in one flow", so: "fast onboarding" },
+      { id: "LC-3", as: "Admin", want: "archive a churned client (soft delete)", so: "keep history but hide from active list" },
+      { id: "LC-4", as: "Admin", want: "permanently delete a test client", so: "cleanup" },
+    ],
+  },
+  {
+    id: "activity", icon: "📊", title: "Activity & history",
+    stories: [
+      { id: "AC-1", as: "Staff", want: "see recent tickets they've submitted per client", so: "know what they need" },
+      { id: "AC-2", as: "Staff", want: "see recent campaigns launched per client", so: "see marketing momentum" },
+      { id: "AC-3", as: "Staff", want: "see recent failed payments from Stripe per client", so: "proactively reach out" },
+      { id: "AC-4", as: "Staff", want: "see latest call note from Notion per client", so: "know what was last discussed" },
+      { id: "AC-5", as: "Staff", want: "see open Asana tasks count per client", so: "see workload" },
+    ],
+  },
+  {
+    id: "notes", icon: "📝", title: "Internal notes",
+    stories: [
+      { id: "NT-1", as: "Staff", want: "add a quick internal note on a client (stays in portal)", so: "capture quick context" },
+      { id: "NT-2", as: "Staff", want: "see notes from other staff", so: "stay aligned without slack-hunting" },
+      { id: "NT-3", as: "Staff", want: "tag a teammate in a note", so: "get help/handoff" },
+    ],
+  },
+];
+
+const state = {};
+
+function render() {
+  const root = document.getElementById("storiesRoot");
+  root.innerHTML = CATEGORIES.map(cat => {
+    const stories = cat.stories.map(s => {
+      const st = state[s.id] || {};
+      const cls = st.decision === "approve" ? "approved" : st.decision === "reject" ? "rejected" : st.feedback ? "feedback" : "";
+      return `
+        <div class="story ${cls}" data-id="${s.id}">
+          <div class="story-header">
+            <span class="story-id">${s.id}</span>
+            <div class="story-text">
+              <span class="as">As ${s.as},</span>
+              <span class="want">I want to ${s.want}</span>
+              <span class="so">— so I can ${s.so}.</span>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn-secondary action-btn approve ${st.decision === 'approve' ? 'active' : ''}" onclick="setDecision('${s.id}', 'approve')">✓ Approve</button>
+            <button class="btn-secondary action-btn reject ${st.decision === 'reject' ? 'active' : ''}" onclick="setDecision('${s.id}', 'reject')">✕ Reject</button>
+            <textarea class="feedback-input" placeholder="Or type feedback here..." oninput="setFeedback('${s.id}', this.value)">${st.feedback || ''}</textarea>
+          </div>
+        </div>
+      `;
+    }).join('');
+    return `
+      <div class="category">
+        <div class="category-header">
+          <span class="category-icon">${cat.icon}</span>
+          <h2 class="category-title">${cat.title}</h2>
+          <span class="category-count">${cat.stories.length} stories</span>
+        </div>
+        ${stories}
+      </div>
+    `;
+  }).join('');
+  updateCounts();
+}
+
+function setDecision(id, decision) {
+  state[id] = state[id] || {};
+  state[id].decision = state[id].decision === decision ? null : decision;
+  render();
+  save();
+}
+
+function setFeedback(id, text) {
+  state[id] = state[id] || {};
+  state[id].feedback = text;
+  updateCounts();
+  save();
+}
+
+function updateCounts() {
+  let total = 0, approved = 0, rejected = 0, feedback = 0;
+  for (const cat of CATEGORIES) {
+    for (const s of cat.stories) {
+      total++;
+      const st = state[s.id] || {};
+      if (st.decision === "approve") approved++;
+      else if (st.decision === "reject") rejected++;
+      else if (st.feedback?.trim()) feedback++;
+    }
+  }
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('approvedCount').textContent = approved;
+  document.getElementById('rejectedCount').textContent = rejected;
+  document.getElementById('feedbackCount').textContent = feedback;
+  document.getElementById('pendingCount').textContent = total - approved - rejected - feedback;
+}
+
+function approveAll() {
+  for (const cat of CATEGORIES) {
+    for (const s of cat.stories) {
+      state[s.id] = state[s.id] || {};
+      if (!state[s.id].decision && !state[s.id].feedback) state[s.id].decision = "approve";
+    }
+  }
+  render(); save();
+}
+
+function clearAll() {
+  if (!confirm("Clear all decisions and feedback?")) return;
+  for (const k of Object.keys(state)) delete state[k];
+  render(); save();
+}
+
+function save() {
+  try { localStorage.setItem('client-stories-v1', JSON.stringify(state)); } catch (e) {}
+}
+function load() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('client-stories-v1') || '{}');
+    Object.assign(state, saved);
+  } catch (e) {}
+}
+
+function buildExport() {
+  let out = `---\nsession: combined-clients-page-stories\ndate: ${new Date().toISOString().slice(0,10)}\n---\n\n# Combined Clients Page — User Story Decisions\n\n`;
+  for (const cat of CATEGORIES) {
+    out += `## ${cat.icon} ${cat.title}\n\n`;
+    for (const s of cat.stories) {
+      const st = state[s.id] || {};
+      const decision = st.decision === "approve" ? "[x] APPROVED"
+                     : st.decision === "reject" ? "[✕] REJECTED"
+                     : st.feedback?.trim() ? "[ ] FEEDBACK"
+                     : "[ ] (skipped)";
+      out += `- **${s.id}** ${decision} — As ${s.as}, I want to ${s.want}, so I can ${s.so}.\n`;
+      if (st.feedback?.trim()) {
+        out += `  > FEEDBACK: ${st.feedback.trim()}\n`;
+      }
+    }
+    out += `\n`;
+  }
+  let total = 0, approved = 0, rejected = 0, feedback = 0;
+  for (const cat of CATEGORIES) {
+    for (const s of cat.stories) {
+      total++;
+      const st = state[s.id] || {};
+      if (st.decision === "approve") approved++;
+      else if (st.decision === "reject") rejected++;
+      else if (st.feedback?.trim()) feedback++;
+    }
+  }
+  out += `\n---\n\n**Summary:** ${approved} approved, ${feedback} feedback, ${rejected} rejected, ${total - approved - rejected - feedback} skipped (out of ${total} total).\n`;
+  return out;
+}
+
+function openExport() {
+  document.getElementById('exportText').value = buildExport();
+  document.getElementById('exportModal').classList.add('open');
+}
+
+function closeExport() {
+  document.getElementById('exportModal').classList.remove('open');
+}
+
+function copyExport() {
+  const txt = document.getElementById('exportText');
+  txt.select();
+  navigator.clipboard.writeText(txt.value).then(() => {
+    showToast('Copied — paste into Claude');
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+load();
+render();
+</script>
+</body>
+</html>

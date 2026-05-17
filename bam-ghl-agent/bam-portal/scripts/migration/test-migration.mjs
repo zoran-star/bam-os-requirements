@@ -153,12 +153,13 @@ if (apiBase) {
     if (res.status === 401) {
       console.log("    (401 expected — endpoint requires auth)");
     } else if (res.ok) {
-      const data = await res.json();
+      const json = await res.json();
+      const data = json.data || json;
       check("Returns array of clients", Array.isArray(data));
-      const sample = data[0];
+      const sample = data?.[0];
       check("Each client has business_name", sample?.business_name !== undefined);
       check("Each client has `name` alias (legacy compat)", sample?.name !== undefined);
-      check("Each client has scaling_manager_id field", "scaling_manager_id" in sample);
+      check("Each client has scaling_manager_id field", sample && "scaling_manager_id" in sample);
     }
   } catch (e) {
     check(`GET /api/clients reachable`, false, e.message);

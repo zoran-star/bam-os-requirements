@@ -217,18 +217,32 @@ export default async function handler(req, res) {
       // - invite-staff + creating new clients (no action) = admin only
       // - setup-account / update-fields / reset-password = admin + marketing roles
       //   (so Ximena and other marketing staff can run the Client Setup page)
+      // Roles model (combined clients page):
+      //   ADMIN_LIKE = admin OR scaling_manager   — full power
+      //   MARKETING  = ADMIN_LIKE + marketing roles
+      //   ANY_STAFF  = anyone with a row in `staff` (defensive: must be authenticated)
       const ADMIN_LIKE_ROLES = new Set(["admin", "scaling_manager"]);
-      const MARKETING_ROLES = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor"]);
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff"]);
-      const MARKETING_OK_ACTIONS = new Set(["setup-account", "update-fields", "reset-password", "create-client"]);
+      const MARKETING_ROLES  = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor"]);
+      const ANY_STAFF_ROLES  = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor", "systems_manager", "systems_executor", "systems"]);
+
+      // Action gating:
+      //   invite-staff             admin+scaling
+      //   create-client            admin+scaling
+      //   setup-account            admin+scaling   (per Zoran's feedback: not marketing)
+      //   reset-password           admin+scaling
+      //   archive                  admin+scaling
+      //   update-fields            any staff (field-level gating below)
+      //   (default insert)         admin+scaling
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "create-client", "setup-account", "reset-password", "archive"]);
+      const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
-        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin only" });
-      } else if (MARKETING_OK_ACTIONS.has(action)) {
-        if (!MARKETING_ROLES.has(role)) return res.status(403).json({ error: "admin or marketing role required" });
+        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin or scaling_manager required" });
+      } else if (ANY_STAFF_OK_ACTIONS.has(action)) {
+        if (!ANY_STAFF_ROLES.has(role)) return res.status(403).json({ error: "staff role required" });
       } else {
         // Default: creating a new client (no action). Admin-level only.
-        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin only" });
+        if (!ADMIN_LIKE_ROLES.has(role)) return res.status(403).json({ error: "admin or scaling_manager required" });
       }
 
       // ── action=invite-staff ──
@@ -334,30 +348,61 @@ export default async function handler(req, res) {
       }
 
       // ── action=update-fields ──
-      // Admin-only. Inline-edit owner_name / email on an existing client
-      // from the Client Setup page. Doesn't send an invite.
+      // Field-level role gating per Zoran's spec:
+      //   any staff → owner_name, email, status, scaling_manager_id, slack_channel_id, ghl_location_id, business_name
+      //   admin+scaling → stripe_customer_id, notion_page_id
       if (action === "update-fields") {
         const body = req.body || {};
         const client_id = typeof body.client_id === "string" ? body.client_id : "";
         if (!client_id) return res.status(400).json({ error: "client_id required" });
+
+        const isAdminLike = ADMIN_LIKE_ROLES.has(role);
+
+        // Validators / coercion per field
+        const setText = (k) => {
+          if (typeof body[k] === "string") return body[k].trim() || null;
+          if (body[k] === null) return null;
+          return undefined;
+        };
+
         const patch = {};
-        if (typeof body.owner_name === "string") patch.owner_name = body.owner_name.trim() || null;
-        if (typeof body.email === "string") {
-          const newEmail = body.email.trim().toLowerCase();
+        const wasSet = (k) => Object.prototype.hasOwnProperty.call(body, k);
+
+        // ── Any-staff fields ──
+        if (wasSet("business_name"))      patch.business_name      = setText("business_name");
+        if (wasSet("owner_name"))         patch.owner_name         = setText("owner_name");
+        if (wasSet("slack_channel_id"))   patch.slack_channel_id   = setText("slack_channel_id");
+        if (wasSet("ghl_location_id"))    patch.ghl_location_id    = setText("ghl_location_id");
+        if (wasSet("scaling_manager_id")) patch.scaling_manager_id = body.scaling_manager_id || null;
+
+        if (wasSet("status")) {
+          const s = body.status;
+          if (s !== null && !["onboarding","active","paused","churned"].includes(s)) {
+            return res.status(400).json({ error: "invalid status value" });
+          }
+          patch.status = s;
+        }
+        if (wasSet("email")) {
+          const newEmail = (body.email || "").trim().toLowerCase();
           if (newEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
             return res.status(400).json({ error: "invalid email format" });
           }
           patch.email = newEmail || null;
         }
-        if (typeof body.slack_channel_id === "string") {
-          const ch = body.slack_channel_id.trim();
-          // Accept C... (public/private channel) or G... (legacy group) IDs;
-          // empty string clears it. Don't validate strictly — Slack IDs can
-          // start with C, G, or D (DMs); just trim.
-          patch.slack_channel_id = ch || null;
+
+        // ── Admin+scaling-only fields ──
+        if (wasSet("stripe_customer_id")) {
+          if (!isAdminLike) return res.status(403).json({ error: "stripe_customer_id requires admin or scaling_manager" });
+          patch.stripe_customer_id = setText("stripe_customer_id");
         }
+        if (wasSet("notion_page_id")) {
+          if (!isAdminLike) return res.status(403).json({ error: "notion_page_id requires admin or scaling_manager" });
+          patch.notion_page_id = setText("notion_page_id");
+        }
+
         if (!Object.keys(patch).length) return res.status(400).json({ error: "nothing to update" });
         patch.updated_at = new Date().toISOString();
+
         const res2 = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`, {
           method: "PATCH",
           headers: {
@@ -373,6 +418,29 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: `update failed: ${errText}` });
         }
         return res.status(200).json({ ok: true, ...patch });
+      }
+
+      // ── action=archive ──
+      // Soft-delete: sets clients.archived_at = now(). Hidden from active list.
+      if (action === "archive") {
+        const body = req.body || {};
+        const client_id = typeof body.client_id === "string" ? body.client_id : "";
+        if (!client_id) return res.status(400).json({ error: "client_id required" });
+        const res2 = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`, {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+        });
+        if (!res2.ok) {
+          const errText = await res2.text();
+          return res.status(500).json({ error: `archive failed: ${errText}` });
+        }
+        return res.status(200).json({ ok: true, archived: true });
       }
 
       if (action === "setup-account") {
