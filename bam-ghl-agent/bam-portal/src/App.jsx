@@ -45,6 +45,10 @@ export default function BAMPortal() {
   // consumes it once via initialClientId then clears it so reopening the tab
   // fresh doesn't keep re-jumping.
   const [clientsInitialId, setClientsInitialId] = useState(null);
+  // When the Clients view drills into a specific client, suppress the
+  // page-level "Clients · 27 total" banner — the in-view header carries
+  // the breadcrumb back out.
+  const [clientsInDetail, setClientsInDetail] = useState(false);
   const [showCmd, setShowCmd] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [onboardingClients, setOnboardingClients] = useState([]);
@@ -696,10 +700,12 @@ export default function BAMPortal() {
           {/* Page content */}
           <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "24px 16px 16px" : "40px 44px 16px" }}>
 
-            <div key={nav} style={{ marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-              <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
-              <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
-            </div>
+            {!(nav === "clients" && clientsInDetail) && (
+              <div key={nav} style={{ marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+                <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
+                <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
+              </div>
+            )}
 
             {/* DASHBOARD — clicking a client card jumps into the Clients tab
                 and opens that client's detail view. Eager (first-paint). */}
@@ -730,6 +736,7 @@ export default function BAMPortal() {
                   session={session}
                   initialClientId={clientsInitialId}
                   onInitialClientHandled={() => setClientsInitialId(null)}
+                  onDetailChange={setClientsInDetail}
                 />
               )}
 

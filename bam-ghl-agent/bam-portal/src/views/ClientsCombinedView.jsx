@@ -39,7 +39,7 @@ const ROLES = {
 
 const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
 
-export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled }) {
+export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled, onDetailChange }) {
   const t = tokens;
   const role = me?.role || "";
 
@@ -106,6 +106,12 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   }, [clients, statusFilter, search, sortKey]);
 
   const selectedClient = selectedId ? clients.find(c => c.id === selectedId) : null;
+
+  // Notify parent (App.jsx) when we enter/leave a detail view so it can hide
+  // the page-level "Clients · 27 total" banner that's otherwise redundant.
+  useEffect(() => {
+    onDetailChange?.(Boolean(selectedId));
+  }, [selectedId, onDetailChange]);
 
   // ─── DETAIL VIEW ─────────────────────────────────────────────────────────
   if (selectedClient) {
@@ -330,20 +336,25 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 
   return (
     <div>
-      {/* Breadcrumb + header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: t.textMute, marginBottom: 10, cursor: "pointer" }} onClick={onBack}>
-        <span>← Clients</span><span>/</span><span style={{ color: t.text }}>{client.business_name}</span>
+      {/* Breadcrumb */}
+      <div
+        onClick={onBack}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: t.textMute, marginBottom: 14, cursor: "pointer" }}
+        onMouseEnter={e => { e.currentTarget.style.color = t.text; }}
+        onMouseLeave={e => { e.currentTarget.style.color = t.textMute; }}
+      >
+        <span>←</span><span>Clients</span>
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, paddingBottom: 16, borderBottom: `1px solid ${t.border}` }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", margin: 0 }}>{client.business_name}</h1>
-          <div style={{ fontSize: 13, color: t.textSub, marginTop: 6 }}>
-            {client.owner_name || "(no owner set)"}
-            {client.email ? <> · {client.email}</> : null}
-            {staffMap[client.scaling_manager_id] && <> · Manager: <b style={{ color: t.text }}>{staffMap[client.scaling_manager_id].name}</b></>}
-          </div>
+
+      {/* Header: title + status pill on one row, owner name below */}
+      <div style={{ marginBottom: 22, paddingBottom: 18, borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: t.text, letterSpacing: "-0.03em", margin: 0 }}>{client.business_name}</h1>
+          <StatusPill status={client.status} tokens={t} />
         </div>
-        <StatusPill status={client.status} tokens={t} />
+        <div style={{ fontSize: 13, color: t.textSub, marginTop: 6 }}>
+          {client.owner_name || "(no owner set)"}
+        </div>
       </div>
 
       {/* Tabs */}
