@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Systems — Font Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;700&family=Anonymous+Pro:wght@400;700&family=Anton&family=Archivo:wght@400;500;700;800&family=Archivo+Black&family=Asap:wght@400;500;700&family=Atkinson+Hyperlegible:wght@400;700&family=Be+Vietnam+Pro:wght@400;500;700&family=Bebas+Neue&family=Big+Shoulders+Display:wght@500;700;800&family=Bricolage+Grotesque:wght@500;700;800&family=Cabin:wght@400;500;700&family=Caprasimo&family=Cardo:wght@400;700&family=Cinzel:wght@500;700&family=Climate+Crisis&family=Cormorant+Garamond:wght@500;700&family=Cousine:wght@400;700&family=Crimson+Pro:wght@500;700&family=Cutive+Mono&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&family=DM+Serif+Display&family=EB+Garamond:wght@500;700&family=Familjen+Grotesk:wght@400;500;700&family=Figtree:wght@400;500;700&family=Fira+Code:wght@400;500&family=Fraunces:wght@500;700;800&family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&family=Gloock&family=Hanken+Grotesk:wght@400;500;700&family=Hind:wght@400;500;700&family=Hubot+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;700&family=IBM+Plex+Serif:wght@400;500;700&family=Inconsolata:wght@400;500&family=Instrument+Serif&family=Inter:wght@400;500;700;800&family=Inter+Tight:wght@400;500;700&family=Italiana&family=JetBrains+Mono:wght@400;500&family=Karla:wght@400;500;700&family=Lexend:wght@400;500;700&family=Lexend+Deca:wght@400;500;700&family=Libre+Bodoni:wght@500;700&family=Libre+Caslon+Text:wght@400;700&family=Lobster+Two:wght@400;700&family=Lora:wght@500;700&family=Major+Mono+Display&family=Manrope:wght@400;500;700&family=Marcellus&family=Merriweather:wght@400;700&family=Mona+Sans:wght@400;500;700&family=Montserrat:wght@400;500;700&family=Mulish:wght@400;500;700&family=Nova+Mono&family=Nunito:wght@500;700;800;900&family=Nunito+Sans:wght@400;500;700&family=Old+Standard+TT:wght@400;700&family=Onest:wght@400;500;700&family=Open+Sans:wght@400;500;700&family=Oswald:wght@500;700&family=Outfit:wght@400;500;700&family=Overpass+Mono:wght@400;500&family=PT+Serif:wght@400;700&family=Playfair+Display:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Poppins:wght@400;500;700&family=Public+Sans:wght@400;500;700&family=Quicksand:wght@400;500;700&family=Raleway:wght@400;500;700&family=Red+Hat+Display:wght@400;500;700&family=Red+Hat+Mono:wght@400;500&family=Red+Hat+Text:wght@400;500;700&family=Roboto:wght@400;500;700&family=Roboto+Flex&family=Roboto+Mono:wght@400;500&family=Roboto+Serif:wght@400;500;700&family=Roboto+Slab:wght@400;500;700&family=Rubik:wght@400;500;700&family=Saira:wght@400;500;700&family=Schibsted+Grotesk:wght@400;500;700&family=Sora:wght@400;500;700&family=Source+Code+Pro:wght@400;500&family=Source+Sans+3:wght@400;500;700&family=Source+Serif+4:wght@500;700&family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&family=Spectral:wght@500;700&family=Syne:wght@500;700;800&family=Tomorrow:wght@400;500;700&family=Ubuntu+Mono:wght@400;700&family=Unbounded:wght@500;700&family=Urbanist:wght@400;500;700&family=VT323&family=Vollkorn:wght@500;700&family=Wix+Madefor+Display:wght@400;500;700&family=Wix+Madefor+Text:wght@400;500;700&family=Work+Sans:wght@400;500;700&family=Yeseva+One&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Tokens (mirror client-portal.html) ───────────────────────────── */
+  :root {
+    --bg:           #0F0E0C;
+    --ink:          #0F0E0C;
+    --surface:      #1A1916;
+    --surface-el:   #222120;
+    --surface-3:    #2C2B28;
+    --line:         rgba(255,255,255,0.08);
+    --line-str:     rgba(255,255,255,0.14);
+    --text:         #F0EDE8;
+    --text-sub:     #A5A19A;
+    --text-mute:    #6E6B63;
+    --gold:         #D4B65C;
+    --gold-l:       #C8A84E;
+    --gold-d:       #E0C56A;
+    --gold-glow:    rgba(212,182,92,0.12);
+    --pace-stop:    #F07060;
+    --pace-flow:    #5A8FB8;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 14px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.15);
+    --shadow-gold: 0 4px 18px rgba(212,182,92,0.18), 0 2px 8px rgba(212,182,92,0.10);
+    --sans:    'Plus Jakarta Sans', system-ui, sans-serif;
+    --display: 'Nunito', system-ui, sans-serif;
+    --mono:    'DM Mono', ui-monospace, monospace;
+    --es:      cubic-bezier(0.4,0,0.2,1);
+    --radius-sm: 8px;
+    --radius:    12px;
+    --radius-lg: 20px;
+    --radius-xl: 24px;
+  }
+  html[data-theme="light"] {
+    --bg:           #F8F7F5;
+    --ink:          #FFFFFF;
+    --surface:      #FFFFFF;
+    --surface-el:   #FAFAF8;
+    --surface-3:    #F0EFEC;
+    --line:         rgba(0,0,0,0.07);
+    --line-str:     rgba(0,0,0,0.14);
+    --text:         #1C1B18;
+    --text-sub:     #6E6B63;
+    --text-mute:    #A5A19A;
+    --gold:         #C8A84E;
+    --gold-l:       #D4B65C;
+    --gold-glow:    rgba(200,168,78,0.10);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-gold: 0 4px 18px rgba(200,168,78,0.12), 0 2px 8px rgba(200,168,78,0.06);
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ── App shell ────────────────────────────────────────────────────── */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--ink);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+  }
+  .sidebar-top { padding: 28px 24px 20px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-l) 100%);
+    box-shadow: var(--shadow-gold);
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .brand-icon::before {
+    content: ""; position: absolute; inset: -4px;
+    border-radius: 16px;
+    background: var(--gold-glow);
+    z-index: -1;
+    animation: brandOrbPulse 2.6s ease-in-out infinite;
+  }
+  @keyframes brandOrbPulse {
+    0%, 100% { transform: scale(1);    opacity: 0.55; }
+    50%      { transform: scale(1.18); opacity: 0;    }
+  }
+  .brand-icon svg { width: 100%; height: 100%; display: block; }
+  .brand-text { display: flex; flex-direction: column; gap: 2px; }
+  .brand-name {
+    font-family: var(--display);
+    font-size: 15px; font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em; line-height: 1;
+  }
+  .brand-name em { color: var(--gold); font-style: normal; font-weight: 700; }
+  .brand-sub {
+    font-family: var(--mono);
+    font-size: 9px; color: var(--text-mute);
+    letter-spacing: 0.20em; text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .client-selector {
+    margin: 18px 24px 0;
+    padding: 12px 14px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s var(--es);
+  }
+  .client-selector:hover { border-color: var(--line-str); }
+  .client-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gold);
+    animation: fc-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes fc-pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  .client-name {
+    font-family: var(--display); font-size: 13px; font-weight: 500;
+    color: var(--text); flex: 1;
+    letter-spacing: -0.01em;
+  }
+  .client-chevron { font-size: 9px; color: var(--text-mute); font-family: var(--mono); }
+
+  .nav { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    padding: 18px 12px 10px;
+  }
+  .nav-label:first-child { padding-top: 0; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    color: var(--text-sub);
+    font-family: var(--sans); font-size: 13px; font-weight: 500;
+    transition: all 160ms var(--es);
+    position: relative;
+  }
+  .nav-item:hover:not(.active) { color: var(--text); transform: translateX(2px); }
+  .nav-item.active { background: var(--gold-glow); color: var(--gold); font-weight: 700; }
+  .nav-item.active::after {
+    content: ""; position: absolute; left: -8px; top: 22%; bottom: 22%;
+    width: 3px; background: var(--gold); border-radius: 0 3px 3px 0;
+  }
+  .nav-item::before {
+    content: ""; width: 4px; height: 4px;
+    border-radius: 50%; background: currentColor;
+    opacity: 0; transition: opacity 0.12s var(--es);
+  }
+  .nav-item.active::before { opacity: 1; }
+  .nav-badge {
+    margin-left: auto;
+    color: var(--gold);
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .sidebar-bottom {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .user-row { display: flex; align-items: center; gap: 12px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold) 0%, #A08030 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: #1C1B18; letter-spacing: 0.05em;
+  }
+  .user-info { display: flex; flex-direction: column; gap: 1px; }
+  .user-name { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--text); }
+  .user-role {
+    font-family: var(--mono); font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: 0.2em; text-transform: uppercase;
+  }
+
+  /* ── Main ─────────────────────────────────────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--ink);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 32px;
+  }
+  .topbar-kicker {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--gold);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .topbar-title {
+    font-family: var(--display);
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+  .topbar-actions { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+  .topbar-bell {
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-el);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text-sub);
+    transition: all 180ms var(--es);
+  }
+  .topbar-bell:hover {
+    border-color: var(--gold); color: var(--gold);
+    background: var(--gold-glow);
+    transform: translateY(-1px);
+  }
+  .topbar-bell svg { width: 16px; height: 16px; }
+
+  .content { padding: 36px 40px 56px; flex: 1; }
+
+  .readout {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex; align-items: center;
+  }
+  .readout-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--gold);
+    margin-right: 8px;
+    animation: fc-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* ── Ticket-type slabs (rounded version) ─────────────────────────── */
+  .ticket-types {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+  .ttype {
+    background: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    cursor: pointer;
+    color: var(--text);
+    font-family: var(--sans);
+    text-align: left;
+    display: flex; flex-direction: column; justify-content: space-between;
+    gap: 28px;
+    min-height: 180px;
+    position: relative;
+    transition: transform 200ms var(--es), box-shadow 200ms var(--es), border-color 200ms var(--es), background 200ms var(--es);
+  }
+  .ttype:hover {
+    background: var(--surface);
+    border-color: var(--line-str);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .ttype::before {
+    content: ""; position: absolute; top: 28px; left: 28px;
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .ttype-red::before   { background: var(--pace-stop); }
+  .ttype-amber::before { background: var(--gold); }
+  .ttype-blue::before  { background: var(--pace-flow); }
+  .ttype-kicker {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    padding-left: 20px;
+  }
+  .ttype-label {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  /* ── Card + tabs + ticket rows ───────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-xl);
+    padding: 8px 28px 20px;
+    box-shadow: var(--shadow-sm);
+  }
+  .tab-row {
+    display: flex; gap: 4px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 8px;
+    padding: 12px 0 0;
+  }
+  .tab {
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 600;
+    color: var(--text-sub);
+    padding: 10px 4px;
+    margin-right: 24px;
+    cursor: pointer;
+    position: relative;
+    transition: color 120ms var(--es);
+  }
+  .tab.active { color: var(--text); }
+  .tab.active::after {
+    content: ""; position: absolute;
+    left: 0; right: 0; bottom: -1px;
+    height: 2px;
+    background: var(--gold);
+    border-radius: 1px;
+  }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  .ticket-row {
+    display: flex; align-items: center; gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .ticket-row:last-child { border-bottom: none; }
+  .ticket-row-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .ticket-row-dot.red   { background: var(--pace-stop); }
+  .ticket-row-dot.amber { background: var(--gold); }
+  .ticket-row-dot.blue  { background: var(--pace-flow); }
+  .ticket-row-main { flex: 1; min-width: 0; }
+  .ticket-row-title {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 2px;
+  }
+  .ticket-row-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .pill {
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    padding: 4px 12px;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-sub);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .pill.green { background: rgba(76,199,106,0.12); border-color: rgba(76,199,106,0.25); color: #4CC76A; }
+  .pill.amber { background: rgba(240,184,74,0.12); border-color: rgba(240,184,74,0.25); color: #F0B84A; }
+  .pill.red   { background: rgba(240,112,96,0.12); border-color: rgba(240,112,96,0.25); color: #F07060; }
+  .pill.blue  { background: rgba(90,143,184,0.12); border-color: rgba(90,143,184,0.25); color: #5A8FB8; }
+  .ticket-row-time {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.1em;
+  }
+
+  /* ── Font picker overlay ──────────────────────────────────────────── */
+  .fp-dock {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    z-index: 100;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-md);
+    width: 320px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: transform 240ms var(--es), opacity 240ms var(--es);
+  }
+  .fp-dock.collapsed { transform: translateY(calc(100% - 48px)); }
+  .fp-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+    cursor: pointer;
+  }
+  .fp-head-title {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 13px; font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    flex: 1;
+  }
+  .fp-head-chev {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-mute);
+  }
+  .fp-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .fp-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text-mute);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    display: flex; justify-content: space-between;
+  }
+  .fp-current {
+    font-family: 'DM Mono', monospace;
+    color: var(--gold);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .fp-select {
+    width: 100%;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .fp-select:focus { outline: none; border-color: var(--gold); }
+  .fp-actions { display: flex; gap: 6px; margin-top: 6px; }
+  .fp-btn {
+    flex: 1;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer;
+    transition: all 140ms var(--es);
+  }
+  .fp-btn:hover { background: var(--surface-3); border-color: var(--gold); color: var(--gold); }
+  .fp-btn-primary {
+    background: var(--gold);
+    color: #1C1B18;
+    border-color: var(--gold);
+  }
+  .fp-btn-primary:hover {
+    background: var(--gold-l);
+    color: #1C1B18;
+  }
+  .fp-msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #4CC76A;
+    margin-top: 8px;
+    min-height: 12px;
+    letter-spacing: 0.06em;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="17" cy="17" r="12" fill="none" stroke="rgba(28,27,24,0.85)" stroke-width="1"/>
+            <circle cx="17" cy="17" r="5" fill="none" stroke="rgba(28,27,24,0.55)" stroke-width="0.8"/>
+            <line x1="17" y1="3" x2="17" y2="31" stroke="rgba(28,27,24,0.45)" stroke-width="0.5"/>
+            <line x1="3" y1="17" x2="31" y2="17" stroke="rgba(28,27,24,0.45)" stroke-width="0.5"/>
+            <polygon points="17,8 19,17 17,26 15,17" fill="#1C1B18"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">BAM <em>Business</em></div>
+          <div class="brand-sub">Client Portal</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="client-selector">
+      <div class="client-dot"></div>
+      <div class="client-name">BAM Toronto Academy</div>
+      <div class="client-chevron">▾</div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">Operate</div>
+      <div class="nav-item active">Systems <span class="nav-badge">12</span></div>
+      <div class="nav-item">Marketing</div>
+      <div class="nav-item">Communication</div>
+      <div class="nav-label">Account</div>
+      <div class="nav-item">Settings</div>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="user-row">
+        <div class="user-avatar">ZS</div>
+        <div class="user-info">
+          <div class="user-name">Zoran Savic</div>
+          <div class="user-role">Academy Owner</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <span class="topbar-kicker">§ 01 · Systems</span>
+        <div class="topbar-title">Systems Support Tickets</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-bell" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="readout"><span class="readout-dot"></span>Open a new request</div>
+      <div class="ticket-types">
+        <button class="ttype ttype-red">
+          <div class="ttype-kicker">01 · Error</div>
+          <div class="ttype-label">Fix something that's broken.</div>
+        </button>
+        <button class="ttype ttype-amber">
+          <div class="ttype-kicker">02 · Change</div>
+          <div class="ttype-label">Adjust something that already exists.</div>
+        </button>
+        <button class="ttype ttype-blue">
+          <div class="ttype-kicker">03 · Build</div>
+          <div class="ttype-label">Build something new.</div>
+        </button>
+      </div>
+
+      <div class="readout">Track what's in flight</div>
+      <div class="card">
+        <div class="tab-row">
+          <div class="tab active">Live Tickets</div>
+          <div class="tab">Approved</div>
+        </div>
+
+        <div class="ticket-row">
+          <div class="ticket-row-dot red"></div>
+          <div class="ticket-row-main">
+            <div class="ticket-row-title">Calendar slot booked twice — same lead got two emails</div>
+            <div class="ticket-row-meta">TKT-204 · Error · Submitted by Sarah</div>
+          </div>
+          <span class="pill red">In review</span>
+          <div class="ticket-row-time">2h ago</div>
+        </div>
+
+        <div class="ticket-row">
+          <div class="ticket-row-dot amber"></div>
+          <div class="ticket-row-main">
+            <div class="ticket-row-title">Change the free trial CTA copy on home page</div>
+            <div class="ticket-row-meta">TKT-203 · Change · Submitted by Cole</div>
+          </div>
+          <span class="pill amber">In progress</span>
+          <div class="ticket-row-time">Yesterday</div>
+        </div>
+
+        <div class="ticket-row">
+          <div class="ticket-row-dot blue"></div>
+          <div class="ticket-row-main">
+            <div class="ticket-row-title">Build a new intake funnel for summer camps</div>
+            <div class="ticket-row-meta">TKT-201 · Build · Submitted by Zoran</div>
+          </div>
+          <span class="pill blue">Scoping</span>
+          <div class="ticket-row-time">3d ago</div>
+        </div>
+
+        <div class="ticket-row">
+          <div class="ticket-row-dot amber"></div>
+          <div class="ticket-row-main">
+            <div class="ticket-row-title">Update the pricing display on offer page</div>
+            <div class="ticket-row-meta">TKT-198 · Change · Submitted by Mike</div>
+          </div>
+          <span class="pill green">Live</span>
+          <div class="ticket-row-time">1w ago</div>
+        </div>
+
+        <div class="ticket-row">
+          <div class="ticket-row-dot red"></div>
+          <div class="ticket-row-main">
+            <div class="ticket-row-title">Welcome SMS not firing for new signups</div>
+            <div class="ticket-row-meta">TKT-194 · Error · Submitted by Sarah</div>
+          </div>
+          <span class="pill green">Resolved</span>
+          <div class="ticket-row-time">1w ago</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Font Picker Dock -->
+<div class="fp-dock" id="fpDock">
+  <div class="fp-head" onclick="toggleDock()">
+    <div class="fp-head-title">Font tester</div>
+    <div class="fp-head-chev" id="fpChev">▾</div>
+  </div>
+
+  <div class="fp-row">
+    <div class="fp-label">Body sans <span class="fp-current" id="cur-sans">Plus Jakarta Sans</span></div>
+    <select class="fp-select" id="sel-sans" onchange="onChange()"></select>
+  </div>
+  <div class="fp-row">
+    <div class="fp-label">Display <span class="fp-current" id="cur-display">Nunito</span></div>
+    <select class="fp-select" id="sel-display" onchange="onChange()"></select>
+  </div>
+  <div class="fp-row">
+    <div class="fp-label">Mono <span class="fp-current" id="cur-mono">DM Mono</span></div>
+    <select class="fp-select" id="sel-mono" onchange="onChange()"></select>
+  </div>
+
+  <div class="fp-actions">
+    <button class="fp-btn" onclick="toggleTheme()" id="themeBtn">☀ Light</button>
+    <button class="fp-btn" onclick="resetFonts()">Reset</button>
+    <button class="fp-btn fp-btn-primary" onclick="copyCss()">Copy CSS</button>
+  </div>
+  <div class="fp-msg" id="fp-msg"></div>
+</div>
+
+<script>
+  // Catalog (same as font-playground.html)
+  const SANS = [
+    { name: "Plus Jakarta Sans", note: "current · warm geometric" },
+    { name: "Inter", note: "industry standard" },
+    { name: "Inter Tight", note: "Inter, tightened" },
+    { name: "Geist", note: "Vercel · clean modern" },
+    { name: "Mona Sans", note: "GitHub · variable, sturdy" },
+    { name: "Hubot Sans", note: "GitHub · refined" },
+    { name: "Manrope", note: "rounded, friendly" },
+    { name: "DM Sans", note: "geometric, balanced" },
+    { name: "Outfit", note: "rounded, modern" },
+    { name: "Sora", note: "geometric, contemporary" },
+    { name: "Be Vietnam Pro", note: "warm, Geist-adjacent" },
+    { name: "Public Sans", note: "US Gov · neutral" },
+    { name: "Figtree", note: "clean, modern" },
+    { name: "Onest", note: "modern indie sans" },
+    { name: "Albert Sans", note: "SF Pro-ish" },
+    { name: "Hanken Grotesk", note: "subtle grotesque" },
+    { name: "Schibsted Grotesk", note: "editorial grotesque" },
+    { name: "Familjen Grotesk", note: "Swedish grotesque" },
+    { name: "Urbanist", note: "geometric, modern" },
+    { name: "Wix Madefor Display", note: "Wix · display" },
+    { name: "Wix Madefor Text", note: "Wix · body" },
+    { name: "Red Hat Display", note: "Red Hat brand sans" },
+    { name: "Red Hat Text", note: "Red Hat text" },
+    { name: "IBM Plex Sans", note: "IBM · humanist" },
+    { name: "Lexend", note: "readability-focused" },
+    { name: "Lexend Deca", note: "Lexend lighter" },
+    { name: "Roboto", note: "Android workhorse" },
+    { name: "Roboto Flex", note: "variable Roboto" },
+    { name: "Open Sans", note: "classic humanist" },
+    { name: "Source Sans 3", note: "Adobe · readable" },
+    { name: "Work Sans", note: "Open Sans-adjacent" },
+    { name: "Nunito Sans", note: "sister of Nunito" },
+    { name: "Poppins", note: "geometric, popular" },
+    { name: "Montserrat", note: "geometric, popular" },
+    { name: "Raleway", note: "elegant geometric" },
+    { name: "Rubik", note: "geometric, distinctive" },
+    { name: "Saira", note: "condensed geometric" },
+    { name: "Mulish", note: "neutral minimal" },
+    { name: "Karla", note: "humanist, narrow" },
+    { name: "Cabin", note: "humanist, warm" },
+    { name: "Quicksand", note: "rounded, soft" },
+    { name: "Asap", note: "neutral, slight slant" },
+    { name: "Hind", note: "humanist" },
+    { name: "Space Grotesk", note: "distinctive 'a'" },
+    { name: "Atkinson Hyperlegible", note: "accessibility-first" },
+    { name: "Tomorrow", note: "tech vibe" },
+    { name: "system-ui", note: "Apple SF Pro on Mac" },
+  ];
+
+  const DISPLAY = [
+    { name: "Nunito", note: "current · warm rounded" },
+    { name: "Bricolage Grotesque", note: "expressive optical" },
+    { name: "Fraunces", note: "premium serif" },
+    { name: "Instrument Serif", note: "editorial serif" },
+    { name: "Source Serif 4", note: "Adobe · refined" },
+    { name: "Libre Bodoni", note: "high-contrast Bodoni" },
+    { name: "Libre Caslon Text", note: "Caslon revival" },
+    { name: "Playfair Display", note: "high-contrast classic" },
+    { name: "DM Serif Display", note: "high-contrast modern" },
+    { name: "Crimson Pro", note: "classic literary serif" },
+    { name: "Lora", note: "workhorse serif" },
+    { name: "Spectral", note: "screen serif" },
+    { name: "Vollkorn", note: "robust book serif" },
+    { name: "Merriweather", note: "readable serif" },
+    { name: "EB Garamond", note: "Garamond revival" },
+    { name: "Cormorant Garamond", note: "elegant Garamond" },
+    { name: "Cardo", note: "scholarly serif" },
+    { name: "Old Standard TT", note: "19th-c. revival" },
+    { name: "PT Serif", note: "neutral workhorse" },
+    { name: "IBM Plex Serif", note: "Plex serif" },
+    { name: "Roboto Serif", note: "Roboto serif" },
+    { name: "Roboto Slab", note: "slab serif" },
+    { name: "Unbounded", note: "futuristic geometric" },
+    { name: "Syne", note: "alt-geometric" },
+    { name: "Anton", note: "ultra-condensed" },
+    { name: "Bebas Neue", note: "condensed all-caps" },
+    { name: "Oswald", note: "condensed gothic" },
+    { name: "Archivo Black", note: "ultra-bold geometric" },
+    { name: "Archivo", note: "neutral grotesque" },
+    { name: "Big Shoulders Display", note: "Chicago caps" },
+    { name: "Caprasimo", note: "playful chunky serif" },
+    { name: "Marcellus", note: "elegant Roman caps" },
+    { name: "Cinzel", note: "Trajan caps" },
+    { name: "Italiana", note: "didone" },
+    { name: "Gloock", note: "high-contrast modern" },
+    { name: "Yeseva One", note: "fashion-mag serif" },
+    { name: "Lobster Two", note: "script" },
+    { name: "Climate Crisis", note: "expressive variable" },
+    { name: "Plus Jakarta Sans", note: "(reuse body)" },
+    { name: "Outfit", note: "(reuse body)" },
+    { name: "Manrope", note: "(reuse body)" },
+  ];
+
+  const MONO = [
+    { name: "DM Mono", note: "current · clean" },
+    { name: "JetBrains Mono", note: "ligatures" },
+    { name: "Geist Mono", note: "Vercel modern" },
+    { name: "Fira Code", note: "ligatures, dev" },
+    { name: "IBM Plex Mono", note: "warm, IBM" },
+    { name: "Space Mono", note: "geometric retro" },
+    { name: "Roboto Mono", note: "Google workhorse" },
+    { name: "Source Code Pro", note: "Adobe classic" },
+    { name: "Red Hat Mono", note: "Red Hat clean" },
+    { name: "Overpass Mono", note: "grotesque mono" },
+    { name: "Ubuntu Mono", note: "Ubuntu friendly" },
+    { name: "Inconsolata", note: "classic readable" },
+    { name: "Anonymous Pro", note: "neutral mono" },
+    { name: "Cousine", note: "Courier-like" },
+    { name: "Cutive Mono", note: "typewriter" },
+    { name: "Major Mono Display", note: "all-caps display" },
+    { name: "Nova Mono", note: "futuristic" },
+    { name: "VT323", note: "retro CRT bitmap" },
+  ];
+
+  function fontStack(name) {
+    if (name === "system-ui") return "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+    return `"${name}", system-ui, sans-serif`;
+  }
+  function monoStack(name) { return `"${name}", ui-monospace, monospace`; }
+
+  function fill(id, list) {
+    const sel = document.getElementById(id);
+    list.forEach(f => {
+      const opt = document.createElement("option");
+      opt.value = f.name;
+      opt.textContent = `${f.name}  —  ${f.note}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  function onChange() {
+    const s = document.getElementById("sel-sans").value;
+    const d = document.getElementById("sel-display").value;
+    const m = document.getElementById("sel-mono").value;
+    document.documentElement.style.setProperty("--sans", fontStack(s));
+    document.documentElement.style.setProperty("--display", fontStack(d));
+    document.documentElement.style.setProperty("--mono", monoStack(m));
+    document.getElementById("cur-sans").textContent = s;
+    document.getElementById("cur-display").textContent = d;
+    document.getElementById("cur-mono").textContent = m;
+    try {
+      localStorage.setItem("sf_sans", s);
+      localStorage.setItem("sf_display", d);
+      localStorage.setItem("sf_mono", m);
+    } catch (_) {}
+  }
+
+  function resetFonts() {
+    document.getElementById("sel-sans").value = "Plus Jakarta Sans";
+    document.getElementById("sel-display").value = "Nunito";
+    document.getElementById("sel-mono").value = "DM Mono";
+    onChange();
+  }
+
+  function copyCss() {
+    const s = document.getElementById("sel-sans").value;
+    const d = document.getElementById("sel-display").value;
+    const m = document.getElementById("sel-mono").value;
+    const css = `:root {
+  --sans:    ${fontStack(s)};
+  --display: ${fontStack(d)};
+  --mono:    ${monoStack(m)};
+}`;
+    navigator.clipboard.writeText(css).then(() => {
+      const msg = document.getElementById("fp-msg");
+      msg.textContent = "Copied :root block — paste into client-portal.html";
+      setTimeout(() => msg.textContent = "", 2400);
+    });
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute("data-theme") !== "light";
+    html.setAttribute("data-theme", isDark ? "light" : "dark");
+    document.getElementById("themeBtn").textContent = isDark ? "☾ Dark" : "☀ Light";
+  }
+
+  function toggleDock() {
+    const d = document.getElementById("fpDock");
+    d.classList.toggle("collapsed");
+    document.getElementById("fpChev").textContent = d.classList.contains("collapsed") ? "▴" : "▾";
+  }
+
+  // Init
+  fill("sel-sans", SANS);
+  fill("sel-display", DISPLAY);
+  fill("sel-mono", MONO);
+  const savedSans = localStorage.getItem("sf_sans") || "Plus Jakarta Sans";
+  const savedDisplay = localStorage.getItem("sf_display") || "Nunito";
+  const savedMono = localStorage.getItem("sf_mono") || "DM Mono";
+  document.getElementById("sel-sans").value = savedSans;
+  document.getElementById("sel-display").value = savedDisplay;
+  document.getElementById("sel-mono").value = savedMono;
+  onChange();
+</script>
+
+</body>
+</html>

@@ -6,7 +6,7 @@
 <title>BAM Business — Client Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,8 +18,8 @@
        NEW radius/shadow tokens added alongside. */
 
     /* Surfaces — warm dark, layered */
-    --bg:           #0F0E0C;
-    --ink:          #0F0E0C;
+    --bg:           #16140F;
+    --ink:          #16140F;
     --surface:      #1A1916;
     --surface-el:   #222120;
     --surface-hov:  #2C2B28;
@@ -95,9 +95,9 @@
     --sidebar-w:    240px;
 
     /* Type families */
-    --display: "Nunito", "Plus Jakarta Sans", system-ui, sans-serif;
-    --sans:    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    --mono:    "DM Mono", "JetBrains Mono", ui-monospace, monospace;
+    --display: "Archivo", system-ui, sans-serif;
+    --sans:    "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono:    "Geist Mono", ui-monospace, monospace;
   }
 
   html, body {
@@ -2643,25 +2643,27 @@
 
   /* ── Light theme override ── */
   html[data-theme="light"] {
-    /* Cream-on-white prototype palette */
-    --bg:           #F8F7F5;
-    --ink:          #F8F7F5;
+    /* Warm cream palette — lighter than #E0D7C1, still warm and editorial.
+       Sidebar + main share one cream tone; cards POP as pure white. */
+    --bg:           #EFEAE0;
+    --ink:          #EFEAE0;
     --surface:      #FFFFFF;
-    --surface-el:   #FAFAF8;
-    --surface-hov:  #F0EFEC;
-    --surface-alt:  #FAFAF8;
-    --surface-3:    #F0EFEC;
+    --surface-el:   #F7F2E7;          /* warm-tinted sub-surface (inputs) */
+    --surface-hov:  #E8E1D2;
+    --surface-alt:  #F7F2E7;
+    --surface-3:    #E8E1D2;
 
-    --line:         rgba(0,0,0,0.07);
-    --line-str:     rgba(0,0,0,0.12);
-    --line-md:      rgba(0,0,0,0.12);
-    --border:       rgba(0,0,0,0.07);
-    --border-med:   rgba(0,0,0,0.12);
-    --border-str:   rgba(0,0,0,0.16);
+    /* Warm-tinted borders — read better on cream than neutral black-on-cream */
+    --line:         rgba(60,40,15,0.10);
+    --line-str:     rgba(60,40,15,0.18);
+    --line-md:      rgba(60,40,15,0.16);
+    --border:       rgba(60,40,15,0.10);
+    --border-med:   rgba(60,40,15,0.16);
+    --border-str:   rgba(60,40,15,0.22);
 
     --text:         #1C1B18;          /* warm near-black, not pure */
-    --text-sub:     #6E6B63;
-    --text-mute:    #A5A19A;
+    --text-sub:     #5F5A50;          /* slightly warmer for hierarchy */
+    --text-mute:    #8E867A;          /* readable on cream */
 
     --accent:       #C8A84E;
     --gold:         #C8A84E;
@@ -2695,8 +2697,19 @@
   }
 
   html[data-theme="light"] body { background: var(--ink); }
-  html[data-theme="light"] .sidebar { background: var(--surface); }
+  html[data-theme="light"] .sidebar { background: var(--ink); }  /* unified w/ main */
   html[data-theme="light"] .main { background: var(--bg); }
+  /* The active nav tile becomes a white card sitting on the cream sidebar */
+  html[data-theme="light"] .topbar { background: var(--ink); }
+  /* Cards/campaign cards POP as white on the cream bg */
+  html[data-theme="light"] .campaign-card,
+  html[data-theme="light"] .creative-tile,
+  html[data-theme="light"] .intake-card {
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02);
+  }
+  /* Brand-icon compass strokes — make the rings visible on cream */
+  html[data-theme="light"] .brand-icon { color: var(--text-sub); }
   html[data-theme="light"] .client-dot { background: var(--gold-2); }
 </style>
 </head>
@@ -2943,34 +2956,33 @@
                 box-shadow 220ms var(--es);
   }
 
-  /* ── #2 Eyebrow / kicker upgrade ──
-     Replace academic "§ 01 · Systems" with a gold, letter-spaced caps eyebrow */
-  .topbar-kicker, .section-kicker {
-    font-family: var(--mono) !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.12em !important;
-    text-transform: uppercase !important;
-    color: var(--gold) !important;
-    opacity: 0.85;
-  }
+  /* ── #2 Section kicker — hidden ──
+     Was a gold mono caps eyebrow above topbar titles ("§ 01 · Systems").
+     Removed per Zoran 2026-05-18 — title alone is enough. */
+  .topbar-kicker, .section-kicker { display: none !important; }
   .topbar-title {
     font-family: var(--display) !important;
-    font-weight: 800 !important;
-    letter-spacing: -0.025em !important;
+    font-size: 26px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
   }
+  /* Align topbar bottom-border with sidebar-top bottom-border.
+     Sidebar-top has padding 28+20=48 and a 56px brand-icon → 104px tall.
+     Match it so the hairline divider runs uninterrupted across the whole top. */
+  .topbar { min-height: 104px; box-sizing: border-box; }
+  .sidebar-top { min-height: 104px; box-sizing: border-box; }
 
-  /* ── #3 Big Nunito numbers — KPI / stat tiles ──
-     Pull metric numbers out as 48-56px display weight.
-     `.stat-num` exists already in some places; we boost where applied. */
+  /* ── #3 Big display numbers — KPI / stat tiles ──
+     Re-tuned 2026-05-18 for Archivo display (heavier than Nunito at same size).
+     32px / 700 reads as confident-but-not-shouting in Archivo. */
   .stat-num, .kpi-num, .big-num,
   .campaign-card .stat-value, .creative-tile .stat-value,
   .campaign-stat-value, .ticket-stat-value {
     font-family: var(--display);
-    font-size: 48px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
     color: var(--text);
   }
   .stat-num.gold, .kpi-num.gold { color: var(--gold); }
@@ -3191,15 +3203,728 @@
     50%      { transform: scale(1.05); box-shadow: 0 0 0 10px var(--gold-glow), var(--shadow-gold); }
   }
 
-  /* ── #1 Nav item smooth slide hover + active ──
-     Add subtle slide-right hover on inactive nav items (already polished) */
+  /* ── #1 Nav item — active "pops out" like a floating tile ─────────
+     Hide the "§ Navigate" label entirely.
+     Active item: elevated surface, shadow, gold text, no accent bar. */
+  .nav-label { display: none !important; }
+  .nav { padding-top: 20px !important; }
+
   .nav-item {
     transform: translateX(0);
-    transition: color 160ms var(--es), background 160ms var(--es), transform 160ms var(--es) !important;
+    transition: color 160ms var(--es), background 160ms var(--es), transform 160ms var(--es), box-shadow 200ms var(--es) !important;
   }
   .nav-item:hover:not(.active) {
     transform: translateX(2px);
     color: var(--text);
+  }
+  .nav-item.active {
+    background: var(--surface) !important;
+    color: var(--gold) !important;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--line);
+  }
+  /* Kill the 3px gold accent bar on active — the card shadow does the work now */
+  .nav-item.active::after { display: none !important; }
+  /* Kill the tiny bullet dot before active items — icon does that job now */
+  .nav-item::before { display: none !important; }
+
+  /* Show real SVG icons before the nav label */
+  .nav-item .nav-icon {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 18px; height: 18px;
+    flex-shrink: 0;
+    color: var(--text-mute);
+    transition: color 160ms var(--es);
+  }
+  .nav-item .nav-icon svg { width: 18px; height: 18px; display: block; }
+  .nav-item:hover .nav-icon { color: var(--text); }
+  .nav-item.active .nav-icon { color: var(--gold); }
+  /* Light mode: tile is white card on warm bg, like the reference */
+  html[data-theme="light"] .nav-item.active {
+    background: var(--surface) !important;
+    border-color: rgba(0,0,0,0.06);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ROUND 2 POLISH — 2026-05-17
+     Brings 4 more prototype patterns to the client portal:
+       1. Brand mark → pulsing gold gradient orb (was: outlined compass square)
+       2. Ticket-type slabs → bigger corners + lift on hover
+       3. Top-level cards → 20-24px corners (was 12px)
+       4. Topbar bell button + badge slot (decorative; data-count to show)
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── R2 #1 ── Brand mark (Cam's compass + sparkle, transparent) ──
+     No background plate, no border, no animation. Just the compass.
+     `currentColor` is set to text-sub so circle + ticks adapt to theme. */
+  .brand-icon {
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    color: var(--text-sub);
+    animation: none !important;
+    flex-shrink: 0;
+  }
+  .brand-icon svg {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+  /* Bump the academy name to match the larger mark */
+  .brand-name {
+    font-size: 19px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.015em !important;
+  }
+  .brand-sub { font-size: 10px !important; }
+
+  /* ── R2 #2a ── Section readouts: bigger title, tighter spacing ──── */
+  .readout {
+    font-size: 13px !important;
+    letter-spacing: 0.20em !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 12px !important;
+  }
+
+  /* ── R2 #2 ── Ticket-type slabs (Error / Change / Build) ───────────
+     Bigger gap, real-gap layout, semantic color tints per type,
+     arrow indicator at bottom-right, stronger hover. */
+  .ticket-types {
+    gap: 14px !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  .ttype {
+    border: 1px solid var(--line) !important;
+    border-radius: var(--radius-xl) !important;  /* 24px */
+    padding: 28px !important;
+    transition: transform 200ms var(--es), box-shadow 200ms var(--es), border-color 200ms var(--es), background 200ms var(--es) !important;
+    overflow: hidden;
+  }
+  /* Idle: meaningful color wash + bolder border + soft colored ground shadow.
+     The cards should already read as colored buttons without hover. */
+  .ttype-red {
+    background: linear-gradient(160deg, rgba(240,112,96,0.14) 0%, rgba(240,112,96,0.02) 65%), var(--ink) !important;
+    border-color: rgba(240,112,96,0.38) !important;
+    box-shadow: 0 6px 20px rgba(240,112,96,0.08), 0 1px 2px rgba(0,0,0,0.20);
+  }
+  .ttype-amber {
+    background: linear-gradient(160deg, rgba(240,184,74,0.14) 0%, rgba(240,184,74,0.02) 65%), var(--ink) !important;
+    border-color: rgba(240,184,74,0.38) !important;
+    box-shadow: 0 6px 20px rgba(240,184,74,0.08), 0 1px 2px rgba(0,0,0,0.20);
+  }
+  .ttype-blue {
+    background: linear-gradient(160deg, rgba(90,143,184,0.16) 0%, rgba(90,143,184,0.02) 65%), var(--ink) !important;
+    border-color: rgba(90,143,184,0.38) !important;
+    box-shadow: 0 6px 20px rgba(90,143,184,0.08), 0 1px 2px rgba(0,0,0,0.20);
+  }
+  /* Light-mode idle: slightly different tints (colors shift on white) */
+  html[data-theme="light"] .ttype-red {
+    background: linear-gradient(160deg, rgba(224,90,66,0.10) 0%, rgba(224,90,66,0.02) 65%), var(--surface) !important;
+    border-color: rgba(224,90,66,0.32) !important;
+    box-shadow: 0 6px 20px rgba(224,90,66,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  html[data-theme="light"] .ttype-amber {
+    background: linear-gradient(160deg, rgba(200,168,78,0.13) 0%, rgba(200,168,78,0.02) 65%), var(--surface) !important;
+    border-color: rgba(200,168,78,0.42) !important;
+    box-shadow: 0 6px 20px rgba(200,168,78,0.10), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  html[data-theme="light"] .ttype-blue {
+    background: linear-gradient(160deg, rgba(59,111,160,0.10) 0%, rgba(59,111,160,0.02) 65%), var(--surface) !important;
+    border-color: rgba(59,111,160,0.32) !important;
+    box-shadow: 0 6px 20px rgba(59,111,160,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  /* Hover (dark mode): deep tint wash, strong border, real lift + colored glow */
+  .ttype-red:hover {
+    background: linear-gradient(160deg, rgba(240,112,96,0.28) 0%, rgba(240,112,96,0.05) 75%), var(--surface) !important;
+    border-color: rgba(240,112,96,0.75) !important;
+    transform: translateY(-5px);
+    box-shadow: 0 16px 40px rgba(240,112,96,0.22), 0 4px 12px rgba(240,112,96,0.12), var(--shadow-md);
+  }
+  .ttype-amber:hover {
+    background: linear-gradient(160deg, rgba(240,184,74,0.28) 0%, rgba(240,184,74,0.05) 75%), var(--surface) !important;
+    border-color: rgba(240,184,74,0.75) !important;
+    transform: translateY(-5px);
+    box-shadow: 0 16px 40px rgba(240,184,74,0.22), 0 4px 12px rgba(240,184,74,0.12), var(--shadow-md);
+  }
+  .ttype-blue:hover {
+    background: linear-gradient(160deg, rgba(90,143,184,0.30) 0%, rgba(90,143,184,0.06) 75%), var(--surface) !important;
+    border-color: rgba(90,143,184,0.75) !important;
+    transform: translateY(-5px);
+    box-shadow: 0 16px 40px rgba(90,143,184,0.24), 0 4px 12px rgba(90,143,184,0.12), var(--shadow-md);
+  }
+  /* Light-mode hover — deeper tints needed because white base shows less */
+  html[data-theme="light"] .ttype-red:hover {
+    background: linear-gradient(160deg, rgba(224,90,66,0.18) 0%, rgba(224,90,66,0.04) 75%), var(--surface) !important;
+    border-color: rgba(224,90,66,0.55) !important;
+    box-shadow: 0 16px 40px rgba(224,90,66,0.18), 0 4px 12px rgba(224,90,66,0.08), var(--shadow-md);
+  }
+  html[data-theme="light"] .ttype-amber:hover {
+    background: linear-gradient(160deg, rgba(200,168,78,0.22) 0%, rgba(200,168,78,0.05) 75%), var(--surface) !important;
+    border-color: rgba(200,168,78,0.65) !important;
+    box-shadow: 0 16px 40px rgba(200,168,78,0.20), 0 4px 12px rgba(200,168,78,0.10), var(--shadow-md);
+  }
+  html[data-theme="light"] .ttype-blue:hover {
+    background: linear-gradient(160deg, rgba(59,111,160,0.18) 0%, rgba(59,111,160,0.04) 75%), var(--surface) !important;
+    border-color: rgba(59,111,160,0.55) !important;
+    box-shadow: 0 16px 40px rgba(59,111,160,0.18), 0 4px 12px rgba(59,111,160,0.08), var(--shadow-md);
+  }
+  /* Push the title color brighter on hover so it pops further */
+  .ttype:hover .ttype-label { color: var(--text) !important; }
+  /* Arrow gets a bigger nudge on hover */
+  .ttype:hover::after { transform: translateX(6px) scale(1.1); }
+  /* Vertically center the colored dot with the kicker caps text.
+     Kicker top sits at padding-top:28px. Cap-height of 11px mono caps is ~8px,
+     centered around y≈32. Dot is 8px tall — top:30 puts its center at y≈34
+     which lines up with the caps optical center. */
+  .ttype::before {
+    top: 32px !important;
+    left: 28px !important;
+    width: 9px !important;
+    height: 9px !important;
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.04);
+  }
+  .ttype-kicker {
+    padding-left: 20px;
+    font-size: 11px !important;
+    line-height: 1 !important;
+    display: flex;
+    align-items: center;
+    min-height: 16px;
+  }
+  /* Reserve right padding so the label never collides with the arrow */
+  .ttype-label { padding-right: 44px !important; }
+  /* Arrow indicator (bottom-right) — signals clickability */
+  .ttype::after {
+    content: "→";
+    position: absolute;
+    right: 24px; bottom: 24px;
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text-mute);
+    transition: transform 200ms var(--es), color 200ms var(--es);
+  }
+  .ttype:hover::after {
+    transform: translateX(4px);
+    color: var(--text);
+  }
+  .ttype-red:hover::after   { color: #F07060; }
+  .ttype-amber:hover::after { color: var(--gold); }
+  .ttype-blue:hover::after  { color: #5A8FB8; }
+
+  /* ── R2 #3 ── Bigger corners on top-level cards ────────────────── */
+  .campaign-card,
+  .creative-tile,
+  .intake-card,
+  .modal-card {
+    border-radius: var(--radius-lg) !important;  /* 20px */
+  }
+  /* Bump the inner `.card` wrapper a touch */
+  .card { border-radius: var(--radius-xl) !important; }  /* 24px */
+
+  /* ── R2 #4 ── Topbar bell button ───────────────────────────────── */
+  .topbar-actions { display: flex; align-items: center; gap: 8px; }
+  .topbar-bell {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--surface-el);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-sub);
+    transition: all 180ms var(--es);
+    flex-shrink: 0;
+  }
+  .topbar-bell:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: var(--gold-glow);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+  .topbar-bell svg { width: 16px; height: 16px; display: block; }
+  /* Red badge — appears when data-count is set on the button */
+  .topbar-bell[data-count]::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--red, #F07060);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--ink);
+    line-height: 1;
+  }
+  .topbar-bell[data-count="0"]::after,
+  .topbar-bell:not([data-count])::after { display: none; }
+  html[data-theme="light"] .topbar-bell[data-count]::after { border-color: var(--bg); }
+
+  /* ── R2 #5 ── Floating login card with depth + shine ──────────────
+     Makes the sign-in card feel premium: drifts gently, casts a layered
+     shadow + soft gold ambient glow, and a slow shine sweeps across the top
+     edge. All overrides win because they appear after the original block. */
+  #login-overlay {
+    perspective: 1200px;
+    overflow: hidden;
+  }
+  /* Ambient atmosphere behind the card — soft gold radial */
+  #login-overlay::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 880px; height: 880px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+      circle,
+      rgba(212,182,92,0.08) 0%,
+      rgba(212,182,92,0.03) 35%,
+      transparent 65%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #login-overlay .login-card {
+    position: relative;
+    isolation: isolate;
+    /* Bigger card */
+    max-width: 500px !important;
+    padding: 44px 40px !important;
+    /* Layered depth — soft cast shadow + tighter contact + gold underglow */
+    box-shadow:
+      0 1px 1px rgba(0,0,0,0.20),
+      0 8px 24px rgba(0,0,0,0.35),
+      0 24px 60px rgba(0,0,0,0.45),
+      0 30px 80px rgba(212,182,92,0.10) !important;
+    /* Subtle inner edge highlight — top picks up gold, bottom darkens */
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 40%),
+      var(--surface) !important;
+    /* No float — card stays put */
+    animation: modalIn 0.5s var(--es);
+  }
+
+  /* Discreet shine — very slow, low-opacity diagonal sweep */
+  #login-overlay .login-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+      115deg,
+      transparent 38%,
+      rgba(255,255,255,0.012) 48%,
+      rgba(212,182,92,0.05) 50%,
+      rgba(255,255,255,0.012) 52%,
+      transparent 62%
+    );
+    background-size: 280% 280%;
+    background-position: 200% 0;
+    animation: loginShine 16s linear infinite;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    z-index: 1;
+  }
+  @keyframes loginShine {
+    0%   { background-position: 200% 0;  }
+    100% { background-position: -120% 0; }
+  }
+
+  /* Hairline gold edge — gives the card a polished bezel */
+  #login-overlay .login-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(212,182,92,0.35) 0%,
+      rgba(212,182,92,0.05) 30%,
+      transparent 50%,
+      rgba(212,182,92,0.05) 70%,
+      rgba(212,182,92,0.20) 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* Ensure card children sit above the shine/edge pseudos */
+  #login-overlay .login-card > * { position: relative; z-index: 3; }
+
+  /* ── R2 #6 ── Tone down full-width gold action bars ──────────────
+     `.btn-add-campaign` / `.btn-add-creative` are width:100% gold slabs.
+     With Archivo body they read too dominant — trim padding + radius. */
+  .btn-add-campaign,
+  .btn-add-creative {
+    padding: 12px 18px !important;
+    border-radius: var(--radius) !important;  /* 12px */
+    font-size: 11px !important;
+    letter-spacing: 0.18em !important;
+    margin-top: 14px !important;  /* sits closer to its campaign card above */
+  }
+
+  /* ── R2 #7 ── Change Campaign button — gold fill at rest ───────── */
+  .btn-change-campaign {
+    background: var(--gold) !important;
+    color: var(--ink) !important;
+    border: 1px solid var(--gold) !important;
+    transition: all 180ms var(--es) !important;
+  }
+  .btn-change-campaign:hover {
+    background: var(--gold-l, var(--gold)) !important;
+    color: var(--ink) !important;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-gold);
+  }
+  html[data-theme="light"] .btn-change-campaign { color: #1C1B18 !important; }
+
+  /* ── R2 #8 ── Hide the topbar bell (removed per Zoran) ─────────── */
+  .topbar-bell, .topbar-actions { display: none !important; }
+
+  /* ── R2 #11 ── Intake forms — easier to scan + complete ──────────
+     - Kill redundant headers (q-label, q-title, topbar-sub in intake)
+     - Sentence-case sans field labels (vs cold mono caps)
+     - Required asterisk in gold
+     - Sticky submit so it's always reachable
+     - Tight spacing — every gap dialed for scan-ability */
+  .intake-wrap .q-label,
+  .intake-wrap .q-title { display: none !important; }
+  #systems-intake .topbar-sub { display: none !important; }
+  .intake-wrap .alert-banner { display: none !important; }
+
+  /* Push the form card down so it isn't kissing the title */
+  #systems-intake .content { padding-top: 28px !important; }
+
+  /* Card: tighter internal padding, modern radius */
+  .intake-card {
+    padding: 28px 26px 22px !important;
+    border-radius: var(--radius-lg) !important;
+  }
+  /* Subtitle (helper text) — closer to the form */
+  .intake-wrap .q-subtitle {
+    font-size: 13px !important;
+    margin-bottom: 22px !important;
+    line-height: 1.5 !important;
+  }
+  /* Field group: clearer rhythm between questions */
+  .intake-wrap .field-group {
+    gap: 6px !important;
+    margin-bottom: 22px !important;
+  }
+  /* Question labels — meaningfully bigger so they read as the question */
+  .intake-wrap .field-label {
+    font-family: var(--sans) !important;
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+    letter-spacing: -0.01em !important;
+    color: var(--text) !important;
+    margin-bottom: 4px !important;
+    line-height: 1.3 !important;
+  }
+  .intake-wrap .req {
+    color: var(--gold);
+    margin-left: 4px;
+    font-weight: 700;
+    font-size: 0.85em;
+    vertical-align: 1px;
+  }
+  /* Textarea: placeholder hugs the line. Auto-grows as user types. */
+  .intake-wrap .input-wrap { gap: 6px !important; }
+  .intake-wrap textarea {
+    min-height: 0 !important;
+    height: auto !important;
+    font-size: 15px !important;
+    padding: 4px 0 8px !important;
+    line-height: 1.5 !important;
+    field-sizing: content;  /* modern auto-grow — Chrome/Edge/Safari 18+ */
+  }
+  .intake-wrap textarea::placeholder { font-size: 15px !important; }
+  .intake-wrap .input-actions { margin-top: 6px; gap: 8px; }
+  .intake-wrap .mini-btn { font-size: 10px !important; padding: 7px 14px !important; }
+
+  /* Submit: sticky-bottom, slightly smaller text */
+  .intake-wrap .intake-primary {
+    position: sticky;
+    bottom: 16px;
+    z-index: 5;
+    margin-top: 24px;
+    font-size: 12px !important;
+    padding: 14px !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.20), var(--shadow-gold);
+  }
+  html[data-theme="light"] .intake-wrap .intake-primary {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08), var(--shadow-gold);
+  }
+
+  /* ── R2 #12 ── Voice button recording state — scope to active only ──
+     The original body.recording selector hit ALL .voice-btn buttons,
+     turning every voice button pink. Now only the actively-recording
+     button gets the red pulse; the others dim out as "disabled while
+     recording." */
+  body.recording .mini-btn.voice-btn {
+    background: transparent !important;
+    border-color: var(--line) !important;
+    color: var(--text-mute) !important;
+    animation: none !important;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  body.recording .mini-btn.voice-btn.active {
+    background: var(--red-soft) !important;
+    border-color: var(--red) !important;
+    color: var(--red) !important;
+    opacity: 1;
+    pointer-events: auto;
+    animation: breathe 1.4s ease-in-out infinite !important;
+  }
+
+  /* ── R2 #13 ── Remove the red/amber WASH on intake cards in DARK ──
+     The funnel-tile color already signals which form-type the user
+     opened. Tinting the whole card felt heavy in dark mode. */
+  html:not([data-theme="light"]) .intake-card.error-card,
+  html:not([data-theme="light"]) .intake-card.change-card {
+    background: var(--surface) !important;
+  }
+  html:not([data-theme="light"]) .intake-card.error-card {
+    border-color: rgba(240,112,96,0.18) !important;
+  }
+  html:not([data-theme="light"]) .intake-card.change-card {
+    border-color: rgba(240,184,74,0.18) !important;
+  }
+
+  /* ── R2 #14 ── Dynamic menu-form (.dform-*) — match the static intake
+     forms' bigger questions, tighter spacing, auto-grow textareas. */
+  .dform-question { margin-bottom: 22px !important; }
+  .dform-question-label {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.01em !important;
+    margin-bottom: 4px !important;
+    line-height: 1.3 !important;
+  }
+  .dform-question-label .req {
+    color: var(--gold) !important;
+    margin-left: 4px !important;
+    font-weight: 700 !important;
+    font-size: 0.85em !important;
+    vertical-align: 1px !important;
+  }
+  .dform-placeholder { margin-bottom: 6px !important; }
+  /* Textareas: auto-grow + smaller default height */
+  .dform-textarea {
+    min-height: 0 !important;
+    height: auto !important;
+    field-sizing: content;
+    padding: 4px 0 8px !important;
+    line-height: 1.5 !important;
+  }
+  /* Inputs sit closer to label too */
+  .dform-input { padding: 4px 0 8px !important; }
+  /* Option rows tighter */
+  .dform-option { padding: 12px 14px !important; }
+
+  /* ── R2 #9 ── Theme slider — replaces "Light/Dark mode" text btn ──
+     iOS-style pill toggle. Sun (left) + moon (right) icons in track,
+     knob slides based on data-theme. */
+  .theme-slider {
+    position: relative;
+    width: 60px;
+    height: 30px;
+    border-radius: 9999px;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    padding: 0;
+    margin: 0 auto;
+    display: block;
+    transition: all 200ms var(--es);
+  }
+  .theme-slider:hover { border-color: var(--gold); }
+  .theme-slider-sun,
+  .theme-slider-moon {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-mute);
+    transition: color 200ms var(--es);
+    pointer-events: none;
+  }
+  .theme-slider-sun { left: 8px; }
+  .theme-slider-moon { right: 8px; }
+  .theme-slider-sun svg,
+  .theme-slider-moon svg { width: 14px; height: 14px; display: block; }
+  .theme-slider-knob {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    border-radius: 9999px;
+    background: var(--gold);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 240ms var(--espring, var(--es));
+  }
+  /* Dark mode default — knob on RIGHT (moon side). Light mode — knob LEFT (sun). */
+  html:not([data-theme="light"]) .theme-slider-knob { transform: translateX(30px); }
+  html:not([data-theme="light"]) .theme-slider-moon { color: var(--ink); }
+  html[data-theme="light"] .theme-slider-knob { transform: translateX(0); }
+  html[data-theme="light"] .theme-slider-sun { color: var(--ink); }
+
+  /* ── R2 #10 ── User block reorg ───────────────────────────────────
+     Status chip · email (ellipsized w/ tooltip) · role · divider ·
+     theme slider + sign out on one row. */
+  .sidebar-bottom { display: flex; flex-direction: column; gap: 12px; }
+
+  /* Online status chip */
+  .user-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 4px 10px;
+    background: var(--gold-glow);
+    border: 1px solid rgba(212,182,92,0.30);
+    border-radius: 9999px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .user-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4CC76A;
+    box-shadow: 0 0 0 2px rgba(76,199,106,0.18);
+    animation: fc-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* Email + role */
+  .user-info { min-width: 0; }
+  .user-name {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    /* Ellipsize with title-attr tooltip on overflow */
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    word-break: normal !important;
+    margin-bottom: 2px;
+  }
+  .user-email {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-sub);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+  .user-role {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    line-height: 1.2;
+  }
+
+  /* Hairline divider */
+  .user-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 4px 0;
+  }
+
+  /* Footer row: slider on left, sign out text-link on right */
+  .user-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  /* Theme slider — drop the centered-block layout from R2 #9, sit inline */
+  .user-footer .theme-slider { margin: 0; }
+
+  /* Sign out: text-link style (compact, tertiary action) */
+  .user-signout {
+    background: transparent;
+    border: none;
+    padding: 4px 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    cursor: pointer;
+    transition: color 160ms var(--es), transform 160ms var(--es);
+  }
+  .user-signout:hover {
+    color: var(--text);
+    transform: translateX(2px);
+  }
+
+  /* Inputs inside login card: no gold glow on focus (override #7 is silenced here) */
+  #login-overlay input:focus,
+  #login-overlay input:focus-visible {
+    border-color: var(--line) !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Light-mode tuning — depth shadow softens, gold glow stays */
+  html[data-theme="light"] #login-overlay .login-card {
+    box-shadow:
+      0 1px 1px rgba(0,0,0,0.04),
+      0 8px 24px rgba(0,0,0,0.08),
+      0 24px 60px rgba(0,0,0,0.12),
+      0 30px 80px rgba(200,168,78,0.12) !important;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.6) 0%, transparent 40%),
+      var(--surface) !important;
+  }
+  html[data-theme="light"] #login-overlay .login-card::before { mix-blend-mode: multiply; opacity: 0.35; }
+
+  /* Reduced motion — kill the shine sweep */
+  @media (prefers-reduced-motion: reduce) {
+    #login-overlay .login-card::before { animation: none; }
   }
 </style>
 
@@ -3240,14 +3965,36 @@
     <div class="sidebar-top">
       <div class="brand">
         <div class="brand-icon">
-          <!-- Full Control compass mark (reduced) -->
-          <svg viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="17" cy="17" r="12" fill="none" stroke="#E8C547" stroke-width="1"/>
-            <circle cx="17" cy="17" r="5" fill="none" stroke="#C9A55C" stroke-width="0.8"/>
-            <line x1="17" y1="3" x2="17" y2="31" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
-            <line x1="3" y1="17" x2="31" y2="17" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
-            <polygon points="17,8 19,17 17,26 15,17" fill="#E8C547"/>
-            <circle cx="17" cy="17" r="1.3" fill="#0A0A0B" stroke="#E8C547" stroke-width="0.6"/>
+          <!-- BAM compass / sparkle mark (Cam's app-icon SVG, no background plate) -->
+          <svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="brand-gold" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#F4D788"/>
+                <stop offset="0.5" stop-color="#E8C547"/>
+                <stop offset="1" stop-color="#C9A55C"/>
+              </linearGradient>
+            </defs>
+            <circle cx="256" cy="256" r="220" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"/>
+            <g stroke="currentColor" stroke-width="2" opacity="0.5">
+              <line x1="256" y1="58" x2="256" y2="40"/>
+              <line x1="331.7713196082878" y1="73.07185256276523" x2="338.6596213908594" y2="56.442020977562066"/>
+              <line x1="396.0071426749364" y1="115.9928573250636" x2="408.73506473629425" y2="103.26493526370575"/>
+              <line x1="438.92814743723477" y1="180.2286803917122" x2="455.55797902243796" y2="173.3403786091406"/>
+              <line x1="454" y1="256" x2="472" y2="256"/>
+              <line x1="438.92814743723477" y1="331.7713196082878" x2="455.55797902243796" y2="338.6596213908594"/>
+              <line x1="396.0071426749364" y1="396.0071426749364" x2="408.73506473629425" y2="408.73506473629425"/>
+              <line x1="331.7713196082878" y1="438.92814743723477" x2="338.6596213908594" y2="455.55797902243796"/>
+              <line x1="256" y1="454" x2="256" y2="472"/>
+              <line x1="180.22868039171223" y1="438.92814743723477" x2="173.3403786091406" y2="455.55797902243796"/>
+              <line x1="115.9928573250636" y1="396.0071426749364" x2="103.26493526370575" y2="408.73506473629425"/>
+              <line x1="73.07185256276526" y1="331.77131960828785" x2="56.44202097756212" y2="338.6596213908595"/>
+              <line x1="58" y1="256" x2="40" y2="256"/>
+              <line x1="73.07185256276526" y1="180.22868039171217" x2="56.442020977562095" y2="173.34037860914054"/>
+              <line x1="115.99285732506357" y1="115.9928573250636" x2="103.2649352637057" y2="103.26493526370575"/>
+              <line x1="180.22868039171212" y1="73.07185256276526" x2="173.3403786091405" y2="56.44202097756212"/>
+            </g>
+            <path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z" fill="url(#brand-gold)"/>
+            <circle cx="256" cy="256" r="10" fill="#E8C547"/>
           </svg>
         </div>
         <div class="brand-text">
@@ -3260,29 +4007,56 @@
       <div class="nav-label">§ Navigate</div>
 
       <div class="nav-item active" onclick="switchView('systems', this)">
-        <span class="nav-icon">⚙️</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </span>
         Systems
       </div>
 
       <div class="nav-item" onclick="switchView('marketing', this)">
-        <span class="nav-icon">📈</span>
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m3 11 18-5v12L3 14v-3z"/>
+            <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+          </svg>
+        </span>
         Marketing
       </div>
     </nav>
 
     <div class="sidebar-bottom">
-      <button class="theme-toggle" onclick="toggleTheme()" id="themeToggleBtn">
-        <span class="theme-toggle-icon" id="themeToggleIcon">☀</span>
-        <span id="themeToggleLabel">Light mode</span>
-      </button>
-      <div class="user-row">
-        <div class="user-avatar" id="userAvatar">·</div>
-        <div class="user-info">
-          <div class="user-name" id="userName">—</div>
-          <div class="user-role">Academy Owner</div>
-        </div>
-        <button onclick="signOut()" title="Sign out" style="margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--text-mute);font-size:11px;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:var(--mono);letter-spacing:0.1em;text-transform:uppercase">Sign out</button>
+      <!-- Name + email + role -->
+      <div class="user-info">
+        <div class="user-name" id="userName" title="">—</div>
+        <div class="user-email" id="userEmail" title="">—</div>
+        <div class="user-role">Academy Owner</div>
       </div>
+
+      <div class="user-divider"></div>
+
+      <!-- Footer row: slider + sign out -->
+      <div class="user-footer">
+        <button class="theme-slider" onclick="toggleTheme()" id="themeToggleBtn" aria-label="Toggle light/dark mode">
+          <span class="theme-slider-sun" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg>
+          </span>
+          <span class="theme-slider-moon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </span>
+          <span class="theme-slider-knob"></span>
+          <!-- Hidden compat spans so toggleTheme() still finds them -->
+          <span id="themeToggleIcon" style="display:none"></span>
+          <span id="themeToggleLabel" style="display:none"></span>
+        </button>
+
+        <button class="user-signout" onclick="signOut()">Sign out →</button>
+      </div>
+
+      <!-- Hidden compat — the userAvatar id is referenced by JS, keep it for now -->
+      <span id="userAvatar" style="display:none"></span>
     </div>
   </aside>
 
@@ -3305,24 +4079,24 @@
         <div class="content">
 
         <!-- 3 ticket-type tiles (Full Control slabs) -->
-        <div class="readout" style="margin-bottom:12px;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-right:8px;vertical-align:1px;animation:fc-pulse 2.4s ease-in-out infinite"></span>Open a new request</div>
+        <div class="readout">Open a new request</div>
         <div class="ticket-types">
           <button class="ttype ttype-red" onclick="openIntake('error')">
-            <div class="ttype-kicker">01 · Error</div>
+            <div class="ttype-kicker">Error</div>
             <div class="ttype-label">Fix something that's broken.</div>
           </button>
           <button class="ttype ttype-amber" onclick="openIntake('change')">
-            <div class="ttype-kicker">02 · Change</div>
+            <div class="ttype-kicker">Change</div>
             <div class="ttype-label">Adjust something that already exists.</div>
           </button>
           <button class="ttype ttype-blue" onclick="openIntake('build')">
-            <div class="ttype-kicker">03 · Build</div>
+            <div class="ttype-kicker">Build</div>
             <div class="ttype-label">Build something new.</div>
           </button>
         </div>
 
         <!-- Tickets list with Live / Approved tabs -->
-        <div class="readout" style="margin-bottom:12px;">Track what's in flight</div>
+        <div class="readout">Track what's in flight</div>
         <div class="card" style="padding-top:8px">
           <div class="tab-row">
             <div class="tab active" data-tab="live" onclick="switchTicketTab('live', this)">Live Tickets</div>
@@ -3365,17 +4139,11 @@
 
             <!-- Error -->
             <div class="intake-screen" id="screen-error">
-              <div class="alert-banner">
-                <div class="alert-dot"></div>
-                This will be flagged as urgent — we'll look at it right away
-              </div>
               <div class="intake-card error-card">
-                <div class="q-label">Error ticket</div>
-                <div class="q-title">Tell us what's broken</div>
                 <div class="q-subtitle">The more detail you can give us, the faster we can fix it.</div>
 
                 <div class="field-group">
-                  <div class="field-label">Where is the error happening?</div>
+                  <div class="field-label">Where is it happening?<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="error-where" placeholder="e.g. On the booking page, the form doesn't submit..." rows="3"></textarea>
                     <div class="input-actions">
@@ -3390,7 +4158,7 @@
                 </div>
 
                 <div class="field-group">
-                  <div class="field-label">How should it work instead?</div>
+                  <div class="field-label">How should it work?<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="error-should" placeholder="e.g. When someone clicks submit, it should..." rows="3"></textarea>
                     <div class="input-actions">
@@ -3402,7 +4170,7 @@
                 <div class="field-group">
                   <div class="field-label">Is this blocking your business right now?</div>
                   <button class="mini-btn red-alert-toggle" id="redAlertBtn" onclick="toggleRedAlert()" style="align-self:flex-start">
-                    Mark as urgent — Red Alert
+                    Yes, this is blocking us
                   </button>
                 </div>
 
@@ -3418,7 +4186,7 @@
                 <div class="q-subtitle">Show us what you want updated — a screenshot or description both work great.</div>
 
                 <div class="field-group">
-                  <div class="field-label">What do you want to change?</div>
+                  <div class="field-label">What do you want to change?<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="change-what" placeholder="e.g. The hero section headline on the home page..." rows="3"></textarea>
                     <div class="input-actions">
@@ -3433,7 +4201,7 @@
                 </div>
 
                 <div class="field-group">
-                  <div class="field-label">How should it look or read instead?</div>
+                  <div class="field-label">How should it look or read instead?<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="change-how" placeholder="e.g. Change the headline to 'Train different.' and make it..." rows="3"></textarea>
                     <div class="input-actions">
@@ -3487,7 +4255,7 @@
                 <div class="q-subtitle">Describe what you want and we'll figure it out together.</div>
 
                 <div class="field-group">
-                  <div class="field-label">Describe what you want to build</div>
+                  <div class="field-label">Describe what you want to build<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="custom-desc" placeholder="e.g. I want a section where people can sign up for a waitlist..." rows="4"></textarea>
                     <div class="input-actions">
@@ -3502,7 +4270,7 @@
                 </div>
 
                 <div class="field-group">
-                  <div class="field-label">Give us all the info we'll need to build this</div>
+                  <div class="field-label">Give us all the info we'll need to build this<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="custom-info" placeholder="Any details, context, examples, or requirements..." rows="3"></textarea>
                     <div class="input-actions">
@@ -3540,14 +4308,13 @@
         <div class="topbar">
           <div>
             <span class="topbar-kicker">§ 02 · Marketing</span>
-            <div class="topbar-title">Campaigns.</div>
-            <div class="topbar-sub">Last calendar month</div>
+            <div class="topbar-title">Meta Ads Management</div>
           </div>
         </div>
 
         <div class="content">
 
-          <div class="section-label">Active Campaigns</div>
+          <div class="readout">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
           <div id="marketing-campaigns-container">
@@ -3558,7 +4325,7 @@
           <button class="btn-add-campaign" onclick="openNewCampaignWizard()">+ Add New Campaign</button>
 
           <!-- ── Track what's in flight ── -->
-          <div class="readout" style="margin: 36px 0 12px;">Track what's in flight</div>
+          <div class="readout" style="margin: 56px 0 12px;">Track what's in flight</div>
           <div class="card" style="padding-top:8px">
             <div class="tab-row">
               <div class="tab active" data-mtab="pending" onclick="switchMarketingTab('pending', this)">Pending</div>
@@ -7393,7 +8160,7 @@ async function boot() {
   }
   // Resolve client_id from authed user
   const { data: clientRow } = await _sb.from('clients')
-    .select('id').eq('auth_user_id', session.user.id).maybeSingle();
+    .select('id, owner_name').eq('auth_user_id', session.user.id).maybeSingle();
   if (!clientRow) {
     // Defensive: if this is actually a STAFF user (e.g. they clicked a staff
     // invite link but Supabase Site URL routed them here), bounce them to
@@ -7419,10 +8186,17 @@ async function boot() {
   CLIENT_ID = clientRow.id;
   document.getElementById('login-overlay').style.display = 'none';
 
-  // Populate user-row from authed email
+  // Populate user-row from authed email + clients.owner_name
   const email = session.user.email || '';
-  document.getElementById('userName').textContent = email;
-  document.getElementById('userAvatar').textContent = email.slice(0, 1).toUpperCase() || '·';
+  const ownerName = clientRow?.owner_name?.trim() || '';
+  const userNameEl = document.getElementById('userName');
+  const userEmailEl = document.getElementById('userEmail');
+  userNameEl.textContent = ownerName || email;       // fallback to email if no name on file
+  userNameEl.title = ownerName || email;
+  userEmailEl.textContent = ownerName ? email : '';  // only show email line if name is present
+  userEmailEl.title = email;
+  userEmailEl.style.display = ownerName ? 'block' : 'none';
+  document.getElementById('userAvatar').textContent = (ownerName || email).slice(0, 1).toUpperCase() || '·';
 
   await loadAcademyName();
   await loadTickets();
@@ -7610,6 +8384,26 @@ function toggleTheme() {
     </div>
   </div>
 </div>
+
+<script>
+  /* Inject a bell button into every topbar that doesn't already have actions.
+     Decorative for now — wire data-count on .topbar-bell to show the red badge. */
+  (function injectTopbarBells() {
+    const bellSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+    document.querySelectorAll('.topbar').forEach(tb => {
+      if (tb.querySelector('.topbar-actions, .topbar-bell')) return;
+      const actions = document.createElement('div');
+      actions.className = 'topbar-actions';
+      const bell = document.createElement('button');
+      bell.className = 'topbar-bell';
+      bell.type = 'button';
+      bell.setAttribute('aria-label', 'Notifications');
+      bell.innerHTML = bellSvg;
+      actions.appendChild(bell);
+      tb.appendChild(actions);
+    });
+  })();
+</script>
 
 </body>
 </html>
