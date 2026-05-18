@@ -35,7 +35,7 @@ export function NewStaffModal({ tokens, session, onClose, onCreated }) {
     setBusy(true);
     try {
       const token = session?.access_token;
-      const res = await fetch("/api/staff", {
+      const res = await fetch("/api/clients?action=invite-staff", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), role }),
@@ -132,14 +132,13 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
     setBusy(true);
     try {
       const token = session?.access_token;
-      const res = await fetch(`/api/staff/${encodeURIComponent(member.id)}`, {
-        method: "PATCH",
+      const res = await fetch("/api/clients?action=update-staff", {
+        method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), role }),
+        body: JSON.stringify({ id: member.id, name: name.trim(), email: email.trim(), role }),
       });
-      // Graceful fallback: if endpoint isn't built yet, treat as success
-      if (!res.ok && res.status !== 404) {
-        const json = await res.json().catch(() => ({}));
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
         setError(json?.error || `HTTP ${res.status}`);
         setBusy(false);
         return;
@@ -148,10 +147,8 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
       setBusy(false);
       onClose();
     } catch (e) {
-      // Network error: treat as success (backend not wired yet)
-      onSaved?.({ ...member, name: name.trim(), email: email.trim(), role });
+      setError(e?.message || "Network error. Try again.");
       setBusy(false);
-      onClose();
     }
   };
 
@@ -161,13 +158,13 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
     setResetBusy(true);
     try {
       const token = session?.access_token;
-      const res = await fetch(`/api/staff/${encodeURIComponent(member.id)}/reset-password`, {
+      const res = await fetch("/api/clients?action=reset-staff-password", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ email: email.trim() }),
       });
-      if (!res.ok && res.status !== 404) {
-        const json = await res.json().catch(() => ({}));
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
         setError(json?.error || `HTTP ${res.status}`);
         setResetBusy(false);
         return;
@@ -175,7 +172,7 @@ export function EditStaffModal({ tokens, session, member, onClose, onSaved }) {
       setBanner(`Password reset link sent to ${email.trim()}.`);
       setResetBusy(false);
     } catch (e) {
-      setBanner(`Password reset link sent to ${email.trim()}.`);
+      setError(e?.message || "Network error. Try again.");
       setResetBusy(false);
     }
   };

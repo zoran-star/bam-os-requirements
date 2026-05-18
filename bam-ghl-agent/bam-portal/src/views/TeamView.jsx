@@ -1,15 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabase";
 import { NewStaffModal, EditStaffModal, getRoleLabel } from "../components/StaffModals";
-
-// Sample staff — replace with Supabase fetch later
-const SAMPLE_STAFF = [
-  { id: "55e35cac-4472-4788-ab2a-4f30c7183904", name: "Zoran Savic",   email: "zoran@byanymeansbball.com",   role: "admin" },
-  { id: "dev-mike",                              name: "Mike Eluki",    email: "mike@byanymeansbball.com",    role: "admin" },
-  { id: "4fe042f4-d890-45c3-a55f-8d18423373dd", name: "Rosano Arandila", email: "rarandila@gmail.com",         role: "systems_manager" },
-  { id: "6e876f7f-6e17-443d-a032-5f28fa0c908b", name: "Chris Delos",   email: "mcdelostrinos@gmail.com",     role: "systems_executor" },
-  { id: "98694d3f-ad3c-4607-85a3-f3900789970a", name: "Jenny Babeco",  email: "jennybabeco@gmail.com",       role: "systems_executor" },
-  { id: "dev-mkt-1",                             name: "Coleman Smith", email: "coleman@byanymeansbball.com", role: "marketing_executor" },
-];
 
 const ROLE_TONE = {
   admin:              { bg: "rgba(232,197,71,0.10)",  border: "rgba(232,197,71,0.45)",  text: "accent" },
@@ -20,12 +11,47 @@ const ROLE_TONE = {
   scaling_manager:    { bg: "rgba(126,217,150,0.10)", border: "rgba(126,217,150,0.40)", text: "greenish" },
 };
 
+const STAFF_ROLE_ORDER = [
+  "admin",
+  "scaling_manager",
+  "systems_manager",
+  "systems_executor",
+  "marketing_manager",
+  "marketing_executor",
+];
+
 export default function TeamView({ tokens: tk, dark, session, me }) {
-  const [staff, setStaff] = useState(SAMPLE_STAFF);
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
+  const isAdmin = me?.role === "admin";
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError("");
+    (async () => {
+      const { data, error } = await supabase
+        .from("staff")
+        .select("id,name,email,role")
+        .order("name");
+      if (cancelled) return;
+      if (error) {
+        setFetchError(error.message);
+      } else {
+        setStaff(data || []);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [refreshCounter]);
+
+  const refresh = () => setRefreshCounter(x => x + 1);
   const editing = editingId ? staff.find(s => s.id === editingId) : null;
 
   const showBanner = (text) => {
@@ -34,15 +60,15 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
   };
 
   const onCreated = (member) => {
-    setStaff(prev => [...prev, member]);
+    showBanner(`Invited ${member.name}.`);
+    refresh();
   };
 
   const onSaved = (member) => {
-    setStaff(prev => prev.map(s => s.id === member.id ? member : s));
     showBanner(`Updated ${member.name}.`);
+    refresh();
   };
 
-  // Group by role for cleaner display
   const grouped = STAFF_ROLE_ORDER.map(role => ({
     role,
     members: staff.filter(s => s.role === role),
@@ -66,25 +92,37 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
         }}>{banner}</div>
       )}
 
-      {/* Page header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Team</div>
-          <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Staff Members</div>
-          <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
-            {staff.length} member{staff.length === 1 ? "" : "s"}. Click any card to edit details or send a password reset.
-          </div>
+      {/* Slim header: count + admin-only Add button */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: tk.textSub }}>
+          {loading
+            ? "Loading…"
+            : `${staff.length} member${staff.length === 1 ? "" : "s"}${isAdmin ? " · click any card to edit or send a password reset" : ""}`
+          }
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          style={{
-            padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
-            border: 0, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
-          }}
-        >+ Add staff member</button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowNew(true)}
+            style={{
+              padding: "10px 18px", background: tk.accent, color: "#0A0A0B",
+              border: 0, borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+            }}
+          >+ Add staff member</button>
+        )}
       </div>
 
-      {/* Grouped staff cards */}
+      {fetchError && (
+        <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 16, padding: "10px 14px", border: `1px solid ${tk.red || "#ED7969"}55`, borderRadius: 8, background: `${tk.red || "#ED7969"}10` }}>
+          ⚠ Could not load staff: {fetchError}
+        </div>
+      )}
+
+      {!loading && !fetchError && staff.length === 0 && (
+        <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
+          No staff members yet.{isAdmin ? " Click \"+ Add staff member\" to get started." : ""}
+        </div>
+      )}
+
       {grouped.map(group => (
         <div key={group.role} style={{ marginBottom: 26 }}>
           <div style={{
@@ -104,22 +142,24 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
               return (
                 <div
                   key={member.id}
-                  onClick={() => setEditingId(member.id)}
+                  onClick={() => isAdmin && setEditingId(member.id)}
                   style={{
                     background: tk.surface,
                     border: `1px solid ${tk.border}`,
                     borderRadius: 12,
                     padding: 18,
-                    cursor: "pointer",
+                    cursor: isAdmin ? "pointer" : "default",
                     transition: "transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
                     display: "flex", alignItems: "center", gap: 14,
                   }}
                   onMouseEnter={e => {
+                    if (!isAdmin) return;
                     e.currentTarget.style.borderColor = tk.accent;
                     e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow = `0 8px 20px rgba(0,0,0,0.15)`;
                   }}
                   onMouseLeave={e => {
+                    if (!isAdmin) return;
                     e.currentTarget.style.borderColor = tk.border;
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = "none";
@@ -137,7 +177,7 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
                       {member.name}
                     </div>
                     <div style={{ fontSize: 12, color: tk.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {member.email}
+                      {member.email || <span style={{ color: tk.textMute, fontStyle: "italic" }}>no email</span>}
                     </div>
                     <div style={{
                       display: "inline-block",
@@ -154,12 +194,6 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
           </div>
         </div>
       ))}
-
-      {staff.length === 0 && (
-        <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
-          No staff members yet. Click "+ Add staff member" to get started.
-        </div>
-      )}
 
       {showNew && (
         <NewStaffModal
@@ -182,12 +216,3 @@ export default function TeamView({ tokens: tk, dark, session, me }) {
     </div>
   );
 }
-
-const STAFF_ROLE_ORDER = [
-  "admin",
-  "scaling_manager",
-  "systems_manager",
-  "systems_executor",
-  "marketing_manager",
-  "marketing_executor",
-];

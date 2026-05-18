@@ -540,7 +540,7 @@ export default async function handler(req, res) {
       //   list-feedback            admin+scaling   (Feedback tab in staff portal)
       //   update-fields            any staff (field-level gating below)
       //   (default insert)         admin+scaling
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "create-client", "setup-account", "reset-password", "archive", "submit-feedback", "list-feedback"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "archive", "submit-feedback", "list-feedback"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -626,6 +626,107 @@ export default async function handler(req, res) {
           }).catch(() => {});
           return res.status(500).json({ error: `staff insert failed: ${insertErr.message}` });
         }
+      }
+
+      // ── action=update-staff ──
+      // Admin-only. Update a staff row's name/email/role.
+      if (action === "update-staff") {
+        const VALID_STAFF_ROLES = new Set([
+          "admin", "systems_manager", "systems_executor",
+          "marketing_manager", "marketing_executor", "scaling_manager",
+        ]);
+        const body = req.body || {};
+        const staffId = typeof body.id === "string" ? body.id.trim() : "";
+        const newName = typeof body.name === "string" ? body.name.trim() : "";
+        const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const newRole = typeof body.role === "string" ? body.role.trim() : "";
+
+        if (!staffId) return res.status(400).json({ error: "id required" });
+        if (!newName) return res.status(400).json({ error: "name required" });
+        if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+          return res.status(400).json({ error: "valid email required" });
+        }
+        if (!VALID_STAFF_ROLES.has(newRole)) {
+          return res.status(400).json({ error: `invalid role (must be one of: ${[...VALID_STAFF_ROLES].join(", ")})` });
+        }
+
+        const updRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({ name: newName, email: newEmail, role: newRole }),
+          }
+        );
+        if (!updRes.ok) {
+          const txt = await updRes.text();
+          return res.status(500).json({ error: `update failed: ${txt}` });
+        }
+        const rows = await updRes.json();
+        if (!Array.isArray(rows) || rows.length === 0) {
+          return res.status(404).json({ error: "staff member not found" });
+        }
+        const row = rows[0];
+        return res.status(200).json({ id: row.id, name: row.name, email: row.email, role: row.role });
+      }
+
+      // ── action=reset-staff-password ──
+      // Admin-only. Same flow as the client reset-password action, but
+      // the recovery link redirects to the staff portal root (/) instead
+      // of /client-portal.html.
+      if (action === "reset-staff-password") {
+        const body = req.body || {};
+        const targetEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        if (!targetEmail) return res.status(400).json({ error: "email required" });
+        if (!process.env.RESEND_API_KEY) {
+          return res.status(500).json({ error: "RESEND_API_KEY not configured" });
+        }
+
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/?type=recovery`;
+
+        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "recovery",
+            email: targetEmail,
+            options: { redirect_to: redirectTo },
+          }),
+        });
+        if (!linkRes.ok) {
+          const errText = await linkRes.text();
+          if (linkRes.status === 404 || /not found/i.test(errText)) {
+            // Generic OK to avoid enumeration even though only admins call this
+            return res.status(200).json({ ok: true });
+          }
+          console.error("generate_link failed (staff):", errText);
+          return res.status(500).json({ error: "could not generate reset link" });
+        }
+        const linkJson = await linkRes.json();
+        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
+        if (!actionLink) {
+          return res.status(500).json({ error: "reset link missing from response" });
+        }
+
+        const sent = await sendResetPasswordEmail({
+          to: targetEmail,
+          actionLink,
+          resendApiKey: process.env.RESEND_API_KEY,
+        });
+        if (!sent.ok) {
+          return res.status(500).json({ error: "failed to send email" });
+        }
+        return res.status(200).json({ ok: true, sent_to: targetEmail });
       }
 
       // ── action=create-client ──
