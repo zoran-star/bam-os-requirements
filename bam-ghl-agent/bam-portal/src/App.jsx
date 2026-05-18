@@ -394,6 +394,7 @@ export default function BAMPortal() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
+        html,body{background:${tk.bg};min-height:100vh;overscroll-behavior:none}
         html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
         ::-webkit-scrollbar{width:4px}
         ::-webkit-scrollbar-track{background:transparent}
