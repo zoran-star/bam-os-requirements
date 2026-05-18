@@ -221,15 +221,23 @@ async function handleMarketingTickets(req, res) {
       return res.status(200).json({ ticket: enriched });
     }
 
+    // Pagination: default 50, cap at 200. Frontend can pass ?limit + ?offset.
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const pageQS = `&limit=${limit}&offset=${offset}`;
+
     if (asStaff) {
-      const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc`);
+      const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc${pageQS}`);
       const out = await enrichWithClient(tickets || []);
-      return res.status(200).json({ tickets: out });
+      return res.status(200).json({ tickets: out, hasMore: (tickets || []).length === limit });
     }
 
     if (!isClient) return res.status(403).json({ error: "not authorized for this scope" });
-    const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc&client_id=eq.${ctx.client.id}`);
-    return res.status(200).json({ tickets: (tickets || []).map(stripInternalMessages) });
+    const tickets = await sb(`marketing_tickets?select=*&order=submitted_at.desc&client_id=eq.${ctx.client.id}${pageQS}`);
+    return res.status(200).json({
+      tickets: (tickets || []).map(stripInternalMessages),
+      hasMore: (tickets || []).length === limit,
+    });
   }
 
   if (req.method === "POST") {
@@ -451,7 +459,10 @@ async function handleMarketingTickets(req, res) {
         `❌ Cancelled — Marketing [${code}]`, req);
     }
 
-    return res.status(200).json({ ticket: updated?.[0] || null });
+    // SEC-5: strip internal messages from any response that reaches a client.
+    // Staff get the raw ticket (with internal notes intact).
+    const outTicket = asStaff ? (updated?.[0] || null) : stripInternalMessages(updated?.[0]);
+    return res.status(200).json({ ticket: outTicket });
   }
 
   return res.status(405).json({ error: "method not allowed" });
@@ -584,11 +595,16 @@ async function handleContentTickets(req, res) {
       return res.status(200).json({ ticket: enriched });
     }
 
+    // Pagination: default 50, cap 200. Same shape as marketing tickets above.
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const pageQS = `&limit=${limit}&offset=${offset}`;
+
     if (asStaff) {
       // Staff list — oldest first per spec (so content team works FIFO)
-      const tickets = await sb(`content_tickets?select=*&order=submitted_at.asc`);
+      const tickets = await sb(`content_tickets?select=*&order=submitted_at.asc${pageQS}`);
       const out = await enrichWithClient(tickets || []);
-      return res.status(200).json({ tickets: out });
+      return res.status(200).json({ tickets: out, hasMore: (tickets || []).length === limit });
     }
 
     // Client view: only return tickets where action is requested OR explicitly all=1
@@ -597,8 +613,11 @@ async function handleContentTickets(req, res) {
     const filter = onlyActionable
       ? `&client_action_status=eq.requested`
       : "";
-    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}&order=submitted_at.desc`);
-    return res.status(200).json({ tickets: (tickets || []).map(stripInternalMessages) });
+    const tickets = await sb(`content_tickets?select=*&client_id=eq.${ctx.client.id}${filter}&order=submitted_at.desc${pageQS}`);
+    return res.status(200).json({
+      tickets: (tickets || []).map(stripInternalMessages),
+      hasMore: (tickets || []).length === limit,
+    });
   }
 
   // ─── POST (client creates) ─────────────────────────────────
@@ -883,7 +902,9 @@ async function handleContentTickets(req, res) {
         `❌ Cancelled — Content [${code}]`, req);
     }
 
-    return res.status(200).json({ ticket: updated?.[0] || null });
+    // SEC-5: strip internal messages from any response that reaches a client.
+    const outTicket = asStaff ? (updated?.[0] || null) : stripInternalMessages(updated?.[0]);
+    return res.status(200).json({ ticket: outTicket });
   }
 
   return res.status(405).json({ error: "method not allowed" });
