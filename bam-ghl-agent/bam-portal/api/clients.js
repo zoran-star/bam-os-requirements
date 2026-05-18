@@ -494,9 +494,11 @@ export default async function handler(req, res) {
       //   setup-account            admin+scaling   (per Zoran's feedback: not marketing)
       //   reset-password           admin+scaling
       //   archive                  admin+scaling
+      //   submit-feedback          admin+scaling   (red bug button on client portal)
+      //   list-feedback            admin+scaling   (Feedback tab in staff portal)
       //   update-fields            any staff (field-level gating below)
       //   (default insert)         admin+scaling
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "create-client", "setup-account", "reset-password", "archive"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "create-client", "setup-account", "reset-password", "archive", "submit-feedback", "list-feedback"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -704,6 +706,58 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: `archive failed: ${errText}` });
         }
         return res.status(200).json({ ok: true, archived: true });
+      }
+
+      // ── action=submit-feedback ──
+      // Admin (or scaling_manager) flags a bug / leaves feedback from anywhere
+      // in the portal. Optionally attaches a file. Lands in portal_feedback
+      // (portal='client' for client-portal red button, 'staff' otherwise).
+      if (action === "submit-feedback") {
+        const body = req.body || {};
+        const fbBody = typeof body.body === "string" ? body.body.trim() : "";
+        const fileUrl = typeof body.file_url === "string" ? body.file_url.trim() : null;
+        const fileName = typeof body.file_name === "string" ? body.file_name.trim() : null;
+        const page = typeof body.page === "string" ? body.page.trim().slice(0, 500) : "";
+        const portal = body.portal === "client" ? "client" : "staff";
+        if (!fbBody) return res.status(400).json({ error: "feedback body required" });
+
+        // Resolve the submitter's staff id (we know they're admin/scaling from
+        // the auth gate above; staffRows lookup was done at handler top).
+        const submitterRows = await supabaseSelect(
+          `staff?email=eq.${encodeURIComponent(user.email)}&select=id`
+        );
+        const authorId = submitterRows?.[0]?.id || null;
+
+        try {
+          const rows = await supabaseInsert("portal_feedback", {
+            body: fbBody,
+            source: "text",
+            page: page || null,
+            file_url: fileUrl,
+            file_name: fileName,
+            submitter_email: user.email,
+            portal,
+            author_id: authorId,
+            status: "pending",
+          });
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return res.status(200).json({ ok: true, id: row?.id });
+        } catch (insertErr) {
+          return res.status(500).json({ error: `feedback insert failed: ${insertErr.message}` });
+        }
+      }
+
+      // ── action=list-feedback ──
+      // Admin-only. Returns the most recent portal_feedback rows for the
+      // staff portal's Feedback tab.
+      if (action === "list-feedback") {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+        const portalFilter = req.query.portal === "client" || req.query.portal === "staff"
+          ? `&portal=eq.${req.query.portal}` : "";
+        const rows = await supabaseSelect(
+          `portal_feedback?select=*${portalFilter}&order=created_at.desc&limit=${limit}`
+        );
+        return res.status(200).json({ data: rows || [] });
       }
 
       if (action === "setup-account") {

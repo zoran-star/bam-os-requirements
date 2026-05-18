@@ -24,6 +24,7 @@ const MarketingView        = lazy(() => import('./views/MarketingView'));
 const TeamView             = lazy(() => import('./views/TeamView'));
 const ContentView          = lazy(() => import('./views/ContentView'));
 const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
+const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -112,6 +113,9 @@ export default function BAMPortal() {
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
+  // Feedback tab: surfaces portal_feedback rows (admin-only red button on
+  // client portal + Settings feedback widget on staff portal both feed it).
+  const canSeeFeedback = me && (me.role === "admin" || me.role === "scaling_manager");
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 
@@ -317,6 +321,7 @@ export default function BAMPortal() {
     marketing: ["Marketing", "Client ad-campaign tickets"],
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
+    feedback: ["Feedback", "Bug reports + portal feedback (admin only)"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -355,6 +360,7 @@ export default function BAMPortal() {
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
+        ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
 
@@ -748,6 +754,7 @@ export default function BAMPortal() {
               {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} me={me} session={session} />}
             </Suspense>
           </div>
         </div>
