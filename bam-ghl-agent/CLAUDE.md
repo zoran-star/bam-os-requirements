@@ -42,7 +42,8 @@ The autonomous agent is a *capability* inside the staff side of the portal — n
 ## Who's working on it
 
 - **Zoran** — founder, product direction, final decisions
-- **Cameron (Rosano)** — systems/build side
+- **Rosano Arandila** — systems_manager (systems/build side)
+- **Cameron Wells (Cam)** — marketing_manager (content + guide cards + marketing ops). Email: cam@byanymeansbball.com. NOT the same person as Rosano.
 - **Cole** — built the staff portal (bam-portal/), Zoran is admin on his Supabase project
 
 Personal prefs go in `CLAUDE.local.md` (gitignored).
