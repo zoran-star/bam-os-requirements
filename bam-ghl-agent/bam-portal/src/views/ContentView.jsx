@@ -147,14 +147,9 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
       {renderMainTabs()}
       {banner && <Banner banner={banner} tk={tk} />}
 
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content · Guides</div>
-          <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Guide Cards</div>
-          <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
-            {loading ? "Loading…" : `${guides.length} card${guides.length === 1 ? "" : "s"}. These guide cards appear in clients' "+ Add New Campaign" wizard.`}
-          </div>
-          {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginTop: 8 }}>⚠ {error}</div>}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: tk.textSub }}>
+          {loading ? "Loading…" : `${guides.length} card${guides.length === 1 ? "" : "s"} · shown to clients in the "+ Add New Campaign" wizard`}
         </div>
         <button
           onClick={() => { setCreating(true); setEditingId(null); }}
@@ -164,6 +159,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
           }}
         >+ New guide card</button>
       </div>
+      {error && <div style={{ color: tk.red || "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
 
       {loading ? (
         <div style={{ padding: 48, textAlign: "center", color: tk.textSub, fontSize: 14 }}>
@@ -584,6 +580,9 @@ function ContentTicketsTab({ tk, session, me }) {
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [banner, setBanner] = useState(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all"); // all | graphic | video | mixed
+  const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
 
   const showBanner = (text) => { setBanner(text); setTimeout(() => setBanner(null), 3500); };
 
@@ -623,10 +622,30 @@ function ContentTicketsTab({ tk, session, me }) {
   const active     = tickets.filter(t => t.status === "active");
   const clientDep  = tickets.filter(t => t.status === "client-dependent");
   const completed  = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
-  const visible =
+  const tabRows =
     subTab === "active"           ? active
     : subTab === "client-dependent" ? clientDep
                                     : completed;
+
+  // Apply toolbar filters: free-text search across academy + notes, type
+  // filter, then sort by submitted_at.
+  const visible = (() => {
+    let list = tabRows;
+    if (typeFilter !== "all") list = list.filter(t => t.type === typeFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(t =>
+        (t.client?.business_name || "").toLowerCase().includes(q) ||
+        (t.notes || "").toLowerCase().includes(q)
+      );
+    }
+    list = [...list].sort((a, b) => {
+      const aDate = new Date(a.submitted_at || 0).getTime();
+      const bDate = new Date(b.submitted_at || 0).getTime();
+      return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
+    });
+    return list;
+  })();
 
   const selected = selectedId ? tickets.find(t => t.id === selectedId) : null;
 
@@ -657,12 +676,48 @@ function ContentTicketsTab({ tk, session, me }) {
         }}>{banner}</div>
       )}
 
-      <div style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>§ Content · Tickets</div>
-        <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>Tickets queue</div>
-        <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
-          Raw assets submitted by clients. Make the creative, upload it, then click "Send to Marketing".
-        </div>
+      {/* Toolbar: search + type filter + sort */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by academy or notes…"
+          style={{
+            flex: "1 1 280px", minWidth: 220,
+            padding: "9px 14px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            outline: "none", fontFamily: "inherit",
+          }}
+        />
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          style={{
+            padding: "9px 12px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          <option value="all">All types</option>
+          {Object.entries(TYPE_META_CT).map(([key, meta]) => (
+            <option key={key} value={key}>{meta.label}</option>
+          ))}
+        </select>
+        <select
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
+          style={{
+            padding: "9px 12px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
       </div>
 
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${tk.border}`, marginBottom: 18, overflowX: "auto" }}>
