@@ -423,11 +423,30 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
       }}>
         {/* Header */}
         <div style={{ padding: "24px 28px", borderBottom: `1px solid ${t.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(ticket.status, t), textTransform: "uppercase", letterSpacing: 0.5 }}>
-              {STATUS_LABEL[ticket.status] || ticket.status}
-            </span>
-            {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            {(() => {
+              const sc = statusColor(ticket.status, t);
+              return (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: sc,
+                  textTransform: "uppercase", letterSpacing: 0.7,
+                  padding: "4px 10px", borderRadius: 999,
+                  border: `1px solid ${sc}55`,
+                  background: `${sc}15`,
+                }}>
+                  {STATUS_LABEL[ticket.status] || ticket.status}
+                </span>
+              );
+            })()}
+            {ticket.priority === "urgent" && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: t.red,
+                textTransform: "uppercase", letterSpacing: 0.7,
+                padding: "4px 10px", borderRadius: 999,
+                border: `1px solid ${t.red}55`,
+                background: `${t.red}15`,
+              }}>🔴 URGENT</span>
+            )}
             <span style={{ fontSize: 11, color: t.textMute, fontFamily: "monospace", marginLeft: "auto" }}>{ticket.id.slice(0, 8)}</span>
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: t.text, margin: 0 }}>
@@ -694,7 +713,7 @@ function Row({ label, value, tokens: t }) {
   }
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-      <div style={{ minWidth: 140, fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "capitalize" }}>{label}</div>
+      <div style={{ minWidth: 220, fontSize: 13, fontWeight: 500, color: t.textSub }}>{label}</div>
       <div style={{ flex: 1, fontSize: 13, color: t.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {rendered}
       </div>
