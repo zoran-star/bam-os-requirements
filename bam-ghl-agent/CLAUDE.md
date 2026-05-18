@@ -310,6 +310,11 @@ When new onboarding completes:
 1. Check `docs/fullcontrol-brand.md` for design rules
 2. Pull questions from Supabase Questions DB (see `docs/questions-db-schema.html` and `.claude/commands/add-question.md`)
 3. Front-end HTML is the source of truth — `docs/client-portal-flow.md` is reference only
+4. **After ANY edit to `bam-portal/public/client-portal.html` UI, run the tour verifier** to confirm the first-login onboarding spotlight targets still exist:
+   ```bash
+   node bam-portal/scripts/verify-client-portal-ui.mjs
+   ```
+   The tour depends on 6 specific selectors (ticket types, live tickets list, marketing nav item, new campaign button, change campaign button, pending requests list). If you rename or remove any of them, the script exits 1. Fix by restoring the selector OR updating `TOUR_STEPS` / `TOUR_DEMO_CONTAINERS` in `client-portal.html`. See [[memories/project_client_portal_tour]] for the full tour design.
 
 ### When editing bam-portal (staff portal)
 1. Stack is React/Vite/Supabase — see `bam-portal/package.json`

@@ -47,6 +47,14 @@ Skip or "Got it" calls `POST /api/clients?action=complete-onboarding` (added thi
 ## Key files
 - `bam-portal/public/client-portal.html` — all tour code (CSS, HTML, JS, sidebar link, boot trigger). ~340 lines added.
 - `bam-portal/api/clients.js` — `?action=complete-onboarding` POST handler (~40 lines added).
+- `bam-portal/scripts/verify-client-portal-ui.mjs` — guardrail script that confirms all 6 spotlight targets still exist in the HTML. Run after every UI edit. Exits 1 if anything is missing.
+
+## Guardrail rule (added 2026-05-18)
+After ANY edit to `bam-portal/public/client-portal.html`, run:
+```bash
+node bam-portal/scripts/verify-client-portal-ui.mjs
+```
+This catches silent breakage of the tour when a UI element is renamed, moved, or removed without updating `TOUR_STEPS`. The script also validates 6 other tour invariants (config presence, function existence, sidebar link, boot trigger, complete-onboarding endpoint usage). Zoran's rule: "add in a check every time we change the UI of the client page."
 
 ## Existing clients
 Zoran chose "let them see it too" (vs marking existing clients done now). DETAIL Miami etc. will see the tour on their next login.
