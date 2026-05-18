@@ -5915,6 +5915,26 @@ const _sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2ptZm1wbnNmbXRxbXdob3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjI1ODQsImV4cCI6MjA5MDE5ODU4NH0.8vUj-MHg73yUtQR5i3VAbgrTyjvmTCMM6-U3mGxbGGo'
 );
 
+// ── Password recovery detection ──────────────────────────────────
+// Supabase fires `PASSWORD_RECOVERY` on the auth event stream when the
+// page loads after a recovery email click. This is way more reliable
+// than parsing the URL hash, which the SDK consumes asynchronously.
+// We capture the event at module load (before boot() runs) and resolve
+// a promise so boot() can await it.
+let _isPasswordRecoveryFlow = false;
+const _recoveryFlowReady = new Promise((resolve) => {
+  let resolved = false;
+  const done = () => { if (!resolved) { resolved = true; resolve(); } };
+  // Listen for the recovery event. If we see PASSWORD_RECOVERY → mark + resolve.
+  // If we see any other auth event first → it's not a recovery flow → resolve.
+  _sb.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') { _isPasswordRecoveryFlow = true; done(); }
+    else if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') { done(); }
+  });
+  // Safety net: don't wait forever if no event ever fires.
+  setTimeout(done, 1500);
+});
+
 // ── Dynamic form state ────────────────────────────────────────────
 let _dformQuestions   = [];   // all questions for current menu item
 let _dformPages       = [];   // array of page arrays (after filtering)
@@ -6731,44 +6751,37 @@ async function loadAcademyName() {
   const el = document.getElementById('academyName');
   if (!el) return;
   if (!CLIENT_ID) { el.textContent = 'No client'; return; }
-  const { data, error } = await _sb.from('clients').select('name').eq('id', CLIENT_ID).maybeSingle();
+  // Column renamed from `name` to `business_name` 2026-05-17. The old query
+  // would silently return error+empty → "Unknown academy" on every load.
+  const { data, error } = await _sb.from('clients').select('business_name').eq('id', CLIENT_ID).maybeSingle();
   if (error || !data) { el.textContent = 'Unknown academy'; return; }
-  el.textContent = data.name;
+  el.textContent = data.business_name;
 }
 
 async function boot() {
-  // Recovery / invite flow: Supabase puts the access_token in the URL hash with
-  // type=recovery (password reset) OR type=invite (first-time signup).
-  // Either way, we show the "set your password" form instead of the normal portal.
+  // Snapshot URL state BEFORE any awaits — the SDK can consume the hash.
   const hash = (window.location.hash || '').replace(/^#/, '');
   const hashParams = new URLSearchParams(hash);
   const search = new URLSearchParams(window.location.search);
 
-  // If the URL carries an auth callback (PKCE `?code=...` or implicit
-  // `#access_token=...`), the SDK is processing it asynchronously. Wait
-  // for the session to land before we decide what to render — otherwise
-  // getSession() returns null and we'd flash the Sign In screen at users
-  // who just clicked an invite or recovery link.
-  const hasAuthCallback = search.has('code') || hashParams.has('access_token');
-  if (hasAuthCallback) {
-    await new Promise((resolve) => {
-      let resolved = false;
-      const finish = () => { if (!resolved) { resolved = true; resolve(); } };
-      const { data: sub } = _sb.auth.onAuthStateChange((event, session) => {
-        if (session) { sub.subscription.unsubscribe(); finish(); }
-      });
-      // Safety net: never hang forever
-      setTimeout(finish, 3000);
-    });
-  }
+  // Always wait for the auth event stream to settle first. This catches:
+  //   - PASSWORD_RECOVERY → set _isPasswordRecoveryFlow = true
+  //   - SIGNED_IN / INITIAL_SESSION → not a recovery
+  //   - Plain page load (no auth in URL) → 1.5s timeout, no event
+  // _recoveryFlowReady was created at module-init time so it's been listening
+  // since before this function runs.
+  await _recoveryFlowReady;
 
-  // Query type wins (we control it via redirect_to). Hash type is set by
-  // Supabase's auth processor — for invites it'll say 'recovery' since the
-  // password-set page is the same machinery, but our query will say 'invite'.
+  // Recovery flow detection — official Supabase pattern (event-based) trumps
+  // URL parsing because the SDK can mangle/consume URL params before we read.
   const flowType = search.get('type') || hashParams.get('type');
-  const isInviteOrRecovery = flowType === 'recovery' || flowType === 'invite' || flowType === 'signup';
-  if (isInviteOrRecovery) {
-    showRecoveryForm(flowType);
+  const isRecoveryByEvent = _isPasswordRecoveryFlow;
+  const isRecoveryByUrl = flowType === 'recovery' || flowType === 'invite' || flowType === 'signup';
+  if (isRecoveryByEvent || isRecoveryByUrl) {
+    // Show the password-set form regardless of staff vs client. ANY user who
+    // just clicked a recovery link should be able to set their new password
+    // on this page. Staff redirect happens AFTER they set the password.
+    showRecoveryForm(isRecoveryByEvent ? 'recovery' : flowType);
     return;
   }
 
