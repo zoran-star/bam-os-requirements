@@ -458,6 +458,48 @@ export default async function handler(req, res) {
         }
       }
 
+      // ── Authenticated client action: complete-onboarding ──
+      // Fires when the client clicks "Got it" (or "Skip") at the end of the
+      // first-login product tour. Sets onboarding_completed_at = now() on the
+      // client row whose auth_user_id matches the caller. The auth_user_id
+      // match IS the authorization boundary — a client can only mark their
+      // own onboarding complete, never someone else's.
+      if (publicSignupAction === "complete-onboarding") {
+        const clientAuth = req.headers.authorization || "";
+        const clientToken = clientAuth.startsWith("Bearer ") ? clientAuth.slice(7) : null;
+        if (!clientToken) return res.status(401).json({ error: "auth required" });
+
+        const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${clientToken}` },
+        });
+        if (!whoRes.ok) return res.status(401).json({ error: "invalid token" });
+        const who = await whoRes.json();
+        if (!who?.id) return res.status(401).json({ error: "invalid token" });
+
+        const updRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/clients?auth_user_id=eq.${encodeURIComponent(who.id)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({ onboarding_completed_at: new Date().toISOString() }),
+          }
+        );
+        if (!updRes.ok) {
+          const txt = await updRes.text();
+          return res.status(500).json({ error: `update failed: ${txt}` });
+        }
+        const updRows = await updRes.json();
+        if (!Array.isArray(updRows) || updRows.length === 0) {
+          return res.status(404).json({ error: "no client row linked to this user" });
+        }
+        return res.status(200).json({ ok: true });
+      }
+
       // ── Staff auth (admin only) ──
       const auth = req.headers.authorization || "";
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;

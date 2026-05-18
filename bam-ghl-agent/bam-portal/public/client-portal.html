@@ -2273,6 +2273,289 @@
   .intake-primary:hover { background: var(--gold-2); border-color: var(--gold-2); }
   .intake-primary:disabled { background: transparent; border-color: var(--line); color: var(--text-mute); cursor: not-allowed; }
 
+  /* ── Onboarding product tour (first-login walk-through) ── */
+  /* Modal mode (steps 1 + 4): full dim, centered card. */
+  .tour-overlay {
+    position: fixed; inset: 0; z-index: 1200;
+    background: rgba(10, 10, 11, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 24px;
+    animation: tour-fade 0.25s ease;
+  }
+  .tour-overlay.active { display: flex; }
+  /* Spotlight mode (steps 2 + 3): transparent click-blocker. The dim effect
+     is rendered by the pulse ring's massive outer box-shadow, which means
+     the highlighted target stays sharp + unblurred. */
+  .tour-overlay.spotlight {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    align-items: stretch; justify-content: stretch;
+    padding: 0;
+    /* Overlay still intercepts clicks so users don't accidentally
+       click the highlighted target mid-tour. */
+  }
+  .tour-overlay.spotlight .tour-card { display: none; }
+  @keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Pulsing gold ring around the target element. The 9999px outer box-shadow
+     creates the page-wide dim while keeping the inside of the ring fully clear. */
+  .tour-pulse-ring {
+    position: fixed;
+    pointer-events: none;
+    border-radius: 14px;
+    z-index: 1200;
+    display: none;
+    box-shadow:
+      0 0 0 3px var(--gold),
+      0 0 0 8px rgba(232,197,71,0.22),
+      0 0 0 9999px rgba(10, 10, 11, 0.55);
+    animation: tour-pulse 1.8s ease-in-out infinite;
+    transition: top 0.4s cubic-bezier(0.16, 1, 0.3, 1), left 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s ease, height 0.4s ease;
+  }
+  .tour-pulse-ring.show { display: block; }
+  @keyframes tour-pulse {
+    0%, 100% {
+      box-shadow:
+        0 0 0 3px var(--gold),
+        0 0 0 8px rgba(232,197,71,0.22),
+        0 0 0 9999px rgba(10, 10, 11, 0.55);
+    }
+    50% {
+      box-shadow:
+        0 0 0 4px var(--gold),
+        0 0 0 14px rgba(232,197,71,0.10),
+        0 0 0 9999px rgba(10, 10, 11, 0.55);
+    }
+  }
+
+  /* Floating tooltip anchored near the target */
+  .tour-tooltip {
+    position: fixed;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 22px 16px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    pointer-events: auto;
+    z-index: 1201;
+    display: none;
+    transition: top 0.4s cubic-bezier(0.16, 1, 0.3, 1), left 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: tour-tip-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tour-tooltip.show { display: block; }
+  @keyframes tour-tip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .tour-tooltip-arrow {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transform: rotate(45deg);
+  }
+  .tour-tooltip[data-place="bottom"] .tour-tooltip-arrow {
+    top: -8px; left: 50%; margin-left: -7px;
+    border-right: 0; border-bottom: 0;
+  }
+  .tour-tooltip[data-place="top"] .tour-tooltip-arrow {
+    bottom: -8px; left: 50%; margin-left: -7px;
+    border-left: 0; border-top: 0;
+  }
+  .tour-tooltip[data-place="right"] .tour-tooltip-arrow {
+    left: -8px; top: 50%; margin-top: -7px;
+    border-right: 0; border-top: 0;
+  }
+  .tour-tooltip[data-place="left"] .tour-tooltip-arrow {
+    right: -8px; top: 50%; margin-top: -7px;
+    border-left: 0; border-bottom: 0;
+  }
+  .tour-tooltip-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .tour-tooltip-title {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    line-height: 1.25;
+  }
+  .tour-tooltip-body {
+    font-size: 13px;
+    color: var(--text-sub);
+    line-height: 1.55;
+    margin-bottom: 18px;
+  }
+  .tour-tooltip-body strong { color: var(--text); font-weight: 600; }
+  .tour-tooltip-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+  }
+  .tour-tooltip-step {
+    font-family: var(--mono);
+    font-size: 9px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold-2);
+  }
+
+  .tour-card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 32px 28px 24px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+    animation: tour-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes tour-rise { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+  .tour-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .tour-step-label {
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--gold-2);
+    flex-shrink: 0;
+  }
+  .tour-dots { display: flex; gap: 6px; align-items: center; }
+  .tour-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--line); transition: all 0.25s ease;
+  }
+  .tour-dot.active { background: var(--gold); transform: scale(1.2); }
+  .tour-dot.done { background: var(--gold-2); }
+  .tour-close {
+    background: transparent; border: 0; color: var(--text-mute);
+    font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px;
+    transition: color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .tour-close:hover { color: var(--text); }
+
+  .tour-screen { display: none; }
+  .tour-screen.active { display: block; animation: tour-screen-in 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes tour-screen-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+
+  .tour-title {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .tour-title strong { font-weight: 500; color: var(--gold); }
+  .tour-body {
+    font-size: 14px;
+    color: var(--text-sub);
+    line-height: 1.6;
+    margin-bottom: 22px;
+  }
+  .tour-body strong { color: var(--text); font-weight: 600; }
+
+  .tour-vis {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    padding: 4px 16px;
+    margin: 8px 0 22px;
+  }
+  .tour-vis .vis-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 0;
+    font-size: 13px;
+    color: var(--text-sub);
+    border-bottom: 1px dashed var(--line);
+  }
+  .tour-vis .vis-row:last-child { border-bottom: 0; }
+  .tour-vis .vis-row strong { color: var(--text); font-weight: 600; margin-right: 4px; }
+  .tour-vis .vis-dot {
+    width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  }
+  .tour-vis .vis-dot.r { background: #ED7969; }
+  .tour-vis .vis-dot.a { background: #E8C547; }
+  .tour-vis .vis-dot.g { background: #7ED996; }
+  .tour-vis .vis-dot.b { background: #7CB7E8; }
+
+  .tour-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .tour-skip {
+    background: transparent; border: 0;
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+    padding: 8px 4px;
+    transition: color 0.15s ease;
+  }
+  .tour-skip:hover { color: var(--text-sub); }
+  .tour-nav { display: flex; gap: 10px; }
+  .tour-back {
+    padding: 11px 18px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text-sub);
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .tour-back:hover { background: var(--surface-el); color: var(--text); border-color: var(--line-str); }
+  .tour-next {
+    padding: 11px 22px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--gold);
+    background: var(--gold);
+    color: #0A0A0B;
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .tour-next:hover { background: var(--gold-2); border-color: var(--gold-2); }
+
+  .user-tour-link {
+    display: block;
+    background: transparent;
+    border: 0;
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 10px; font-weight: 500;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+    padding: 6px 0 0;
+    width: 100%;
+    text-align: left;
+    transition: color 0.15s ease;
+  }
+  .user-tour-link:hover { color: var(--gold); }
+
+  @media (max-width: 520px) {
+    .tour-card { padding: 24px 20px 18px; }
+    .tour-title { font-size: 22px; }
+    .tour-foot { flex-wrap: wrap; }
+    .tour-nav { width: 100%; justify-content: space-between; }
+  }
+
   .menu-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -4054,6 +4337,8 @@
 
         <button class="user-signout" onclick="signOut()">Sign out →</button>
       </div>
+
+      <button class="user-tour-link" onclick="startOnboardingTour()">↻ Take the tour</button>
 
       <!-- Hidden compat — the userAvatar id is referenced by JS, keep it for now -->
       <span id="userAvatar" style="display:none"></span>
@@ -8118,6 +8403,354 @@ async function loadAcademyName() {
   el.textContent = data.business_name;
 }
 
+// ─────────────────────────────────────────────────────────
+//  ONBOARDING PRODUCT TOUR
+//  Fires on first login when clients.onboarding_completed_at IS NULL.
+//  4 steps: 1 + 4 are centered welcome/done modals; 2 + 3 are real
+//  spotlight tooltips that point at actual buttons in the portal.
+//  Completing or skipping writes the timestamp via
+//  /api/clients?action=complete-onboarding so the tour doesn't repeat.
+//  Restartable any time via the sidebar "Take the tour" link.
+// ─────────────────────────────────────────────────────────
+const TOUR_STEPS = [
+  // Step 1: Welcome (centered modal)
+  {
+    type: 'modal',
+    title: 'Welcome to your BAM portal{NAME}',
+    body: 'Two areas to know:',
+    vis: [
+      ['a', '<strong>Systems</strong> for tickets (fixes, changes, builds)'],
+      ['a', '<strong>Marketing</strong> for your live ads'],
+    ],
+    nextLabel: 'Show me →',
+  },
+  // Step 2: Systems ticket type buttons
+  {
+    type: 'spot',
+    view: 'systems',
+    selector: '.ticket-types',
+    place: 'bottom',
+    title: 'Submit tickets from Systems',
+    body: 'Pick a type. <strong>Error</strong> fixes something broken. <strong>Change</strong> adjusts what exists. <strong>Build</strong> creates something new.',
+    nextLabel: 'Next →',
+  },
+  // Step 3: Systems live tickets + action required example
+  {
+    type: 'spot',
+    view: 'systems',
+    selector: '#ticket-list-live',
+    place: 'top',
+    title: "Track what's in flight",
+    body: 'Submitted tickets land here. When we need a reply from you, the row shows <strong>⏳ Action Needed</strong> (like the example). Tap it to respond.',
+    nextLabel: 'Next →',
+  },
+  // Step 4 (NEW): view-switch transition. Spotlight the Marketing nav item while still on Systems.
+  {
+    type: 'spot',
+    view: 'systems',
+    selector: '.nav-item[onclick*="marketing"]',
+    place: 'right',
+    title: "Now let's see your ads",
+    body: 'Click <strong>Marketing</strong> in the sidebar (we\'ll switch you).',
+    nextLabel: 'Switch →',
+  },
+  // Step 5: Marketing new campaign button
+  {
+    type: 'spot',
+    view: 'marketing',
+    selector: '.btn-add-campaign',
+    place: 'top',
+    title: 'Request a new ad',
+    body: 'Tap <strong>+ Add New Campaign</strong>. Tell us your goal and budget, we handle the rest.',
+    nextLabel: 'Next →',
+  },
+  // Step 6: Marketing change campaign button
+  {
+    type: 'spot',
+    view: 'marketing',
+    selector: '.btn-change-campaign',
+    place: 'left',
+    title: 'Edit a live campaign',
+    body: 'Every live campaign has <strong>Change Campaign</strong>. Adjust budget, audience, creative, or pause it. We review every change.',
+    nextLabel: 'Next →',
+  },
+  // Step 7: Marketing pending requests + action required example
+  {
+    type: 'spot',
+    view: 'marketing',
+    selector: '#marketing-request-list-pending',
+    place: 'top',
+    title: 'Your campaign requests',
+    body: 'Campaigns you\'ve requested show here. <strong>⏳ Action Needed</strong> means we\'re waiting on you. Tap to reply.',
+    nextLabel: 'Next →',
+  },
+  // Step 8: Done (centered modal)
+  {
+    type: 'modal',
+    title: "You're set",
+    body: "Submit a ticket whenever you need something. Your account manager replies inside the same ticket.<br><br>Replay this tour anytime from the sidebar.",
+    nextLabel: 'Got it →',
+  },
+];
+
+// Demo elements injected so the spotlight always has something real to point at,
+// even for fresh clients with zero tickets, requests, or campaigns. Containers
+// have their original innerHTML saved + restored on teardown so we don't
+// permanently overwrite the real data fetch.
+const TOUR_DEMO_CONTAINERS = [
+  {
+    id: 'ticket-list-live',
+    html: `<div class="ticket-row tour-demo" style="background:rgba(232,191,96,0.08);border-left:3px solid var(--accent);padding-left:13px;cursor:default">
+      <span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(232,191,96,0.18);padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-right:8px">⏳ Action Needed</span>
+      <div class="ticket-row-title">Skills Camp signup form, your reply needed</div>
+      <span class="status-pill action-required">Action Required</span>
+    </div>`,
+  },
+  {
+    id: 'marketing-request-list-pending',
+    html: `<div class="ticket-row tour-demo" style="background:rgba(232,191,96,0.08);border-left:3px solid var(--accent);padding-left:13px;cursor:default">
+      <span style="font-size:10px;font-weight:700;color:var(--accent);background:rgba(232,191,96,0.18);padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-right:8px">⏳ Action Needed</span>
+      <div class="ticket-row-title">Approve new campaign creative for Skills Trial Ad</div>
+      <span class="status-pill action-required">Action Required</span>
+    </div>`,
+  },
+  {
+    id: 'marketing-campaigns-container',
+    onlyIfMissing: '.campaign-card',
+    html: `<div class="campaign-card tour-demo">
+      <div class="campaign-card-main">
+        <div class="card-title" style="margin-bottom:6px">Example: Skills Camp Lead Gen</div>
+        <div style="font-family:var(--mono);font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">Last 30 days</div>
+        <div class="campaign-stats">
+          <div class="campaign-stat"><div class="campaign-stat-value">$420.00</div><div class="campaign-stat-label">Spend</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">18</div><div class="campaign-stat-label">Results</div></div>
+          <div class="campaign-stat"><div class="campaign-stat-value">$23.33</div><div class="campaign-stat-label">Cost / Result</div></div>
+        </div>
+      </div>
+      <button class="btn-change-campaign" type="button" onclick="event.preventDefault()">Change Campaign</button>
+    </div>`,
+  },
+];
+
+function _tourSetupDemos() {
+  TOUR_DEMO_CONTAINERS.forEach(d => {
+    const el = document.getElementById(d.id);
+    if (!el) return;
+    // Skip if the real element we need already exists
+    if (d.onlyIfMissing && el.querySelector(d.onlyIfMissing)) return;
+    if (el.dataset.tourOriginal === undefined) {
+      el.dataset.tourOriginal = el.innerHTML;
+    }
+    el.innerHTML = d.html;
+  });
+}
+
+function _tourTeardownDemos() {
+  TOUR_DEMO_CONTAINERS.forEach(d => {
+    const el = document.getElementById(d.id);
+    if (!el) return;
+    if (el.dataset.tourOriginal !== undefined) {
+      el.innerHTML = el.dataset.tourOriginal;
+      delete el.dataset.tourOriginal;
+    }
+  });
+}
+
+let _tourStep = 1;
+const _TOUR_TOTAL = TOUR_STEPS.length;
+
+function startOnboardingTour() {
+  _tourStep = 1;
+  _tourSetupDemos();
+  _renderTourStep();
+  document.body.style.overflow = 'hidden';
+  window.addEventListener('resize', _repositionTooltip);
+  window.addEventListener('scroll', _repositionTooltip, true);
+}
+
+function _renderTourStep() {
+  const overlay = document.getElementById('tour-overlay');
+  const tooltip = document.getElementById('tour-tooltip');
+  const ring = document.getElementById('tour-pulse-ring');
+  const step = TOUR_STEPS[_tourStep - 1];
+  if (!step) return;
+
+  // Always update the modal-style step dots + step label (used by both modes)
+  document.getElementById('tour-step-label').textContent = `Step ${_tourStep} of ${_TOUR_TOTAL}`;
+  document.getElementById('tour-tooltip-step').textContent = `Step ${_tourStep} of ${_TOUR_TOTAL}`;
+  document.querySelectorAll('#tour-overlay .tour-dot').forEach(d => {
+    const n = Number(d.dataset.step);
+    d.classList.toggle('active', n === _tourStep);
+    d.classList.toggle('done', n < _tourStep);
+  });
+  document.getElementById('tour-back').style.display = _tourStep === 1 ? 'none' : 'inline-block';
+  document.getElementById('tour-next').textContent = step.nextLabel || 'Next →';
+  document.getElementById('tour-tip-next').textContent = step.nextLabel || 'Next →';
+
+  if (step.type === 'modal') {
+    // Centered modal mode
+    overlay.classList.add('active');
+    overlay.classList.remove('spotlight');
+    tooltip.classList.remove('show');
+    ring.classList.remove('show');
+
+    // Personalize {NAME} token if present
+    let title = step.title || '';
+    const owner = (document.getElementById('userName')?.textContent || '').trim();
+    const first = owner.split(/\s+/)[0] || '';
+    const namePart = (first && !first.includes('@')) ? `, ${first}` : '';
+    title = title.replace('{NAME}', namePart);
+    document.getElementById('tour-modal-title').innerHTML = title;
+    document.getElementById('tour-modal-body').innerHTML = step.body || '';
+    const visEl = document.getElementById('tour-modal-vis');
+    if (Array.isArray(step.vis) && step.vis.length) {
+      visEl.innerHTML = step.vis.map(([tone, txt]) =>
+        `<div class="vis-row"><span class="vis-dot ${tone}"></span><span>${txt}</span></div>`
+      ).join('');
+      visEl.style.display = '';
+    } else {
+      visEl.style.display = 'none';
+      visEl.innerHTML = '';
+    }
+  } else if (step.type === 'spot') {
+    // Spotlight tooltip mode. Switch view first so the target exists.
+    if (step.view) _tourSwitchTo(step.view);
+    // Light dim, no center card
+    overlay.classList.add('active');
+    overlay.classList.add('spotlight');
+    // Wait a beat for the view switch to lay out, then position
+    requestAnimationFrame(() => {
+      setTimeout(() => _positionSpotlight(step), 40);
+    });
+    document.getElementById('tour-tooltip-title').innerHTML = step.title || '';
+    document.getElementById('tour-tooltip-body').innerHTML = step.body || '';
+    tooltip.classList.add('show');
+    ring.classList.add('show');
+  }
+}
+
+function _positionSpotlight(step) {
+  const target = document.querySelector(step.selector);
+  const tooltip = document.getElementById('tour-tooltip');
+  const ring = document.getElementById('tour-pulse-ring');
+  if (!target) {
+    // Target not found. Fall back: dismiss the spotlight, show plain tooltip centered.
+    ring.classList.remove('show');
+    tooltip.style.top = '50%';
+    tooltip.style.left = '50%';
+    tooltip.style.transform = 'translate(-50%, -50%)';
+    tooltip.removeAttribute('data-place');
+    return;
+  }
+  tooltip.style.transform = '';
+  const r = target.getBoundingClientRect();
+  // Pulse ring sized slightly bigger than the target
+  const pad = 6;
+  ring.style.top = `${r.top - pad}px`;
+  ring.style.left = `${r.left - pad}px`;
+  ring.style.width = `${r.width + pad * 2}px`;
+  ring.style.height = `${r.height + pad * 2}px`;
+
+  // Tooltip placement
+  const TIP_W = Math.min(360, window.innerWidth - 32);
+  tooltip.style.width = `${TIP_W}px`;
+  const tipH = tooltip.offsetHeight || 220;
+  const margin = 24;
+  let place = step.place || 'bottom';
+  let top, left;
+  if (place === 'bottom') {
+    top = r.bottom + margin;
+    left = r.left + r.width / 2 - TIP_W / 2;
+    if (top + tipH > window.innerHeight - 12) {
+      place = 'top';
+      top = r.top - margin - tipH;
+    }
+  } else if (place === 'top') {
+    top = r.top - margin - tipH;
+    left = r.left + r.width / 2 - TIP_W / 2;
+    if (top < 12) {
+      place = 'bottom';
+      top = r.bottom + margin;
+    }
+  } else if (place === 'right') {
+    top = r.top + r.height / 2 - tipH / 2;
+    left = r.right + margin;
+    // If it would clip the right edge, flip to left
+    if (left + TIP_W > window.innerWidth - 12) {
+      place = 'left';
+      left = r.left - margin - TIP_W;
+    }
+  } else if (place === 'left') {
+    top = r.top + r.height / 2 - tipH / 2;
+    left = r.left - margin - TIP_W;
+    // If it would clip the left edge, flip to bottom (safer than right since right is usually crowded)
+    if (left < 12) {
+      place = 'bottom';
+      top = r.bottom + margin;
+      left = r.left + r.width / 2 - TIP_W / 2;
+    }
+  }
+  // Clamp left within viewport
+  left = Math.max(12, Math.min(left, window.innerWidth - TIP_W - 12));
+  // Clamp top within viewport
+  top = Math.max(12, Math.min(top, window.innerHeight - tipH - 12));
+  tooltip.style.top = `${top}px`;
+  tooltip.style.left = `${left}px`;
+  tooltip.setAttribute('data-place', place);
+}
+
+function _repositionTooltip() {
+  const step = TOUR_STEPS[_tourStep - 1];
+  if (step && step.type === 'spot') _positionSpotlight(step);
+}
+
+function _tourSwitchTo(name) {
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(el => {
+    const handler = el.getAttribute('onclick') || '';
+    if (handler.includes(`'${name}'`)) {
+      try { switchView(name, el); } catch (_) {}
+    }
+  });
+}
+
+function tourNext() {
+  if (_tourStep < _TOUR_TOTAL) { _tourStep += 1; _renderTourStep(); }
+  else { completeOnboardingTour(); }
+}
+
+function tourBack() {
+  if (_tourStep > 1) { _tourStep -= 1; _renderTourStep(); }
+}
+
+async function completeOnboardingTour() { await _closeAndPersist(); }
+async function skipOnboardingTour()     { await _closeAndPersist(); }
+
+async function _closeAndPersist() {
+  const overlay = document.getElementById('tour-overlay');
+  overlay.classList.remove('active');
+  overlay.classList.remove('spotlight');
+  document.getElementById('tour-tooltip').classList.remove('show');
+  document.getElementById('tour-pulse-ring').classList.remove('show');
+  document.body.style.overflow = '';
+  window.removeEventListener('resize', _repositionTooltip);
+  window.removeEventListener('scroll', _repositionTooltip, true);
+  _tourTeardownDemos();
+  await _markOnboardingComplete();
+}
+
+async function _markOnboardingComplete() {
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return;
+    await fetch('/api/clients?action=complete-onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    });
+  } catch (_) { /* best-effort; tour just re-shows next login on failure */ }
+}
+
 async function boot() {
   // Snapshot URL state BEFORE any awaits — the SDK can consume the hash.
   const hash = (window.location.hash || '').replace(/^#/, '');
@@ -8160,7 +8793,7 @@ async function boot() {
   }
   // Resolve client_id from authed user
   const { data: clientRow } = await _sb.from('clients')
-    .select('id, owner_name').eq('auth_user_id', session.user.id).maybeSingle();
+    .select('id, owner_name, onboarding_completed_at').eq('auth_user_id', session.user.id).maybeSingle();
   if (!clientRow) {
     // Defensive: if this is actually a STAFF user (e.g. they clicked a staff
     // invite link but Supabase Site URL routed them here), bounce them to
@@ -8204,6 +8837,12 @@ async function boot() {
   // Admin-only floating red feedback button (no-op if user isn't admin/scaling)
   setupAdminFeedbackWidget();
 
+  // First-login product tour: fires once when the client has never finished onboarding.
+  // Skipping or completing writes onboarding_completed_at so it doesn't fire again.
+  if (!clientRow?.onboarding_completed_at) {
+    setTimeout(() => startOnboardingTour(), 600);
+  }
+
   // OAuth callback handler: when /api/auth/meta/callback finishes it
   // redirects back here with ?meta=connected (or ?meta=error). Surface a
   // toast + auto-open the ad-account picker so the user can finish wiring
@@ -8236,6 +8875,18 @@ _sb.auth.onAuthStateChange((event, _session) => {
 
 boot();
 renderMarketingRequests();  // initial empty render
+
+// Dev/support preview: ?preview=tour opens the tour overlay immediately,
+// bypassing the login + onboarding_completed_at check. The login overlay is
+// hidden so spotlight targets behind it are visible. Skip/Got-it still call
+// _markOnboardingComplete but the API call no-ops when no token exists.
+if (new URLSearchParams(window.location.search).get('preview') === 'tour') {
+  setTimeout(() => {
+    const lo = document.getElementById('login-overlay');
+    if (lo) lo.style.display = 'none';
+    startOnboardingTour();
+  }, 400);
+}
 // Fetch real tickets + campaigns in the background once the page is up
 setTimeout(() => fetchAndRenderMarketingRequests(), 100);
 _attachPasteHandler('error-where',  'error-files');
@@ -8404,6 +9055,60 @@ function toggleTheme() {
     });
   })();
 </script>
+
+<!-- ── Onboarding product tour (first-login walk-through) ── -->
+<!-- Pulse ring sits BEHIND the tooltip and ABOVE the page; positioned by JS -->
+<div class="tour-pulse-ring" id="tour-pulse-ring"></div>
+
+<!-- Centered modal used for the welcome and done screens -->
+<div class="tour-overlay" id="tour-overlay" role="dialog" aria-modal="true" aria-labelledby="tour-modal-title">
+  <div class="tour-card">
+    <div class="tour-head">
+      <div class="tour-step-label" id="tour-step-label">Step 1 of 4</div>
+      <div class="tour-dots">
+        <span class="tour-dot active" data-step="1"></span>
+        <span class="tour-dot" data-step="2"></span>
+        <span class="tour-dot" data-step="3"></span>
+        <span class="tour-dot" data-step="4"></span>
+        <span class="tour-dot" data-step="5"></span>
+        <span class="tour-dot" data-step="6"></span>
+        <span class="tour-dot" data-step="7"></span>
+        <span class="tour-dot" data-step="8"></span>
+      </div>
+      <button class="tour-close" onclick="skipOnboardingTour()" aria-label="Close tour">×</button>
+    </div>
+
+    <div class="tour-title" id="tour-modal-title"></div>
+    <div class="tour-body" id="tour-modal-body"></div>
+    <div class="tour-vis" id="tour-modal-vis" style="display:none"></div>
+
+    <div class="tour-foot">
+      <button class="tour-skip" onclick="skipOnboardingTour()">Skip tour</button>
+      <div class="tour-nav">
+        <button class="tour-back" id="tour-back" onclick="tourBack()" style="display:none">← Back</button>
+        <button class="tour-next" id="tour-next" onclick="tourNext()">Show me →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Floating tooltip used for spotlight steps, anchored to a target -->
+<div class="tour-tooltip" id="tour-tooltip" role="dialog" aria-modal="false">
+  <div class="tour-tooltip-arrow"></div>
+  <div class="tour-tooltip-head">
+    <div class="tour-tooltip-step" id="tour-tooltip-step">Step 2 of 4</div>
+    <button class="tour-close" onclick="skipOnboardingTour()" aria-label="Close tour" style="font-size:20px">×</button>
+  </div>
+  <div class="tour-tooltip-title" id="tour-tooltip-title"></div>
+  <div class="tour-tooltip-body" id="tour-tooltip-body"></div>
+  <div class="tour-tooltip-foot">
+    <button class="tour-skip" onclick="skipOnboardingTour()">Skip</button>
+    <div class="tour-nav">
+      <button class="tour-back" onclick="tourBack()">← Back</button>
+      <button class="tour-next" id="tour-tip-next" onclick="tourNext()">Next →</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
