@@ -104,6 +104,146 @@ function shapeClient(row, revenue) {
   };
 }
 
+// ─── Password reset email ──────────────────────────────────────────────────
+// Bulletproof email-client-compatible template. Uses table layout (Outlook
+// hates flexbox/grid), all-inline styles, and a bgcolor button. The plain
+// URL is also prominently shown as a fallback in case the button is stripped
+// by a paranoid spam filter.
+function buildResetPasswordEmail(actionLink) {
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reset your BAM portal password</title>
+</head>
+<body style="margin:0;padding:0;background:#F5F1E8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1A1A1F;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F1E8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+
+          <!-- Header band -->
+          <tr>
+            <td style="background:#0B0B0D;padding:24px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em;">
+                    <span style="color:#E8C547;">BAM</span> Business
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px 32px 8px 32px;">
+              <p style="margin:0 0 6px;font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;font-weight:600;color:#8B6914;letter-spacing:0.14em;text-transform:uppercase;">Client Portal</p>
+              <h1 style="margin:0 0 18px;font-family:'Space Grotesk',-apple-system,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.025em;color:#0B0B0D;line-height:1.15;">
+                Reset your password
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#3A3A45;">
+                We got a request to reset the password on your BAM Business portal account.
+                Click the button below to choose a new one.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Bulletproof button -->
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#E8C547" style="border-radius:6px;">
+                    <a href="${actionLink}"
+                       style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:700;color:#0B0B0D;text-decoration:none;letter-spacing:-0.01em;border-radius:6px;">
+                      Reset password →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Fallback URL -->
+          <tr>
+            <td style="padding:24px 32px 12px 32px;">
+              <p style="margin:0 0 8px;font-size:13px;color:#666;">
+                Button not working? Copy and paste this link into your browser:
+              </p>
+              <p style="margin:0;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;">
+                <a href="${actionLink}" style="color:#0B0B0D;text-decoration:underline;">${actionLink}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider + footer -->
+          <tr>
+            <td style="padding:28px 32px 36px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="border-top:1px solid #E8E8E8;height:1px;line-height:1px;">&nbsp;</td></tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:12px;line-height:1.55;color:#888;">
+                This link expires in <strong style="color:#3A3A45;">1 hour</strong>.
+                If you didn't ask for a password reset, you can ignore this email — your password won't change.
+              </p>
+              <p style="margin:14px 0 0;font-size:11px;color:#AAA;">
+                BAM Business · <a href="https://bam-portal-tawny.vercel.app/client-portal.html" style="color:#AAA;text-decoration:underline;">Client portal</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  // Plain-text fallback used by some mail clients when HTML rendering is off.
+  // Keep the URL on its own line so it auto-links.
+  const text = [
+    "Reset your BAM portal password",
+    "",
+    "We got a request to reset the password on your BAM Business portal account.",
+    "",
+    "Open this link to choose a new password:",
+    actionLink,
+    "",
+    "This link expires in 1 hour.",
+    "If you didn't ask for a password reset, you can ignore this email — your password won't change.",
+    "",
+    "— BAM Business",
+  ].join("\n");
+
+  return { html, text };
+}
+
+async function sendResetPasswordEmail({ to, actionLink, resendApiKey }) {
+  const { html, text } = buildResetPasswordEmail(actionLink);
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "BAM Business <portal@byanymeansbball.com>",
+      to: [to],
+      subject: "Reset your BAM portal password",
+      html,
+      text,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Resend send failed:", errText.slice(0, 200));
+    return { ok: false, error: errText };
+  }
+  return { ok: true };
+}
+
 async function supabaseInsert(path, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: "POST",
@@ -191,40 +331,15 @@ export default async function handler(req, res) {
           return res.status(200).json(GENERIC_RESET_RESPONSE);
         }
 
-        // Send the email via Resend with the same BAM-branded template the
-        // staff-initiated reset uses.
-        const FROM_EMAIL = "BAM Business <portal@byanymeansbball.com>";
-        const SUBJECT = "Reset your BAM portal password";
-        const html = `<!doctype html>
-<html><body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1f; line-height: 1.55;">
-  <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8b6914; margin-bottom: 12px;">BAM Business · Client Portal</div>
-  <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px;">Reset your password</h1>
-  <p style="font-size: 15px; color: #555; margin: 0 0 24px;">We got a request to reset the password on your BAM portal account. Click the button below to choose a new password.</p>
-  <p style="margin: 0 0 24px;">
-    <a href="${actionLink}" style="display: inline-block; background: #1a1a1f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Reset password</a>
-  </p>
-  <p style="font-size: 13px; color: #888; margin: 0 0 8px;">Or copy this link into your browser:</p>
-  <p style="font-size: 12px; color: #555; word-break: break-all; margin: 0 0 32px;"><a href="${actionLink}" style="color: #1a1a1f;">${actionLink}</a></p>
-  <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-  <p style="font-size: 12px; color: #999; margin: 0;">This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email — your password won't change.</p>
-</body></html>`;
-        const text = `Reset your BAM portal password\n\nWe got a request to reset the password on your BAM portal account.\n\nOpen this link to choose a new password:\n${actionLink}\n\nThis link expires in 1 hour. If you didn't request this reset, you can safely ignore this email.`;
-
-        const resendRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: SUBJECT, html, text }),
+        // Send via shared helper (BAM-branded, email-client-bulletproof template).
+        const sent = await sendResetPasswordEmail({
+          to: email,
+          actionLink,
+          resendApiKey: process.env.RESEND_API_KEY,
         });
-        if (!resendRes.ok) {
-          console.error("Resend send failed (public reset):", (await resendRes.text()).slice(0, 200));
-          await logResetAttempt(false);
-          // Still return generic success — don't expose internal failures.
-          return res.status(200).json(GENERIC_RESET_RESPONSE);
-        }
-        await logResetAttempt(true);
+        await logResetAttempt(sent.ok);
+        // Always return generic success regardless of whether send succeeded
+        // (don't leak infra failure info to anonymous callers).
         return res.status(200).json(GENERIC_RESET_RESPONSE);
       }
 
@@ -714,49 +829,13 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "reset link missing from response" });
         }
 
-        // Step 2: send the email via Resend
-        const FROM_EMAIL = "BAM Business <portal@byanymeansbball.com>";
-        const SUBJECT = "Reset your BAM portal password";
-        const html = `<!doctype html>
-<html><body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1f; line-height: 1.55;">
-  <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8b6914; margin-bottom: 12px;">BAM Business · Client Portal</div>
-  <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px;">Reset your password</h1>
-  <p style="font-size: 15px; color: #555; margin: 0 0 24px;">We got a request to reset the password on your BAM portal account. Click the button below to choose a new password.</p>
-  <p style="margin: 0 0 24px;">
-    <a href="${actionLink}" style="display: inline-block; background: #1a1a1f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Reset password</a>
-  </p>
-  <p style="font-size: 13px; color: #888; margin: 0 0 8px;">Or copy this link into your browser:</p>
-  <p style="font-size: 12px; color: #555; word-break: break-all; margin: 0 0 32px;"><a href="${actionLink}" style="color: #1a1a1f;">${actionLink}</a></p>
-  <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
-  <p style="font-size: 12px; color: #999; margin: 0;">This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email — your password won't change.</p>
-</body></html>`;
-
-        const text = `Reset your BAM portal password
-
-We got a request to reset the password on your BAM portal account.
-
-Open this link to choose a new password:
-${actionLink}
-
-This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email.`;
-
-        const resendRes = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            from: FROM_EMAIL,
-            to: [targetEmail],
-            subject: SUBJECT,
-            html,
-            text,
-          }),
+        // Step 2: send via the shared helper (BAM-branded, email-client-bulletproof).
+        const sent = await sendResetPasswordEmail({
+          to: targetEmail,
+          actionLink,
+          resendApiKey: process.env.RESEND_API_KEY,
         });
-        if (!resendRes.ok) {
-          const errText = await resendRes.text();
-          console.error("Resend send failed:", errText);
+        if (!sent.ok) {
           return res.status(500).json({ error: "failed to send email" });
         }
         return res.status(200).json({ ok: true, sent_to: targetEmail });
