@@ -181,7 +181,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
           <button
             onClick={() => setSelectedId("__new__")}
             style={{
-              padding: "10px 16px", background: t.gold, color: "#0B0B0D",
+              padding: "10px 16px", background: t.accent, color: "#0B0B0D",
               border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
           >
@@ -355,8 +355,8 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
             style={{
               padding: "10px 18px",
               background: "transparent",
-              color: tab === tb.id ? t.gold : t.textMute,
-              borderBottom: `2px solid ${tab === tb.id ? t.gold : "transparent"}`,
+              color: tab === tb.id ? t.accent : t.textMute,
+              borderBottom: `2px solid ${tab === tb.id ? t.accent : "transparent"}`,
               borderTop: "none", borderLeft: "none", borderRight: "none",
               fontSize: 13, fontWeight: 600, cursor: "pointer",
             }}
@@ -580,7 +580,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
           onClick={save}
           disabled={!hasChanges || saving}
           style={{
-            padding: "10px 22px", background: hasChanges ? t.gold : t.surfaceEl,
+            padding: "10px 22px", background: hasChanges ? t.accent : t.surfaceEl,
             color: hasChanges ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
             fontSize: 13, fontWeight: 600, cursor: hasChanges ? "pointer" : "not-allowed",
           }}
@@ -863,7 +863,7 @@ function MarketingTab({ client, tokens, role, session }) {
               <div style={{ fontSize: 11, color: t.textMute, marginTop: 6 }}>
                 Suggested: <button
                   onClick={() => setPickedAdAccount(suggested.id)}
-                  style={{ background: "transparent", color: t.gold, border: "none", padding: 0, fontWeight: 600, cursor: "pointer", fontSize: 11 }}
+                  style={{ background: "transparent", color: t.accent, border: "none", padding: 0, fontWeight: 600, cursor: "pointer", fontSize: 11 }}
                 >{suggested.name} · {suggested.id}</button>
               </div>
             )}
@@ -889,7 +889,7 @@ function MarketingTab({ client, tokens, role, session }) {
               onClick={saveSetup}
               disabled={!hasUnsaved || setupSaving}
               style={{
-                padding: "9px 18px", background: hasUnsaved ? t.gold : t.surfaceEl,
+                padding: "9px 18px", background: hasUnsaved ? t.accent : t.surfaceEl,
                 color: hasUnsaved ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
                 fontSize: 13, fontWeight: 600, cursor: hasUnsaved ? "pointer" : "not-allowed",
               }}
@@ -1113,7 +1113,7 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
             onClick={addNote}
             disabled={saving || !body.trim()}
             style={{
-              padding: "8px 18px", background: body.trim() ? t.gold : t.surfaceEl,
+              padding: "8px 18px", background: body.trim() ? t.accent : t.surfaceEl,
               color: body.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6,
               fontSize: 13, fontWeight: 600, cursor: body.trim() ? "pointer" : "not-allowed",
             }}
@@ -1289,7 +1289,7 @@ function QuickLink({ label, value, url, tokens, hidden }) {
     <div style={{ padding: "10px 0", borderBottom: `1px solid ${tokens.border}` }}>
       <div style={{ fontSize: 11, color: tokens.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
       {value && url ? (
-        <a href={url} target="_blank" rel="noreferrer" style={{ color: tokens.gold, fontSize: 13, textDecoration: "none", fontFamily: "JetBrains Mono, monospace" }}>
+        <a href={url} target="_blank" rel="noreferrer" style={{ color: tokens.accent, fontSize: 13, textDecoration: "none", fontFamily: "JetBrains Mono, monospace" }}>
           {value} ↗
         </a>
       ) : (
@@ -1341,7 +1341,7 @@ function EditSelect({ label, value, onChange, options, tokens }) {
 
 function btnStyle(t, kind) {
   if (kind === "primary") return {
-    padding: "9px 18px", background: t.gold, color: "#0B0B0D",
+    padding: "9px 18px", background: t.accent, color: "#0B0B0D",
     border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
   };
   return {
