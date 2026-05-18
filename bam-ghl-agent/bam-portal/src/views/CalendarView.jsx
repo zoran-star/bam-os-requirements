@@ -400,18 +400,17 @@ export default function CalendarView({ tokens, dark }) {
     const start = new Date(currentWeekStart);
     const end = new Date(currentWeekStart);
     end.setDate(end.getDate() + 7);
-    fetchEvents(start.toISOString(), end.toISOString()).then(({ data }) => {
+    fetchEvents(start.toISOString(), end.toISOString()).then(({ data, connected }) => {
       if (cancelled) return;
-      if (data && data.length > 0) {
-        // Normalize service fields (start/end) to view fields (startTime/endTime)
-        const normalized = data.map(ev => ({
-          ...ev,
-          startTime: ev.startTime || ev.start,
-          endTime: ev.endTime || ev.end,
-        }));
-        setEvents(normalized);
-        setIsMock(false);
-      }
+      // Normalize service fields (start/end) to view fields (startTime/endTime).
+      // Empty array is normal (no events that week) — don't keep stale data around.
+      const normalized = (data || []).map(ev => ({
+        ...ev,
+        startTime: ev.startTime || ev.start,
+        endTime: ev.endTime || ev.end,
+      }));
+      setEvents(normalized);
+      setIsMock(connected === false);
       setIsLoading(false);
     });
     return () => { cancelled = true; };
@@ -510,14 +509,17 @@ export default function CalendarView({ tokens, dark }) {
         @keyframes calPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
       `}</style>
 
-      {/* Sample data indicator */}
+      {/* Calendar disconnected banner */}
       {isMock && !isLoading && (
-        <div style={{ marginBottom: 16 }}>
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-            background: `${tokens.amber}15`, color: tokens.amber,
-            letterSpacing: "0.04em",
-          }}>SAMPLE DATA</span>
+        <div style={{
+          marginBottom: 16, padding: "10px 14px",
+          background: `${tokens.amber}10`, border: `1px solid ${tokens.amber}40`,
+          borderRadius: 6, display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ color: tokens.amber, fontWeight: 600, fontSize: 13 }}>● Calendar disconnected</span>
+          <span style={{ color: tokens.textSub, fontSize: 12 }}>
+            Connect Google Calendar in <b style={{ color: tokens.text }}>Settings</b> to see real events.
+          </span>
         </div>
       )}
 

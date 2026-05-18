@@ -39,7 +39,7 @@ const ROLES = {
 
 const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
 
-export default function ClientsCombinedView({ tokens, dark, me, session }) {
+export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled }) {
   const t = tokens;
   const role = me?.role || "";
 
@@ -47,6 +47,17 @@ export default function ClientsCombinedView({ tokens, dark, me, session }) {
   const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+
+  // If parent passed an initialClientId (e.g. Dashboard click), open that client.
+  // One-shot: parent clears it via onInitialClientHandled so reopening the
+  // Clients tab fresh doesn't keep re-jumping into the same client.
+  useEffect(() => {
+    if (initialClientId && initialClientId !== selectedId) {
+      setSelectedId(initialClientId);
+      onInitialClientHandled?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialClientId]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all|active|onboarding|paused|churned
   const [sortKey, setSortKey] = useState("alpha"); // alpha|recent|mrr

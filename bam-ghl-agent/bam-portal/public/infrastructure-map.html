@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BAM Portal — Infrastructure Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --bg-el: #131318;
+    --bg-card: #16161C;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #F5F5F7;
+    --text-sub: #B0B0BA;
+    --text-mute: #6E6E78;
+    --gold: #E8C547;
+    --green: #4ADE80;
+    --red: #ED7969;
+    --amber: #F5A524;
+    --blue: #7AB8F5;
+    --purple: #C78EF5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .page { max-width: 1400px; margin: 0 auto; padding: 48px 24px 96px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 14px; line-height: 1.1; }
+  h2 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 48px 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h3 { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; margin: 18px 0 10px; color: var(--text); }
+  .sub { font-size: 15px; color: var(--text-sub); margin: 0 0 32px; line-height: 1.55; max-width: 820px; }
+  .tab-strip { display: flex; gap: 2px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; padding: 3px; margin-bottom: 32px; max-width: 600px; }
+  .tab-strip button { flex: 1; background: transparent; color: var(--text-mute); border: none; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 4px; transition: all 0.15s; }
+  .tab-strip button.active { background: var(--bg-card); color: var(--gold); }
+
+  /* Legend */
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; padding: 14px 18px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 32px; font-size: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text-sub); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* Flow rows */
+  .flow-row { display: grid; grid-template-columns: 240px 1fr; gap: 32px; margin-bottom: 36px; align-items: start; }
+  .flow-row .label { padding-top: 4px; }
+  .flow-row .label .title { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .flow-row .label .desc { font-size: 12px; color: var(--text-mute); line-height: 1.5; }
+  .nodes { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  /* Generic node */
+  .node { background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; min-width: 168px; max-width: 240px; transition: border-color 0.15s; }
+  .node-title { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .node-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-mute); line-height: 1.4; }
+  .node-tag { display: inline-block; margin-top: 8px; font-size: 9px; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-sub); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* Color types */
+  .node.client { border-left: 3px solid var(--blue); }
+  .node.staff { border-left: 3px solid var(--gold); }
+  .node.api { border-left: 3px solid var(--purple); }
+  .node.db { border-left: 3px solid var(--green); }
+  .node.external { border-left: 3px solid var(--amber); }
+  .node.dead { opacity: 0.45; border-style: dashed; }
+  .node.problem { border-color: var(--red); background: rgba(237,121,105,0.06); }
+  .node.problem .node-title::before { content: "⚠ "; color: var(--red); font-weight: 700; }
+
+  /* Problem panel */
+  .problems { background: rgba(237,121,105,0.05); border: 1px solid rgba(237,121,105,0.3); border-radius: 6px; padding: 22px 26px; margin-top: 36px; }
+  .problems h2 { color: var(--red); border-bottom-color: rgba(237,121,105,0.2); margin-top: 0; }
+  .problem-item { padding: 12px 0; border-bottom: 1px dashed rgba(237,121,105,0.2); display: grid; grid-template-columns: 36px 1fr; gap: 14px; align-items: start; }
+  .problem-item:last-child { border-bottom: none; }
+  .problem-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--red); font-weight: 600; padding-top: 2px; }
+  .problem-body { font-size: 13px; line-height: 1.6; color: var(--text); }
+  .problem-body b { color: var(--red); }
+  .problem-body .where { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-mute); display: block; margin-top: 4px; }
+  .problem-sev { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 999px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; margin-right: 6px; vertical-align: middle; }
+  .sev-high { background: rgba(237,121,105,0.18); color: var(--red); }
+  .sev-med { background: rgba(245,165,36,0.18); color: var(--amber); }
+  .sev-low { background: rgba(255,255,255,0.08); color: var(--text-sub); }
+
+  .filter-toggle { display: flex; gap: 8px; align-items: center; margin-left: auto; font-size: 12px; color: var(--text-sub); }
+  .filter-toggle label { display: flex; gap: 5px; align-items: center; cursor: pointer; }
+
+  /* Pages list */
+  .page-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .page-card { padding: 12px 14px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; }
+  .page-card.dead { opacity: 0.5; border-style: dashed; }
+  .page-card.problem { border-color: var(--red); }
+  .page-card .name { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--text); }
+  .page-card .desc { font-size: 11px; color: var(--text-mute); margin-top: 4px; line-height: 1.5; }
+
+  .small-note { font-size: 11px; color: var(--text-mute); margin-top: 4px; padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Infrastructure · 2026-05-17 · v1 audit (no security review)</div>
+  <h1>BAM Portal — what's running, where it lives</h1>
+  <p class="sub">A non-technical map of the entire system. Each row is one "layer" of the stack. The right column shows the actual things in that layer. <b style="color:var(--red)">Red boxes are problems</b> with a number you can match to the problem list at the bottom. Security is out of scope for this audit.</p>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><span class="legend-dot" style="background:var(--blue)"></span>Client-facing (academies)</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Staff-facing</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span>API endpoint</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--green)"></span>Database table</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--amber)"></span>External service</div>
+    <div class="legend-item"><span class="legend-dot" style="background:var(--red)"></span>Problem flagged</div>
+    <div class="legend-item"><span style="opacity:0.5">▢▢▢</span> Dashed = orphan / dead code</div>
+  </div>
+
+  <!-- LAYER 1: WHO USES IT -->
+  <h2>🚪 Who uses the system</h2>
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Client side</div>
+      <div class="desc">Academies BAM serves. Sign up, submit tickets, manage their own portal.</div>
+    </div>
+    <div class="nodes">
+      <div class="node client">
+        <div class="node-title">onboarding.html</div>
+        <div class="node-meta">Self-serve signup form. Posts to /api/clients → creates row + sends invite email.</div>
+        <div class="node-tag">live</div>
+      </div>
+      <div class="node client">
+        <div class="node-title">client-portal.html</div>
+        <div class="node-meta">Logged-in client view. Submit Error / Change / Build tickets. View status.</div>
+        <div class="node-tag">live</div>
+      </div>
+      <div class="node client problem">
+        <div class="node-title" data-problem="1">Duplicate HTML files</div>
+        <div class="node-meta">onboarding.html + client-portal.html exist in TWO places: /Users/zoransavic/bam-ghl-agent/ AND bam-portal/public/. Editing wrong copy = silent drift.</div>
+        <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #1</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Staff side</div>
+      <div class="desc">BAM team. React app with sidebar nav, 13 tabs.</div>
+    </div>
+    <div class="nodes">
+      <div class="node staff"><div class="node-title">Dashboard</div><div class="node-meta">Cockpit: client cards, tasks, calendar, alerts</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Clients</div><div class="node-meta">List + per-client detail (Overview / Setup / Marketing / Activity / Notes)</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Tasks</div><div class="node-meta">Action items + Asana tasks + reminders</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Calendar</div><div class="node-meta">Weekly Google Calendar view</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Knowledge Base</div><div class="node-meta">Notion SOPs + solution warehouse</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Financials</div><div class="node-meta">Stripe dashboard. Admin + scaling_manager only.</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Systems</div><div class="node-meta">Ticket workflow: open → delegated → done</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Marketing</div><div class="node-meta">Per-client ad tickets, Meta campaigns</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Content</div><div class="node-meta">Guide cards + ad creative tickets</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Team</div><div class="node-meta">Staff roles + invites</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">Settings</div><div class="node-meta">Integrations status, OAuth flows</div><div class="node-tag">live</div></div>
+      <div class="node staff"><div class="node-title">SM Training</div><div class="node-meta">Separate /training app (not the main React tree)</div><div class="node-tag">live</div></div>
+    </div>
+  </div>
+
+  <!-- LAYER 2: WHAT'S BROKEN OR ORPHANED IN THE UI -->
+  <h2>🪦 Code that exists but nothing uses (UI layer)</h2>
+  <p class="sub">These files are still in the repo but no one renders them. Either delete them or wire them up.</p>
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Orphan React views</div>
+      <div class="desc">Defined in src/views/ but not imported anywhere in App.jsx.</div>
+    </div>
+    <div class="nodes">
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">LeadsCRMView</div>
+        <div class="node-meta">GHL leads CRM page. Built but not in nav.</div>
+        <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #2</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">ProblemWarehouseView</div>
+        <div class="node-meta">Notion problem warehouse browser. Orphan.</div>
+        <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #2</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">SOPView</div>
+        <div class="node-meta">Folded into Knowledge Base. Orphan.</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">ChannelView</div>
+        <div class="node-meta">Cole's basketball acquisition test. Removed from nav.</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">OnboardingSummary</div>
+        <div class="node-meta">Exported but never used.</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">ClientsView (old)</div>
+        <div class="node-meta">Replaced by ClientsCombinedView. Still on disk.</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">ClientModal (old)</div>
+        <div class="node-meta">Was the old client detail modal. Still referenced for dashboard click-through.</div>
+      </div>
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="2">CommandPalette</div>
+        <div class="node-meta">Built but SearchOverlay is used instead.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Dead mock data</div>
+      <div class="desc">All 10 files in src/data/ are leftover hardcoded mocks from early prototypes. Not imported.</div>
+    </div>
+    <div class="nodes">
+      <div class="node staff dead problem">
+        <div class="node-title" data-problem="3">src/data/*.js</div>
+        <div class="node-meta">activeClientsData, onboardingData, actionItemsData, calendarData, financialsData, leadsData, marketingData, problemWarehouseData, sopData, systemsData</div>
+        <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #3</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Legacy customer HTML</div>
+      <div class="desc">In /Users/zoransavic/bam-ghl-agent/ — predate the React onboarding flow.</div>
+    </div>
+    <div class="nodes">
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">analysis.html</div>
+        <div class="node-meta">Status unknown</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">build-mode.html</div>
+        <div class="node-meta">Status unknown</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">change-ticket-internal.html</div>
+        <div class="node-meta">Status unknown</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">class-setup.html</div>
+        <div class="node-meta">Old onboarding step 1</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">offer-setup.html</div>
+        <div class="node-meta">Old onboarding step 2</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">parent-onboarding.html</div>
+        <div class="node-meta">Old onboarding step 3</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">dashboard.html</div>
+        <div class="node-meta">Status unknown</div>
+      </div>
+      <div class="node client dead problem">
+        <div class="node-title" data-problem="4">error-ticket-internal.html</div>
+        <div class="node-meta">Status unknown</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYER 3: API ENDPOINTS -->
+  <h2>🛰 API endpoints (Vercel serverless functions)</h2>
+  <p class="sub">Each is one .js file under <code>/api/</code>. The portal frontends call these; they talk to the database + external services.</p>
+  <div class="flow-row">
+    <div class="label">
+      <div class="title">Core endpoints</div>
+      <div class="desc">The 12 backend handlers that power everything.</div>
+    </div>
+    <div class="nodes">
+      <div class="node api"><div class="node-title">/api/clients</div><div class="node-meta">Clients CRUD + Stripe revenue lookup + invite/reset/archive actions</div></div>
+      <div class="node api"><div class="node-title">/api/tickets</div><div class="node-meta">Support ticket workflow (Error/Change/Build), staff ↔ client threading</div></div>
+      <div class="node api"><div class="node-title">/api/marketing</div><div class="node-meta">Marketing + content tickets, Meta ads, guide cards. <b>Huge file (~26KB).</b></div></div>
+      <div class="node api"><div class="node-title">/api/ghl</div><div class="node-meta">GoHighLevel proxy: locations, contacts, pipelines, conversations</div></div>
+      <div class="node api"><div class="node-title">/api/stripe/overview</div><div class="node-meta">MRR, churn, customers, invoices, alerts, channel snapshots</div></div>
+      <div class="node api"><div class="node-title">/api/slack/channels</div><div class="node-meta">Channels, messages, OAuth, feedback collection</div></div>
+      <div class="node api"><div class="node-title">/api/asana/tasks</div><div class="node-meta">Asana tasks + import "Tickets - MASTER"</div></div>
+      <div class="node api"><div class="node-title">/api/notion/query</div><div class="node-meta">SOPs, action items, client profiles, solution warehouses</div></div>
+      <div class="node api"><div class="node-title">/api/calendar/events</div><div class="node-meta">Google Calendar merged feed (2 accounts)</div></div>
+      <div class="node api"><div class="node-title">/api/auth/google/[step]</div><div class="node-meta">OAuth login + callback for Google Calendar</div></div>
+      <div class="node api"><div class="node-title">/api/ai/search</div><div class="node-meta">SOP semantic search + call note summarization</div></div>
+      <div class="node api"><div class="node-title">/api/training</div><div class="node-meta">SM scenario training, AI evaluation, queue generation</div></div>
+    </div>
+  </div>
+
+  <!-- LAYER 4: DATABASE -->
+  <h2>🗄 Supabase database (31 tables in public schema)</h2>
+  <p class="sub">All persistent data lives here. Each box is one table — number on the right is column count.</p>
+
+  <h3 style="color:var(--gold)">Core BAM business tables</h3>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node db"><div class="node-title">clients <span style="float:right;color:var(--text-mute)">18</span></div><div class="node-meta">All academies. business_name, owner_name, email, status, scaling_manager_id, integrations IDs</div></div>
+    <div class="node db"><div class="node-title">staff <span style="float:right;color:var(--text-mute)">9</span></div><div class="node-meta">BAM team. name, email, role, user_id</div></div>
+    <div class="node db"><div class="node-title">client_notes <span style="float:right;color:var(--text-mute)">5</span></div><div class="node-meta">Internal staff notes per client (new)</div></div>
+    <div class="node db"><div class="node-title">tickets <span style="float:right;color:var(--text-mute)">27</span></div><div class="node-meta">Support ticket pipeline (Error/Change/Build)</div></div>
+    <div class="node db"><div class="node-title">marketing_tickets <span style="float:right;color:var(--text-mute)">15</span></div><div class="node-meta">Ad campaign launch requests</div></div>
+    <div class="node db"><div class="node-title">content_tickets <span style="float:right;color:var(--text-mute)">16</span></div><div class="node-meta">Creative production requests</div></div>
+    <div class="node db"><div class="node-title">guide_cards <span style="float:right;color:var(--text-mute)">10</span></div><div class="node-meta">Content team's reusable guide cards</div></div>
+    <div class="node db"><div class="node-title">portal_feedback <span style="float:right;color:var(--text-mute)">11</span></div><div class="node-meta">Staff feedback submissions → Slack</div></div>
+    <div class="node db"><div class="node-title">academy_mappings <span style="float:right;color:var(--text-mute)">5</span></div><div class="node-meta">Asana academy-name → Supabase client_id</div></div>
+  </div>
+
+  <h3 style="color:var(--amber)">Integration token storage</h3>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node db"><div class="node-title">staff_meta_tokens <span style="float:right;color:var(--text-mute)">9</span></div><div class="node-meta">Staff Meta/Facebook OAuth tokens</div></div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="5">client_meta_tokens <span style="float:right;color:var(--text-mute)">9</span></div>
+      <div class="node-meta">Memory note: marked LEGACY but code paths still reference it.</div>
+      <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #5</div>
+    </div>
+    <div class="node db"><div class="node-title">user_slack_tokens <span style="float:right;color:var(--text-mute)">8</span></div><div class="node-meta">Per-user Slack OAuth tokens</div></div>
+  </div>
+
+  <h3 style="color:var(--purple)">SM Training subsystem (separate app)</h3>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node db"><div class="node-title">sm_scenarios <span style="float:right;color:var(--text-mute)">18</span></div><div class="node-meta">Training scenarios</div></div>
+    <div class="node db"><div class="node-title">sm_units <span style="float:right;color:var(--text-mute)">10</span></div><div class="node-meta">Curriculum units</div></div>
+    <div class="node db"><div class="node-title">sm_sessions <span style="float:right;color:var(--text-mute)">9</span></div><div class="node-meta">Training sessions</div></div>
+    <div class="node db"><div class="node-title">sm_daily_queue <span style="float:right;color:var(--text-mute)">8</span></div><div class="node-meta">Daily practice queue</div></div>
+    <div class="node db"><div class="node-title">sm_calibrations <span style="float:right;color:var(--text-mute)">8</span></div><div class="node-meta">SM calibration responses</div></div>
+    <div class="node db"><div class="node-title">sm_progress <span style="float:right;color:var(--text-mute)">13</span></div><div class="node-meta">Trainee progress</div></div>
+    <div class="node db"><div class="node-title">sm_responses <span style="float:right;color:var(--text-mute)">24</span></div><div class="node-meta">All scenario answers</div></div>
+    <div class="node db"><div class="node-title">sm_transcripts <span style="float:right;color:var(--text-mute)">9</span></div><div class="node-meta">Conversation transcripts</div></div>
+    <div class="node db"><div class="node-title">sm_user_roles <span style="float:right;color:var(--text-mute)">5</span></div><div class="node-meta">Training-specific roles</div></div>
+    <div class="node db"><div class="node-title">sm_scenario_feedback <span style="float:right;color:var(--text-mute)">7</span></div><div class="node-meta">Trainee feedback on scenarios</div></div>
+  </div>
+
+  <h3 style="color:var(--blue)">Internal-only tracking (Cole / channel test)</h3>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node db dead problem">
+      <div class="node-title" data-problem="6">bam_channel_settings <span style="float:right;color:var(--text-mute)">30</span></div>
+      <div class="node-meta">Channel test config. Only zoran/mike/coleman can see.</div>
+    </div>
+    <div class="node db dead problem">
+      <div class="node-title" data-problem="6">bam_channel_snapshots <span style="float:right;color:var(--text-mute)">21</span></div>
+      <div class="node-meta">Snapshots from channel test. ChannelView is orphaned in nav.</div>
+    </div>
+  </div>
+
+  <h3 style="color:var(--text-mute)">Status unclear — purpose not documented</h3>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">client_users <span style="float:right;color:var(--text-mute)">8</span></div>
+      <div class="node-meta">Exists in DB but unclear what populates it. Separate from `clients` and Supabase Auth.</div>
+      <div class="node-tag" style="background:rgba(237,121,105,0.2);color:var(--red)">problem #7</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">board_items <span style="float:right;color:var(--text-mute)">19</span></div>
+      <div class="node-meta">Unclear purpose. No API code references it.</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">content_themes <span style="float:right;color:var(--text-mute)">12</span></div>
+      <div class="node-meta">20 rows. Unclear if active.</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">content_creatives <span style="float:right;color:var(--text-mute)">20</span></div>
+      <div class="node-meta">May overlap with content_tickets / guide_cards.</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">content_scripts <span style="float:right;color:var(--text-mute)">7</span></div>
+      <div class="node-meta">Likely the content production stack but not surfaced in nav.</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">content_feedback <span style="float:right;color:var(--text-mute)">5</span></div>
+      <div class="node-meta">Same as above.</div>
+    </div>
+    <div class="node db problem">
+      <div class="node-title" data-problem="7">Questions Database <span style="float:right;color:var(--text-mute)">13</span></div>
+      <div class="node-meta">Powers the customer onboarding HTML forms (legacy ones).</div>
+    </div>
+  </div>
+
+  <!-- LAYER 5: EXTERNAL SERVICES -->
+  <h2>🌐 External services we're hooked into</h2>
+  <p class="sub">10 third-party systems the portal talks to. If any of these go down or change their API, that feature breaks.</p>
+  <div class="nodes" style="margin-bottom:20px;">
+    <div class="node external"><div class="node-title">Supabase</div><div class="node-meta">Database + auth. Everything depends on this.</div></div>
+    <div class="node external"><div class="node-title">Stripe</div><div class="node-meta">Subscriptions, MRR, invoices, customer search</div></div>
+    <div class="node external"><div class="node-title">Slack</div><div class="node-meta">Notifications, channel messages, OAuth</div></div>
+    <div class="node external"><div class="node-title">GoHighLevel</div><div class="node-meta">CRM data: contacts, pipelines, conversations</div></div>
+    <div class="node external"><div class="node-title">Notion</div><div class="node-meta">SOPs, action items, client profile notes, solution warehouse</div></div>
+    <div class="node external"><div class="node-title">Meta / Facebook Ads</div><div class="node-meta">Ad accounts, campaigns, creatives, insights</div></div>
+    <div class="node external"><div class="node-title">Asana</div><div class="node-meta">Tasks, "Tickets - MASTER" import</div></div>
+    <div class="node external"><div class="node-title">Google Calendar</div><div class="node-meta">2 accounts merged into one weekly view</div></div>
+    <div class="node external"><div class="node-title">Anthropic Claude</div><div class="node-meta">AI search, call summaries, training evaluation</div></div>
+    <div class="node external"><div class="node-title">Resend (SMTP)</div><div class="node-meta">Email invites + password resets (via Supabase Auth)</div></div>
+  </div>
+
+  <!-- ─────────── PROBLEMS ─────────── -->
+  <div class="problems">
+    <h2>🚩 Problems to clean up</h2>
+    <p style="font-size:13px; color:var(--text-sub); margin:0 0 20px;">Numbered to match the red callouts above. Severity is my guess at impact, not effort.</p>
+
+    <div class="problem-item">
+      <div class="problem-num">#1</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-high">High</span><b>Customer-facing HTML lives in two places.</b> <code>onboarding.html</code> and <code>client-portal.html</code> exist BOTH in <code>/Users/zoransavic/bam-ghl-agent/</code> (local, not in git) AND <code>bam-portal/public/</code> (in git, served by Vercel). Editing the wrong one = silent drift between what's deployed and what you think you're editing.
+        <span class="where">/Users/zoransavic/bam-ghl-agent/{onboarding,client-portal}.html  vs  bam-portal/public/{onboarding,client-portal}.html</span>
+        <span class="where">Fix: pick one canonical location, delete the other, document in CLAUDE.md.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#2</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>8 orphaned React view files.</b> Files exist in <code>src/views/</code> but nothing imports them. They confuse new contributors and bloat the build.
+        <span class="where">LeadsCRMView.jsx · ProblemWarehouseView.jsx · SOPView.jsx · ChannelView.jsx · OnboardingSummary.jsx · ClientsView.jsx (old) · ClientModal.jsx · CommandPalette.jsx</span>
+        <span class="where">Fix: delete or wire them up. ClientsView + ClientModal are leftover from the migration we just did.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#3</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>10 dead mock-data files.</b> <code>src/data/*.js</code> — hardcoded fixtures from when the portal was a prototype. None imported anywhere.
+        <span class="where">activeClientsData, onboardingData, actionItemsData, calendarData, financialsData, leadsData, marketingData, problemWarehouseData, sopData, systemsData</span>
+        <span class="where">Fix: delete the entire src/data/ folder.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#4</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>8 legacy customer HTML files of unknown status.</b> In <code>/Users/zoransavic/bam-ghl-agent/</code>. Some are pre-React onboarding steps (class-setup, offer-setup, parent-onboarding). Others have no documented purpose (analysis.html, build-mode.html, dashboard.html, error-ticket-internal.html, change-ticket-internal.html).
+        <span class="where">CLAUDE.md flags these as "LEGACY / STATUS UNKNOWN; may be deprecated; confirm before editing"</span>
+        <span class="where">Fix: walk through each with Cam/Mike. Delete if dead. Move to /archive/ folder if reference-only.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#5</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>Legacy <code>client_meta_tokens</code> table still wired.</b> Memory note says it was deprecated when staff-side Meta OAuth landed, but <code>api/marketing.js</code> still has fallback code paths reading from it. Either fully decommission or document that hybrid mode is intentional.
+        <span class="where">api/marketing.js — handleMetaCampaigns has client-token preference logic</span>
+        <span class="where">memories/MEMORY.md round-3 deferred list: "Cleanup legacy client_meta_tokens code paths in marketing.js"</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#6</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>Channel test data still in DB after view removed.</b> <code>bam_channel_settings</code> + <code>bam_channel_snapshots</code> are populated by <code>/api/stripe/overview?section=channel-ingest</code>. The UI (<code>ChannelView</code>) was removed from nav but the backend still ingests. If Cole's 6-week test ended, this is dead weight.
+        <span class="where">Tables: bam_channel_settings, bam_channel_snapshots · Endpoint: api/stripe/overview.js section=channel-ingest</span>
+        <span class="where">Fix: confirm test status with Cole. If done: drop tables, remove ingest endpoint, delete ChannelView.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#7</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>7 Supabase tables with unclear purpose.</b> No code references them in the staff portal we audited (<code>client_users</code>, <code>board_items</code>, <code>content_themes</code>, <code>content_creatives</code>, <code>content_scripts</code>, <code>content_feedback</code>, <code>Questions Database</code>). The <code>content_*</code> stack might be Coleman's content production system. <code>client_users</code> might be Cole's older auth model.
+        <span class="where">tables: client_users (8 cols), board_items (19), content_themes (12, 20 rows), content_creatives (20), content_scripts (7), content_feedback (5), Questions Database (13)</span>
+        <span class="where">Fix: per-table owner audit. Each needs to either get wired into a view, get documented as "used by external system", or get dropped.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#8</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b><code>shapeClient()</code> still returns a <code>name</code> alias.</b> The DB rename (<code>name → business_name</code>) is done, but <code>api/clients.js</code> still mirrors <code>business_name</code> to a deprecated <code>name</code> field so legacy UI keeps working. The audit shows ~13 frontend files still read <code>c.name</code> instead of <code>c.business_name</code>.
+        <span class="where">api/clients.js shapeClient() · src/App.jsx, ClientModal, ActiveCard, OnboardingRow, UnifiedTasksView, FinancialsView, CommandPalette, SearchOverlay, DashboardView, AsanaImportView</span>
+        <span class="where">Fix: grep all <code>.name</code> reads on client objects, swap to <code>.business_name</code>, then drop the alias.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#9</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>SystemsView mixes <code>x.client.name</code> and <code>x.client.business_name</code>.</b> Line 100 uses business_name, lines 113/204 use name. Should be one or the other.
+        <span class="where">src/views/SystemsView.jsx</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#10</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>Calendar mock fallback is active.</b> <code>calendarService</code> returns mock events when <code>VITE_CALENDAR_CONNECTED !== "true"</code>. If Google tokens expire silently, the UI shows fake data without warning.
+        <span class="where">src/services/calendarService.js + api/calendar/events.js</span>
+        <span class="where">Fix: replace the mock with an explicit "Calendar disconnected" empty state.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#11</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>Notion queries swallow errors silently.</b> Multiple <code>.catch(() => ({ results: [] }))</code> in <code>api/notion/query.js</code>. If a Notion page is moved or deleted, the portal silently shows an empty list — no log, no alert.
+        <span class="where">api/notion/query.js lines 110, 167, 170</span>
+        <span class="where">Fix: at minimum, log the error to console with the page ID that failed.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#12</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>Hardcoded Notion page IDs.</b> <code>api/notion/query.js</code> has constants like <code>ACTION_ITEMS_DB</code>, <code>CLIENT_PROFILES_PAGE</code>, <code>SOP_PAGES</code> (10 entries). If anyone moves these pages in Notion, queries return empty silently (see #11).
+        <span class="where">api/notion/query.js lines 5–32</span>
+        <span class="where">Fix: move to Supabase config table or .env vars, and add a status check on the Settings page.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#13</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>Asana import uses brittle regex parsing.</b> <code>api/asana/tasks.js</code> lines 128–151 extract academy, email, category, and title via regex from the task notes body. If the Asana template changes, imports break.
+        <span class="where">api/asana/tasks.js</span>
+        <span class="where">Fix: switch to Asana custom fields where possible (already partially done).</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#14</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>2 duplicate Zoran staff rows + 1 junk "marketing test" row.</b> Documented in QUESTIONS-FOR-MIKE.md. Cleanup pending.
+        <span class="where">staff table: zoran@byanymeansbball.com + zoransavic2000@gmail.com + name='marketing test'</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#15</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>Bundle is large + unsplit.</b> Main JS bundle is 921KB (232KB gzipped). Vite is warning about chunks > 500KB. Affects first-load time on slow connections, especially phones.
+        <span class="where">dist/assets/index-*.js</span>
+        <span class="where">Fix: dynamic imports for heavy views (Marketing, Content, Training). Even just code-splitting the SM Training tree would help — TrainingApp is 475KB on its own.</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#16</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-med">Med</span><b>Round-3 backlog still pending (from May 2026 memory refresh).</b>
+        <span class="where">1. Email/SMS ticket notifications (Slack done; email/SMS for clients without Slack) · 2. Supabase Realtime subscriptions (auto-refresh) · 3. Per-client signed URLs on ticket-files bucket (currently public) · 4. Meta token refresh on 401 (no auto-refresh — needs "Reconnect" CTA) · 5. End-to-end test of client-side Meta OAuth · 6. Polish ad-account picker UI · 7. Meta App Review submission · 8. Cleanup DETAIL Miami orphan test tickets</span>
+        <span class="where">memories/project_marketing_portal_state.md + project_meta_api_integration.md</span>
+      </div>
+    </div>
+
+    <div class="problem-item">
+      <div class="problem-num">#17</div>
+      <div class="problem-body">
+        <span class="problem-sev sev-low">Low</span><b>Mike doc still unresolved.</b> <code>scripts/migration/QUESTIONS-FOR-MIKE.md</code> has 8 items from the Notion→Supabase consolidation: BAM GTA/NY/SJ/WV need profile data, ACTIV8 / Supreme owner ambiguity, scaling_manager role permission rework, Alex Twin is real or stale, etc.
+        <span class="where">scripts/migration/QUESTIONS-FOR-MIKE.md</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top: 48px; padding: 20px 24px; background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px;">
+    <h3 style="margin-top:0">Recap by the numbers</h3>
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; margin-top: 14px;">
+      <div><div style="font-size:28px; font-weight:700; color:var(--gold);">12</div><div style="font-size:12px; color:var(--text-mute);">API endpoint files</div></div>
+      <div><div style="font-size:28px; font-weight:700; color:var(--green);">31</div><div style="font-size:12px; color:var(--text-mute);">Supabase tables</div></div>
+      <div><div style="font-size:28px; font-weight:700; color:var(--amber);">10</div><div style="font-size:12px; color:var(--text-mute);">External services</div></div>
+      <div><div style="font-size:28px; font-weight:700; color:var(--blue);">12</div><div style="font-size:12px; color:var(--text-mute);">Live staff portal tabs</div></div>
+      <div><div style="font-size:28px; font-weight:700; color:var(--red);">17</div><div style="font-size:12px; color:var(--text-mute);">Problems flagged</div></div>
+      <div><div style="font-size:28px; font-weight:700; color:var(--text-mute);">8</div><div style="font-size:12px; color:var(--text-mute);">Orphan UI views</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Highlight matching problem item when clicking a red node
+  document.querySelectorAll('[data-problem]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      const num = el.getAttribute('data-problem');
+      const items = document.querySelectorAll('.problem-num');
+      for (const it of items) {
+        if (it.textContent === '#' + num) {
+          it.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          it.parentElement.style.background = 'rgba(237,121,105,0.15)';
+          setTimeout(() => { it.parentElement.style.background = ''; }, 1600);
+          break;
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>

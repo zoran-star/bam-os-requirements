@@ -1265,7 +1265,7 @@ function MyToDoPanel({ tokens, dark, tasks, onCreateTask, onUpdateTask, isLoadin
 function PulseCheckPanel({ tokens, allClients, allReminders, actionItems, selectedSM, clientSMMap, isLoading }) {
   const clientCards = useMemo(() => {
     const clients = (allClients || []).map(c => {
-      const name = c.name;
+      const name = c.business_name;
       const sm = c.manager || "\u2014";
       const health = typeof c.health === "number" ? c.health : (typeof c.healthScore === "number" ? c.healthScore : null);
       const lastCall = c.lastCallDate || c.lastCall || null;
@@ -1295,7 +1295,7 @@ function PulseCheckPanel({ tokens, allClients, allReminders, actionItems, select
     // Filter by SM
     let filtered = clients;
     if (selectedSM) {
-      filtered = clients.filter(c => clientSMMap[c.name] === selectedSM);
+      filtered = clients.filter(c => clientSMMap[c.business_name] === selectedSM);
     }
 
     // Sort by health ascending (worst first), nulls at end
@@ -1488,7 +1488,7 @@ export default function UnifiedTasksView({ tokens, dark, tasks, onCreateTask, on
   // Build client-to-SM map for filtering
   const clientSMMap = useMemo(() => {
     const map = {};
-    allClients.forEach(c => { if (c.manager) map[c.name] = c.manager; });
+    allClients.forEach(c => { if (c.manager) map[c.business_name] = c.manager; });
     return map;
   }, [allClients]);
 

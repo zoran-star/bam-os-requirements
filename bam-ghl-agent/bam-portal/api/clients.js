@@ -64,10 +64,6 @@ function shapeClient(row, revenue) {
   return {
     id: row.id,
     business_name: row.business_name,
-    // Legacy alias: many UI files still read `client.name`. Mirroring business_name
-    // here keeps them working during the gradual rename. Safe to drop after every
-    // `client.name` / `c.name` UI reference is migrated to `business_name`.
-    name: row.business_name,
     owner_name: row.owner_name || null,
     email: row.email || null,
     auth_user_id: row.auth_user_id || null,
@@ -147,10 +143,59 @@ export default async function handler(req, res) {
         const business_name = signupBody.business_name.trim();
         const owner_name = signupBody.owner_name.trim();
         const email = signupBody.email.trim().toLowerCase();
+        // Genericized response so attackers can't distinguish "email exists" from
+        // "invite sent". Closes SEC-2 (email enumeration).
+        const GENERIC_RESPONSE = {
+          ok: true,
+          message: "If that's a new account, we've sent you an invite. Check your inbox in a few minutes (and your spam folder).",
+        };
+
+        // Basic shape validation. Return errors here are NOT enumeration-relevant —
+        // they only fire for malformed input, not "email exists" decisions.
         if (!business_name) return res.status(400).json({ error: "business name required" });
         if (!owner_name) return res.status(400).json({ error: "owner name required" });
         if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           return res.status(400).json({ error: "valid email required" });
+        }
+
+        // ── Rate limit: 10 signup attempts per IP per 24h ──
+        // Headers Vercel populates with the real client IP, falling back gracefully.
+        const ip = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown")
+          .toString()
+          .split(",")[0]
+          .trim();
+        const SIGNUPS_PER_IP_PER_DAY = 10;
+        try {
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const recent = await supabaseSelect(
+            `signup_attempts?ip=eq.${encodeURIComponent(ip)}&attempted_at=gte.${encodeURIComponent(since)}&select=id`
+          );
+          if (Array.isArray(recent) && recent.length >= SIGNUPS_PER_IP_PER_DAY) {
+            // Don't tell them the limit — vague rate-limit message.
+            return res.status(429).json({ error: "Too many signup attempts. Try again later." });
+          }
+        } catch (_) {
+          // If the rate-limit lookup itself fails, fall open (don't block legit signups).
+          // We still log the attempt below.
+        }
+
+        // Log this attempt up front so even failures count toward the limit.
+        const logAttempt = (succeeded) =>
+          supabaseInsert("signup_attempts", { ip, email, succeeded }).catch(() => {});
+
+        // Check if a clients row with this email already exists. If so, silently
+        // succeed without re-inviting (don't spam the existing user, don't tell
+        // the caller).
+        try {
+          const existing = await supabaseSelect(
+            `clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`
+          );
+          if (Array.isArray(existing) && existing.length > 0) {
+            await logAttempt(false);
+            return res.status(200).json(GENERIC_RESPONSE);
+          }
+        } catch (_) {
+          // If the lookup itself fails, continue with invite — fail-open.
         }
 
         // Send invite (creates auth user with no password + emails the link).
@@ -169,29 +214,33 @@ export default async function handler(req, res) {
           body: JSON.stringify({ email, redirect_to: redirectTo, data: { needs_password: true } }),
         });
         if (!inviteRes.ok) {
-          const errText = await inviteRes.text();
-          const friendly = inviteRes.status === 422 || /already/i.test(errText)
-            ? "an account with that email already exists — try signing in instead"
-            : `invite: ${errText}`;
-          return res.status(400).json({ error: friendly });
+          // 422 = already exists in auth (no clients row though — orphan auth user).
+          // Either way: log + return generic success. Never echo Supabase error text.
+          await logAttempt(false);
+          return res.status(200).json(GENERIC_RESPONSE);
         }
         const invited = await inviteRes.json();
         const auth_user_id = invited?.id || invited?.user?.id;
-        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
+        if (!auth_user_id) {
+          await logAttempt(false);
+          return res.status(200).json(GENERIC_RESPONSE);
+        }
 
         try {
-          const rows = await supabaseInsert("clients", {
+          await supabaseInsert("clients", {
             business_name, owner_name, email, status: "onboarding", auth_user_id,
           });
-          const row = Array.isArray(rows) ? rows[0] : rows;
-          return res.status(200).json({ id: row?.id, business_name: row?.business_name, email, invited: true });
-        } catch (insertErr) {
+          await logAttempt(true);
+          return res.status(200).json(GENERIC_RESPONSE);
+        } catch (_insertErr) {
           // Roll back the auth user if the clients insert fails so they don't get orphaned
           await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
             method: "DELETE",
             headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
           }).catch(() => {});
-          return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
+          await logAttempt(false);
+          // Still return generic success — caller doesn't get to see internal failures.
+          return res.status(200).json(GENERIC_RESPONSE);
         }
       }
 

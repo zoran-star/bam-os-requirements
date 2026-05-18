@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>BAM Portal — Scale + Security Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --bg-el: #131318;
+    --bg-card: #16161C;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #F5F5F7;
+    --text-sub: #B0B0BA;
+    --text-mute: #6E6E78;
+    --gold: #E8C547;
+    --green: #4ADE80;
+    --red: #ED7969;
+    --amber: #F5A524;
+    --blue: #7AB8F5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .page { max-width: 1400px; margin: 0 auto; padding: 48px 24px 96px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 14px; line-height: 1.1; }
+  h2 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 48px 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; }
+  h2 .badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-sub); }
+  .sub { font-size: 15px; color: var(--text-sub); margin: 0 0 32px; line-height: 1.55; max-width: 820px; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 28px 0 24px; }
+  .stat { background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; padding: 18px 20px; }
+  .stat .n { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+  .stat .lbl { font-size: 11px; color: var(--text-mute); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; }
+  .stat.crit { border-left: 3px solid var(--red); }
+  .stat.crit .n { color: var(--red); animation: pulse 2.4s ease-in-out infinite; }
+  .stat.high { border-left: 3px solid var(--red); }
+  .stat.high .n { color: var(--red); }
+  .stat.med  { border-left: 3px solid var(--amber); }
+  .stat.med  .n { color: var(--amber); }
+  .stat.low  { border-left: 3px solid var(--text-mute); }
+  .stat.low  .n { color: var(--text-sub); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+  /* Finding cards */
+  .finding { background: var(--bg-el); border: 1px solid var(--border); border-radius: 6px; padding: 18px 22px; margin-bottom: 14px; display: grid; grid-template-columns: 60px 1fr; gap: 18px; }
+  .finding.crit { border-left: 3px solid var(--red); background: rgba(237,121,105,0.04); }
+  .finding.high { border-left: 3px solid var(--red); }
+  .finding.med  { border-left: 3px solid var(--amber); }
+  .finding.low  { border-left: 3px solid var(--text-mute); }
+
+  .finding-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-mute); font-weight: 600; padding-top: 4px; }
+  .finding-body { display: grid; gap: 8px; }
+
+  .finding-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .finding-title { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; color: var(--text); }
+  .sev { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .sev.crit { background: var(--red); color: #0B0B0D; }
+  .sev.high { background: rgba(237,121,105,0.2); color: var(--red); }
+  .sev.med  { background: rgba(245,165,36,0.2); color: var(--amber); }
+  .sev.low  { background: rgba(255,255,255,0.08); color: var(--text-sub); }
+
+  .where { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-mute); padding: 4px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; display: inline-block; margin-top: 2px; }
+  .desc { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+  .desc b { color: var(--text); }
+  .fix { font-size: 13px; line-height: 1.6; color: var(--text); padding: 10px 14px; background: rgba(74,222,128,0.06); border-left: 3px solid var(--green); border-radius: 4px; margin-top: 4px; }
+  .fix::before { content: "✓ Fix: "; font-weight: 700; color: var(--green); }
+
+  .impact { font-size: 12px; color: var(--text-sub); line-height: 1.55; padding: 8px 12px; background: rgba(237,121,105,0.06); border-left: 3px solid var(--red); border-radius: 4px; margin-top: 4px; }
+  .impact::before { content: "🩸 What breaks: "; font-weight: 700; color: var(--red); }
+
+  .tl-dr { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 6px; padding: 24px 28px; margin-bottom: 32px; }
+  .tl-dr h3 { font-family: 'Space Grotesk', sans-serif; margin: 0 0 12px; font-size: 18px; }
+  .tl-dr ul { margin: 0; padding-left: 22px; font-size: 14px; color: var(--text-sub); line-height: 1.7; }
+  .tl-dr li b { color: var(--text); }
+  .tl-dr li .crit-text { color: var(--red); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">Audit · 2026-05-17 · Scale + Security · Round 2</div>
+  <h1>Scale &amp; Security Audit</h1>
+  <p class="sub">Round-2 audit focused on (1) what breaks past 50 clients and (2) actual exploitable security issues. The earlier infrastructure map covered architecture + dead code; this one looks at performance + risk.</p>
+
+  <!-- TL;DR -->
+  <div class="tl-dr">
+    <h3>TL;DR — what to fix this week</h3>
+    <ul>
+      <li><span class="crit-text">3 CRITICAL security issues</span>: hardcoded anon key fallback, email enumeration on signup, Notion endpoint reads arbitrary pages with no auth.</li>
+      <li><span class="crit-text">3 HIGH scale blockers</span>: per-client Stripe lookup on every Clients tab load, unbounded ticket queries, missing indexes on hot foreign keys.</li>
+      <li>2 HIGH security: client-portal session leak, internal messages can reach client view.</li>
+      <li>Rest are medium/low and can be batched.</li>
+    </ul>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat crit"><div class="n">3</div><div class="lbl">Critical</div></div>
+    <div class="stat high"><div class="n">5</div><div class="lbl">High</div></div>
+    <div class="stat med"><div class="n">6</div><div class="lbl">Medium</div></div>
+    <div class="stat low"><div class="n">3</div><div class="lbl">Low</div></div>
+  </div>
+
+  <!-- ═══════════════════ SCALABILITY ═══════════════════ -->
+  <h2>📈 Scalability (50+ clients)<span class="badge">8 findings</span></h2>
+  <p class="sub">Today: 25 clients. These all get worse linearly or quadratically as that number grows.</p>
+
+  <div class="finding high">
+    <div class="finding-num">S-1</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Per-client Stripe revenue lookup</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">api/clients.js:607-612 · Promise.all(rows.map(getStripeRevenue))</div>
+      <div class="desc">Every time anyone opens the Clients tab, the API fires <b>one Stripe API call per client</b> to get live MRR. With 50 clients that's 50 calls; at 200 clients it's 200 calls every page load.</div>
+      <div class="impact">Clients tab takes longer to load each time you add a client. Eventually hits Stripe rate limits or just becomes unusable.</div>
+      <div class="fix">Cache MRR in Supabase (refreshed nightly or via Stripe webhook), or batch with one <code>?expand=subscriptions</code> Stripe call instead of N customer fetches.</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-num">S-2</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Unbounded ticket queries (no LIMIT)</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">api/marketing.js:225, 231, 589, 600 · sb('marketing_tickets?select=*…')</div>
+      <div class="desc">Marketing + content ticket fetches have <b>no <code>limit=</code> clause</b>. Right now there are dozens of rows total. At 50 clients each averaging ~10 tickets/year that's 500/year per table. Both will balloon.</div>
+      <div class="impact">As tickets accumulate, every Marketing/Content tab load downloads the entire history. Browser memory + Vercel payload size go up forever.</div>
+      <div class="fix">Add <code>?limit=50&offset=…&order=submitted_at.desc</code>. Add a "Load older" button in the UI. Same for content tickets.</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-num">S-3</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Missing indexes on hot foreign keys</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">Supabase tables: tickets, marketing_tickets, content_tickets, client_notes</div>
+      <div class="desc">Only <code>clients(scaling_manager_id)</code> has an index. Every other client_id FK is unindexed. Every query like "tickets for this client" does a full table scan.</div>
+      <div class="impact">Per-client detail page Activity tab and Marketing tab get slower as ticket count grows. Postgres falls off a cliff around ~10k rows on unindexed scans.</div>
+      <div class="fix">Add B-tree indexes on every <code>*_tickets.client_id</code>, <code>client_notes.client_id</code>, and any <code>created_at DESC</code> we filter on. Single migration, ~10 lines of SQL.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">S-4</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">No pagination on Clients list</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">src/views/ClientsCombinedView.jsx:72 · supabase.from("clients").select("*")</div>
+      <div class="desc">All clients loaded into a single React state array. Search/filter/sort happen client-side. Fine for 25, sluggish at 100, painful at 300.</div>
+      <div class="impact">Typing in the search box re-renders all rows. Initial paint takes longer. Eventually the list itself becomes the slowest thing on screen.</div>
+      <div class="fix">Move filtering/sorting/searching server-side (Supabase <code>.ilike()</code> + <code>.range()</code>). Or virtualize the list with react-window. Cheap win when needed.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">S-5</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Per-DM Slack message fetches on Dashboard</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">src/views/DashboardView.jsx:72-88 · dms.slice(0, 5).map(async ch =&gt; fetchMessages(ch.id))</div>
+      <div class="desc">Every Dashboard load fetches the last messages for 5 DMs in parallel. Slack rate limit is ~50 req/min for that endpoint.</div>
+      <div class="impact">Multiple staff hitting the dashboard simultaneously could throttle. Adds 5 round-trips to every dashboard load.</div>
+      <div class="fix">Cache last-message-per-DM in Supabase via a Slack Events webhook subscription. Or just don't show the message preview on Dashboard — Communication tab covers it.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">S-6</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">File uploads use Promise.all on unlimited batch</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">src/views/ContentView.jsx:293-305 · incoming.map(file =&gt; supabase.storage…upload(…))</div>
+      <div class="desc">If a content team member drops 20 raw video files at once, all 20 start uploading at the same time. Browser network can choke.</div>
+      <div class="impact">Bad UX on flaky wifi, slows down concurrent users sharing bandwidth.</div>
+      <div class="fix">Limit concurrency to 3 simultaneous uploads with a simple queue. Show progress per file.</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-num">S-7</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Communication tab polls every 10s</div>
+        <span class="sev low">Low</span>
+      </div>
+      <div class="where">src/views/CommunicationView.jsx:386-399 · setInterval(fetchMessages, 10000)</div>
+      <div class="desc">Polling instead of subscribing. One staff person leaving the tab open all day = 8,640 polls/day. Multiply by team size.</div>
+      <div class="impact">Wastes API calls and Slack rate limit budget. Real-time UX is also worse (10s lag).</div>
+      <div class="fix">Use Supabase Realtime channel subscriptions for message updates. Already in the round-3 backlog.</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-num">S-8</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">GHL cache hit rate could be higher</div>
+        <span class="sev low">Low</span>
+      </div>
+      <div class="where">api/ghl.js:10-32 · 5 min TTL</div>
+      <div class="desc">GHL data (locations, contacts, pipelines) is cached but only for 5 minutes. Many of these change daily, not by the minute.</div>
+      <div class="impact">More GHL API calls than necessary. GHL has rate limits.</div>
+      <div class="fix">Bump TTL to 60 min for location list. Keep 5 min for conversations.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ SECURITY ═══════════════════ -->
+  <h2>🔒 Security<span class="badge">9 findings</span></h2>
+  <p class="sub">Real exploitation paths against THIS codebase, not theoretical hardening. Severity tracks impact + ease of exploitation.</p>
+
+  <div class="finding crit">
+    <div class="finding-num">SEC-1</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Hardcoded Supabase anon key in client code</div>
+        <span class="sev crit">Critical</span>
+      </div>
+      <div class="where">src/lib/supabase.js:4 · fallback when env var missing</div>
+      <div class="desc">The Supabase anon JWT is hardcoded as a fallback if <code>VITE_SUPABASE_ANON_KEY</code> isn't set. Anon key is meant to be public, but having it baked in means: (a) we can't easily rotate it without a code change, (b) if Vercel env var ever fails to set, we silently fall back to a literal hardcoded key that may differ from what RLS policies were written for.</div>
+      <div class="impact">Key rotation becomes painful. If RLS isn't fully locked down (and it mostly relies on API gating, see SEC-8), anyone with the URL + key can hit PostgREST directly.</div>
+      <div class="fix">Remove fallback. <code>throw new Error("VITE_SUPABASE_ANON_KEY missing")</code> if not set. Verify all tables have actual RLS policies, not just <code>auth.role() = 'authenticated'</code>.</div>
+    </div>
+  </div>
+
+  <div class="finding crit">
+    <div class="finding-num">SEC-2</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Email enumeration on public signup</div>
+        <span class="sev crit">Critical</span>
+      </div>
+      <div class="where">api/clients.js:169-172 · public signup error messages</div>
+      <div class="desc">Signup returns distinct errors for "email already exists" vs "invalid format" vs other failures. Attacker can probe <code>POST /api/clients</code> with any email and learn whether it's already in the system.</div>
+      <div class="impact">Anyone can harvest the full list of registered client emails by spraying. Useful for spear-phishing your clients. No rate limit makes this trivial.</div>
+      <div class="fix">Always return the same generic success ("If that's a new account, an invite is on its way") regardless of whether the email exists. Send the email async. Add rate limiting (10/IP/day).</div>
+    </div>
+  </div>
+
+  <div class="finding crit">
+    <div class="finding-num">SEC-3</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Notion endpoint reads any pageId, no auth</div>
+        <span class="sev crit">Critical</span>
+      </div>
+      <div class="where">api/notion/query.js:588-657 · type=sop_content accepts user-supplied pageId</div>
+      <div class="desc"><b>The endpoint has no auth check.</b> For <code>type=sop_content</code>, it accepts an arbitrary <code>pageId</code> from the request body and fetches that Notion page using the integration key. An attacker can pass any Notion page ID the integration has access to — including internal notes, financials, strategy docs.</div>
+      <div class="impact">Anyone with the public URL can read any Notion page in your workspace the BAM integration has been shared with. Could include sensitive business info.</div>
+      <div class="fix">Add staff auth check at the top of the handler. Whitelist allowed pageIds to the constants (SOP_PAGES, CLIENT_PROFILES_PAGE, WAREHOUSE_*). Reject any pageId not in the whitelist.</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-num">SEC-4</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Client portal session — token-to-client mapping</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">api/tickets.js:126-140 + api/marketing.js:67-72</div>
+      <div class="desc">Client portal resolves <code>client_id</code> from the user's Supabase auth_user_id once at request start, then trusts it for all subsequent ops. If a single auth_user is ever linked to multiple clients (current schema doesn't prevent it), or if a token leaks, the attacker reads/writes tickets across clients.</div>
+      <div class="impact">Lateral movement: one compromised client login → access to other clients' tickets if the data model allows multi-client auth_user.</div>
+      <div class="fix">Add a unique constraint: <code>clients.auth_user_id</code> already nullable; make it UNIQUE. Re-verify token freshness on each mutating op. Use shorter TTLs for client portal tokens.</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-num">SEC-5</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Internal messages can reach client view</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">api/marketing.js:90-93 (stripInternalMessages) + line 363-430 (request-content-revision)</div>
+      <div class="desc">Marketing ticket messages have an <code>internal: true</code> flag. <code>stripInternalMessages()</code> filters them out, but it's only called in some code paths. If a client requests with the wrong <code>scope</code> param or hits a path that uses <code>enrichWithClient()</code> (which doesn't strip), they see staff-only handoff notes.</div>
+      <div class="impact">Clients can read internal staff conversation about their tickets — work-in-progress feedback, internal blame, staff handoff notes.</div>
+      <div class="fix">Strip internal messages in <i>every</i> client-facing response path. Add an explicit test that runs the client endpoint and asserts no message with <code>internal:true</code> is returned.</div>
+    </div>
+  </div>
+
+  <div class="finding high">
+    <div class="finding-num">SEC-6</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Ticket files bucket is public</div>
+        <span class="sev high">High</span>
+      </div>
+      <div class="where">Supabase Storage · ticket-files bucket · per round-3 backlog</div>
+      <div class="desc">Files uploaded to support tickets (videos, screenshots, raw assets) live in a public bucket. URLs are guessable patterns. Anyone who knows or guesses a URL can download anyone's files.</div>
+      <div class="impact">A client's raw video assets, error screenshots that may contain PII, or marketing creatives can be downloaded by anyone with the URL pattern.</div>
+      <div class="fix">Switch the bucket to private. Generate signed URLs server-side per request with short TTLs. Listed in round-3 backlog (deferred from MVP).</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">SEC-7</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">No rate limit on public signup</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">api/clients.js:127-192 · public signup path</div>
+      <div class="desc">Anyone can hit <code>POST /api/clients</code> with no auth in a loop. Each call creates a Supabase auth user + sends an invite email via Resend.</div>
+      <div class="impact">Attacker can spam create thousands of bogus client accounts, exhaust Resend email quota (100/day on free), pollute auth.users + clients tables.</div>
+      <div class="fix">Add IP-based rate limiting (e.g., Vercel Edge middleware: 10 signups/IP/day). Consider Cloudflare Turnstile or hCaptcha on the form.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">SEC-8</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">RLS bypassed by service key — no defense in depth</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">All api/*.js · all queries use SUPABASE_SERVICE_KEY</div>
+      <div class="desc">Every API route uses the service role key, which bypasses RLS entirely. All role/permission gating is in API code. If a future API bug forgets a role check, the database has no second line of defense.</div>
+      <div class="impact">One missed <code>if (!isAdmin) return 403</code> in a future PR = full data exposure. RLS is your fallback; right now it's disabled at runtime.</div>
+      <div class="fix">For client-portal-facing endpoints, switch to the anon key + user JWT so RLS does the gating. Keep service key for staff-only admin actions. Two-tier model.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">SEC-9</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Sensitive data potentially in server logs</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">api/clients.js:592, api/tickets.js:361, api/marketing.js:187 · console.error(err)</div>
+      <div class="desc">Several catch blocks log <code>err</code> or <code>err.message</code> without sanitizing. Supabase error messages can echo back the offending row data (including emails, tokens) or the request body.</div>
+      <div class="impact">Vercel logs may contain client emails or auth tokens. If a Vercel session is ever compromised, those logs become a goldmine.</div>
+      <div class="fix">Log <code>err.message</code> only (not <code>err</code>), and never log request bodies in catch blocks. Strip Authorization headers from any log object.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">SEC-10</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Notion endpoint quota exhaustion (DOS)</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">api/notion/query.js · no auth at all</div>
+      <div class="desc">Beyond SEC-3 (reading arbitrary pages), the endpoint can be hit in a loop with no auth, no rate limit. Each call burns Notion API quota.</div>
+      <div class="impact">Attacker can DOS your Notion integration by exhausting daily quota. Knowledge Base + Tasks tabs go blank until quota resets.</div>
+      <div class="fix">Same fix as SEC-3 (add staff auth check). Rate limit doesn't hurt either.</div>
+    </div>
+  </div>
+
+  <div class="finding med">
+    <div class="finding-num">SEC-11</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">No CSRF protection on staff mutations</div>
+        <span class="sev med">Med</span>
+      </div>
+      <div class="where">All POST/PATCH endpoints · trust Bearer token only</div>
+      <div class="desc">Mutations rely on Bearer tokens, not CSRF tokens. Supabase tokens live in localStorage so they'd need an XSS to leak — but there's no defense if XSS ever happens.</div>
+      <div class="impact">Lower-tier risk because no <code>dangerouslySetInnerHTML</code> usage in the codebase. But CSRF is still standard hygiene.</div>
+      <div class="fix">Standard CSRF tokens on mutating routes, or use SameSite=Strict cookies for the staff session.</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-num">SEC-12</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">Hardcoded GHL location IDs / Notion IDs (already covered)</div>
+        <span class="sev low">Low</span>
+      </div>
+      <div class="where">api/ghl.js · api/notion/query.js</div>
+      <div class="desc">Constants in code rather than DB. Not a security issue per se, but if the integration's permissions ever expand, the whitelist (per SEC-3 fix) becomes load-bearing.</div>
+      <div class="impact">Configuration drift if Notion shares more pages with the BAM integration than the code allows for.</div>
+      <div class="fix">Document the integration's allowed pages list. Audit Notion permissions quarterly.</div>
+    </div>
+  </div>
+
+  <div class="finding low">
+    <div class="finding-num">SEC-13</div>
+    <div class="finding-body">
+      <div class="finding-title-row">
+        <div class="finding-title">No CSP / security headers</div>
+        <span class="sev low">Low</span>
+      </div>
+      <div class="where">vercel.json — no headers config</div>
+      <div class="desc">No Content-Security-Policy, X-Frame-Options, Strict-Transport-Security, etc.</div>
+      <div class="impact">If an XSS ever happens, no CSP defense. Site could be iframe'd by phishing sites.</div>
+      <div class="fix">Add <code>headers</code> block to <code>vercel.json</code> with standard hardening.</div>
+    </div>
+  </div>
+
+  <!-- Recommended fix order -->
+  <h2 style="margin-top: 56px">📋 Recommended fix order</h2>
+  <div class="tl-dr" style="margin-bottom: 0">
+    <h3>This sprint (critical only)</h3>
+    <ul>
+      <li><b>SEC-3</b> Add staff auth + pageId whitelist to <code>/api/notion/query</code>. <span style="color:var(--text-mute)">30 min.</span></li>
+      <li><b>SEC-2</b> Genericize signup error messages + add IP rate limit. <span style="color:var(--text-mute)">45 min.</span></li>
+      <li><b>SEC-1</b> Remove hardcoded anon key fallback. <span style="color:var(--text-mute)">5 min.</span></li>
+      <li><b>S-3</b> Add missing indexes via one SQL migration. <span style="color:var(--text-mute)">10 min.</span></li>
+    </ul>
+    <h3>Next sprint (high)</h3>
+    <ul>
+      <li><b>S-1</b> Cache Stripe MRR in Supabase (refreshed via webhook or nightly job).</li>
+      <li><b>S-2</b> Paginate ticket queries.</li>
+      <li><b>SEC-4</b> UNIQUE constraint on <code>clients.auth_user_id</code>.</li>
+      <li><b>SEC-5</b> Audit + fix internal-message stripping in every client path.</li>
+      <li><b>SEC-6</b> Switch ticket-files bucket to private + signed URLs (already in round-3 backlog).</li>
+    </ul>
+    <h3>Round 4 (medium)</h3>
+    <ul>
+      <li><b>SEC-7</b> Rate limit + CAPTCHA on public signup.</li>
+      <li><b>SEC-8</b> Two-tier Supabase keys: anon key for client portal endpoints, service key for staff admin.</li>
+      <li><b>S-4</b> Server-side filter/sort/pagination on Clients list.</li>
+      <li><b>S-5, S-6, S-7</b> Slack DM cache, upload concurrency limit, Realtime subscriptions.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

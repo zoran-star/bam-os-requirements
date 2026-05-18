@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { T, calcProgress } from './tokens/tokens';
 import { fetchActionItems } from './services/notionService';
 import { createTicket } from './services/ticketsService';
@@ -8,21 +8,22 @@ import { fetchEvents } from './services/calendarService';
 import { fetchAlerts } from './services/stripeService';
 import Avatar from './components/primitives/Avatar';
 import { getNextAction } from './views/OnboardingRow';
-import ClientModal from './views/ClientModal';
 import DashboardView from './views/DashboardView';
-import CalendarView from './views/CalendarView';
-import FinancialsView from './views/FinancialsView';
-import ClientsView from './views/ClientsView';
-import UnifiedTasksView from './views/UnifiedTasksView';
-import KnowledgeBaseView from './views/KnowledgeBaseView';
-import CommunicationView from './views/CommunicationView';
 import SearchOverlay from './components/overlays/SearchOverlay';
 import SettingsView from './views/SettingsView';
-import SystemsView from './views/SystemsView';
-import MarketingView from './views/MarketingView';
-import TeamView from './views/TeamView';
-import ContentView from './views/ContentView';
-import ClientsCombinedView from './views/ClientsCombinedView';
+
+// Lazy-load heavy/rarely-first views so the initial bundle stays small.
+// Each becomes its own JS chunk Vite ships on demand.
+const CalendarView         = lazy(() => import('./views/CalendarView'));
+const FinancialsView       = lazy(() => import('./views/FinancialsView'));
+const UnifiedTasksView     = lazy(() => import('./views/UnifiedTasksView'));
+const KnowledgeBaseView    = lazy(() => import('./views/KnowledgeBaseView'));
+const CommunicationView    = lazy(() => import('./views/CommunicationView'));
+const SystemsView          = lazy(() => import('./views/SystemsView'));
+const MarketingView        = lazy(() => import('./views/MarketingView'));
+const TeamView             = lazy(() => import('./views/TeamView'));
+const ContentView          = lazy(() => import('./views/ContentView'));
+const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import SetPasswordView from './views/SetPasswordView';
@@ -39,8 +40,10 @@ export default function BAMPortal() {
   const [accessChecking, setAccessChecking] = useState(false);
   const [dark, setDark] = useState(true);
   const [nav, setNav] = useState("dashboard");
-  const [selected, setSelected] = useState(null);
-  const [isOnboardingModal, setIsOnboardingModal] = useState(false);
+  // Dashboard click-to-detail: parent stashes the client id, ClientsCombinedView
+  // consumes it once via initialClientId then clears it so reopening the tab
+  // fresh doesn't keep re-jumping.
+  const [clientsInitialId, setClientsInitialId] = useState(null);
   const [showCmd, setShowCmd] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [onboardingClients, setOnboardingClients] = useState([]);
@@ -212,59 +215,10 @@ export default function BAMPortal() {
     }
   };
 
-  // ─ Client mutations ─
-  const updateOnboardingClient = (id, updater) => {
-    setOnboardingClients(prev => prev.map(c => c.id === id ? (typeof updater === "function" ? updater(c) : { ...c, ...updater }) : c));
-    setSelected(prev => prev && prev.id === id ? (typeof updater === "function" ? updater(prev) : { ...prev, ...updater }) : prev);
-  };
-
-  const toggleCheck = (clientId, checkIndex) => {
-    updateOnboardingClient(clientId, c => {
-      const newChecks = [...c.checks];
-      newChecks[checkIndex] = !newChecks[checkIndex];
-      const pct = Math.round(newChecks.filter(Boolean).length / newChecks.length * 100);
-      const newHealth = Math.max(15, Math.min(100, Math.round(pct * 0.9 + (c.aiSentiment?.score || 0))));
-      return { ...c, checks: newChecks, health: newHealth, healthStatus: newHealth >= 70 ? "healthy" : newHealth >= 40 ? "at-risk" : "critical" };
-    });
-  };
-
-  const addCustomTask = (clientId, taskName) => {
-    if (!taskName.trim()) return;
-    updateOnboardingClient(clientId, c => ({
-      ...c,
-      customTasks: [...(c.customTasks || []), { name: taskName.trim(), done: false }],
-    }));
-  };
-
-  const toggleCustomTask = (clientId, taskIndex) => {
-    updateOnboardingClient(clientId, c => {
-      const newTasks = [...(c.customTasks || [])];
-      newTasks[taskIndex] = { ...newTasks[taskIndex], done: !newTasks[taskIndex].done };
-      return { ...c, customTasks: newTasks };
-    });
-  };
-
-  const updateClientNotes = (clientId, notes) => {
-    updateOnboardingClient(clientId, { notes });
-  };
-
-  const moveToActive = (clientId) => {
-    const client = onboardingClients.find(c => c.id === clientId);
-    if (!client) return;
-    const newActive = {
-      ...client,
-      id: 200 + client.id,
-      kpis: { leads: 0, trials: 0, conversion: "0%", revenue: "$0" },
-      recurring: [false, false, false, false, false, false],
-      healthStatus: "healthy",
-      health: 70,
-      alerts: [],
-    };
-    setActiveClients(prev => [...prev, newActive]);
-    setOnboardingClients(prev => prev.filter(c => c.id !== clientId));
-    setSelected(null);
-    showToast(`${client.name} moved to Active Clients`);
-  };
+  // Legacy per-client mutations (toggleCheck/addCustomTask/moveToActive/etc.)
+  // were tied to the prototype's mock-data shape (checks[], customTasks[],
+  // healthStatus, recurring[]) and the old ClientModal. Both are gone. All
+  // real client edits now flow through the combined Clients page → /api/clients.
 
   const totalAlerts = [...onboardingClients, ...activeClients].reduce((a, c) => a + (c.alerts?.length || 0), 0);
   const critCount = [...onboardingClients, ...activeClients].filter(c => c.healthStatus === "critical").length;
@@ -275,17 +229,17 @@ export default function BAMPortal() {
     const pct = calcProgress(c.checks);
     if (pct < 100) {
       const nextTask = getNextAction(c);
-      if (nextTask !== "All complete") reminders.push({ client: c.name, msg: nextTask, type: "task", urgent: c.healthStatus === "critical" });
+      if (nextTask !== "All complete") reminders.push({ client: c.business_name, msg: nextTask, type: "task", urgent: c.healthStatus === "critical" });
     }
     (c.customTasks || []).filter(t => !t.done).forEach(t => {
-      reminders.push({ client: c.name, msg: t.name, type: "custom", urgent: false });
+      reminders.push({ client: c.business_name, msg: t.name, type: "custom", urgent: false });
     });
     return reminders;
   });
   const activeReminders = activeClients.flatMap(c => {
     const reminders = [];
     (c.recurring || []).forEach((done, i) => {
-      if (!done) reminders.push({ client: c.name, msg: (c.recurringTaskNames || [])[i] || `Recurring task ${i + 1}`, type: "recurring", urgent: c.healthStatus !== "healthy" });
+      if (!done) reminders.push({ client: c.business_name, msg: (c.recurringTaskNames || [])[i] || `Recurring task ${i + 1}`, type: "recurring", urgent: c.healthStatus !== "healthy" });
     });
     return reminders;
   });
@@ -740,66 +694,65 @@ export default function BAMPortal() {
               <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
             </div>
 
-            {/* DASHBOARD */}
-            {nav === "dashboard" && <DashboardView tokens={tk} dark={dark} onboardingClients={onboardingClients} activeClients={activeClients} allReminders={allReminders} tasks={tasks} calendarEvents={calendarEvents} financialAlerts={financialAlerts} onNavigate={setNav} loading={dashboardLoading} onUpdateTask={handleUpdateTask} onSelectClient={(client, isOnboarding) => { setSelected(client); setIsOnboardingModal(isOnboarding); }} userName={userName} />}
-
-            {/* CLIENTS — combined view (list + per-client detail with tabs).
-                Merges the old Clients tab + Client Setup tab into one place. */}
-            {nav === "clients" && (
-              <ClientsCombinedView
-                tokens={tk}
-                dark={dark}
-                me={me}
-                session={session}
+            {/* DASHBOARD — clicking a client card jumps into the Clients tab
+                and opens that client's detail view. Eager (first-paint). */}
+            {nav === "dashboard" && (
+              <DashboardView
+                tokens={tk} dark={dark}
+                onboardingClients={onboardingClients} activeClients={activeClients}
+                allReminders={allReminders} tasks={tasks} calendarEvents={calendarEvents}
+                financialAlerts={financialAlerts} onNavigate={setNav}
+                loading={dashboardLoading} onUpdateTask={handleUpdateTask}
+                onSelectClient={(client) => { setClientsInitialId(client?.id); setNav("clients"); }}
+                userName={userName}
               />
             )}
 
-            {/* TASKS (Action Items + Asana Tasks + Reminders) */}
-            {nav === "tasks" && (
-              <UnifiedTasksView
-                tokens={tk}
-                dark={dark}
-                tasks={tasks}
-                onCreateTask={handleCreateTask}
-                onUpdateTask={handleUpdateTask}
-                allReminders={allReminders}
-                onboardingClients={onboardingClients}
-                activeClients={activeClients}
-                currentUser={userName}
-              />
-            )}
-
-            {/* CALENDAR */}
-            {nav === "calendar" && <CalendarView tokens={tk} dark={dark} />}
-
-            {/* KNOWLEDGE BASE (SOPs + Solutions) */}
-            {nav === "knowledge" && <KnowledgeBaseView tokens={tk} dark={dark} />}
-
-            {/* FINANCIALS */}
-            {nav === "financials" && canSeeFinancials && <FinancialsView tokens={tk} dark={dark} />}
-
-            {/* COMMUNICATION */}
-            {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
-
-            {/* SYSTEMS */}
-            {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
-
-            {/* MARKETING */}
-            {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
-
-            {/* TEAM */}
-            {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
-
-            {/* CONTENT */}
-            {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
-
-            {/* SETTINGS */}
+            {/* SETTINGS — eager (small + frequently hit) */}
             {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
+
+            {/* Lazy-loaded views below. Suspense fallback is a tiny spinner so
+                the page doesn't blank out while the chunk downloads. */}
+            <Suspense fallback={<div style={{ padding: 24, color: tk.textMute, fontSize: 13 }}>Loading…</div>}>
+              {/* CLIENTS — combined view (list + per-client detail with tabs). */}
+              {nav === "clients" && (
+                <ClientsCombinedView
+                  tokens={tk}
+                  dark={dark}
+                  me={me}
+                  session={session}
+                  initialClientId={clientsInitialId}
+                  onInitialClientHandled={() => setClientsInitialId(null)}
+                />
+              )}
+
+              {nav === "tasks" && (
+                <UnifiedTasksView
+                  tokens={tk}
+                  dark={dark}
+                  tasks={tasks}
+                  onCreateTask={handleCreateTask}
+                  onUpdateTask={handleUpdateTask}
+                  allReminders={allReminders}
+                  onboardingClients={onboardingClients}
+                  activeClients={activeClients}
+                  currentUser={userName}
+                />
+              )}
+
+              {nav === "calendar" && <CalendarView tokens={tk} dark={dark} />}
+              {nav === "knowledge" && <KnowledgeBaseView tokens={tk} dark={dark} />}
+              {nav === "financials" && canSeeFinancials && <FinancialsView tokens={tk} dark={dark} />}
+              {nav === "communication" && <CommunicationView tokens={tk} dark={dark} />}
+              {nav === "systems" && canSeeSystems && <SystemsView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
+              {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
+            </Suspense>
           </div>
         </div>
       </div>
 
-      {selected && <ClientModal client={selected} tokens={tk} dark={dark} isOnboarding={isOnboardingModal} onClose={() => setSelected(null)} onToggleCheck={toggleCheck} onAddTask={addCustomTask} onToggleCustomTask={toggleCustomTask} onUpdateNotes={updateClientNotes} onMoveToActive={moveToActive} />}
       {showCmd && <SearchOverlay tokens={tk} dark={dark} onClose={() => setShowCmd(false)} allClients={[...onboardingClients, ...activeClients]} onNavigate={(key) => { setNav(key); setShowCmd(false); }} />}
 
       {/* Toast */}
@@ -828,7 +781,7 @@ function NewTicketModal({ tokens, clients, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const sortedClients = [...(clients || [])].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const sortedClients = [...(clients || [])].sort((a, b) => (a.business_name || "").localeCompare(b.business_name || ""));
 
   const submit = async () => {
     setBusy(true); setError("");
@@ -852,7 +805,7 @@ function NewTicketModal({ tokens, clients, onClose }) {
         <label style={labelStyle}>Client</label>
         <select style={inputStyle} value={clientId} onChange={e => setClientId(e.target.value)}>
           <option value="">— select a client —</option>
-          {sortedClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {sortedClients.map(c => <option key={c.id} value={c.id}>{c.business_name}</option>)}
         </select>
 
         <label style={labelStyle}>Type</label>

@@ -125,21 +125,31 @@ async function verifyStaffForImport(req) {
   return me;
 }
 
-function parseNotes(notes) {
+function parseNotes(notes, taskGid) {
   const out = { academy: "", email: "", category: "", title: "", description: "" };
   if (!notes) return out;
   const text = notes.replace(/\r\n/g, "\n");
   const FIELDS = [
-    { key: "academy",     label: /Academy:\s*\n/i },
-    { key: "email",       label: /Email address[^\n]*:\s*\n/i },
-    { key: "category",    label: /Category:\s*\n/i },
-    { key: "title",       label: /Title:\s*\n/i },
-    { key: "description", label: /(Issue Description|Description|Details)\s*:\s*\n/i },
+    { key: "academy",     label: /Academy:\s*\n/i,                                       required: true  },
+    { key: "email",       label: /Email address[^\n]*:\s*\n/i,                          required: false },
+    { key: "category",    label: /Category:\s*\n/i,                                      required: false },
+    { key: "title",       label: /Title:\s*\n/i,                                         required: true  },
+    { key: "description", label: /(Issue Description|Description|Details)\s*:\s*\n/i,  required: false },
   ];
   const found = [];
+  const missing = [];
   for (const f of FIELDS) {
     const m = text.match(f.label);
-    if (m) found.push({ key: f.key, start: m.index, end: m.index + m[0].length });
+    if (m) {
+      found.push({ key: f.key, start: m.index, end: m.index + m[0].length });
+    } else if (f.required) {
+      missing.push(f.key);
+    }
+  }
+  if (missing.length) {
+    // Asana template drift surfaces here. Custom fields (handled separately
+    // by customFields()) may still fill these in, so this is a soft warning.
+    console.warn(`[asana] parseNotes missing required sections [${missing.join(", ")}]${taskGid ? ` on task ${taskGid}` : ""}. Template may have changed.`);
   }
   found.sort((a, b) => a.start - b.start);
   for (let i = 0; i < found.length; i++) {
@@ -164,7 +174,7 @@ function customFields(t) {
 
 function mapAsanaTicket(t, importedGids) {
   if (importedGids.has(t.gid)) return null;
-  const parsed = parseNotes(t.notes);
+  const parsed = parseNotes(t.notes, t.gid);
   const cf = customFields(t);
   return {
     asana_gid:     t.gid,

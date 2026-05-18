@@ -234,11 +234,15 @@
         body: JSON.stringify({ business_name, owner_name, email }),
       });
       const data = await res.json();
-      if (!res.ok || !data.id) {
+      // API returns a generic { ok: true, message } regardless of whether
+      // the email already exists (anti-enumeration). 4xx errors (rate limit,
+      // malformed input) still bubble up as `error`.
+      if (!res.ok) {
         throw new Error(data.error || 'Something went wrong. Please try again.');
       }
 
-      // Replace form with success card — invite email is on its way
+      // Replace form with success card — invite email is on its way (or the
+      // user already has an account; we never tell them which).
       document.getElementById('successEmail').textContent = email;
       form.style.display = 'none';
       document.getElementById('successCard').classList.add('show');

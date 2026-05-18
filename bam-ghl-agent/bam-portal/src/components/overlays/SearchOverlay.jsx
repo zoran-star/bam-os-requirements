@@ -70,7 +70,7 @@ export default function SearchOverlay({ tokens, dark, onClose, allClients, onNav
   const lq = q.toLowerCase().trim();
 
   const clientResults = lq
-    ? allClients.filter((c) => c.name.toLowerCase().includes(lq)).slice(0, 5)
+    ? allClients.filter((c) => (c.business_name || "").toLowerCase().includes(lq)).slice(0, 5)
     : [];
 
   const actionResults = lq
@@ -130,7 +130,7 @@ export default function SearchOverlay({ tokens, dark, onClose, allClients, onNav
         const clientContext = allClients
           .map(
             (c) =>
-              `Client: ${c.name} | Manager: ${c.manager} | Health: ${c.health} (${c.healthStatus}) | Alerts: ${c.alerts?.join(", ") || "none"}`
+              `Client: ${c.business_name} | Manager: ${c.manager} | Health: ${c.health} (${c.healthStatus}) | Alerts: ${c.alerts?.join(", ") || "none"}`
           )
           .join("\n");
         const taskContext = actionItems.map(
@@ -820,7 +820,7 @@ export default function SearchOverlay({ tokens, dark, onClose, allClients, onNav
                           color: tokens.text,
                         }}
                       >
-                        {client.name}
+                        {client.business_name}
                       </div>
                       <div
                         style={{

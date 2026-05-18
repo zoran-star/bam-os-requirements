@@ -294,7 +294,7 @@ function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOver
               </div>
               <div style={{ fontSize: 12, fontWeight: 600, color: t.textSub }}>{TYPE_LABEL[x.type] || x.type}</div>
               <div style={{ fontSize: 13, fontWeight: 600, color: due.color }}>{due.text}</div>
-              <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client?.name || "—"}</div>
+              <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client?.business_name || "—"}</div>
             </div>
           );
         })}

@@ -1,11 +1,17 @@
-// Notion Service — calls /api/notion/query when connected, returns empty on failure
+// Notion Service — calls /api/notion/query when connected, returns empty on failure.
+// Sends the current Supabase session token; the API enforces staff-only access.
+
+import { supabase } from "../lib/supabase";
 
 const CONNECTED = import.meta.env.VITE_NOTION_CONNECTED === "true";
 
 async function notionQuery(body) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = { "Content-Type": "application/json" };
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
   const res = await fetch("/api/notion/query", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   const json = await res.json();

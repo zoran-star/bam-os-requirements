@@ -107,7 +107,10 @@ async function querySOPTree() {
     entries.map(([key, { id }]) =>
       notionFetch(`/blocks/${id}/children?page_size=100`)
         .then(res => ({ key, res }))
-        .catch(() => ({ key, res: { results: [] } }))
+        .catch(err => {
+          console.warn(`[notion] SOP tree fetch failed for "${key}" (id=${id}): ${err.message}`);
+          return { key, res: { results: [] } };
+        })
     )
   );
 
@@ -142,7 +145,10 @@ async function querySOPContent(pageId) {
   let expandedContent = "";
   if (expandable.length > 0) {
     const expanded = await Promise.all(
-      expandable.map(b => notionFetch(`/blocks/${b.id}/children?page_size=100`).catch(() => ({ results: [] })))
+      expandable.map(b => notionFetch(`/blocks/${b.id}/children?page_size=100`).catch(err => {
+        console.warn(`[notion] sub-block fetch failed (block ${b.id}): ${err.message}`);
+        return { results: [] };
+      }))
     );
     expandedContent = expanded.map(e => blocksToMarkdown(e.results)).join("\n");
   }
@@ -164,10 +170,16 @@ async function querySOPContent(pageId) {
 async function querySOPs() {
   const allSops = [];
   for (const [category, { id }] of Object.entries(SOP_PAGES)) {
-    const blocks = await notionFetch(`/blocks/${id}/children?page_size=100`).catch(() => ({ results: [] }));
+    const blocks = await notionFetch(`/blocks/${id}/children?page_size=100`).catch(err => {
+      console.warn(`[notion] SOP list fetch failed for "${category}" (id=${id}): ${err.message}`);
+      return { results: [] };
+    });
     const childPages = blocks.results.filter(b => b.type === "child_page");
     for (const cp of childPages) {
-      const contentBlocks = await notionFetch(`/blocks/${cp.id}/children?page_size=100`).catch(() => ({ results: [] }));
+      const contentBlocks = await notionFetch(`/blocks/${cp.id}/children?page_size=100`).catch(err => {
+        console.warn(`[notion] SOP page content fetch failed (page ${cp.id}, "${category}"): ${err.message}`);
+        return { results: [] };
+      });
       allSops.push({
         id: cp.id,
         title: cp.child_page?.title || "Untitled",
@@ -392,7 +404,10 @@ async function queryClientProfile(clientName) {
         toFetch.map(({ pageId }) =>
           notionFetch(`/blocks/${pageId}/children?page_size=100`)
             .then(r => blocksToMarkdown(r.results))
-            .catch(() => "")
+            .catch(err => {
+              console.warn(`[notion] call note content fetch failed (page ${pageId}): ${err.message}`);
+              return "";
+            })
         )
       );
       toFetch.forEach(({ entry }, idx) => { entry.fullNotes = fetched[idx]; });
@@ -568,6 +583,51 @@ async function createSolution(problem, solution, category) {
   };
 }
 
+// ─── Auth gate ──────────────────────────────────────────────────────────────
+// Audit SEC-3: this endpoint previously accepted any caller with no auth and
+// could be tricked into reading arbitrary Notion pages via the `sop_content`
+// type. Now requires a valid Supabase staff session + staff row.
+async function requireStaff(req) {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) return { ok: false, status: 401, error: "auth token required" };
+
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const anon = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !anon || !serviceKey) {
+    return { ok: false, status: 500, error: "supabase env missing" };
+  }
+
+  // Verify the token resolves to a real auth user
+  const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: { apikey: anon, Authorization: `Bearer ${token}` },
+  });
+  if (!userRes.ok) return { ok: false, status: 401, error: "invalid token" };
+  const user = await userRes.json();
+  if (!user?.email) return { ok: false, status: 401, error: "invalid token" };
+
+  // Confirm the user is a staff member (otherwise client portal users could
+  // hit this and read SOPs / action items / client profiles they shouldn't)
+  const staffRes = await fetch(
+    `${supabaseUrl}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  if (!staffRes.ok) return { ok: false, status: 500, error: "staff lookup failed" };
+  const staffRows = await staffRes.json();
+  if (!staffRows?.length) return { ok: false, status: 403, error: "staff role required" };
+  return { ok: true, staff: staffRows[0] };
+}
+
+// Defense in depth for the one type that takes a free-form pageId.
+// Accept only UUID-shaped strings. The actual access control still comes from
+// the Notion integration's permission grants — we just stop the worst of the
+// "pass any page ID" abuse.
+function isValidNotionPageId(id) {
+  if (typeof id !== "string") return false;
+  return /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(id);
+}
+
 // ─── Handler ────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -578,6 +638,10 @@ export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." });
   }
+
+  // Auth: staff-only. Closes SEC-3.
+  const gate = await requireStaff(req);
+  if (!gate.ok) return res.status(gate.status).json({ error: gate.error });
 
   const { type, clientName, pageId, category, problem, solution } = req.body || {};
 
@@ -599,6 +663,7 @@ export default async function handler(req, res) {
 
       case "sop_content": {
         if (!pageId) return res.status(400).json({ error: "pageId required for sop_content" });
+        if (!isValidNotionPageId(pageId)) return res.status(400).json({ error: "invalid pageId format" });
         const data = await querySOPContent(pageId);
         return res.status(200).json({ data });
       }

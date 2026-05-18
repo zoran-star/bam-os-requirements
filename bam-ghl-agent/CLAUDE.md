@@ -126,12 +126,14 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 - Onboarding checkpoints/alerts (waiting for client-portal.html scope to fully settle)
 - Cleanup legacy `client_meta_tokens` code paths in marketing.js
 
-### Two-path setup (IMPORTANT — causes confusion)
-Project files live in TWO places:
-- `/Users/zoransavic/bam-ghl-agent/` — LOCAL (not in monorepo git). Holds the working HTML files: `client-portal.html`, `class-setup.html`, `offer-setup.html`, `parent-onboarding.html`. Also holds `.claude/commands/` (skills) and `.claude/worktrees/` (session worktrees).
-- `/Users/zoransavic/bam-os-requirements/bam-ghl-agent/` — GIT (inside the monorepo). Holds this CLAUDE.md, `bam-portal/` React app, `docs/`, `sections/`.
+### Where customer-facing HTML lives
+**All customer-facing HTML is canonical at `bam-portal/public/`** (in git, served by Vercel):
+- `bam-portal/public/onboarding.html` — public signup
+- `bam-portal/public/client-portal.html` — logged-in client portal
 
-Both folders have a `.mcp.json` pointing Supabase at `jnojmfmpnsfmtqmwhopz`. When starting a new session, open Claude Code on `/Users/zoransavic/bam-os-requirements/bam-ghl-agent/` for portal work, or on `/Users/zoransavic/bam-ghl-agent/` for customer HTML work.
+The old `/Users/zoransavic/bam-ghl-agent/` local-only folder previously held duplicate copies of these files. The duplicates were deleted 2026-05-17 because they had drifted 23 days stale. **Never re-create them there.** Edit the git versions in `bam-portal/public/`.
+
+The `/Users/zoransavic/bam-ghl-agent/` folder still holds: `.claude/commands/` (skills), `.claude/worktrees/` (session worktrees), and an `archive/` folder of pre-React prototype HTML files (analysis, build-mode, change-ticket-internal, class-setup, offer-setup, parent-onboarding, dashboard, error-ticket-internal). Archived 2026-05-17 — none of these are referenced anywhere in production code. Treat as reference-only.
 
 ---
 
@@ -147,6 +149,21 @@ Client submits form
 ```
 
 ---
+
+## Supabase tables with unknown status (audit 2026-05-17)
+
+These tables exist in Supabase but no code in `bam-portal/api/` or `bam-portal/src/` reads or writes them. They have data; the source/owner is unclear. **Do not drop without confirming with the likely owner.**
+
+| Table | Rows | Last touched | Likely owner |
+|---|---|---|---|
+| `client_users` | 0 | never | Cole's older auth model? (separate from `clients` + Supabase Auth) |
+| `board_items` | 20 | 2026-04-09 | Unknown — possibly old Notion sync or planning artifact |
+| `content_themes` | 20 | 2026-04-05 | Coleman's content production workflow? |
+| `content_creatives` | 9 | 2026-03-28 | Same |
+| `content_scripts` | 1 | 2026-03-28 | Same |
+| `content_feedback` | 15 | 2026-03-28 | Same |
+
+Note: these are SEPARATE from `content_tickets` (which IS the active staff-portal content workflow — used by MarketingView + ContentView). The `content_*` tables above predate that system.
 
 ## Knowledge storage — what lives where
 
