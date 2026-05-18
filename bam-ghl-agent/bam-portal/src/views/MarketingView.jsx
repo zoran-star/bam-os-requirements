@@ -211,6 +211,9 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const [revisionMessage, setRevisionMessage] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [banner, setBanner] = useState(null); // { type, text }
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all"); // all | replace | add | remove | budget | campaign-create
+  const [sortOrder, setSortOrder] = useState("newest"); // newest | oldest
 
   // ─── Fetch tickets on mount ───
   useEffect(() => {
@@ -248,10 +251,30 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
   const active      = inProgress.filter(t => t.clientActionStatus !== "requested" && !t._raw?.awaiting_revision);
   const completed   = tickets.filter(t => t.status === "completed" || t.status === "cancelled");
 
-  const rows =
+  const tabRows =
     tab === "active"         ? active
     : tab === "client-action" ? clientDep
                               : completed;
+
+  // Apply toolbar filters: free-text search across academy + campaign,
+  // type filter, then sort by submitted date.
+  const rows = (() => {
+    let list = tabRows;
+    if (typeFilter !== "all") list = list.filter(t => t.type === typeFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(t =>
+        (t.academyName || "").toLowerCase().includes(q) ||
+        (t.campaignTitle || "").toLowerCase().includes(q)
+      );
+    }
+    list = [...list].sort((a, b) => {
+      const aDate = new Date(a._raw?.submitted_at || 0).getTime();
+      const bDate = new Date(b._raw?.submitted_at || 0).getTime();
+      return sortOrder === "newest" ? bDate - aDate : aDate - bDate;
+    });
+    return list;
+  })();
 
   const showBanner = (type, text) => {
     setBanner({ type, text });
@@ -480,17 +503,48 @@ export default function MarketingView({ tokens: tk, dark, me, session }) {
     <div style={{ padding: "24px 28px", color: tk.text }}>
       {banner && <Banner banner={banner} tk={tk} />}
 
-      {/* Page header */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
-          § Marketing
-        </div>
-        <div style={{ fontSize: 28, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
-          Marketing Tickets
-        </div>
-        <div style={{ fontSize: 13, color: tk.textSub, marginTop: 6 }}>
-          Requests from clients about their ad campaigns.
-        </div>
+      {/* Toolbar: search + type filter + sort */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by academy or campaign…"
+          style={{
+            flex: "1 1 280px", minWidth: 220,
+            padding: "9px 14px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            outline: "none", fontFamily: "inherit",
+          }}
+        />
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          style={{
+            padding: "9px 12px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          <option value="all">All types</option>
+          {Object.entries(TYPE_META).map(([key, meta]) => (
+            <option key={key} value={key}>{meta.label}</option>
+          ))}
+        </select>
+        <select
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
+          style={{
+            padding: "9px 12px", fontSize: 13,
+            background: tk.surfaceEl, color: tk.text,
+            border: `1px solid ${tk.border}`, borderRadius: 8,
+            cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
       </div>
 
       {/* Tabs */}
