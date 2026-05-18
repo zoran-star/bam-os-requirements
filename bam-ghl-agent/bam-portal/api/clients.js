@@ -567,25 +567,98 @@ export default async function handler(req, res) {
       }
 
       if (action === "reset-password") {
+        // Old Supabase /auth/v1/recover flow relied on the "Reset Password" email
+        // template configured in the Supabase dashboard — which got broken (no link
+        // rendered). We now:
+        //   1. Use admin/generate_link to get a one-shot recovery URL
+         //   2. Send it ourselves via Resend with a clean BAM-branded template
+        // This bypasses Supabase's email templates entirely for client-facing
+        // emails. The invite (setup-account) flow is still on Supabase invite —
+        // can be migrated later for consistency.
         const body = req.body || {};
         const targetEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
         if (!targetEmail) return res.status(400).json({ error: "email required" });
+        if (!process.env.RESEND_API_KEY) {
+          return res.status(500).json({ error: "RESEND_API_KEY not configured" });
+        }
 
-        // Use Supabase auth recover endpoint — sends the standard recovery email
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=recovery`;
-        const recoverRes = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+
+        // Step 1: generate the recovery link via Supabase admin endpoint
+        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
           method: "POST",
           headers: {
             apikey: SUPABASE_SERVICE_KEY,
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: targetEmail, redirect_to: redirectTo }),
+          body: JSON.stringify({
+            type: "recovery",
+            email: targetEmail,
+            options: { redirect_to: redirectTo },
+          }),
         });
-        if (!recoverRes.ok) {
-          const errText = await recoverRes.text();
-          return res.status(400).json({ error: errText || `recover ${recoverRes.status}` });
+        if (!linkRes.ok) {
+          const errText = await linkRes.text();
+          // Common case: user not found → return generic 200 to avoid email enumeration
+          if (linkRes.status === 404 || /not found/i.test(errText)) {
+            return res.status(200).json({ ok: true });
+          }
+          console.error("generate_link failed:", errText);
+          return res.status(500).json({ error: "could not generate reset link" });
+        }
+        const linkJson = await linkRes.json();
+        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
+        if (!actionLink) {
+          console.error("generate_link returned no action_link:", JSON.stringify(linkJson).slice(0, 200));
+          return res.status(500).json({ error: "reset link missing from response" });
+        }
+
+        // Step 2: send the email via Resend
+        const FROM_EMAIL = "BAM Business <portal@byanymeansbball.com>";
+        const SUBJECT = "Reset your BAM portal password";
+        const html = `<!doctype html>
+<html><body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1f; line-height: 1.55;">
+  <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8b6914; margin-bottom: 12px;">BAM Business · Client Portal</div>
+  <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px;">Reset your password</h1>
+  <p style="font-size: 15px; color: #555; margin: 0 0 24px;">We got a request to reset the password on your BAM portal account. Click the button below to choose a new password.</p>
+  <p style="margin: 0 0 24px;">
+    <a href="${actionLink}" style="display: inline-block; background: #1a1a1f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Reset password</a>
+  </p>
+  <p style="font-size: 13px; color: #888; margin: 0 0 8px;">Or copy this link into your browser:</p>
+  <p style="font-size: 12px; color: #555; word-break: break-all; margin: 0 0 32px;"><a href="${actionLink}" style="color: #1a1a1f;">${actionLink}</a></p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+  <p style="font-size: 12px; color: #999; margin: 0;">This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email — your password won't change.</p>
+</body></html>`;
+
+        const text = `Reset your BAM portal password
+
+We got a request to reset the password on your BAM portal account.
+
+Open this link to choose a new password:
+${actionLink}
+
+This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email.`;
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: FROM_EMAIL,
+            to: [targetEmail],
+            subject: SUBJECT,
+            html,
+            text,
+          }),
+        });
+        if (!resendRes.ok) {
+          const errText = await resendRes.text();
+          console.error("Resend send failed:", errText);
+          return res.status(500).json({ error: "failed to send email" });
         }
         return res.status(200).json({ ok: true, sent_to: targetEmail });
       }
