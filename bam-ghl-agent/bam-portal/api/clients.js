@@ -126,14 +126,113 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
+      const hasAuth = (req.headers.authorization || "").startsWith("Bearer ");
+      const publicSignupAction = req.query.action;
+      const signupBody = req.body || {};
+
+      // ── Public "forgot password" path ──
+      // Client portal login screen posts here when a user clicks "Forgot password?"
+      // No auth required. Generic 200 response regardless of whether the email
+      // exists, plus IP rate limit, to prevent enumeration + nuisance reset spam.
+      if (!hasAuth && publicSignupAction === "request-password-reset") {
+        const email = typeof signupBody.email === "string" ? signupBody.email.trim().toLowerCase() : "";
+        const GENERIC_RESET_RESPONSE = {
+          ok: true,
+          message: "If that email is registered, we've sent a password reset link. Check your inbox.",
+        };
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return res.status(400).json({ error: "valid email required" });
+        }
+        if (!process.env.RESEND_API_KEY) {
+          return res.status(500).json({ error: "email service not configured" });
+        }
+
+        // Rate limit: 5 reset requests per IP per 24h. More aggressive than
+        // signup (10/24h) because resets target a specific victim and could be
+        // used for nuisance spam.
+        const ip = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown")
+          .toString().split(",")[0].trim();
+        const RESETS_PER_IP_PER_DAY = 5;
+        try {
+          const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const recent = await supabaseSelect(
+            `signup_attempts?ip=eq.${encodeURIComponent(ip)}&kind=eq.password_reset&attempted_at=gte.${encodeURIComponent(since)}&select=id`
+          );
+          if (Array.isArray(recent) && recent.length >= RESETS_PER_IP_PER_DAY) {
+            return res.status(429).json({ error: "Too many reset attempts. Try again later." });
+          }
+        } catch (_) { /* fail-open on rate-limit lookup */ }
+
+        const logResetAttempt = (succeeded) =>
+          supabaseInsert("signup_attempts", { ip, email, succeeded, kind: "password_reset" }).catch(() => {});
+
+        // Generate the recovery link via Supabase admin endpoint.
+        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const redirectTo = `${origin}/client-portal.html?type=recovery`;
+        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ type: "recovery", email, options: { redirect_to: redirectTo } }),
+        });
+        if (!linkRes.ok) {
+          // 404 = user not found. Return generic success to avoid email enumeration.
+          await logResetAttempt(false);
+          return res.status(200).json(GENERIC_RESET_RESPONSE);
+        }
+        const linkJson = await linkRes.json();
+        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
+        if (!actionLink) {
+          console.error("generate_link returned no action_link (public reset)");
+          await logResetAttempt(false);
+          return res.status(200).json(GENERIC_RESET_RESPONSE);
+        }
+
+        // Send the email via Resend with the same BAM-branded template the
+        // staff-initiated reset uses.
+        const FROM_EMAIL = "BAM Business <portal@byanymeansbball.com>";
+        const SUBJECT = "Reset your BAM portal password";
+        const html = `<!doctype html>
+<html><body style="font-family: system-ui, -apple-system, Segoe UI, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; color: #1a1a1f; line-height: 1.55;">
+  <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #8b6914; margin-bottom: 12px;">BAM Business · Client Portal</div>
+  <h1 style="font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 14px;">Reset your password</h1>
+  <p style="font-size: 15px; color: #555; margin: 0 0 24px;">We got a request to reset the password on your BAM portal account. Click the button below to choose a new password.</p>
+  <p style="margin: 0 0 24px;">
+    <a href="${actionLink}" style="display: inline-block; background: #1a1a1f; color: #fff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px;">Reset password</a>
+  </p>
+  <p style="font-size: 13px; color: #888; margin: 0 0 8px;">Or copy this link into your browser:</p>
+  <p style="font-size: 12px; color: #555; word-break: break-all; margin: 0 0 32px;"><a href="${actionLink}" style="color: #1a1a1f;">${actionLink}</a></p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;" />
+  <p style="font-size: 12px; color: #999; margin: 0;">This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email — your password won't change.</p>
+</body></html>`;
+        const text = `Reset your BAM portal password\n\nWe got a request to reset the password on your BAM portal account.\n\nOpen this link to choose a new password:\n${actionLink}\n\nThis link expires in 1 hour. If you didn't request this reset, you can safely ignore this email.`;
+
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ from: FROM_EMAIL, to: [email], subject: SUBJECT, html, text }),
+        });
+        if (!resendRes.ok) {
+          console.error("Resend send failed (public reset):", (await resendRes.text()).slice(0, 200));
+          await logResetAttempt(false);
+          // Still return generic success — don't expose internal failures.
+          return res.status(200).json(GENERIC_RESET_RESPONSE);
+        }
+        await logResetAttempt(true);
+        return res.status(200).json(GENERIC_RESET_RESPONSE);
+      }
+
       // ── Public self-serve signup path ──
       // /onboarding.html posts {business_name, owner_name, email} with no auth header.
       // Treat as a public signup (creates client + auth user via Supabase invite).
       // Detected by: no Authorization header AND no ?action= AND body has the
       // signup shape. Anything else falls through to the admin path below.
-      const hasAuth = (req.headers.authorization || "").startsWith("Bearer ");
-      const publicSignupAction = req.query.action;
-      const signupBody = req.body || {};
       const isPublicSignup = !hasAuth && !publicSignupAction
         && typeof signupBody.business_name === "string"
         && typeof signupBody.owner_name === "string"

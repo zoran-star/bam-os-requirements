@@ -2689,6 +2689,32 @@
 
     <button id="login-submit" class="login-submit" onclick="signIn()">Sign in →</button>
     <div id="login-error" class="login-error"></div>
+    <div style="text-align: center; margin-top: 18px;">
+      <a href="#" id="forgot-link" onclick="showForgotForm(event)" style="color: #999; font-size: 12px; text-decoration: none; border-bottom: 1px solid transparent;">Forgot password?</a>
+    </div>
+  </div>
+
+  <!-- Forgot password form (revealed when "Forgot password?" link clicked) -->
+  <div id="forgot-card" class="login-card" style="display:none">
+    <svg class="login-icon" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="17" cy="17" r="12" fill="none" stroke="#E8C547" stroke-width="1"/>
+      <circle cx="17" cy="17" r="5" fill="none" stroke="#C9A55C" stroke-width="0.8"/>
+      <line x1="17" y1="3" x2="17" y2="31" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+      <line x1="3" y1="17" x2="31" y2="17" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
+      <polygon points="17,8 19,17 17,26 15,17" fill="#E8C547"/>
+      <circle cx="17" cy="17" r="1.3" fill="#0A0A0B" stroke="#E8C547" stroke-width="0.6"/>
+    </svg>
+    <div class="login-title">Reset your password</div>
+    <div class="login-sub">Enter the email associated with your portal. We'll send you a reset link.</div>
+
+    <label for="forgot-email">Email</label>
+    <input id="forgot-email" type="email" autocomplete="email" placeholder="you@academy.com">
+
+    <button id="forgot-submit" class="login-submit" onclick="submitForgot()">Send reset link →</button>
+    <div id="forgot-msg" class="login-error" style="color: #888"></div>
+    <div style="text-align: center; margin-top: 18px;">
+      <a href="#" onclick="showLoginForm(event)" style="color: #999; font-size: 12px; text-decoration: none;">← Back to sign in</a>
+    </div>
   </div>
 
   <!-- Password recovery card (hidden until ?type=recovery) -->
@@ -6583,6 +6609,69 @@ async function signIn() {
   btn.disabled = false; btn.textContent = 'Sign in →';
   if (error) { errEl.textContent = error.message; return; }
   await boot();
+}
+
+// ── Forgot password ───────────────────────────────────────────────
+function showForgotForm(e) {
+  if (e) e.preventDefault();
+  const overlay = document.getElementById('login-overlay');
+  const loginCard = overlay.querySelector('.login-card:not(#recovery-card):not(#forgot-card)');
+  if (loginCard) loginCard.style.display = 'none';
+  document.getElementById('forgot-card').style.display = 'block';
+  // Prefill if they already typed email on the login form
+  const loginEmail = document.getElementById('login-email').value.trim();
+  if (loginEmail) document.getElementById('forgot-email').value = loginEmail;
+  document.getElementById('forgot-email').focus();
+}
+
+function showLoginForm(e) {
+  if (e) e.preventDefault();
+  document.getElementById('forgot-card').style.display = 'none';
+  document.getElementById('forgot-msg').textContent = '';
+  document.getElementById('forgot-msg').style.color = '#888';
+  const overlay = document.getElementById('login-overlay');
+  const loginCard = overlay.querySelector('.login-card:not(#recovery-card):not(#forgot-card)');
+  if (loginCard) loginCard.style.display = 'block';
+  document.getElementById('forgot-submit').textContent = 'Send reset link →';
+  document.getElementById('forgot-submit').disabled = false;
+}
+
+async function submitForgot() {
+  const email = document.getElementById('forgot-email').value.trim();
+  const msgEl = document.getElementById('forgot-msg');
+  const btn = document.getElementById('forgot-submit');
+  msgEl.textContent = '';
+  msgEl.style.color = '#888';
+  if (!email) { msgEl.style.color = '#ED7969'; msgEl.textContent = 'Enter your email.'; return; }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    const res = await fetch('/api/clients?action=request-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 429) {
+      msgEl.style.color = '#ED7969';
+      msgEl.textContent = data.error || 'Too many attempts. Try again later.';
+      btn.disabled = false; btn.textContent = 'Send reset link →';
+      return;
+    }
+    if (!res.ok) {
+      msgEl.style.color = '#ED7969';
+      msgEl.textContent = data.error || 'Something went wrong. Try again.';
+      btn.disabled = false; btn.textContent = 'Send reset link →';
+      return;
+    }
+    // Generic success — don't say whether the email exists.
+    msgEl.style.color = '#4ADE80';
+    msgEl.textContent = data.message || 'If that email is registered, we sent a reset link.';
+    btn.textContent = 'Sent ✓';
+  } catch (err) {
+    msgEl.style.color = '#ED7969';
+    msgEl.textContent = 'Network error. Try again.';
+    btn.disabled = false; btn.textContent = 'Send reset link →';
+  }
 }
 
 async function signOut() {
