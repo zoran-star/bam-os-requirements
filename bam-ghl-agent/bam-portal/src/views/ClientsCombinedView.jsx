@@ -940,8 +940,8 @@ function MarketingTab({ client, tokens, role, session }) {
               }}
             >
               <div style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</div>
-              <div style={{ fontSize: 13, color: t.textSub }}>{c.spend ? `$${c.spend}` : "—"}</div>
-              <div style={{ fontSize: 13, color: t.textSub }}>{c.leads || 0} leads</div>
+              <div style={{ fontSize: 13, color: t.textSub }}>{c.spend_display || (c.spend ? `$${c.spend}` : "—")}</div>
+              <div style={{ fontSize: 13, color: t.textSub }}>{c.results || 0} results</div>
               <div style={{ fontSize: 12, color: t.textMute, textAlign: "right" }}>↗ Open in Meta</div>
             </a>
           ))}
