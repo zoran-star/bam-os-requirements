@@ -56,6 +56,9 @@ node bam-portal/scripts/verify-client-portal-ui.mjs
 ```
 This catches silent breakage of the tour when a UI element is renamed, moved, or removed without updating `TOUR_STEPS`. The script also validates 6 other tour invariants (config presence, function existence, sidebar link, boot trigger, complete-onboarding endpoint usage). Zoran's rule: "add in a check every time we change the UI of the client page."
 
+### Auto-run via Claude Code hook (Zoran's machine)
+PostToolUse hook in `.claude/settings.local.json` (untracked, local-only) runs `.claude/hooks/verify-client-portal-on-edit.sh` after every Edit/Write. The hook reads the tool's file_path from stdin and only runs the verifier if the path ends with `bam-portal/public/client-portal.html`. The hook script IS committed so Cole + Cam can add the same wiring to their own settings.local.json if they want auto-run.
+
 ## Existing clients
 Zoran chose "let them see it too" (vs marking existing clients done now). DETAIL Miami etc. will see the tour on their next login.
 
