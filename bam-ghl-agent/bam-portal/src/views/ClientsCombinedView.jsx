@@ -63,13 +63,16 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   const [sortKey, setSortKey] = useState("alpha"); // alpha|recent|mrr
   const [refreshCounter, setRefreshCounter] = useState(0);
 
-  // Load clients + staff
+  // Load clients + staff.
+  // Hard cap at 500 to prevent runaway memory if the table ever grows huge.
+  // Past 500 clients we'll need server-side search/pagination; for now this
+  // is a defensive safety net.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     (async () => {
       const [c, s] = await Promise.all([
-        supabase.from("clients").select("*").order("business_name").then(r => r.data || []),
+        supabase.from("clients").select("*").order("business_name").limit(500).then(r => r.data || []),
         supabase.from("staff").select("id,name,role,email").order("name").then(r => r.data || []),
       ]);
       if (cancelled) return;

@@ -289,19 +289,30 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
     if (!incoming.length) return;
     setUploading(true);
     setError("");
+
+    // Concurrency-limited upload. Browser network gets messy if a user drops
+    // 20+ files at once. Cap at 3 in flight; sequential batches.
+    const MAX_PARALLEL = 3;
+    const uploadOne = async (file) => {
+      const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${STORAGE_FOLDER}/${uid}-${safeName}`;
+      const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
+        contentType: file.type || "application/octet-stream",
+        cacheControl: "3600",
+      });
+      if (upErr) throw new Error(upErr.message);
+      const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      return { name: file.name, url: urlData.publicUrl, type: file.type || "" };
+    };
+
     try {
-      const uploads = await Promise.all(incoming.map(async (file) => {
-        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const path = `${STORAGE_FOLDER}/${uid}-${safeName}`;
-        const { error: upErr } = await supabase.storage.from(STORAGE_BUCKET).upload(path, file, {
-          contentType: file.type || "application/octet-stream",
-          cacheControl: "3600",
-        });
-        if (upErr) throw new Error(upErr.message);
-        const { data: urlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-        return { name: file.name, url: urlData.publicUrl, type: file.type || "" };
-      }));
+      const uploads = [];
+      for (let i = 0; i < incoming.length; i += MAX_PARALLEL) {
+        const batch = incoming.slice(i, i + MAX_PARALLEL);
+        const results = await Promise.all(batch.map(uploadOne));
+        uploads.push(...results);
+      }
       setAssets(prev => [...prev, ...uploads]);
     } catch (e) {
       setError("Upload failed: " + e.message);

@@ -7,7 +7,11 @@ const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 
 // ─── Response Cache (in-memory with TTL) ───
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// Default 5 min. Some endpoints (locations) are essentially static — use the
+// LONG TTL for those. Conversations/contacts stay short.
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes (default)
+const CACHE_TTL_LONG_MS = 60 * 60 * 1000; // 60 minutes
+const LONG_TTL_ACTIONS = new Set(["locations"]);
 const _responseCache = new Map();
 
 function cacheKey(action, location, params) {
@@ -19,7 +23,9 @@ function cacheGet(key) {
   const entry = _responseCache.get(key);
   if (!entry) return null;
   const age = Date.now() - entry.ts;
-  return { ...entry, age, fresh: age < CACHE_TTL_MS };
+  const action = key.split(":")[0];
+  const ttl = LONG_TTL_ACTIONS.has(action) ? CACHE_TTL_LONG_MS : CACHE_TTL_MS;
+  return { ...entry, age, fresh: age < ttl };
 }
 
 function cacheSet(key, status, body) {

@@ -69,7 +69,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ answer, sources });
   } catch (err) {
-    console.error("AI search error:", err);
+    console.error("AI search error:", err?.message || "unknown");
     return res.status(200).json(fallbackSearch(query, context));
   }
 }
@@ -156,7 +156,7 @@ Rules:
       thingsToKnow: Array.isArray(parsed.thingsToKnow) ? parsed.thingsToKnow : [],
     });
   } catch (err) {
-    console.error("summarize-call error:", err);
+    console.error("summarize-call error:", err?.message || "unknown");
     return res.status(200).json({ summary: "", bullets: [], actionItems: [], thingsToKnow: [], error: err.message });
   }
 }

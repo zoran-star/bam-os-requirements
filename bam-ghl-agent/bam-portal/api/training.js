@@ -116,7 +116,7 @@ async function handleEvaluate({ scenarioId, responseText, conversationHistory },
 
     return res.status(200).json(evaluation);
   } catch (err) {
-    console.error("Evaluation error:", err);
+    console.error("Evaluation error:", err?.message || "unknown");
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -206,7 +206,7 @@ async function handleGenerateQueue({ userId }, res) {
       deepSituationCount: dsQueue.length,
     });
   } catch (err) {
-    console.error("Queue generation error:", err);
+    console.error("Queue generation error:", err?.message || "unknown");
     return res.status(500).json({ error: "Failed to generate queue" });
   }
 }
@@ -354,7 +354,7 @@ IMPORTANT: Return ONLY the JSON object, no other text or markdown code blocks.`;
 
     return res.status(200).json({ results });
   } catch (err) {
-    console.error("Seed error:", err);
+    console.error("Seed error:", err?.message || "unknown");
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -459,7 +459,7 @@ async function handleSyncNotion({ userId, scenarioId }, res) {
 
     return res.status(200).json({ message: `Synced ${synced} calibrations to Notion`, synced });
   } catch (err) {
-    console.error("Notion sync error:", err);
+    console.error("Notion sync error:", err?.message || "unknown");
     return res.status(500).json({ error: "Failed to sync to Notion" });
   }
 }

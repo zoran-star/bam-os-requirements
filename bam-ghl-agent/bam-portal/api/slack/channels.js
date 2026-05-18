@@ -156,7 +156,7 @@ async function handleOAuthCallback(req, res) {
     if (dbError) { console.error("Supabase upsert error:", dbError); return res.redirect(302, "/?nav=settings&slack=error"); }
     return res.redirect(302, "/?nav=settings&slack=connected");
   } catch (err) {
-    console.error("OAuth callback error:", err);
+    console.error("OAuth callback error:", err?.message || "unknown");
     return res.redirect(302, "/?nav=settings&slack=error");
   }
 }
