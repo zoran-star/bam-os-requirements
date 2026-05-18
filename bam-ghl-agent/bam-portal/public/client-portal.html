@@ -6,63 +6,98 @@
 <title>BAM Business — Client Portal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    /* ── Full Control · Ink (dark surfaces) ── */
-    --bg:           #0A0A0B;              /* canonical ink */
-    --ink:          #0A0A0B;
-    --surface:      #131316;              /* ink-2 · raised surface */
-    --surface-el:   #1C1C21;              /* ink-3 · cards & elevated */
-    --surface-hov:  #22222A;
-    --surface-alt:  #131316;
-    --line:         #2A2A31;              /* line-dark — hairline divider */
-    --line-str:     #383842;              /* line-dark-2 — focus/borders */
-    --border:       #2A2A31;
-    --border-med:   #2A2A31;
-    --border-str:   #383842;
-    /* Paper mirrors (for light mode) */
-    --paper:        #F5F1E8;
-    --paper-2:      #EBE4D3;
-    --paper-3:      #E0D7C1;
-    --line-light:   #D4C9AD;
-    --line-light-2: #B8A77F;
-    /* Typography color roles */
-    --text:         #F5F1E8;              /* paper as default text on ink */
-    --text-sub:     rgba(245,241,232,0.60);
-    --text-mute:    rgba(245,241,232,0.38);
-    /* Gold — signal */
-    --accent:       #E8C547;              /* signal gold */
-    --gold:         #E8C547;
-    --gold-2:       #C9A55C;
-    --gold-3:       #8B6F2A;
-    --gold-hi:      #F4D788;
-    --accent-ghost: rgba(232,197,71,0.08);
-    --accent-border:rgba(232,197,71,0.22);
-    --accent-glow:  0 0 0 1px rgba(232,197,71,0.28);
-    /* Pace — semantic (muted) */
-    --green:        #9FD88A;  --pace-go:   #9FD88A;
-    --green-soft:   rgba(159,216,138,0.10);
-    --amber:        #E8C547;
-    --amber-soft:   rgba(232,197,71,0.10);
-    --red:          #E87560;   --pace-stop: #E87560;
-    --red-soft:     rgba(232,117,96,0.10);
-    --blue:         #5A8FB8;   --pace-flow: #5A8FB8;
-    --blue-soft:    rgba(90,143,184,0.10);
-    /* No shadows in Full Control */
-    --card-shadow:  none;
-    --card-hover:   none;
+    /* ── FullControl design system (dark mode default) ──
+       Tokens mirror the prototype at fullcontrol-prototype-six.vercel.app.
+       Existing variable names preserved so legacy rules don't break;
+       NEW radius/shadow tokens added alongside. */
+
+    /* Surfaces — warm dark, layered */
+    --bg:           #0F0E0C;
+    --ink:          #0F0E0C;
+    --surface:      #1A1916;
+    --surface-el:   #222120;
+    --surface-hov:  #2C2B28;
+    --surface-alt:  #1A1916;
+    --surface-3:    #2C2B28;
+
+    /* Borders */
+    --line:         rgba(255,255,255,0.08);
+    --line-str:     rgba(255,255,255,0.12);
+    --line-md:      rgba(255,255,255,0.12);
+    --border:       rgba(255,255,255,0.08);
+    --border-med:   rgba(255,255,255,0.12);
+    --border-str:   rgba(255,255,255,0.16);
+
+    /* Paper mirrors (light mode references — preserved for legacy rules) */
+    --paper:        #F8F7F5;
+    --paper-2:      #FFFFFF;
+    --paper-3:      #F0EFEC;
+    --line-light:   rgba(0,0,0,0.07);
+    --line-light-2: rgba(0,0,0,0.12);
+
+    /* Text */
+    --text:         #F0EDE8;
+    --text-sub:     #A5A19A;
+    --text-mute:    #6E6B63;
+
+    /* Gold — primary accent */
+    --accent:       #D4B65C;
+    --gold:         #D4B65C;
+    --gold-l:       #C8A84E;
+    --gold-d:       #E0C56A;
+    --gold-2:       #C8A84E;   /* legacy alias */
+    --gold-3:       #A08030;   /* legacy alias */
+    --gold-hi:      #E0C56A;   /* legacy alias */
+    --gold-glow:    rgba(212,182,92,0.12);
+    --gold-sheen:   rgba(212,182,92,0.06);
+    --accent-ghost: rgba(212,182,92,0.10);
+    --accent-border:rgba(212,182,92,0.25);
+    --accent-glow:  0 0 0 3px rgba(212,182,92,0.10);
+
+    /* Semantic */
+    --green:        #4CC76A;  --pace-go:   #4CC76A;
+    --green-soft:   rgba(76,199,106,0.12);
+    --amber:        #F0B84A;
+    --amber-soft:   rgba(240,184,74,0.12);
+    --red:          #F07060;  --pace-stop: #F07060;
+    --red-soft:     rgba(240,112,96,0.12);
+    --blue:         #5A8FB8;  --pace-flow: #5A8FB8;
+    --blue-soft:    rgba(90,143,184,0.12);
+
+    /* Radii — rounded SaaS feel */
+    --radius-sm:    8px;
+    --radius:       12px;
+    --radius-md:    16px;
+    --radius-lg:    20px;
+    --radius-xl:    24px;
+    --radius-2xl:   28px;
+    --radius-full:  9999px;
+
+    /* Shadows — multi-layer, dark-friendly */
+    --shadow-sm:    0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md:    0 4px 14px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.15);
+    --shadow-lg:    0 8px 28px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.20);
+    --shadow-gold:  0 4px 18px rgba(212,182,92,0.18), 0 2px 8px rgba(212,182,92,0.10);
+    --card-shadow:  var(--shadow-sm);
+    --card-hover:   var(--shadow-md);
+
+    /* Easings */
+    --es:           cubic-bezier(0.4, 0, 0.2, 1);
+    --espring:      cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Layout */
     --sidebar-w:    240px;
-    --radius:       4px;
-    --radius-sm:    3px;
-    --radius-lg:    6px;
+
     /* Type families */
-    --display: "Space Grotesk", "Inter", sans-serif;
-    --sans:    "Inter", system-ui, sans-serif;
-    --mono:    "JetBrains Mono", ui-monospace, monospace;
+    --display: "Nunito", "Plus Jakarta Sans", system-ui, sans-serif;
+    --sans:    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono:    "DM Mono", "JetBrains Mono", ui-monospace, monospace;
   }
 
   html, body {
@@ -237,9 +272,21 @@
   .nav-item:hover { color: var(--text); }
 
   .nav-item.active {
-    background: rgba(232,197,71,0.06);
+    background: var(--gold-glow);
     color: var(--gold);
-    font-weight: 500;
+    font-weight: 600;
+  }
+
+  /* 3px rounded gold accent on left of the active nav item — prototype signature */
+  .nav-item.active::after {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    background: var(--gold);
+    border-radius: 0 3px 3px 0;
   }
 
   /* Small bullet dot on active nav item — Full Control hallmark */
@@ -410,13 +457,17 @@
     margin-bottom: 14px;
   }
 
-  /* ── Cards (flat, hairline-bordered) ── */
+  /* ── Cards (rounded, layered, subtle shadow) ── */
   .card {
-    background: var(--ink);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     padding: 24px 28px;
-    box-shadow: none;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 200ms var(--es), transform 200ms var(--es);
+  }
+  .card:hover {
+    box-shadow: var(--shadow-md);
   }
 
   .card-title {
@@ -780,11 +831,16 @@
   .modal-card {
     width: 100%;
     max-width: 440px;
-    background: var(--ink);
-    border: 1px solid var(--line-str);
-    border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-2xl);  /* 28px — premium feel */
     padding: 28px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-lg);
+    animation: modalIn 0.3s var(--es);
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .modal-kicker {
@@ -832,19 +888,20 @@
   .modal-input,
   .modal-textarea {
     width: 100%;
-    background: rgba(255,255,255,0.03);
+    background: var(--surface-el);
     border: 1px solid var(--line);
-    border-radius: 6px;
+    border-radius: var(--radius);  /* 12px */
     color: var(--text);
     font-family: inherit;
     font-size: 14px;
-    padding: 10px 12px;
-    transition: border-color 0.15s ease;
+    padding: 11px 14px;
+    transition: border-color 180ms var(--es), box-shadow 180ms var(--es);
   }
   .modal-input:focus,
   .modal-textarea:focus {
     outline: none;
     border-color: var(--gold);
+    box-shadow: var(--accent-glow);
   }
   .modal-textarea { min-height: 84px; resize: vertical; }
 
@@ -856,52 +913,55 @@
   }
 
   .btn-modal-secondary {
-    background: transparent;
+    background: var(--surface-el);
     border: 1px solid var(--line);
     color: var(--text-sub);
-    padding: 10px 18px;
-    border-radius: 6px;
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    padding: 11px 20px;
+    border-radius: var(--radius);  /* 12px */
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    transition: border-color 0.15s ease, color 0.15s ease;
+    transition: all 180ms var(--es);
   }
   .btn-modal-secondary:hover {
-    border-color: var(--text-mute);
+    background: var(--surface-3);
+    border-color: var(--line-md);
     color: var(--text);
   }
 
   .btn-modal-primary {
     background: var(--gold);
-    color: var(--ink);
+    color: #1C1B18;
     border: none;
-    padding: 10px 22px;
-    border-radius: 6px;
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    padding: 11px 24px;
+    border-radius: var(--radius);  /* 12px */
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 180ms var(--es);
   }
-  .btn-modal-primary:hover { background: var(--gold-hi); }
+  .btn-modal-primary:hover {
+    background: var(--gold-l);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-gold);
+  }
+  .btn-modal-primary:active { transform: translateY(0); }
 
   .btn-modal-danger {
-    background: #C7253E;
+    background: var(--red);
     color: #fff;
     border: none;
-    padding: 10px 22px;
-    border-radius: 6px;
-    font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+    padding: 11px 24px;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: all 180ms var(--es);
   }
   .btn-modal-danger:hover { background: #E03A53; }
 
@@ -2583,31 +2643,55 @@
 
   /* ── Light theme override ── */
   html[data-theme="light"] {
-    --bg:           #F5F1E8;
-    --ink:          #F5F1E8;
-    --surface:      #EBE4D3;
-    --surface-el:   #E0D7C1;
-    --surface-hov:  #D4C9AD;
-    --surface-alt:  #EBE4D3;
-    --line:         #D4C9AD;
-    --line-str:     #B8A77F;
-    --border:       #D4C9AD;
-    --border-med:   #D4C9AD;
-    --border-str:   #B8A77F;
-    --text:         #0A0A0B;
-    --text-sub:     rgba(10,10,11,0.65);
-    --text-mute:    rgba(10,10,11,0.38);
-    --accent-ghost: rgba(139,111,42,0.08);
-    --accent-border:rgba(139,111,42,0.22);
-    --accent-glow:  0 0 0 1px rgba(139,111,42,0.28);
-    --gold:         #8B6F2A;
-    --gold-2:       #C9A55C;
-    --gold-3:       #8B6F2A;
-    --gold-hi:      #C9A55C;
-    --green-soft:   rgba(80,140,60,0.10);
-    --amber-soft:   rgba(139,111,42,0.10);
-    --red-soft:     rgba(180,70,50,0.10);
-    --blue-soft:    rgba(50,100,150,0.10);
+    /* Cream-on-white prototype palette */
+    --bg:           #F8F7F5;
+    --ink:          #F8F7F5;
+    --surface:      #FFFFFF;
+    --surface-el:   #FAFAF8;
+    --surface-hov:  #F0EFEC;
+    --surface-alt:  #FAFAF8;
+    --surface-3:    #F0EFEC;
+
+    --line:         rgba(0,0,0,0.07);
+    --line-str:     rgba(0,0,0,0.12);
+    --line-md:      rgba(0,0,0,0.12);
+    --border:       rgba(0,0,0,0.07);
+    --border-med:   rgba(0,0,0,0.12);
+    --border-str:   rgba(0,0,0,0.16);
+
+    --text:         #1C1B18;          /* warm near-black, not pure */
+    --text-sub:     #6E6B63;
+    --text-mute:    #A5A19A;
+
+    --accent:       #C8A84E;
+    --gold:         #C8A84E;
+    --gold-l:       #D4B65C;
+    --gold-d:       #A08030;
+    --gold-2:       #D4B65C;
+    --gold-3:       #A08030;
+    --gold-hi:      #D4B65C;
+    --gold-glow:    rgba(200,168,78,0.10);
+    --gold-sheen:   rgba(200,168,78,0.05);
+    --accent-ghost: rgba(200,168,78,0.08);
+    --accent-border:rgba(200,168,78,0.25);
+    --accent-glow:  0 0 0 3px rgba(200,168,78,0.08);
+
+    --green:        #3EAF5C;
+    --green-soft:   rgba(62,175,92,0.10);
+    --amber:        #E09D24;
+    --amber-soft:   rgba(224,157,36,0.10);
+    --red:          #E05A42;
+    --red-soft:     rgba(224,90,66,0.10);
+    --blue:         #3B6FA0;
+    --blue-soft:    rgba(59,111,160,0.10);
+
+    /* Light-mode shadows are softer */
+    --shadow-sm:    0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md:    0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-lg:    0 8px 28px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+    --shadow-gold:  0 4px 18px rgba(200,168,78,0.12), 0 2px 8px rgba(200,168,78,0.06);
+    --card-shadow:  var(--shadow-sm);
+    --card-hover:   var(--shadow-md);
   }
 
   html[data-theme="light"] body { background: var(--ink); }
@@ -2619,52 +2703,75 @@
 <body>
 
 <style>
-  /* Login overlay */
+  /* Login overlay — FullControl design system */
   #login-overlay {
     position: fixed; inset: 0; z-index: 9999;
     display: flex; align-items: center; justify-content: center;
-    background: var(--bg, #0E0E12);
+    background: var(--bg);
+    padding: 24px;
   }
   #login-overlay .login-card {
-    width: 100%; max-width: 400px;
-    padding: 32px 28px;
-    background: var(--surface, #1A1A20);
-    border: 1px solid var(--line, rgba(255,255,255,0.08));
-    border-radius: 12px;
-    font-family: var(--display, 'Inter', system-ui, sans-serif);
+    width: 100%; max-width: 420px;
+    padding: 36px 32px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);  /* 20px — premium, rounded */
+    box-shadow: var(--shadow-lg);
+    font-family: var(--sans);
+    animation: modalIn 0.4s var(--es);
   }
   #login-overlay .login-icon {
-    width: 48px; height: 48px; margin: 0 auto 18px;
+    width: 52px; height: 52px; margin: 0 auto 20px;
+    display: block;
   }
   #login-overlay .login-title {
-    font-size: 18px; font-weight: 600; color: var(--text, #F5F1E8);
-    text-align: center; margin-bottom: 4px;
+    font-family: var(--display);
+    font-size: 22px; font-weight: 800; color: var(--text);
+    letter-spacing: -0.02em;
+    text-align: center; margin-bottom: 6px;
   }
   #login-overlay .login-sub {
-    font-size: 13px; color: var(--text-sub, #98989D);
-    text-align: center; margin-bottom: 24px;
+    font-size: 13px; color: var(--text-sub);
+    text-align: center; margin-bottom: 26px;
+    line-height: 1.55;
   }
   #login-overlay label {
-    display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
-    text-transform: uppercase; color: var(--text-mute, #6E6E73); margin-bottom: 6px;
+    display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-mute); margin-bottom: 6px;
   }
   #login-overlay input {
-    width: 100%; padding: 10px 12px; margin-bottom: 14px;
-    background: var(--bg, #0E0E12);
-    border: 1px solid var(--line, rgba(255,255,255,0.08));
-    border-radius: 8px;
-    color: var(--text, #F5F1E8); font-size: 14px; font-family: inherit;
+    width: 100%; padding: 12px 14px; margin-bottom: 14px;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);  /* 12px */
+    color: var(--text); font-size: 14px; font-family: inherit;
+    transition: all 180ms var(--es);
   }
-  #login-overlay input:focus { outline: none; border-color: var(--accent, #E8C547); }
+  #login-overlay input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: var(--accent-glow);
+  }
   #login-overlay button.login-submit {
-    width: 100%; padding: 12px;
-    background: var(--accent, #E8C547); color: #0A0A0B;
-    border: 0; border-radius: 8px; font-weight: 600; font-size: 14px;
+    width: 100%; padding: 13px;
+    background: var(--gold); color: #1C1B18;
+    border: 0; border-radius: var(--radius);
+    font-weight: 700; font-size: 14px;
     cursor: pointer; font-family: inherit;
+    transition: all 180ms var(--es);
+    margin-top: 6px;
+  }
+  #login-overlay button.login-submit:hover:not(:disabled) {
+    background: var(--gold-l);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-gold);
+  }
+  #login-overlay button.login-submit:active:not(:disabled) {
+    transform: translateY(0);
   }
   #login-overlay button.login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
   #login-overlay .login-error {
-    color: #ED7969; font-size: 12px; margin-top: 10px; text-align: center; min-height: 16px;
+    color: var(--red); font-size: 12px; margin-top: 12px; text-align: center; min-height: 16px;
   }
 </style>
 
@@ -2816,6 +2923,284 @@
   .fb-btn-submit:hover { background: #F25555; }
   .fb-btn-submit:disabled { background: #4A2828; color: #888; cursor: not-allowed; }
   #admin-fb-msg { font-size: 12px; margin-top: 12px; min-height: 16px; }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     UI POLISH — prototype-informed (2026-05-17)
+     11 improvements bundled together. All additive overrides, no DOM
+     or class-name changes. Cascade order: this block wins because it
+     appears last in the document.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* ── #11 Theme toggle crossfade ──
+     Smooth color/background swap when toggling light/dark, instead of hard cut */
+  html, body, .sidebar, .main, .topbar, .card, .modal-card,
+  .row-item, .campaign-card, .creative-tile, .intake-card,
+  .pill, .btn-modal-primary, .btn-modal-secondary, .modal-input,
+  .modal-textarea, #login-overlay .login-card, .nav-item {
+    transition: background-color 220ms var(--es),
+                color 220ms var(--es),
+                border-color 220ms var(--es),
+                box-shadow 220ms var(--es);
+  }
+
+  /* ── #2 Eyebrow / kicker upgrade ──
+     Replace academic "§ 01 · Systems" with a gold, letter-spaced caps eyebrow */
+  .topbar-kicker, .section-kicker {
+    font-family: var(--mono) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+    color: var(--gold) !important;
+    opacity: 0.85;
+  }
+  .topbar-title {
+    font-family: var(--display) !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  /* ── #3 Big Nunito numbers — KPI / stat tiles ──
+     Pull metric numbers out as 48-56px display weight.
+     `.stat-num` exists already in some places; we boost where applied. */
+  .stat-num, .kpi-num, .big-num,
+  .campaign-card .stat-value, .creative-tile .stat-value,
+  .campaign-stat-value, .ticket-stat-value {
+    font-family: var(--display);
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: var(--text);
+  }
+  .stat-num.gold, .kpi-num.gold { color: var(--gold); }
+
+  /* ── #4 Card cascade — staggered fade-up on list load ──
+     Generic for any .row-item / .campaign-card / .creative-tile / .card / .mreq-row */
+  @keyframes pgFadeUp {
+    from { opacity: 0; transform: translateY(9px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .row-list .row-item,
+  .campaign-list .campaign-card,
+  .creative-grid .creative-tile,
+  .mreq-list .mreq-row,
+  .card-cascade > * {
+    animation: pgFadeUp 0.4s var(--es) both;
+  }
+  .row-list .row-item:nth-child(1),
+  .campaign-list .campaign-card:nth-child(1),
+  .creative-grid .creative-tile:nth-child(1),
+  .mreq-list .mreq-row:nth-child(1) { animation-delay: 0ms; }
+  .row-list .row-item:nth-child(2),
+  .campaign-list .campaign-card:nth-child(2),
+  .creative-grid .creative-tile:nth-child(2),
+  .mreq-list .mreq-row:nth-child(2) { animation-delay: 40ms; }
+  .row-list .row-item:nth-child(3),
+  .campaign-list .campaign-card:nth-child(3),
+  .creative-grid .creative-tile:nth-child(3),
+  .mreq-list .mreq-row:nth-child(3) { animation-delay: 80ms; }
+  .row-list .row-item:nth-child(4),
+  .campaign-list .campaign-card:nth-child(4),
+  .creative-grid .creative-tile:nth-child(4),
+  .mreq-list .mreq-row:nth-child(4) { animation-delay: 120ms; }
+  .row-list .row-item:nth-child(5),
+  .campaign-list .campaign-card:nth-child(5),
+  .creative-grid .creative-tile:nth-child(5),
+  .mreq-list .mreq-row:nth-child(5) { animation-delay: 160ms; }
+  .row-list .row-item:nth-child(n+6),
+  .campaign-list .campaign-card:nth-child(n+6),
+  .creative-grid .creative-tile:nth-child(n+6),
+  .mreq-list .mreq-row:nth-child(n+6) { animation-delay: 200ms; }
+
+  /* ── #5 Segmented pill control — for ?type tab-like selectors ──
+     Apply by adding class .segmented to any parent containing pill buttons.
+     Used naturally where .pill is a button (e.g. status filters). */
+  .segmented {
+    display: inline-flex;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .segmented > * {
+    padding: 7px 16px !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+    color: var(--text-mute) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    cursor: pointer;
+    transition: all 160ms var(--es);
+  }
+  .segmented > *:hover { color: var(--text) !important; }
+  .segmented > .active, .segmented > [aria-selected="true"] {
+    background: var(--bg) !important;
+    color: var(--gold) !important;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── #6 Status pills with soft tinted backgrounds ──
+     Override the existing minimalist .pill to use semantic-colored backgrounds.
+     The old "colored dot, transparent bg" is replaced with a soft tinted pill. */
+  .pill {
+    background: var(--surface-el) !important;
+    padding: 4px 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid var(--line);
+    letter-spacing: 0.08em !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+  }
+  .pill.green {
+    background: rgba(76,199,106,0.12) !important;
+    border-color: rgba(76,199,106,0.25);
+    color: var(--green) !important;
+  }
+  .pill.amber, .pill.warn {
+    background: rgba(240,184,74,0.12) !important;
+    border-color: rgba(240,184,74,0.25);
+    color: var(--amber) !important;
+  }
+  .pill.red, .pill.danger {
+    background: rgba(240,112,96,0.12) !important;
+    border-color: rgba(240,112,96,0.25);
+    color: var(--red) !important;
+  }
+  .pill.blue {
+    background: rgba(90,143,184,0.12) !important;
+    border-color: rgba(90,143,184,0.25);
+    color: var(--blue) !important;
+  }
+  .pill.gold {
+    background: var(--gold-glow) !important;
+    border-color: var(--accent-border);
+    color: var(--gold) !important;
+  }
+  /* Hide the old colored bullet dot since the whole pill is colored now */
+  .pill .pill-dot { display: none !important; }
+  /* Light-mode tints */
+  html[data-theme="light"] .pill.green  { background: rgba(62,175,92,0.10) !important; border-color: rgba(62,175,92,0.20); }
+  html[data-theme="light"] .pill.amber  { background: rgba(224,157,36,0.10) !important; border-color: rgba(224,157,36,0.20); }
+  html[data-theme="light"] .pill.red    { background: rgba(224,90,66,0.10) !important; border-color: rgba(224,90,66,0.20); }
+  html[data-theme="light"] .pill.blue   { background: rgba(59,111,160,0.10) !important; border-color: rgba(59,111,160,0.20); }
+
+  /* ── #7 Gold-glow focus rings on ALL inputs ──
+     Extend the existing focus treatment to every form field across the portal */
+  input:focus, textarea:focus, select:focus,
+  .dform-input:focus, .modal-input:focus, .modal-textarea:focus,
+  .intake-wrap textarea:focus, .intake-wrap input:focus {
+    outline: none !important;
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 3px var(--gold-glow) !important;
+  }
+
+  /* ── #8 Gradient + glow on primary CTAs ──
+     Adds subtle gold gradient + lift to the main "submit ticket" / "send" buttons */
+  .btn-modal-primary,
+  .intake-primary,
+  .btn-add-campaign,
+  .btn-add-creative,
+  #login-overlay button.login-submit,
+  .sample-btn-primary {
+    background: linear-gradient(180deg, var(--gold) 0%, var(--gold-l) 100%) !important;
+    color: #1C1B18 !important;
+    border: none !important;
+    transition: all 180ms var(--es) !important;
+  }
+  .btn-modal-primary:hover:not(:disabled),
+  .intake-primary:hover:not(:disabled),
+  .btn-add-campaign:hover:not(:disabled),
+  .btn-add-creative:hover:not(:disabled),
+  #login-overlay button.login-submit:hover:not(:disabled) {
+    background: linear-gradient(180deg, var(--gold-d) 0%, var(--gold) 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: var(--shadow-gold) !important;
+  }
+  .btn-modal-primary:active:not(:disabled),
+  .intake-primary:active:not(:disabled),
+  #login-overlay button.login-submit:active:not(:disabled) {
+    transform: translateY(0) !important;
+  }
+
+  /* ── #9 Animated dform-option-dot (radio/checkbox) ──
+     Gold-fill scale-in on select with spring easing */
+  .dform-option-dot,
+  .dform-option-box {
+    transition: all 220ms var(--espring) !important;
+    border-color: var(--line-md) !important;
+  }
+  .dform-option:hover .dform-option-dot,
+  .dform-option:hover .dform-option-box {
+    border-color: var(--gold) !important;
+  }
+  .dform-option.selected .dform-option-dot,
+  .dform-option.selected .dform-option-box {
+    border-color: var(--gold) !important;
+    background: var(--gold) !important;
+    transform: scale(1.08);
+  }
+  /* The inner dot/checkmark — already drawn by existing CSS */
+  .dform-option.selected .dform-option-dot::after {
+    background: #1C1B18 !important;
+  }
+
+  /* ── #10 Empty state — Sage gold orb + helper copy ──
+     Apply by giving any empty-state container the class .empty-state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 56px 24px;
+    text-align: center;
+    gap: 18px;
+  }
+  .empty-state-orb {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-l) 100%);
+    box-shadow: 0 0 0 6px var(--gold-glow), var(--shadow-gold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: orbPulse 2.5s ease-in-out infinite;
+  }
+  .empty-state-orb svg, .empty-state-orb .orb-glyph {
+    width: 28px; height: 28px; color: #1C1B18;
+  }
+  .empty-state-title {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .empty-state-sub {
+    font-size: 13px;
+    color: var(--text-sub);
+    max-width: 360px;
+    line-height: 1.55;
+  }
+  @keyframes orbPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 6px var(--gold-glow), var(--shadow-gold); }
+    50%      { transform: scale(1.05); box-shadow: 0 0 0 10px var(--gold-glow), var(--shadow-gold); }
+  }
+
+  /* ── #1 Nav item smooth slide hover + active ──
+     Add subtle slide-right hover on inactive nav items (already polished) */
+  .nav-item {
+    transform: translateX(0);
+    transition: color 160ms var(--es), background 160ms var(--es), transform 160ms var(--es) !important;
+  }
+  .nav-item:hover:not(.active) {
+    transform: translateX(2px);
+    color: var(--text);
+  }
 </style>
 
 <button id="admin-fb-btn" onclick="openAdminFeedback()" title="Send feedback (admin only)" aria-label="Send feedback">
@@ -2913,7 +3298,7 @@
         <div class="topbar">
           <div>
             <span class="topbar-kicker">§ 01 · Systems</span>
-            <div class="topbar-title">Support tickets.</div>
+            <div class="topbar-title">Systems Support Tickets</div>
           </div>
         </div>
 

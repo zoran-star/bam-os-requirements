@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Client Portal — Font Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!--
+  Load ALL candidate fonts upfront. Yes it's a lot, but for the playground we
+  want zero-latency switching. Production client-portal.html loads only the 3
+  it's actually using.
+-->
+<link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Bricolage+Grotesque:wght@500;700;800&family=Cormorant+Garamond:wght@500;700&family=Crimson+Pro:wght@500;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700;800&family=DM+Serif+Display&family=Figtree:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&family=Fraunces:wght@500;700;800;900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=Instrument+Serif&family=JetBrains+Mono:wght@400;500&family=Lora:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&family=Nunito:wght@700;800;900&family=Onest:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── Hard reset for the playground shell ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* These mirror the production client-portal.html tokens (dark mode).
+       The font vars below are what the playground swaps live. */
+    --bg:          #0F0E0C;
+    --surface:     #1A1916;
+    --surface-el:  #222120;
+    --surface-3:   #2C2B28;
+    --line:        rgba(255,255,255,0.08);
+    --line-md:     rgba(255,255,255,0.12);
+    --text:        #F0EDE8;
+    --text-sub:    #A5A19A;
+    --text-mute:   #6E6B63;
+    --gold:        #D4B65C;
+    --gold-l:      #C8A84E;
+    --gold-glow:   rgba(212,182,92,0.12);
+    --red:         #F07060;
+    --green:       #4CC76A;
+
+    --radius-sm: 8px;
+    --radius:    12px;
+    --radius-md: 16px;
+    --radius-lg: 20px;
+    --radius-2xl: 28px;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.15);
+    --shadow-md: 0 4px 14px rgba(0,0,0,0.25), 0 2px 6px rgba(0,0,0,0.15);
+    --shadow-lg: 0 8px 28px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.20);
+    --shadow-gold: 0 4px 18px rgba(212,182,92,0.18);
+
+    --es: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ─── THE TWO FONTS THE PLAYGROUND CONTROLS ─── */
+    --sans:    "Plus Jakarta Sans", system-ui, sans-serif;
+    --display: "Nunito", "Plus Jakarta Sans", sans-serif;
+    --mono:    "DM Mono", "JetBrains Mono", monospace;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+
+  /* ── Playground layout ── */
+  .pg-shell {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ── Control panel (left sidebar) ── */
+  .pg-controls {
+    background: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 28px 24px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .pg-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .pg-controls h1 {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .pg-controls .pg-intro {
+    font-size: 12px;
+    color: var(--text-sub);
+    line-height: 1.55;
+    margin-bottom: 26px;
+  }
+  .pg-group { margin-bottom: 22px; }
+  .pg-group-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 6px;
+  }
+  .pg-select {
+    width: 100%;
+    background: var(--surface-el);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 180ms var(--es);
+    cursor: pointer;
+  }
+  .pg-select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+  }
+  .pg-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .pg-btn {
+    flex: 1;
+    padding: 10px 14px;
+    background: var(--surface-el);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 160ms var(--es);
+  }
+  .pg-btn:hover { border-color: var(--line-md); background: var(--surface-3); }
+  .pg-btn.primary {
+    background: var(--gold);
+    color: #1C1B18;
+    border-color: var(--gold);
+  }
+  .pg-btn.primary:hover { background: var(--gold-l); }
+  .pg-divider { height: 1px; background: var(--line); margin: 22px 0; }
+  .pg-current {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-sub);
+    line-height: 1.7;
+  }
+  .pg-current b { color: var(--text); font-weight: 600; }
+
+  /* ── Preview canvas ── */
+  .pg-preview {
+    padding: 40px 48px 80px;
+    overflow-y: auto;
+  }
+  .pg-section { margin-bottom: 48px; }
+  .pg-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* ── Sample components — replicate the actual client portal patterns ── */
+
+  /* Login card sample */
+  .sample-login {
+    width: 100%;
+    max-width: 420px;
+    padding: 36px 32px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    font-family: var(--sans);
+    margin: 0 auto;
+  }
+  .sample-login-icon {
+    width: 52px; height: 52px;
+    margin: 0 auto 20px;
+    display: block;
+  }
+  .sample-login-title {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    text-align: center;
+    margin-bottom: 6px;
+  }
+  .sample-login-sub {
+    font-size: 13px;
+    color: var(--text-sub);
+    text-align: center;
+    margin-bottom: 26px;
+    line-height: 1.55;
+  }
+  .sample-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin-bottom: 6px;
+  }
+  .sample-input {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    margin-bottom: 14px;
+    transition: all 180ms var(--es);
+  }
+  .sample-input:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px var(--gold-glow);
+  }
+  .sample-btn-primary {
+    width: 100%;
+    padding: 13px;
+    background: var(--gold);
+    color: #1C1B18;
+    border: 0;
+    border-radius: var(--radius);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 6px;
+    transition: all 180ms var(--es);
+  }
+  .sample-btn-primary:hover { background: var(--gold-l); transform: translateY(-1px); box-shadow: var(--shadow-gold); }
+
+  /* Typography ramp */
+  .ramp { display: grid; gap: 18px; }
+  .ramp-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    align-items: baseline;
+    gap: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .ramp-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mute);
+    padding-top: 6px;
+  }
+  .ramp-meta b { color: var(--text-sub); font-weight: 500; display: block; }
+  .ramp-text { color: var(--text); }
+  .ramp-text.h1 { font-family: var(--display); font-size: 38px; font-weight: 800; letter-spacing: -0.025em; line-height: 1.1; }
+  .ramp-text.h2 { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  .ramp-text.h3 { font-family: var(--display); font-size: 22px; font-weight: 700; letter-spacing: -0.015em; }
+  .ramp-text.body-lg { font-family: var(--sans); font-size: 16px; font-weight: 400; line-height: 1.6; color: var(--text-sub); }
+  .ramp-text.body { font-family: var(--sans); font-size: 14px; font-weight: 500; line-height: 1.55; }
+  .ramp-text.sm { font-family: var(--sans); font-size: 13px; color: var(--text-sub); }
+  .ramp-text.eyebrow { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+  .ramp-text.mono { font-family: var(--mono); font-size: 13px; color: var(--text-sub); }
+  .ramp-text.big-num { font-family: var(--display); font-size: 56px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--gold); }
+
+  /* Card sample (ticket / campaign) */
+  .sample-card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 20px 24px;
+    box-shadow: var(--shadow-sm);
+    transition: all 200ms var(--es);
+    margin-bottom: 12px;
+  }
+  .sample-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .sample-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .sample-card-title {
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .sample-card-sub {
+    font-size: 13px;
+    color: var(--text-sub);
+    line-height: 1.5;
+  }
+  .sample-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface-el);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-sub);
+  }
+  .sample-pill.green { color: var(--green); }
+  .sample-pill.gold  { color: var(--gold); }
+  .sample-pill.red   { color: var(--red); }
+
+  /* Button row */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sample-btn-secondary {
+    padding: 11px 20px;
+    background: var(--surface-el);
+    color: var(--text-sub);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 180ms var(--es);
+  }
+  .sample-btn-secondary:hover { background: var(--surface-3); color: var(--text); }
+  .sample-btn-gold {
+    padding: 11px 24px;
+    background: var(--gold);
+    color: #1C1B18;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 180ms var(--es);
+  }
+  .sample-btn-gold:hover { background: var(--gold-l); transform: translateY(-1px); box-shadow: var(--shadow-gold); }
+
+  /* Theme toggle in top right */
+  .pg-theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10;
+    padding: 8px 14px;
+    background: var(--surface-el);
+    color: var(--text-sub);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 160ms var(--es);
+  }
+  .pg-theme-toggle:hover { color: var(--text); border-color: var(--line-md); }
+
+  /* Light mode override */
+  html[data-theme="light"] {
+    --bg: #F8F7F5;
+    --surface: #FFFFFF;
+    --surface-el: #FAFAF8;
+    --surface-3: #F0EFEC;
+    --line: rgba(0,0,0,0.07);
+    --line-md: rgba(0,0,0,0.12);
+    --text: #1C1B18;
+    --text-sub: #6E6B63;
+    --text-mute: #A5A19A;
+    --gold: #C8A84E;
+    --gold-l: #D4B65C;
+    --gold-glow: rgba(200,168,78,0.10);
+    --red: #E05A42;
+    --green: #3EAF5C;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 14px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+    --shadow-lg: 0 8px 28px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+    --shadow-gold: 0 4px 18px rgba(200,168,78,0.12);
+  }
+</style>
+</head>
+<body>
+
+<button class="pg-theme-toggle" onclick="toggleTheme()">☾ Dark</button>
+
+<div class="pg-shell">
+
+  <!-- ──── Controls ──── -->
+  <aside class="pg-controls">
+    <div class="pg-eyebrow">Client Portal · Type</div>
+    <h1>Font Playground</h1>
+    <p class="pg-intro">Swap body / display / mono live. The preview on the right is built from the same components and tokens as the real client portal — so what you see here is what you'd ship.</p>
+
+    <div class="pg-group">
+      <label class="pg-group-label">Body sans (interactive text)</label>
+      <select class="pg-select" id="sel-sans" onchange="onChange()"></select>
+    </div>
+
+    <div class="pg-group">
+      <label class="pg-group-label">Display (headings, big numbers)</label>
+      <select class="pg-select" id="sel-display" onchange="onChange()"></select>
+    </div>
+
+    <div class="pg-group">
+      <label class="pg-group-label">Mono (eyebrows, codes)</label>
+      <select class="pg-select" id="sel-mono" onchange="onChange()"></select>
+    </div>
+
+    <div class="pg-actions">
+      <button class="pg-btn" onclick="resetFonts()">Reset</button>
+      <button class="pg-btn primary" onclick="copyCss()">Copy CSS</button>
+    </div>
+    <div id="copy-msg" style="font-size:11px;color:var(--green);margin-top:8px;min-height:14px;font-family:var(--mono)"></div>
+
+    <div class="pg-divider"></div>
+
+    <div class="pg-group-label" style="margin-bottom: 8px;">Currently applied</div>
+    <div class="pg-current" id="pg-current">
+      <b>--sans:</b> <span id="cur-sans">…</span><br/>
+      <b>--display:</b> <span id="cur-display">…</span><br/>
+      <b>--mono:</b> <span id="cur-mono">…</span>
+    </div>
+
+    <div class="pg-divider"></div>
+
+    <p style="font-size:11px;color:var(--text-mute);line-height:1.55;">
+      All fonts are free via Google Fonts. The picks lean toward what Apple-tier
+      product teams (Linear, Vercel, Stripe, Arc, Notion, Raycast) actually use.
+    </p>
+  </aside>
+
+  <!-- ──── Preview ──── -->
+  <main class="pg-preview">
+
+    <div class="pg-section">
+      <div class="pg-section-label">Login card (full)</div>
+      <div class="sample-login">
+        <svg class="sample-login-icon" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="17" cy="17" r="12" fill="none" stroke="var(--gold)" stroke-width="1"/>
+          <circle cx="17" cy="17" r="5" fill="none" stroke="var(--gold-l)" stroke-width="0.8"/>
+          <line x1="17" y1="3" x2="17" y2="31" stroke="var(--text-sub)" stroke-width="0.5" opacity="0.4"/>
+          <line x1="3" y1="17" x2="31" y2="17" stroke="var(--text-sub)" stroke-width="0.5" opacity="0.4"/>
+          <polygon points="17,8 19,17 17,26 15,17" fill="var(--gold)"/>
+          <circle cx="17" cy="17" r="1.3" fill="var(--bg)" stroke="var(--gold)" stroke-width="0.6"/>
+        </svg>
+        <div class="sample-login-title">Sign in to your portal</div>
+        <div class="sample-login-sub">Enter the email and password BAM provided</div>
+
+        <label class="sample-label">Email</label>
+        <input class="sample-input" type="email" placeholder="you@academy.com" value="jeremy@majorhoops.com" />
+
+        <label class="sample-label">Password</label>
+        <input class="sample-input" type="password" placeholder="••••••••" value="abcdefgh" />
+
+        <button class="sample-btn-primary">Sign in →</button>
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-label">Typography ramp</div>
+      <div class="ramp">
+        <div class="ramp-row"><div class="ramp-meta"><b>H1</b>display 38/800</div><div class="ramp-text h1">Submit a support ticket</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>H2</b>display 28/700</div><div class="ramp-text h2">Your active campaigns</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>H3</b>display 22/700</div><div class="ramp-text h3">Spring Free Trial — Lead Gen</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Body lg</b>sans 16/400</div><div class="ramp-text body-lg">Tell us what happened. A short description and a screenshot is enough — we'll follow up if we need more.</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Body</b>sans 14/500</div><div class="ramp-text body">The trainer running the Saturday slots isn't great with parent conversations, so we removed it from the trial calendar.</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Small</b>sans 13/400</div><div class="ramp-text sm">Submitted 2 hours ago · Mike Eluki replied</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Eyebrow</b>mono 11/600 caps</div><div class="ramp-text eyebrow">Marketing · Active campaigns</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Mono</b>mono 13/400</div><div class="ramp-text mono">cus_NJZ8sUx2KqLrV9 · created 2026-04-22</div></div>
+        <div class="ramp-row"><div class="ramp-meta"><b>Big num</b>display 56/800</div><div class="ramp-text big-num">$1,247</div></div>
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-label">Cards (ticket list rows)</div>
+      <div class="sample-card">
+        <div class="sample-card-row">
+          <div class="sample-card-title">Player Intake — Q1 Retarget</div>
+          <span class="sample-pill green">Active</span>
+        </div>
+        <div class="sample-card-sub">$2,104 spend · 117 leads · $17.98 CPL · last 30 days</div>
+      </div>
+      <div class="sample-card">
+        <div class="sample-card-row">
+          <div class="sample-card-title">Calendar booking broken</div>
+          <span class="sample-pill gold">In progress</span>
+        </div>
+        <div class="sample-card-sub">Error ticket · submitted 2 days ago · Chris is on it</div>
+      </div>
+      <div class="sample-card">
+        <div class="sample-card-row">
+          <div class="sample-card-title">New summer camp landing page</div>
+          <span class="sample-pill">Awaiting client</span>
+        </div>
+        <div class="sample-card-sub">Build ticket · 5 raw videos uploaded · waiting on copy approval</div>
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-label">Buttons</div>
+      <div class="btn-row">
+        <button class="sample-btn-gold">Submit ticket</button>
+        <button class="sample-btn-secondary">Cancel</button>
+        <button class="sample-btn-secondary">Save draft</button>
+        <button class="sample-btn-gold">Send invite →</button>
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-label">Form fields</div>
+      <div style="max-width:480px;display:grid;gap:14px;">
+        <div>
+          <label class="sample-label">Email address</label>
+          <input class="sample-input" type="email" placeholder="you@academy.com" />
+        </div>
+        <div>
+          <label class="sample-label">What happened?</label>
+          <textarea class="sample-input" rows="4" style="font-family:inherit;resize:vertical;" placeholder="Describe what you saw, what you expected, and what page you were on…">Calendar slot booked twice — same lead got two confirmation emails.</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-label">Quick paragraph (real client message)</div>
+      <p style="max-width:640px;font-size:14px;line-height:1.7;color:var(--text-sub);">
+        Hey BAM team — Mike asked me to flag this. We had a parent book the 2pm Saturday slot twice in a row.
+        Both confirmation emails went out, and the trainer ended up double-booked. The lead is fine, just a
+        little confused about which time was real. Can we get this fixed before next week?
+      </p>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ─── Font catalog ────────────────────────────────────────────────
+  // Picks lean toward what Apple-tier product teams actually ship today.
+  const SANS = [
+    { name: "Plus Jakarta Sans", note: "current · warm geometric" },
+    { name: "Inter", note: "industry standard · neutral" },
+    { name: "Geist", note: "Vercel · clean modern" },
+    { name: "Manrope", note: "rounded, friendly" },
+    { name: "DM Sans", note: "geometric, balanced" },
+    { name: "Outfit", note: "rounded, modern" },
+    { name: "Sora", note: "geometric, contemporary" },
+    { name: "Be Vietnam Pro", note: "warm, Geist-adjacent" },
+    { name: "Public Sans", note: "US Gov · neutral workhorse" },
+    { name: "Figtree", note: "clean, modern" },
+    { name: "Onest", note: "modern indie sans" },
+    { name: "Albert Sans", note: "SF Pro-ish · friendly" },
+    { name: "Hanken Grotesk", note: "subtle grotesque" },
+    { name: "Space Grotesk", note: "geometric, distinctive 'a'" },
+    { name: "system-ui", note: "Apple SF Pro on Apple devices" },
+  ];
+
+  const DISPLAY = [
+    { name: "Nunito", note: "current · warm rounded" },
+    { name: "Space Grotesk", note: "modern, geometric, slight quirk" },
+    { name: "Bricolage Grotesque", note: "expressive, optical sizes" },
+    { name: "Fraunces", note: "premium serif · optical sizes" },
+    { name: "Instrument Serif", note: "editorial display serif" },
+    { name: "Crimson Pro", note: "classic literary serif" },
+    { name: "Lora", note: "workhorse serif" },
+    { name: "Playfair Display", note: "high-contrast classic" },
+    { name: "DM Serif Display", note: "high-contrast modern" },
+    { name: "Cormorant Garamond", note: "elegant Garamond" },
+    { name: "Unbounded", note: "geometric, futuristic" },
+    { name: "Plus Jakarta Sans", note: "(reuse the body font)" },
+  ];
+
+  const MONO = [
+    { name: "DM Mono", note: "current · clean" },
+    { name: "JetBrains Mono", note: "popular · ligatures" },
+    { name: "Geist Mono", note: "Vercel · modern" },
+    { name: "Fira Code", note: "ligatures, dev favorite" },
+    { name: "IBM Plex Mono", note: "warm, IBM" },
+    { name: "Space Mono", note: "geometric, retro" },
+  ];
+
+  function fontStack(name) {
+    if (name === "system-ui") return "system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+    return `"${name}", system-ui, sans-serif`;
+  }
+
+  function monoStack(name) {
+    return `"${name}", ui-monospace, monospace`;
+  }
+
+  function fill(selectId, list) {
+    const sel = document.getElementById(selectId);
+    list.forEach(f => {
+      const opt = document.createElement("option");
+      opt.value = f.name;
+      opt.textContent = `${f.name}  —  ${f.note}`;
+      sel.appendChild(opt);
+    });
+  }
+
+  function onChange() {
+    const sans = document.getElementById("sel-sans").value;
+    const display = document.getElementById("sel-display").value;
+    const mono = document.getElementById("sel-mono").value;
+    document.documentElement.style.setProperty("--sans", fontStack(sans));
+    document.documentElement.style.setProperty("--display", fontStack(display));
+    document.documentElement.style.setProperty("--mono", monoStack(mono));
+    document.getElementById("cur-sans").textContent = sans;
+    document.getElementById("cur-display").textContent = display;
+    document.getElementById("cur-mono").textContent = mono;
+    try {
+      localStorage.setItem("fp_sans", sans);
+      localStorage.setItem("fp_display", display);
+      localStorage.setItem("fp_mono", mono);
+    } catch (_) {}
+  }
+
+  function resetFonts() {
+    document.getElementById("sel-sans").value = "Plus Jakarta Sans";
+    document.getElementById("sel-display").value = "Nunito";
+    document.getElementById("sel-mono").value = "DM Mono";
+    onChange();
+  }
+
+  function copyCss() {
+    const sans = document.getElementById("sel-sans").value;
+    const display = document.getElementById("sel-display").value;
+    const mono = document.getElementById("sel-mono").value;
+    const css = `:root {
+  --sans:    ${fontStack(sans)};
+  --display: ${fontStack(display)};
+  --mono:    ${monoStack(mono)};
+}`;
+    navigator.clipboard.writeText(css).then(() => {
+      const msg = document.getElementById("copy-msg");
+      msg.textContent = "Copied CSS — paste into client-portal.html :root";
+      setTimeout(() => { msg.textContent = ""; }, 2400);
+    });
+  }
+
+  function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute("data-theme") !== "light";
+    html.setAttribute("data-theme", isDark ? "light" : "dark");
+    document.querySelector(".pg-theme-toggle").textContent = isDark ? "☀ Light" : "☾ Dark";
+  }
+
+  // ── Init ──
+  fill("sel-sans", SANS);
+  fill("sel-display", DISPLAY);
+  fill("sel-mono", MONO);
+
+  // Restore last picks if any
+  const savedSans = localStorage.getItem("fp_sans");
+  const savedDisplay = localStorage.getItem("fp_display");
+  const savedMono = localStorage.getItem("fp_mono");
+  if (savedSans) document.getElementById("sel-sans").value = savedSans;
+  else document.getElementById("sel-sans").value = "Plus Jakarta Sans";
+  if (savedDisplay) document.getElementById("sel-display").value = savedDisplay;
+  else document.getElementById("sel-display").value = "Nunito";
+  if (savedMono) document.getElementById("sel-mono").value = savedMono;
+  else document.getElementById("sel-mono").value = "DM Mono";
+  onChange();
+</script>
+
+</body>
+</html>
