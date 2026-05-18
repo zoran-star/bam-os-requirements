@@ -6194,7 +6194,7 @@ function openMarketingRequest(id) {
           <div class="req-update-meta">${escapeHTML(u.when)} · ${escapeHTML(u.who)}</div>
           <div class="req-update-message">${escapeHTML(u.message)}</div>
         </div>`).join('')
-    : '<div class="req-empty">No updates yet — your account manager will respond shortly.</div>';
+    : '<div class="req-empty">No updates yet</div>';
 
   // Hide Cancel button for completed/cancelled requests
   const actionsBar = document.getElementById('reqDetailActions');

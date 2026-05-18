@@ -501,6 +501,31 @@ export default function DashboardView({ tokens, dark, onboardingClients, activeC
               ))
             )}
           </div>
+
+          {/* Urgent Reminders — clickable to clients */}
+          <div style={{ marginTop: 36 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, marginBottom: 12, letterSpacing: "-0.01em" }}>Urgent Reminders</div>
+            {urgentReminders.length === 0 ? (
+              <div style={{ fontSize: 13, color: tokens.textMute }}>No urgent reminders.</div>
+            ) : (
+              urgentReminders.map((r, i) => (
+                <div key={i} onClick={() => onNavigate && onNavigate("clients")} style={{
+                  display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: `1px solid ${tokens.border}`,
+                  animation: `cardIn 0.3s ease ${i * 30}ms both`,
+                  cursor: "pointer", transition: "opacity 0.15s",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
+                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                >
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: tokens.red, flexShrink: 0, marginTop: 6 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{r.client}</div>
+                    <div style={{ fontSize: 12, color: tokens.textSub, marginTop: 2 }}>{r.msg}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Right column */}
@@ -602,30 +627,6 @@ export default function DashboardView({ tokens, dark, onboardingClients, activeC
           })()}
 
 
-          {/* Urgent Reminders — clickable to clients */}
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text, marginBottom: 12, letterSpacing: "-0.01em" }}>Urgent Reminders</div>
-            {urgentReminders.length === 0 ? (
-              <div style={{ fontSize: 13, color: tokens.textMute }}>No urgent reminders.</div>
-            ) : (
-              urgentReminders.map((r, i) => (
-                <div key={i} onClick={() => onNavigate && onNavigate("clients")} style={{
-                  display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: `1px solid ${tokens.border}`,
-                  animation: `cardIn 0.3s ease ${i * 30}ms both`,
-                  cursor: "pointer", transition: "opacity 0.15s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                >
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: tokens.red, flexShrink: 0, marginTop: 6 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{r.client}</div>
-                    <div style={{ fontSize: 12, color: tokens.textSub, marginTop: 2 }}>{r.msg}</div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </div>
       </div>
     </div>

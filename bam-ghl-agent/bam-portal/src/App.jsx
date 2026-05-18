@@ -693,7 +693,7 @@ export default function BAMPortal() {
           </div>
 
           {/* Page content */}
-          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "24px 16px 40px" : "40px 44px 64px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "24px 16px 16px" : "40px 44px 16px" }}>
 
             <div key={nav} style={{ marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
               <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
