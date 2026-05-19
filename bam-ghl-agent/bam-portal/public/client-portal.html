@@ -6343,19 +6343,17 @@ const _DEMO_CAMPAIGNS = [
   { id: 'demo_4', name: 'Coach Showcase Reel Boost',     spend: 456.20,  results: 19,  cpr: 24.01 },
 ];
 
-function _buildDemoCampaignsHTML(metaConnected) {
+function _buildDemoCampaignsHTML(_metaConnected) {
+  // Meta is staff-managed — clients never connect Meta or pick ad accounts
+  // themselves. When no real campaigns are available, show sample data with
+  // a passive banner ("BAM is setting this up") and no CTA.
   const banner = `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.3);border-radius:8px">
       <div style="font-size:18px">✨</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:600;color:var(--text)">Sample data shown below</div>
-        <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${metaConnected
-          ? "Your Meta account is connected but no ad account is selected yet. Pick one to see your real campaigns."
-          : "Connect your Meta ad account to see your real campaigns and performance."}</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:2px">Your BAM team is setting up your Meta ad account. Real campaigns will appear here once it's wired up.</div>
       </div>
-      <button onclick="${metaConnected ? '_openMetaAdAccountPicker()' : '_startClientMetaConnect()'}" style="background:var(--gold);color:#0A0A0B;border:0;padding:8px 14px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;white-space:nowrap">
-        ${metaConnected ? 'Pick ad account →' : 'Connect Meta →'}
-      </button>
     </div>`;
   const cards = _DEMO_CAMPAIGNS.map(c => `
     <div class="campaign-card" style="opacity:0.85">
@@ -9103,18 +9101,12 @@ async function boot() {
     setTimeout(() => startOnboardingTour(), 600);
   }
 
-  // OAuth callback handler: when /api/auth/meta/callback finishes it
-  // redirects back here with ?meta=connected (or ?meta=error). Surface a
-  // toast + auto-open the ad-account picker so the user can finish wiring
-  // their account in one flow.
+  // Strip any leftover ?meta=connected / ?meta=error query params if a
+  // legacy bookmark or older link surfaces them. We don't act on them
+  // anymore — Meta is staff-managed; clients never see this flow.
   const metaParam = new URLSearchParams(window.location.search).get('meta');
-  if (metaParam === 'connected') {
+  if (metaParam) {
     history.replaceState(null, '', window.location.pathname);
-    showConfirmation('Meta connected ✅', 'Now pick which ad account to show in this portal.');
-    setTimeout(() => { _openMetaAdAccountPicker(); }, 600);
-  } else if (metaParam === 'error') {
-    history.replaceState(null, '', window.location.pathname);
-    alert('Meta connection failed. Try again or contact BAM support.');
   }
 }
 
