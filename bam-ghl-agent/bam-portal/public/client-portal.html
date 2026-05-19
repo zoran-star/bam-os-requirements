@@ -4411,6 +4411,16 @@
     <nav class="nav">
       <div class="nav-label">§ Navigate</div>
 
+      <div class="nav-item" onclick="switchView('messages', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </span>
+        Messages
+        <span class="nav-badge" id="messages-unread-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
+      </div>
+
       <div class="nav-item active" onclick="switchView('systems', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5081,137 +5091,41 @@ Then the call to action."]</div>
     </div>
 
     <!-- ══════════════════════════════
-         CHAT VIEW
+         MESSAGES VIEW (live, replaces Slack)
     ══════════════════════════════ -->
-    <div class="view" id="view-chat">
+    <div class="view" id="view-messages">
       <div class="chat-layout">
-
-        <!-- Thread list -->
-        <div class="chat-sidebar">
-          <input class="chat-search" placeholder="Search messages…" type="text">
-
-          <div class="chat-thread active">
-            <div class="thread-avatar bam" style="background:var(--accent-ghost);color:var(--accent);font-size:12px">BA</div>
-            <div class="thread-info">
-              <div class="thread-name">BAM Support Team</div>
-              <div class="thread-preview">Your New Hire page is almost ready…</div>
-            </div>
-            <div class="thread-meta">
-              <div class="thread-time">2h ago</div>
-              <div class="thread-unread"></div>
-            </div>
-          </div>
-
-          <div class="chat-thread">
-            <div class="thread-avatar" style="background:var(--red-soft);color:var(--red)">BA</div>
-            <div class="thread-info">
-              <div class="thread-name">BAM Support Team</div>
-              <div class="thread-preview">🚨 Error ticket update: we found the issue…</div>
-            </div>
-            <div class="thread-meta">
-              <div class="thread-time">5h ago</div>
-              <div class="thread-unread"></div>
-            </div>
-          </div>
-
-          <div class="chat-thread">
-            <div class="thread-avatar" style="background:var(--surface-el);color:var(--text-sub)">BA</div>
-            <div class="thread-info">
-              <div class="thread-name">BAM Support Team</div>
-              <div class="thread-preview">Your Youth Academy page is live! Here's your guide…</div>
-            </div>
-            <div class="thread-meta">
-              <div class="thread-time">Yesterday</div>
-              <div class="thread-unread"></div>
-            </div>
-          </div>
-
-          <div class="chat-thread">
-            <div class="thread-avatar" style="background:var(--surface-el);color:var(--text-sub)">BA</div>
-            <div class="thread-info">
-              <div class="thread-name">BAM Support Team</div>
-              <div class="thread-preview">Gym Rental automation is all set 🎉</div>
-            </div>
-            <div class="thread-meta">
-              <div class="thread-time">Apr 15</div>
-            </div>
-          </div>
+        <!-- Thread list — only renders when user has >1 client (multi-POC).
+             For single-client users, this gets hidden + the main pane fills. -->
+        <div class="chat-sidebar" id="messages-sidebar" style="display:none">
+          <input class="chat-search" id="messages-search" placeholder="Search academies…" type="text" oninput="renderMessagesInbox()">
+          <div id="messages-thread-list"></div>
         </div>
 
-        <!-- Chat main -->
-        <div class="chat-main">
-          <div class="chat-header">
+        <!-- Active thread -->
+        <div class="chat-main" id="messages-main">
+          <div class="chat-header" id="messages-header">
             <div>
-              <span class="topbar-kicker">§ 03 · Signal</span>
-              <div class="chat-header-name">BAM Support Team</div>
-              <div class="chat-header-sub">Holding line · replies within a few hours</div>
-            </div>
-            <div>
-              <span class="pill green"><span class="pill-dot" style="background:var(--green)"></span>Online</span>
+              <span class="topbar-kicker">§ 03 · Messages</span>
+              <div class="chat-header-name" id="messages-header-name">BAM Support Team</div>
+              <div class="chat-header-sub" id="messages-header-sub">Replies within a few hours</div>
             </div>
           </div>
-
-          <div class="chat-messages">
-
-            <div class="chat-date-divider">Today</div>
-
-            <div class="msg-group">
-              <div class="msg-row">
-                <div class="msg-avatar bam">BA</div>
-                <div class="msg-bubble">Hey Jordan! Just wanted to give you an update — your New Hire landing page is looking great. We're putting the finishing touches on the form automation now.</div>
-                <div class="msg-time">10:14 AM</div>
-              </div>
-              <div class="msg-row">
-                <div class="msg-avatar bam">BA</div>
-                <div class="msg-bubble">Once the automation is tested, we'll send over your user guide so you know exactly how to use it. Should be done by end of day.</div>
-              </div>
-            </div>
-
-            <div class="msg-group">
-              <div class="msg-row outgoing">
-                <div class="msg-avatar" style="background:var(--surface-el);color:var(--text-sub)">JC</div>
-                <div class="msg-bubble">That's awesome, thanks! Quick question — will applicants get an automatic confirmation email when they submit?</div>
-                <div class="msg-time">10:22 AM</div>
-              </div>
-            </div>
-
-            <div class="msg-group">
-              <div class="msg-row">
-                <div class="msg-avatar bam">BA</div>
-                <div class="msg-bubble">Yes! The automation triggers immediately on submit — they'll get a confirmation SMS + email within 60 seconds. You'll also get an internal notification so you know when a new application comes in.</div>
-                <div class="msg-time">10:31 AM</div>
-              </div>
-            </div>
-
-            <div class="msg-group">
-              <div class="msg-row outgoing">
-                <div class="msg-avatar" style="background:var(--surface-el);color:var(--text-sub)">JC</div>
-                <div class="msg-bubble">Perfect, that's exactly what I needed. Can't wait to see it live 🔥</div>
-                <div class="msg-time">10:35 AM</div>
-              </div>
-            </div>
-
-            <div class="msg-group">
-              <div class="msg-row">
-                <div class="msg-avatar bam">BA</div>
-                <div class="msg-bubble">We'll have it ready for you shortly. We'll drop the link and user guide here when it's done!</div>
-                <div class="msg-time">10:36 AM</div>
-              </div>
-            </div>
-
+          <div class="chat-messages" id="messages-thread">
+            <div class="req-empty" style="padding:48px 24px;text-align:center">Loading messages…</div>
           </div>
-
           <div class="chat-input-area">
+            <div id="messages-pending-files" style="display:none;padding:0 4px 8px;font-size:12px;color:var(--text-mute)"></div>
             <div class="chat-input-wrap">
-              <textarea class="chat-input" rows="1" placeholder="Message BAM support…"
-                oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"
-                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();}">
-              </textarea>
-              <div class="chat-send">↑</div>
+              <input type="file" id="messages-file-input" multiple style="display:none" onchange="onMessagesFilePicked(event)">
+              <label for="messages-file-input" style="cursor:pointer;padding:8px;color:var(--text-mute);font-size:18px" title="Attach files">📎</label>
+              <textarea class="chat-input" id="messages-input" rows="1" placeholder="Message BAM team…"
+                oninput="onMessagesInputChange(event)"
+                onkeydown="onMessagesInputKeyDown(event)"></textarea>
+              <div class="chat-send" id="messages-send-btn" onclick="sendCurrentMessage()" title="Send">↑</div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -5236,6 +5150,9 @@ function switchView(name, el) {
 
   // When entering Marketing, refresh tickets from the API
   if (name === 'marketing') fetchAndRenderMarketingRequests();
+
+  // When entering Messages, load conversations
+  if (name === 'messages') openMessagesView();
 }
 
 // Apply the greyed-out look to the Marketing nav item when marketing
@@ -8985,6 +8902,399 @@ async function _markOnboardingComplete() {
     });
   } catch (_) { /* best-effort; tour just re-shows next login on failure */ }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// MESSAGES VIEW — live chat replacing Slack
+// ═══════════════════════════════════════════════════════════════════
+// Backend at /api/messages. Realtime via supabase.channel(). For
+// single-client users, the sidebar list is hidden and the thread fills.
+// For multi-POC users (e.g. Mike covers DETAIL Miami + Out Work + Johnson)
+// the sidebar shows a merged inbox of every academy they cover.
+
+let _msgConversations = [];        // all convos the user can see
+let _msgActiveConvoId = null;      // currently open thread
+let _msgMessages = [];             // messages for active thread
+let _msgChannel = null;            // supabase realtime channel
+let _msgPendingFiles = [];         // [{file, attachment?, uploading, error}]
+let _msgTypingTimeout = null;
+let _msgTypingUsers = {};          // {userId: {name, expiresAt}}
+let _msgTypingGcInterval = null;
+const MSG_EDIT_WINDOW_MS = 5 * 60 * 1000;
+const MSG_TYPING_TIMEOUT_MS = 3000;
+
+async function _msgAuthHeaders() {
+  const { data: { session } } = await _sb.auth.getSession();
+  const tok = session?.access_token;
+  return tok ? { Authorization: 'Bearer ' + tok } : {};
+}
+
+async function _msgApi(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(await _msgAuthHeaders()), ...(opts.headers || {}) };
+  const res = await fetch(url, { ...opts, headers });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || ('HTTP ' + res.status));
+  return json;
+}
+
+// Entry point — called by switchView('messages').
+async function openMessagesView() {
+  try {
+    const json = await _msgApi('/api/messages?action=list-conversations');
+    _msgConversations = json.conversations || [];
+
+    const sidebar = document.getElementById('messages-sidebar');
+    const isMultiClient = _msgConversations.length > 1;
+    sidebar.style.display = isMultiClient ? 'flex' : 'none';
+
+    if (isMultiClient) {
+      renderMessagesInbox();
+      // If the user previously had a convo open + it's still in the list, reopen it.
+      // Otherwise default to the most recently active conversation.
+      const target = (_msgActiveConvoId && _msgConversations.some(c => c.id === _msgActiveConvoId))
+        ? _msgActiveConvoId
+        : _msgConversations[0]?.id;
+      if (target) openMessageConvo(target);
+    } else if (_msgConversations.length === 1) {
+      openMessageConvo(_msgConversations[0].id);
+    } else {
+      // No conversations at all (shouldn't happen — auto-created on client insert)
+      document.getElementById('messages-thread').innerHTML =
+        '<div class="req-empty" style="padding:48px 24px;text-align:center">No conversation available. Refresh the page.</div>';
+    }
+    updateUnreadBadge();
+  } catch (err) {
+    console.error('openMessagesView failed:', err);
+    document.getElementById('messages-thread').innerHTML =
+      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">⚠ ' + escapeHTML(err.message) + '</div>';
+  }
+}
+
+function renderMessagesInbox() {
+  const list = document.getElementById('messages-thread-list');
+  if (!list) return;
+  const search = (document.getElementById('messages-search')?.value || '').trim().toLowerCase();
+  const filtered = search
+    ? _msgConversations.filter(c => (c.business_name || '').toLowerCase().includes(search))
+    : _msgConversations;
+
+  list.innerHTML = filtered.map(c => {
+    const active = c.id === _msgActiveConvoId;
+    const initials = (c.business_name || '?').split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+    const preview = c.last_message_preview
+      ? escapeHTML(c.last_message_preview)
+      : '<span style="font-style:italic;color:var(--text-mute)">No messages yet</span>';
+    const time = c.last_message_at ? msgRelTime(c.last_message_at) : '';
+    return `
+      <div class="chat-thread${active ? ' active' : ''}" onclick="openMessageConvo('${c.id}')" style="cursor:pointer">
+        <div class="thread-avatar" style="background:var(--accent-ghost);color:var(--accent);font-size:11px">${escapeHTML(initials)}</div>
+        <div class="thread-info">
+          <div class="thread-name">${escapeHTML(c.business_name)}</div>
+          <div class="thread-preview">${preview}</div>
+        </div>
+        <div class="thread-meta">
+          ${time ? `<div class="thread-time">${time}</div>` : ''}
+          ${c.has_unread ? '<div class="thread-unread"></div>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="req-empty" style="padding:18px">No matches.</div>';
+}
+
+async function openMessageConvo(conversationId) {
+  _msgActiveConvoId = conversationId;
+  renderMessagesInbox();  // update active highlight
+  const convo = _msgConversations.find(c => c.id === conversationId);
+  // Header
+  if (convo) {
+    document.getElementById('messages-header-name').textContent = 'BAM team — ' + (convo.business_name || '');
+  }
+  // Load messages
+  document.getElementById('messages-thread').innerHTML =
+    '<div class="req-empty" style="padding:24px;text-align:center">Loading…</div>';
+  try {
+    const json = await _msgApi('/api/messages?conversation_id=' + encodeURIComponent(conversationId) + '&limit=100');
+    _msgMessages = json.messages || [];
+    renderMessageThread();
+    subscribeMessagesRealtime(conversationId);
+    // Mark read
+    const latest = _msgMessages[_msgMessages.length - 1]?.created_at;
+    if (latest) {
+      _msgApi('/api/messages?action=mark-read', {
+        method: 'POST',
+        body: JSON.stringify({ conversation_id: conversationId, last_read_at: latest }),
+      }).catch(() => {});
+      // Optimistically clear unread on the inbox row
+      _msgConversations = _msgConversations.map(c => c.id === conversationId ? { ...c, has_unread: false } : c);
+      renderMessagesInbox();
+      updateUnreadBadge();
+    }
+  } catch (err) {
+    document.getElementById('messages-thread').innerHTML =
+      '<div class="req-empty" style="padding:24px;color:var(--red);text-align:center">⚠ ' + escapeHTML(err.message) + '</div>';
+  }
+}
+
+function renderMessageThread() {
+  const root = document.getElementById('messages-thread');
+  if (!root) return;
+  if (_msgMessages.length === 0) {
+    root.innerHTML = '<div class="req-empty" style="padding:48px 24px;text-align:center">No messages yet. Say hi 👋</div>';
+    return;
+  }
+  const html = _msgMessages.map(m => {
+    const isMine = !m.author_staff_id;  // client side: my messages = client author
+    const fromStaff = !!m.author_staff_id;
+    const avatar = fromStaff ? 'BA' : ((document.getElementById('userName')?.textContent || '?').slice(0, 2).toUpperCase());
+    const ageMs = Date.now() - new Date(m.created_at).getTime();
+    const canEdit = isMine && !m.deleted_at && ageMs < MSG_EDIT_WINDOW_MS;
+    const body = m.deleted_at
+      ? '<span style="color:var(--text-mute);font-style:italic">(deleted)</span>'
+      : escapeHTML(m.body || '');
+    const files = Array.isArray(m.files) ? m.files : [];
+    const filesHtml = files.length === 0 ? '' : '<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">' + files.map(f => {
+      const isImg = (f.mime || '').startsWith('image/');
+      const safeUrl = escapeAttr(f.url || '#');
+      const safeName = escapeHTML(f.name || 'file');
+      return isImg
+        ? `<a href="${safeUrl}" target="_blank" rel="noreferrer"><img src="${safeUrl}" alt="${safeName}" style="max-width:240px;max-height:240px;border-radius:6px;display:block"></a>`
+        : `<a href="${safeUrl}" target="_blank" rel="noreferrer" style="font-size:12px;color:var(--accent);text-decoration:none;padding:5px 9px;border:1px solid var(--line);border-radius:6px;display:inline-block">📎 ${safeName}</a>`;
+    }).join('') + '</div>';
+    return `
+      <div class="msg-group">
+        <div class="msg-row${isMine ? ' outgoing' : ''}">
+          <div class="msg-avatar${fromStaff ? ' bam' : ''}" style="${fromStaff ? '' : 'background:var(--surface-el);color:var(--text-sub)'}">${escapeHTML(avatar)}</div>
+          <div class="msg-bubble">
+            ${body}
+            ${filesHtml}
+          </div>
+          <div class="msg-time">${msgShortTime(m.created_at)}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  // Typing indicator
+  const typingNames = Object.values(_msgTypingUsers).map(u => u.name);
+  const typingHtml = typingNames.length > 0
+    ? `<div style="padding:6px 14px;color:var(--text-mute);font-size:12px;font-style:italic">${typingNames.length === 1 ? escapeHTML(typingNames[0]) + ' is typing…' : typingNames.length + ' people typing…'}</div>`
+    : '';
+  root.innerHTML = html + typingHtml;
+  // Auto-scroll to bottom
+  requestAnimationFrame(() => { root.scrollTop = root.scrollHeight; });
+}
+
+function subscribeMessagesRealtime(conversationId) {
+  // Tear down old
+  if (_msgChannel) {
+    _sb.removeChannel(_msgChannel);
+    _msgChannel = null;
+  }
+  const channel = _sb
+    .channel('msg-convo:' + conversationId)
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'conversation_messages', filter: 'conversation_id=eq.' + conversationId },
+      (payload) => {
+        const msg = payload.new;
+        if (_msgMessages.some(m => m.id === msg.id)) return;
+        _msgMessages.push(msg);
+        renderMessageThread();
+        // Mark read since we're actively viewing
+        _msgApi('/api/messages?action=mark-read', {
+          method: 'POST',
+          body: JSON.stringify({ conversation_id: conversationId, last_read_at: msg.created_at }),
+        }).catch(() => {});
+      })
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'conversation_messages', filter: 'conversation_id=eq.' + conversationId },
+      (payload) => {
+        const msg = payload.new;
+        _msgMessages = _msgMessages.map(m => m.id === msg.id ? msg : m);
+        renderMessageThread();
+      })
+    .on('broadcast', { event: 'typing' }, (payload) => {
+      const { user_id, name } = payload.payload || {};
+      if (!user_id) return;
+      // Ignore own typing
+      _sb.auth.getUser().then(({ data }) => {
+        if (data?.user?.id === user_id) return;
+        _msgTypingUsers[user_id] = { name: name || 'Someone', expiresAt: Date.now() + MSG_TYPING_TIMEOUT_MS };
+        renderMessageThread();
+      });
+    })
+    .subscribe();
+  _msgChannel = channel;
+
+  // GC typing entries
+  if (_msgTypingGcInterval) clearInterval(_msgTypingGcInterval);
+  _msgTypingGcInterval = setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    for (const [k, v] of Object.entries(_msgTypingUsers)) {
+      if (v.expiresAt <= now) { delete _msgTypingUsers[k]; changed = true; }
+    }
+    if (changed) renderMessageThread();
+  }, 1000);
+}
+
+function onMessagesInputChange(e) {
+  // Auto-grow textarea
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+  // Debounced typing broadcast
+  if (_msgTypingTimeout) clearTimeout(_msgTypingTimeout);
+  _msgTypingTimeout = setTimeout(broadcastTyping, 80);
+}
+
+function onMessagesInputKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendCurrentMessage();
+  }
+}
+
+async function broadcastTyping() {
+  if (!_msgChannel) return;
+  const { data } = await _sb.auth.getUser();
+  if (!data?.user?.id) return;
+  const name = (document.getElementById('userName')?.textContent || '').trim() || 'Someone';
+  _msgChannel.send({ type: 'broadcast', event: 'typing', payload: { user_id: data.user.id, name } });
+}
+
+async function onMessagesFilePicked(e) {
+  const files = Array.from(e.target.files || []);
+  if (!files.length || !_msgActiveConvoId) return;
+  for (const f of files) {
+    const entry = { file: f, uploading: true };
+    _msgPendingFiles.push(entry);
+    renderPendingFiles();
+    try {
+      const path = _msgActiveConvoId + '/' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) + '-' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const { error } = await _sb.storage.from('message-attachments').upload(path, f, { cacheControl: '3600', upsert: false });
+      if (error) throw new Error(error.message);
+      const { data } = _sb.storage.from('message-attachments').getPublicUrl(path);
+      entry.uploading = false;
+      entry.attachment = { url: data.publicUrl, name: f.name, size: f.size, mime: f.type };
+    } catch (err) {
+      entry.uploading = false;
+      entry.error = err.message;
+    }
+    renderPendingFiles();
+  }
+  e.target.value = '';  // reset input
+}
+
+function renderPendingFiles() {
+  const root = document.getElementById('messages-pending-files');
+  if (!root) return;
+  if (_msgPendingFiles.length === 0) {
+    root.style.display = 'none';
+    root.innerHTML = '';
+    return;
+  }
+  root.style.display = 'block';
+  root.innerHTML = _msgPendingFiles.map((f, i) => `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 8px;margin:2px 4px 2px 0;border:1px solid var(--line);border-radius:6px;font-size:11px">
+      ${f.uploading ? '⏳' : f.error ? '⚠' : '📎'}
+      <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(f.file.name)}</span>
+      <a href="#" onclick="event.preventDefault();removePendingFile(${i})" style="color:var(--text-mute);text-decoration:none">×</a>
+    </span>
+  `).join('');
+}
+
+function removePendingFile(idx) {
+  _msgPendingFiles.splice(idx, 1);
+  renderPendingFiles();
+}
+
+async function sendCurrentMessage() {
+  if (!_msgActiveConvoId) return;
+  const input = document.getElementById('messages-input');
+  const body = (input?.value || '').trim();
+  const readyFiles = _msgPendingFiles.filter(f => f.attachment && !f.error).map(f => f.attachment);
+  if (!body && readyFiles.length === 0) return;
+  const btn = document.getElementById('messages-send-btn');
+  if (btn) btn.style.opacity = '0.5';
+  try {
+    const json = await _msgApi('/api/messages?action=send', {
+      method: 'POST',
+      body: JSON.stringify({ conversation_id: _msgActiveConvoId, body, files: readyFiles }),
+    });
+    if (json.message && !_msgMessages.some(m => m.id === json.message.id)) {
+      _msgMessages.push(json.message);
+      renderMessageThread();
+    }
+    input.value = '';
+    input.style.height = 'auto';
+    _msgPendingFiles = [];
+    renderPendingFiles();
+  } catch (err) {
+    alert('Send failed: ' + err.message);
+  } finally {
+    if (btn) btn.style.opacity = '1';
+  }
+}
+
+async function deleteMsg(messageId) {
+  if (!confirm('Delete this message?')) return;
+  try {
+    await _msgApi('/api/messages?action=delete', {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
+    });
+    _msgMessages = _msgMessages.map(m => m.id === messageId ? { ...m, deleted_at: new Date().toISOString(), body: null, files: [] } : m);
+    renderMessageThread();
+  } catch (err) {
+    alert('Delete failed: ' + err.message);
+  }
+}
+
+function updateUnreadBadge() {
+  const badge = document.getElementById('messages-unread-badge');
+  if (!badge) return;
+  const count = _msgConversations.filter(c => c.has_unread).length;
+  if (count > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = count;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function msgRelTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'now';
+  if (m < 60) return m + 'm';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h';
+  const d = Math.floor(h / 24);
+  if (d < 7) return d + 'd';
+  return new Date(iso).toLocaleDateString();
+}
+
+function msgShortTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const same = d.toDateString() === new Date().toDateString();
+  return d.toLocaleString(undefined, same
+    ? { hour: 'numeric', minute: '2-digit' }
+    : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function escapeAttr(s) {
+  return String(s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Background-poll the inbox every 30s so unread badge stays current
+// even when the user is on a different view.
+setInterval(() => {
+  if (!CLIENT_ID) return;
+  _msgApi('/api/messages?action=list-conversations').then(json => {
+    _msgConversations = json.conversations || [];
+    if (document.getElementById('view-messages').classList.contains('active')) renderMessagesInbox();
+    updateUnreadBadge();
+  }).catch(() => {});
+}, 30000);
 
 // Month progress indicator in the Marketing topbar. Shows what day of the
 // current month we are on plus a thin progress bar, so clients understand
