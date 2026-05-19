@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
+import MessageThread from "../components/MessageThread";
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -370,6 +371,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 
   const tabs = [
     { id: "overview",     label: "Overview" },
+    { id: "messages",     label: "Messages" },
     { id: "setup",        label: "Setup" },
     { id: "marketing",    label: "Marketing" },
     { id: "activity",     label: "Activity", hide: !ROLES.canViewFinancials(role) },
@@ -418,6 +420,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       </div>
 
       {tab === "overview" && <OverviewTab client={client} staffMap={staffMap} tokens={t} role={role} session={session} onChanged={onChanged} />}
+      {tab === "messages" && <MessagesTab client={client} tokens={t} session={session} me={me} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
@@ -1185,6 +1188,63 @@ function ActivityTab({ client, tokens, session }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── MESSAGES tab ───────────────────────────────────────────────────────────
+// Per-client view of the general conversation thread. Wraps the same
+// MessageThread component the Inbox uses, scoped to this client's
+// auto-created 'general' conversation. Conversation row is guaranteed
+// to exist by the new-client trigger + backfill.
+function MessagesTab({ client, tokens, session, me }) {
+  const t = tokens;
+  const [conversationId, setConversationId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    supabase
+      .from("conversations")
+      .select("id")
+      .eq("client_id", client.id)
+      .eq("kind", "general")
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setErr(error.message); setLoading(false); return; }
+        setConversationId(data?.id || null);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [client.id]);
+
+  if (loading) {
+    return <div style={{ color: t.textMute, fontSize: 13, padding: 20 }}>Loading conversation…</div>;
+  }
+  if (err) {
+    return <div style={{ color: t.red, fontSize: 13, padding: 20 }}>⚠ {err}</div>;
+  }
+  if (!conversationId) {
+    return <div style={{ color: t.textMute, fontSize: 13, padding: 20, fontStyle: "italic" }}>No conversation row for this client. Refresh the page.</div>;
+  }
+
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column",
+      height: "calc(100vh - 60px - 220px)", minHeight: 400,
+      border: `1px solid ${t.border}`, borderRadius: 8,
+      overflow: "hidden", background: t.surface,
+    }}>
+      <MessageThread
+        conversationId={conversationId}
+        tokens={t}
+        session={session}
+        me={me}
+      />
     </div>
   );
 }

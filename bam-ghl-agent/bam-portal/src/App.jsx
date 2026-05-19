@@ -25,6 +25,7 @@ const TeamView             = lazy(() => import('./views/TeamView'));
 const ContentView          = lazy(() => import('./views/ContentView'));
 const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 const FeedbackView         = lazy(() => import('./views/FeedbackView'));
+const InboxView            = lazy(() => import('./views/InboxView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -317,6 +318,7 @@ export default function BAMPortal() {
 
   const titles = {
     dashboard: ["Dashboard", "Your daily cockpit"],
+    inbox: ["Inbox", "Messages from clients"],
     clients: ["Clients", `${onboardingClients.length + activeClients.length} total`],
     tasks: ["Tasks", `${taskCount} due \u00b7 ${urgentActionItems} urgent`],
     calendar: ["Calendar", "Your schedule"],
@@ -334,6 +336,7 @@ export default function BAMPortal() {
 
   const NAV_ICONS = {
     dashboard: IconDashboard,
+    inbox: IconMessage,
     clients: IconClients,
     tasks: IconTasks,
     calendar: IconCalendar,
@@ -357,6 +360,7 @@ export default function BAMPortal() {
       ]
     : [
         { label: "Dashboard", key: "dashboard" },
+        { label: "Inbox", key: "inbox" },
         { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
         { label: "Tasks", key: "tasks", count: taskCount, alert: taskAlert },
         { label: "Calendar", key: "calendar" },
@@ -740,6 +744,10 @@ export default function BAMPortal() {
                   onInitialClientHandled={() => setClientsInitialId(null)}
                   onDetailChange={setClientsInDetail}
                 />
+              )}
+
+              {nav === "inbox" && (
+                <InboxView tokens={tk} session={session} me={me} />
               )}
 
               {nav === "tasks" && (
