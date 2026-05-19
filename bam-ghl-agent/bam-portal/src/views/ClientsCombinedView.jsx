@@ -39,6 +39,33 @@ const ROLES = {
 
 const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
 
+// Derive the user-facing status label from a client row. Live = the
+// onboarding flow is complete (call done OR link accepted), or status was
+// flipped to active manually.
+//   onboarding + method=call  + !call_completed_at  → Call pending (amber)
+//   onboarding + method=send_link + !auth_user_id   → Pending link accept (amber)
+//   onboarding + no method picked yet               → Onboarding (amber)
+//   active / call done / link accepted              → Live (green)
+//   paused / churned                                → keep label, dim/red
+function deriveClientStatus(client, t) {
+  if (client.status === "paused") return { label: "Paused", color: t.textMute };
+  if (client.status === "churned") return { label: "Churned", color: t.red };
+  if (client.status === "active") return { label: "Live", color: t.green };
+  // status === "onboarding"
+  if (client.onboarding_method === "call") {
+    return client.call_completed_at
+      ? { label: "Live", color: t.green }
+      : { label: "Call pending", color: t.amber };
+  }
+  if (client.onboarding_method === "send_link") {
+    return client.auth_user_id
+      ? { label: "Live", color: t.green }
+      : { label: "Pending link accept", color: t.amber };
+  }
+  // No method picked yet
+  return { label: "Onboarding", color: t.amber };
+}
+
 export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled, onDetailChange }) {
   const t = tokens;
   const role = me?.role || "";
@@ -282,10 +309,7 @@ function ClientRow({ client, staff, tokens, onClick }) {
   const authStatus = client.auth_user_id ? { label: "Active", color: t.green }
     : client.email ? { label: "Ready", color: t.amber }
     : { label: "No email", color: t.textMute };
-  const statusColor = client.status === "active" ? t.green
-    : client.status === "onboarding" ? t.amber
-    : client.status === "paused" ? t.textMute
-    : t.red;
+  const derived = deriveClientStatus(client, t);
 
   return (
     <div
@@ -309,9 +333,9 @@ function ClientRow({ client, staff, tokens, onClick }) {
       <div>
         <span style={{
           fontSize: 11, padding: "3px 9px", borderRadius: 999,
-          background: `${statusColor}22`, color: statusColor, fontWeight: 600,
-          textTransform: "capitalize",
-        }}>{client.status}</span>
+          background: `${derived.color}22`, color: derived.color, fontWeight: 600,
+          whiteSpace: "nowrap",
+        }}>{derived.label}</span>
       </div>
       <div>
         <span style={{ fontSize: 11, color: authStatus.color, fontWeight: 600 }}>{authStatus.label}</span>
@@ -350,7 +374,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       <div style={{ marginBottom: 22, paddingBottom: 18, borderBottom: `1px solid ${t.border}` }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
           <h1 style={{ fontSize: 28, fontWeight: 700, color: t.text, letterSpacing: "-0.03em", margin: 0 }}>{client.business_name}</h1>
-          <StatusPill status={client.status} tokens={t} />
+          <StatusPill client={client} tokens={t} />
         </div>
         <div style={{ fontSize: 13, color: t.textSub, marginTop: 6 }}>
           {client.owner_name || "(no owner set)"}
@@ -384,17 +408,15 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
   );
 }
 
-function StatusPill({ status, tokens }) {
+function StatusPill({ client, tokens }) {
   const t = tokens;
-  const color = status === "active" ? t.green
-    : status === "onboarding" ? t.amber
-    : status === "paused" ? t.textMute
-    : t.red;
+  const { label, color } = deriveClientStatus(client, t);
   return (
     <span style={{
       fontSize: 12, padding: "5px 12px", borderRadius: 999,
-      background: `${color}22`, color, fontWeight: 600, textTransform: "capitalize",
-    }}>{status}</span>
+      background: `${color}22`, color, fontWeight: 600,
+      whiteSpace: "nowrap",
+    }}>{label}</span>
   );
 }
 
@@ -550,6 +572,15 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
         value={currentValue("scaling_manager_id") || ""}
         onChange={v => set("scaling_manager_id", v || null)}
         options={[{ value: "", label: "(unassigned)" }, ...staff.map(s => ({ value: s.id, label: `${s.name} · ${s.role}` }))]}
+        tokens={t}
+      />
+
+      <SectionTitle style={{ marginTop: 28 }}>Onboarding</SectionTitle>
+      <OnboardingMethodPicker
+        method={currentValue("onboarding_method") || ""}
+        callDone={!!currentValue("call_completed_at")}
+        onMethodChange={v => set("onboarding_method", v || null)}
+        onCallDoneChange={v => set("call_completed_at", v)}
         tokens={t}
       />
 
@@ -1324,6 +1355,56 @@ function EditField({ label, value, onChange, tokens, type = "text", hint }) {
         }}
       />
       {hint && <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 4 }}>{hint}</div>}
+    </div>
+  );
+}
+
+function OnboardingMethodPicker({ method, callDone, onMethodChange, onCallDoneChange, tokens }) {
+  const t = tokens;
+  const labelStyle = { display: "block", fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 };
+
+  const Pill = ({ value, label }) => {
+    const active = method === value;
+    return (
+      <button
+        type="button"
+        onClick={() => onMethodChange(value)}
+        style={{
+          padding: "8px 16px", borderRadius: 999,
+          background: active ? `${t.accent}22` : "transparent",
+          border: `1px solid ${active ? t.accent : t.border}`,
+          color: active ? t.accent : t.textSub,
+          fontSize: 13, fontWeight: 600, cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >{label}</button>
+    );
+  };
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={labelStyle}>Method</label>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <Pill value="call" label="Call" />
+        <Pill value="send_link" label="Send link" />
+      </div>
+      {method === "call" && (
+        <label style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 14px", border: `1px solid ${t.border}`, borderRadius: 8,
+          cursor: "pointer", fontSize: 13, color: t.text,
+          background: callDone ? `${t.green}10` : "transparent",
+        }}>
+          <input
+            type="checkbox"
+            checked={callDone}
+            onChange={e => onCallDoneChange(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.green }}
+          />
+          <span>Call done?</span>
+          {callDone && <span style={{ marginLeft: "auto", fontSize: 11, color: t.green, fontWeight: 600 }}>✓ marks client live</span>}
+        </label>
+      )}
     </div>
   );
 }

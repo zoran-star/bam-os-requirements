@@ -798,6 +798,38 @@ export default async function handler(req, res) {
           patch.email = newEmail || null;
         }
 
+        if (wasSet("onboarding_method")) {
+          const m = body.onboarding_method;
+          if (m !== null && !["call", "send_link"].includes(m)) {
+            return res.status(400).json({ error: "onboarding_method must be 'call' or 'send_link'" });
+          }
+          patch.onboarding_method = m;
+        }
+
+        // call_completed_at: clients send boolean true/false (the checkbox state).
+        // We translate to timestamp now() / null and auto-promote status to
+        // 'active' when call done (so the Onboarding count drops + the client
+        // counts toward Active).
+        if (wasSet("call_completed_at")) {
+          const v = body.call_completed_at;
+          if (v === true) {
+            patch.call_completed_at = new Date().toISOString();
+            // Only auto-flip status if not explicitly overridden by the same patch
+            if (!wasSet("status")) patch.status = "active";
+          } else if (v === false || v === null) {
+            patch.call_completed_at = null;
+            // Reverting "call done" should drop them back to onboarding so the
+            // status pill isn't lying — but only if the same patch didn't set
+            // status explicitly.
+            if (!wasSet("status")) patch.status = "onboarding";
+          } else if (typeof v === "string") {
+            // Pass-through ISO timestamp (in case we ever need to backfill)
+            patch.call_completed_at = v;
+          } else {
+            return res.status(400).json({ error: "call_completed_at must be a boolean or ISO string" });
+          }
+        }
+
         // ── Admin+scaling-only fields ──
         if (wasSet("stripe_customer_id")) {
           if (!isAdminLike) return res.status(403).json({ error: "stripe_customer_id requires admin or scaling_manager" });
