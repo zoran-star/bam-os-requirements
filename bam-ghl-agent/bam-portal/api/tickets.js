@@ -331,6 +331,32 @@ export default async function handler(req, res) {
           update.status = "needs_rework";
           break;
 
+        case "cancel_ticket":
+          // Hard-cancel the whole ticket. Any authenticated systems staff
+          // can do this, at any non-final status. Done/approved/cancelled
+          // are terminal — refuse to re-cancel.
+          if (["done", "approved", "cancelled"].includes(t.status)) {
+            return res.status(400).json({ error: "ticket is already final and cannot be cancelled" });
+          }
+          update.status = "cancelled";
+          update.resolved_at = now;
+          // If staff provided a reason, append it as a system message so the
+          // audit trail captures why. Empty reason is fine.
+          if (body.reason && String(body.reason).trim()) {
+            update.messages = [
+              ...(t.messages || []),
+              {
+                direction: "staff_to_client",
+                body: `(ticket cancelled by staff)${body.reason ? ` — ${String(body.reason).trim()}` : ""}`,
+                files: [],
+                author_id: me.id,
+                system: true,
+                created_at: now,
+              },
+            ];
+          }
+          break;
+
         default:
           return res.status(400).json({ error: "invalid action" });
       }

@@ -12,6 +12,7 @@ import {
   saveUserGuide,
   approveTicket,
   denyTicket,
+  cancelTicket,
 } from "../services/ticketsService";
 import AsanaImportView from "./AsanaImportView";
 import { supabase } from "../lib/supabase";
@@ -25,6 +26,7 @@ const STATUS_LABEL = {
   needs_rework:     "Needs rework",
   approved:         "Approved",
   done:             "Done",
+  cancelled:        "Cancelled",
 };
 
 function statusColor(status, t) {
@@ -37,6 +39,7 @@ function statusColor(status, t) {
     case "needs_rework":     return t.red;
     case "approved":
     case "done":             return t.green;
+    case "cancelled":        return t.textMute;
     default:                 return t.textMute;
   }
 }
@@ -341,6 +344,8 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   const [assignee, setAssignee] = useState(initial.assigned_to || "");
   const [showDeny, setShowDeny] = useState(false);
   const [showRequest, setShowRequest] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [questionMap, setQuestionMap] = useState({});
 
@@ -676,8 +681,79 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             </>
           )}
 
-          <button onClick={onClose} style={{ ...btn(t, "ghost"), marginLeft: "auto" }}>Close</button>
+          {/* Cancel ticket — any systems staff can cancel at any non-final
+              status (i.e. not done/approved/cancelled). Pushed to the right
+              edge next to Close so it's discoverable but not the primary
+              action. */}
+          {!["done", "approved", "cancelled"].includes(ticket.status) && (
+            <button
+              onClick={() => { setCancelReason(""); setShowCancel(true); }}
+              disabled={busy}
+              style={{ ...btn(t, "danger-ghost"), marginLeft: "auto" }}
+            >Cancel ticket</button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              ...btn(t, "ghost"),
+              ...(["done", "approved", "cancelled"].includes(ticket.status) ? { marginLeft: "auto" } : {}),
+            }}
+          >Close</button>
         </div>
+
+        {/* Cancel-ticket confirmation modal */}
+        {showCancel && (
+          <div
+            onClick={() => !busy && setShowCancel(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 1100,
+              background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: 24,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: "100%", maxWidth: 460,
+                background: t.surface, border: `1px solid ${t.borderMed || t.border}`,
+                borderRadius: 16, padding: 28,
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 700, color: t.text, marginBottom: 6 }}>Cancel this ticket?</div>
+              <div style={{ fontSize: 13, color: t.textSub, marginBottom: 18 }}>
+                This marks the ticket as cancelled and removes it from your active queue. It can't be reopened.
+              </div>
+
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Reason (optional)
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                placeholder="Why is this being cancelled? Appears in the audit log."
+                style={{
+                  width: "100%", minHeight: 80, padding: 12,
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
+                  color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
+                  marginBottom: 18,
+                }}
+              />
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button onClick={() => setShowCancel(false)} disabled={busy} style={btn(t, "ghost")}>Keep ticket</button>
+                <button
+                  onClick={async () => {
+                    await wrap(() => cancelTicket(ticket.id, cancelReason));
+                    setShowCancel(false);
+                  }}
+                  disabled={busy}
+                  style={btn(t, "danger")}
+                >{busy ? "Cancelling…" : "Cancel ticket"}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

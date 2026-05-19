@@ -47,3 +47,4 @@ export const cancelClientRequest  = (id)                       => patch(id, "can
 export const submitForReview      = (id, user_guide)           => patch(id, "submit_review", { user_guide });
 export const approveTicket        = (id)                       => patch(id, "approve");
 export const denyTicket           = (id, denial_notes)         => patch(id, "deny", { denial_notes });
+export const cancelTicket         = (id, reason)               => patch(id, "cancel_ticket", { reason: reason || "" });
