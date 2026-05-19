@@ -13,6 +13,7 @@ import {
   approveTicket,
   denyTicket,
   cancelTicket,
+  saveTicketFields,
 } from "../services/ticketsService";
 import AsanaImportView from "./AsanaImportView";
 import { supabase } from "../lib/supabase";
@@ -343,6 +344,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
   const [showRequest, setShowRequest] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [fieldEdits, setFieldEdits] = useState({});
   const [busy, setBusy] = useState(false);
   const [questionMap, setQuestionMap] = useState({});
 
@@ -463,31 +465,70 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
 
         {/* Body */}
         <div style={{ padding: "24px 28px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Submission fields */}
-          <Section title="Submission" tokens={t}>
-            {Object.entries(ticket.fields || {}).map(([k, v]) => {
-              // Resolve label: real question text > custom-answer hint > raw key
-              let label = questionMap[k];
-              if (!label && k.endsWith("_custom")) {
-                const baseId = k.slice(0, -"_custom".length);
-                const base = questionMap[baseId];
-                label = base ? `${base} (other)` : "Other (custom answer)";
-              }
-              if (!label) label = k;
-              return <Row key={k} label={label} value={v} tokens={t} />;
-            })}
-            {(ticket.files || []).length > 0 && (
-              <Row label="Files" tokens={t} value={
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {ticket.files.map((f, i) => (
-                    <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, textDecoration: "none" }}>
-                      📎 {f.name}
-                    </a>
-                  ))}
-                </div>
-              } />
-            )}
-          </Section>
+          {/* Submission fields — editable, gated to non-terminal statuses */}
+          {(() => {
+            const fieldsLocked = ["done", "approved", "cancelled"].includes(ticket.status);
+            const hasFieldEdits = Object.keys(fieldEdits).length > 0;
+            const currentFieldValue = (k) =>
+              Object.prototype.hasOwnProperty.call(fieldEdits, k) ? fieldEdits[k] : (ticket.fields || {})[k];
+            return (
+              <Section title="Submission" tokens={t}>
+                {Object.entries(ticket.fields || {}).map(([k, v]) => {
+                  // Resolve label: real question text > custom-answer hint > raw key
+                  let label = questionMap[k];
+                  if (!label && k.endsWith("_custom")) {
+                    const baseId = k.slice(0, -"_custom".length);
+                    const base = questionMap[baseId];
+                    label = base ? `${base} (other)` : "Other (custom answer)";
+                  }
+                  if (!label) label = k;
+                  return (
+                    <EditableRow
+                      key={k}
+                      label={label}
+                      value={currentFieldValue(k)}
+                      originalValue={v}
+                      onChange={(nv) => setFieldEdits(prev => ({ ...prev, [k]: nv }))}
+                      disabled={fieldsLocked}
+                      tokens={t}
+                    />
+                  );
+                })}
+                {(ticket.files || []).length > 0 && (
+                  <Row label="Files" tokens={t} value={
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {ticket.files.map((f, i) => (
+                        <a key={i} href={f.url} target="_blank" rel="noreferrer" style={{ color: t.accent, fontSize: 13, textDecoration: "none" }}>
+                          📎 {f.name}
+                        </a>
+                      ))}
+                    </div>
+                  } />
+                )}
+                {/* Save bar: only shows when there are edits */}
+                {hasFieldEdits && !fieldsLocked && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+                    <button
+                      onClick={async () => {
+                        await wrap(() => saveTicketFields(ticket.id, fieldEdits));
+                        setFieldEdits({});
+                      }}
+                      disabled={busy}
+                      style={btn(t, "primary")}
+                    >{busy ? "Saving…" : "Save changes"}</button>
+                    <button
+                      onClick={() => setFieldEdits({})}
+                      disabled={busy}
+                      style={btn(t, "ghost")}
+                    >Discard</button>
+                    <span style={{ fontSize: 12, color: t.textMute }}>
+                      {Object.keys(fieldEdits).length} field{Object.keys(fieldEdits).length === 1 ? "" : "s"} edited
+                    </span>
+                  </div>
+                )}
+              </Section>
+            );
+          })()}
 
           {/* Denial notes (visible when rework) */}
           {ticket.denial_notes && ticket.status === "needs_rework" && (
@@ -789,6 +830,71 @@ function Row({ label, value, tokens: t }) {
       <div style={{ minWidth: 220, fontSize: 13, fontWeight: 500, color: t.textSub }}>{label}</div>
       <div style={{ flex: 1, fontSize: 13, color: t.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {rendered}
+      </div>
+    </div>
+  );
+}
+
+// Submission row that lets staff edit the value. Decides between a
+// single-line input vs a multi-line textarea based on the current
+// content (any newline or > 60 chars → textarea). Complex values
+// (objects/arrays that aren't simple lists) fall back to read-only —
+// editing those structurally would need a richer UI.
+function EditableRow({ label, value, originalValue, onChange, disabled, tokens: t }) {
+  const isEdited = value !== originalValue;
+  const isPlainString = value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  const isStringArray = Array.isArray(value) && value.every(v => v == null || typeof v === "string" || typeof v === "number");
+
+  // Coerce to a string for the input
+  const stringValue = value == null
+    ? ""
+    : isStringArray ? value.filter(v => v != null && v !== "").join(", ")
+    : typeof value === "object" ? JSON.stringify(value, null, 2)
+    : String(value);
+
+  const isComplex = !isPlainString && !isStringArray;
+  const useTextarea = stringValue.includes("\n") || stringValue.length > 60;
+
+  const emit = (raw) => {
+    // Empty string → null (matches the rest of the codebase's normalization)
+    if (raw === "") return onChange(null);
+    // String array → split back to array
+    if (isStringArray) return onChange(raw.split(",").map(s => s.trim()).filter(Boolean));
+    onChange(raw);
+  };
+
+  const baseInputStyle = {
+    width: "100%", padding: "8px 10px",
+    background: t.bg, border: `1px solid ${isEdited ? t.accent : t.border}`,
+    borderRadius: 6, color: t.text, fontSize: 13,
+    fontFamily: "inherit", outline: "none",
+    transition: "border-color 0.15s",
+  };
+
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ minWidth: 220, fontSize: 13, fontWeight: 500, color: t.textSub, paddingTop: 8 }}>{label}</div>
+      <div style={{ flex: 1 }}>
+        {isComplex ? (
+          <div style={{ fontSize: 13, color: t.text, fontStyle: "italic", paddingTop: 8 }}>
+            (complex value — edit via direct DB)
+          </div>
+        ) : useTextarea ? (
+          <textarea
+            value={stringValue}
+            onChange={e => emit(e.target.value)}
+            disabled={disabled}
+            style={{ ...baseInputStyle, minHeight: 80, resize: "vertical", lineHeight: 1.45 }}
+          />
+        ) : (
+          <input
+            type="text"
+            value={stringValue}
+            onChange={e => emit(e.target.value)}
+            disabled={disabled}
+            style={baseInputStyle}
+          />
+        )}
       </div>
     </div>
   );

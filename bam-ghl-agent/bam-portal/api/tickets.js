@@ -331,6 +331,22 @@ export default async function handler(req, res) {
           update.status = "needs_rework";
           break;
 
+        case "update_fields":
+          // Edit the submission fields (ticket.fields jsonb). Any
+          // authenticated systems staff can edit. Refuse on terminal
+          // statuses so the audit trail stays clean.
+          if (["done", "approved", "cancelled"].includes(t.status)) {
+            return res.status(400).json({ error: "ticket is final; fields are locked" });
+          }
+          if (!body.fields || typeof body.fields !== "object" || Array.isArray(body.fields)) {
+            return res.status(400).json({ error: "fields object required" });
+          }
+          // Merge: start with what's there, overwrite with edits. This lets
+          // the caller send only the fields that changed instead of the
+          // full object.
+          update.fields = { ...(t.fields || {}), ...body.fields };
+          break;
+
         case "cancel_ticket":
           // Hard-cancel the whole ticket. Any authenticated systems staff
           // can do this, at any non-final status. Done/approved/cancelled
