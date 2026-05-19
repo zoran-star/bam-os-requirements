@@ -139,13 +139,14 @@ function buildResetPasswordEmail(actionLink) {
           <!-- Body -->
           <tr>
             <td style="padding:36px 32px 8px 32px;">
-              <p style="margin:0 0 6px;font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;font-weight:600;color:#8B6914;letter-spacing:0.14em;text-transform:uppercase;">Client Portal</p>
+              <p style="margin:0 0 6px;font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;font-weight:600;color:#8B6914;letter-spacing:0.14em;text-transform:uppercase;">Password Reset</p>
               <h1 style="margin:0 0 18px;font-family:'Space Grotesk',-apple-system,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.025em;color:#0B0B0D;line-height:1.15;">
                 Reset your password
               </h1>
               <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#3A3A45;">
                 We got a request to reset the password on your BAM Business portal account.
-                Click the button below to choose a new one.
+                Click the button below to choose a new one — you'll be taken straight to the
+                page where you can set it and log in.
               </p>
             </td>
           </tr>
@@ -458,9 +459,23 @@ export default async function handler(req, res) {
         const logResetAttempt = (succeeded) =>
           supabaseInsert("signup_attempts", { ip, email, succeeded, kind: "password_reset" }).catch(() => {});
 
+        // Detect staff vs client by email lookup so the recovery link
+        // redirects to the right portal. Staff land on / (staff portal
+        // root, which handles PASSWORD_RECOVERY via App.jsx). Clients
+        // land on /client-portal.html?type=recovery.
+        // Failing-open: if the staff lookup errors, default to client
+        // portal — that's the safer guess since most users are clients.
+        let isStaff = false;
+        try {
+          const staffRows = await supabaseSelect(`staff?email=eq.${encodeURIComponent(email)}&select=id`);
+          isStaff = Array.isArray(staffRows) && staffRows.length > 0;
+        } catch (_) { /* default isStaff=false */ }
+
         // Generate the recovery link via Supabase admin endpoint.
         const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/client-portal.html?type=recovery`;
+        const redirectTo = isStaff
+          ? `${origin}/?type=recovery`
+          : `${origin}/client-portal.html?type=recovery`;
         const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
           method: "POST",
           headers: {

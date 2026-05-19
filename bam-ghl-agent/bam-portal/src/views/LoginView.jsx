@@ -35,15 +35,29 @@ export default function LoginView({ onLogin, supabase }) {
       return;
     }
     setLoading(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
-    });
-    setLoading(false);
-    if (resetError) {
-      setError(resetError.message);
-    } else {
-      setForgotSent(true);
-      setError(null);
+    // Use our own Resend-backed reset flow instead of Supabase's built-in
+    // template (which had been silently broken — link missing from email).
+    // The backend detects staff vs client by email lookup and picks the
+    // right redirect_to so the recovery link lands on the correct portal.
+    try {
+      const res = await fetch("/api/clients?action=request-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        setError(data.error || "Too many attempts. Try again later.");
+      } else if (!res.ok) {
+        setError(data.error || "Something went wrong. Try again.");
+      } else {
+        setForgotSent(true);
+        setError(null);
+      }
+    } catch (err) {
+      setError(err.message || "Network error. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
