@@ -327,7 +327,13 @@ async function sendInviteEmail({ to, actionLink, businessName, resendApiKey }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "BAM Business <portal@byanymeansbusiness.com>",
+      // Resend FROM domain: must use byanymeansbball.com (verified in Resend
+      // by Coleman). byanymeansbusiness.com was never DNS-verified there even
+      // though the memory note suggested it was — verified 2026-05-19 by
+      // probing the Resend API directly. Using the .com domain returns 403
+      // "API key is not authorized to send emails from byanymeansbusiness.com"
+      // and silently drops every reset/invite email.
+      from: "BAM Business <portal@byanymeansbball.com>",
       to: [to],
       subject: `${businessName ? `${businessName.trim()}: w` : "W"}elcome to your BAM portal — set your password`,
       html,
@@ -440,7 +446,13 @@ async function sendResetPasswordEmail({ to, actionLink, resendApiKey }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "BAM Business <portal@byanymeansbusiness.com>",
+      // Resend FROM domain: must use byanymeansbball.com (verified in Resend
+      // by Coleman). byanymeansbusiness.com was never DNS-verified there even
+      // though the memory note suggested it was — verified 2026-05-19 by
+      // probing the Resend API directly. Using the .com domain returns 403
+      // "API key is not authorized to send emails from byanymeansbusiness.com"
+      // and silently drops every reset/invite email.
+      from: "BAM Business <portal@byanymeansbball.com>",
       to: [to],
       subject: "Reset your BAM portal password",
       html,
