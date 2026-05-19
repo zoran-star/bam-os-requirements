@@ -373,6 +373,55 @@ async function postInviteToSlack({ slackChannelId, businessName, ownerName, emai
   }
 }
 
+// Smart link generator for "send a link to log in" flows. Tries invite
+// first (which works for never-confirmed users, including unaccepted
+// invitees like Cam was). Falls back to recovery (which works for users
+// who already have a password). Returns { ok, mode, actionLink, kind }
+// where kind is 'invite' | 'recovery' so the caller can pick the right
+// email template.
+async function generateLinkForResetOrInvite({ supabaseUrl, serviceKey, email, redirectTo }) {
+  const tryGen = async (type, opts = {}) => {
+    const r = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: "POST",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type, email, options: { redirect_to: redirectTo, ...opts } }),
+    });
+    if (!r.ok) return { ok: false, status: r.status, text: await r.text() };
+    const j = await r.json();
+    return { ok: true, actionLink: j?.properties?.action_link || j?.action_link };
+  };
+
+  // Try invite first. For an invited-but-not-confirmed user this re-issues
+  // a fresh invite link (right tool for the job). For a brand-new email,
+  // this creates the user + returns the link. For a fully-confirmed user,
+  // this returns 422 'already_registered' and we fall back to recovery.
+  const inviteRes = await tryGen("invite", { data: { needs_password: true } });
+  if (inviteRes.ok && inviteRes.actionLink) {
+    return { ok: true, kind: "invite", actionLink: inviteRes.actionLink };
+  }
+
+  // Fall back to recovery if invite said the user already exists. Anything
+  // else surfaces as an error to the caller.
+  const looksLikeAlreadyRegistered =
+    inviteRes.status === 422 || /already|registered|exist/i.test(inviteRes.text || "");
+  if (!looksLikeAlreadyRegistered) {
+    return { ok: false, error: inviteRes.text || `invite: ${inviteRes.status}` };
+  }
+
+  const recoveryRes = await tryGen("recovery");
+  if (recoveryRes.ok && recoveryRes.actionLink) {
+    return { ok: true, kind: "recovery", actionLink: recoveryRes.actionLink };
+  }
+  if (recoveryRes.status === 404 || /not found/i.test(recoveryRes.text || "")) {
+    return { ok: false, notFound: true };
+  }
+  return { ok: false, error: recoveryRes.text || `recovery: ${recoveryRes.status}` };
+}
+
 async function sendResetPasswordEmail({ to, actionLink, resendApiKey }) {
   const { html, text } = buildResetPasswordEmail(actionLink);
   const res = await fetch("https://api.resend.com/emails", {
@@ -471,42 +520,39 @@ export default async function handler(req, res) {
           isStaff = Array.isArray(staffRows) && staffRows.length > 0;
         } catch (_) { /* default isStaff=false */ }
 
-        // Generate the recovery link via Supabase admin endpoint.
+        // Smart link generator: invite first (for never-confirmed accounts),
+        // recovery fallback (for active accounts). Right tool per user state.
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = isStaff
           ? `${origin}/?type=recovery`
           : `${origin}/client-portal.html?type=recovery`;
-        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ type: "recovery", email, options: { redirect_to: redirectTo } }),
+        const link = await generateLinkForResetOrInvite({
+          supabaseUrl: SUPABASE_URL,
+          serviceKey: SUPABASE_SERVICE_KEY,
+          email,
+          redirectTo,
         });
-        if (!linkRes.ok) {
-          // 404 = user not found. Return generic success to avoid email enumeration.
-          await logResetAttempt(false);
-          return res.status(200).json(GENERIC_RESET_RESPONSE);
-        }
-        const linkJson = await linkRes.json();
-        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
-        if (!actionLink) {
-          console.error("generate_link returned no action_link (public reset)");
+        if (link.notFound || !link.ok) {
+          // Either user doesn't exist or link gen failed — return generic
+          // success to avoid leaking either piece of info to anonymous callers.
           await logResetAttempt(false);
           return res.status(200).json(GENERIC_RESET_RESPONSE);
         }
 
-        // Send via shared helper (BAM-branded, email-client-bulletproof template).
-        const sent = await sendResetPasswordEmail({
-          to: email,
-          actionLink,
-          resendApiKey: process.env.RESEND_API_KEY,
-        });
+        // Send via the matching template.
+        const sent = link.kind === "invite"
+          ? await sendInviteEmail({
+              to: email,
+              actionLink: link.actionLink,
+              businessName: "",
+              resendApiKey: process.env.RESEND_API_KEY,
+            })
+          : await sendResetPasswordEmail({
+              to: email,
+              actionLink: link.actionLink,
+              resendApiKey: process.env.RESEND_API_KEY,
+            });
         await logResetAttempt(sent.ok);
-        // Always return generic success regardless of whether send succeeded
-        // (don't leak infra failure info to anonymous callers).
         return res.status(200).json(GENERIC_RESET_RESPONSE);
       }
 
@@ -857,43 +903,43 @@ export default async function handler(req, res) {
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/?type=recovery`;
 
-        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type: "recovery",
-            email: targetEmail,
-            options: { redirect_to: redirectTo },
-          }),
+        // Smart link: re-issues an INVITE link for staff who never
+        // accepted their original invite (the right tool for that case);
+        // falls back to RECOVERY for staff who already have a password.
+        const link = await generateLinkForResetOrInvite({
+          supabaseUrl: SUPABASE_URL,
+          serviceKey: SUPABASE_SERVICE_KEY,
+          email: targetEmail,
+          redirectTo,
         });
-        if (!linkRes.ok) {
-          const errText = await linkRes.text();
-          if (linkRes.status === 404 || /not found/i.test(errText)) {
-            // Generic OK to avoid enumeration even though only admins call this
-            return res.status(200).json({ ok: true });
-          }
-          console.error("generate_link failed (staff):", errText);
-          return res.status(500).json({ error: "could not generate reset link" });
+        if (link.notFound) {
+          // Generic OK to avoid enumeration even though only admins call this
+          return res.status(200).json({ ok: true });
         }
-        const linkJson = await linkRes.json();
-        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
-        if (!actionLink) {
-          return res.status(500).json({ error: "reset link missing from response" });
+        if (!link.ok) {
+          console.error("link gen failed (staff):", link.error);
+          return res.status(500).json({ error: "could not generate link" });
         }
 
-        const sent = await sendResetPasswordEmail({
-          to: targetEmail,
-          actionLink,
-          resendApiKey: process.env.RESEND_API_KEY,
-        });
+        // Pick the email template that matches what we just generated.
+        // Invite = first-time set-password copy; recovery = reset-password copy.
+        // Staff get a clean "Staff Portal" business name on the invite header.
+        const sent = link.kind === "invite"
+          ? await sendInviteEmail({
+              to: targetEmail,
+              actionLink: link.actionLink,
+              businessName: "",
+              resendApiKey: process.env.RESEND_API_KEY,
+            })
+          : await sendResetPasswordEmail({
+              to: targetEmail,
+              actionLink: link.actionLink,
+              resendApiKey: process.env.RESEND_API_KEY,
+            });
         if (!sent.ok) {
           return res.status(500).json({ error: "failed to send email" });
         }
-        return res.status(200).json({ ok: true, sent_to: targetEmail });
+        return res.status(200).json({ ok: true, sent_to: targetEmail, kind: link.kind });
       }
 
       // ── action=create-client ──
@@ -1310,46 +1356,68 @@ export default async function handler(req, res) {
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=recovery`;
 
-        // Step 1: generate the recovery link via Supabase admin endpoint
-        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type: "recovery",
-            email: targetEmail,
-            options: { redirect_to: redirectTo },
-          }),
+        // Smart link: re-issues INVITE for never-confirmed clients (e.g.
+        // someone we invited months ago who never clicked through), falls
+        // back to RECOVERY for clients who already have a password.
+        const link = await generateLinkForResetOrInvite({
+          supabaseUrl: SUPABASE_URL,
+          serviceKey: SUPABASE_SERVICE_KEY,
+          email: targetEmail,
+          redirectTo,
         });
-        if (!linkRes.ok) {
-          const errText = await linkRes.text();
-          // Common case: user not found → return generic 200 to avoid email enumeration
-          if (linkRes.status === 404 || /not found/i.test(errText)) {
-            return res.status(200).json({ ok: true });
-          }
-          console.error("generate_link failed:", errText);
-          return res.status(500).json({ error: "could not generate reset link" });
-        }
-        const linkJson = await linkRes.json();
-        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
-        if (!actionLink) {
-          console.error("generate_link returned no action_link:", JSON.stringify(linkJson).slice(0, 200));
-          return res.status(500).json({ error: "reset link missing from response" });
+        if (link.notFound) return res.status(200).json({ ok: true });
+        if (!link.ok) {
+          console.error("link gen failed:", link.error);
+          return res.status(500).json({ error: "could not generate link" });
         }
 
-        // Step 2: send via the shared helper (BAM-branded, email-client-bulletproof).
-        const sent = await sendResetPasswordEmail({
-          to: targetEmail,
-          actionLink,
-          resendApiKey: process.env.RESEND_API_KEY,
-        });
+        // Look up business + Slack channel for nicer messaging on resends
+        let businessName = "";
+        let slackChannelId = null;
+        try {
+          const c = await supabaseSelect(`clients?email=eq.${encodeURIComponent(targetEmail)}&select=business_name,slack_channel_id`);
+          businessName = c?.[0]?.business_name || "";
+          slackChannelId = c?.[0]?.slack_channel_id || null;
+        } catch (_) { /* best-effort */ }
+
+        const sent = link.kind === "invite"
+          ? await sendInviteEmail({
+              to: targetEmail,
+              actionLink: link.actionLink,
+              businessName,
+              resendApiKey: process.env.RESEND_API_KEY,
+            })
+          : await sendResetPasswordEmail({
+              to: targetEmail,
+              actionLink: link.actionLink,
+              resendApiKey: process.env.RESEND_API_KEY,
+            });
         if (!sent.ok) {
           return res.status(500).json({ error: "failed to send email" });
         }
-        return res.status(200).json({ ok: true, sent_to: targetEmail });
+
+        // If we re-issued an INVITE (never-accepted client), also post to
+        // Slack so they have a second delivery channel — same pattern as
+        // setup-account. Recovery resets don't ping Slack (the user is
+        // already active and most likely just lost their password).
+        let slackPosted = false;
+        if (link.kind === "invite" && slackChannelId) {
+          const sr = await postInviteToSlack({
+            slackChannelId,
+            businessName,
+            ownerName: "",
+            email: targetEmail,
+            actionLink: link.actionLink,
+          });
+          slackPosted = !!sr?.ok;
+        }
+
+        return res.status(200).json({
+          ok: true,
+          sent_to: targetEmail,
+          kind: link.kind,
+          slack_posted: slackPosted,
+        });
       }
 
       // ── Validate inputs (no password — invite flow) ──
