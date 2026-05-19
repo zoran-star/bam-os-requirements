@@ -161,9 +161,6 @@ export default async function handler(req, res) {
     if (resource === "content-tickets") {
       return handleContentTickets(req, res);
     }
-    if (resource === "meta-auth") {
-      return handleMetaAuth(req, res);
-    }
     if (resource === "meta-adaccounts") {
       return handleMetaAdAccounts(req, res);
     }
@@ -182,7 +179,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-auth' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -913,8 +910,10 @@ async function handleContentTickets(req, res) {
 // ─────────────────────────────────────────────────────────
 // META OAUTH + API
 // ─────────────────────────────────────────────────────────
-// Client (academy owner) connects their own Meta ad account.
-// Token stored in client_meta_tokens, scoped via RLS to that client.
+// Meta is staff-managed. Client-side OAuth has been removed.
+// Staff connect via /api/auth/staff-meta/* and the team token wires
+// every client's ad account. The client_meta_tokens table is no
+// longer read or written (kept in DB as historical record only).
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -924,10 +923,6 @@ function metaGetOrigin(req) {
   const proto = req.headers["x-forwarded-proto"] || "https";
   const host = req.headers["x-forwarded-host"] || req.headers.host;
   return `${proto}://${host}`;
-}
-
-function metaRedirectUri(req) {
-  return `${metaGetOrigin(req)}/api/auth/meta/callback`;
 }
 
 function metaSignState(payload) {
@@ -950,114 +945,6 @@ function metaVerifyState(state) {
   const payload = JSON.parse(Buffer.from(data, "base64url").toString());
   if (typeof payload.exp !== "number" || Date.now() > payload.exp) throw new Error("state expired");
   return payload;
-}
-
-function metaRedirect(res, status, msg) {
-  const params = new URLSearchParams({ meta: status });
-  if (msg) params.set("msg", msg);
-  res.setHeader("Location", `/client-portal.html?${params.toString()}`);
-  return res.status(302).end();
-}
-
-async function handleMetaAuth(req, res) {
-  const step = req.query.step;
-
-  // step = prepare: POST, authenticated client, returns Facebook OAuth URL
-  if (step === "prepare") {
-    if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
-    const ctx = await resolveUser(req);
-    if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
-    if (!ctx.client) return res.status(403).json({ error: "client only" });
-
-    const appId = process.env.META_APP_ID;
-    if (!appId) return res.status(500).json({ error: "META_APP_ID not configured" });
-
-    const state = metaSignState({
-      client_id: ctx.client.id,
-      exp: Date.now() + 5 * 60 * 1000,
-      nonce: crypto.randomBytes(8).toString("hex"),
-    });
-
-    const params = new URLSearchParams({
-      client_id: appId,
-      redirect_uri: metaRedirectUri(req),
-      scope: META_OAUTH_SCOPES.join(","),
-      response_type: "code",
-      state,
-    });
-
-    return res.status(200).json({
-      redirect_url: `https://www.facebook.com/${META_API_VERSION}/dialog/oauth?${params.toString()}`,
-    });
-  }
-
-  // step = callback: GET from Facebook with ?code + ?state; exchange + store + redirect.
-  if (step === "callback") {
-    if (req.method !== "GET") return res.status(405).end();
-
-    const { code, state, error: fbError, error_description } = req.query;
-    if (fbError) return metaRedirect(res, "error", error_description || String(fbError));
-    if (!code || !state) return metaRedirect(res, "error", "missing code or state");
-
-    let payload;
-    try { payload = metaVerifyState(state); }
-    catch (e) { return metaRedirect(res, "error", `state: ${e.message}`); }
-
-    const appId = process.env.META_APP_ID;
-    const appSecret = process.env.META_APP_SECRET;
-    if (!appId || !appSecret) return metaRedirect(res, "error", "Meta app not configured");
-
-    const shortUrl = `${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      client_id: appId,
-      client_secret: appSecret,
-      redirect_uri: metaRedirectUri(req),
-      code,
-    });
-    const shortRes = await fetch(shortUrl);
-    const shortJson = await shortRes.json();
-    if (!shortRes.ok || !shortJson.access_token) {
-      return metaRedirect(res, "error", shortJson?.error?.message || "token exchange failed");
-    }
-
-    const longUrl = `${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: "fb_exchange_token",
-      client_id: appId,
-      client_secret: appSecret,
-      fb_exchange_token: shortJson.access_token,
-    });
-    const longRes = await fetch(longUrl);
-    const longJson = await longRes.json();
-    const accessToken = longJson.access_token || shortJson.access_token;
-    const expiresIn = longJson.expires_in || shortJson.expires_in || 60 * 60;
-    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-
-    const meRes = await fetch(`${META_GRAPH}/me?` + new URLSearchParams({
-      fields: "id,name",
-      access_token: accessToken,
-    }));
-    const me = await meRes.json();
-    if (!meRes.ok || !me.id) {
-      return metaRedirect(res, "error", me?.error?.message || "could not fetch FB user");
-    }
-
-    await sb(`client_meta_tokens?on_conflict=client_id`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify([{
-        client_id: payload.client_id,
-        fb_user_id: me.id,
-        fb_user_name: me.name || null,
-        access_token: accessToken,
-        expires_at: expiresAt,
-        scopes: META_OAUTH_SCOPES,
-        updated_at: nowIso(),
-      }]),
-    });
-
-    return metaRedirect(res, "connected");
-  }
-
-  return res.status(400).json({ error: "unknown step (expected 'prepare' or 'callback')" });
 }
 
 // Staff-side ad account picker. Lists ad accounts the LOGGED-IN STAFF has
@@ -1133,31 +1020,27 @@ async function handleMetaAdAccounts(req, res) {
 
   // GET → list every ad account accessible to the caller's Meta token.
   //
-  // Client caller: use their own client_meta_tokens row. If they haven't
-  // connected, return 404 so the frontend can prompt them to connect.
-  //
-  // Staff caller: use their own staff_meta_tokens first, then any team
-  // token. Lets any admin/marketing role do Client Setup without
-  // personally connecting Meta.
+  // Client callers don't reach this anymore (client-side OAuth removed);
+  // the UI on client-portal.html no longer surfaces an ad-account picker.
+  // Staff callers use their own staff_meta_tokens first, then fall back
+  // to any team token, so any admin/marketing role can do Client Setup
+  // without personally connecting Meta.
   let tok = null;
   let usingOwnToken = false;
   if (ctx.client) {
-    const clientTokRows = await sb(`client_meta_tokens?client_id=eq.${ctx.client.id}&select=access_token,expires_at,fb_user_name`);
-    if (clientTokRows?.[0]) {
-      tok = clientTokRows[0];
-      usingOwnToken = true;
-    }
-  } else {
-    const ownTokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
-    if (ownTokRows?.[0]) {
-      tok = ownTokRows[0];
-      usingOwnToken = true;
-    } else {
-      const teamRows = await sb(`staff_meta_tokens?select=access_token,expires_at,fb_user_name&order=updated_at.desc&limit=1`);
-      if (teamRows?.[0]) tok = teamRows[0];
-    }
+    // Defensive — surface a clear error if anyone reaches this from the
+    // client side via a stale path. UI never calls this for clients now.
+    return res.status(404).json({ error: "Meta is managed by BAM staff for your account. Ask your BAM contact if you need a change." });
   }
-  if (!tok) return res.status(404).json({ error: "Meta not connected. Click Connect Meta to link your account first." });
+  const ownTokRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,expires_at,fb_user_name`);
+  if (ownTokRows?.[0]) {
+    tok = ownTokRows[0];
+    usingOwnToken = true;
+  } else {
+    const teamRows = await sb(`staff_meta_tokens?select=access_token,expires_at,fb_user_name&order=updated_at.desc&limit=1`);
+    if (teamRows?.[0]) tok = teamRows[0];
+  }
+  if (!tok) return res.status(404).json({ error: "Meta not connected. Connect your Meta account on the staff side first." });
 
   const fbRes = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
     fields: "id,account_id,name,currency,account_status",
@@ -1229,38 +1112,22 @@ async function handleMetaCampaigns(req, res) {
   const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
   const clientFull = clientRows?.[0];
 
-  // Look up the client's own Meta token first — when they've connected their
-  // own Meta via the optional onboarding flow, we use their token. Otherwise
-  // fall back to any staff token (the partner-share architecture). The two
-  // approaches are interchangeable from Meta's side; what matters is which
-  // ad account is being queried.
-  let chosenToken = null;
-  let tokenSource = null;
-  try {
-    const clientTokRows = await sb(`client_meta_tokens?client_id=eq.${targetClientId}&select=access_token,expires_at`);
-    const ctok = clientTokRows?.[0];
-    if (ctok?.access_token) {
-      chosenToken = ctok.access_token;
-      tokenSource = "client";
-    }
-  } catch (_) { /* fall through to staff token */ }
-  if (!chosenToken) {
-    const staffToken = await getAnyStaffMetaToken();
-    if (staffToken) { chosenToken = staffToken; tokenSource = "staff"; }
-  }
+  // Always use the team staff token to query Meta. Client-side OAuth was
+  // removed — there's only one token source now, which makes attribution +
+  // refresh management much simpler.
+  const staffToken = await getAnyStaffMetaToken();
 
   if (!clientFull?.meta_ad_account_id) {
-    // No ad account wired yet. Signal the frontend so it can either show
-    // dummy/demo data + a "Connect Meta" CTA, or (if Meta is connected but
-    // no ad account picked) trigger the ad-account picker.
+    // No ad account wired yet. Frontend shows passive "BAM is setting
+    // this up" copy + sample data — no CTA (Meta is staff-managed).
     return res.status(200).json({
       campaigns: [],
       reason: "no_ad_account",
-      meta_connected: tokenSource === "client",
+      meta_connected: false,
     });
   }
-  if (!chosenToken) return res.status(200).json({ campaigns: [], reason: "no_staff_token" });
-  const tok = { access_token: chosenToken };
+  if (!staffToken) return res.status(200).json({ campaigns: [], reason: "no_staff_token" });
+  const tok = { access_token: staffToken };
 
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id

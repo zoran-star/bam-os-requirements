@@ -6370,59 +6370,13 @@ function _buildDemoCampaignsHTML(_metaConnected) {
   return banner + cards;
 }
 
-// Kicks off the client-side Meta OAuth flow.
-// Backend (POST /api/auth/meta/start) returns a Facebook OAuth URL; we
-// navigate the whole tab there. After approval, /api/auth/meta/callback
-// stores client_meta_tokens and redirects back to /client-portal.html?meta=connected.
-async function _startClientMetaConnect() {
-  try {
-    const token = await _mreqAuthToken();
-    const res = await fetch('/api/auth/meta/start', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    const json = await _safeJson(res);
-    if (!res.ok || !json.redirect_url) {
-      alert('Couldn\'t start Meta connect: ' + (json.error || `HTTP ${res.status}`));
-      return;
-    }
-    window.location.href = json.redirect_url;
-  } catch (e) {
-    alert('Couldn\'t start Meta connect: ' + e.message);
-  }
-}
+// Client-side Meta OAuth has been removed. Meta is staff-managed —
+// BAM staff wire each client's ad account on the per-client Setup
+// tab in the staff portal. The two helpers that used to live here
+// (_startClientMetaConnect, _openMetaAdAccountPicker) are gone and
+// the /api/auth/meta/* endpoints they hit no longer exist.
 
-// Opens a simple picker so the client (once Meta is connected) can choose
-// which of their ad accounts to surface in this portal. Uses native prompt
-// for now — minimum viable; can polish to a real modal later.
-async function _openMetaAdAccountPicker() {
-  try {
-    const token = await _mreqAuthToken();
-    const res = await fetch('/api/meta/adaccounts', { headers: { Authorization: 'Bearer ' + token } });
-    const json = await _safeJson(res);
-    if (!res.ok) { alert('Couldn\'t load ad accounts: ' + (json.error || `HTTP ${res.status}`)); return; }
-    const accts = json.ad_accounts || [];
-    if (!accts.length) { alert('No ad accounts found on your Meta account. Make sure you have advertiser access to at least one ad account.'); return; }
-    const list = accts.map((a, i) => `${i + 1}. ${a.name || a.id} (${a.id})`).join('\n');
-    const choice = prompt(`Which ad account should we pull campaigns from?\n\n${list}\n\nType the number (1-${accts.length}):`);
-    const idx = parseInt(choice, 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= accts.length) return;
-    const pick = accts[idx];
-    const saveRes = await fetch('/api/meta/adaccounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ ad_account_id: pick.id }),
-    });
-    const saveJson = await _safeJson(saveRes);
-    if (!saveRes.ok) { alert('Couldn\'t save selection: ' + (saveJson.error || `HTTP ${saveRes.status}`)); return; }
-    showConfirmation('Ad account saved ✅', `Showing campaigns from ${pick.name || pick.id}.`);
-    await _renderMarketingCampaigns();
-  } catch (e) {
-    alert('Ad account picker failed: ' + e.message);
-  }
-}
-
-// ── Meta campaigns + connect flow ─────────────────────────────────────
+// ── Meta campaigns display ────────────────────────────────────────────
 // Renders the Active Campaigns section based on the client's Meta connection state.
 //   not connected  → demo data + "Connect Meta" CTA
 //   connected, no ad account chosen → demo data + "Pick ad account" CTA
