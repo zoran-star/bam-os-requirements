@@ -461,6 +461,23 @@ async function supabaseInsert(path, body) {
   return res.json();
 }
 
+// Resolves the canonical staff + client portal URLs used to build invite
+// and password-recovery redirect links in emails / Slack messages.
+//
+// Production: env vars STAFF_PORTAL_URL + CLIENT_PORTAL_URL are set in
+// Vercel (e.g. https://staff.byanymeansbusiness.com and
+// https://portal.byanymeansbusiness.com). Falls back to the request's
+// own origin so localhost + preview deployments still work without env
+// vars. This matters because an invite sent from the staff portal needs
+// to land the client on the CLIENT portal, not whichever URL staff is on.
+function portalUrls(req) {
+  const origin = req.headers.origin || `https://${req.headers.host}`;
+  return {
+    staffUrl: process.env.STAFF_PORTAL_URL || origin,
+    clientUrl: process.env.CLIENT_PORTAL_URL || origin,
+  };
+}
+
 export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing (need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)" });
@@ -522,10 +539,10 @@ export default async function handler(req, res) {
 
         // Smart link generator: invite first (for never-confirmed accounts),
         // recovery fallback (for active accounts). Right tool per user state.
-        const origin = req.headers.origin || `https://${req.headers.host}`;
+        const { staffUrl, clientUrl } = portalUrls(req);
         const redirectTo = isStaff
-          ? `${origin}/?type=recovery`
-          : `${origin}/client-portal.html?type=recovery`;
+          ? `${staffUrl}/?type=recovery`
+          : `${clientUrl}/client-portal.html?type=recovery`;
         const link = await generateLinkForResetOrInvite({
           supabaseUrl: SUPABASE_URL,
           serviceKey: SUPABASE_SERVICE_KEY,
@@ -629,8 +646,8 @@ export default async function handler(req, res) {
         // user_metadata.needs_password=true is a defensive marker: the client portal
         // checks this on boot and forces the password-set form even if redirect query
         // params get stripped. Cleared on first successful password update.
-        const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/client-portal.html?type=invite`;
+        const { clientUrl } = portalUrls(req);
+        const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
           method: "POST",
           headers: {
@@ -799,8 +816,8 @@ export default async function handler(req, res) {
 
         // Send Supabase invite — creates auth user, emails the password-set link.
         // Redirect goes to staff portal root so they land in the right app.
-        const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/?type=invite`;
+        const { staffUrl } = portalUrls(req);
+        const redirectTo = `${staffUrl}/?type=invite`;
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
           method: "POST",
           headers: {
@@ -900,8 +917,8 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "RESEND_API_KEY not configured" });
         }
 
-        const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/?type=recovery`;
+        const { staffUrl } = portalUrls(req);
+        const redirectTo = `${staffUrl}/?type=recovery`;
 
         // Smart link: re-issues an INVITE link for staff who never
         // accepted their original invite (the right tool for that case);
@@ -1190,8 +1207,8 @@ export default async function handler(req, res) {
         const businessName = row.business_name || "";
         const slackChannelId = row.slack_channel_id || null;
 
-        const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/client-portal.html?type=invite`;
+        const { clientUrl } = portalUrls(req);
+        const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
 
         // Helper: call generate_link with a given type and return action_link + user id
         const genLink = async (type, options = {}) => {
@@ -1353,8 +1370,8 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "RESEND_API_KEY not configured" });
         }
 
-        const origin = req.headers.origin || `https://${req.headers.host}`;
-        const redirectTo = `${origin}/client-portal.html?type=recovery`;
+        const { clientUrl } = portalUrls(req);
+        const redirectTo = `${clientUrl}/client-portal.html?type=recovery`;
 
         // Smart link: re-issues INVITE for never-confirmed clients (e.g.
         // someone we invited months ago who never clicked through), falls
@@ -1434,8 +1451,8 @@ export default async function handler(req, res) {
       }
 
       // ── Send invite (creates auth user with no password + emails the link) ──
-      const origin = req.headers.origin || `https://${req.headers.host}`;
-      const redirectTo = `${origin}/client-portal.html?type=invite`;
+      const { clientUrl } = portalUrls(req);
+      const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
       const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
         method: "POST",
         headers: {
