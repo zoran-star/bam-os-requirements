@@ -13,7 +13,7 @@
   ],
   "rewrites": [
     {
-      "source": "/",
+      "source": "/(index\\.html)?",
       "has": [{ "type": "host", "value": "portal.byanymeansbusiness.com" }],
       "destination": "/client-portal.html"
     },
