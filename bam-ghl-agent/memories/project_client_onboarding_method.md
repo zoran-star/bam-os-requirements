@@ -25,16 +25,20 @@ ALTER TABLE public.clients
 
 Single helper `deriveClientStatus(client, t)` in `ClientsCombinedView.jsx` — used by both `ClientRow` (list) and `StatusPill` (detail header):
 
-| Condition | Label | Color |
-|---|---|---|
-| `status === "paused"` | Paused | mute |
-| `status === "churned"` | Churned | red |
-| `status === "active"` | **Live** | green |
-| `status === "onboarding"` + `method=call` + `call_completed_at` set | Live | green |
-| `status === "onboarding"` + `method=call` + no completion | Call pending | amber |
-| `status === "onboarding"` + `method=send_link` + `auth_user_id` set | Live | green |
-| `status === "onboarding"` + `method=send_link` + no auth user | Pending link accept | amber |
-| `status === "onboarding"` + no method picked | Onboarding | amber |
+**Priority order matters** — pending onboarding states win over `status`. Picking a method is the source of truth for "is this client done onboarding"; we don't trust the status column to know that on its own.
+
+| Priority | Condition | Label | Color |
+|---|---|---|---|
+| 1 | `status === "paused"` | Paused | mute |
+| 2 | `status === "churned"` | Churned | red |
+| 3 | `method=call` + `!call_completed_at` | **Call pending** | amber |
+| 4 | `method=send_link` + `!auth_user_id` | **Pending link accept** | amber |
+| 5 | `status === "active"` | Live | green |
+| 6 | `method=call` + `call_completed_at` set | Live | green |
+| 7 | `method=send_link` + `auth_user_id` set | Live | green |
+| 8 | (default — `onboarding` + no method) | Onboarding | amber |
+
+The 2026-05-19 first version had `status==='active'` checked BEFORE the method states, which made ACTIV8 (status=active, method=call, call_completed_at=null) show "Live" instead of "Call pending". Reordered same day.
 
 Two "Live" paths exist:
 1. **Call done** — backend auto-flips `status` to `"active"` when the checkbox lands true, so this case usually surfaces as `status === "active"`.
