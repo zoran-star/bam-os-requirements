@@ -41,19 +41,25 @@ const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
 
 // Derive the user-facing status label from a client row.
 //
-// Priority order matters: pending onboarding states (Call pending / Pending
-// link accept) win over the raw status column. Picking a method on an
-// already-active client is treated as "they're going through onboarding
-// again" — the pill flips to pending until the call is marked done or the
-// new auth user is attached. Otherwise we'd silently lie ("Live" pill
-// while Call done? sits unchecked).
+// Priority order matters: pending onboarding states win over the raw
+// status column. Picking a method is the source of truth for "is this
+// client done onboarding" - status='active' alone doesn't override that.
+//
+// send_link three-state distinguishes "link not sent" from "sent but
+// not accepted" using auth_user_id (set by the Supabase invite call)
+// and onboarding_completed_at (set when the client finishes the
+// first-login product tour):
+//   !auth_user_id                                  → Link not sent
+//   auth_user_id + !onboarding_completed_at        → Pending link accept
+//   onboarding_completed_at                        → Live
 //
 //   paused                                                  → Paused
 //   churned                                                 → Churned
 //   method=call + !call_completed_at                        → Call pending
-//   method=send_link + !auth_user_id                        → Pending link accept
-//   active / call done / link accepted                      → Live
-//   onboarding + no method picked yet                       → Onboarding
+//   method=send_link + !auth_user_id                        → Link not sent
+//   method=send_link + auth_user_id + !onboarding_completed → Pending link accept
+//   active / call done / send_link + tour complete          → Live
+//   onboarding + no method picked yet                       → null (empty)
 function deriveClientStatus(client, t) {
   if (client.status === "paused") return { label: "Paused", color: t.textMute };
   if (client.status === "churned") return { label: "Churned", color: t.red };
@@ -61,25 +67,26 @@ function deriveClientStatus(client, t) {
   if (client.onboarding_method === "call" && !client.call_completed_at) {
     return { label: "Call pending", color: t.amber };
   }
-  if (client.onboarding_method === "send_link" && !client.auth_user_id) {
-    return { label: "Pending link accept", color: t.amber };
+  if (client.onboarding_method === "send_link") {
+    if (!client.auth_user_id) {
+      return { label: "Link not sent", color: t.amber };
+    }
+    if (!client.onboarding_completed_at) {
+      return { label: "Pending link accept", color: t.amber };
+    }
+    return { label: "Live", color: t.green };
   }
 
   if (client.status === "active") return { label: "Live", color: t.green };
 
-  // Onboarding completion-derived live: method is set AND completion marker
-  // is present (call done OR auth user attached) but status hasn't been
-  // flipped yet (mostly only possible for send_link clients, since call
-  // done auto-flips status to active).
   if (client.onboarding_method === "call" && client.call_completed_at) {
     return { label: "Live", color: t.green };
   }
-  if (client.onboarding_method === "send_link" && client.auth_user_id) {
-    return { label: "Live", color: t.green };
-  }
 
-  // No method picked + status === "onboarding"
-  return { label: "Onboarding", color: t.amber };
+  // No method picked + status === "onboarding" — leave the column blank
+  // so unstarted onboarding clients don't visually compete with the real
+  // statuses. Pill reappears as soon as staff picks a method.
+  return null;
 }
 
 export default function ClientsCombinedView({ tokens, dark, me, session, initialClientId, onInitialClientHandled, onDetailChange }) {
@@ -251,7 +258,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden" }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr 0.7fr",
+            gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr",
             padding: "12px 18px",
             background: t.surface,
             borderBottom: `1px solid ${t.border}`,
@@ -261,7 +268,6 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
             <div>Owner</div>
             <div>Scaling Manager</div>
             <div>Status</div>
-            <div>Auth</div>
           </div>
           {filtered.map((c) => (
             <ClientRow
@@ -322,9 +328,6 @@ function SegmentedControl({ value, onChange, options, tokens }) {
 function ClientRow({ client, staff, tokens, onClick }) {
   const [hov, setHov] = useState(false);
   const t = tokens;
-  const authStatus = client.auth_user_id ? { label: "Active", color: t.green }
-    : client.email ? { label: "Ready", color: t.amber }
-    : { label: "No email", color: t.textMute };
   const derived = deriveClientStatus(client, t);
 
   return (
@@ -334,7 +337,7 @@ function ClientRow({ client, staff, tokens, onClick }) {
       onMouseLeave={() => setHov(false)}
       style={{
         display: "grid",
-        gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr 0.7fr",
+        gridTemplateColumns: "1.4fr 1fr 1fr 0.8fr",
         padding: "14px 18px",
         borderBottom: `1px solid ${t.border}`,
         cursor: "pointer",
@@ -347,14 +350,13 @@ function ClientRow({ client, staff, tokens, onClick }) {
       <div style={{ fontSize: 13, color: t.textSub }}>{client.owner_name || <span style={{ color: t.textMute, fontStyle: "italic" }}>none</span>}</div>
       <div style={{ fontSize: 13, color: t.textSub }}>{staff?.name || <span style={{ color: t.textMute, fontStyle: "italic" }}>unassigned</span>}</div>
       <div>
-        <span style={{
-          fontSize: 11, padding: "3px 9px", borderRadius: 999,
-          background: `${derived.color}22`, color: derived.color, fontWeight: 600,
-          whiteSpace: "nowrap",
-        }}>{derived.label}</span>
-      </div>
-      <div>
-        <span style={{ fontSize: 11, color: authStatus.color, fontWeight: 600 }}>{authStatus.label}</span>
+        {derived && (
+          <span style={{
+            fontSize: 11, padding: "3px 9px", borderRadius: 999,
+            background: `${derived.color}22`, color: derived.color, fontWeight: 600,
+            whiteSpace: "nowrap",
+          }}>{derived.label}</span>
+        )}
       </div>
     </div>
   );
@@ -417,7 +419,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 
       {tab === "overview" && <OverviewTab client={client} staffMap={staffMap} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
-      {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} />}
+      {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
     </div>
@@ -426,7 +428,9 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 
 function StatusPill({ client, tokens }) {
   const t = tokens;
-  const { label, color } = deriveClientStatus(client, t);
+  const derived = deriveClientStatus(client, t);
+  if (!derived) return null;
+  const { label, color } = derived;
   return (
     <span style={{
       fontSize: 12, padding: "5px 12px", borderRadius: 999,
@@ -711,9 +715,34 @@ function suggestAdAccount(clientName, adAccounts) {
   return bestScore >= 15 ? best : null;
 }
 
-function MarketingTab({ client, tokens, role, session }) {
+function MarketingTab({ client, tokens, role, session, onChanged }) {
   const t = tokens;
   const canEdit = ROLES.canEditMeta(role);
+
+  // marketing_included defaults to true for legacy rows (the column was
+  // added with DEFAULT true), so undefined === included for safety.
+  const marketingIncluded = client.marketing_included !== false;
+  const [savingFlag, setSavingFlag] = useState(false);
+  const [flagErr, setFlagErr] = useState(null);
+
+  async function toggleMarketingIncluded(nextValue) {
+    setSavingFlag(true); setFlagErr(null);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, marketing_included: nextValue }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      onChanged?.();
+    } catch (err) {
+      setFlagErr(err.message);
+    } finally {
+      setSavingFlag(false);
+    }
+  }
 
   // Setup state
   const [adAccounts, setAdAccounts] = useState([]);
@@ -871,6 +900,53 @@ function MarketingTab({ client, tokens, role, session }) {
 
   return (
     <div style={{ maxWidth: 880 }}>
+      {/* Marketing included toggle — always at top */}
+      <div style={{
+        padding: "14px 18px", marginBottom: 22, borderRadius: 8,
+        background: t.surfaceEl, border: `1px solid ${marketingIncluded ? t.border : `${t.amber}55`}`,
+        display: "flex", alignItems: "center", gap: 14,
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+            {marketingIncluded ? "Marketing included" : "Marketing not included"}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+            {marketingIncluded
+              ? "BAM manages this client's ad campaigns and Meta setup."
+              : "Client portal Marketing menu is greyed out and onboarding skips the marketing step."}
+          </div>
+          {flagErr && <div style={{ color: t.red, fontSize: 12, marginTop: 4 }}>⚠ {flagErr}</div>}
+        </div>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => toggleMarketingIncluded(!marketingIncluded)}
+            disabled={savingFlag}
+            aria-label={marketingIncluded ? "Turn off marketing" : "Turn on marketing"}
+            style={{
+              width: 44, height: 24, borderRadius: 999, position: "relative",
+              background: marketingIncluded ? t.green : t.borderStr || t.border,
+              border: "none", cursor: savingFlag ? "wait" : "pointer",
+              transition: "background 0.2s ease",
+              opacity: savingFlag ? 0.6 : 1,
+              flexShrink: 0,
+            }}
+          >
+            <span style={{
+              position: "absolute", top: 2,
+              left: marketingIncluded ? 22 : 2,
+              width: 20, height: 20, borderRadius: "50%",
+              background: "#fff",
+              transition: "left 0.2s ease",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }} />
+          </button>
+        )}
+      </div>
+
+      {/* Everything below is hidden when marketing is not included */}
+      {!marketingIncluded ? null : <>
+
       {/* Meta connection status */}
       <div style={{
         padding: "12px 16px", marginBottom: 22, borderRadius: 6,
@@ -1021,6 +1097,8 @@ function MarketingTab({ client, tokens, role, session }) {
           tokens={t}
         />
       )}
+
+      </>}
     </div>
   );
 }

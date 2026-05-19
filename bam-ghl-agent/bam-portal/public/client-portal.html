@@ -5131,6 +5131,9 @@ Then the call to action."]</div>
 
 <script>
 function switchView(name, el) {
+  // Clients without marketing have the Marketing nav greyed + click-blocked
+  if (name === 'marketing' && !MARKETING_INCLUDED) return;
+
   // Update nav
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
   el.classList.add('active');
@@ -5144,6 +5147,26 @@ function switchView(name, el) {
 
   // When entering Marketing, refresh tickets from the API
   if (name === 'marketing') fetchAndRenderMarketingRequests();
+}
+
+// Apply the greyed-out look to the Marketing nav item when marketing
+// isn't included for this client. Called once after the client row
+// loads. Visual only — the click is blocked in switchView() above.
+function applyMarketingNavState() {
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(item => {
+    const onclick = item.getAttribute('onclick') || '';
+    if (!onclick.includes("'marketing'")) return;
+    if (MARKETING_INCLUDED) {
+      item.style.opacity = '';
+      item.style.cursor = '';
+      item.title = '';
+    } else {
+      item.style.opacity = '0.4';
+      item.style.cursor = 'not-allowed';
+      item.title = 'Marketing is not part of your current BAM plan';
+    }
+  });
 }
 
 /* ════════════════════════════════
@@ -7120,6 +7143,11 @@ const FIELD_SCHEMAS = {
 
 // ── Client scoping — resolved from auth session in boot() ────────────
 let CLIENT_ID = null;
+// True if the BAM service for this client includes Marketing. Falsy
+// values mean the Marketing sidebar item is greyed out + clicks blocked,
+// and the first-login tour skips marketing steps. Defaults true so any
+// loaded row without the column (legacy) still gets marketing.
+let MARKETING_INCLUDED = true;
 
 async function _authHeaders() {
   const { data: { session } } = await _sb.auth.getSession();
@@ -8461,8 +8489,11 @@ async function loadAcademyName() {
 // ─────────────────────────────────────────────────────────
 const TOUR_STEPS = [
   // Step 1: Welcome (centered modal)
+  // Welcome copy adapts to whether marketing is included — see
+  // getEffectiveTourSteps() below.
   {
     type: 'modal',
+    id: 'welcome',
     title: 'Welcome to your BAM portal{NAME}',
     body: 'Two areas to know:',
     vis: [
@@ -8494,6 +8525,7 @@ const TOUR_STEPS = [
   // Step 4 (NEW): view-switch transition. Spotlight the Marketing nav item while still on Systems.
   {
     type: 'spot',
+    marketingOnly: true,
     view: 'systems',
     selector: '.nav-item[onclick*="marketing"]',
     place: 'right',
@@ -8504,6 +8536,7 @@ const TOUR_STEPS = [
   // Step 5: Marketing new campaign button
   {
     type: 'spot',
+    marketingOnly: true,
     view: 'marketing',
     selector: '.btn-add-campaign',
     place: 'top',
@@ -8514,6 +8547,7 @@ const TOUR_STEPS = [
   // Step 6: Marketing change campaign button
   {
     type: 'spot',
+    marketingOnly: true,
     view: 'marketing',
     selector: '.btn-change-campaign',
     place: 'left',
@@ -8524,6 +8558,7 @@ const TOUR_STEPS = [
   // Step 7: Marketing pending requests + action required example
   {
     type: 'spot',
+    marketingOnly: true,
     view: 'marketing',
     selector: '#marketing-request-list-pending',
     place: 'top',
@@ -8604,7 +8639,26 @@ function _tourTeardownDemos() {
 }
 
 let _tourStep = 1;
-const _TOUR_TOTAL = TOUR_STEPS.length;
+
+// Effective steps depend on MARKETING_INCLUDED: drop the four marketing-only
+// steps and rewrite the welcome modal so it doesn't mention ads. Computed
+// at tour start (and at every step lookup, since it's cheap) so the same
+// session can toggle marketing on/off without a reload.
+function getEffectiveTourSteps() {
+  if (MARKETING_INCLUDED) return TOUR_STEPS;
+  return TOUR_STEPS
+    .filter(s => !s.marketingOnly)
+    .map(s => {
+      if (s.id !== 'welcome') return s;
+      return {
+        ...s,
+        body: 'One area to know:',
+        vis: [
+          ['a', '<strong>Systems</strong> for tickets (fixes, changes, builds)'],
+        ],
+      };
+    });
+}
 
 function startOnboardingTour() {
   _tourStep = 1;
@@ -8619,17 +8673,24 @@ function _renderTourStep() {
   const overlay = document.getElementById('tour-overlay');
   const tooltip = document.getElementById('tour-tooltip');
   const ring = document.getElementById('tour-pulse-ring');
-  const step = TOUR_STEPS[_tourStep - 1];
+  const steps = getEffectiveTourSteps();
+  const total = steps.length;
+  const step = steps[_tourStep - 1];
   if (!step) return;
 
   // Always update the modal-style step dots + step label (used by both modes)
-  document.getElementById('tour-step-label').textContent = `Step ${_tourStep} of ${_TOUR_TOTAL}`;
-  document.getElementById('tour-tooltip-step').textContent = `Step ${_tourStep} of ${_TOUR_TOTAL}`;
-  document.querySelectorAll('#tour-overlay .tour-dot').forEach(d => {
-    const n = Number(d.dataset.step);
-    d.classList.toggle('active', n === _tourStep);
-    d.classList.toggle('done', n < _tourStep);
-  });
+  document.getElementById('tour-step-label').textContent = `Step ${_tourStep} of ${total}`;
+  document.getElementById('tour-tooltip-step').textContent = `Step ${_tourStep} of ${total}`;
+  // Rebuild dots dynamically — count depends on whether marketing steps
+  // are included, so we can't rely on the 8 static spans in the HTML.
+  const dotsContainer = document.querySelector('#tour-overlay .tour-dots');
+  if (dotsContainer) {
+    dotsContainer.innerHTML = Array.from({ length: total }, (_, i) => {
+      const n = i + 1;
+      const cls = n === _tourStep ? 'tour-dot active' : (n < _tourStep ? 'tour-dot done' : 'tour-dot');
+      return `<span class="${cls}" data-step="${n}"></span>`;
+    }).join('');
+  }
   document.getElementById('tour-back').style.display = _tourStep === 1 ? 'none' : 'inline-block';
   document.getElementById('tour-next').textContent = step.nextLabel || 'Next →';
   document.getElementById('tour-tip-next').textContent = step.nextLabel || 'Next →';
@@ -8747,7 +8808,7 @@ function _positionSpotlight(step) {
 }
 
 function _repositionTooltip() {
-  const step = TOUR_STEPS[_tourStep - 1];
+  const step = getEffectiveTourSteps()[_tourStep - 1];
   if (step && step.type === 'spot') _positionSpotlight(step);
 }
 
@@ -8762,7 +8823,8 @@ function _tourSwitchTo(name) {
 }
 
 function tourNext() {
-  if (_tourStep < _TOUR_TOTAL) { _tourStep += 1; _renderTourStep(); }
+  const total = getEffectiveTourSteps().length;
+  if (_tourStep < total) { _tourStep += 1; _renderTourStep(); }
   else { completeOnboardingTour(); }
 }
 
@@ -8859,7 +8921,7 @@ async function boot() {
   }
   // Resolve client_id from authed user
   const { data: clientRow } = await _sb.from('clients')
-    .select('id, owner_name, onboarding_completed_at').eq('auth_user_id', session.user.id).maybeSingle();
+    .select('id, owner_name, onboarding_completed_at, marketing_included').eq('auth_user_id', session.user.id).maybeSingle();
   if (!clientRow) {
     // Defensive: if this is actually a STAFF user (e.g. they clicked a staff
     // invite link but Supabase Site URL routed them here), bounce them to
@@ -8883,6 +8945,8 @@ async function boot() {
     return;
   }
   CLIENT_ID = clientRow.id;
+  MARKETING_INCLUDED = clientRow.marketing_included !== false;
+  applyMarketingNavState();
   document.getElementById('login-overlay').style.display = 'none';
 
   // Populate user-row from authed email + clients.owner_name

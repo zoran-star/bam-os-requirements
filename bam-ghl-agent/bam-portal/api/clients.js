@@ -798,6 +798,14 @@ export default async function handler(req, res) {
           patch.email = newEmail || null;
         }
 
+        if (wasSet("marketing_included")) {
+          const v = body.marketing_included;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "marketing_included must be a boolean" });
+          }
+          patch.marketing_included = v;
+        }
+
         if (wasSet("onboarding_method")) {
           const m = body.onboarding_method;
           if (m !== null && !["call", "send_link"].includes(m)) {
