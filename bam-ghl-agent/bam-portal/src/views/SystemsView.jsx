@@ -319,9 +319,6 @@ function TicketCard({ ticket, tokens: t, onOpen }) {
       onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(ticket.status, t), textTransform: "uppercase", letterSpacing: 0.5 }}>
-          {STATUS_LABEL[ticket.status] || ticket.status}
-        </span>
         {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
         <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{formatDate(ticket.submitted_at)}</span>
       </div>

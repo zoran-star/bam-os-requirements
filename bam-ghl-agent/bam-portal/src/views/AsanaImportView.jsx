@@ -98,7 +98,9 @@ export default function AsanaImportView({ tokens: t, dark }) {
       : /\bbuild|create|new|launch|set ?up\b/.test(text)       ? "build"
       : "error";
     setType(guessType);
-    setPriority(current.parsed.red_alert ? "red_alert" : "standard");
+    // DB priority enum is ['urgent', 'standard', 'low']. The Asana
+    // "Red Alert?" flag maps to 'urgent' on our side.
+    setPriority(current.parsed.red_alert ? "urgent" : "standard");
     setAssignedTo(autoAssignee);
     setTitle(current.parsed.title || current.name || "");
     setFields(initialFieldsFor(guessType, current.parsed.description));
@@ -318,8 +320,9 @@ function TicketCard({
           <div>
             <FormLabel tokens={t}>Priority</FormLabel>
             <select value={priority} onChange={e => setPriority(e.target.value)} style={selectStyle(t)}>
+              <option value="low">Low</option>
               <option value="standard">Standard</option>
-              <option value="red_alert">🔴 Red Alert</option>
+              <option value="urgent">🔴 Urgent</option>
             </select>
           </div>
         </div>
