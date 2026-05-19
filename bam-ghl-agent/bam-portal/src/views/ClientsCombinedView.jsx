@@ -204,7 +204,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by business or owner..."
+          placeholder="Search by business or point of contact..."
           style={{
             flex: 1, minWidth: 240, padding: "10px 14px", background: t.surface,
             border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13,
@@ -265,7 +265,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
             fontSize: 11, fontWeight: 600, color: t.textMute, letterSpacing: "0.08em", textTransform: "uppercase",
           }}>
             <div>Business</div>
-            <div>Owner</div>
+            <div>Point of contact</div>
             <div>Scaling Manager</div>
             <div>Status</div>
           </div>
@@ -477,7 +477,7 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
       <div>
         <SectionTitle>Profile</SectionTitle>
         <Field k="Business Name" v={client.business_name} tokens={t} />
-        <Field k="Owner" v={client.owner_name} tokens={t} />
+        <Field k="Point of contact" v={client.owner_name} tokens={t} />
         <Field k="Email" v={client.email} tokens={t} />
         <Field k="Scaling Manager" v={staffMap[client.scaling_manager_id]?.name} tokens={t} />
         <Field k="Status" v={client.status} tokens={t} cap />
@@ -584,7 +584,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
     <div style={{ maxWidth: 720 }}>
       <SectionTitle>Basics</SectionTitle>
       <EditField label="Business name" value={currentValue("business_name") || ""} onChange={v => set("business_name", v)} tokens={t} />
-      <EditField label="Owner name" value={currentValue("owner_name") || ""} onChange={v => set("owner_name", v)} tokens={t} />
+      <EditField label="Point of contact" value={currentValue("owner_name") || ""} onChange={v => set("owner_name", v)} tokens={t} />
       <EditField label="Email" value={currentValue("email") || ""} onChange={v => set("email", v)} tokens={t} type="email" />
       <EditSelect label="Status" value={currentValue("status")} onChange={v => set("status", v)} options={STATUS_OPTIONS} tokens={t} />
       <EditSelect
@@ -1421,7 +1421,7 @@ function NewClientModal({ tokens, session, onClose, onCreated }) {
     setErr(null);
     if (!biz.trim()) { setErr("Business name required"); return; }
     if (sendInvite && (!email.trim() || !owner.trim())) {
-      setErr("Email + owner required to send invite");
+      setErr("Email + point of contact required to send invite");
       return;
     }
     setBusy(true);
@@ -1453,11 +1453,11 @@ function NewClientModal({ tokens, session, onClose, onCreated }) {
       <div onClick={e => e.stopPropagation()} style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, padding: 28, maxWidth: 460, width: "100%" }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 18px", color: t.text }}>New client</h2>
         <EditField label="Business name" value={biz} onChange={setBiz} tokens={t} />
-        <EditField label="Owner name" value={owner} onChange={setOwner} tokens={t} />
+        <EditField label="Point of contact" value={owner} onChange={setOwner} tokens={t} />
         <EditField label="Email" value={email} onChange={setEmail} tokens={t} type="email" />
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, cursor: "pointer", fontSize: 13, color: t.textSub }}>
           <input type="checkbox" checked={sendInvite} onChange={e => setSendInvite(e.target.checked)} />
-          Send portal invite immediately *(requires email + owner)*
+          Send portal invite immediately *(requires email + point of contact)*
         </label>
         {err && <div style={{ color: t.red, fontSize: 13, marginTop: 10 }}>{err}</div>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>

@@ -1096,23 +1096,26 @@ export default async function handler(req, res) {
       }
 
       if (action === "setup-account") {
-        // Send an INVITE to the client.
-        //   1. generate_link (type=invite) creates the Supabase auth user
-        //      and returns the action_link. We control sending the email
-        //      and where the link goes.
-        //   2. Send the link via Resend with our branded invite template.
-        //   3. Post the link to the client's Slack channel (if mapped).
-        //   4. Return the link in the API response so staff can copy/paste
-        //      from the UI as a fallback.
-        // Updates clients row with owner_name + email + auth_user_id once
-        // the link generation succeeds.
+        // Three-way smart invite:
+        //   A. Client already accepted (has auth_user_id + onboarding_completed_at)
+        //      → block, tell staff to use Reset password instead.
+        //   B. Client invited but never completed onboarding (has auth_user_id,
+        //      no onboarding_completed_at) → RESEND. Generate fresh magiclink,
+        //      send via Resend + Slack, return link.
+        //   C. No auth_user_id yet → search auth.users by email.
+        //      - If a user with that email already exists (e.g. Mike — also
+        //        the point of contact on other clients) → link this client
+        //        to that user_id, generate a magiclink so they can log in,
+        //        send a 'now has portal access' email + Slack.
+        //      - If no existing user → generate_link(invite) which creates
+        //        a fresh auth user AND returns the action_link.
         const body = req.body || {};
         const client_id = typeof body.client_id === "string" ? body.client_id : "";
         const owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
         const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
 
         if (!client_id) return res.status(400).json({ error: "client_id required" });
-        if (!owner_name) return res.status(400).json({ error: "owner name required" });
+        if (!owner_name) return res.status(400).json({ error: "point of contact name required" });
         if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
           return res.status(400).json({ error: "valid email required" });
         }
@@ -1120,97 +1123,151 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: "RESEND_API_KEY not configured" });
         }
 
-        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,business_name,auth_user_id,slack_channel_id`);
+        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,business_name,auth_user_id,slack_channel_id,onboarding_completed_at`);
         if (!existing?.length) return res.status(404).json({ error: "client not found" });
-        if (existing[0].auth_user_id) {
-          return res.status(400).json({ error: "this client already has an account — use Reset password instead" });
-        }
-        const businessName = existing[0].business_name || "";
-        const slackChannelId = existing[0].slack_channel_id || null;
+        const row = existing[0];
+        const businessName = row.business_name || "";
+        const slackChannelId = row.slack_channel_id || null;
 
-        // Step 1: generate_link with type=invite creates the auth user AND
-        // returns a one-shot action_link. We control sending from here.
-        // user_metadata.needs_password=true is a defensive marker so the
-        // client portal forces the password-set form even if redirect query
-        // params get stripped.
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=invite`;
-        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_SERVICE_KEY,
-            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            type: "invite",
-            email: newEmail,
-            options: { redirect_to: redirectTo, data: { needs_password: true } },
-          }),
-        });
-        if (!linkRes.ok) {
-          const errText = await linkRes.text();
-          const friendly = linkRes.status === 422 || /already/i.test(errText)
-            ? "an account with that email already exists"
-            : `invite: ${errText}`;
-          return res.status(400).json({ error: friendly });
-        }
-        const linkJson = await linkRes.json();
-        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
-        const auth_user_id = linkJson?.user?.id || linkJson?.id;
-        if (!actionLink || !auth_user_id) {
-          return res.status(500).json({ error: "invite created but no link returned" });
+
+        // Helper: call generate_link with a given type and return action_link + user id
+        const genLink = async (type, options = {}) => {
+          const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ type, email: newEmail, options: { redirect_to: redirectTo, ...options } }),
+          });
+          if (!r.ok) {
+            const t = await r.text();
+            return { ok: false, status: r.status, text: t };
+          }
+          const j = await r.json();
+          return {
+            ok: true,
+            actionLink: j?.properties?.action_link || j?.action_link,
+            authUserId: j?.user?.id || j?.id,
+          };
+        };
+
+        let mode = "invite"; // 'invite' | 'resend' | 'link-existing'
+        let actionLink = null;
+        let auth_user_id = null;
+
+        // Case A: already fully onboarded
+        if (row.auth_user_id && row.onboarding_completed_at) {
+          return res.status(400).json({
+            error: "this client already has an active account — use Send password reset instead",
+          });
         }
 
-        // Step 2: Update the clients row (do this before email/slack so we
-        // don't end up with the auth user attached but the row not updated)
-        try {
-          const updateRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`,
-            {
-              method: "PATCH",
-              headers: {
-                apikey: SUPABASE_SERVICE_KEY,
-                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-                "Content-Type": "application/json",
-                Prefer: "return=representation",
-              },
-              body: JSON.stringify({ owner_name, email: newEmail, auth_user_id }),
+        // Case B: invited but not accepted yet → resend
+        if (row.auth_user_id && !row.onboarding_completed_at) {
+          mode = "resend";
+          const r = await genLink("magiclink");
+          if (!r.ok) return res.status(500).json({ error: `resend link: ${r.text}` });
+          actionLink = r.actionLink;
+          auth_user_id = row.auth_user_id; // unchanged
+        } else {
+          // Case C: no auth_user_id yet. Try invite first; if user already
+          // exists in auth, fall back to link-existing.
+          const inviteRes = await genLink("invite", { data: { needs_password: true } });
+          if (inviteRes.ok) {
+            mode = "invite";
+            actionLink = inviteRes.actionLink;
+            auth_user_id = inviteRes.authUserId;
+          } else if (inviteRes.status === 422 || /already/i.test(inviteRes.text || "")) {
+            // User already exists — look up by email and link
+            const lookupRes = await fetch(
+              `${SUPABASE_URL}/auth/v1/admin/users?filter=email.eq.${encodeURIComponent(newEmail)}`,
+              { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+            );
+            const lookupJson = await lookupRes.json().catch(() => ({}));
+            const existingUser = (lookupJson?.users || []).find(u => (u?.email || "").toLowerCase() === newEmail);
+            if (!existingUser?.id) {
+              return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
             }
-          );
-          if (!updateRes.ok) throw new Error(`Supabase ${updateRes.status}: ${await updateRes.text()}`);
-        } catch (updateErr) {
-          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
-            method: "DELETE",
-            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-          }).catch(() => {});
-          return res.status(500).json({ error: `update failed: ${updateErr.message}` });
+            mode = "link-existing";
+            auth_user_id = existingUser.id;
+            // Generate a magiclink so they have something clickable in the
+            // Slack/email notification.
+            const ml = await genLink("magiclink");
+            if (ml.ok) actionLink = ml.actionLink;
+            // If magiclink fails (e.g. settings disabled), the access is
+            // still wired up — they can log in normally with their existing
+            // password. We just won't have a copy/paste link.
+          } else {
+            return res.status(400).json({ error: `invite: ${inviteRes.text}` });
+          }
         }
 
-        // Step 3 + 4: send email + post to Slack in parallel. Both are
-        // best-effort — if either fails, the staff member can still copy
-        // the action_link returned in the response and send it manually.
-        const [emailRes, slackRes] = await Promise.all([
-          sendInviteEmail({
-            to: newEmail,
-            actionLink,
-            businessName,
-            resendApiKey: process.env.RESEND_API_KEY,
-          }),
-          postInviteToSlack({
-            slackChannelId,
-            businessName,
-            ownerName: owner_name,
-            email: newEmail,
-            actionLink,
-          }),
-        ]);
+        if (!auth_user_id) {
+          return res.status(500).json({ error: "auth_user_id not resolved" });
+        }
+
+        // Update the clients row (skip on resend — auth_user_id unchanged,
+        // and we don't want to overwrite owner_name/email mid-flight).
+        if (mode !== "resend") {
+          try {
+            const updateRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`,
+              {
+                method: "PATCH",
+                headers: {
+                  apikey: SUPABASE_SERVICE_KEY,
+                  Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                  "Content-Type": "application/json",
+                  Prefer: "return=representation",
+                },
+                body: JSON.stringify({ owner_name, email: newEmail, auth_user_id }),
+              }
+            );
+            if (!updateRes.ok) throw new Error(`Supabase ${updateRes.status}: ${await updateRes.text()}`);
+          } catch (updateErr) {
+            // Only roll back the auth user if WE created it (invite mode).
+            // For link-existing, the user belongs to other clients too.
+            if (mode === "invite") {
+              await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
+                method: "DELETE",
+                headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+              }).catch(() => {});
+            }
+            return res.status(500).json({ error: `update failed: ${updateErr.message}` });
+          }
+        }
+
+        // Notify via Resend + Slack in parallel. For 'link-existing' the
+        // copy is more about "you now have access" than "set your password",
+        // but the invite email template is generic enough either way.
+        const [emailRes, slackRes] = actionLink
+          ? await Promise.all([
+              sendInviteEmail({
+                to: newEmail,
+                actionLink,
+                businessName,
+                resendApiKey: process.env.RESEND_API_KEY,
+              }),
+              postInviteToSlack({
+                slackChannelId,
+                businessName,
+                ownerName: owner_name,
+                email: newEmail,
+                actionLink,
+              }),
+            ])
+          : [{ ok: false, error: "no link generated" }, { ok: false, skipped: true }];
 
         return res.status(200).json({
           id: client_id,
           business_name: businessName,
           email: newEmail,
           invited: true,
+          mode,
           action_link: actionLink,
           email_sent: !!emailRes?.ok,
           slack_posted: !!slackRes?.ok,
