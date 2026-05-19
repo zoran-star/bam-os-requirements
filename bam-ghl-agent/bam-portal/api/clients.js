@@ -323,7 +323,7 @@ async function sendInviteEmail({ to, actionLink, businessName, resendApiKey }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "BAM Business <portal@byanymeansbball.com>",
+      from: "BAM Business <portal@byanymeansbusiness.com>",
       to: [to],
       subject: `${businessName ? `${businessName.trim()}: w` : "W"}elcome to your BAM portal — set your password`,
       html,
@@ -431,7 +431,7 @@ async function sendResetPasswordEmail({ to, actionLink, resendApiKey }) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "BAM Business <portal@byanymeansbball.com>",
+      from: "BAM Business <portal@byanymeansbusiness.com>",
       to: [to],
       subject: "Reset your BAM portal password",
       html,
