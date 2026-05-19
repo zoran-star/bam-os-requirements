@@ -3236,25 +3236,25 @@
 </div>
 
 
-<!-- ─── Admin Feedback Widget (red floating button bottom-right) ─────────
-     Hidden by default. Shown by setupAdminFeedbackWidget() if the logged-in
-     user is admin or scaling_manager. Lets admins flag bugs / submit feedback
-     from anywhere in the client portal. Lands in portal_feedback table and
-     surfaces in the staff portal's Feedback tab.
+<!-- ─── Universal Feedback Widget (gold floating button bottom-right) ──
+     ALWAYS visible (even before login). Anyone (anonymous, client, staff)
+     can submit a Bug or Feature request from any page. Lands in
+     portal_feedback. Only Zoran sees them via the staff portal Feedback tab.
+     The widget IDs still start with "admin-fb" for historical reasons.
 -->
 <style>
   #admin-fb-btn {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9000;
-    width: 56px; height: 56px; border-radius: 50%;
-    background: #ED4444; color: #fff; border: none; cursor: pointer;
-    box-shadow: 0 6px 20px rgba(237, 68, 68, 0.45), 0 2px 6px rgba(0,0,0,0.3);
-    display: none; align-items: center; justify-content: center;
-    font-size: 24px; transition: transform 0.18s ease, box-shadow 0.18s ease;
+    position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: #E8C547; color: #0A0A0B; border: none; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(232, 197, 71, 0.40), 0 2px 6px rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
-  #admin-fb-btn:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 8px 26px rgba(237, 68, 68, 0.55), 0 4px 10px rgba(0,0,0,0.35); }
+  #admin-fb-btn:hover { transform: translateY(-2px) scale(1.06); box-shadow: 0 10px 28px rgba(232, 197, 71, 0.50), 0 4px 10px rgba(0,0,0,0.35); }
   #admin-fb-btn:active { transform: translateY(0) scale(0.98); }
   #admin-fb-overlay {
-    position: fixed; inset: 0; z-index: 9100;
+    position: fixed; inset: 0; z-index: 10100;
     background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(4px);
     display: none; align-items: center; justify-content: center;
     padding: 24px;
@@ -3306,10 +3306,36 @@
   }
   .fb-btn-cancel { background: transparent; color: #B0B0BA; border: 1px solid rgba(255,255,255,0.12); }
   .fb-btn-cancel:hover { background: rgba(255,255,255,0.04); color: #F5F5F7; }
-  .fb-btn-submit { background: #ED4444; color: #fff; }
-  .fb-btn-submit:hover { background: #F25555; }
-  .fb-btn-submit:disabled { background: #4A2828; color: #888; cursor: not-allowed; }
+  .fb-btn-submit { background: #E8C547; color: #0A0A0B; }
+  .fb-btn-submit:hover { background: #F0D15D; }
+  .fb-btn-submit:disabled { background: #4A4128; color: #888; cursor: not-allowed; }
   #admin-fb-msg { font-size: 12px; margin-top: 12px; min-height: 16px; }
+
+  /* Bug / Feature segmented toggle inside the modal */
+  .fb-kind-toggle {
+    display: flex; gap: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 6px;
+    padding: 4px;
+    margin-bottom: 18px;
+  }
+  .fb-kind-opt {
+    flex: 1; padding: 9px 14px;
+    background: transparent; border: 0; border-radius: 4px;
+    color: #B0B0BA;
+    font-family: inherit;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .fb-kind-opt:hover { color: #F5F5F7; }
+  .fb-kind-opt.active {
+    background: #E8C547;
+    color: #0A0A0B;
+    box-shadow: 0 2px 6px rgba(232,197,71,0.30);
+  }
 
   /* ═══════════════════════════════════════════════════════════════════
      UI POLISH — prototype-informed (2026-05-17)
@@ -4302,7 +4328,7 @@
   }
 </style>
 
-<button id="admin-fb-btn" onclick="openAdminFeedback()" title="Send feedback (admin only)" aria-label="Send feedback">
+<button id="admin-fb-btn" onclick="openAdminFeedback()" title="Send feedback" aria-label="Send feedback">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>
@@ -4310,11 +4336,16 @@
 
 <div id="admin-fb-overlay" onclick="if (event.target === this) closeAdminFeedback()">
   <div id="admin-fb-modal">
-    <h2>Send feedback</h2>
-    <p class="fb-sub">Flag a bug, a UX issue, or anything else. Lands in the Feedback tab of the staff portal.</p>
+    <h2>Got feedback?</h2>
+    <p class="fb-sub">Tell us about a bug or a feature you'd like to see. Goes straight to Zoran.</p>
 
-    <label for="admin-fb-body">What's up?</label>
-    <textarea id="admin-fb-body" placeholder="Describe what you saw, what you expected, and what page you were on…"></textarea>
+    <div class="fb-kind-toggle" role="radiogroup" aria-label="Feedback type">
+      <button type="button" class="fb-kind-opt active" data-kind="bug" onclick="setFeedbackKind('bug')" role="radio" aria-checked="true">🐛 Bug</button>
+      <button type="button" class="fb-kind-opt" data-kind="feature" onclick="setFeedbackKind('feature')" role="radio" aria-checked="false">✨ Feature</button>
+    </div>
+
+    <label for="admin-fb-body" id="admin-fb-body-label">What's the bug?</label>
+    <textarea id="admin-fb-body" placeholder="What you saw, what you expected, what page you were on..."></textarea>
 
     <label>Attach a screenshot or file <span style="color:#6E6E78; text-transform:none; letter-spacing:0; font-weight:400;">(optional)</span></label>
     <div id="admin-fb-file-row">
@@ -8442,24 +8473,16 @@ async function submitNewPassword() {
 // ── Admin feedback widget ────────────────────────────────────────
 // Shown only if the logged-in auth user is staff with role=admin or
 // scaling_manager. Lets them flag bugs from anywhere in the client portal.
-async function setupAdminFeedbackWidget() {
-  try {
-    const { data: { session } } = await _sb.auth.getSession();
-    if (!session?.user?.email) return;
-    const { data: staffRow } = await _sb.from('staff')
-      .select('role').eq('email', session.user.email).maybeSingle();
-    if (!staffRow) return; // not staff, no widget
-    if (staffRow.role !== 'admin' && staffRow.role !== 'scaling_manager') return;
-    document.getElementById('admin-fb-btn').style.display = 'flex';
-  } catch (e) {
-    // Silent failure — widget just stays hidden if anything errors
-    console.warn('admin feedback widget setup failed:', e?.message || e);
-  }
-}
+// Widget is visible by default via CSS (display: flex) so it shows even
+// before login. No setup gating needed; we leave the function as a no-op
+// for backwards compat with the boot() call.
+async function setupAdminFeedbackWidget() { /* widget always-on now */ }
 
 let _adminFbSelectedFile = null;
+let _adminFbKind = 'bug';
 
 function openAdminFeedback() {
+  setFeedbackKind('bug'); // always reset to bug on open
   document.getElementById('admin-fb-overlay').classList.add('open');
   document.getElementById('admin-fb-body').focus();
 }
@@ -8473,6 +8496,24 @@ function closeAdminFeedback() {
   _adminFbSelectedFile = null;
   const btn = document.getElementById('admin-fb-submit-btn');
   btn.disabled = false; btn.textContent = 'Send →';
+}
+
+function setFeedbackKind(kind) {
+  _adminFbKind = (kind === 'feature') ? 'feature' : 'bug';
+  document.querySelectorAll('#admin-fb-modal .fb-kind-opt').forEach(b => {
+    const isActive = b.dataset.kind === _adminFbKind;
+    b.classList.toggle('active', isActive);
+    b.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
+  const bodyEl = document.getElementById('admin-fb-body');
+  const labelEl = document.getElementById('admin-fb-body-label');
+  if (_adminFbKind === 'bug') {
+    labelEl.textContent = "What's the bug?";
+    bodyEl.placeholder = "What you saw, what you expected, what page you were on...";
+  } else {
+    labelEl.textContent = "What's the feature?";
+    bodyEl.placeholder = "What would you like to be able to do? Who needs it, why...";
+  }
 }
 
 function onAdminFeedbackFilePick() {
@@ -8497,30 +8538,41 @@ async function submitAdminFeedback() {
   let fileUrl = null;
   let fileName = null;
   try {
-    // Optional file upload to ticket-files bucket under feedback/ folder
+    // Optional file upload to ticket-files bucket under feedback/ folder.
+    // For anonymous (pre-login) users this requires the bucket to allow
+    // anon insert; if it fails we still submit the feedback as text-only.
     if (_adminFbSelectedFile) {
-      const file = _adminFbSelectedFile;
-      const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
-      const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `feedback/${uid}-${safe}`;
-      const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
-        contentType: file.type || 'application/octet-stream',
-        cacheControl: '3600',
-      });
-      if (upErr) throw new Error(upErr.message);
-      const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
-      fileUrl = urlData.publicUrl;
-      fileName = file.name;
+      try {
+        const file = _adminFbSelectedFile;
+        const uid = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2,8)}`);
+        const safe = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `feedback/${uid}-${safe}`;
+        const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
+          contentType: file.type || 'application/octet-stream',
+          cacheControl: '3600',
+        });
+        if (upErr) throw new Error(upErr.message);
+        const { data: urlData } = _sb.storage.from('ticket-files').getPublicUrl(path);
+        fileUrl = urlData.publicUrl;
+        fileName = file.name;
+      } catch (upErr) {
+        // Non-fatal: text feedback still goes through, just no attachment.
+        console.warn('Feedback file upload failed (continuing with text only):', upErr?.message || upErr);
+      }
     }
 
-    // Submit feedback
-    const { data: { session } } = await _sb.auth.getSession();
+    // Submit feedback. Auth header only added if we have a session;
+    // anonymous submissions are valid (API rate-limits by IP).
+    const { data: { session } } = await _sb.auth.getSession().catch(() => ({ data: { session: null } }));
     const tok = session?.access_token;
+    const headers = { 'Content-Type': 'application/json' };
+    if (tok) headers.Authorization = `Bearer ${tok}`;
     const res = await fetch('/api/clients?action=submit-feedback', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+      headers,
       body: JSON.stringify({
         body,
+        kind: _adminFbKind,
         file_url: fileUrl,
         file_name: fileName,
         page: window.location.pathname + window.location.search,

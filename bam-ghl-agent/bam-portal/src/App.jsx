@@ -27,6 +27,7 @@ const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
+import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
 import SetPasswordView from './views/SetPasswordView';
 import DevRoleSwitcher from './components/DevRoleSwitcher';
 import { supabase } from './lib/supabase';
@@ -117,9 +118,10 @@ export default function BAMPortal() {
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
-  // Feedback tab: surfaces portal_feedback rows (admin-only red button on
-  // client portal + Settings feedback widget on staff portal both feed it).
-  const canSeeFeedback = me && (me.role === "admin" || me.role === "scaling_manager");
+  // Feedback tab: ZORAN-ONLY (email-gated, not role-gated). The widget that
+  // submits feedback is universal (any user, any page), but only Zoran can
+  // see the list + check items off as resolved.
+  const canSeeFeedback = me?.email === "zoran@byanymeansbball.com";
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 
@@ -769,6 +771,9 @@ export default function BAMPortal() {
       </div>
 
       {showCmd && <SearchOverlay tokens={tk} dark={dark} onClose={() => setShowCmd(false)} allClients={[...onboardingClients, ...activeClients]} onNavigate={(key) => { setNav(key); setShowCmd(false); }} />}
+
+      {/* Universal feedback widget — always visible to staff. Submissions go to portal_feedback. Only Zoran sees the inbox. */}
+      <UniversalFeedbackWidget tokens={tk} session={session} />
 
       {/* Toast */}
       {toast && (

@@ -159,6 +159,56 @@
     line-height: 1.7;
   }
   .success-card ol li::marker { color: var(--gold); font-weight: 600; }
+
+  /* ── Universal feedback widget (text-only on this page; signup users can't upload files) ── */
+  #fb-btn {
+    position: fixed; bottom: 20px; right: 20px; z-index: 10000;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--gold); color: var(--ink-0); border: 0; cursor: pointer;
+    box-shadow: 0 6px 20px rgba(232, 197, 71, 0.40), 0 2px 6px rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  #fb-btn:hover { transform: translateY(-2px) scale(1.06); box-shadow: 0 10px 28px rgba(232,197,71,0.50), 0 4px 10px rgba(0,0,0,0.35); }
+  #fb-overlay {
+    position: fixed; inset: 0; z-index: 10100;
+    background: rgba(0,0,0,0.72); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; padding: 24px;
+  }
+  #fb-overlay.open { display: flex; }
+  #fb-modal {
+    background: var(--ink-1); border: 1px solid var(--ink-3);
+    border-radius: var(--radius); padding: 26px; max-width: 460px; width: 100%;
+  }
+  #fb-modal h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+  #fb-modal .fb-sub { font-size: 13px; color: var(--fg-1); margin: 0 0 18px; line-height: 1.55; }
+  #fb-modal label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-2); margin-bottom: 8px; }
+  #fb-modal .toggle {
+    display: flex; gap: 0; padding: 4px; background: var(--ink-2);
+    border: 1px solid var(--ink-3); border-radius: var(--radius); margin-bottom: 16px;
+  }
+  #fb-modal .toggle button {
+    flex: 1; padding: 9px 14px; background: transparent; border: 0; border-radius: 4px;
+    color: var(--fg-1); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+  }
+  #fb-modal .toggle button.active { background: var(--gold); color: var(--ink-0); }
+  #fb-modal textarea {
+    width: 100%; min-height: 100px; padding: 11px 13px;
+    background: var(--ink-2); border: 1px solid var(--ink-3); border-radius: var(--radius);
+    color: var(--fg-0); font-family: inherit; font-size: 14px; line-height: 1.5; box-sizing: border-box;
+    resize: vertical; margin-bottom: 16px;
+  }
+  #fb-modal textarea:focus { outline: none; border-color: var(--gold); }
+  #fb-msg { font-size: 12px; margin: 0 0 10px; min-height: 16px; }
+  #fb-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  #fb-actions button {
+    padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 700;
+    cursor: pointer; border: 0; font-family: inherit;
+  }
+  #fb-cancel { background: transparent; color: var(--fg-1); border: 1px solid var(--ink-3) !important; }
+  #fb-submit { background: var(--gold); color: var(--ink-0); }
+  #fb-submit:disabled { background: #4A4128; color: #888; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -252,6 +302,93 @@
       btn.textContent = 'Create my portal →';
     }
   });
+</script>
+
+<!-- ── Universal Feedback Widget (text-only on the signup page) ── -->
+<button id="fb-btn" onclick="fbOpen()" aria-label="Send feedback">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+</button>
+<div id="fb-overlay" onclick="if (event.target === this) fbClose()">
+  <div id="fb-modal">
+    <h2>Got feedback?</h2>
+    <p class="fb-sub">Tell us about a bug or a feature you'd like to see. Goes straight to Zoran.</p>
+    <div class="toggle" role="radiogroup">
+      <button type="button" class="active" data-kind="bug" onclick="fbSetKind('bug')" role="radio" aria-checked="true">🐛 Bug</button>
+      <button type="button" data-kind="feature" onclick="fbSetKind('feature')" role="radio" aria-checked="false">✨ Feature</button>
+    </div>
+    <label id="fb-body-label">What's the bug?</label>
+    <textarea id="fb-body" placeholder="What you saw, what you expected..."></textarea>
+    <div id="fb-msg"></div>
+    <div id="fb-actions">
+      <button type="button" id="fb-cancel" onclick="fbClose()">Cancel</button>
+      <button type="button" id="fb-submit" onclick="fbSend()">Send →</button>
+    </div>
+  </div>
+</div>
+<script>
+  let _fbKind = 'bug';
+  function fbOpen() {
+    fbSetKind('bug');
+    document.getElementById('fb-overlay').classList.add('open');
+    document.getElementById('fb-body').focus();
+  }
+  function fbClose() {
+    document.getElementById('fb-overlay').classList.remove('open');
+    document.getElementById('fb-body').value = '';
+    document.getElementById('fb-msg').textContent = '';
+    const b = document.getElementById('fb-submit');
+    b.disabled = false; b.textContent = 'Send →';
+  }
+  function fbSetKind(kind) {
+    _fbKind = (kind === 'feature') ? 'feature' : 'bug';
+    document.querySelectorAll('#fb-modal .toggle button').forEach(b => {
+      const on = b.dataset.kind === _fbKind;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    const label = document.getElementById('fb-body-label');
+    const ta = document.getElementById('fb-body');
+    if (_fbKind === 'bug') {
+      label.textContent = "What's the bug?";
+      ta.placeholder = "What you saw, what you expected...";
+    } else {
+      label.textContent = "What's the feature?";
+      ta.placeholder = "What would you like to be able to do? Who needs it, why...";
+    }
+  }
+  async function fbSend() {
+    const body = document.getElementById('fb-body').value.trim();
+    const msg = document.getElementById('fb-msg');
+    const btn = document.getElementById('fb-submit');
+    msg.style.color = '#f09090'; msg.textContent = '';
+    if (!body) { msg.textContent = 'Type something first.'; return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    // Include the email they typed in the signup form (if any) so Zoran knows who submitted.
+    const signupEmail = (document.getElementById('email')?.value || '').trim();
+    try {
+      const res = await fetch('/api/clients?action=submit-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body,
+          kind: _fbKind,
+          page: window.location.pathname + window.location.search,
+          portal: 'signup',
+          submitter_email: signupEmail || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      msg.style.color = '#7ED996'; msg.textContent = 'Sent ✓ Thanks.';
+      btn.textContent = 'Sent ✓';
+      setTimeout(fbClose, 1200);
+    } catch (err) {
+      msg.style.color = '#f09090'; msg.textContent = err.message || 'Failed to send.';
+      btn.disabled = false; btn.textContent = 'Send →';
+    }
+  }
 </script>
 </body>
 </html>

@@ -7,6 +7,10 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
 
+// Identity gate for feedback-management actions (list-feedback,
+// resolve-feedback). Only this email can see / check off feedback.
+const ZORAN_EMAIL = "zoran@byanymeansbball.com";
+
 // In-memory cache for Stripe revenue (keyed by stripe_customer_id, 60s TTL)
 const revenueCache = new Map();
 const REVENUE_TTL_MS = 60 * 1000;
@@ -578,6 +582,92 @@ export default async function handler(req, res) {
         return res.status(200).json(GENERIC_RESET_RESPONSE);
       }
 
+      // ── Public submit-feedback path ──
+      // Universal feedback widget on every page (client portal, signup page,
+      // staff portal). Accepts anonymous submissions (no auth header) AND
+      // authenticated submissions (Bearer token used to populate submitter
+      // email + author_id if the user is staff). Anonymous submissions are
+      // IP rate-limited to 20/24h to deter spam.
+      if (publicSignupAction === "submit-feedback") {
+        const fb = req.body || {};
+        const fbBody = typeof fb.body === "string" ? fb.body.trim() : "";
+        const fbKind = fb.kind === "feature" ? "feature" : "bug";
+        const fileUrl = typeof fb.file_url === "string" ? fb.file_url.trim() : null;
+        const fileName = typeof fb.file_name === "string" ? fb.file_name.trim() : null;
+        const page = typeof fb.page === "string" ? fb.page.trim().slice(0, 500) : "";
+        const portalKind = fb.portal === "client" || fb.portal === "staff" || fb.portal === "signup"
+          ? fb.portal : "client";
+        if (!fbBody) return res.status(400).json({ error: "feedback body required" });
+
+        // Try to resolve the submitter from the Bearer token if present.
+        // Auth failures don't reject the submission, just leave fields blank.
+        let submitterEmail = null;
+        let authorId = null;
+        if (hasAuth) {
+          const fbToken = (req.headers.authorization || "").slice(7);
+          try {
+            const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+              headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${fbToken}` },
+            });
+            if (whoRes.ok) {
+              const who = await whoRes.json();
+              if (who?.email) {
+                submitterEmail = who.email;
+                try {
+                  const sRows = await supabaseSelect(
+                    `staff?email=eq.${encodeURIComponent(who.email)}&select=id`
+                  );
+                  authorId = sRows?.[0]?.id || null;
+                } catch (_) { /* not staff */ }
+              }
+            }
+          } catch (_) { /* unauth submission, fine */ }
+        }
+        // Allow caller-supplied email if no auth (e.g. anon user on signup page typed it in)
+        if (!submitterEmail && typeof fb.submitter_email === "string"
+            && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fb.submitter_email.trim())) {
+          submitterEmail = fb.submitter_email.trim().toLowerCase();
+        }
+
+        // IP rate limit anonymous submissions (20 per 24h).
+        if (!authorId && !submitterEmail) {
+          const ip = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "unknown")
+            .toString().split(",")[0].trim();
+          try {
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+            const recent = await supabaseSelect(
+              `signup_attempts?ip=eq.${encodeURIComponent(ip)}&kind=eq.feedback&attempted_at=gte.${encodeURIComponent(since)}&select=id`
+            );
+            if (Array.isArray(recent) && recent.length >= 20) {
+              return res.status(429).json({ error: "Too many feedback submissions. Try again later." });
+            }
+            supabaseInsert("signup_attempts", { ip, email: null, succeeded: true, kind: "feedback" }).catch(() => {});
+          } catch (_) { /* fail-open */ }
+        }
+
+        try {
+          const insertRow = {
+            body: fbBody,
+            kind: fbKind,
+            source: "text",
+            page: page || null,
+            file_url: fileUrl,
+            file_name: fileName,
+            submitter_email: submitterEmail,
+            portal: portalKind,
+            status: "pending",
+          };
+          // Only set author_id when we resolved one (otherwise the table's
+          // gen_random_uuid() default fills in a placeholder).
+          if (authorId) insertRow.author_id = authorId;
+          const rows = await supabaseInsert("portal_feedback", insertRow);
+          const row = Array.isArray(rows) ? rows[0] : rows;
+          return res.status(200).json({ ok: true, id: row?.id });
+        } catch (insertErr) {
+          return res.status(500).json({ error: `feedback insert failed: ${insertErr.message}` });
+        }
+      }
+
       // ── Public self-serve signup path ──
       // /onboarding.html posts {business_name, owner_name, email} with no auth header.
       // Treat as a public signup (creates client + auth user via Supabase invite).
@@ -775,7 +865,10 @@ export default async function handler(req, res) {
       //   list-feedback            admin+scaling   (Feedback tab in staff portal)
       //   update-fields            any staff (field-level gating below)
       //   (default insert)         admin+scaling
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "archive", "submit-feedback", "list-feedback"]);
+      // submit-feedback moved to the public path (no auth required).
+      // list-feedback + resolve-feedback flow through staff auth, then are
+      // additionally gated to ZORAN_EMAIL inside their handlers.
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "archive", "list-feedback", "resolve-feedback"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -1126,56 +1219,71 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true, archived: true });
       }
 
-      // ── action=submit-feedback ──
-      // Admin (or scaling_manager) flags a bug / leaves feedback from anywhere
-      // in the portal. Optionally attaches a file. Lands in portal_feedback
-      // (portal='client' for client-portal red button, 'staff' otherwise).
-      if (action === "submit-feedback") {
-        const body = req.body || {};
-        const fbBody = typeof body.body === "string" ? body.body.trim() : "";
-        const fileUrl = typeof body.file_url === "string" ? body.file_url.trim() : null;
-        const fileName = typeof body.file_name === "string" ? body.file_name.trim() : null;
-        const page = typeof body.page === "string" ? body.page.trim().slice(0, 500) : "";
-        const portal = body.portal === "client" ? "client" : "staff";
-        if (!fbBody) return res.status(400).json({ error: "feedback body required" });
-
-        // Resolve the submitter's staff id (we know they're admin/scaling from
-        // the auth gate above; staffRows lookup was done at handler top).
-        const submitterRows = await supabaseSelect(
-          `staff?email=eq.${encodeURIComponent(user.email)}&select=id`
-        );
-        const authorId = submitterRows?.[0]?.id || null;
-
-        try {
-          const rows = await supabaseInsert("portal_feedback", {
-            body: fbBody,
-            source: "text",
-            page: page || null,
-            file_url: fileUrl,
-            file_name: fileName,
-            submitter_email: user.email,
-            portal,
-            author_id: authorId,
-            status: "pending",
-          });
-          const row = Array.isArray(rows) ? rows[0] : rows;
-          return res.status(200).json({ ok: true, id: row?.id });
-        } catch (insertErr) {
-          return res.status(500).json({ error: `feedback insert failed: ${insertErr.message}` });
-        }
-      }
+      // (submit-feedback moved up to the public path so anonymous + clients
+      //  + staff can all use the universal widget. See above.)
 
       // ── action=list-feedback ──
-      // Admin-only. Returns the most recent portal_feedback rows for the
-      // staff portal's Feedback tab.
+      // ZORAN-ONLY (email-gated, not role-gated). Returns the most recent
+      // portal_feedback rows for the staff portal's Feedback tab.
       if (action === "list-feedback") {
-        const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
-        const portalFilter = req.query.portal === "client" || req.query.portal === "staff"
+        if (user.email !== ZORAN_EMAIL) {
+          return res.status(403).json({ error: "feedback view is Zoran-only" });
+        }
+        const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
+        const portalFilter = (req.query.portal === "client" || req.query.portal === "staff" || req.query.portal === "signup")
           ? `&portal=eq.${req.query.portal}` : "";
+        const kindFilter = (req.query.kind === "bug" || req.query.kind === "feature")
+          ? `&kind=eq.${req.query.kind}` : "";
+        // Open first (resolved_at NULL), then by newest. Postgres orders NULLs
+        // last by default with DESC; use ASC NULLS FIRST to put unresolved on top.
         const rows = await supabaseSelect(
-          `portal_feedback?select=*${portalFilter}&order=created_at.desc&limit=${limit}`
+          `portal_feedback?select=*${portalFilter}${kindFilter}&order=resolved_at.asc.nullsfirst,created_at.desc&limit=${limit}`
         );
         return res.status(200).json({ data: rows || [] });
+      }
+
+      // ── action=resolve-feedback ──
+      // ZORAN-ONLY. Checks off a feedback item as resolved (or un-resolves
+      // it with ?undo=1).
+      if (action === "resolve-feedback") {
+        if (user.email !== ZORAN_EMAIL) {
+          return res.status(403).json({ error: "feedback resolve is Zoran-only" });
+        }
+        const fbId = typeof req.query.id === "string" ? req.query.id : "";
+        if (!fbId) return res.status(400).json({ error: "id required" });
+        const undo = req.query.undo === "1" || req.body?.undo === true;
+
+        // Resolve the staff id for Zoran (for the resolved_by FK)
+        const sRows = await supabaseSelect(
+          `staff?email=eq.${encodeURIComponent(ZORAN_EMAIL)}&select=id`
+        );
+        const zoranStaffId = sRows?.[0]?.id || null;
+
+        const updateBody = undo
+          ? { resolved_at: null, resolved_by: null }
+          : { resolved_at: new Date().toISOString(), resolved_by: zoranStaffId };
+        const updRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/portal_feedback?id=eq.${encodeURIComponent(fbId)}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify(updateBody),
+          }
+        );
+        if (!updRes.ok) {
+          const txt = await updRes.text();
+          return res.status(500).json({ error: `resolve failed: ${txt}` });
+        }
+        const updated = await updRes.json();
+        if (!Array.isArray(updated) || updated.length === 0) {
+          return res.status(404).json({ error: "feedback id not found" });
+        }
+        return res.status(200).json({ ok: true, resolved: !undo, item: updated[0] });
       }
 
       if (action === "setup-account") {
