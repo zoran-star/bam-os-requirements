@@ -381,6 +381,11 @@ async function postInviteToSlack({ slackChannelId, businessName, ownerName, emai
 // email template.
 async function generateLinkForResetOrInvite({ supabaseUrl, serviceKey, email, redirectTo }) {
   const tryGen = async (type, opts = {}) => {
+    // CRITICAL: redirect_to MUST be at the top level of the request body —
+    // nesting it inside `options: { redirect_to }` causes Supabase to
+    // silently ignore the value and substitute the Site URL, breaking
+    // every reset/invite link. Confirmed via direct API probe 2026-05-19.
+    const body = { type, email, redirect_to: redirectTo, ...opts };
     const r = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
       method: "POST",
       headers: {
@@ -388,7 +393,7 @@ async function generateLinkForResetOrInvite({ supabaseUrl, serviceKey, email, re
         Authorization: `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ type, email, options: { redirect_to: redirectTo, ...opts } }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) return { ok: false, status: r.status, text: await r.text() };
     const j = await r.json();
@@ -1210,8 +1215,12 @@ export default async function handler(req, res) {
         const { clientUrl } = portalUrls(req);
         const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
 
-        // Helper: call generate_link with a given type and return action_link + user id
-        const genLink = async (type, options = {}) => {
+        // Helper: call generate_link with a given type and return action_link + user id.
+        // redirect_to MUST be at the top level (not nested under options) or
+        // Supabase silently ignores it and uses Site URL. See note in
+        // generateLinkForResetOrInvite above for the full story.
+        const genLink = async (type, extra = {}) => {
+          const body = { type, email: newEmail, redirect_to: redirectTo, ...extra };
           const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
             method: "POST",
             headers: {
@@ -1219,7 +1228,7 @@ export default async function handler(req, res) {
               Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ type, email: newEmail, options: { redirect_to: redirectTo, ...options } }),
+            body: JSON.stringify(body),
           });
           if (!r.ok) {
             const t = await r.text();
