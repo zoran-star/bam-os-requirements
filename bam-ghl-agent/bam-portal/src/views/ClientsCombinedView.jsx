@@ -39,30 +39,46 @@ const ROLES = {
 
 const STATUS_OPTIONS = ["onboarding", "active", "paused", "churned"];
 
-// Derive the user-facing status label from a client row. Live = the
-// onboarding flow is complete (call done OR link accepted), or status was
-// flipped to active manually.
-//   onboarding + method=call  + !call_completed_at  → Call pending (amber)
-//   onboarding + method=send_link + !auth_user_id   → Pending link accept (amber)
-//   onboarding + no method picked yet               → Onboarding (amber)
-//   active / call done / link accepted              → Live (green)
-//   paused / churned                                → keep label, dim/red
+// Derive the user-facing status label from a client row.
+//
+// Priority order matters: pending onboarding states (Call pending / Pending
+// link accept) win over the raw status column. Picking a method on an
+// already-active client is treated as "they're going through onboarding
+// again" — the pill flips to pending until the call is marked done or the
+// new auth user is attached. Otherwise we'd silently lie ("Live" pill
+// while Call done? sits unchecked).
+//
+//   paused                                                  → Paused
+//   churned                                                 → Churned
+//   method=call + !call_completed_at                        → Call pending
+//   method=send_link + !auth_user_id                        → Pending link accept
+//   active / call done / link accepted                      → Live
+//   onboarding + no method picked yet                       → Onboarding
 function deriveClientStatus(client, t) {
   if (client.status === "paused") return { label: "Paused", color: t.textMute };
   if (client.status === "churned") return { label: "Churned", color: t.red };
+
+  if (client.onboarding_method === "call" && !client.call_completed_at) {
+    return { label: "Call pending", color: t.amber };
+  }
+  if (client.onboarding_method === "send_link" && !client.auth_user_id) {
+    return { label: "Pending link accept", color: t.amber };
+  }
+
   if (client.status === "active") return { label: "Live", color: t.green };
-  // status === "onboarding"
-  if (client.onboarding_method === "call") {
-    return client.call_completed_at
-      ? { label: "Live", color: t.green }
-      : { label: "Call pending", color: t.amber };
+
+  // Onboarding completion-derived live: method is set AND completion marker
+  // is present (call done OR auth user attached) but status hasn't been
+  // flipped yet (mostly only possible for send_link clients, since call
+  // done auto-flips status to active).
+  if (client.onboarding_method === "call" && client.call_completed_at) {
+    return { label: "Live", color: t.green };
   }
-  if (client.onboarding_method === "send_link") {
-    return client.auth_user_id
-      ? { label: "Live", color: t.green }
-      : { label: "Pending link accept", color: t.amber };
+  if (client.onboarding_method === "send_link" && client.auth_user_id) {
+    return { label: "Live", color: t.green };
   }
-  // No method picked yet
+
+  // No method picked + status === "onboarding"
   return { label: "Onboarding", color: t.amber };
 }
 
