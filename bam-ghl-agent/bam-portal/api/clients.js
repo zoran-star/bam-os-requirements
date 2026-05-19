@@ -220,6 +220,158 @@ function buildResetPasswordEmail(actionLink) {
   return { html, text };
 }
 
+// Invite email — separate template from reset-password so the copy
+// matches a brand-new account setup ("Set your password" vs "Reset").
+function buildInviteEmail(actionLink, businessName) {
+  const biz = (businessName || "").trim();
+  const greeting = biz ? `Welcome ${biz}` : "Welcome";
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${greeting} to your BAM portal</title>
+</head>
+<body style="margin:0;padding:0;background:#F5F1E8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1A1A1F;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F1E8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <tr>
+            <td style="background:#0B0B0D;padding:24px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                <td style="font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em;">
+                  <span style="color:#E8C547;">BAM</span> Business
+                </td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 32px 8px 32px;">
+              <p style="margin:0 0 6px;font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;font-weight:600;color:#8B6914;letter-spacing:0.14em;text-transform:uppercase;">Client Portal</p>
+              <h1 style="margin:0 0 18px;font-family:'Space Grotesk',-apple-system,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.025em;color:#0B0B0D;line-height:1.15;">
+                ${greeting} to your BAM portal
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#3A3A45;">
+                Your BAM Business portal is ready. Click the button below to set your password and log in.
+                You'll use this portal to track tickets, request changes, and see your live campaigns.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                <td bgcolor="#E8C547" style="border-radius:6px;">
+                  <a href="${actionLink}"
+                     style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:700;color:#0B0B0D;text-decoration:none;letter-spacing:-0.01em;border-radius:6px;">
+                    Set your password →
+                  </a>
+                </td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 32px 12px 32px;">
+              <p style="margin:0 0 8px;font-size:13px;color:#666;">
+                Button not working? Copy and paste this link into your browser:
+              </p>
+              <p style="margin:0;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;">
+                <a href="${actionLink}" style="color:#0B0B0D;text-decoration:underline;">${actionLink}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 36px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="border-top:1px solid #E8E8E8;height:1px;line-height:1px;">&nbsp;</td></tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:12px;line-height:1.55;color:#888;">
+                This link expires in <strong style="color:#3A3A45;">24 hours</strong>.
+                If you weren't expecting this, you can ignore the email — no account changes happen until you click the link.
+              </p>
+              <p style="margin:14px 0 0;font-size:11px;color:#AAA;">
+                BAM Business
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  const text = [
+    `${greeting} to your BAM portal`,
+    "",
+    "Your BAM Business portal is ready. Click the link below to set your password and log in:",
+    actionLink,
+    "",
+    "This link expires in 24 hours.",
+    "",
+    "— BAM Business",
+  ].join("\n");
+  return { html, text };
+}
+
+async function sendInviteEmail({ to, actionLink, businessName, resendApiKey }) {
+  const { html, text } = buildInviteEmail(actionLink, businessName);
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "BAM Business <portal@byanymeansbball.com>",
+      to: [to],
+      subject: `${businessName ? `${businessName.trim()}: w` : "W"}elcome to your BAM portal — set your password`,
+      html,
+      text,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Resend invite send failed:", errText.slice(0, 200));
+    return { ok: false, error: errText };
+  }
+  return { ok: true };
+}
+
+// Post an invite link to the client's Slack channel. Fire-and-forget,
+// silently no-ops if SLACK_BOT_TOKEN unset or channel not mapped.
+async function postInviteToSlack({ slackChannelId, businessName, ownerName, email, actionLink }) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !slackChannelId) return { ok: false, skipped: true };
+    const greet = ownerName ? `Hey ${ownerName.split(/\s+/)[0]}!` : "Hey!";
+    const biz = businessName ? ` for ${businessName}` : "";
+    const text = [
+      `${greet} Your BAM Business portal${biz} is ready 🎉`,
+      `Click the link below to set your password and log in:`,
+      actionLink,
+      ``,
+      `_Sent to ${email}. Link expires in 24 hours._`,
+    ].join("\n");
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: slackChannelId,
+        text,
+        unfurl_links: false,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    return { ok: !!j.ok, error: j.error };
+  } catch (err) {
+    console.error("Slack invite post failed:", err?.message || err);
+    return { ok: false, error: err?.message };
+  }
+}
+
 async function sendResetPasswordEmail({ to, actionLink, resendApiKey }) {
   const { html, text } = buildResetPasswordEmail(actionLink);
   const res = await fetch("https://api.resend.com/emails", {
@@ -944,9 +1096,16 @@ export default async function handler(req, res) {
       }
 
       if (action === "setup-account") {
-        // Send an INVITE email to the client. They click the link to set their
-        // own password (never seen by us). Updates the clients row with
-        // owner_name + email + auth_user_id once the invite call succeeds.
+        // Send an INVITE to the client.
+        //   1. generate_link (type=invite) creates the Supabase auth user
+        //      and returns the action_link. We control sending the email
+        //      and where the link goes.
+        //   2. Send the link via Resend with our branded invite template.
+        //   3. Post the link to the client's Slack channel (if mapped).
+        //   4. Return the link in the API response so staff can copy/paste
+        //      from the UI as a fallback.
+        // Updates clients row with owner_name + email + auth_user_id once
+        // the link generation succeeds.
         const body = req.body || {};
         const client_id = typeof body.client_id === "string" ? body.client_id : "";
         const owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
@@ -957,40 +1116,54 @@ export default async function handler(req, res) {
         if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
           return res.status(400).json({ error: "valid email required" });
         }
+        if (!process.env.RESEND_API_KEY) {
+          return res.status(500).json({ error: "RESEND_API_KEY not configured" });
+        }
 
-        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,business_name,auth_user_id`);
+        const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=id,business_name,auth_user_id,slack_channel_id`);
         if (!existing?.length) return res.status(404).json({ error: "client not found" });
         if (existing[0].auth_user_id) {
           return res.status(400).json({ error: "this client already has an account — use Reset password instead" });
         }
+        const businessName = existing[0].business_name || "";
+        const slackChannelId = existing[0].slack_channel_id || null;
 
-        // Send invite via Supabase admin endpoint — creates the auth user (no
-        // password) AND emails the invite link in one call.
-        // user_metadata.needs_password=true is a defensive marker so the client portal
-        // forces the password-set form even if redirect query params get stripped.
+        // Step 1: generate_link with type=invite creates the auth user AND
+        // returns a one-shot action_link. We control sending from here.
+        // user_metadata.needs_password=true is a defensive marker so the
+        // client portal forces the password-set form even if redirect query
+        // params get stripped.
         const origin = req.headers.origin || `https://${req.headers.host}`;
         const redirectTo = `${origin}/client-portal.html?type=invite`;
-        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
+        const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
           method: "POST",
           headers: {
             apikey: SUPABASE_SERVICE_KEY,
             Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email: newEmail, redirect_to: redirectTo, data: { needs_password: true } }),
+          body: JSON.stringify({
+            type: "invite",
+            email: newEmail,
+            options: { redirect_to: redirectTo, data: { needs_password: true } },
+          }),
         });
-        if (!inviteRes.ok) {
-          const errText = await inviteRes.text();
-          const friendly = inviteRes.status === 422 || /already/i.test(errText)
+        if (!linkRes.ok) {
+          const errText = await linkRes.text();
+          const friendly = linkRes.status === 422 || /already/i.test(errText)
             ? "an account with that email already exists"
             : `invite: ${errText}`;
           return res.status(400).json({ error: friendly });
         }
-        const invited = await inviteRes.json();
-        const auth_user_id = invited?.id || invited?.user?.id;
-        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
+        const linkJson = await linkRes.json();
+        const actionLink = linkJson?.properties?.action_link || linkJson?.action_link;
+        const auth_user_id = linkJson?.user?.id || linkJson?.id;
+        if (!actionLink || !auth_user_id) {
+          return res.status(500).json({ error: "invite created but no link returned" });
+        }
 
-        // Update the clients row
+        // Step 2: Update the clients row (do this before email/slack so we
+        // don't end up with the auth user attached but the row not updated)
         try {
           const updateRes = await fetch(
             `${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`,
@@ -1006,8 +1179,6 @@ export default async function handler(req, res) {
             }
           );
           if (!updateRes.ok) throw new Error(`Supabase ${updateRes.status}: ${await updateRes.text()}`);
-          const rows = await updateRes.json();
-          return res.status(200).json({ id: client_id, business_name: rows?.[0]?.business_name, email: newEmail, invited: true });
         } catch (updateErr) {
           await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
             method: "DELETE",
@@ -1015,6 +1186,37 @@ export default async function handler(req, res) {
           }).catch(() => {});
           return res.status(500).json({ error: `update failed: ${updateErr.message}` });
         }
+
+        // Step 3 + 4: send email + post to Slack in parallel. Both are
+        // best-effort — if either fails, the staff member can still copy
+        // the action_link returned in the response and send it manually.
+        const [emailRes, slackRes] = await Promise.all([
+          sendInviteEmail({
+            to: newEmail,
+            actionLink,
+            businessName,
+            resendApiKey: process.env.RESEND_API_KEY,
+          }),
+          postInviteToSlack({
+            slackChannelId,
+            businessName,
+            ownerName: owner_name,
+            email: newEmail,
+            actionLink,
+          }),
+        ]);
+
+        return res.status(200).json({
+          id: client_id,
+          business_name: businessName,
+          email: newEmail,
+          invited: true,
+          action_link: actionLink,
+          email_sent: !!emailRes?.ok,
+          slack_posted: !!slackRes?.ok,
+          slack_skipped: !!slackRes?.skipped,
+          slack_error: slackRes?.error || null,
+        });
       }
 
       if (action === "reset-password") {

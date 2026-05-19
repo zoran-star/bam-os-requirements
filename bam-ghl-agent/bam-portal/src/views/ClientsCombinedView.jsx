@@ -1281,6 +1281,11 @@ function AuthActions({ client, tokens, session, onChanged }) {
   const t = tokens;
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
+  // After a successful invite, the API returns the one-shot action_link
+  // (set password URL) + whether Slack/email succeeded. We stash it here
+  // so the staff can copy it or re-share manually.
+  const [inviteResult, setInviteResult] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   async function send(action, body) {
     setBusy(true); setMsg(null);
@@ -1294,11 +1299,31 @@ function AuthActions({ client, tokens, session, onChanged }) {
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
       setMsg({ kind: "ok", text: action === "reset-password" ? "Reset email sent ✓" : "Invite sent ✓" });
+      if (action === "setup-account" && j.action_link) {
+        setInviteResult({
+          link: j.action_link,
+          emailSent: j.email_sent,
+          slackPosted: j.slack_posted,
+          slackSkipped: j.slack_skipped,
+          slackError: j.slack_error,
+        });
+      }
       onChanged();
     } catch (err) {
       setMsg({ kind: "err", text: err.message });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!inviteResult?.link) return;
+    try {
+      await navigator.clipboard.writeText(inviteResult.link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
     }
   }
 
@@ -1327,6 +1352,56 @@ function AuthActions({ client, tokens, session, onChanged }) {
         <span style={{ fontSize: 13, color: msg.kind === "ok" ? t.green : t.red, fontWeight: 600 }}>
           {msg.text}
         </span>
+      )}
+
+      {inviteResult && (
+        <div style={{ flexBasis: "100%", marginTop: 8 }}>
+          <div style={{
+            padding: "12px 14px", borderRadius: 8,
+            background: `${t.green}10`, border: `1px solid ${t.green}55`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.green, letterSpacing: 0.3, textTransform: "uppercase" }}>
+                Invite link
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, color: t.textMute }}>
+                <span>{inviteResult.emailSent ? "📧 emailed" : "✗ email failed"}</span>
+                <span>·</span>
+                <span>
+                  {inviteResult.slackPosted ? "💬 posted to Slack"
+                    : inviteResult.slackSkipped ? "💬 Slack not linked"
+                    : `✗ Slack: ${inviteResult.slackError || "failed"}`}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+              <input
+                type="text"
+                readOnly
+                value={inviteResult.link}
+                onFocus={e => e.target.select()}
+                style={{
+                  flex: 1, padding: "8px 10px",
+                  background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6,
+                  color: t.text, fontSize: 12, fontFamily: "monospace",
+                  minWidth: 0,
+                }}
+              />
+              <button
+                onClick={copyLink}
+                style={{
+                  padding: "8px 14px", background: copied ? t.green : t.accent,
+                  color: "#0B0B0D", border: "none", borderRadius: 6,
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+              >{copied ? "Copied ✓" : "Copy"}</button>
+            </div>
+            <div style={{ fontSize: 11, color: t.textMute, marginTop: 6 }}>
+              One-shot link that expires in 24 hours. Send manually if email/Slack didn't reach the client.
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
