@@ -167,6 +167,9 @@ export default async function handler(req, res) {
     if (resource === "meta-campaigns") {
       return handleMetaCampaigns(req, res);
     }
+    if (resource === "meta-kpis") {
+      return handleMetaKpis(req, res);
+    }
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
@@ -1184,6 +1187,120 @@ async function handleMetaCampaigns(req, res) {
     campaigns: filtered,
     // Only echo the filter list to staff (clients don't need to know about it)
     ...(isStaffPicker ? { meta_campaign_ids: associated || [] } : {}),
+  });
+}
+
+// Action types that count as a "lead" across Meta's various tracking
+// setups. GTA's lead-gen campaign registers conversions as
+// offsite_conversion.fb_pixel_custom (a custom pixel event) rather than
+// standard `lead` actions, so all four are summed.
+const LEAD_ACTION_TYPES = new Set([
+  "lead",
+  "onsite_conversion.lead_grouped",
+  "offsite_conversion.fb_pixel_lead",
+  "offsite_conversion.fb_pixel_custom",
+]);
+
+function countLeads(actions) {
+  if (!Array.isArray(actions)) return 0;
+  let n = 0;
+  for (const a of actions) {
+    if (LEAD_ACTION_TYPES.has(a.action_type)) n += parseInt(a.value, 10) || 0;
+  }
+  return n;
+}
+
+// GET ?resource=meta-kpis&client_id=<id>
+// Marketing KPIs for a client's ad account:
+//   - yesterday: leads / spend / cpl (the full prior calendar day)
+//   - lastWeek + weekBefore: two complete Monday-Sunday weeks
+//   - leadChangePct: week-over-week lead change for drop-off detection
+// One Meta API call (daily increment over the whole span), then bucketed.
+async function handleMetaKpis(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.client) targetClientId = ctx.client.id;
+  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
+  const clientFull = clientRows?.[0];
+  if (!clientFull?.meta_ad_account_id) {
+    return res.status(200).json({ reason: "no_ad_account" });
+  }
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ reason: "no_staff_token" });
+
+  const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
+    ? clientFull.meta_ad_account_id
+    : `act_${clientFull.meta_ad_account_id}`;
+
+  // ── Date windows (UTC). Weeks are Monday-Sunday, both complete. ──
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const yesterday = new Date(now); yesterday.setUTCDate(now.getUTCDate() - 1);
+  const dow = now.getUTCDay();                 // 0=Sun .. 6=Sat
+  const daysSinceSun = dow === 0 ? 7 : dow;    // days back to the last completed Sunday
+  const lastSunday = new Date(now); lastSunday.setUTCDate(now.getUTCDate() - daysSinceSun);
+  const lastMonday = new Date(lastSunday); lastMonday.setUTCDate(lastSunday.getUTCDate() - 6);
+  const prevSunday = new Date(lastMonday); prevSunday.setUTCDate(lastMonday.getUTCDate() - 1);
+  const prevMonday = new Date(prevSunday); prevMonday.setUTCDate(prevSunday.getUTCDate() - 6);
+
+  // Single fetch spanning the earliest needed day (prevMonday) through yesterday.
+  const rangeSince = fmt(prevMonday);
+  const rangeUntil = fmt(yesterday) >= fmt(lastSunday) ? fmt(yesterday) : fmt(lastSunday);
+  const insUrl = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+    fields: "spend,actions",
+    time_range: JSON.stringify({ since: rangeSince, until: rangeUntil }),
+    time_increment: "1",
+    access_token: staffToken,
+  });
+  const insRes = await fetch(insUrl);
+  const insJson = await insRes.json();
+  if (!insRes.ok) {
+    return res.status(insRes.status).json({ error: insJson?.error?.message || "Meta API error" });
+  }
+
+  const yKey = fmt(yesterday);
+  const lwStart = fmt(lastMonday), lwEnd = fmt(lastSunday);
+  const wbStart = fmt(prevMonday), wbEnd = fmt(prevSunday);
+  const buckets = {
+    yesterday:  { leads: 0, spend: 0 },
+    lastWeek:   { leads: 0, spend: 0 },
+    weekBefore: { leads: 0, spend: 0 },
+  };
+  for (const row of (insJson.data || [])) {
+    const d = row.date_start;
+    const leads = countLeads(row.actions);
+    const spend = parseFloat(row.spend || "0") || 0;
+    if (d === yKey) { buckets.yesterday.leads += leads; buckets.yesterday.spend += spend; }
+    if (d >= lwStart && d <= lwEnd) { buckets.lastWeek.leads += leads; buckets.lastWeek.spend += spend; }
+    if (d >= wbStart && d <= wbEnd) { buckets.weekBefore.leads += leads; buckets.weekBefore.spend += spend; }
+  }
+
+  const shape = (b) => ({
+    leads: b.leads,
+    spend: Math.round(b.spend * 100) / 100,
+    cpl: b.leads > 0 ? Math.round((b.spend / b.leads) * 100) / 100 : null,
+  });
+
+  // Week-over-week lead change %
+  let leadChangePct = null;
+  if (buckets.weekBefore.leads > 0) {
+    leadChangePct = Math.round(
+      ((buckets.lastWeek.leads - buckets.weekBefore.leads) / buckets.weekBefore.leads) * 100
+    );
+  }
+
+  return res.status(200).json({
+    ad_account: adAcct,
+    yesterday:  { date: yKey, ...shape(buckets.yesterday) },
+    lastWeek:   { start: lwStart, end: lwEnd, ...shape(buckets.lastWeek) },
+    weekBefore: { start: wbStart, end: wbEnd, ...shape(buckets.weekBefore) },
+    leadChangePct,
   });
 }
 

@@ -728,6 +728,10 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
   const [savingFlag, setSavingFlag] = useState(false);
   const [flagErr, setFlagErr] = useState(null);
 
+  // Sub-tab within the Marketing tab: "campaigns" (setup + active campaigns)
+  // or "kpis" (yesterday + week-over-week lead KPIs).
+  const [marketingSubTab, setMarketingSubTab] = useState("campaigns");
+
   async function toggleMarketingIncluded(nextValue) {
     setSavingFlag(true); setFlagErr(null);
     try {
@@ -950,6 +954,33 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
       {/* Everything below is hidden when marketing is not included */}
       {!marketingIncluded ? null : <>
 
+      {/* Sub-tab bar: Campaigns | KPIs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 22, borderBottom: `1px solid ${t.border}` }}>
+        {[
+          { id: "campaigns", label: "Campaigns" },
+          { id: "kpis", label: "KPIs" },
+        ].map(st => (
+          <button
+            key={st.id}
+            type="button"
+            onClick={() => setMarketingSubTab(st.id)}
+            style={{
+              padding: "8px 16px", background: "transparent", border: "none",
+              borderBottom: `2px solid ${marketingSubTab === st.id ? t.accent : "transparent"}`,
+              color: marketingSubTab === st.id ? t.accent : t.textMute,
+              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+              marginBottom: -1,
+            }}
+          >{st.label}</button>
+        ))}
+      </div>
+
+      {marketingSubTab === "kpis" && (
+        <MarketingKpis client={client} tokens={t} session={session} />
+      )}
+
+      {marketingSubTab === "campaigns" && <>
+
       {/* Meta connection status */}
       <div style={{
         padding: "12px 16px", marginBottom: 22, borderRadius: 6,
@@ -1101,7 +1132,135 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
         />
       )}
 
+      </>}{/* end campaigns sub-tab */}
+
       </>}
+    </div>
+  );
+}
+
+// ─── Marketing KPIs sub-tab ─────────────────────────────────────────────────
+// Two KPI cards: yesterday's leads/spend/CPL, and last full Monday-Sunday
+// week vs the week before (drop-off check). Data from /api/meta/kpis.
+function MarketingKpis({ client, tokens, session }) {
+  const t = tokens;
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    if (!client.meta_ad_account_id) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true); setErr(null);
+    fetch(`/api/meta/kpis?client_id=${client.id}`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (cancelled) return;
+        if (!ok) throw new Error(j.error || "Failed to load KPIs");
+        setData(j);
+        setLoading(false);
+      })
+      .catch(e => { if (!cancelled) { setErr(e.message); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [client.id, client.meta_ad_account_id, session]);
+
+  if (!client.meta_ad_account_id) {
+    return <div style={{ color: t.textMute, padding: 16, fontSize: 13, fontStyle: "italic" }}>
+      No ad account connected. Wire one up in the Campaigns sub-tab first.
+    </div>;
+  }
+  if (loading) return <div style={{ color: t.textMute, padding: 16 }}>Loading KPIs…</div>;
+  if (err) return <div style={{ color: t.red, padding: 16 }}>Error: {err}</div>;
+  if (data?.reason === "no_ad_account") {
+    return <div style={{ color: t.textMute, padding: 16, fontSize: 13, fontStyle: "italic" }}>No ad account connected.</div>;
+  }
+  if (data?.reason === "no_staff_token") {
+    return <div style={{ color: t.amber, padding: 16, fontSize: 13 }}>Meta isn't connected. Reconnect Meta in the staff portal.</div>;
+  }
+
+  const money = (n) => n == null ? "—" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const mdShort = (iso) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-").map(Number);
+    return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m - 1]} ${d}`;
+  };
+
+  const y = data.yesterday || {};
+  const lw = data.lastWeek || {};
+  const wb = data.weekBefore || {};
+  const pct = data.leadChangePct;
+  const arrow = pct == null ? "→" : pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
+  const verdict =
+    pct == null ? { text: "No leads the prior week to compare against.", color: t.textMute }
+    : pct <= -20 ? { text: "⚠ Drop-off detected", color: t.red }
+    : pct >= 20  ? { text: "✓ Lead flow up", color: t.green }
+    :              { text: "→ Roughly steady", color: t.textSub };
+  const arrowColor = pct == null ? t.textMute : pct > 0 ? t.green : pct < 0 ? t.red : t.textSub;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640 }}>
+
+      {/* KPI 1 — Yesterday */}
+      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginBottom: 14 }}>
+          Yesterday · {mdShort(y.date)}
+        </div>
+        <div style={{ display: "flex", gap: 32 }}>
+          <Kpi label="Leads" value={y.leads ?? 0} tokens={t} />
+          <Kpi label="Spend" value={money(y.spend)} tokens={t} />
+          <Kpi label="Cost / Lead" value={money(y.cpl)} tokens={t} accent />
+        </div>
+      </div>
+
+      {/* KPI 2 — Week over week */}
+      <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, padding: 18 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginBottom: 14 }}>
+          Weekly lead flow (Mon-Sun)
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <WeekRow label="Last week" range={`${mdShort(lw.start)} - ${mdShort(lw.end)}`} leads={lw.leads ?? 0} spend={money(lw.spend)} cpl={money(lw.cpl)} tokens={t} strong />
+          <WeekRow label="Week before" range={`${mdShort(wb.start)} - ${mdShort(wb.end)}`} leads={wb.leads ?? 0} spend={money(wb.spend)} cpl={money(wb.cpl)} tokens={t} />
+        </div>
+        <div style={{ borderTop: `1px solid ${t.border}`, marginTop: 14, paddingTop: 14, display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: arrowColor }}>
+            {arrow} {pct == null ? "" : `${Math.abs(pct)}%`}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: verdict.color }}>{verdict.text}</div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: t.textMute, fontStyle: "italic" }}>
+        Leads counted from standard lead actions plus the custom pixel conversion.
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, tokens, accent }) {
+  const t = tokens;
+  return (
+    <div>
+      <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: accent ? t.accent : t.text }}>{value}</div>
+      <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
+
+function WeekRow({ label, range, leads, spend, cpl, tokens, strong }) {
+  const t = tokens;
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+      <div style={{ width: 110, flexShrink: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: strong ? 700 : 600, color: strong ? t.text : t.textSub }}>{label}</div>
+        <div style={{ fontSize: 11, color: t.textMute }}>{range}</div>
+      </div>
+      <div style={{ display: "flex", gap: 20, fontSize: 13 }}>
+        <span style={{ color: t.text }}><b style={{ fontSize: 15 }}>{leads}</b> <span style={{ color: t.textMute }}>leads</span></span>
+        <span style={{ color: t.textSub }}>{spend}</span>
+        <span style={{ color: t.textSub }}>{cpl} <span style={{ color: t.textMute }}>CPL</span></span>
+      </div>
     </div>
   );
 }
