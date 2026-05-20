@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-20 — incorporating the BAM GTA member-management system into the client portal as a client-side "Members" feature. Stripe model = Connect. Phase 1a done (schema SQL written, not yet run). Resume via /member-management-continue.
+description: 2026-05-20 — incorporating the BAM GTA member-management system into the client portal as a client-side "Members" feature. Stripe model = Connect. Phases 1a/2a/2b done — Members tab built end to end; schema SQL not yet run. Resume via /member-management-continue.
 type: project
 ---
 
@@ -87,9 +87,10 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
   - **2a ✅ DONE** — `bam-portal/api/members.js`: GET endpoint (list +
     single), client-scoped, DB-only (Stripe enrichment deferred to Phase 3).
     PATCH returns 501. Built on marketing.js conventions (sb + resolveUser).
-  - **2b ⏳** — the "Members" view in client-portal.html: sidebar nav item
-    + mobile bottom nav item + `<div id="view-members">` container +
-    `switchView` hook + `fetchAndRenderMembers()`.
+  - **2b ✅ DONE** — the "Members" view in client-portal.html: sidebar +
+    mobile nav items, `<div id="view-members">` container, `switchView`
+    hook, and `fetchAndRenderMembers()` / `renderMembers()` (roster cards:
+    athlete, parent, plan, trainer, status pill). Tour verifier passes.
 - **Phase 3 — Billing actions.** PATCH actions porting the 7 GTA skills,
   honoring GTA's locked Stripe conventions; confirm modal as the
   "preview → y" safety gate; a member_audit_log row per write.
@@ -132,13 +133,21 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
 
 ## Where we left off
 
-Stripe model decided (Connect). Phase 1a + 2a done. Next actions:
-1. Run `bam-portal/supabase/member-management-schema.sql` in the Supabase
-   SQL Editor (project `jnojmfmpnsfmtqmwhopz`).
-2. Phase 2b — build the "Members" view in client-portal.html (nav items +
-   view container + `switchView` hook + `fetchAndRenderMembers()`).
-3. Phase 1b — migrate BAM GTA's member data in (needs GTA Supabase access).
-4. Then Phase 3 — Stripe Connect onboarding + billing PATCH actions.
+Stripe model decided (Connect). Phases 1a, 2a, 2b done — the Members tab
+is built end to end (UI → `api/members.js` → tables). But NOTHING works
+until the schema SQL is run. Next actions:
+1. **Run `bam-portal/supabase/member-management-schema.sql`** in the
+   Supabase SQL Editor (project `jnojmfmpnsfmtqmwhopz`). Until then the tab
+   shows a graceful error (the `members` table doesn't exist yet).
+2. Phase 1b — migrate BAM GTA's member data in (needs GTA Supabase access).
+3. Phase 3 — Stripe Connect onboarding flow + billing PATCH actions
+   (pause/unpause/cancel/refund/change/payment-link/refer).
+
+The Members tab is gated behind `MEMBER_MGMT_ENABLED` — a const in
+client-portal.html, currently `false` — so it is hidden from clients on
+deploy. Flip it to `true` once the schema SQL is run and the roster is
+migrated in. (`applyMemberMgmtNavState()` toggles the `[data-feature=
+"members"]` nav items; called in boot.)
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works

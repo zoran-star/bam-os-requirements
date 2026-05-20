@@ -4683,6 +4683,18 @@
         </span>
         Marketing
       </div>
+
+      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+        Members
+      </div>
     </nav>
 
     <div class="sidebar-bottom">
@@ -5403,6 +5415,24 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <!-- ══════════════════════════════
+         MEMBERS VIEW (academy roster + billing)
+    ══════════════════════════════ -->
+    <div class="view" id="view-members">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 03 · Members</span>
+          <div class="topbar-title">Member Management</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="readout">Your Roster</div>
+        <div id="members-list-container">
+          <div class="req-empty" style="padding:20px 0">Loading members…</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Mobile bottom nav (phones only — replaces the hidden sidebar) ── -->
@@ -5428,6 +5458,15 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Marketing</span>
     </button>
+    <button type="button" class="mobile-nav-item" data-feature="members" style="display:none" data-view="members" onclick="mobileSwitchView('members')" aria-label="Members">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <span class="mobile-nav-label">Members</span>
+    </button>
   </nav>
 </div>
 
@@ -5452,6 +5491,9 @@ function switchView(name, el) {
 
   // When entering Messages, load conversations
   if (name === 'messages') openMessagesView();
+
+  // When entering Members, load the roster
+  if (name === 'members') fetchAndRenderMembers();
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
@@ -5496,6 +5538,18 @@ function applyMarketingNavState() {
   // Mirror the disabled state onto the mobile bottom-nav button
   const mNav = document.querySelector('.mobile-nav-item[data-view="marketing"]');
   if (mNav) mNav.classList.toggle('disabled', !MARKETING_INCLUDED);
+}
+
+// ── Member Management feature flag ──
+// The Members tab is gated until the Supabase schema + roster data are
+// live. Flip MEMBER_MGMT_ENABLED to true once member-management-schema.sql
+// has been run and the academy's members are migrated in.
+const MEMBER_MGMT_ENABLED = false;
+
+function applyMemberMgmtNavState() {
+  document.querySelectorAll('[data-feature="members"]').forEach(el => {
+    el.style.display = MEMBER_MGMT_ENABLED ? '' : 'none';
+  });
 }
 
 // Bottom-left account switcher. Only renders when this auth user is
@@ -6475,6 +6529,65 @@ async function _safeJson(res) {
   catch (_) {
     return { error: `HTTP ${res.status} — ${text.slice(0, 200).replace(/<[^>]*>/g, '').trim()}` };
   }
+}
+
+// ══════════════════════════════════════════════════════════
+// MEMBERS — academy roster (Phase 2: read-only)
+// GET /api/members?scope=client — see bam-portal/api/members.js
+// ══════════════════════════════════════════════════════════
+
+async function fetchAndRenderMembers() {
+  const container = document.getElementById('members-list-container');
+  if (!container) return;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/members?scope=client', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    renderMembers(json.members || []);
+  } catch (e) {
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _memberStatusPill(status) {
+  const map = {
+    live:                    ['Live', '#1f7a3d'],
+    paused:                  ['Paused', '#8a6d1f'],
+    payment_method_required: ['Needs card', '#9a3b2f'],
+    payment_failed:          ['Payment failed', '#9a3b2f'],
+  };
+  const [label, color] = map[status] || [status || '—', '#555'];
+  return `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
+}
+
+function renderMembers(members) {
+  const container = document.getElementById('members-list-container');
+  if (!container) return;
+
+  if (!members.length) {
+    container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
+    return;
+  }
+
+  const live = members.filter(m => m.status === 'live').length;
+  const paused = members.filter(m => m.status === 'paused').length;
+  const summary = `<div style="font-size:13px;color:var(--text-mute);margin-bottom:14px">${members.length} total · ${live} live · ${paused} paused</div>`;
+
+  const rows = members.map(m => `
+    <div class="card" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px">
+        <div style="font-weight:700;font-size:15px">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
+      </div>
+      <div style="font-size:13px;min-width:70px">${escapeHTML(m.plan || '—')}</div>
+      <div style="font-size:13px;min-width:90px;color:var(--text-mute)">${escapeHTML(m.trainer || '—')}</div>
+      <div>${_memberStatusPill(m.status)}</div>
+    </div>`).join('');
+
+  container.innerHTML = summary + rows;
 }
 
 async function _mreqCreateTicket(payload) {
@@ -9773,6 +9886,7 @@ async function boot() {
   CLIENT_ID = clientRow.id;
   MARKETING_INCLUDED = clientRow.marketing_included !== false;
   applyMarketingNavState();
+  applyMemberMgmtNavState();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
 
