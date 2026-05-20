@@ -32,8 +32,12 @@ export default function FeedbackView({ tokens, dark, me, session }) {
         const tok = session?.access_token;
         const portalQs = portalFilter === "all" ? "" : `&portal=${portalFilter}`;
         const kindQs = kindFilter === "all" ? "" : `&kind=${kindFilter}`;
+        // CRITICAL: method MUST be POST. The list-feedback action lives inside
+        // the api/clients.js POST handler. A GET falls through to the catch-all
+        // that returns the clients list instead, silently swapping the data.
         const res = await fetch(`/api/clients?action=list-feedback&limit=300${portalQs}${kindQs}`, {
-          headers: { Authorization: `Bearer ${tok}` },
+          method: "POST",
+          headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
         });
         const json = await res.json();
         if (cancelled) return;
@@ -89,6 +93,7 @@ export default function FeedbackView({ tokens, dark, me, session }) {
       const res = await fetch(`/api/clients?action=resolve-feedback&id=${encodeURIComponent(item.id)}${undo}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
