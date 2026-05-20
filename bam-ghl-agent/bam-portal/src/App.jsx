@@ -30,7 +30,6 @@ import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
 import SetPasswordView from './views/SetPasswordView';
-import DevRoleSwitcher from './components/DevRoleSwitcher';
 import { supabase } from './lib/supabase';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
@@ -395,7 +394,6 @@ export default function BAMPortal() {
 
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
-      <DevRoleSwitcher session={session} />
 
       {/* FAB: New ticket — only visible on the Systems page */}
       {me && nav === "systems" && (
@@ -722,8 +720,11 @@ export default function BAMPortal() {
             )}
           </div>
 
-          {/* Page content */}
-          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "24px 16px 16px" : "40px 44px 16px" }}>
+          {/* Page content. minHeight:0 is required for a flex:1 child to
+              actually scroll inside a flex column — without it the child
+              grows past the viewport and gets clipped by the parent's
+              overflow:hidden instead of scrolling. */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "24px 16px 64px" : "40px 44px 80px" }}>
 
             {!(nav === "clients" && clientsInDetail) && (
               <div key={nav} style={{ marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
