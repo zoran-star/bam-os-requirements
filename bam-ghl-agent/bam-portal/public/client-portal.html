@@ -1647,17 +1647,20 @@
 
   /* ── Chat ── */
   .chat-layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
+    display: flex;
     gap: 0;
     height: calc(100vh - 73px);
     overflow: hidden;
   }
 
   .chat-sidebar {
+    width: 280px;
+    flex-shrink: 0;
     border-right: 1px solid var(--line);
     overflow-y: auto;
     padding: 20px 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .chat-search {
@@ -1753,6 +1756,8 @@
 
   /* Chat main */
   .chat-main {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     overflow: hidden;

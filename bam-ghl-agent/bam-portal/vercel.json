@@ -11,14 +11,6 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "portal.byanymeansbusiness.com" }],
-      "destination": "/client-portal.html",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     { "source": "/api/marketing-tickets",      "destination": "/api/marketing?resource=tickets" },
     { "source": "/api/marketing-tickets/(.*)", "destination": "/api/marketing?resource=tickets&path=$1" },
