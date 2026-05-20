@@ -30,5 +30,5 @@ Session goal (2026-03-28): finalize all data points collected during academy own
 
 ## Already Decided
 - Reorganized from collection-phase grouping to functional-domain grouping (8 sections)
-- Review doc lives at `onboarding-review.html` in bam-os-requirements repo
+- Review doc lives at `prototype/sessions/onboarding-review.html` in bam-os-requirements repo
 - Decision saved to Notion Working Memory (2026-03-28)

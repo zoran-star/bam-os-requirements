@@ -13,7 +13,7 @@ type: project
 4. Merged into `whiteboard/session-data-merged.json`
 5. Populated SECTION Data in Notion Sessions DB for sessions 1-10
 6. Fixed API chunking bug for rich_text fields
-7. Built `onboarding-viewer.html` standalone viewer
+7. Built `prototype/sessions/onboarding-viewer.html` standalone viewer
 
 ## What was done this session (2026-04-01)
 Full prototype audit vs Notion Business Requirements. Found 10+ gaps where prototype features weren't documented.
@@ -69,7 +69,7 @@ These requirements are written and ready but the target pages are too large for 
 
 ## Key file locations
 - `bam-os-requirements/whiteboard/session-data-merged.json` — combined items + feedback
-- `bam-os-requirements/onboarding-viewer.html` — standalone HTML viewer
+- `bam-os-requirements/prototype/sessions/onboarding-viewer.html` — standalone HTML viewer
 - `bam-os-requirements/whiteboard/.env.local` — Vercel OIDC token
 
 ## Notion DB IDs
