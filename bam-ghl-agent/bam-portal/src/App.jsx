@@ -132,6 +132,25 @@ export default function BAMPortal() {
     }
   }, [me, nav]);
 
+  // Deep-link support: ?nav=inbox jumps the user straight to that nav
+  // tab on page load. Used by mention notifications (Slack DM / future
+  // push) so receivers land on the Inbox when they click the link.
+  // Runs once on mount; param is stripped after consumption so a
+  // refresh doesn't keep re-asserting the nav.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const target = params.get("nav");
+    if (target && ["dashboard", "inbox", "clients", "tasks", "calendar", "knowledge", "financials", "systems", "marketing", "content", "team", "feedback", "settings"].includes(target)) {
+      setNav(target);
+      params.delete("nav");
+      const newQs = params.toString();
+      const newUrl = window.location.pathname + (newQs ? "?" + newQs : "") + window.location.hash;
+      window.history.replaceState(null, "", newUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const tk = dark ? T.dark : T.light;
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };

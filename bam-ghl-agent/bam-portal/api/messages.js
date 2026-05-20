@@ -104,6 +104,63 @@ async function parseMentions(body) {
   return [...matched];
 }
 
+// Fire-and-forget DM to each mentioned staff via Slack. Silently no-ops
+// when SLACK_BOT_TOKEN isn't configured OR the mentioned staff has no
+// slack_user_id on their row (which is currently true for every staff
+// member — backfill the slack_user_id column to enable DMs).
+//
+// When native push lands in Phase 3, swap the body of this function
+// for an FCM call. The mentioned_staff_ids stored on the message row
+// is the same source of truth.
+async function notifyMentionedStaff({ mentioned_staff_ids, conversation, message, authorLabel, req }) {
+  if (!mentioned_staff_ids || mentioned_staff_ids.length === 0) return;
+  const slackToken = process.env.SLACK_BOT_TOKEN;
+  if (!slackToken) return; // not configured — silent skip
+
+  // Load the staff rows we need (name + slack_user_id) in one shot
+  const idsCsv = mentioned_staff_ids.join(",");
+  let staffRows;
+  try {
+    staffRows = await sb(`staff?id=in.(${idsCsv})&select=id,name,slack_user_id`);
+  } catch (_) { return; }
+  if (!Array.isArray(staffRows) || staffRows.length === 0) return;
+
+  // Resolve the client business name for context
+  let businessName = "";
+  try {
+    const cRows = await sb(`clients?id=eq.${conversation.client_id}&select=business_name`);
+    businessName = cRows?.[0]?.business_name || "";
+  } catch (_) {}
+
+  // Origin → staff portal link the receiver will click
+  const origin = (process.env.STAFF_PORTAL_URL || req.headers.origin || `https://${req.headers.host}` || "").replace(/\/+$/, "");
+  const portalLink = `${origin}/?nav=inbox`;
+
+  const preview = (message?.body || "").trim().slice(0, 180);
+  const text = [
+    `🔔 *${authorLabel}* mentioned you in *${businessName || "a conversation"}*`,
+    preview ? `> ${preview}` : "(no text content)",
+    `→ ${portalLink}`,
+  ].filter(Boolean).join("\n");
+
+  // Fire all DMs in parallel; swallow per-staff errors
+  await Promise.all(staffRows.map(async (s) => {
+    if (!s.slack_user_id) return;
+    try {
+      await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${slackToken}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify({ channel: s.slack_user_id, text, unfurl_links: false }),
+      });
+    } catch (err) {
+      console.warn(`Slack DM failed for staff ${s.id}:`, err?.message);
+    }
+  }));
+}
+
 // Pull conversation + verify the caller is authorized for it.
 // Returns { conversation } or { error }.
 async function loadConversationForUser(conversationId, ctx) {
@@ -245,6 +302,22 @@ export default async function handler(req, res) {
           last_read_at: row?.created_at || new Date().toISOString(),
         }),
       }).catch(() => {});
+
+      // Fire @mention notifications out-of-band. Don't await — keep the
+      // send response snappy. Author label is "staff name" if sent by
+      // staff, "client business name" if sent by client.
+      if (mentioned_staff_ids.length > 0) {
+        const authorLabel = ctx.staff
+          ? (ctx.staff.name || "A staff member")
+          : (ctx.clients?.find(c => c.id === convo.client_id)?.business_name || "A client");
+        notifyMentionedStaff({
+          mentioned_staff_ids,
+          conversation: convo,
+          message: row,
+          authorLabel,
+          req,
+        }).catch(err => console.warn("notifyMentionedStaff failed:", err?.message));
+      }
 
       return res.status(200).json({ message: row });
     }
