@@ -64,6 +64,7 @@ export default function BAMPortal() {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showNewTicket, setShowNewTicket] = useState(false);
+  const [updateReady, setUpdateReady] = useState(false);
 
   // ─ Auth ─
   useEffect(() => {
@@ -76,6 +77,34 @@ export default function BAMPortal() {
       setSession(s);
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // ─ New-version detection ─
+  // The running app loaded one specific /assets/index-<hash>.js chunk. When a
+  // new deploy goes out, index.html points at a different hash. We poll the
+  // live index.html (on window focus + every 5 min) and, if the hash changed,
+  // surface a refresh banner. This kills the "I'm staring at a stale build"
+  // problem without anyone needing to hard-refresh.
+  useEffect(() => {
+    const currentChunk = Array.from(document.querySelectorAll("script[src]"))
+      .map(s => s.getAttribute("src"))
+      .find(src => src && src.includes("/assets/index-"));
+    if (!currentChunk) return;
+
+    let stopped = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`/?_v=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const html = await res.text();
+        const m = html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/);
+        if (m && m[0] !== currentChunk && !stopped) setUpdateReady(true);
+      } catch (_) { /* offline — ignore */ }
+    };
+    const onFocus = () => check();
+    window.addEventListener("focus", onFocus);
+    const iv = setInterval(check, 5 * 60 * 1000);
+    return () => { stopped = true; window.removeEventListener("focus", onFocus); clearInterval(iv); };
   }, []);
 
   const handleLogout = async () => {
@@ -394,6 +423,27 @@ export default function BAMPortal() {
 
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", background: tk.bg, minHeight: "100vh" }}>
+
+      {/* New-version banner — appears when a fresh deploy is detected */}
+      {updateReady && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, zIndex: 99999,
+          background: tk.accent, color: "#0A0A0B",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 14,
+          padding: "10px 16px", fontSize: 13, fontWeight: 600,
+          boxShadow: "0 2px 12px rgba(0,0,0,0.35)",
+        }}>
+          <span>A new version of the portal is available.</span>
+          <button
+            onClick={() => window.location.reload(true)}
+            style={{
+              background: "#0A0A0B", color: tk.accent, border: 0,
+              borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700,
+              cursor: "pointer", fontFamily: "inherit",
+            }}
+          >Refresh now</button>
+        </div>
+      )}
 
       {/* FAB: New ticket — only visible on the Systems page */}
       {me && nav === "systems" && (
