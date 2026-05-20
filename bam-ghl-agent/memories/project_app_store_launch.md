@@ -49,23 +49,25 @@ org would need ABM).
   registers on login, captures the device token, and upserts it to a new
   Supabase `device_tokens` table (RLS-scoped per user). No-op outside the
   native app. Staff send-side is the follow-up below.
+- **`device_tokens` migration applied** — 2026-05-20: ran
+  `bam-portal/scripts/migration/device-tokens.sql` against live Supabase
+  (`jnojmfmpnsfmtqmwhopz`) via the Supabase MCP `apply_migration`. Verified
+  7 columns, 4 owner-scoped RLS policies (select/insert/update/delete),
+  2 indexes. The push registration code now has a table to write to.
 
 ### ⏳ Next steps (in order)
-1. **Run the DB migration** — `bam-portal/scripts/migration/device-tokens.sql`
-   in the Supabase SQL editor (creates the `device_tokens` table + RLS the
-   push code writes to). One-time; do before the first device test.
-2. **Compile on a Mac** (Zoran's task) — needs Mac + Xcode + CocoaPods.
+1. **Compile on a Mac** (Zoran's task) — needs Mac + Xcode + CocoaPods.
    `npm install` → `npx cap sync ios` → `npx cap open ios` → set signing
    Team → add the **Push Notifications** capability → Archive → upload to
    App Store Connect. Full steps in `bam-portal-app/README.md`.
-3. **APNs Auth Key** — in the Apple Developer portal create a `.p8` APNs
+2. **APNs Auth Key** — in the Apple Developer portal create a `.p8` APNs
    key; save the key file + Key ID + Team ID (the staff send-backend needs
    them later).
-4. **Phase 3 — App Store Connect**: screenshots, 1024 icon, description,
+3. **Phase 3 — App Store Connect**: screenshots, 1024 icon, description,
    a hosted **privacy policy URL**, App Privacy data declaration, and a
    **demo login account** for the reviewer (portal is behind a login —
    mandatory or instant rejection).
-5. **Submit for review** → expect a possible 4.2 rejection round → then
+4. **Submit for review** → expect a possible 4.2 rejection round → then
    request Unlisted distribution → release.
 
 ### 🔜 Follow-up (after approval)
