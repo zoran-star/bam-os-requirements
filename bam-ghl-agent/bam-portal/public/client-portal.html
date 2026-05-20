@@ -4353,6 +4353,196 @@
   }
 </style>
 
+<style>
+  /* ════════════════════════════════════════════════════════════════
+     MOBILE LAYOUT  (≤768px)
+     The sidebar is hidden on phones — a fixed bottom tab bar takes
+     over navigation. Every screen is re-spaced for small viewports.
+     All rules here are additive overrides; desktop is untouched.
+     This block is intentionally last in the document so it wins the
+     cascade.
+     ════════════════════════════════════════════════════════════════ */
+
+  /* Bottom tab bar — hidden on desktop, revealed ≤768px */
+  .mobile-nav { display: none; }
+
+  @keyframes sheetIn {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+
+  @media (max-width: 768px) {
+    :root { --mobnav-h: 56px; }
+
+    /* Dynamic viewport height so iOS browser chrome never clips content */
+    html, body { height: 100dvh; }
+    .app { height: 100dvh; }
+    .main { overflow-x: hidden; width: 100%; }
+
+    /* Sidebar fully removed on phones */
+    .sidebar { display: none !important; }
+
+    /* ── Bottom tab bar ── */
+    .mobile-nav {
+      display: flex;
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      z-index: 900;
+      background: var(--ink);
+      border-top: 1px solid var(--line);
+      box-shadow: 0 -2px 14px rgba(0,0,0,0.35);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .mobile-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      height: var(--mobnav-h);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      color: var(--text-mute);
+      font-family: var(--mono);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s ease;
+    }
+    .mobile-nav-item svg { width: 21px; height: 21px; display: block; }
+    .mobile-nav-item.active { color: var(--gold); }
+    .mobile-nav-item.active::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 30px; height: 2px;
+      background: var(--gold);
+      border-radius: 0 0 2px 2px;
+    }
+    .mobile-nav-item:active { background: var(--surface); }
+    .mobile-nav-item.disabled { opacity: 0.32; pointer-events: none; }
+    .mobile-nav-badge {
+      position: absolute;
+      top: 5px; left: calc(50% + 6px);
+      min-width: 16px; height: 16px;
+      padding: 0 4px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #0B0B0D;
+      font-family: var(--mono);
+      font-size: 9px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      min-height: auto !important;
+      padding: 14px 16px 12px !important;
+      gap: 10px !important;
+      flex-wrap: wrap;
+      row-gap: 10px;
+      align-items: flex-start;
+    }
+    .topbar-title { font-size: 20px !important; line-height: 1.15 !important; }
+    .topbar-sub { margin-top: 8px; }
+    .topbar [style*="display:flex"] { flex-wrap: wrap; }
+    .topbar .month-progress { align-items: flex-start; width: 100%; }
+
+    /* ── Content area — clear the fixed bottom nav ── */
+    .content {
+      padding: 18px 16px calc(var(--mobnav-h) + env(safe-area-inset-bottom) + 48px) !important;
+    }
+
+    /* ── Cards ── */
+    .card { padding: 18px 16px; border-radius: var(--radius-md); }
+
+    /* ── Ticket-type tiles → single column ── */
+    .ticket-types { grid-template-columns: 1fr; }
+    .ttype { min-height: auto; padding: 18px 18px 20px; gap: 10px; }
+    .ttype::before { top: 19px; left: 18px; }
+    .ttype-label { font-size: 19px; }
+
+    /* ── Build / intake forms ── */
+    .intake-card { padding: 20px 16px; }
+    .dform-staff-row-top { grid-template-columns: 1fr; }
+
+    /* ── Request-detail info rows stack ── */
+    .req-info-row { flex-direction: column; gap: 6px; }
+    .req-info-label { width: auto; padding-top: 0; }
+
+    /* ── Campaign cards ── */
+    .campaign-card { padding: 18px 16px; gap: 16px; }
+    .campaign-card-main { min-width: 100%; }
+    .campaign-stats { gap: 24px; }
+    .btn-change-campaign { width: 100%; }
+    .spend-bar { padding: 14px 16px; gap: 12px; flex-wrap: wrap; }
+
+    /* ── New-campaign wizard ── */
+    .wizard-offer-grid { grid-template-columns: 1fr 1fr; }
+
+    /* ── Modals → bottom sheet ── */
+    /* Raise above the feedback button (z-index 10000) so a full-width
+       sheet is never overlapped by it. */
+    .modal-backdrop { padding: 0; align-items: flex-end; z-index: 10050; }
+    .modal-card {
+      max-width: 100% !important;
+      width: 100%;
+      max-height: 92dvh;
+      overflow-y: auto;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: 22px 18px calc(20px + env(safe-area-inset-bottom));
+      animation: sheetIn 0.28s var(--es);
+    }
+    .modal-footer { flex-direction: column; gap: 8px; }
+    .modal-footer > * { width: 100%; }
+    #admin-fb-modal { padding: 20px; }
+
+    /* ── Chat / Messages ── */
+    .chat-layout {
+      height: calc(100dvh - var(--mobnav-h) - env(safe-area-inset-bottom));
+      flex-direction: column;
+    }
+    .chat-sidebar {
+      width: 100%;
+      max-height: 38dvh;
+      border-right: none;
+      border-bottom: 1px solid var(--line);
+    }
+    .chat-header { padding: 14px 16px; }
+    .chat-messages { padding: 16px; gap: 16px; }
+    .msg-bubble { max-width: 82%; }
+    .chat-input-area { padding: 12px 16px; }
+
+    /* ── Login ── */
+    #login-overlay { padding: 16px; }
+    #login-overlay .login-card { padding: 28px 20px; }
+
+    /* ── Feedback widget — lift clear of the bottom nav ── */
+    #admin-fb-wrap {
+      bottom: calc(var(--mobnav-h) + 14px + env(safe-area-inset-bottom));
+      right: 16px;
+    }
+    #admin-fb-btn { width: 48px; height: 48px; }
+    /* Hide it on the chat view so it never covers the send button */
+    body:has(#view-messages.active) #admin-fb-wrap { display: none; }
+
+    /* ── Inputs ≥16px so iOS doesn't zoom on focus ── */
+    input, textarea, select,
+    .modal-input, .modal-textarea, .dform-input, .dform-textarea,
+    .dform-time, .chat-input, .wizard-search, .intake-wrap textarea,
+    .detail-field textarea, #login-overlay input {
+      font-size: 16px !important;
+    }
+  }
+</style>
+
 <div id="admin-fb-wrap">
   <div id="admin-fb-tip">help zoran out...</div>
   <button id="admin-fb-btn" onclick="openAdminFeedback()" aria-label="Send feedback">
@@ -5154,6 +5344,31 @@ Then the call to action."]</div>
     </div>
 
   </div>
+
+  <!-- ── Mobile bottom nav (phones only — replaces the hidden sidebar) ── -->
+  <nav class="mobile-nav" id="mobileNav" aria-label="Primary">
+    <button type="button" class="mobile-nav-item" data-view="messages" onclick="mobileSwitchView('messages')" aria-label="Messages">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <span class="mobile-nav-label">Messages</span>
+      <span class="mobile-nav-badge" id="mnav-messages-badge" style="display:none"></span>
+    </button>
+    <button type="button" class="mobile-nav-item active" data-view="systems" onclick="mobileSwitchView('systems')" aria-label="Systems">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      <span class="mobile-nav-label">Systems</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-view="marketing" onclick="mobileSwitchView('marketing')" aria-label="Marketing">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m3 11 18-5v12L3 14v-3z"/>
+        <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+      </svg>
+      <span class="mobile-nav-label">Marketing</span>
+    </button>
+  </nav>
 </div>
 
 <script>
@@ -5177,6 +5392,26 @@ function switchView(name, el) {
 
   // When entering Messages, load conversations
   if (name === 'messages') openMessagesView();
+
+  // Keep the mobile bottom nav in sync with the active view
+  syncMobileNav(name);
+}
+
+// ── Mobile bottom-nav helpers ──
+// The sidebar is hidden on phones; the fixed bottom tab bar drives nav.
+function syncMobileNav(name) {
+  document.querySelectorAll('.mobile-nav-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === name);
+  });
+}
+function mobileSwitchView(name) {
+  if (name === 'marketing' && typeof MARKETING_INCLUDED !== 'undefined' && !MARKETING_INCLUDED) return;
+  // Route through switchView via the matching sidebar item so every
+  // existing view-switch side effect still fires.
+  const sidebarItem = Array.from(document.querySelectorAll('.sidebar .nav-item'))
+    .find(el => (el.getAttribute('onclick') || '').includes("'" + name + "'"));
+  if (sidebarItem) switchView(name, sidebarItem);
+  else syncMobileNav(name);
 }
 
 // Apply the greyed-out look to the Marketing nav item when marketing
@@ -5197,6 +5432,10 @@ function applyMarketingNavState() {
       item.title = 'Marketing is not part of your current BAM plan';
     }
   });
+
+  // Mirror the disabled state onto the mobile bottom-nav button
+  const mNav = document.querySelector('.mobile-nav-item[data-view="marketing"]');
+  if (mNav) mNav.classList.toggle('disabled', !MARKETING_INCLUDED);
 }
 
 // Bottom-left account switcher. Only renders when this auth user is
@@ -8652,7 +8891,7 @@ const TOUR_STEPS = [
     selector: '.nav-item[onclick*="marketing"]',
     place: 'right',
     title: "Now let's see your ads",
-    body: 'Click <strong>Marketing</strong> in the sidebar (we\'ll switch you).',
+    body: 'Open <strong>Marketing</strong> to see your ads (we\'ll switch you).',
     nextLabel: 'Switch →',
   },
   // Step 5: Marketing new campaign button
@@ -8860,7 +9099,19 @@ function _renderTourStep() {
 }
 
 function _positionSpotlight(step) {
-  const target = document.querySelector(step.selector);
+  let target = document.querySelector(step.selector);
+  // On phones the sidebar is hidden — if the tour targets a sidebar nav
+  // item, spotlight the equivalent bottom-nav button instead.
+  if (target) {
+    const tr = target.getBoundingClientRect();
+    if (tr.width === 0 && tr.height === 0) {
+      const m = (target.getAttribute('onclick') || '').match(/'(messages|systems|marketing)'/);
+      if (m) {
+        const alt = document.querySelector('.mobile-nav-item[data-view="' + m[1] + '"]');
+        if (alt && alt.getBoundingClientRect().width > 0) target = alt;
+      }
+    }
+  }
   const tooltip = document.getElementById('tour-tooltip');
   const ring = document.getElementById('tour-pulse-ring');
   if (!target) {
@@ -9325,14 +9576,17 @@ async function deleteMsg(messageId) {
 }
 
 function updateUnreadBadge() {
-  const badge = document.getElementById('messages-unread-badge');
-  if (!badge) return;
   const count = _msgConversations.filter(c => c.has_unread).length;
-  if (count > 0) {
-    badge.style.display = 'inline-block';
-    badge.textContent = count;
-  } else {
-    badge.style.display = 'none';
+  const badge = document.getElementById('messages-unread-badge');
+  if (badge) {
+    if (count > 0) { badge.style.display = 'inline-block'; badge.textContent = count; }
+    else { badge.style.display = 'none'; }
+  }
+  // Mobile bottom-nav badge
+  const mBadge = document.getElementById('mnav-messages-badge');
+  if (mBadge) {
+    if (count > 0) { mBadge.style.display = 'flex'; mBadge.textContent = count > 9 ? '9+' : count; }
+    else { mBadge.style.display = 'none'; }
   }
 }
 
