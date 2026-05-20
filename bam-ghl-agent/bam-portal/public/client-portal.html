@@ -5111,9 +5111,7 @@ Then the call to action."]</div>
         <div class="chat-main" id="messages-main">
           <div class="chat-header" id="messages-header">
             <div>
-              <span class="topbar-kicker">§ 03 · Messages</span>
-              <div class="chat-header-name" id="messages-header-name">BAM Support Team</div>
-              <div class="chat-header-sub" id="messages-header-sub">Replies within a few hours</div>
+              <div class="chat-header-name" id="messages-header-name">Chat with our team</div>
             </div>
           </div>
           <div class="chat-messages" id="messages-thread">
@@ -9008,11 +9006,9 @@ function renderMessagesInbox() {
 async function openMessageConvo(conversationId) {
   _msgActiveConvoId = conversationId;
   renderMessagesInbox();  // update active highlight
-  const convo = _msgConversations.find(c => c.id === conversationId);
-  // Header
-  if (convo) {
-    document.getElementById('messages-header-name').textContent = 'BAM team — ' + (convo.business_name || '');
-  }
+  // Header stays as the static "Chat with our team" — academy context
+  // is implied by which thread is selected in the sidebar (multi-POC)
+  // or by the user's only client (single-POC).
   // Load messages
   document.getElementById('messages-thread').innerHTML =
     '<div class="req-empty" style="padding:24px;text-align:center">Loading…</div>';
