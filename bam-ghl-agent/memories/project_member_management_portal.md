@@ -83,9 +83,13 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
   - **1b ⏳** — migrate BAM GTA's ~50 member rows + cancellations / referrals
     / refunds history into the portal Supabase under a BAM GTA `clients`
     row. Needs read access to GTA's Supabase project `oatwstyzxreujgsbmaxr`.
-- **Phase 2 — Read-only Members tab.** New "Members" view in
-  client-portal.html (sidebar nav + mobile bottom nav + view container) +
-  `api/members.js` GET, client-scoped roster with live Stripe status.
+- **Phase 2 — Read-only Members tab.**
+  - **2a ✅ DONE** — `bam-portal/api/members.js`: GET endpoint (list +
+    single), client-scoped, DB-only (Stripe enrichment deferred to Phase 3).
+    PATCH returns 501. Built on marketing.js conventions (sb + resolveUser).
+  - **2b ⏳** — the "Members" view in client-portal.html: sidebar nav item
+    + mobile bottom nav item + `<div id="view-members">` container +
+    `switchView` hook + `fetchAndRenderMembers()`.
 - **Phase 3 — Billing actions.** PATCH actions porting the 7 GTA skills,
   honoring GTA's locked Stripe conventions; confirm modal as the
   "preview → y" safety gate; a member_audit_log row per write.
@@ -128,12 +132,13 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
 
 ## Where we left off
 
-Stripe model decided (Connect). Phase 1a done — schema SQL written, not yet
-run. Next actions:
+Stripe model decided (Connect). Phase 1a + 2a done. Next actions:
 1. Run `bam-portal/supabase/member-management-schema.sql` in the Supabase
    SQL Editor (project `jnojmfmpnsfmtqmwhopz`).
-2. Phase 1b — migrate BAM GTA's member data in (needs GTA Supabase access).
-3. Phase 2 — the read-only Members tab + `api/members.js` GET.
+2. Phase 2b — build the "Members" view in client-portal.html (nav items +
+   view container + `switchView` hook + `fetchAndRenderMembers()`).
+3. Phase 1b — migrate BAM GTA's member data in (needs GTA Supabase access).
+4. Then Phase 3 — Stripe Connect onboarding + billing PATCH actions.
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
