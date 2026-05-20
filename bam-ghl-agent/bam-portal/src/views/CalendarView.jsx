@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { fetchEvents } from "../services/calendarService";
+import { fetchEvents, getCalendarConnectUrl, disconnectCalendar } from "../services/calendarService";
 import MeetingPrepModal from './MeetingPrepModal';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
@@ -387,6 +387,8 @@ export default function CalendarView({ tokens, dark }) {
   const [events, setEvents] = useState([]);
   const [isMock, setIsMock] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [googleEmail, setGoogleEmail] = useState(null);
+  const [connecting, setConnecting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showPrep, setShowPrep] = useState(false);
   const [clientMappings, setClientMappings] = useState(() => {
@@ -400,7 +402,7 @@ export default function CalendarView({ tokens, dark }) {
     const start = new Date(currentWeekStart);
     const end = new Date(currentWeekStart);
     end.setDate(end.getDate() + 7);
-    fetchEvents(start.toISOString(), end.toISOString()).then(({ data, connected }) => {
+    fetchEvents(start.toISOString(), end.toISOString()).then(({ data, connected, googleEmail }) => {
       if (cancelled) return;
       // Normalize service fields (start/end) to view fields (startTime/endTime).
       // Empty array is normal (no events that week) — don't keep stale data around.
@@ -411,6 +413,7 @@ export default function CalendarView({ tokens, dark }) {
       }));
       setEvents(normalized);
       setIsMock(connected === false);
+      setGoogleEmail(googleEmail || null);
       setIsLoading(false);
     });
     return () => { cancelled = true; };
@@ -503,23 +506,75 @@ export default function CalendarView({ tokens, dark }) {
     fontFamily: "inherit", fontWeight: active ? 600 : 400, transition: "all 0.12s",
   });
 
+  async function handleConnectCalendar() {
+    setConnecting(true);
+    const url = await getCalendarConnectUrl();
+    if (url) {
+      window.location.href = url;
+    } else {
+      setConnecting(false);
+      alert("Your session expired. Sign in again, then reconnect.");
+    }
+  }
+
+  async function handleDisconnectCalendar() {
+    if (!window.confirm("Disconnect your Google Calendar from the portal?")) return;
+    await disconnectCalendar();
+    setIsMock(true);
+    setEvents([]);
+    setGoogleEmail(null);
+  }
+
   return (
     <div style={{ animation: "cardIn 0.3s ease both" }}>
       <style>{`
         @keyframes calPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
       `}</style>
 
-      {/* Calendar disconnected banner */}
+      {/* Not connected — full connect panel */}
       {isMock && !isLoading && (
         <div style={{
-          marginBottom: 16, padding: "10px 14px",
-          background: `${tokens.amber}10`, border: `1px solid ${tokens.amber}40`,
-          borderRadius: 6, display: "flex", alignItems: "center", gap: 10,
+          marginBottom: 20, padding: "28px 24px",
+          background: tokens.surfaceEl, border: `1px solid ${tokens.border}`,
+          borderRadius: 10, textAlign: "center",
         }}>
-          <span style={{ color: tokens.amber, fontWeight: 600, fontSize: 13 }}>● Calendar disconnected</span>
-          <span style={{ color: tokens.textSub, fontSize: 12 }}>
-            Connect Google Calendar in <b style={{ color: tokens.text }}>Settings</b> to see real events.
-          </span>
+          <div style={{ fontSize: 17, fontWeight: 700, color: tokens.text, marginBottom: 6 }}>
+            Connect your Google Calendar
+          </div>
+          <div style={{ fontSize: 13, color: tokens.textSub, marginBottom: 18, lineHeight: 1.5 }}>
+            Link your own Google Calendar to see your meetings and events right here.
+            Each staff member connects their own.
+          </div>
+          <button
+            type="button"
+            onClick={handleConnectCalendar}
+            disabled={connecting}
+            style={{
+              padding: "11px 22px", background: tokens.accent, color: "#0A0A0B",
+              border: 0, borderRadius: 8, fontSize: 14, fontWeight: 700,
+              cursor: connecting ? "wait" : "pointer", fontFamily: "inherit",
+              opacity: connecting ? 0.6 : 1,
+            }}
+          >{connecting ? "Opening Google…" : "Connect Google Calendar"}</button>
+        </div>
+      )}
+
+      {/* Connected — small status line with disconnect */}
+      {!isMock && !isLoading && (
+        <div style={{
+          marginBottom: 16, display: "flex", alignItems: "center", gap: 10, fontSize: 12,
+        }}>
+          <span style={{ color: tokens.green, fontWeight: 600 }}>● Connected</span>
+          {googleEmail && <span style={{ color: tokens.textMute }}>{googleEmail}</span>}
+          <button
+            type="button"
+            onClick={handleDisconnectCalendar}
+            style={{
+              marginLeft: "auto", background: "transparent", border: `1px solid ${tokens.border}`,
+              color: tokens.textSub, borderRadius: 6, padding: "5px 11px",
+              fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >Disconnect</button>
         </div>
       )}
 

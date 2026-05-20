@@ -6,11 +6,12 @@ import { useStaffMe } from '../hooks/useStaffMe';
 import { supabase } from '../lib/supabase';
 import { NewStaffModal } from '../components/StaffModals';
 
+// Google Calendar was removed from here — it is now connected per-staff
+// directly on the Calendar page (each person links their own).
 const INTEGRATIONS = [
   { key: "ghl", label: "GoHighLevel", desc: "CRM, contacts, pipelines, conversations", endpoint: "/api/ghl?action=locations" },
   { key: "asana", label: "Asana", desc: "Tasks, projects, team assignments", endpoint: "/api/asana/tasks?mode=user&user=mike&limit=1" },
   { key: "stripe", label: "Stripe", desc: "Payments, subscriptions, alerts", endpoint: "/api/stripe/alerts" },
-  { key: "gcal", label: "Google Calendar", desc: "Events, meetings, scheduling", endpoint: "/api/calendar/events" },
 ];
 
 function StatusDot({ status, tokens }) {

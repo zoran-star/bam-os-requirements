@@ -1,12 +1,32 @@
-// Vercel Serverless Function — Google Calendar Events
-// GET: list events from both Mike calendars, merged + sorted
-// Uses OAuth refresh token for private calendar access
+// Vercel Serverless Function — Google Calendar Events (per-staff)
+//   GET    /api/calendar/events  → the signed-in staff member's calendar
+//   DELETE /api/calendar/events  → disconnect (remove their stored token)
+//
+// Auth: Supabase Bearer token. Each staff member connects their own Google
+// Calendar via /api/auth/google/login; the refresh token lives in the
+// staff_calendar_tokens table keyed to their auth user id.
 
 const GCAL_API = "https://www.googleapis.com/calendar/v3";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
+async function verifySupabaseUser(token) {
+  if (!token) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u?.id ? u : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Exchange a Google refresh token for a short-lived access token.
 async function getAccessToken(refreshToken) {
   if (!refreshToken) return null;
-
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -24,12 +44,9 @@ async function getAccessToken(refreshToken) {
 async function fetchCalendarEvents(calendarId, accessToken, timeMin, timeMax) {
   const url = `${GCAL_API}/calendars/${encodeURIComponent(calendarId)}/events?` +
     `timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}` +
-    `&maxResults=50&singleEvents=true&orderBy=startTime`;
+    `&maxResults=100&singleEvents=true&orderBy=startTime`;
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.items || []).map(e => ({
@@ -55,24 +72,37 @@ async function fetchCalendarEvents(calendarId, accessToken, timeMin, timeMax) {
 }
 
 export default async function handler(req, res) {
+  const bearer = (req.headers.authorization || "").startsWith("Bearer ")
+    ? req.headers.authorization.slice(7)
+    : null;
+  const user = await verifySupabaseUser(bearer);
+  if (!user) return res.status(401).json({ error: "auth required", connected: false });
+
+  // ── DELETE: disconnect this staff member's calendar ──
+  if (req.method === "DELETE") {
+    const delRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/staff_calendar_tokens?staff_user_id=eq.${encodeURIComponent(user.id)}`,
+      {
+        method: "DELETE",
+        headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+      }
+    );
+    if (!delRes.ok) return res.status(500).json({ error: "disconnect failed" });
+    return res.status(200).json({ ok: true, connected: false });
+  }
+
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  // Two Google accounts: Bball and Business, each with their own refresh token + calendar
-  const accounts = [
-    { refreshToken: process.env.GOOGLE_REFRESH_TOKEN_BBALL, calendarId: process.env.GOOGLE_CALENDAR_ID },
-    { refreshToken: process.env.GOOGLE_REFRESH_TOKEN_BUSINESS, calendarId: process.env.GOOGLE_CALENDAR_ID_2 },
-    // Legacy fallback: single GOOGLE_REFRESH_TOKEN for both calendars
-    ...(process.env.GOOGLE_REFRESH_TOKEN && !process.env.GOOGLE_REFRESH_TOKEN_BBALL
-      ? [{ refreshToken: process.env.GOOGLE_REFRESH_TOKEN, calendarId: process.env.GOOGLE_CALENDAR_ID },
-         { refreshToken: process.env.GOOGLE_REFRESH_TOKEN, calendarId: process.env.GOOGLE_CALENDAR_ID_2 }]
-      : []),
-  ].filter(a => a.refreshToken && a.calendarId);
-
-  if (accounts.length === 0) {
-    return res.status(401).json({
-      error: "Not authenticated. Visit /api/auth/google/login to connect Google Calendar.",
-      loginUrl: "/api/auth/google/login",
-    });
+  // Look up this staff member's stored Google Calendar token.
+  const rowRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/staff_calendar_tokens?staff_user_id=eq.${encodeURIComponent(user.id)}&select=refresh_token,calendar_id,google_email`,
+    { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+  );
+  const rows = rowRes.ok ? await rowRes.json() : [];
+  const conn = rows[0];
+  if (!conn?.refresh_token) {
+    // Not connected yet — honest empty state, no fake events.
+    return res.status(200).json({ data: [], connected: false });
   }
 
   try {
@@ -87,23 +117,16 @@ export default async function handler(req, res) {
     const timeMin = req.query.timeMin || weekStart.toISOString();
     const timeMax = req.query.timeMax || weekEnd.toISOString();
 
-    // Get access tokens and fetch events for each account in parallel
-    const results = await Promise.all(
-      accounts.map(async ({ refreshToken, calendarId }) => {
-        const accessToken = await getAccessToken(refreshToken);
-        if (!accessToken) return [];
-        return fetchCalendarEvents(calendarId, accessToken, timeMin, timeMax);
-      })
-    );
-
-    // Merge and sort by start time
-    const allEvents = results.flat().sort((a, b) =>
-      new Date(a.start).getTime() - new Date(b.start).getTime()
-    );
-
-    return res.status(200).json({ data: allEvents });
+    const accessToken = await getAccessToken(conn.refresh_token);
+    if (!accessToken) {
+      // Refresh token rejected — likely revoked in the Google account.
+      return res.status(200).json({ data: [], connected: false, reason: "token_revoked" });
+    }
+    const events = await fetchCalendarEvents(conn.calendar_id || "primary", accessToken, timeMin, timeMax);
+    events.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    return res.status(200).json({ data: events, connected: true, google_email: conn.google_email || null });
   } catch (err) {
     console.error("Calendar error:", err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, connected: false });
   }
 }

@@ -183,6 +183,23 @@ export default function BAMPortal() {
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
+  // Handle the Google Calendar OAuth return (?gcal=connected | error).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gcal = params.get("gcal");
+    if (!gcal) return;
+    if (gcal === "connected") {
+      setNav("calendar");
+      showToast("Google Calendar connected");
+    } else if (gcal === "error") {
+      const reason = params.get("reason");
+      showToast(reason === "no_refresh_token"
+        ? "Google didn't return a refresh token — try again"
+        : "Google Calendar connection failed — try again");
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
   // Load clients from Supabase (with live Stripe revenue)
   useEffect(() => {
     if (!session) return;
