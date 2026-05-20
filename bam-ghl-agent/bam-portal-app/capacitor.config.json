@@ -1,0 +1,23 @@
+{
+  "appId": "com.byanymeansbusiness.portal",
+  "appName": "BAM Portal",
+  "webDir": "www",
+  "backgroundColor": "#16140F",
+  "server": {
+    "url": "https://portal.byanymeansbusiness.com/client-portal.html"
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1000,
+      "backgroundColor": "#16140F",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#16140F"
+    }
+  }
+}

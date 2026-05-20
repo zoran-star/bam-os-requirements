@@ -1,0 +1,24 @@
+node_modules/
+.DS_Store
+
+# Generated web bundle (copied in by `cap sync`)
+ios/App/App/public/
+android/app/src/main/assets/public/
+
+# iOS build artifacts
+ios/App/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+DerivedData/
+*.xcuserstate
+
+# Android build artifacts
+android/build/
+android/app/build/
+android/.gradle/
+android/captures/
+android/local.properties
+android/.idea/
+android/app/release/
