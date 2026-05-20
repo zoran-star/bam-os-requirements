@@ -121,6 +121,7 @@ bam-os-requirements/
 ├── bam-ghl-agent/              ← Autonomous GHL agent for client builds and support tickets
 │   ├── client-portal.html      ← Client-facing support portal (10 tiles)
 │   ├── bam-portal/             ← React/Vite staff portal app (live on Vercel)
+│   ├── bam-portal-app/         ← Capacitor iOS/Android native app wrapper (App Store launch)
 │   ├── bam-gta-staff/          ← BAM GTA staff dashboard (React/Vite)
 │   ├── docs/                   ← Schema, brand, and copy convention references
 │   └── sections/               ← HTML section templates

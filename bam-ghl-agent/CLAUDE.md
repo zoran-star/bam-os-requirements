@@ -198,6 +198,10 @@ bam-ghl-agent/
 ├── STAFF-FACING
 │   └── bam-portal/                 ← React/Vite staff portal (deployed, live in production)
 │
+├── NATIVE APP
+│   └── bam-portal-app/             ← Capacitor iOS/Android wrapper for the client portal
+│                                     (App Store launch — see memories/project_app_store_launch.md)
+│
 ├── LEGACY / STATUS UNKNOWN         ← may be deprecated; confirm before editing
 │   ├── dashboard.html
 │   ├── error-ticket-internal.html
