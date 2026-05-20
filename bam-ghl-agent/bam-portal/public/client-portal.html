@@ -5235,6 +5235,61 @@ async function switchClient(newId) {
   renderClientSwitcher();
   await loadAcademyName();
   await loadTickets();
+  subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Realtime auto-refresh
+// ─────────────────────────────────────────────────────────────────
+// Tickets channel: re-runs loadTickets() on any tickets-table change
+// scoped to the active CLIENT_ID. Re-subscribes when switchClient flips
+// CLIENT_ID. Status changes, new tickets, messages updates — all
+// trigger an automatic refresh of the Systems view.
+let _ticketsChannel = null;
+function subscribeTicketsRealtime() {
+  if (_ticketsChannel) {
+    try { _sb.removeChannel(_ticketsChannel); } catch (_) {}
+    _ticketsChannel = null;
+  }
+  if (!CLIENT_ID) return;
+  _ticketsChannel = _sb
+    .channel('tickets:client:' + CLIENT_ID)
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'tickets', filter: 'client_id=eq.' + CLIENT_ID },
+      () => { loadTickets().catch(() => {}); })
+    .subscribe();
+}
+
+// Conversations channel: scoped to ALL the user's clients (multi-POC users
+// like Mike see updates across DETAIL Miami + Out Work + Johnson without
+// switching). Refreshes the inbox list + unread badge whenever a
+// conversation row changes (which happens on every new message via the
+// last_message_at trigger). This replaces the old 30s polling loop with
+// instant updates.
+let _conversationsChannel = null;
+function subscribeAllConversationsRealtime() {
+  if (_conversationsChannel) {
+    try { _sb.removeChannel(_conversationsChannel); } catch (_) {}
+    _conversationsChannel = null;
+  }
+  const clientIds = (CLIENT_ROWS || []).map(c => c.id);
+  if (clientIds.length === 0) return;
+  _conversationsChannel = _sb
+    .channel('conversations:user')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'conversations',
+        filter: clientIds.length === 1
+          ? 'client_id=eq.' + clientIds[0]
+          : 'client_id=in.(' + clientIds.join(',') + ')' },
+      () => {
+        // Re-fetch inbox via the API (it has the unread-computation logic)
+        _msgApi('/api/messages?action=list-conversations').then(json => {
+          _msgConversations = json.conversations || [];
+          if (document.getElementById('view-messages').classList.contains('active')) renderMessagesInbox();
+          updateUnreadBadge();
+        }).catch(() => {});
+      })
+    .subscribe();
 }
 
 /* ════════════════════════════════
@@ -9286,16 +9341,8 @@ function escapeAttr(s) {
   return String(s || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Background-poll the inbox every 30s so unread badge stays current
-// even when the user is on a different view.
-setInterval(() => {
-  if (!CLIENT_ID) return;
-  _msgApi('/api/messages?action=list-conversations').then(json => {
-    _msgConversations = json.conversations || [];
-    if (document.getElementById('view-messages').classList.contains('active')) renderMessagesInbox();
-    updateUnreadBadge();
-  }).catch(() => {});
-}, 30000);
+// Inbox auto-updates via subscribeAllConversationsRealtime() — no
+// polling needed. (Previously polled every 30s; superseded by realtime.)
 
 // Month progress indicator in the Marketing topbar. Shows what day of the
 // current month we are on plus a thin progress bar, so clients understand
@@ -9408,6 +9455,8 @@ async function boot() {
 
   await loadAcademyName();
   await loadTickets();
+  subscribeTicketsRealtime();
+  subscribeAllConversationsRealtime();
 
   // Admin-only floating red feedback button (no-op if user isn't admin/scaling)
   setupAdminFeedbackWidget();

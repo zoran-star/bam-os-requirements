@@ -75,6 +75,19 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime: auto-refresh the ticket list whenever any tickets row
+  // changes (new ticket, status flip, delegation, client reply). No
+  // more manual refresh needed.
+  useEffect(() => {
+    const channel = supabase
+      .channel("systems:tickets")
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "tickets" },
+        () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load]);
+
   const visibleTickets = tickets.filter(x => {
     if (tab === "delegation") return x.status === "open";
     if (tab === "review") return x.status === "in_review";
