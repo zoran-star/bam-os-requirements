@@ -77,9 +77,29 @@ npm run assets
 
 ---
 
-## Next step — push notifications
+## Push notifications
 
-Apple may reject a pure WebView wrapper (Guideline 4.2, "minimum
-functionality"). The fix is real native functionality — **push
-notifications** via `@capacitor/push-notifications`. That is the planned
-follow-up build before submitting for review.
+Push notifications are wired in — this is the native functionality that
+defends against Apple's Guideline 4.2 ("just a website") rejection.
+
+**What's built:**
+- `@capacitor/push-notifications` plugin added to `package.json`.
+- `capacitor.config.json` declares `PushNotifications.presentationOptions`.
+- The live portal (`bam-portal/public/client-portal.html`) registers the
+  device on login, captures the APNs/FCM token, and saves it to the
+  Supabase `device_tokens` table tied to the logged-in client. The block
+  is a no-op in a normal browser / PWA — it only runs inside this wrapper.
+
+**Required before push works on a device** (do during the iOS build):
+1. Run the DB migration once: `bam-portal/scripts/migration/device-tokens.sql`
+   in the Supabase SQL editor (creates the `device_tokens` table + RLS).
+2. In Xcode → **App** target → **Signing & Capabilities** → **+ Capability**
+   → add **Push Notifications**.
+3. In the Apple Developer portal → **Certificates, IDs & Profiles → Keys**
+   → create an **APNs Auth Key** (`.p8`). Save the key file, Key ID, and
+   Team ID — the staff "send" backend will need them later.
+4. `npx cap sync ios` copies the plugin into the native project.
+
+**Not built yet (follow-up):** the staff-side "send a notification" UI and
+the APNs send backend. The app *collects* device tokens now; *sending* is
+a separate build after the app is approved.

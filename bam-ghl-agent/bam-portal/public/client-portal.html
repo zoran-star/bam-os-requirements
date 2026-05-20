@@ -10074,5 +10074,101 @@ function toggleTheme() {
   }
 </script>
 
+<!-- ── Native push notifications (Capacitor wrapper only) ──────────────── -->
+<!-- Runs ONLY inside the iOS/Android app (bam-portal-app). In a normal     -->
+<!-- browser or installed PWA this whole block is a no-op. It registers the -->
+<!-- device for push, captures the APNs/FCM token, and saves it to the      -->
+<!-- Supabase `device_tokens` table tied to the logged-in client so staff   -->
+<!-- can later push notifications to this client.                           -->
+<script>
+(function () {
+  var Cap = window.Capacitor;
+  // Only inside the native wrapper — bail out in browsers / PWA.
+  if (!Cap || typeof Cap.isNativePlatform !== 'function' || !Cap.isNativePlatform()) return;
+  var Push = Cap.Plugins && Cap.Plugins.PushNotifications;
+  if (!Push) { console.warn('[push] PushNotifications plugin unavailable'); return; }
+
+  var platform = (typeof Cap.getPlatform === 'function' && Cap.getPlatform()) || 'unknown';
+  var deviceToken = null;
+  var registerStarted = false;
+
+  // Upsert the captured token against the logged-in client.
+  function saveToken() {
+    if (!deviceToken) return;
+    _sb.auth.getSession().then(function (res) {
+      var session = res && res.data && res.data.session;
+      if (!session || !session.user) return;       // not logged in yet — retried on SIGNED_IN
+      var authUserId = session.user.id;
+      var clientId = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? CLIENT_ID : null;
+      var ready = clientId
+        ? Promise.resolve(clientId)
+        : _sb.from('clients').select('id').eq('auth_user_id', authUserId).maybeSingle()
+            .then(function (r) { return r && r.data ? r.data.id : null; });
+      ready.then(function (cid) {
+        return _sb.from('device_tokens').upsert({
+          token: deviceToken,
+          platform: platform,
+          auth_user_id: authUserId,
+          client_id: cid,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'token' });
+      }).then(function (r) {
+        if (r && r.error) console.warn('[push] token save failed:', r.error.message);
+        else console.log('[push] device token saved');
+      });
+    }).catch(function (e) { console.warn('[push] saveToken error:', e); });
+  }
+
+  // On logout, drop this device's token so it stops receiving this client's pushes.
+  function deleteToken() {
+    if (!deviceToken) return;
+    _sb.from('device_tokens').delete().eq('token', deviceToken)
+       .then(function () {}, function () {});
+  }
+
+  Push.addListener('registration', function (t) {
+    deviceToken = t && t.value;
+    console.log('[push] device registered');
+    saveToken();
+  });
+  Push.addListener('registrationError', function (err) {
+    console.warn('[push] registration error:', err);
+  });
+  // Received / tapped — no-op for now; the staff "send" side is a later follow-up.
+  Push.addListener('pushNotificationReceived', function () {});
+  Push.addListener('pushNotificationActionPerformed', function () {});
+
+  // Request permission + register — once, and only for a logged-in client.
+  function ensureRegistered() {
+    if (registerStarted) { saveToken(); return; }   // already registered — just re-save token
+    registerStarted = true;
+    Push.checkPermissions().then(function (perm) {
+      if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+        return Push.requestPermissions();
+      }
+      return perm;
+    }).then(function (perm) {
+      if (perm.receive === 'granted') {
+        return Push.register();                     // → fires the 'registration' listener
+      }
+      console.log('[push] permission not granted:', perm.receive);
+      registerStarted = false;
+    }).catch(function (e) {
+      console.warn('[push] register error:', e);
+      registerStarted = false;
+    });
+  }
+
+  // Trigger once the client is logged in (avoids prompting on the login screen).
+  _sb.auth.getSession().then(function (r) {
+    if (r && r.data && r.data.session) ensureRegistered();
+  });
+  _sb.auth.onAuthStateChange(function (event) {
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') ensureRegistered();
+    if (event === 'SIGNED_OUT') deleteToken();
+  });
+})();
+</script>
+
 </body>
 </html>

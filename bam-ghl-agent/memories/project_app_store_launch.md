@@ -40,25 +40,38 @@ org would need ABM).
   `appName` = "BAM Portal". See `bam-portal-app/README.md` for build steps.
 - **Phase 1** — Apple Developer Program enrollment + D-U-N-S number —
   Zoran confirmed done.
+- **`server.url` verified** — 2026-05-20: curled both candidate URLs;
+  `portal.byanymeansbusiness.com/client-portal.html` and the raw
+  `bam-portal-tawny.vercel.app` serve byte-identical content. Config keeps
+  the custom domain (branded + stable). No change needed.
+- **Push notifications (wrapper-complete)** — 2026-05-20: `@capacitor/push-notifications`
+  installed; `capacitor.config.json` configured; `client-portal.html`
+  registers on login, captures the device token, and upserts it to a new
+  Supabase `device_tokens` table (RLS-scoped per user). No-op outside the
+  native app. Staff send-side is the follow-up below.
 
 ### ⏳ Next steps (in order)
-1. **CONFIRM `server.url`** in `bam-portal-app/capacitor.config.json` —
-   currently `https://portal.byanymeansbusiness.com/client-portal.html`.
-   This is a best guess, **NOT verified**. It must be the exact URL clients
-   use. (The env network allowlist now permits `*.byanymeansbusiness.com`,
-   so a session can `curl` it to confirm.)
-2. **Build push notifications** into the wrapper (`@capacitor/push-notifications`).
-   This is the mitigation for Apple Guideline 4.2 ("just a wrapped website"
-   rejection) — do it BEFORE submitting. ~1–2 days.
-3. **Compile on a Mac** (Zoran's task) — needs Mac + Xcode + CocoaPods.
-   `npx cap open ios` → set signing Team → Archive → upload to App Store
-   Connect. Full steps in `bam-portal-app/README.md`.
+1. **Run the DB migration** — `bam-portal/scripts/migration/device-tokens.sql`
+   in the Supabase SQL editor (creates the `device_tokens` table + RLS the
+   push code writes to). One-time; do before the first device test.
+2. **Compile on a Mac** (Zoran's task) — needs Mac + Xcode + CocoaPods.
+   `npm install` → `npx cap sync ios` → `npx cap open ios` → set signing
+   Team → add the **Push Notifications** capability → Archive → upload to
+   App Store Connect. Full steps in `bam-portal-app/README.md`.
+3. **APNs Auth Key** — in the Apple Developer portal create a `.p8` APNs
+   key; save the key file + Key ID + Team ID (the staff send-backend needs
+   them later).
 4. **Phase 3 — App Store Connect**: screenshots, 1024 icon, description,
    a hosted **privacy policy URL**, App Privacy data declaration, and a
    **demo login account** for the reviewer (portal is behind a login —
    mandatory or instant rejection).
 5. **Submit for review** → expect a possible 4.2 rejection round → then
    request Unlisted distribution → release.
+
+### 🔜 Follow-up (after approval)
+- Staff-side "send a notification" UI in `bam-portal/` + an APNs send
+  backend (service-role API route reading `device_tokens`). The app
+  collects tokens now; sending is a separate build.
 
 ## Key facts
 - Capacitor project lives at `bam-ghl-agent/bam-portal-app/`.
