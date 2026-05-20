@@ -15,6 +15,7 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState("");
+  const [btnHover, setBtnHover] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleOpen = () => {
@@ -91,26 +92,46 @@ export default function UniversalFeedbackWidget({ tokens, session }) {
     <>
       {/* Floating button (always visible) */}
       {!open && (
-        <button
-          type="button"
-          onClick={handleOpen}
-          title="Send feedback"
-          aria-label="Send feedback"
-          style={{
-            position: "fixed", bottom: 24, right: 24, zIndex: 1800,
-            width: 52, height: 52, borderRadius: "50%",
-            background: t.accent, color: "#0A0A0B", border: 0, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 6px 20px rgba(232,197,71,0.40), 0 2px 6px rgba(0,0,0,0.35)",
-            transition: "transform 0.18s ease, box-shadow 0.18s ease",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px) scale(1.06)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0) scale(1)"; }}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-        </button>
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1800 }}>
+          {/* Hover tooltip */}
+          <div style={{
+            position: "absolute", bottom: "calc(100% + 12px)", right: 0,
+            background: "#131318", color: "#F5F5F7",
+            border: "1px solid rgba(255,255,255,0.14)",
+            borderRadius: 8, padding: "8px 13px",
+            fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.45)",
+            opacity: btnHover ? 1 : 0,
+            transform: btnHover ? "translateY(0)" : "translateY(5px)",
+            pointerEvents: "none",
+            transition: "opacity 0.18s ease, transform 0.18s ease",
+          }}>
+            help zoran out...
+            <span style={{
+              position: "absolute", top: "100%", right: 22,
+              borderWidth: 6, borderStyle: "solid",
+              borderColor: "#131318 transparent transparent transparent",
+            }} />
+          </div>
+          <button
+            type="button"
+            onClick={handleOpen}
+            aria-label="Send feedback"
+            onMouseEnter={e => { setBtnHover(true); e.currentTarget.style.transform = "translateY(-2px) scale(1.06)"; }}
+            onMouseLeave={e => { setBtnHover(false); e.currentTarget.style.transform = "translateY(0) scale(1)"; }}
+            style={{
+              width: 56, height: 56, borderRadius: "50%",
+              padding: 0, overflow: "hidden", cursor: "pointer",
+              border: `2px solid ${t.accent}`,
+              background: t.accent,
+              display: "block",
+              boxShadow: "0 6px 20px rgba(232,197,71,0.40), 0 2px 6px rgba(0,0,0,0.35)",
+              transition: "transform 0.18s ease, box-shadow 0.18s ease",
+            }}
+          >
+            <img src="/help-zoran.png" alt="Send feedback" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </button>
+        </div>
       )}
 
       {/* Expanded panel */}

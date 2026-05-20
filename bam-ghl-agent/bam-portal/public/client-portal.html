@@ -3248,16 +3248,36 @@
      The widget IDs still start with "admin-fb" for historical reasons.
 -->
 <style>
-  #admin-fb-btn {
+  #admin-fb-wrap {
     position: fixed; bottom: 24px; right: 24px; z-index: 10000;
-    width: 52px; height: 52px; border-radius: 50%;
-    background: #E8C547; color: #0A0A0B; border: none; cursor: pointer;
-    box-shadow: 0 6px 20px rgba(232, 197, 71, 0.40), 0 2px 6px rgba(0,0,0,0.35);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
+  #admin-fb-btn {
+    width: 56px; height: 56px; border-radius: 50%;
+    padding: 0; overflow: hidden; cursor: pointer;
+    border: 2px solid #E8C547;
+    background: #E8C547;
+    box-shadow: 0 6px 20px rgba(232, 197, 71, 0.40), 0 2px 6px rgba(0,0,0,0.35);
+    display: block;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+  #admin-fb-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
   #admin-fb-btn:hover { transform: translateY(-2px) scale(1.06); box-shadow: 0 10px 28px rgba(232, 197, 71, 0.50), 0 4px 10px rgba(0,0,0,0.35); }
   #admin-fb-btn:active { transform: translateY(0) scale(0.98); }
+  #admin-fb-tip {
+    position: absolute; bottom: calc(100% + 12px); right: 0;
+    background: #131318; color: #F5F5F7;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px; padding: 8px 13px;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    opacity: 0; transform: translateY(5px); pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+  #admin-fb-tip::after {
+    content: ""; position: absolute; top: 100%; right: 22px;
+    border: 6px solid transparent; border-top-color: #131318;
+  }
+  #admin-fb-wrap:hover #admin-fb-tip { opacity: 1; transform: translateY(0); }
   #admin-fb-overlay {
     position: fixed; inset: 0; z-index: 10100;
     background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(4px);
@@ -4333,11 +4353,12 @@
   }
 </style>
 
-<button id="admin-fb-btn" onclick="openAdminFeedback()" title="Send feedback" aria-label="Send feedback">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-  </svg>
-</button>
+<div id="admin-fb-wrap">
+  <div id="admin-fb-tip">help zoran out...</div>
+  <button id="admin-fb-btn" onclick="openAdminFeedback()" aria-label="Send feedback">
+    <img src="/help-zoran.png" alt="Send feedback" />
+  </button>
+</div>
 
 <div id="admin-fb-overlay" onclick="if (event.target === this) closeAdminFeedback()">
   <div id="admin-fb-modal">
