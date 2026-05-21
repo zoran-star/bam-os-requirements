@@ -239,8 +239,9 @@ files, so raw inserts are fragile).
 
 **Steps:**
 1. **Staff portal → Clients → New client** — create **"Demo Academy"**.
-2. **Send the invite** (Setup account) to **`appreview@byanymeansbusiness.com`**
-   — an inbox you control.
+2. **Send the invite** (Setup account) to **`zoran+appreview@byanymeansbball.com`**
+   — a plus-alias that delivers to Zoran's real inbox (decided 2026-05-21;
+   `appreview@byanymeansbusiness.com` was never created).
 3. Open the invite email → it lands on the **client portal** → **set a
    password**. Write it down — it goes in the review form.
 4. Log in once as the demo account and **submit one sample support
@@ -248,7 +249,7 @@ files, so raw inserts are fragile).
 5. Test the login end to end before submitting.
 
 **Reviewer credentials** (for the App Store / Play review forms):
-- Email: `appreview@byanymeansbusiness.com`
+- Email: `zoran+appreview@byanymeansbball.com`
 - Password: *(the one set in step 3)*
 
 > Bonus: this doubles as a live re-test of the invite-redirect fix — the
@@ -341,7 +342,7 @@ lifecycle is handled by By Any Means. Login is email + password; there is
 no third-party or social login.
 
 Demo account for review:
-  Email:    appreview@byanymeansbusiness.com
+  Email:    zoran+appreview@byanymeansbball.com
   Password: [paste the password you set]
 
 After signing in, the reviewer can browse every tab — Systems, Messages,

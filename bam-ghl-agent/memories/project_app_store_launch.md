@@ -104,6 +104,9 @@ review notes, final checklist).
 - **Decisions:** business/legal name = "By Any Means, LLC"; contact email
   = zoran@byanymeansbball.com; app is universal (iPhone + iPad); a
   dedicated demo reviewer account will be created (spec in the guide).
+  Demo reviewer login email = `zoran+appreview@byanymeansbball.com` — a
+  plus-alias to Zoran's inbox (decided 2026-05-21; the originally-spec'd
+  `appreview@byanymeansbusiness.com` mailbox never existed).
 - **Members hidden in the app** — Zoran chose to ship the app WITHOUT the
   Members tab. `isNativeApp()` in `client-portal.html` (wraps
   `Capacitor.isNativePlatform()`) makes `applyMemberMgmtNavState()` hide
