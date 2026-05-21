@@ -7656,7 +7656,7 @@ async function _populateGuideCard(offerName) {
         if (!url) return '';
         return `<button type="button" class="guide-asset" data-asset-url="${url}" data-asset-name="${name}" title="View ${name}">`
           + `<img src="${url}" alt="${name}" onerror="this.closest('.guide-asset').classList.add('is-file');this.remove();" />`
-          + `<span class="guide-asset-file"><span class="guide-asset-file-icon">⤓</span><span>${name}</span></span>`
+          + `<span class="guide-asset-file"><span class="guide-asset-file-icon">↓</span><span>${name}</span></span>`
           + `</button>`;
       }).join('');
       if (assetsSection) assetsSection.style.display = '';
@@ -7700,7 +7700,7 @@ function openAssetModal(url, name) {
       '<div class="asset-modal-card">' +
         '<div class="asset-modal-body" id="assetModalBody"></div>' +
         '<div class="asset-modal-actions">' +
-          '<button type="button" class="asset-modal-dl" id="assetModalDl">⤓ Download</button>' +
+          '<button type="button" class="asset-modal-dl" id="assetModalDl">↓ Download</button>' +
           '<button type="button" class="asset-modal-x" id="assetModalX">Close</button>' +
         '</div>' +
       '</div>';
@@ -7715,7 +7715,7 @@ function openAssetModal(url, name) {
   img.alt = name || 'Asset';
   img.onerror = () => {
     body.innerHTML = '<div class="asset-modal-file">'
-      + '<div class="asset-modal-file-icon">⤓</div>'
+      + '<div class="asset-modal-file-icon">↓</div>'
       + '<div>' + escapeHTML(name || 'Asset') + '</div>'
       + '<div class="asset-modal-file-hint">Tap Download to save it to your device</div>'
       + '</div>';
@@ -7752,7 +7752,7 @@ async function downloadAsset(url, name) {
     // CORS or network failure — fall back to opening the asset directly.
     window.open(url, '_blank', 'noopener');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '⤓ Download'; }
+    if (btn) { btn.disabled = false; btn.textContent = '↓ Download'; }
   }
 }
 
