@@ -517,7 +517,7 @@ export default function CommunicationView({ tokens, dark }) {
 
   return (
     <div style={{
-      display: "flex", height: isMobile ? "calc(100vh - 160px)" : "calc(100vh - 220px)", borderRadius: 16,
+      display: "flex", height: "calc(100dvh - 290px)", minHeight: 420, borderRadius: 16,
       border: `1px solid ${tokens.border}`, overflow: "hidden",
       background: tokens.surface,
       boxShadow: tokens.cardShadow,

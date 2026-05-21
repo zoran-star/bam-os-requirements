@@ -488,7 +488,7 @@ export default function BAMPortal() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        html,body{background:${tk.bg};min-height:100vh;overscroll-behavior:none}
+        html,body{background:${tk.bg};min-height:100dvh;overscroll-behavior:none}
         html{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
         ::-webkit-scrollbar{width:4px}
         ::-webkit-scrollbar-track{background:transparent}
@@ -509,7 +509,7 @@ export default function BAMPortal() {
         input:focus,textarea:focus,select:focus{outline:none;border-color:${tk.accentBorder}!important;box-shadow:${tk.inputGlow}!important;transition:all 0.2s cubic-bezier(0.22, 1, 0.36, 1)!important}
       `}</style>
 
-      <div style={{ display: "flex", height: "100vh" }}>
+      <div style={{ display: "flex", height: "100dvh" }}>
 
         {/* SIDEBAR */}
         <div style={{
