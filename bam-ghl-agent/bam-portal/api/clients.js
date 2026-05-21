@@ -837,6 +837,210 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
 
+      // ── Dual-auth actions: client portal Team management ──
+      // invite-team-member / revoke-team-member can be called by BAM staff
+      // OR by a client portal user (the academy owner or a teammate). Auth
+      // is resolved per-action below, so these MUST sit before the staff-only
+      // gate — that gate would 403 a legitimate client-portal caller.
+      if (publicSignupAction === "invite-team-member" || publicSignupAction === "revoke-team-member") {
+        const teamAuth = req.headers.authorization || "";
+        const teamToken = teamAuth.startsWith("Bearer ") ? teamAuth.slice(7) : null;
+        if (!teamToken) return res.status(401).json({ error: "auth required" });
+
+        const whoRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${teamToken}` },
+        });
+        if (!whoRes.ok) return res.status(401).json({ error: "invalid token" });
+        const who = await whoRes.json();
+        if (!who?.id) return res.status(401).json({ error: "invalid token" });
+
+        const teamBody = req.body || {};
+        const client_id = typeof teamBody.client_id === "string" ? teamBody.client_id.trim() : "";
+        if (!client_id) return res.status(400).json({ error: "client_id required" });
+
+        // Resolve the caller's capabilities for this client.
+        const callerStaff = who.email
+          ? await supabaseSelect(`staff?email=eq.${encodeURIComponent(who.email)}&select=id`).catch(() => [])
+          : [];
+        const isStaffCaller = Array.isArray(callerStaff) && callerStaff.length > 0;
+        const callerMembership = await supabaseSelect(
+          `client_users?user_id=eq.${who.id}&client_id=eq.${client_id}&status=eq.active&select=id,role`
+        ).catch(() => []);
+        const callerRole = callerMembership?.[0]?.role || null;   // 'owner' | 'member' | null
+
+        // The target client row — needed for business name + Slack channel.
+        const teamClientRows = await supabaseSelect(
+          `clients?id=eq.${client_id}&select=id,business_name,slack_channel_id`
+        );
+        if (!teamClientRows?.length) return res.status(404).json({ error: "client not found" });
+        const teamClient = teamClientRows[0];
+
+        // ---- action=invite-team-member ----
+        // Any BAM staff OR any active portal user of this client can invite.
+        if (publicSignupAction === "invite-team-member") {
+          if (!isStaffCaller && !callerRole) {
+            return res.status(403).json({ error: "not authorized for this client" });
+          }
+          const name = typeof teamBody.name === "string" ? teamBody.name.trim() : "";
+          const email = typeof teamBody.email === "string" ? teamBody.email.trim().toLowerCase() : "";
+          if (!name) return res.status(400).json({ error: "name required" });
+          if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ error: "valid email required" });
+          }
+          if (!process.env.RESEND_API_KEY) {
+            return res.status(500).json({ error: "RESEND_API_KEY not configured" });
+          }
+
+          const { clientUrl } = portalUrls(req);
+          const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
+
+          // generate_link returns both the action_link and the auth user id.
+          const genTeamLink = async (type, extra = {}) => {
+            const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+              method: "POST",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ type, email, redirect_to: redirectTo, ...extra }),
+            });
+            if (!r.ok) return { ok: false, status: r.status, text: await r.text() };
+            const j = await r.json();
+            return {
+              ok: true,
+              actionLink: j?.properties?.action_link || j?.action_link,
+              authUserId: j?.user?.id || j?.id,
+            };
+          };
+
+          // Try invite (creates a fresh auth user). If the email already has
+          // an auth user, look them up and issue a magiclink instead.
+          let actionLink = null, memberUserId = null;
+          const inviteRes = await genTeamLink("invite", { data: { needs_password: true } });
+          if (inviteRes.ok) {
+            actionLink = inviteRes.actionLink;
+            memberUserId = inviteRes.authUserId;
+          } else if (inviteRes.status === 422 || /already/i.test(inviteRes.text || "")) {
+            const lookupRes = await fetch(
+              `${SUPABASE_URL}/auth/v1/admin/users?filter=email.eq.${encodeURIComponent(email)}`,
+              { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
+            );
+            const lookupJson = await lookupRes.json().catch(() => ({}));
+            const existingUser = (lookupJson?.users || []).find(u => (u?.email || "").toLowerCase() === email);
+            if (!existingUser?.id) {
+              return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
+            }
+            memberUserId = existingUser.id;
+            const ml = await genTeamLink("magiclink");
+            if (ml.ok) actionLink = ml.actionLink;
+            // If the magiclink fails the access is still wired up — they can
+            // log in with their existing password; we just lack a copy link.
+          } else {
+            return res.status(400).json({ error: `invite: ${inviteRes.text}` });
+          }
+          if (!memberUserId) return res.status(500).json({ error: "could not resolve the invited user" });
+
+          // Upsert the membership. A previously-revoked row for this
+          // user+client is reactivated; otherwise a fresh row is inserted.
+          const existingMembership = await supabaseSelect(
+            `client_users?user_id=eq.${memberUserId}&client_id=eq.${client_id}&select=id,role,status`
+          ).catch(() => []);
+          let memberRow;
+          if (existingMembership?.length) {
+            const ex = existingMembership[0];
+            if (ex.status === "active") {
+              return res.status(409).json({ error: "that person already has access to this portal" });
+            }
+            const updRes = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${ex.id}`, {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({ name, email, status: "active" }),
+            });
+            if (!updRes.ok) return res.status(500).json({ error: `membership update failed: ${await updRes.text()}` });
+            memberRow = (await updRes.json())[0];
+          } else {
+            try {
+              const rows = await supabaseInsert("client_users", {
+                user_id: memberUserId, client_id, name, email,
+                role: "member", status: "active",
+              });
+              memberRow = Array.isArray(rows) ? rows[0] : rows;
+            } catch (insErr) {
+              return res.status(500).json({ error: `membership insert failed: ${insErr.message}` });
+            }
+          }
+
+          // Notify: email to the new teammate + Slack to the client channel
+          // (so BAM staff watching that channel see the new portal user).
+          const [emailRes, slackRes] = actionLink
+            ? await Promise.all([
+                sendInviteEmail({
+                  to: email, actionLink,
+                  businessName: teamClient.business_name || "",
+                  resendApiKey: process.env.RESEND_API_KEY,
+                }),
+                postInviteToSlack({
+                  slackChannelId: teamClient.slack_channel_id || null,
+                  businessName: teamClient.business_name || "",
+                  ownerName: name, email, actionLink,
+                }),
+              ])
+            : [{ ok: false, error: "no link generated" }, { ok: false, skipped: true }];
+
+          return res.status(200).json({
+            ok: true,
+            member: memberRow,
+            action_link: actionLink,
+            email_sent: !!emailRes?.ok,
+            slack_posted: !!slackRes?.ok,
+            slack_skipped: !!slackRes?.skipped,
+            slack_error: slackRes?.error || null,
+          });
+        }
+
+        // ---- action=revoke-team-member ----
+        // BAM staff OR the client's owner can revoke. Regular members cannot.
+        if (publicSignupAction === "revoke-team-member") {
+          if (!isStaffCaller && callerRole !== "owner") {
+            return res.status(403).json({ error: "only the owner or BAM staff can revoke access" });
+          }
+          const member_id = typeof teamBody.member_id === "string" ? teamBody.member_id.trim() : "";
+          if (!member_id) return res.status(400).json({ error: "member_id required" });
+
+          const targetRows = await supabaseSelect(
+            `client_users?id=eq.${member_id}&select=id,client_id,role,status`
+          );
+          if (!targetRows?.length) return res.status(404).json({ error: "team member not found" });
+          const target = targetRows[0];
+          if (target.client_id !== client_id) {
+            return res.status(400).json({ error: "member does not belong to this client" });
+          }
+          if (target.role === "owner") {
+            return res.status(403).json({ error: "the owner's access can't be revoked here" });
+          }
+
+          const updRes = await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${member_id}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=representation",
+            },
+            body: JSON.stringify({ status: "revoked" }),
+          });
+          if (!updRes.ok) return res.status(500).json({ error: `revoke failed: ${await updRes.text()}` });
+
+          return res.status(200).json({ ok: true, member_id, status: "revoked" });
+        }
+      }
+
       // ── Staff auth (admin only) ──
       const auth = req.headers.authorization || "";
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;

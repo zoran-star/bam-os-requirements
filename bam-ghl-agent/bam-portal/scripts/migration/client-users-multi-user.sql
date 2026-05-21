@@ -154,17 +154,51 @@ create policy "client_users_member_select" on public.client_users
 
 
 -- ══ PART C — staff RLS hardening ═════════════════════════════════════════
--- ⚠️ NOT YET APPLIED — pending Zoran's decision (see project_multi_user_portal.md).
--- The existing "Staff" policies are wide open (qual = true / auth.role() =
--- 'authenticated'), so any logged-in user can read/update ALL client data.
--- That overrides the PART B client policies. The intended fix:
---
---   create or replace function public.is_staff()
---   returns boolean language sql stable security definer set search_path=public
---   as $$ select exists (select 1 from public.staff s where s.user_id = auth.uid()) $$;
---   grant execute on function public.is_staff() to authenticated, anon;
---
---   then rewrite: tickets/staff_select_all_tickets, tickets/"Staff can update tickets",
---   clients/"Staff can read clients", clients/"Staff can update clients",
---   client_users/"Staff can read all client users"
---   -> using (public.is_staff())
+-- Applied as migration: staff_rls_scope_to_real_staff
+-- The "Staff" policies on tickets/clients/client_users were wide open
+-- (qual = true / auth.role()='authenticated') -> any logged-in user could
+-- read/update ALL client data, overriding the PART B client policies.
+-- (marketing_tickets/content_tickets/conversations staff policies were
+-- already correctly scoped to staff — left alone.)
+
+create or replace function public.is_staff()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.staff s where s.user_id = auth.uid())
+$$;
+
+grant execute on function public.is_staff() to authenticated, anon;
+
+-- tickets
+drop policy if exists "staff_select_all_tickets" on public.tickets;
+create policy "staff_select_all_tickets" on public.tickets
+  for select to authenticated using (public.is_staff());
+
+drop policy if exists "Staff can update tickets" on public.tickets;
+create policy "Staff can update tickets" on public.tickets
+  for update to authenticated using (public.is_staff()) with check (public.is_staff());
+
+-- clients
+drop policy if exists "Staff can read clients" on public.clients;
+create policy "Staff can read clients" on public.clients
+  for select to authenticated using (public.is_staff());
+
+drop policy if exists "Staff can update clients" on public.clients;
+create policy "Staff can update clients" on public.clients
+  for update to authenticated using (public.is_staff()) with check (public.is_staff());
+
+drop policy if exists "Staff can insert clients" on public.clients;
+create policy "Staff can insert clients" on public.clients
+  for insert to authenticated with check (public.is_staff());
+
+-- client_users
+drop policy if exists "Staff can read all client users" on public.client_users;
+create policy "Staff can read all client users" on public.client_users
+  for select to authenticated using (public.is_staff());
+
+-- Verified 2026-05-20: staff user -> 29 clients / 36 tickets / 7 client_users;
+-- client user -> 1 client / 6 tickets / 1 client_user. RLS fully enforced.

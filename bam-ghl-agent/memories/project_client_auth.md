@@ -1,14 +1,21 @@
 ---
-name: Client Portal Auth (email + password, 1 user per client)
-description: How clients log in to client-portal.html — Supabase Auth, password-required, manually invited via Supabase dashboard, RLS-scoped queries
+name: Client Portal Auth (email + password)
+description: How clients log in to client-portal.html — Supabase Auth, password-required, RLS-scoped queries. NOTE: cardinality is now MANY users per client — see [[Multi-User Client Portal Access]].
 type: project
 ---
+
+> ⚠️ **Superseded in part (2026-05-20):** the client portal is now
+> **multi-user** — many logins per academy via the `client_users` join
+> table, with RLS scoped by `my_client_ids()`. The "1 user per client /
+> `clients.auth_user_id`" model below is the OLD design. The auth provider,
+> password/invite/recovery machinery still apply. See
+> [[Multi-User Client Portal Access]] for the current model.
 
 ## Model
 
 - **Auth provider:** Supabase Auth, email + password (no magic links, no signup form, no third-party providers)
-- **Cardinality:** one Supabase auth user per client. The `clients.auth_user_id` column links them.
-- **Provisioning:** manual via Supabase dashboard (no in-app signup, no automatic invite trigger).
+- **Cardinality:** ~~one Supabase auth user per client~~ → now **many users per client** via `client_users` (owner + invited teammates). `clients.auth_user_id` is kept as the owner pointer.
+- **Provisioning:** owner via the staff portal; teammates via the in-portal "Invite teammate" flow or the staff portal Team tab.
 
 ## Schema
 

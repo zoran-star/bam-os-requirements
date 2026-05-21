@@ -373,6 +373,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "overview",     label: "Overview" },
     { id: "messages",     label: "Messages" },
     { id: "setup",        label: "Setup" },
+    { id: "team",         label: "Team" },
     { id: "marketing",    label: "Marketing" },
     { id: "activity",     label: "Activity", hide: !ROLES.canViewFinancials(role) },
     { id: "notes",        label: "Notes" },
@@ -422,6 +423,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "overview" && <OverviewTab client={client} staffMap={staffMap} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "messages" && <MessagesTab client={client} tokens={t} session={session} me={me} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
+      {tab === "team" && <TeamTab client={client} tokens={t} session={session} />}
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
@@ -1409,6 +1411,187 @@ function MessagesTab({ client, tokens, session, me }) {
 }
 
 // ─── NOTES tab ──────────────────────────────────────────────────────────────
+// ─── Team tab — multi-user client portal access ─────────────────────────────
+// Lists everyone who can log in to this client's portal (owner + invited
+// teammates). Staff can invite new teammates and revoke members. Membership
+// lives in client_users; invite/revoke route through /api/clients.
+function TeamTab({ client, tokens, session }) {
+  const t = tokens;
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refresh, setRefresh] = useState(0);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [revokeId, setRevokeId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    supabase
+      .from("client_users")
+      .select("id,name,email,role,user_id")
+      .eq("client_id", client.id)
+      .eq("status", "active")
+      .then(({ data }) => {
+        if (cancelled) return;
+        setMembers(data || []);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [client.id, refresh]);
+
+  async function callTeamApi(action, body) {
+    const res = await fetch(`/api/clients?action=${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify(body),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    return j;
+  }
+
+  async function sendInvite() {
+    if (!inviteName.trim()) return setMsg({ kind: "err", text: "Name required" });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail.trim())) {
+      return setMsg({ kind: "err", text: "Valid email required" });
+    }
+    setBusy(true); setMsg(null);
+    try {
+      await callTeamApi("invite-team-member", {
+        client_id: client.id, name: inviteName.trim(), email: inviteEmail.trim(),
+      });
+      setMsg({ kind: "ok", text: `Invite sent to ${inviteEmail.trim()} ✓` });
+      setInviteName(""); setInviteEmail(""); setShowInvite(false);
+      setRefresh(x => x + 1);
+    } catch (e) {
+      setMsg({ kind: "err", text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(memberId) {
+    setBusy(true); setMsg(null);
+    try {
+      await callTeamApi("revoke-team-member", { client_id: client.id, member_id: memberId });
+      setMsg({ kind: "ok", text: "Access revoked ✓" });
+      setRevokeId(null);
+      setRefresh(x => x + 1);
+    } catch (e) {
+      setMsg({ kind: "err", text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const inputStyle = {
+    flex: "1 1 180px", padding: "9px 12px", background: t.surfaceEl,
+    color: t.text, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13,
+  };
+  const sorted = [...members].sort((a, b) => {
+    if (a.role !== b.role) return a.role === "owner" ? -1 : 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>Portal access</div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>
+            Everyone who can log in to this client's portal.
+          </div>
+        </div>
+        <button style={btnStyle(t, "primary")} onClick={() => { setShowInvite(s => !s); setMsg(null); }}>
+          {showInvite ? "Cancel" : "+ Invite teammate"}
+        </button>
+      </div>
+
+      {showInvite && (
+        <div style={{ padding: 16, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <input placeholder="Name" value={inviteName} onChange={e => setInviteName(e.target.value)} style={inputStyle} />
+            <input placeholder="Email" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} style={inputStyle} />
+            <button style={btnStyle(t, "primary")} disabled={busy} onClick={sendInvite}>
+              {busy ? "Sending…" : "Send invite"}
+            </button>
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute, marginTop: 8 }}>
+            They get an email to set their password, then full portal access.
+          </div>
+        </div>
+      )}
+
+      {msg && (
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: msg.kind === "ok" ? t.green : t.red }}>
+          {msg.text}
+        </div>
+      )}
+
+      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
+      {!loading && sorted.length === 0 && (
+        <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>
+          No portal users yet.
+        </div>
+      )}
+      {sorted.map(m => {
+        const isOwner = m.role === "owner";
+        return (
+          <div key={m.id} style={{
+            display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+            border: `1px solid ${t.border}`, borderRadius: 6, background: t.surfaceEl, marginBottom: 8,
+          }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%", background: t.accent, color: "#0B0B0D",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, fontSize: 14, flexShrink: 0,
+            }}>
+              {(m.name || m.email || "?").trim().slice(0, 1).toUpperCase()}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{m.name || "(no name)"}</div>
+              <div style={{ fontSize: 12, color: t.textMute, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {m.email || ""}
+              </div>
+            </div>
+            <span style={{
+              fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
+              padding: "3px 9px", borderRadius: 999, flexShrink: 0,
+              ...(isOwner
+                ? { background: t.accent, color: "#0B0B0D" }
+                : { border: `1px solid ${t.border}`, color: t.textMute }),
+            }}>
+              {isOwner ? "Owner" : "Member"}
+            </span>
+            {!isOwner && (revokeId === m.id ? (
+              <span style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button style={{ ...btnStyle(t, "secondary"), padding: "6px 10px", fontSize: 12 }}
+                  disabled={busy} onClick={() => setRevokeId(null)}>Keep</button>
+                <button style={{
+                  padding: "6px 10px", background: t.red, color: "#fff", border: "none",
+                  borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                }} disabled={busy} onClick={() => revoke(m.id)}>
+                  {busy ? "…" : "Confirm revoke"}
+                </button>
+              </span>
+            ) : (
+              <button style={{
+                padding: "6px 12px", background: "transparent", color: t.red,
+                border: `1px solid ${t.red}55`, borderRadius: 6, fontSize: 12, fontWeight: 600,
+                cursor: "pointer", flexShrink: 0,
+              }} onClick={() => { setRevokeId(m.id); setMsg(null); }}>Revoke</button>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function NotesTab({ client, tokens, me, session, staffMap }) {
   const t = tokens;
   const [notes, setNotes] = useState([]);

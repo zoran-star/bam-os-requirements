@@ -1,6 +1,6 @@
 ---
 name: Multi-User Client Portal Access
-description: 2026-05-20 — letting an academy owner add multiple staff logins to their client portal. DB foundation + RLS rewrite applied; API + both portal UIs still to build. Resume via /account-continue.
+description: 2026-05-20 — many logins per academy via the client_users join table. DB + API + both portal UIs SHIPPED. Notion requirement still to add.
 type: project
 ---
 
@@ -11,7 +11,8 @@ academy**. An academy owner (and any teammate) can invite more staff into
 their client portal; BAM staff can do the same from the staff portal and
 see the full team on each client's page.
 
-Resume with **`/account-continue`**.
+**Status: feature SHIPPED end to end (2026-05-20).** Only the Notion
+business-requirement write-up is outstanding.
 
 ## Locked decisions (Zoran, 2026-05-20)
 
@@ -23,23 +24,13 @@ Resume with **`/account-continue`**.
 | New teammate added | **Slack notification** to the client's channel |
 | UI naming | Call them **"Team"** (avoids clash with BAM "staff") |
 
-## 🔴 OPEN DECISION — blocks the rest, re-ask on resume
+## ✅ RESOLVED — staff RLS hole fixed (PART C)
 
-While rewriting RLS we found the **"Staff" RLS policies are wide open**:
-- `tickets/staff_select_all_tickets` SELECT → `qual = true`
-- `clients/"Staff can read clients"` SELECT → `auth.role()='authenticated'`
-- `clients/"Staff can update clients"` UPDATE → `auth.role()='authenticated'`
-- `tickets/"Staff can update tickets"` UPDATE → `auth.role()='authenticated'`
-- `client_users/"Staff can read all client users"` SELECT → `auth.role()='authenticated'`
-
-**Effect:** any logged-in client can read/update EVERY academy's data via a
-direct Supabase query with their own token. Pre-existing hole. It also means
-the new PART B client policies are dead code until this is fixed.
-
-Fix is ready (PART C in the SQL file): add `is_staff()` SECURITY DEFINER
-function, scope the 5 policies to it. `staff` table has `user_id` → auth.users
-(7 of 8 staff linked). **Re-ask Zoran: fix now, or ship feature + log as a
-High Open Loop.** Session paused here.
+The pre-existing "Staff" RLS policies on tickets/clients/client_users were
+wide open (`qual = true` / `auth.role()='authenticated'`). Zoran chose to
+fix now. Migration `staff_rls_scope_to_real_staff` applied: added
+`is_staff()` SECURITY DEFINER fn, scoped all 6 open policies to it.
+Verified — staff sees all, client sees only their own.
 
 ## ✅ DONE — applied to live Supabase (jnojmfmpnsfmtqmwhopz)
 
@@ -63,34 +54,51 @@ SQL recorded in `bam-portal/scripts/migration/client-users-multi-user.sql`.
   owner. RLS filtering itself can't be fully proven until PART C closes the
   open staff policies.
 
-## ⏳ REMAINING — to build on resume
+## ✅ DONE — API (`bam-portal/api/clients.js`)
 
-1. **PART C** — staff RLS hardening (pending the open decision above).
-2. **API** (`bam-portal/api/clients.js`) — two new actions:
-   - `invite-team-member` — caller = BAM staff (admin) **OR any active
-     `client_users` member of the target client**. Dual-auth: mirror the
-     client Bearer-token verification in `api/tickets.js?public=1`. Generate
-     a Supabase invite link, insert a `client_users` row (role 'member'),
-     send email + Slack (reuse `postInviteToSlack` / `sendInviteEmail`).
-   - `revoke-team-member` — caller = BAM staff OR the client's **owner**.
-     Delete the `client_users` row; delete the auth user only if they belong
-     to no other client. Cannot revoke an 'owner' row via this path.
-3. **Client portal** `bam-portal/public/client-portal.html`:
-   - `boot()` (line ~9814) currently resolves clients via
-     `clients.auth_user_id = session.user.id` → change to resolve via
-     `client_users` (membership). Keep the multi-client switcher (`CLIENT_ROWS`).
-   - New **"Team" section/nav item**: list teammates, "Invite teammate"
-     button (any user), "Revoke" (owner only). **+ mobile layout** (file has
-     a ≤768px stylesheet + bottom tab bar — see [[project_client_portal_mobile]]).
-4. **Staff portal** `bam-portal/src/views/ClientsCombinedView.jsx`:
-   - `ClientDetail` tabs are defined ~line 372 (overview/messages/setup/
-     marketing/activity/notes). Add a **"Team" tab** listing all
-     `client_users` for the client + invite + revoke. `AuthActions`
-     component (~line 1499) shows the `send()` → `/api/clients?action=`
-     pattern to copy.
-5. **Notion + memory** — add a PRF requirement (Profiles & Identity domain)
-   for multi-user portal access; check Onboarding Data Points DB; update
-   [[project_client_auth]] (the "1 user per client" note is now outdated).
+Two new dual-auth actions, placed BEFORE the staff-only gate so a
+client-portal caller isn't 403'd:
+- `invite-team-member` — caller = BAM staff **OR any active `client_users`
+  member** of the target client. generate_link (invite, or magiclink for an
+  existing auth user), upserts a `client_users` row (`role 'member'`,
+  reactivates a revoked row), emails the teammate + posts to the client's
+  Slack channel.
+- `revoke-team-member` — caller = BAM staff **OR the client's owner**.
+  Soft-revoke (`status='revoked'`); the auth user is left intact (re-invite
+  reactivates). Cannot revoke an `owner` row.
+
+## ✅ DONE — Client portal (`client-portal.html`)
+
+- `boot()` now resolves clients with no `auth_user_id` filter — RLS
+  (`my_client_ids()`) scopes the query, so owners AND teammates resolve.
+- New **"Team"** sidebar nav item + `view-team` + mobile bottom-nav tab.
+- Team view: lists members (owner badged), "+ Invite teammate" (any user),
+  "Revoke" (owner only, on member rows). Invite + revoke modals.
+- Mobile styles included in the same pass (`@media (max-width:768px)` in
+  the team `<style>` block; modals get the existing bottom-sheet treatment).
+- Tour verifier (`scripts/verify-client-portal-ui.mjs`) passes.
+
+## ✅ DONE — Staff portal (`ClientsCombinedView.jsx`)
+
+- New **"Team" tab** on the client detail page (`TeamTab` component).
+- Lists all `client_users` for the client, inline invite form, inline
+  revoke confirm. Routes through `/api/clients?action=invite-team-member`
+  / `revoke-team-member`. `npm run build` passes.
+
+## ⏳ REMAINING
+
+- **Notion** — add a PRF requirement (Profiles & Identity domain) for
+  multi-user portal access. Onboarding Data Points DB: nothing to add
+  (teammates are added ad-hoc, not during onboarding; no new config/threshold).
+
+## Known minor gaps (not blockers)
+
+- The first-login tour's `complete-onboarding` API matches the client by
+  `clients.auth_user_id` — a non-owner teammate on a not-yet-onboarded
+  client couldn't mark the tour done. Edge case; cosmetic.
+- "Invited but not yet logged in" state is not shown in either Team list —
+  v1 shows all active members flat. Enhancement: enrich with
+  `auth.users.last_sign_in_at`.
 
 ## Code anchors (so resume doesn't re-explore)
 
