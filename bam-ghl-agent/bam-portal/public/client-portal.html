@@ -1137,6 +1137,36 @@
     object-fit: cover;
     border-radius: 6px;
     border: 1px solid var(--line);
+    display: block;
+  }
+  .guide-asset {
+    display: block;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .guide-asset .guide-asset-file { display: none; }
+  .guide-asset.is-file .guide-asset-file {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    aspect-ratio: 1 / 1;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface-el);
+    color: var(--text-sub);
+    font-size: 10px;
+    line-height: 1.3;
+    text-align: center;
+    word-break: break-word;
+    overflow: hidden;
+  }
+  .guide-asset-file-icon {
+    font-size: 20px;
+    color: var(--gold);
+    line-height: 1;
   }
 
   /* Wizard file list (asset upload step) */
@@ -7547,7 +7577,15 @@ async function _populateGuideCard(offerName) {
       assetsEl.innerHTML = assets.map(a => {
         const url = escapeHTML(a.url || a);
         const name = escapeHTML(a.name || 'Example');
-        return `<img src="${url}" alt="${name}" />`;
+        if (!url) return '';
+        // Tappable: opens the asset full-size in a new tab so it can be
+        // viewed or saved on a phone. onerror swaps a broken image — or a
+        // non-image file like a PDF/video — for a clean downloadable tile
+        // instead of the browser's broken-image icon.
+        return `<a href="${url}" target="_blank" rel="noreferrer" class="guide-asset" title="Tap to view ${name}">`
+          + `<img src="${url}" alt="${name}" onerror="this.closest('.guide-asset').classList.add('is-file');this.remove();" />`
+          + `<span class="guide-asset-file"><span class="guide-asset-file-icon">⤓</span><span>${name}</span></span>`
+          + `</a>`;
       }).join('');
     }
 
