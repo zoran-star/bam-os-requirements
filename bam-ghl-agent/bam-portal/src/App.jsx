@@ -791,7 +791,7 @@ export default function BAMPortal() {
               actually scroll inside a flex column — without it the child
               grows past the viewport and gets clipped by the parent's
               overflow:hidden instead of scrolling. */}
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", padding: isMobile ? "24px 16px 64px" : "40px 44px 80px" }}>
+          <div style={{ flex: 1, minHeight: 0, padding: isMobile ? "24px 16px 64px" : "40px 44px 80px", ...(["communication", "clients"].includes(nav) ? { overflow: "hidden", display: "flex", flexDirection: "column" } : { overflowY: "auto" }) }}>
 
             {!(nav === "clients" && clientsInDetail) && (
               <div key={nav} style={{ flexShrink: 0, marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
@@ -800,9 +800,10 @@ export default function BAMPortal() {
               </div>
             )}
 
-            {/* View area — fills the space below the header; the active
-                view scrolls inside this, so the page itself never scrolls. */}
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            {/* View area. App-like views (Communication, Clients) fill the
+                space and scroll internally; normal pages (Dashboard, etc.)
+                are a plain passthrough and scroll with the content area. */}
+            <div style={["communication", "clients"].includes(nav) ? { flex: 1, minHeight: 0, overflowY: "auto" } : {}}>
 
             {/* DASHBOARD — clicking a client card jumps into the Clients tab
                 and opens that client's detail view. Eager (first-paint). */}
