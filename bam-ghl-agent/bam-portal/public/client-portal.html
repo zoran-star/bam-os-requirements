@@ -3271,13 +3271,35 @@
 <!-- Boot splash — shown instantly on load, hidden by boot() once the auth
      check resolves, so the login screen never flashes for a signed-in user. -->
 <div id="boot-splash" style="position:fixed;inset:0;z-index:10001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#16140F">
-  <svg class="boot-splash-icon" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <circle cx="17" cy="17" r="12" fill="none" stroke="#E8C547" stroke-width="1"/>
-    <circle cx="17" cy="17" r="5" fill="none" stroke="#C9A55C" stroke-width="0.8"/>
-    <line x1="17" y1="3" x2="17" y2="31" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
-    <line x1="3" y1="17" x2="31" y2="17" stroke="#F5F1E8" stroke-width="0.5" opacity="0.4"/>
-    <polygon points="17,8 19,17 17,26 15,17" fill="#E8C547"/>
-    <circle cx="17" cy="17" r="1.3" fill="#0A0A0B" stroke="#E8C547" stroke-width="0.6"/>
+  <svg class="boot-splash-icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="boot-gold" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#F4D788"/>
+        <stop offset="0.5" stop-color="#E8C547"/>
+        <stop offset="1" stop-color="#C9A55C"/>
+      </linearGradient>
+    </defs>
+    <circle cx="256" cy="256" r="220" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.35"/>
+    <g stroke="currentColor" stroke-width="2" opacity="0.5">
+      <line x1="256" y1="58" x2="256" y2="40"/>
+      <line x1="331.7713196082878" y1="73.07185256276523" x2="338.6596213908594" y2="56.442020977562066"/>
+      <line x1="396.0071426749364" y1="115.9928573250636" x2="408.73506473629425" y2="103.26493526370575"/>
+      <line x1="438.92814743723477" y1="180.2286803917122" x2="455.55797902243796" y2="173.3403786091406"/>
+      <line x1="454" y1="256" x2="472" y2="256"/>
+      <line x1="438.92814743723477" y1="331.7713196082878" x2="455.55797902243796" y2="338.6596213908594"/>
+      <line x1="396.0071426749364" y1="396.0071426749364" x2="408.73506473629425" y2="408.73506473629425"/>
+      <line x1="331.7713196082878" y1="438.92814743723477" x2="338.6596213908594" y2="455.55797902243796"/>
+      <line x1="256" y1="454" x2="256" y2="472"/>
+      <line x1="180.22868039171223" y1="438.92814743723477" x2="173.3403786091406" y2="455.55797902243796"/>
+      <line x1="115.9928573250636" y1="396.0071426749364" x2="103.26493526370575" y2="408.73506473629425"/>
+      <line x1="73.07185256276526" y1="331.77131960828785" x2="56.44202097756212" y2="338.6596213908595"/>
+      <line x1="58" y1="256" x2="40" y2="256"/>
+      <line x1="73.07185256276526" y1="180.22868039171217" x2="56.442020977562095" y2="173.34037860914054"/>
+      <line x1="115.99285732506357" y1="115.9928573250636" x2="103.2649352637057" y2="103.26493526370575"/>
+      <line x1="180.22868039171212" y1="73.07185256276526" x2="173.3403786091405" y2="56.44202097756212"/>
+    </g>
+    <path d="M 256 80 L 290 230 L 432 256 L 290 282 L 256 432 L 222 282 L 80 256 L 222 230 Z" fill="url(#boot-gold)"/>
+    <circle cx="256" cy="256" r="10" fill="#E8C547"/>
   </svg>
   <div class="boot-splash-spinner"></div>
 </div>
@@ -3286,7 +3308,7 @@
   /* Boot splash — instant cover during the auth check */
   #boot-splash { transition: opacity 0.32s ease; }
   #boot-splash.hide { opacity: 0; pointer-events: none; }
-  .boot-splash-icon { width: 46px; height: 46px; }
+  .boot-splash-icon { width: 60px; height: 60px; color: var(--text-sub); }
   .boot-splash-spinner {
     width: 24px;
     height: 24px;
@@ -4871,7 +4893,7 @@
         Members
       </div>
 
-      <div class="nav-item" onclick="switchView('team', this)">
+      <div class="nav-item" data-feature="team" onclick="switchView('team', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
@@ -5714,7 +5736,7 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Members</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team">
+    <button type="button" class="mobile-nav-item" data-feature="team" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
@@ -5820,6 +5842,12 @@ function applyMemberMgmtNavState() {
   const showMembers = MEMBER_MGMT_ENABLED && !isNativeApp();
   document.querySelectorAll('[data-feature="members"]').forEach(el => {
     el.style.display = showMembers ? '' : 'none';
+  });
+  // Team is web-only — hidden inside the native app (not part of the
+  // App Store v1, same treatment as Members). Stays live on the web.
+  const showTeam = !isNativeApp();
+  document.querySelectorAll('[data-feature="team"]').forEach(el => {
+    el.style.display = showTeam ? '' : 'none';
   });
 }
 
@@ -10491,11 +10519,19 @@ _sb.auth.onAuthStateChange((event, _session) => {
 
 // Boot splash — covers the auth check so the login screen never flashes
 // for an already-signed-in user. Hidden once boot() reaches a final state.
+const _bootSplashStart = Date.now();
 function _hideBootSplash() {
   const s = document.getElementById('boot-splash');
-  if (!s || s.classList.contains('hide')) return;
-  s.classList.add('hide');
-  setTimeout(() => { s.style.display = 'none'; }, 340);
+  if (!s || s.classList.contains('hide') || s.dataset.hiding) return;
+  // Hold the splash for a minimum beat so it reads as intentional, never
+  // a flicker — even when boot resolves instantly from a cached session.
+  const MIN_MS = 1100;
+  const wait = Math.max(0, MIN_MS - (Date.now() - _bootSplashStart));
+  s.dataset.hiding = '1';
+  setTimeout(() => {
+    s.classList.add('hide');
+    setTimeout(() => { s.style.display = 'none'; }, 340);
+  }, wait);
 }
 setTimeout(_hideBootSplash, 12000); // safety net if boot ever hangs
 boot().catch(e => console.error('[boot]', e)).finally(_hideBootSplash);
