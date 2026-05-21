@@ -2449,6 +2449,17 @@
   }
   .intake-wrap textarea::placeholder { color: var(--text-mute); }
   .intake-wrap textarea:focus { border-bottom-color: var(--gold); }
+  .intake-wrap input[type="text"] {
+    width: 100%;
+    background: transparent;
+    border: none; border-bottom: 1px solid var(--line);
+    border-radius: 0; padding: 10px 0;
+    font-family: inherit; font-size: 15px;
+    color: var(--text); outline: none;
+    transition: border-color 0.15s ease;
+  }
+  .intake-wrap input[type="text"]::placeholder { color: var(--text-mute); }
+  .intake-wrap input[type="text"]:focus { border-bottom-color: var(--gold); }
 
   .input-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -4674,7 +4685,17 @@
       row-gap: 10px;
       align-items: flex-start;
     }
-    .topbar-title { font-size: 20px !important; line-height: 1.15 !important; }
+    .topbar-title { font-size: 24px !important; line-height: 1.2 !important; }
+    /* Mobile has no sidebar — surface the BAM mark beside every header. */
+    .topbar-title::before {
+      content: '';
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      margin-right: 10px;
+      vertical-align: middle;
+      background: url('/brand-mark.svg') center/contain no-repeat;
+    }
     .topbar-sub { margin-top: 8px; }
     .topbar [style*="display:flex"] { flex-wrap: wrap; }
     .topbar .month-progress { align-items: flex-start; width: 100%; }
@@ -5030,6 +5051,13 @@
                 <div class="q-subtitle">The more detail you can give us, the faster we can fix it.</div>
 
                 <div class="field-group">
+                  <div class="field-label">Title<span class="req">*</span></div>
+                  <div class="input-wrap">
+                    <input type="text" id="error-title" maxlength="80" placeholder="A short name for this ticket" />
+                  </div>
+                </div>
+
+                <div class="field-group">
                   <div class="field-label">Where is it happening?<span class="req">*</span></div>
                   <div class="input-wrap">
                     <textarea id="error-where" placeholder="e.g. On the booking page, the form doesn't submit..." rows="3"></textarea>
@@ -5071,6 +5099,13 @@
                 <div class="q-label">Change ticket</div>
                 <div class="q-title">What needs to change?</div>
                 <div class="q-subtitle">Show us what you want updated — a screenshot or description both work great.</div>
+
+                <div class="field-group">
+                  <div class="field-label">Title<span class="req">*</span></div>
+                  <div class="input-wrap">
+                    <input type="text" id="change-title" maxlength="80" placeholder="A short name for this ticket" />
+                  </div>
+                </div>
 
                 <div class="field-group">
                   <div class="field-label">What do you want to change?<span class="req">*</span></div>
@@ -5173,6 +5208,13 @@
                 <div class="q-label">Custom request</div>
                 <div class="q-title">Tell us what you have in mind</div>
                 <div class="q-subtitle">Describe what you want and we'll figure it out together.</div>
+
+                <div class="field-group">
+                  <div class="field-label">Title<span class="req">*</span></div>
+                  <div class="input-wrap">
+                    <input type="text" id="custom-title" maxlength="80" placeholder="A short name for this request" />
+                  </div>
+                </div>
 
                 <div class="field-group">
                   <div class="field-label">Describe what you want to build<span class="req">*</span></div>
@@ -8271,7 +8313,12 @@ function mapTicket(r) {
   } else {
     Object.assign(data, r.fields || {});
   }
-  const title = r.menu_item
+  // The client-entered title (fields.title) heads the ticket card. Drop it
+  // from the detail fields so it doesn't render twice.
+  const userTitle = (r.fields && typeof r.fields.title === 'string') ? r.fields.title.trim() : '';
+  delete data.title;
+  const title = userTitle
+    || r.menu_item
     || (r.type === 'error' ? 'Error report' : r.type === 'change' ? 'Change request' : 'Build request');
   return {
     id: r.id,
@@ -9271,6 +9318,7 @@ async function submitTicket(type) {
 
   if (type === 'error') {
     fields = {
+      title:  (document.getElementById('error-title')?.value  || '').trim(),
       where:  (document.getElementById('error-where')?.value  || '').trim(),
       should: (document.getElementById('error-should')?.value || '').trim(),
     };
@@ -9278,6 +9326,7 @@ async function submitTicket(type) {
 
   } else if (type === 'change') {
     fields = {
+      title: (document.getElementById('change-title')?.value || '').trim(),
       what: (document.getElementById('change-what')?.value || '').trim(),
       how:  (document.getElementById('change-how')?.value  || '').trim(),
     };
@@ -9290,6 +9339,7 @@ async function submitTicket(type) {
   } else if (type === 'custom') {
     menuItem = 'Build something else';
     fields = {
+      title:    (document.getElementById('custom-title')?.value || '').trim(),
       describe: (document.getElementById('custom-desc')?.value || '').trim(),
       info:     (document.getElementById('custom-info')?.value || '').trim(),
     };
