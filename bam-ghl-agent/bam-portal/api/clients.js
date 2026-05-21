@@ -492,10 +492,17 @@ async function supabaseInsert(path, body) {
 // vars. This matters because an invite sent from the staff portal needs
 // to land the client on the CLIENT portal, not whichever URL staff is on.
 function portalUrls(req) {
-  const origin = req.headers.origin || `https://${req.headers.host}`;
+  const origin = req.headers.origin || `https://${req.headers.host}` || "";
+  // Supabase only honours redirect_to URLs that match its allow-list. An
+  // invite generated from a *.vercel.app preview origin (or any non-prod
+  // host) won't match, so Supabase silently falls back to the Site URL —
+  // the staff portal root. Unless we're genuinely on localhost, pin to
+  // the allow-listed production domain instead of the raw request origin.
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
   return {
-    staffUrl: process.env.STAFF_PORTAL_URL || origin,
-    clientUrl: process.env.CLIENT_PORTAL_URL || origin,
+    staffUrl: process.env.STAFF_PORTAL_URL || base,
+    clientUrl: process.env.CLIENT_PORTAL_URL || base,
   };
 }
 

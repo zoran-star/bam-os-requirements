@@ -5876,6 +5876,9 @@ const MEMBER_MGMT_ENABLED = true;
 // billing actions (Phase 3) are ready for App Store review.
 // When Members is app-ready: delete `&& !isNativeApp()` below + resubmit.
 function isNativeApp() {
+  // ?native=1 forces native-app behaviour so the App Store build's hidden
+  // tabs (Members, Team) can be previewed in a normal browser or PWA.
+  if (/[?&]native=1/.test(location.search)) return true;
   const Cap = window.Capacitor;
   return !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
 }
