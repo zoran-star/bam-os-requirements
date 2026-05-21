@@ -4695,6 +4695,18 @@
         </span>
         Members
       </div>
+
+      <div class="nav-item" onclick="switchView('team', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </span>
+        Team
+      </div>
     </nav>
 
     <div class="sidebar-bottom">
@@ -5433,6 +5445,66 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <style>
+      .team-intro { font-size:13px; color:var(--text-mute); margin:6px 0 16px; line-height:1.5; max-width:560px; }
+      .team-row {
+        display:flex; align-items:center; gap:14px;
+        padding:14px 16px; border:1px solid var(--border); border-radius:8px;
+        background:var(--surface); margin-bottom:10px;
+      }
+      .team-avatar {
+        flex:0 0 38px; width:38px; height:38px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        background:var(--accent); color:#0B0B0D; font-weight:700; font-size:15px;
+      }
+      .team-meta { flex:1 1 auto; min-width:0; }
+      .team-name { font-size:14px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; }
+      .team-email { font-size:12px; color:var(--text-mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .team-you {
+        font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+        background:var(--border); color:var(--text-mute); padding:2px 6px; border-radius:4px;
+      }
+      .team-role-badge {
+        flex:0 0 auto; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;
+        color:var(--text-mute); border:1px solid var(--border); padding:3px 9px; border-radius:999px;
+      }
+      .team-role-badge.owner { color:#0B0B0D; background:var(--accent); border-color:var(--accent); }
+      .team-revoke-btn {
+        flex:0 0 auto; font-size:12px; font-weight:600; cursor:pointer;
+        background:transparent; color:#d9534f; border:1px solid #d9534f55;
+        padding:6px 12px; border-radius:6px;
+      }
+      .team-revoke-btn:hover { background:#d9534f12; }
+      .team-msg { font-size:13px; font-weight:600; margin-top:10px; min-height:18px; }
+      .team-msg.err { color:#d9534f; }
+      .team-msg.ok { color:#3CB371; }
+      @media (max-width:768px) {
+        .team-row { flex-wrap:wrap; gap:10px 12px; padding:12px 14px; }
+        .team-meta { flex:1 1 55%; }
+        .team-role-badge { order:2; }
+        .team-revoke-btn { order:3; flex:1 1 100%; padding:9px 12px; }
+        #view-team .btn-primary { width:100%; }
+        .team-intro { max-width:none; }
+      }
+    </style>
+
+    <div class="view" id="view-team">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 04 · Team</span>
+          <div class="topbar-title">Your Team</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="readout">Portal Access</div>
+        <p class="team-intro">Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; the account owner can revoke access.</p>
+        <button class="btn btn-primary" onclick="openInviteTeamModal()">+ Invite teammate</button>
+        <div id="team-list-container" style="margin-top:18px">
+          <div class="req-empty" style="padding:20px 0">Loading team…</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Mobile bottom nav (phones only — replaces the hidden sidebar) ── -->
@@ -5467,6 +5539,15 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Members</span>
     </button>
+    <button type="button" class="mobile-nav-item" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <span class="mobile-nav-label">Team</span>
+    </button>
   </nav>
 </div>
 
@@ -5494,6 +5575,9 @@ function switchView(name, el) {
 
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
+
+  // When entering Team, load the portal-access list
+  if (name === 'team') fetchAndRenderTeam();
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
@@ -5544,7 +5628,7 @@ function applyMarketingNavState() {
 // The Members tab is gated until the Supabase schema + roster data are
 // live. Flip MEMBER_MGMT_ENABLED to true once member-management-schema.sql
 // has been run and the academy's members are migrated in.
-const MEMBER_MGMT_ENABLED = false;
+const MEMBER_MGMT_ENABLED = true;
 
 function applyMemberMgmtNavState() {
   document.querySelectorAll('[data-feature="members"]').forEach(el => {
@@ -5587,6 +5671,147 @@ function renderClientSwitcher() {
     root.appendChild(l);
   }
   root.insertAdjacentHTML('beforeend', buttons);
+}
+
+// ── Team (multi-user portal access) ──
+// The Team view lists everyone who can log in to this client's portal.
+// Any portal user can invite teammates; the account owner can revoke members.
+// Membership lives in the client_users table; RLS scopes these queries.
+let TEAM_ROWS = [];
+let TEAM_MY_ROLE = null;
+let _revokeTeamMemberId = null;
+
+async function fetchAndRenderTeam() {
+  const box = document.getElementById('team-list-container');
+  if (!box || !CLIENT_ID) return;
+  box.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading team…</div>';
+  try {
+    const { data: rows, error } = await _sb.from('client_users')
+      .select('id, name, email, role, user_id')
+      .eq('client_id', CLIENT_ID)
+      .eq('status', 'active');
+    if (error) throw error;
+    TEAM_ROWS = rows || [];
+    const { data: { session } } = await _sb.auth.getSession();
+    const myId = session?.user?.id || null;
+    const myRow = TEAM_ROWS.find(r => r.user_id === myId);
+    TEAM_MY_ROLE = myRow?.role || null;
+    renderTeamList(myId);
+  } catch (e) {
+    box.innerHTML = '<div class="req-empty" style="padding:20px 0">Couldn’t load the team. Refresh to try again.</div>';
+  }
+}
+
+function renderTeamList(myId) {
+  const box = document.getElementById('team-list-container');
+  if (!box) return;
+  if (!TEAM_ROWS.length) {
+    box.innerHTML = '<div class="req-empty" style="padding:20px 0">No one on the team yet.</div>';
+    return;
+  }
+  // Owner first, then members alphabetically.
+  const sorted = [...TEAM_ROWS].sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'owner' ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  box.innerHTML = sorted.map(r => {
+    const isOwner = r.role === 'owner';
+    const isMe = r.user_id === myId;
+    const canRevoke = TEAM_MY_ROLE === 'owner' && !isOwner && !isMe;
+    const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
+    return `<div class="team-row">
+      <div class="team-avatar">${escapeHTML(initial)}</div>
+      <div class="team-meta">
+        <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
+        <div class="team-email">${escapeHTML(r.email || '')}</div>
+      </div>
+      <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
+      ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function setTeamMsg(id, text, kind) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'team-msg' + (kind ? ' ' + kind : '');
+}
+
+function openInviteTeamModal() {
+  document.getElementById('inviteTeamName').value = '';
+  document.getElementById('inviteTeamEmail').value = '';
+  setTeamMsg('inviteTeamMsg', '');
+  const btn = document.getElementById('inviteTeamSubmitBtn');
+  btn.disabled = false; btn.textContent = 'Send invite';
+  document.getElementById('inviteTeamModal').style.display = 'flex';
+}
+function closeInviteTeamModal() {
+  document.getElementById('inviteTeamModal').style.display = 'none';
+}
+
+async function submitInviteTeam() {
+  const name = document.getElementById('inviteTeamName').value.trim();
+  const email = document.getElementById('inviteTeamEmail').value.trim();
+  if (!name) return setTeamMsg('inviteTeamMsg', 'Enter their name.', 'err');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setTeamMsg('inviteTeamMsg', 'Enter a valid email.', 'err');
+  const btn = document.getElementById('inviteTeamSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  setTeamMsg('inviteTeamMsg', '');
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) throw new Error('Your session expired — please sign in again.');
+    const res = await fetch('/api/clients?action=invite-team-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ client_id: CLIENT_ID, name, email }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    setTeamMsg('inviteTeamMsg', '✓ Invite sent to ' + email, 'ok');
+    btn.textContent = 'Sent';
+    fetchAndRenderTeam();
+    setTimeout(closeInviteTeamModal, 1600);
+  } catch (e) {
+    setTeamMsg('inviteTeamMsg', e.message, 'err');
+    btn.disabled = false; btn.textContent = 'Send invite';
+  }
+}
+
+function openRevokeTeamModal(memberId) {
+  _revokeTeamMemberId = memberId;
+  const row = TEAM_ROWS.find(r => r.id === memberId);
+  document.getElementById('revokeTeamName').textContent =
+    (row && (row.name || row.email)) || 'This teammate';
+  setTeamMsg('revokeTeamMsg', '');
+  const btn = document.getElementById('revokeTeamConfirmBtn');
+  btn.disabled = false; btn.textContent = 'Yes, revoke';
+  document.getElementById('revokeTeamModal').style.display = 'flex';
+}
+function closeRevokeTeamModal() {
+  document.getElementById('revokeTeamModal').style.display = 'none';
+  _revokeTeamMemberId = null;
+}
+async function confirmRevokeTeam() {
+  if (!_revokeTeamMemberId) return;
+  const btn = document.getElementById('revokeTeamConfirmBtn');
+  btn.disabled = true; btn.textContent = 'Revoking…';
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) throw new Error('Your session expired — please sign in again.');
+    const res = await fetch('/api/clients?action=revoke-team-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ client_id: CLIENT_ID, member_id: _revokeTeamMemberId }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+    closeRevokeTeamModal();
+    fetchAndRenderTeam();
+  } catch (e) {
+    setTeamMsg('revokeTeamMsg', e.message, 'err');
+    btn.disabled = false; btn.textContent = 'Yes, revoke';
+  }
 }
 
 async function switchClient(newId) {
@@ -9855,12 +10080,12 @@ async function boot() {
     showRecoveryForm('invite');
     return;
   }
-  // Resolve all clients linked to this auth user. One auth user can be
-  // the Point of Contact for multiple clients (e.g. Mike for DETAIL Miami
-  // + Out Work + Johnson). The bottom-left switcher lets them flip.
+  // Resolve every client this user can access. Membership lives in the
+  // client_users table (owner OR invited teammate); RLS scopes this query
+  // to exactly the caller's clients via my_client_ids(). One auth user can
+  // belong to multiple clients — the bottom-left switcher lets them flip.
   const { data: clientRows } = await _sb.from('clients')
     .select('id, business_name, owner_name, onboarding_completed_at, marketing_included')
-    .eq('auth_user_id', session.user.id)
     .is('archived_at', null)
     .order('business_name');
   const clientRow = (clientRows && clientRows.length) ? clientRows[0] : null;
@@ -10001,6 +10226,42 @@ function toggleTheme() {
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeCancelRequestModal()">Keep it</button>
       <button class="btn-modal-danger" onclick="confirmCancelRequest()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Invite teammate modal ── -->
+<div id="inviteTeamModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeInviteTeamModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Team</div>
+    <div class="modal-title">Invite a teammate</div>
+    <div class="modal-sub">They'll get an email to set their password, then they can log in with full access to this portal.</div>
+
+    <label class="modal-label" for="inviteTeamName">Name</label>
+    <input type="text" id="inviteTeamName" class="modal-input" placeholder="e.g. Jordan Lee" />
+
+    <label class="modal-label" for="inviteTeamEmail" style="margin-top:14px">Email</label>
+    <input type="email" id="inviteTeamEmail" class="modal-input" placeholder="jordan@academy.com" inputmode="email" autocomplete="off" />
+
+    <div class="team-msg" id="inviteTeamMsg"></div>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeInviteTeamModal()">Cancel</button>
+      <button class="btn-modal-primary" id="inviteTeamSubmitBtn" onclick="submitInviteTeam()">Send invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Revoke teammate modal ── -->
+<div id="revokeTeamModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeRevokeTeamModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Confirm</div>
+    <div class="modal-title">Revoke portal access?</div>
+    <div class="modal-sub"><strong id="revokeTeamName">This teammate</strong> will no longer be able to log in to this portal. You can re-invite them later.</div>
+    <div class="team-msg" id="revokeTeamMsg"></div>
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeRevokeTeamModal()">Keep access</button>
+      <button class="btn-modal-danger" id="revokeTeamConfirmBtn" onclick="confirmRevokeTeam()">Yes, revoke</button>
     </div>
   </div>
 </div>

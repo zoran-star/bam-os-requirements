@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-20 — incorporating the BAM GTA member-management system into the client portal as a client-side "Members" feature. Stripe model = Connect. Phases 1a/2a/2b done — Members tab built end to end; schema SQL not yet run. Resume via /member-management-continue.
+description: 2026-05-20 — BAM GTA member-management system incorporated into the client portal as a client-side "Members" feature. Phases 1+2 DONE — tab LIVE for BAM GTA (51 athletes migrated). Stripe model = Connect. Next = Phase 3 (billing actions). Resume via /member-management-continue.
 type: project
 ---
 
@@ -155,27 +155,26 @@ owns fixing those; not our concern here.
 
 ## Where we left off
 
-GOAL (session): get the Member Management tab live for BAM GTA's account.
-Stripe model = Connect. Phases 1a/2a/2b done + multi-user-aligned.
+✅ GOAL MET (2026-05-20) — the Member Management tab is LIVE for BAM GTA.
 
-Confirmed via the portal REST API (service key in `bam-portal/.env.local` —
-note: that file's values are JSON-quoted, parse with JSON.parse):
-- BAM GTA `clients` row exists — id `39875f07-0a4b-4429-a201-2249bc1f24df`,
-  business_name "BAM GTA", has an `auth_user_id` (so it has a portal login).
-- `members` table does NOT exist yet (schema SQL not run).
+- Schema applied to the portal Supabase (`jnojmfmpnsfmtqmwhopz`) via the
+  Management API: 5 tables + enums + per-client RLS + the clients Connect
+  columns.
+- BAM GTA's roster migrated: **51 athletes** (41 live · 7 paused · 3
+  payment-flagged) under `client_id 39875f07-0a4b-4429-a201-2249bc1f24df`.
+- `MEMBER_MGMT_ENABLED` flipped to `true` in client-portal.html → the tab
+  is visible on deploy. Tour verifier passes.
+- The migration ran via
+  `bam-portal/scripts/migration/run-member-management-migration.mjs`
+  (one-shot, needs a Supabase PAT; idempotent).
 
-The whole finish is automated in one script:
-`bam-portal/scripts/migration/run-member-management-migration.mjs` — given a
-Supabase personal access token (account-level → reaches BOTH projects via
-the Management API) it creates the tables, pulls BAM GTA's live roster from
-the GTA project, loads it into the portal scoped to BAM GTA, and verifies.
+Note: the flag is GLOBAL — every academy login sees a Members tab; non-GTA
+academies see an empty roster (their `members` rows = 0). Per-academy
+gating = a Phase 4 item.
 
-To finish:
-1. Run the runner with a Supabase PAT — OR run `member-management-schema.sql`
-   + `member-management-gta-data.sql` by hand in the dashboards.
-2. Flip `MEMBER_MGMT_ENABLED` → `true` in client-portal.html → commit → push.
-3. Verify: log into the portal as BAM GTA → Members tab shows the roster.
-Then Phase 3 — Stripe Connect onboarding + billing PATCH actions.
+NEXT — Phase 3: Stripe Connect onboarding flow + billing PATCH actions
+(pause/unpause/cancel/refund/change/payment-link/refer). Also migrate
+cancellations/referrals/refunds history. The tab is READ-ONLY until Phase 3.
 
 The Members tab is gated behind `MEMBER_MGMT_ENABLED` — a const in
 client-portal.html, currently `false` — so it is hidden from clients on
