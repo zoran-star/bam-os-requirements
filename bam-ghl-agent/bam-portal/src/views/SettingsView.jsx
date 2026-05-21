@@ -24,7 +24,7 @@ function StatusDot({ status, tokens }) {
   );
 }
 
-export default function SettingsView({ tokens, dark, setDark, userName, session }) {
+export default function SettingsView({ tokens, dark, setDark, userName, session, onLogout }) {
   const isMobile = useIsMobile();
   const me = useStaffMe(session);
   const [showNewStaff, setShowNewStaff] = useState(false);
@@ -480,6 +480,17 @@ export default function SettingsView({ tokens, dark, setDark, userName, session 
             )}
           </div>
         )}
+      </div>
+
+      <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${tokens.border}` }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: tokens.textMute, marginBottom: 12 }}>Account</div>
+        <button onClick={onLogout} style={{
+          background: "none", border: `1px solid ${tokens.red}`, borderRadius: 8,
+          padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+          color: tokens.red, fontFamily: "inherit",
+        }}>
+          Sign Out
+        </button>
       </div>
 
       {showNewStaff && (

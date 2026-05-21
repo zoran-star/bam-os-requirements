@@ -599,43 +599,6 @@ export default function BAMPortal() {
             </div>
           </div>
 
-          {!isSystemsTeam && (
-          <div style={{ padding: "0 24px 20px", borderTop: `1px solid ${tk.border}`, paddingTop: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: tk.textMute, marginBottom: 14, letterSpacing: "0.04em" }}>Portfolio</div>
-            {[
-              { label: "Healthy", count: activeClients.filter(c => c.healthStatus === "healthy" && c.alerts.length === 0).length, color: tk.green },
-              { label: "At Risk", count: [...onboardingClients, ...activeClients].filter(c => c.healthStatus === "at-risk").length, color: tk.amber },
-              { label: "Critical", count: critCount, color: tk.red },
-            ].map((s, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <span style={{ fontSize: 13, color: tk.textSub }}>{s.label}</span>
-                <span style={{ fontSize: 16, fontWeight: 700, color: s.color, letterSpacing: "-0.02em" }}>{s.count}</span>
-              </div>
-            ))}
-          </div>
-          )}
-
-          <div style={{ padding: "16px 24px 24px", borderTop: `1px solid ${tk.border}` }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex" }}>
-                {["Coleman","Silva","Mike","Zoran","Graham"].map((name, i) => (
-                  <div key={i} style={{ marginLeft: i === 0 ? 0 : -6 }} title={name}>
-                    <Avatar name={name} size={28} />
-                  </div>
-                ))}
-              </div>
-              <button onClick={handleLogout} title="Sign out" style={{
-                background: "none", border: `1px solid ${tk.border}`, borderRadius: 8,
-                padding: "5px 12px", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                color: tk.textMute, fontFamily: "inherit", transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = tk.red; e.currentTarget.style.color = tk.red; e.currentTarget.style.background = tk.redSoft; e.currentTarget.style.boxShadow = tk.redGlow; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = tk.border; e.currentTarget.style.color = tk.textMute; e.currentTarget.style.background = "none"; e.currentTarget.style.boxShadow = "none"; }}
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
         </div>
 
         {isMobile && sidebarOpen && (
@@ -820,7 +783,7 @@ export default function BAMPortal() {
             )}
 
             {/* SETTINGS — eager (small + frequently hit) */}
-            {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} />}
+            {nav === "settings" && <SettingsView tokens={tk} dark={dark} setDark={setDark} userName={userName} session={session} onLogout={handleLogout} />}
 
             {/* Lazy-loaded views below. Suspense fallback is a tiny spinner so
                 the page doesn't blank out while the chunk downloads. */}
