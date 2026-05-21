@@ -52,7 +52,7 @@ export default function InboxView({ tokens: tk, session, me }) {
     : conversations;
 
   return (
-    <div style={{ display: "flex", height: "calc(100dvh - 290px)", minHeight: 420, color: t.text, overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100%", minHeight: 420, boxSizing: "border-box", color: t.text, overflow: "hidden" }}>
       {/* Conversation list (left) */}
       <div style={{
         width: 320, flexShrink: 0, borderRight: `1px solid ${t.border}`,

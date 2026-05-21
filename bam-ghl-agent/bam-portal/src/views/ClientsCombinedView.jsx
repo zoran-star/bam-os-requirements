@@ -1396,7 +1396,7 @@ function MessagesTab({ client, tokens, session, me }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      height: "calc(100dvh - 290px)", minHeight: 420,
+      height: "100%", minHeight: 420, boxSizing: "border-box",
       border: `1px solid ${t.border}`, borderRadius: 8,
       overflow: "hidden", background: t.surface,
     }}>

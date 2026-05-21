@@ -791,14 +791,18 @@ export default function BAMPortal() {
               actually scroll inside a flex column — without it the child
               grows past the viewport and gets clipped by the parent's
               overflow:hidden instead of scrolling. */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: isMobile ? "24px 16px 64px" : "40px 44px 80px" }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", padding: isMobile ? "24px 16px 64px" : "40px 44px 80px" }}>
 
             {!(nav === "clients" && clientsInDetail) && (
-              <div key={nav} style={{ marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+              <div key={nav} style={{ flexShrink: 0, marginBottom: 40, animation: "slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both" }}>
                 <h1 style={{ fontSize: isMobile ? 24 : 32, fontWeight: 700, color: tk.text, letterSpacing: "-0.03em", lineHeight: 1.1, margin: 0 }}>{pageTitle}</h1>
                 <p style={{ fontSize: 15, color: tk.textMute, marginTop: 8 }}>{pageDesc}</p>
               </div>
             )}
+
+            {/* View area — fills the space below the header; the active
+                view scrolls inside this, so the page itself never scrolls. */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
 
             {/* DASHBOARD — clicking a client card jumps into the Clients tab
                 and opens that client's detail view. Eager (first-paint). */}
@@ -861,6 +865,7 @@ export default function BAMPortal() {
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} me={me} session={session} />}
             </Suspense>
+            </div>
           </div>
         </div>
       </div>
