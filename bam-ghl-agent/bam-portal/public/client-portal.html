@@ -1421,6 +1421,27 @@
     letter-spacing: 0.08em;
   }
 
+  /* Phone: give the title the full first row; status + date drop below. */
+  @media (max-width: 768px) {
+    .mreq-row {
+      flex-wrap: wrap;
+      align-items: center;
+      row-gap: 9px;
+    }
+    .mreq-title {
+      flex: 1 1 calc(100% - 44px);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .mreq-date {
+      margin-left: auto;
+      padding-left: 0;
+      flex-direction: row;
+      align-items: baseline;
+      gap: 8px;
+    }
+  }
+
   /* Marketing status pill colors (extend existing) */
   .status-pill.pending      { color: var(--gold-2); }
   .status-pill.needs-action { color: var(--pace-stop); }
