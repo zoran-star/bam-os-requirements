@@ -5630,9 +5630,21 @@ function applyMarketingNavState() {
 // has been run and the academy's members are migrated in.
 const MEMBER_MGMT_ENABLED = true;
 
+// The Members tab is hidden inside the native iOS/Android app. The portal
+// is ONE codebase for web + app (the app is a Capacitor wrapper around
+// this page), so this check lets the same deploy show Members on the web
+// while hiding it in the app — Members ships to the web only until its
+// billing actions (Phase 3) are ready for App Store review.
+// When Members is app-ready: delete `&& !isNativeApp()` below + resubmit.
+function isNativeApp() {
+  const Cap = window.Capacitor;
+  return !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
+}
+
 function applyMemberMgmtNavState() {
+  const showMembers = MEMBER_MGMT_ENABLED && !isNativeApp();
   document.querySelectorAll('[data-feature="members"]').forEach(el => {
-    el.style.display = MEMBER_MGMT_ENABLED ? '' : 'none';
+    el.style.display = showMembers ? '' : 'none';
   });
 }
 

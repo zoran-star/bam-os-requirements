@@ -90,6 +90,43 @@ The Claude Code cloud environment's network allowlist was updated to permit
 session can now query the live Supabase DB and reach the live portal
 directly (e.g. to confirm the `server.url`).
 
+## App Store submission prep (2026-05-20)
+
+Submission groundwork done — full end-to-end guide lives at
+`bam-portal-app/app-store-submission.md` (feature approval, phone testing
+checklist, store listing copy, App Privacy / Data safety declaration, demo
+reviewer account spec, screenshots spec, iOS + Android submit steps,
+review notes, final checklist).
+
+- **Hosted pages shipped** — `bam-portal/public/privacy.html` +
+  `support.html` deploy to `portal.byanymeansbusiness.com/privacy.html`
+  and `/support.html`. The stores require hosted privacy + support URLs.
+- **Decisions:** business/legal name = "By Any Means, LLC"; contact email
+  = zoran@byanymeansbball.com; app is universal (iPhone + iPad); a
+  dedicated demo reviewer account will be created (spec in the guide).
+- **Members hidden in the app** — Zoran chose to ship the app WITHOUT the
+  Members tab. `isNativeApp()` in `client-portal.html` (wraps
+  `Capacitor.isNativePlatform()`) makes `applyMemberMgmtNavState()` hide
+  the `[data-feature="members"]` nav inside the native wrapper only —
+  Members stays live on the web so it keeps being built + can onboard
+  real clients. App v1 = 4 tabs (Systems, Messages, Marketing, Team) +
+  push + tour. To bring Members into the app later: delete
+  `&& !isNativeApp()` in `applyMemberMgmtNavState()` and resubmit.
+- **Approval-risk section** added to the guide — the WebView-wrapper
+  rejection traps (Apple 4.2 "just a website", 2.1 demo login, 5.1.1(v)
+  account deletion, 4.8 Sign in with Apple) each mapped to a mitigation.
+  Login is email/password only (no Sign in with Apple needed) and the app
+  is login-only (no in-app signup → no account-deletion flow required);
+  native push is the key 4.2 defense.
+- **Still on Zoran:** phone testing (Part 2 checklist), create + seed the
+  demo account, screenshots + Play feature graphic, the Mac compile, and
+  the two store submissions.
+- **Resume command:** `/app-submission` (repo-root `.claude/commands/`)
+  reloads this work, prints a 9-step status board, and continues the
+  walkthrough.
+
 ## Related notes
 - [[project_client_portal_mobile]] — the mobile/phone layout pass that made
   the portal phone-ready (prerequisite for the app)
+- [[project_member_management_portal]] — the Members feature, now hidden in
+  the native app (still live on web)
