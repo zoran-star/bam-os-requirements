@@ -80,9 +80,11 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
     trigger + per-client RLS + the clients Connect columns). NOT YET RUN
     against Supabase (no Supabase MCP this session) — run it in the Supabase
     SQL Editor for project `jnojmfmpnsfmtqmwhopz`.
-  - **1b ⏳** — migrate BAM GTA's ~50 member rows + cancellations / referrals
-    / refunds history into the portal Supabase under a BAM GTA `clients`
-    row. Needs read access to GTA's Supabase project `oatwstyzxreujgsbmaxr`.
+  - **1b ⏳** — migrate BAM GTA's roster into the portal Supabase under a
+    BAM GTA `clients` row. Generator-query migration written:
+    `bam-portal/supabase/member-management-gta-data.sql` (run SECTION B in
+    GTA's Supabase, paste its output into the portal's — no MCP needed).
+    cancellations / referrals / refunds history = a later pass.
 - **Phase 2 — Read-only Members tab.**
   - **2a ✅ DONE** — `bam-portal/api/members.js`: GET endpoint (list +
     single), client-scoped, DB-only (Stripe enrichment deferred to Phase 3).
@@ -153,15 +155,19 @@ owns fixing those; not our concern here.
 
 ## Where we left off
 
-Stripe model decided (Connect). Phases 1a, 2a, 2b done — the Members tab
-is built end to end (UI → `api/members.js` → tables). But NOTHING works
-until the schema SQL is run. Next actions:
-1. **Run `bam-portal/supabase/member-management-schema.sql`** in the
-   Supabase SQL Editor (project `jnojmfmpnsfmtqmwhopz`). Until then the tab
-   shows a graceful error (the `members` table doesn't exist yet).
-2. Phase 1b — migrate BAM GTA's member data in (needs GTA Supabase access).
-3. Phase 3 — Stripe Connect onboarding flow + billing PATCH actions
-   (pause/unpause/cancel/refund/change/payment-link/refer).
+GOAL (session): get the Member Management tab live for BAM GTA's account.
+Stripe model = Connect. Phases 1a/2a/2b done + multi-user-aligned. Driving
+the go-live checklist:
+1. Run `member-management-schema.sql` in the PORTAL Supabase
+   (`jnojmfmpnsfmtqmwhopz`) — creates the 5 tables.
+2. Run `member-management-gta-data.sql` — Phase 1b: SECTION A ensures the
+   BAM GTA `clients` row; SECTION B (GTA Supabase) generates the INSERT;
+   SECTION C (portal Supabase) runs it.
+3. Flip `MEMBER_MGMT_ENABLED` to `true` in client-portal.html → commit →
+   push (auto-deploys). Tab goes visible.
+4. Verify: log into the portal as BAM GTA → Members tab shows the roster.
+Then Phase 3 — Stripe Connect onboarding + billing PATCH actions
+(pause/unpause/cancel/refund/change/payment-link/refer).
 
 The Members tab is gated behind `MEMBER_MGMT_ENABLED` — a const in
 client-portal.html, currently `false` — so it is hidden from clients on
