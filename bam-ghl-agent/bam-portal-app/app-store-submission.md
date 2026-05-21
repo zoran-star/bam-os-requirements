@@ -231,28 +231,28 @@ tracking or advertising.** Declare exactly this:
 
 ## Part 6 — Demo reviewer account  **[Zoran]**
 
-The portal is behind a login, so Apple and Google **require working
-credentials** or they reject the app instantly. Create a dedicated account
-(not a real academy's) and seed it so reviewers see a populated portal.
+Apple and Google **require working credentials** to review a login-gated
+app — no login, instant rejection. Don't hand-write SQL for this: use the
+staff portal's own **create-client + invite** flow, which fills every
+table/column correctly (the schema has drifted from the repo's `.sql`
+files, so raw inserts are fragile).
 
-**Account to create:**
-- Email: `appreview@byanymeansbusiness.com`  *(or any inbox you control)*
-- Password: a fixed strong password — you'll paste it into the review form
+**Steps:**
+1. **Staff portal → Clients → New client** — create **"Demo Academy"**.
+2. **Send the invite** (Setup account) to **`appreview@byanymeansbusiness.com`**
+   — an inbox you control.
+3. Open the invite email → it lands on the **client portal** → **set a
+   password**. Write it down — it goes in the review form.
+4. Log in once as the demo account and **submit one sample support
+   ticket**, so the Messages tab isn't empty for the reviewer.
+5. Test the login end to end before submitting.
 
-**Steps (Supabase project `jnojmfmpnsfmtqmwhopz`):**
-1. **Auth → Users → Add user** — create the email + password above;
-   mark the email confirmed.
-2. **SQL Editor** — insert a demo `clients` row (e.g. business_name
-   `Demo Academy`, status `active`).
-3. Insert a `client_users` row linking that auth user to the demo client
-   with `role = 'owner'`, `status = 'active'`.
-4. Seed a little sample data so tabs aren't empty: ~3 `members` rows, one
-   `tickets` row with a short message thread.
+**Reviewer credentials** (for the App Store / Play review forms):
+- Email: `appreview@byanymeansbusiness.com`
+- Password: *(the one set in step 3)*
 
-> Want this exact? Say the word and I'll generate the precise SQL from the
-> current schema — I just need to confirm the demo client's name.
-
-Test the login yourself before submitting.
+> Bonus: this doubles as a live re-test of the invite-redirect fix — the
+> invite must land on the client portal, not the staff portal.
 
 ---
 
