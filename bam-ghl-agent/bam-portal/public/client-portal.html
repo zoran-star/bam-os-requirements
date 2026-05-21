@@ -1141,7 +1141,12 @@
   }
   .guide-asset {
     display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
     text-decoration: none;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
   .guide-asset .guide-asset-file { display: none; }
@@ -1168,6 +1173,61 @@
     color: var(--gold);
     line-height: 1;
   }
+
+  /* Example-asset viewer modal */
+  .asset-modal { position: fixed; inset: 0; z-index: 5000; display: none; }
+  .asset-modal.open { display: flex; align-items: center; justify-content: center; }
+  .asset-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.8); }
+  .asset-modal-card {
+    position: relative;
+    width: min(440px, 92vw);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .asset-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    padding: 12px;
+  }
+  .asset-modal-img { max-width: 100%; max-height: 68vh; border-radius: 8px; display: block; }
+  .asset-modal-file {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 44px 20px;
+    color: var(--text-sub);
+    text-align: center;
+  }
+  .asset-modal-file-icon { font-size: 40px; color: var(--gold); }
+  .asset-modal-file-hint { font-size: 12px; color: var(--text-mute); }
+  .asset-modal-actions {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .asset-modal-dl, .asset-modal-x {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .asset-modal-dl { background: var(--gold); color: #16140F; border: 1px solid var(--gold); }
+  .asset-modal-dl:disabled { opacity: 0.6; }
+  .asset-modal-x { background: transparent; color: var(--text-sub); border: 1px solid var(--line); }
 
   /* Wizard file list (asset upload step) */
   .wizard-files-list {
@@ -7546,47 +7606,67 @@ async function _populateGuideCard(offerName) {
     el.textContent = (val && String(val).trim()) ? val : placeholder;
     el.style.opacity = (val && String(val).trim()) ? '1' : '0.55';
   };
-  // Defaults (in case fetch fails or no match)
-  setText('wizardGuidePurpose', null, '[Your account manager will fill this in. Why does this offer exist? Who\'s the audience? What action do we want them to take?]');
-  setText('wizardGuideFilming', null, '[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]');
-  setText('wizardGuideScript', null, '[Your account manager will fill this in.\n"Hook line in the first 3 seconds.\nThen the offer pitch.\nThen the call to action."]');
-  // Hide links by default
+  // Placeholder copy — shown only as a genuine final state (no card yet),
+  // never as a flash while the real card is still loading.
+  const GUIDE_PLACEHOLDERS = {
+    wizardGuidePurpose: '[Your account manager will fill this in. Why does this offer exist? Who\'s the audience? What action do we want them to take?]',
+    wizardGuideFilming: '[Your account manager will fill this in. Camera angle, lighting, length, voiceover, hook in the first 3 seconds, etc.]',
+    wizardGuideScript: '[Your account manager will fill this in.\n"Hook line in the first 3 seconds.\nThen the offer pitch.\nThen the call to action."]',
+  };
+  const showGuidePlaceholders = () => {
+    Object.keys(GUIDE_PLACEHOLDERS).forEach(id => setText(id, null, GUIDE_PLACEHOLDERS[id]));
+  };
+
+  // Loading state up front — clears any stale content from a previously
+  // viewed offer so nothing flashes before the real card arrives.
+  ['wizardGuidePurpose', 'wizardGuideFilming', 'wizardGuideScript'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = 'Loading…'; el.style.opacity = '0.4'; }
+  });
+  const assetsEl = document.getElementById('wizardGuideAssets');
+  if (assetsEl) assetsEl.innerHTML = '';
+  const assetsSection = document.getElementById('wizardGuideAssetsSection');
+  if (assetsSection) assetsSection.style.display = 'none';
   const linksSection = document.getElementById('wizardGuideLinksSection');
   if (linksSection) linksSection.style.display = 'none';
 
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/guide-cards', { headers: { Authorization: 'Bearer ' + token } });
-    if (!res.ok) return;
+    if (!res.ok) { showGuidePlaceholders(); return; }
     const json = await _safeJson(res);
     const cards = json.guide_cards || json.cards || json || [];
     const match = (Array.isArray(cards) ? cards : []).find(c => {
       const t = (c.title || '').toLowerCase().trim();
       return t === (offerName || '').toLowerCase().trim();
     });
-    if (!match) return;
+    if (!match) { showGuidePlaceholders(); return; }
 
-    setText('wizardGuidePurpose', match.purpose, document.getElementById('wizardGuidePurpose').textContent);
-    setText('wizardGuideFilming', match.filming_tips, document.getElementById('wizardGuideFilming').textContent);
-    setText('wizardGuideScript', match.example_script, document.getElementById('wizardGuideScript').textContent);
+    setText('wizardGuidePurpose', match.purpose, GUIDE_PLACEHOLDERS.wizardGuidePurpose);
+    setText('wizardGuideFilming', match.filming_tips, GUIDE_PLACEHOLDERS.wizardGuideFilming);
+    setText('wizardGuideScript', match.example_script, GUIDE_PLACEHOLDERS.wizardGuideScript);
 
-    // Assets — array of { url, name } from staff content editor
+    // Assets — array of { url, name } from staff content editor. Each tile
+    // opens the in-app asset viewer (openAssetModal) with a Download button.
     const assets = Array.isArray(match.example_assets) ? match.example_assets : [];
-    const assetsEl = document.getElementById('wizardGuideAssets');
     if (assetsEl && assets.length) {
       assetsEl.innerHTML = assets.map(a => {
         const url = escapeHTML(a.url || a);
         const name = escapeHTML(a.name || 'Example');
         if (!url) return '';
-        // Tappable: opens the asset full-size in a new tab so it can be
-        // viewed or saved on a phone. onerror swaps a broken image — or a
-        // non-image file like a PDF/video — for a clean downloadable tile
-        // instead of the browser's broken-image icon.
-        return `<a href="${url}" target="_blank" rel="noreferrer" class="guide-asset" title="Tap to view ${name}">`
+        return `<button type="button" class="guide-asset" data-asset-url="${url}" data-asset-name="${name}" title="View ${name}">`
           + `<img src="${url}" alt="${name}" onerror="this.closest('.guide-asset').classList.add('is-file');this.remove();" />`
           + `<span class="guide-asset-file"><span class="guide-asset-file-icon">⤓</span><span>${name}</span></span>`
-          + `</a>`;
+          + `</button>`;
       }).join('');
+      if (assetsSection) assetsSection.style.display = '';
+      if (!assetsEl._modalWired) {
+        assetsEl._modalWired = true;
+        assetsEl.addEventListener('click', (e) => {
+          const tile = e.target.closest('.guide-asset');
+          if (tile) openAssetModal(tile.dataset.assetUrl, tile.dataset.assetName);
+        });
+      }
     }
 
     // Links — array of { url, label } or plain strings
@@ -7601,7 +7681,79 @@ async function _populateGuideCard(offerName) {
         return `<div style="margin-bottom:6px"><a href="${url}" target="_blank" rel="noreferrer" style="color:var(--gold);text-decoration:none">${label} ↗</a></div>`;
       }).join('');
     }
-  } catch (_) { /* silent — placeholders stay */ }
+  } catch (_) { showGuidePlaceholders(); }
+}
+
+// ── Example-asset viewer ─────────────────────────────────────────────
+// Tapping a guide-card asset opens this lightweight modal: a full-size
+// preview (or a file tile if it isn't an image) plus a Download button
+// that saves the file to the device.
+function openAssetModal(url, name) {
+  if (!url) return;
+  let modal = document.getElementById('assetModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'assetModal';
+    modal.className = 'asset-modal';
+    modal.innerHTML =
+      '<div class="asset-modal-backdrop"></div>' +
+      '<div class="asset-modal-card">' +
+        '<div class="asset-modal-body" id="assetModalBody"></div>' +
+        '<div class="asset-modal-actions">' +
+          '<button type="button" class="asset-modal-dl" id="assetModalDl">⤓ Download</button>' +
+          '<button type="button" class="asset-modal-x" id="assetModalX">Close</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('.asset-modal-backdrop').addEventListener('click', closeAssetModal);
+    modal.querySelector('#assetModalX').addEventListener('click', closeAssetModal);
+  }
+  const body = modal.querySelector('#assetModalBody');
+  body.innerHTML = '';
+  const img = document.createElement('img');
+  img.className = 'asset-modal-img';
+  img.alt = name || 'Asset';
+  img.onerror = () => {
+    body.innerHTML = '<div class="asset-modal-file">'
+      + '<div class="asset-modal-file-icon">⤓</div>'
+      + '<div>' + escapeHTML(name || 'Asset') + '</div>'
+      + '<div class="asset-modal-file-hint">Tap Download to save it to your device</div>'
+      + '</div>';
+  };
+  img.src = url;
+  body.appendChild(img);
+  modal.querySelector('#assetModalDl').onclick = () => downloadAsset(url, name);
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAssetModal() {
+  const modal = document.getElementById('assetModal');
+  if (modal) modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function downloadAsset(url, name) {
+  const btn = document.getElementById('assetModalDl');
+  if (btn) { btn.disabled = true; btn.textContent = 'Downloading…'; }
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('fetch failed');
+    const blob = await resp.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = name || 'asset';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objUrl), 5000);
+  } catch (_) {
+    // CORS or network failure — fall back to opening the asset directly.
+    window.open(url, '_blank', 'noopener');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⤓ Download'; }
+  }
 }
 
 function wizardGoToNewOfferForm() {
