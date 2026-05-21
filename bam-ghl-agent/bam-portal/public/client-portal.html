@@ -6541,7 +6541,11 @@ async function fetchAndRenderMembers() {
   if (!container) return;
   try {
     const token = await _mreqAuthToken();
-    const res = await fetch('/api/members?scope=client', {
+    // Multi-user model: scope the request to the active academy.
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
+      ? '?scope=client&client_id=' + encodeURIComponent(CLIENT_ID)
+      : '?scope=client';
+    const res = await fetch('/api/members' + qs, {
       headers: { 'Authorization': 'Bearer ' + token },
     });
     const json = await _safeJson(res);

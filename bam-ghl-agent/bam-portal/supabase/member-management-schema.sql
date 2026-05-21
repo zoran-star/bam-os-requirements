@@ -199,7 +199,8 @@ CREATE OR REPLACE TRIGGER members_updated_at
 
 -- ------------------------------------------------------------
 -- 10. Row-Level Security
---     SELECT: an academy reads only its own rows; staff read all.
+--     SELECT: a user reads rows for the academies they belong to —
+--             public.my_client_ids(), the multi-user model; staff read all.
 --     WRITE : no anon/authenticated policy -> writes go through the
 --             API only (service-role key, which bypasses RLS).
 -- ------------------------------------------------------------
@@ -213,7 +214,7 @@ ALTER TABLE member_audit_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS members_select_own_or_staff ON members;
 CREATE POLICY members_select_own_or_staff ON members
   FOR SELECT USING (
-    client_id IN (SELECT id FROM clients WHERE auth_user_id = auth.uid())
+    client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM staff WHERE staff.user_id = auth.uid())
   );
 
@@ -221,7 +222,7 @@ CREATE POLICY members_select_own_or_staff ON members
 DROP POLICY IF EXISTS cancellations_select_own_or_staff ON cancellations;
 CREATE POLICY cancellations_select_own_or_staff ON cancellations
   FOR SELECT USING (
-    client_id IN (SELECT id FROM clients WHERE auth_user_id = auth.uid())
+    client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM staff WHERE staff.user_id = auth.uid())
   );
 
@@ -229,7 +230,7 @@ CREATE POLICY cancellations_select_own_or_staff ON cancellations
 DROP POLICY IF EXISTS referrals_select_own_or_staff ON referrals;
 CREATE POLICY referrals_select_own_or_staff ON referrals
   FOR SELECT USING (
-    client_id IN (SELECT id FROM clients WHERE auth_user_id = auth.uid())
+    client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM staff WHERE staff.user_id = auth.uid())
   );
 
@@ -237,7 +238,7 @@ CREATE POLICY referrals_select_own_or_staff ON referrals
 DROP POLICY IF EXISTS refunds_select_own_or_staff ON refunds;
 CREATE POLICY refunds_select_own_or_staff ON refunds
   FOR SELECT USING (
-    client_id IN (SELECT id FROM clients WHERE auth_user_id = auth.uid())
+    client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM staff WHERE staff.user_id = auth.uid())
   );
 
@@ -245,7 +246,7 @@ CREATE POLICY refunds_select_own_or_staff ON refunds
 DROP POLICY IF EXISTS audit_select_own_or_staff ON member_audit_log;
 CREATE POLICY audit_select_own_or_staff ON member_audit_log
   FOR SELECT USING (
-    client_id IN (SELECT id FROM clients WHERE auth_user_id = auth.uid())
+    client_id IN (SELECT public.my_client_ids())
     OR EXISTS (SELECT 1 FROM staff WHERE staff.user_id = auth.uid())
   );
 

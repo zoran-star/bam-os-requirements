@@ -106,8 +106,9 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
   price map).
 - `created_at` / `updated_at` included on `members` (GTA omitted them;
   portal convention keeps them).
-- RLS: real per-client SELECT policy (academy reads only its own rows,
-  even via direct REST); writes go through the API only (service role).
+- RLS: real per-client SELECT policy via `public.my_client_ids()` (a user
+  reads only academies they belong to, even via direct REST); writes go
+  through the API only (service role).
 - Discord bot stays running for GTA; the portal is an additional surface.
 
 ## Portal architecture facts (so we don't re-explore)
@@ -130,6 +131,25 @@ billing with the platform key + the `Stripe-Account: acct_XXX` header.
   marketing_included, archived_at, onboarding_completed_at.
 - **Stripe** — server-side via `process.env.STRIPE_SECRET_KEY` (BAM master
   key). This is exactly WHY the open decision above matters.
+
+## Multi-user portal model — aligned 2026-05-20
+
+The portal moved from 1 login/academy to many, via a `client_users` join
+table — see [[project_multi_user_portal]]. PART A + B are LIVE on the portal
+Supabase: `public.my_client_ids()` (SECURITY DEFINER) returns the caller's
+active client_ids; ~8 tables' RLS now use `client_id in (select my_client_ids())`.
+
+Member Management was built to match this:
+- `member-management-schema.sql` RLS uses `public.my_client_ids()` — NOT
+  `clients.auth_user_id`.
+- `api/members.js` `resolveUser` resolves academies via `client_users`
+  (active rows), returns a `clients` array; the caller passes `?client_id=`
+  to choose one (staff may target any).
+- `client-portal.html` `fetchAndRenderMembers()` passes `&client_id=CLIENT_ID`.
+
+⚠️ marketing.js and other existing endpoints still use the OLD
+`clients.auth_user_id` resolve — the multi-user project (`/account-continue`)
+owns fixing those; not our concern here.
 
 ## Where we left off
 
