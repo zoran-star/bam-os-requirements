@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Onboarding Reloaded — Question Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0B; --surface: #131316; --surface-el: #1C1C21; --surface-hov: #22222A;
+    --line: #2A2A31; --line-str: #383842;
+    --text: #F5F1E8; --text-sub: rgba(245,241,232,0.62); --text-mute: rgba(245,241,232,0.40);
+    --gold: #E8C547; --gold-2: #C9A55C;
+    --ghost: rgba(232,197,71,0.08); --border-acc: rgba(232,197,71,0.30);
+    --green: #9FD88A; --red: #E87560;
+    --radius: 5px;
+    --display: "Space Grotesk","Inter",sans-serif;
+    --sans: "Inter",system-ui,sans-serif;
+    --mono: "JetBrains Mono",ui-monospace,monospace;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+  /* ── Top bar ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(10,10,11,0.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    padding: 16px 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  }
+  .topbar-left .eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 3px; }
+  .topbar-left h1 { font-family: var(--display); font-size: 19px; font-weight: 600; letter-spacing: -0.3px; }
+  .stats { display: flex; gap: 18px; }
+  .stat { text-align: center; }
+  .stat-num { font-family: var(--display); font-size: 20px; font-weight: 600; color: var(--gold); }
+  .stat-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-mute); }
+  .topbar-btns { display: flex; gap: 10px; }
+
+  .btn {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 11px 18px; border-radius: var(--radius); cursor: pointer; border: none;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--gold); color: var(--bg); font-weight: 600; }
+  .btn-primary:hover { opacity: 0.88; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-str); color: var(--text-sub); }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-mute); }
+  .btn-sm { padding: 7px 11px; font-size: 10px; }
+
+  .page { max-width: 920px; margin: 0 auto; padding: 28px 24px 160px; }
+
+  .intro {
+    background: var(--ghost); border: 1px solid var(--border-acc);
+    border-radius: var(--radius); padding: 14px 18px; margin-bottom: 28px;
+    font-size: 13px; color: var(--text-sub); line-height: 1.6;
+  }
+  .intro b { color: var(--text); }
+  .intro .step { color: var(--gold); font-family: var(--mono); font-size: 11px; }
+
+  /* ── Section card ── */
+  .section {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; margin-bottom: 18px; overflow: hidden;
+  }
+  .sec-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 16px 18px; border-bottom: 1px solid var(--line);
+  }
+  .sec-num {
+    font-family: var(--mono); font-size: 12px; font-weight: 500;
+    color: var(--bg); background: var(--gold);
+    width: 26px; height: 26px; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .sec-titles { flex: 1; min-width: 0; }
+  .sec-name {
+    width: 100%; background: transparent; border: none; color: var(--text);
+    font-family: var(--display); font-size: 17px; font-weight: 600; letter-spacing: -0.2px;
+    padding: 2px 4px; border-radius: 4px; outline: none;
+  }
+  .sec-name:hover, .sec-name:focus { background: var(--surface-el); }
+  .sec-purpose {
+    width: 100%; background: transparent; border: none; color: var(--text-sub);
+    font-family: var(--sans); font-size: 12.5px; padding: 3px 4px; margin-top: 2px;
+    border-radius: 4px; outline: none; resize: none;
+  }
+  .sec-purpose:hover, .sec-purpose:focus { background: var(--surface-el); }
+  .sec-meta { font-family: var(--mono); font-size: 10px; color: var(--text-mute); padding: 3px 4px; }
+  .sec-meta .req-tag { color: var(--gold-2); }
+  .sec-ctrls { display: flex; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    background: transparent; border: 1px solid transparent; color: var(--text-mute);
+    width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, background 0.15s; font-family: var(--sans);
+  }
+  .icon-btn:hover { color: var(--text); background: var(--surface-hov); }
+  .icon-btn.danger:hover { color: var(--red); background: rgba(232,117,96,0.1); }
+
+  .sec-body { padding: 14px 18px 18px; }
+  .sec-body.collapsed { display: none; }
+
+  /* ── Question row ── */
+  .q {
+    background: var(--surface-el); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 12px 13px; margin-bottom: 9px;
+  }
+  .q.empty-q { border-color: rgba(232,117,96,0.35); }
+  .q-line1 { display: flex; align-items: center; gap: 9px; }
+  .q-num { font-family: var(--mono); font-size: 10px; color: var(--text-mute); width: 22px; flex-shrink: 0; text-align: right; }
+  .q-text {
+    flex: 1; background: var(--surface); border: 1px solid var(--line);
+    color: var(--text); font-family: var(--sans); font-size: 14px;
+    padding: 9px 11px; border-radius: 4px; outline: none; transition: border-color 0.15s;
+  }
+  .q-text:focus { border-color: var(--gold); }
+  .q-text::placeholder { color: var(--text-mute); }
+
+  .q-line2 { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-left: 31px; flex-wrap: wrap; }
+  select.q-type {
+    background: var(--surface); border: 1px solid var(--line-str); color: var(--text-sub);
+    font-family: var(--mono); font-size: 11px; padding: 6px 9px; border-radius: 4px;
+    outline: none; cursor: pointer;
+  }
+  .q-mand {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;
+    padding: 6px 11px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--line-str); background: var(--surface); color: var(--text-mute);
+    transition: all 0.15s; user-select: none;
+  }
+  .q-mand.on { background: var(--ghost); border-color: var(--border-acc); color: var(--gold); }
+  .q-hint {
+    flex: 1; min-width: 140px; background: var(--surface); border: 1px solid var(--line);
+    color: var(--text-sub); font-family: var(--sans); font-size: 12px;
+    padding: 6px 9px; border-radius: 4px; outline: none;
+  }
+  .q-hint:focus { border-color: var(--line-str); }
+  .q-hint::placeholder { color: var(--text-mute); }
+  .q-move { display: flex; gap: 2px; }
+
+  .q-extra { margin-top: 8px; margin-left: 31px; }
+  .q-extra-label { font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-mute); margin-bottom: 5px; }
+  .q-extra textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--line);
+    color: var(--text-sub); font-family: var(--mono); font-size: 12px; line-height: 1.7;
+    padding: 8px 10px; border-radius: 4px; outline: none; resize: vertical; min-height: 60px;
+  }
+  .q-extra textarea:focus { border-color: var(--line-str); }
+
+  .add-q {
+    width: 100%; background: transparent; border: 1px dashed var(--line-str);
+    border-radius: var(--radius); padding: 10px; color: var(--text-mute);
+    font-family: var(--sans); font-size: 13px; cursor: pointer; margin-top: 4px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .add-q:hover { border-color: var(--gold-2); color: var(--text); }
+
+  .add-section {
+    width: 100%; background: var(--surface); border: 1px dashed var(--line-str);
+    border-radius: 8px; padding: 18px; color: var(--text-sub);
+    font-family: var(--display); font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s; margin-top: 6px;
+  }
+  .add-section:hover { border-color: var(--gold); color: var(--text); }
+
+  /* ── Modal ── */
+  .overlay {
+    position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.78);
+    display: none; align-items: center; justify-content: center; padding: 28px;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--line-str);
+    border-radius: 8px; padding: 24px; width: 100%; max-width: 720px;
+    max-height: 86vh; display: flex; flex-direction: column;
+  }
+  .modal h2 { font-family: var(--display); font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .modal p { font-size: 13px; color: var(--text-sub); margin-bottom: 14px; line-height: 1.55; }
+  .modal textarea {
+    flex: 1; width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--text-sub); font-family: var(--mono); font-size: 11.5px; line-height: 1.6;
+    padding: 14px; border-radius: var(--radius); outline: none; resize: none; min-height: 320px;
+  }
+  .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+  .copied-flag { color: var(--green); font-family: var(--mono); font-size: 11px; align-self: center; margin-right: auto; opacity: 0; transition: opacity 0.2s; }
+  .copied-flag.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="eyebrow">BAM Business · Internal Tool</div>
+    <h1>Onboarding Reloaded — Question Editor</h1>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="stat-sec">0</div><div class="stat-lbl">Sections</div></div>
+    <div class="stat"><div class="stat-num" id="stat-q">0</div><div class="stat-lbl">Questions</div></div>
+    <div class="stat"><div class="stat-num" id="stat-req">0</div><div class="stat-lbl">Required</div></div>
+  </div>
+  <div class="topbar-btns">
+    <button class="btn btn-ghost" onclick="resetAll()">Reset to default</button>
+    <button class="btn btn-primary" onclick="openExport()">Copy prompt for Claude →</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="intro">
+    <span class="step">HOW THIS WORKS</span> &nbsp; Edit anything below — rename a question, change its type,
+    mark it <b>Required</b>, delete it, add new ones, or add whole sections. Your work auto-saves in this browser.
+    When you're happy, click <b>Copy prompt for Claude</b> and paste it back into Claude Code — it'll build the
+    database table and the client onboarding flow from exactly what you set here.
+  </div>
+  <div id="app"></div>
+  <button class="add-section" onclick="addSection()">+ Add a section</button>
+</div>
+
+<!-- Export modal -->
+<div class="overlay" id="export-overlay" onclick="if(event.target===this)closeExport()">
+  <div class="modal">
+    <h2>Prompt for Claude</h2>
+    <p>This is auto-copied to your clipboard. If it didn't copy, select all and copy manually, then paste it into Claude Code.</p>
+    <textarea id="export-text" readonly></textarea>
+    <div class="modal-btns">
+      <span class="copied-flag" id="copied-flag">Copied to clipboard ✓</span>
+      <button class="btn btn-ghost" onclick="closeExport()">Close</button>
+      <button class="btn btn-primary" onclick="doCopy()">Copy again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = 'onboarding_reloaded_config_v1';
+
+const TYPES = [
+  ['short_text','Short text'],['long_text','Long text'],['email','Email'],['phone','Phone'],
+  ['url','URL / link'],['number','Number'],['currency','Currency'],['date','Date'],['time','Time'],
+  ['yes_no','Yes / No'],['single_choice','Single choice'],['multi_choice','Multiple choice'],
+  ['file','File upload'],['builder','Repeating group'],['connect','Connect account']
+];
+
+// ── Default question set (9 sections) ──────────────────────────────
+function q(text, type, mandatory, hint, options, fields) {
+  return { text, type, mandatory: !!mandatory, hint: hint||'', options: options||[], fields: fields||[] };
+}
+const DEFAULTS = { sections: [
+  { name: 'Business Basics',
+    purpose: 'Core identity and legal info — powers your account, Stripe, and contracts.',
+    questions: [
+      q('What is your business display name?','short_text',true,'How customers know you'),
+      q('What is your legal business name?','short_text',true),
+      q('What is your business entity type?','single_choice',true,'',['LLC','Sole Proprietorship','S-Corp','C-Corp','Partnership','Other']),
+      q('What is your EIN?','short_text',true),
+      q('What kind of business is this?','short_text',true,'e.g. youth basketball training academy'),
+      q('What is your primary training location name and full address?','long_text',true),
+      q('Do you have additional locations? List them.','long_text',false),
+      q('Legal business address (if different from above)','long_text',false),
+      q('Best contact phone number','phone',true),
+      q('Best contact email','email',true),
+      q('What time zone are you in?','single_choice',true,'',['Eastern (ET)','Central (CT)','Mountain (MT)','Pacific (PT)','Alaska (AKT)','Hawaii (HT)','Other']),
+      q('What are your business / support hours?','long_text',true)
+    ]},
+  { name: 'Brand & Voice',
+    purpose: 'How your brand looks and sounds — drives your site, ads, and the AI agent.',
+    questions: [
+      q('Upload your logo files (dark and light versions)','file',true),
+      q('Do you have both a dark and a light version of your logo?','yes_no',false),
+      q('Primary brand color (hex code if known)','short_text',true),
+      q('Secondary brand color (hex code if known)','short_text',false),
+      q('What is your mission statement?','long_text',true),
+      q('What core problem do you solve for your customers?','long_text',true),
+      q('What are your core values?','long_text',false),
+      q('What makes you different? Your key selling points.','long_text',true),
+      q('Describe your ideal customer.','long_text',true),
+      q('How should your brand sound? Pick 2-3 voice descriptors.','multi_choice',false,'',['Bold','Friendly','Premium','Energetic','Professional','Playful','Inspirational','Straight-talking','Elite','Community-driven']),
+      q('Do-not-say list — words, phrases, or claims to avoid','long_text',true),
+      q('What topics should the AI always hand off to a human?','long_text',true)
+    ]},
+  { name: 'Website',
+    purpose: 'What we need to build or refresh your website and booking funnel.',
+    questions: [
+      q('Do you have an existing website?','yes_no',true),
+      q('Existing website URL','url',false,'If you have one'),
+      q('Do you want a new site built, or your current one improved?','single_choice',true,'',['Build a new site','Keep and improve current site','Not sure yet']),
+      q('What domain name do you want to use?','short_text',true),
+      q('Do you already own that domain?','single_choice',true,'',['Yes','No — need help buying it','Not sure']),
+      q('Which pages do you need?','multi_choice',true,'',['Home','About','Programs','Pricing','Coaches','Schedule','Contact','Book a trial','Testimonials','Blog','Shop']),
+      q('What is the main call-to-action on your site?','single_choice',true,'',['Book a free trial','Book a discovery call','Contact us','Sign up directly']),
+      q('Key stats or proof points to feature on the site','long_text',false),
+      q('Share 2-3 websites or brands whose look you love','long_text',false),
+      q('Where are your photos and videos stored? (paste a link)','short_text',false),
+      q('Anything specific you want on the site?','long_text',false)
+    ]},
+  { name: 'Training Setup',
+    purpose: 'Your programs, locations, schedule, and pricing — the core of what you sell.',
+    questions: [
+      q('What sport or activity do you train?','short_text',true),
+      q('Which age groups do you train?','multi_choice',true,'',['7-9','10-12','13-15','16-18','College / Pro','Other']),
+      q('How do you group athletes?','single_choice',true,'',['By age','By skill level','By both']),
+      q('Are classes co-ed or separated by gender?','single_choice',true,'',['Co-ed','Separated by gender','Both — depends on program']),
+      q('Your locations','builder',true,'Add one row per location',[],['Location name','Full address']),
+      q('Your programs / classes','builder',true,'Add one row per program',[],['Program name','Age / skill group','Days','Time','Session length','Max size','Assigned coach']),
+      q('What training structures do you offer?','multi_choice',true,'',['Monthly memberships','Pay per session','Session packages','Seasonal programs','Personal training','Semi-private training','Other']),
+      q('Your offers and pricing','builder',true,'Add one row per offer',[],['Offer name','Type (single / package / membership)','Price or tiers','Commitment period','What is included']),
+      q('Drop-in / pay-per-session price','currency',false),
+      q('What discounts do you offer?','multi_choice',false,'',['Military','Sibling','Seasonal promotions','Referral','Other']),
+      q('Do you run a referral program? Describe it.','long_text',false),
+      q('Seasonal schedule changes or blackout dates','long_text',false)
+    ]},
+  { name: 'Team Setup',
+    purpose: 'Your staff, and how athletes will be organized into teams later (after Member Management goes live).',
+    questions: [
+      q('Owner / head coach full name','short_text',true),
+      q('Owner / head coach email','email',true),
+      q('Owner / head coach phone','phone',true),
+      q('Staff members who need system access','builder',true,'Add one row per staff member',[],['Full name','Role','Email','Phone','Notify on new sales? (Y/N)','Notify on member management? (Y/N)']),
+      q('How much access should coaches have by default?','single_choice',true,'',['Coach — own schedule only','Manager — full access','Mixed — set per person']),
+      q('How should athletes be grouped into teams?','single_choice',true,'',['By age group','By skill level','By program','Custom']),
+      q('Team naming convention','short_text',false,'e.g. "U12 Elite", "Saturday Squad"'),
+      q('Who should be able to create and manage teams?','single_choice',true,'',['Owner only','Owner and managers','Any coach'])
+    ]},
+  { name: 'Policies',
+    purpose: 'The rules that govern memberships, payments, and liability.',
+    questions: [
+      q('What is your cancellation policy?','long_text',true),
+      q('Cancellation notice period required','short_text',true,'e.g. 30 days'),
+      q('What is your refund policy?','long_text',true),
+      q('Are membership pauses allowed?','yes_no',true),
+      q('Max pause duration and pauses allowed per year','short_text',false),
+      q('What is your make-up session policy?','long_text',false),
+      q('Failed payment — retry schedule','short_text',true,'e.g. retry on day 1, 3, 7'),
+      q('Grace period after a failed payment','short_text',true),
+      q('Upload your liability waiver','file',true),
+      q('Upload your membership terms & conditions','file',true),
+      q('Upload your media / photo release','file',false),
+      q('Any other legal documents to upload','file',false)
+    ]},
+  { name: 'Leads & Sales',
+    purpose: 'How leads come in, get qualified, and get booked.',
+    questions: [
+      q('What is your primary lead magnet?','single_choice',true,'',['Free trial session','Free clinic','Discovery call','Other']),
+      q('How do you currently generate leads?','multi_choice',true,'',['Instagram / Facebook','SMS / Email','Website','Word of mouth','Free clinics / events','Other']),
+      q('Do you offer free trials?','yes_no',true),
+      q('Describe how your free trial works','long_text',false),
+      q('How should the sales flow work?','single_choice',true,'',['Direct sign up','Free trial, then sell','Discovery call']),
+      q('What are your sales pipeline stages?','long_text',true,'e.g. New lead → Contacted → Booked → Showed → Member'),
+      q('How do you decide a lead is a good fit?','long_text',true),
+      q('What is your geographic focus / service area?','short_text',true),
+      q('Trial booking link or calendar','url',false),
+      q('Who should be notified when a new lead comes in?','short_text',true)
+    ]},
+  { name: 'Automations',
+    purpose: 'Which automated message sequences to switch on, and how they behave.',
+    questions: [
+      q('Turn on the new-lead instant response?','yes_no',true),
+      q('How fast should the first message go out?','single_choice',true,'',['Instantly','Within 5 minutes','Within 15 minutes']),
+      q('Instant response channel','single_choice',true,'',['SMS','Email','Both']),
+      q('Turn on free trial confirmation + reminders?','yes_no',true),
+      q('When should trial reminders send?','multi_choice',false,'',['24h before','2h before','1h before','Morning of']),
+      q('Turn on no-show follow-up?','yes_no',true),
+      q('Turn on the post-trial conversion sequence?','yes_no',true),
+      q('Post-trial follow-up cadence','short_text',false,'e.g. Day 0, Day 2, Day 5'),
+      q('Turn on the failed-payment dunning sequence?','yes_no',true),
+      q('Turn on the new-member welcome sequence?','yes_no',true),
+      q('Request a review after how many sessions?','number',false),
+      q('Turn on re-engagement for ghosted / cold leads?','yes_no',true),
+      q('Turn on birthday / milestone messages?','yes_no',false),
+      q('Existing automations to preserve (if already on GHL)','long_text',false)
+    ]},
+  { name: 'Connect Accounts',
+    purpose: 'Link the tools that run your payments, CRM, and ads.',
+    questions: [
+      q('What is your current payment processor?','single_choice',true,'',['Stripe','Square','Other','None yet']),
+      q('Connect your Stripe account','connect',true),
+      q('Are you currently a GoHighLevel user?','yes_no',true),
+      q('If yes — your GHL account access details (so we can port it)','long_text',false),
+      q('What should we preserve from your current GHL?','multi_choice',false,'',['Registration forms','SMS / email contacts','Custom fields','Automations','Pipelines','Other']),
+      q('Other tools you currently use','multi_choice',false,'',['GoHighLevel','CoachIQ','Acuity Scheduling','Square','Constant Contact','Mailchimp','Google Voice','Other']),
+      q('Connect your Meta / Facebook ad account','connect',true),
+      q('CSV of your current leads','single_choice',true,'',['Provided','Will send separately','Do not have']),
+      q('CSV of your current clients / members','single_choice',true,'',['Provided','Will send separately','Do not have'])
+    ]}
+]};
+
+// ── State ──────────────────────────────────────────────────────────
+let state;
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function load(){
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.sections)) { state = s; return; } } catch(e){}
+  state = clone(DEFAULTS);
+}
+function save(){
+  const out = { sections: state.sections.map(s => ({ name:s.name, purpose:s.purpose, questions:s.questions })) };
+  localStorage.setItem(KEY, JSON.stringify(out));
+}
+function resetAll(){
+  if (!confirm('Reset everything back to the default question set? Your edits will be lost.')) return;
+  state = clone(DEFAULTS); save(); render();
+}
+
+// ── Mutations (text edits do NOT re-render, to keep focus) ──────────
+function secName(s,v){ state.sections[s].name=v; save(); }
+function secPurpose(s,v){ state.sections[s].purpose=v; save(); }
+function qText(s,i,v){ state.sections[s].questions[i].text=v; save(); markEmpty(s,i,v); }
+function qHint(s,i,v){ state.sections[s].questions[i].hint=v; save(); }
+function qType(s,i,v){
+  const qq=state.sections[s].questions[i]; qq.type=v;
+  if((v==='single_choice'||v==='multi_choice')&&(!qq.options||!qq.options.length)) qq.options=['Option 1','Option 2'];
+  if(v==='builder'&&(!qq.fields||!qq.fields.length)) qq.fields=['Field 1','Field 2'];
+  save(); render();
+}
+function qMand(s,i){ state.sections[s].questions[i].mandatory=!state.sections[s].questions[i].mandatory; save(); render(); }
+function qOptions(s,i,v){ state.sections[s].questions[i].options=v.split('\n').map(x=>x.trim()).filter(Boolean); save(); }
+function qFields(s,i,v){ state.sections[s].questions[i].fields=v.split('\n').map(x=>x.trim()).filter(Boolean); save(); }
+function qDelete(s,i){
+  if(!confirm('Delete this question?')) return;
+  state.sections[s].questions.splice(i,1); save(); render();
+}
+function qAdd(s){
+  state.sections[s].questions.push(q('','short_text',false));
+  save(); render();
+  const el=document.getElementById('q-'+s+'-'+(state.sections[s].questions.length-1)); if(el) el.focus();
+}
+function qMove(s,i,dir){
+  const arr=state.sections[s].questions, j=i+dir;
+  if(j<0||j>=arr.length) return;
+  [arr[i],arr[j]]=[arr[j],arr[i]]; save(); render();
+}
+function secDelete(s){
+  if(!confirm('Delete the entire "'+(state.sections[s].name||'untitled')+'" section and all its questions?')) return;
+  state.sections.splice(s,1); save(); render();
+}
+function secMove(s,dir){
+  const j=s+dir; if(j<0||j>=state.sections.length) return;
+  [state.sections[s],state.sections[j]]=[state.sections[j],state.sections[s]]; save(); render();
+}
+function secCollapse(s){ state.sections[s]._collapsed=!state.sections[s]._collapsed; render(); }
+function addSection(){
+  state.sections.push({ name:'New section', purpose:'Describe what this section collects.', questions:[q('','short_text',false)] });
+  save(); render();
+  window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' });
+}
+function markEmpty(s,i,v){
+  const el=document.getElementById('qcard-'+s+'-'+i);
+  if(el) el.classList.toggle('empty-q', !v.trim());
+}
+
+// ── Render ─────────────────────────────────────────────────────────
+function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function render(){
+  const app=document.getElementById('app');
+  app.innerHTML = state.sections.map((sec,s)=>{
+    const reqCount=sec.questions.filter(x=>x.mandatory).length;
+    const collapsed=!!sec._collapsed;
+    const body = collapsed ? '' : `
+      <div class="sec-body">
+        ${sec.questions.map((qq,i)=>renderQ(s,i,qq)).join('')}
+        <button class="add-q" onclick="qAdd(${s})">+ Add a question</button>
+      </div>`;
+    return `
+      <div class="section">
+        <div class="sec-head">
+          <div class="sec-num">${String(s+1).padStart(2,'0')}</div>
+          <div class="sec-titles">
+            <input class="sec-name" value="${esc(sec.name)}" placeholder="Section name"
+              oninput="secName(${s},this.value)">
+            <input class="sec-purpose" value="${esc(sec.purpose)}" placeholder="What this section collects"
+              oninput="secPurpose(${s},this.value)">
+            <div class="sec-meta">${sec.questions.length} questions · <span class="req-tag">${reqCount} required</span></div>
+          </div>
+          <div class="sec-ctrls">
+            <button class="icon-btn" title="${collapsed?'Expand':'Collapse'}" onclick="secCollapse(${s})">${collapsed?'▸':'▾'}</button>
+            <button class="icon-btn" title="Move up" onclick="secMove(${s},-1)">↑</button>
+            <button class="icon-btn" title="Move down" onclick="secMove(${s},1)">↓</button>
+            <button class="icon-btn danger" title="Delete section" onclick="secDelete(${s})">✕</button>
+          </div>
+        </div>
+        ${body}
+      </div>`;
+  }).join('');
+  updateStats();
+}
+
+function renderQ(s,i,qq){
+  const isChoice = qq.type==='single_choice'||qq.type==='multi_choice';
+  const isBuilder = qq.type==='builder';
+  let extra='';
+  if(isChoice){
+    extra=`<div class="q-extra">
+      <div class="q-extra-label">Choices — one per line</div>
+      <textarea oninput="qOptions(${s},${i},this.value)" placeholder="Option 1&#10;Option 2">${esc((qq.options||[]).join('\n'))}</textarea>
+    </div>`;
+  } else if(isBuilder){
+    extra=`<div class="q-extra">
+      <div class="q-extra-label">Fields in each repeating row — one per line</div>
+      <textarea oninput="qFields(${s},${i},this.value)" placeholder="Field 1&#10;Field 2">${esc((qq.fields||[]).join('\n'))}</textarea>
+    </div>`;
+  }
+  const typeOpts=TYPES.map(([v,l])=>`<option value="${v}"${qq.type===v?' selected':''}>${l}</option>`).join('');
+  return `
+    <div class="q${qq.text.trim()?'':' empty-q'}" id="qcard-${s}-${i}">
+      <div class="q-line1">
+        <div class="q-num">${i+1}</div>
+        <input class="q-text" id="q-${s}-${i}" value="${esc(qq.text)}" placeholder="Type the question…"
+          oninput="qText(${s},${i},this.value)">
+      </div>
+      <div class="q-line2">
+        <select class="q-type" onchange="qType(${s},${i},this.value)">${typeOpts}</select>
+        <div class="q-mand${qq.mandatory?' on':''}" onclick="qMand(${s},${i})">${qq.mandatory?'★ Required':'☆ Optional'}</div>
+        <input class="q-hint" value="${esc(qq.hint)}" placeholder="Helper hint (optional)"
+          oninput="qHint(${s},${i},this.value)">
+        <div class="q-move">
+          <button class="icon-btn" title="Move up" onclick="qMove(${s},${i},-1)">↑</button>
+          <button class="icon-btn" title="Move down" onclick="qMove(${s},${i},1)">↓</button>
+          <button class="icon-btn danger" title="Delete" onclick="qDelete(${s},${i})">🗑</button>
+        </div>
+      </div>
+      ${extra}
+    </div>`;
+}
+
+function updateStats(){
+  const secs=state.sections.length;
+  let qs=0, req=0;
+  state.sections.forEach(s=>s.questions.forEach(x=>{ qs++; if(x.mandatory) req++; }));
+  document.getElementById('stat-sec').textContent=secs;
+  document.getElementById('stat-q').textContent=qs;
+  document.getElementById('stat-req').textContent=req;
+}
+
+// ── Export ─────────────────────────────────────────────────────────
+function buildPrompt(){
+  const config = {
+    project: 'onboarding-reloaded',
+    exported_at: new Date().toISOString(),
+    sections: state.sections.map(s=>({
+      name: s.name||'',
+      purpose: s.purpose||'',
+      questions: s.questions.map(qq=>{
+        const o={ text:qq.text||'', type:qq.type, mandatory:!!qq.mandatory };
+        if(qq.hint) o.hint=qq.hint;
+        if((qq.type==='single_choice'||qq.type==='multi_choice')&&qq.options&&qq.options.length) o.options=qq.options;
+        if(qq.type==='builder'&&qq.fields&&qq.fields.length) o.fields=qq.fields;
+        return o;
+      })
+    }))
+  };
+  let qs=0,req=0;
+  config.sections.forEach(s=>s.questions.forEach(x=>{qs++;if(x.mandatory)req++;}));
+  return `Here is the finalized "Onboarding Reloaded" question set from the editor.
+
+Please:
+1. Create the new Supabase table for this onboarding question set.
+2. Load every section and question below into it.
+3. Workshop it with me — flag weak or missing questions and recommend improvements before we build the client flow.
+
+Summary: ${config.sections.length} sections, ${qs} questions, ${req} required.
+
+<<<ONBOARDING_RELOADED_CONFIG>>>
+${JSON.stringify(config,null,2)}
+<<<END_ONBOARDING_RELOADED_CONFIG>>>`;
+}
+function openExport(){
+  document.getElementById('export-text').value=buildPrompt();
+  document.getElementById('export-overlay').classList.add('open');
+  document.getElementById('copied-flag').classList.remove('show');
+  doCopy();
+}
+function closeExport(){ document.getElementById('export-overlay').classList.remove('open'); }
+function doCopy(){
+  const ta=document.getElementById('export-text');
+  ta.select(); ta.setSelectionRange(0,ta.value.length);
+  let ok=false;
+  try { ok=document.execCommand('copy'); } catch(e){}
+  if(navigator.clipboard){ navigator.clipboard.writeText(ta.value).then(()=>flagCopied()).catch(()=>{}); }
+  if(ok) flagCopied();
+}
+function flagCopied(){
+  const f=document.getElementById('copied-flag');
+  f.classList.add('show'); setTimeout(()=>f.classList.remove('show'),2500);
+}
+
+// ── Boot ───────────────────────────────────────────────────────────
+load(); render();
+</script>
+</body>
+</html>

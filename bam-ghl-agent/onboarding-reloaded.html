@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Get Set Up — BAM Business</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0A0A0B; --surface: #131316; --surface-el: #1C1C21; --surface-hov: #22222A;
+    --line: #2A2A31; --line-str: #383842;
+    --text: #F5F1E8; --text-sub: rgba(245,241,232,0.62); --text-mute: rgba(245,241,232,0.40);
+    --gold: #E8C547; --gold-2: #C9A55C;
+    --ghost: rgba(232,197,71,0.08); --border-acc: rgba(232,197,71,0.30);
+    --green: #9FD88A; --green-soft: rgba(159,216,138,0.12); --red: #E87560;
+    --radius: 5px;
+    --display: "Space Grotesk","Inter",sans-serif;
+    --sans: "Inter",system-ui,sans-serif;
+    --mono: "JetBrains Mono",ui-monospace,monospace;
+  }
+  html, body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+  /* ── Progress header ── */
+  .prog {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(10,10,11,0.95); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line); padding: 13px 24px;
+  }
+  .prog-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 9px; }
+  .prog-brand { font-family: var(--mono); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); }
+  .prog-label { font-family: var(--mono); font-size: 11px; color: var(--text-sub); }
+  /* overall bar */
+  .bar { height: 6px; background: var(--line-str); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--gold-2), var(--gold)); border-radius: 3px; transition: width 0.35s ease; }
+  .prog-pct { font-family: var(--mono); font-size: 11px; color: var(--gold); margin-top: 6px; text-align: right; }
+  .steps { display: flex; gap: 6px; margin-top: 10px; }
+  .step { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 4px 2px; border-radius: 4px; cursor: default; }
+  .step.clickable { cursor: pointer; }
+  .step.clickable:hover { background: var(--surface-el); }
+  .step-bar2 { height: 4px; width: 100%; border-radius: 2px; background: var(--line-str); transition: background 0.2s; }
+  .step.done .step-bar2 { background: var(--gold-2); }
+  .step.active .step-bar2 { background: var(--gold); }
+  .step-name { font-family: var(--mono); font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-mute); white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+  .step.done .step-name { color: var(--text-sub); }
+  .step.active .step-name { color: var(--gold); }
+
+  /* ── Page shell ── */
+  .page { max-width: 640px; margin: 0 auto; padding: 40px 24px 150px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+  .sec-title { font-family: var(--display); font-size: 27px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 8px; }
+  .sec-purpose { color: var(--text-sub); font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+  .sec-subhead { font-family: var(--display); font-size: 16px; font-weight: 600; color: var(--gold); margin: 36px 0 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line-str); }
+
+  /* per-section progress */
+  .sec-prog { display: flex; align-items: center; gap: 12px; margin-bottom: 34px; }
+  .sec-prog .bar { flex: 1; height: 4px; }
+  .sec-prog-label { font-family: var(--mono); font-size: 10px; color: var(--text-mute); white-space: nowrap; }
+
+  /* ── Question ── */
+  .q { margin-bottom: 28px; }
+  .q-label { font-size: 15px; font-weight: 500; line-height: 1.45; margin-bottom: 4px; }
+  .q-req { color: var(--gold); margin-left: 3px; }
+  .q-hint { font-size: 12.5px; color: var(--text-mute); margin-bottom: 12px; }
+  .q.missing .q-label { color: var(--red); }
+  .q.missing .field, .q.missing .opt, .q.missing .builder-box, .q.missing .offers-box, .q.missing .link-box { border-color: rgba(232,117,96,0.5); }
+
+  .field {
+    width: 100%; background: var(--surface-el); border: 1px solid var(--line-str);
+    color: var(--text); font-family: var(--sans); font-size: 14px;
+    padding: 11px 13px; border-radius: var(--radius); outline: none; transition: border-color 0.15s;
+  }
+  textarea.field { resize: vertical; min-height: 88px; line-height: 1.55; }
+  .field:focus { border-color: var(--gold); }
+  .field::placeholder { color: var(--text-mute); }
+  .field-pre { display: flex; align-items: center; }
+  .field-pre .pre {
+    background: var(--surface-el); border: 1px solid var(--line-str); border-right: none;
+    color: var(--text-mute); padding: 11px 12px; border-radius: var(--radius) 0 0 var(--radius);
+    font-family: var(--mono); font-size: 14px;
+  }
+  .field-pre .field { border-radius: 0 var(--radius) var(--radius) 0; }
+
+  /* voice input */
+  .ta-wrap { position: relative; }
+  .ta-wrap textarea.field { padding-right: 46px; }
+  .mic-btn {
+    position: absolute; top: 8px; right: 8px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--line-str);
+    color: var(--text-mute); cursor: pointer; font-size: 14px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .mic-btn:hover { color: var(--text); border-color: var(--gold-2); }
+  .mic-btn.listening { background: var(--gold); color: var(--bg); border-color: var(--gold); animation: micpulse 1.1s ease-in-out infinite; }
+  @keyframes micpulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(232,197,71,0.55); }
+    50% { box-shadow: 0 0 0 7px rgba(232,197,71,0); }
+  }
+
+  .opts { display: flex; flex-direction: column; gap: 8px; }
+  .opt {
+    display: flex; align-items: center; gap: 12px;
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none;
+  }
+  .opt:hover { border-color: var(--line-str); }
+  .opt.sel { border-color: var(--border-acc); background: var(--ghost); }
+  .opt-mark {
+    width: 16px; height: 16px; flex-shrink: 0; border: 1px solid var(--line-str);
+    display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--bg);
+  }
+  .opt-mark.radio { border-radius: 50%; }
+  .opt-mark.check { border-radius: 4px; }
+  .opt.sel .opt-mark { background: var(--gold); border-color: var(--gold); }
+  .opt-txt { font-size: 14px; }
+
+  .yn { display: flex; gap: 10px; }
+  .yn-btn {
+    flex: 1; text-align: center; border: 1px solid var(--line-str);
+    border-radius: var(--radius); padding: 13px; cursor: pointer; font-weight: 500;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .yn-btn:hover { border-color: var(--text-mute); }
+  .yn-btn.sel { border-color: var(--border-acc); background: var(--ghost); color: var(--gold); }
+
+  .dropzone {
+    border: 1px dashed var(--line-str); border-radius: var(--radius);
+    padding: 20px; text-align: center; cursor: pointer; transition: border-color 0.15s;
+    color: var(--text-mute); font-size: 13px;
+  }
+  .dropzone:hover { border-color: var(--gold-2); }
+  .dropzone.has { border-style: solid; border-color: var(--border-acc); color: var(--gold-2); }
+  .file-row { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 3px 0; }
+  .file-x { background: none; border: none; color: var(--text-mute); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+  .file-x:hover { color: var(--red); }
+  .dz-more { color: var(--text-mute); font-size: 12px; margin-top: 8px; }
+  .link-add { display: flex; gap: 8px; margin-top: 8px; }
+  .link-add-input { flex: 1; }
+  .link-add-btn {
+    flex-shrink: 0; background: var(--surface-el); border: 1px solid var(--line-str);
+    color: var(--text-sub); border-radius: var(--radius); padding: 0 16px;
+    font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  }
+  .link-add-btn:hover { color: var(--text); border-color: var(--gold-2); }
+  .other-box { margin-top: 8px; }
+  .bchk { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 6px 0; user-select: none; }
+  .bchk-box { width: 16px; height: 16px; border: 1px solid var(--line-str); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--bg); }
+  .bchk.on .bchk-box { background: var(--gold); border-color: var(--gold); }
+  .bchk-label { font-size: 13px; }
+  .confirm-box { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; padding: 12px 13px; border: 1px solid var(--line-str); border-radius: var(--radius); background: var(--surface-el); user-select: none; }
+  .confirm-box.on { border-color: var(--border-acc); background: var(--ghost); }
+  .confirm-mark { width: 18px; height: 18px; border: 1px solid var(--line-str); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--bg); margin-top: 1px; }
+  .confirm-box.on .confirm-mark { background: var(--gold); border-color: var(--gold); }
+  .confirm-txt { font-size: 13px; line-height: 1.5; color: var(--text-sub); }
+  .connect-btn {
+    width: 100%; border: 1px solid var(--line-str); background: var(--surface-el);
+    border-radius: var(--radius); padding: 14px; cursor: pointer; color: var(--text);
+    font-family: var(--sans); font-size: 14px; font-weight: 500; transition: all 0.15s;
+  }
+  .connect-btn:hover { border-color: var(--gold-2); }
+  .connect-btn.done { border-color: var(--border-acc); background: var(--green-soft); color: var(--green); cursor: default; }
+
+  /* link-out (GoHighLevel) */
+  .link-box { border: 1px solid var(--line-str); border-radius: var(--radius); padding: 16px; background: var(--surface-el); }
+  .link-box p { font-size: 13px; color: var(--text-sub); margin-bottom: 12px; line-height: 1.55; }
+  .link-btn {
+    display: inline-block; background: var(--gold); color: var(--bg); text-decoration: none;
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600;
+    padding: 11px 18px; border-radius: var(--radius); cursor: pointer; border: none;
+  }
+  .link-btn:hover { opacity: 0.88; }
+  .link-done { color: var(--green); font-size: 12px; margin-top: 10px; }
+
+  /* builder (flat repeating group) */
+  .builder-box, .offers-box { border: 1px solid var(--line); border-radius: var(--radius); padding: 4px; }
+  .builder-row {
+    background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; margin: 6px; display: flex; flex-direction: column; gap: 9px; position: relative;
+  }
+  .builder-row-head { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-mute); }
+  .builder-sub-label { font-size: 11px; color: var(--text-mute); margin-bottom: 3px; }
+  .builder-remove, .offer-x {
+    position: absolute; top: 8px; right: 8px; background: none; border: none;
+    color: var(--text-mute); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px;
+  }
+  .builder-remove:hover, .offer-x:hover { color: var(--red); }
+  .builder-add {
+    width: calc(100% - 12px); margin: 6px; background: none; border: 1px dashed var(--line-str);
+    border-radius: var(--radius); color: var(--text-mute); font-family: var(--sans); font-size: 13px;
+    padding: 9px; cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  }
+  .builder-add:hover { border-color: var(--gold-2); color: var(--text); }
+  .builder-empty { color: var(--text-mute); font-size: 13px; text-align: center; padding: 14px; }
+
+  /* offers */
+  .offer-card { background: var(--surface-el); border: 1px solid var(--line); border-radius: var(--radius); margin: 6px; overflow: hidden; }
+  .offer-head {
+    display: flex; align-items: center; gap: 10px; padding: 13px 14px; cursor: pointer; position: relative;
+  }
+  .offer-head:hover { background: var(--surface-hov); }
+  .offer-caret { color: var(--text-mute); font-size: 11px; }
+  .offer-title { font-weight: 500; flex: 1; }
+  .offer-badge {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--gold); background: var(--ghost); border: 1px solid var(--border-acc);
+    border-radius: 4px; padding: 3px 7px;
+  }
+  .offer-x { position: static; }
+  .offer-form { padding: 6px 14px 16px; border-top: 1px solid var(--line); }
+  .offer-field { margin-top: 16px; }
+  .offer-field .q-label { font-size: 14px; }
+  .offer-heading {
+    font-family: var(--display); font-size: 14px; font-weight: 600; color: var(--gold);
+    margin-top: 26px; padding-bottom: 6px; border-bottom: 1px solid var(--line-str);
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .offer-note {
+    font-size: 12.5px; color: var(--text-sub); line-height: 1.55;
+    background: var(--ghost); border: 1px solid var(--border-acc);
+    border-radius: var(--radius); padding: 10px 12px; margin-top: 14px;
+  }
+
+  /* ── Footer ── */
+  .footbar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 13px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .footbar-r { display: flex; gap: 10px; align-items: center; }
+  .save-flag { font-family: var(--mono); font-size: 10px; color: var(--green); opacity: 0; transition: opacity 0.2s; }
+  .save-flag.show { opacity: 0.85; }
+  .btn {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 12px 22px; border-radius: var(--radius); cursor: pointer; border: none;
+    transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s; white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn-primary { background: var(--gold); color: var(--bg); font-weight: 600; }
+  .btn-primary:hover:not(:disabled) { opacity: 0.88; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line-str); color: var(--text-sub); }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-mute); }
+  .btn-link { background: none; border: none; color: var(--text-mute); font-family: var(--mono); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; cursor: pointer; }
+  .btn-link:hover { color: var(--text-sub); }
+
+  /* ── Full-screen states ── */
+  .screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .screen-card { max-width: 440px; text-align: center; width: 100%; }
+  .screen-mark {
+    width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 22px;
+    background: var(--ghost); border: 1px solid var(--border-acc); color: var(--gold);
+    display: flex; align-items: center; justify-content: center; font-size: 24px;
+  }
+  .screen-card h1 { font-family: var(--display); font-size: 27px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 10px; }
+  .screen-card p { color: var(--text-sub); font-size: 14px; line-height: 1.65; margin-bottom: 24px; }
+  .screen-btns { display: flex; flex-direction: column; gap: 10px; }
+  .resume-note { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin-bottom: 22px; text-align: left; }
+  .resume-note .rn-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
+  .resume-note .rn-row b { color: var(--gold-2); }
+  .toast {
+    position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%) translateY(12px);
+    background: var(--surface-el); border: 1px solid var(--border-acc); color: var(--text);
+    padding: 11px 18px; border-radius: var(--radius); font-size: 13px; z-index: 40;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- Progress header -->
+<div class="prog hidden" id="prog">
+  <div class="prog-top">
+    <div class="prog-brand">BAM Business · Setup</div>
+    <div class="prog-label" id="prog-label">Section 1 of 6</div>
+  </div>
+  <div class="bar"><div class="bar-fill" id="overall-fill"></div></div>
+  <div class="prog-pct" id="overall-pct">0% complete</div>
+  <div class="steps" id="pips"></div>
+</div>
+
+<!-- Welcome / resume -->
+<div class="screen" id="welcome">
+  <div class="screen-card">
+    <div class="screen-mark">✦</div>
+    <h1 id="welcome-title">Let's get you set up.</h1>
+    <p id="welcome-sub">A quick walk through your business so we can build your CRM, website, and marketing. It saves as you go — leave and come back anytime.</p>
+    <div class="resume-note hidden" id="resume-note"></div>
+    <div class="screen-btns" id="welcome-btns"></div>
+  </div>
+</div>
+
+<!-- Wizard -->
+<div class="page hidden" id="wizard"></div>
+
+<!-- Footer -->
+<div class="footbar hidden" id="footbar">
+  <div style="display:flex;gap:12px;align-items:center">
+    <button class="btn-link" onclick="saveAndExit()">Save &amp; finish later</button>
+    <span class="save-flag" id="save-flag">Saved</span>
+  </div>
+  <div class="footbar-r">
+    <button class="btn btn-ghost" id="back-btn" onclick="prevSection()">Back</button>
+    <button class="btn btn-primary" id="next-btn" onclick="nextSection()">Continue</button>
+  </div>
+</div>
+
+<!-- Complete -->
+<div class="screen hidden" id="complete">
+  <div class="screen-card">
+    <div class="screen-mark">✓</div>
+    <h1>You're all set.</h1>
+    <p>Everything's in. Your BAM Business team has what they need to build your CRM, website, and marketing. We'll be in touch with next steps.</p>
+    <div class="screen-btns">
+      <button class="btn btn-ghost" onclick="reviewAgain()">Review my answers</button>
+    </div>
+  </div>
+</div>
+
+<!-- Exit -->
+<div class="screen hidden" id="exited">
+  <div class="screen-card">
+    <div class="screen-mark">✦</div>
+    <h1>Progress saved.</h1>
+    <p>Pick up right where you left off whenever you're ready — nothing is lost.</p>
+    <div class="screen-btns">
+      <button class="btn btn-primary" onclick="resumeFromExit()">Continue setup</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ════════════════════════════════════════════════════════════════
+   ONBOARDING RELOADED — client flow  (v2 — restructured)
+   6 sections. Conditional offer builder. Question-level showIf.
+   Progress bars throughout. Pause + resume via localStorage.
+   Every save also mirrors the submission to the Supabase
+   onboarding_reloaded table (see onboarding-reloaded-schema.sql).
+   ════════════════════════════════════════════════════════════════ */
+
+const PROGRESS_KEY = 'onboarding_reloaded_progress_v2';
+// TODO (Zoran): real BAM GoHighLevel subscription link goes here.
+const GHL_SIGNUP_URL = 'https://link.byanymeansbball.com/ghl-signup';
+const SPEECH_OK = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+// ── Supabase sync — mirrors each submission to the onboarding_reloaded table ──
+const SB_URL = 'https://jnojmfmpnsfmtqmwhopz.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2ptZm1wbnNmbXRxbXdob3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjI1ODQsImV4cCI6MjA5MDE5ODU4NH0.8vUj-MHg73yUtQR5i3VAbgrTyjvmTCMM6-U3mGxbGGo';
+let _sb = null;
+try { if (window.supabase) _sb = window.supabase.createClient(SB_URL, SB_ANON); } catch(e){}
+function submissionKey(){
+  let k=null;
+  try { k=localStorage.getItem('onboarding_reloaded_key'); } catch(e){}
+  if(!k){
+    k = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('k'+Date.now()+Math.random().toString(36).slice(2));
+    try { localStorage.setItem('onboarding_reloaded_key', k); } catch(e){}
+  }
+  return k;
+}
+let _syncTimer=null;
+function syncToSupabase(){
+  if(!_sb) return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(function(){
+    const row={
+      submission_key: submissionKey(),
+      business_name: (state.answers && state.answers['business_0']) || null,
+      answers: state.answers || {},
+      section_idx: state.sectionIdx || 0,
+      status: state.completedAll ? 'completed' : 'in_progress',
+      updated_at: new Date().toISOString(),
+      completed_at: state.completedAll ? (state.completed_at || new Date().toISOString()) : null
+    };
+    try {
+      _sb.from('onboarding_reloaded').upsert(row,{onConflict:'submission_key'})
+        .then(function(r){ if(r && r.error) console.warn('[onboarding sync]', r.error.message); });
+    } catch(e){ console.warn('[onboarding sync]', e); }
+  }, 1200);
+}
+
+function q(o){ return Object.assign({ mandatory:false, hint:'', options:[], fields:[] }, o); }
+
+// ── Conditional offer form (matches the "input offer" diagram) ─────
+const M = { k:'pricing_type', v:['Membership'] };
+const P = { k:'pricing_type', v:['Package'] };
+const SS = { k:'pricing_type', v:['Single Session'] };
+const FT = { k:'sales_flow', v:['Free trial first'] };
+const CONFIRM_NOTE = 'By checking the boxes above, you confirm the uploaded file(s) contain each selected agreement / policy. You are responsible for ensuring the documents are accurate and complete.';
+const OFFER_FORM = [
+  // ── Section 1: Basic Offer Information ──
+  { type:'heading', label:'Basic Offer Information' },
+  { k:'name',        label:'What is the name of this training offer?', type:'short_text', req:true, hint:'e.g. Middle School Skill Training' },
+  { k:'description', label:'Give a short description of the training offer', type:'long_text' },
+  { k:'age_group',   label:'What age group is this for?', type:'short_text' },
+  { k:'skill_level', label:'What skill level is this for?', type:'single_choice', options:['Beginner','Intermediate','Advanced'] },
+  { k:'gender',      label:'Who is this for?', type:'multi_choice', options:['Boys','Girls'] },
+  // ── Section 2: Scheduling Setup ──
+  { type:'heading', label:'Scheduling Setup' },
+  { k:'uses_software',  label:'Do you currently use a scheduling software / app?', type:'yes_no', req:true },
+  { k:'software',       label:'Which scheduling software do you use?', type:'single_choice', options:['CoachIQ','Acuity','Mindbody','Vagaro','Other'], showIf:{ k:'uses_software', v:['Yes'] } },
+  { k:'admin_added', label:'I have added admin@byanymeansbusiness.com as an admin / staff member inside our scheduling software so the BAM team can connect and configure our systems.', type:'confirm', req:true, showIf:{ k:'uses_software', v:['Yes'] } },
+  { type:'heading', label:'Schedule Consistency' },
+  { k:'schedule_consistent', label:'Is your training schedule generally consistent week to week?', type:'yes_no', req:true },
+  { k:'schedule_blocks', label:'Add your weekly schedule', type:'builder', fields:[{label:'Weekday',type:'combo',options:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']},{label:'Start time',type:'time'},{label:'End time',type:'time'},{label:'Location',type:'location'}], hint:'Add a block for each training time', showIf:{ k:'schedule_consistent', v:['Yes'] } },
+  { k:'schedule_explain', label:'How are athletes / parents informed about training times and schedule changes?', type:'long_text', hint:'e.g. We send weekly schedules through WhatsApp every Sunday', showIf:{ k:'schedule_consistent', v:['No'] } },
+  // ── Section 3: Pricing Structure ──
+  { type:'heading', label:'Pricing Structure' },
+  { k:'pricing_type', label:'What type of pricing structure is this?', type:'single_choice', req:true, options:['Membership','Package','Single Session','Other'], otherBig:true },
+  { k:'mem_name',      label:'Membership name / title', type:'short_text', hint:'e.g. Unlimited Training', showIf:M },
+  { k:'mem_cycle',     label:'Membership billing cycle', type:'short_text', hint:'e.g. monthly, every 4 weeks, biweekly', showIf:M },
+  { k:'mem_price',     label:'Membership price', type:'currency', showIf:M },
+  { k:'mem_highlight', label:'Discount to highlight between membership options (optional)', type:'short_text', hint:'e.g. Save 15% on Unlimited', showIf:M },
+  { k:'mem_discounts', label:'Are there any discount codes?', type:'short_text', hint:'e.g. Sibling discount → 2SIBLING', showIf:M },
+  { k:'mem_addons',    label:'Any add-ons or bonuses included?', type:'long_text', hint:'e.g. shooting program, online workouts, film review', showIf:M },
+  { type:'note', label:'Please upload a document or folder that contains all required agreements / policies for this membership offer.', showIf:M },
+  { k:'mem_agreements', label:'Confirm which agreements / policies your upload contains', type:'multi_choice', options:['Waiver','Media Release','Cancellation Policy','Refund Policy','Missed Session Policy','Pause / Freeze Policy'], showIf:M },
+  { k:'mem_files',     label:'Upload membership agreements / policies', type:'files', showIf:M },
+  { type:'note', label:CONFIRM_NOTE, showIf:M },
+  { k:'mem_notes',     label:'Any other notes?', type:'long_text', showIf:M },
+  { k:'pkg_name',      label:'Package name / title', type:'short_text', showIf:P },
+  { k:'pkg_sessions',  label:'Number of sessions', type:'number', showIf:P },
+  { k:'pkg_cost',      label:'Package cost', type:'currency', showIf:P },
+  { k:'pkg_expiry',    label:'When do the sessions expire?', type:'short_text', showIf:P },
+  { k:'pkg_discounts', label:'Are there any discount codes?', type:'short_text', hint:'e.g. Sibling discount → 2SIBLING', showIf:P },
+  { k:'pkg_addons',    label:'Any add-ons or bonuses included?', type:'long_text', showIf:P },
+  { type:'note', label:'Please upload a document or folder that contains all required agreements / policies for this package offer.', showIf:P },
+  { k:'pkg_agreements', label:'Confirm which agreements / policies your upload contains', type:'multi_choice', options:['Waiver','Media Release','Cancellation Policy','Refund Policy','Missed Session Policy'], showIf:P },
+  { k:'pkg_files',     label:'Upload package agreements / policies', type:'files', showIf:P },
+  { type:'note', label:CONFIRM_NOTE, showIf:P },
+  { k:'pkg_notes',     label:'Any other notes?', type:'long_text', showIf:P },
+  { k:'ss_cost',       label:'How much does one session cost?', type:'currency', showIf:SS },
+  { k:'ss_discounts',  label:'Are there any discount codes?', type:'short_text', hint:'e.g. Sibling discount → 2SIBLING', showIf:SS },
+  { type:'note', label:'Please upload a document or folder that contains all required agreements / policies for this single session offer.', showIf:SS },
+  { k:'ss_agreements', label:'Confirm which agreements / policies your upload contains', type:'multi_choice', options:['Waiver','Media Release','Cancellation Policy','Refund Policy'], showIf:SS },
+  { k:'ss_files',      label:'Upload single session agreements / policies', type:'files', showIf:SS },
+  { type:'note', label:CONFIRM_NOTE, showIf:SS },
+  { k:'ss_notes',      label:'Any other notes?', type:'long_text', showIf:SS },
+  // ── Section 4: Sales Flow ──
+  { type:'heading', label:'Sales Flow' },
+  { k:'sales_flow',  label:'How do athletes normally join this training program?', type:'single_choice', req:true, options:['Direct signup','Free trial first','Discovery call first','Application required'] },
+  { k:'lead_notify', label:'Who should get notified when a lead comes in?', type:'staff_select' },
+  { k:'lead_extra',  label:'What extra information would you like to collect from new leads / parents?', type:'long_text' },
+  { type:'note', label:'Please upload your free trial agreements / policies.', showIf:FT },
+  { k:'ft_agreements', label:'Confirm which free-trial agreements your upload contains', type:'multi_choice', options:['Free Trial Waiver','Free Trial Media Release','Free Trial Agreement'], showIf:FT },
+  { k:'ft_files',    label:'Upload free trial agreements / policies', type:'files', showIf:FT },
+  { type:'note', label:CONFIRM_NOTE, showIf:FT },
+  // ── Section 5: Client Onboarding ──
+  { type:'heading', label:'Client Onboarding' },
+  { k:'onboard_notify', label:'Who should get notified when a new athlete signs up?', type:'staff_select' },
+  { k:'info_collect',   label:'What information would you like to collect from athletes / parents after signup?', type:'long_text', hint:'e.g. Emergency contact, Medical notes, Jersey size, School, Basketball experience, Goals' },
+  { type:'heading', label:'Welcome / Onboarding Message' },
+  { k:'welcome_msg',   label:'What welcome message should the athlete / parent receive after signing up?', type:'long_text' },
+  { k:'welcome_files', label:'Files to send with the welcome message', type:'files', hint:'PDFs, schedules, welcome packets, intro videos' },
+  // ── Section 6: Offer Assets ──
+  { type:'heading', label:'Offer Assets' },
+  { k:'assets', label:'Any assets specific to this offer', type:'files', hint:'Graphics, promo images, schedules, videos, PDFs' }
+];
+
+// ── Per-team form (each competitive team walks through this) ────────
+const TEAM_FORM = [
+  { type:'heading', label:'Team Information' },
+  { k:'team_name',  label:'Team name', type:'short_text', req:true, hint:'e.g. BAM 15U Black' },
+  { k:'age_group',  label:'Age group', type:'short_text', hint:'e.g. 15U' },
+  { k:'gender',     label:'Gender', type:'single_choice', options:['Boys','Girls'] },
+  { k:'team_level', label:'Team level', type:'short_text', hint:'e.g. Local, Rep, AAU, Elite' },
+  { k:'season',     label:'Season duration', type:'short_text', hint:'e.g. March to July, Full year, Fall only' },
+  { type:'heading', label:'Team Schedule' },
+  { k:'sched_consistent', label:'Is the practice schedule consistent week to week?', type:'yes_no', req:true },
+  { k:'sched_blocks', label:'Add your weekly practice schedule', type:'builder', fields:[{label:'Weekday',type:'combo',options:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']},{label:'Start time',type:'time'},{label:'End time',type:'time'},{label:'Location',type:'location'}], showIf:{ k:'sched_consistent', v:['Yes'] } },
+  { k:'sched_explain', label:'How are players informed about practices and schedule changes?', type:'long_text', showIf:{ k:'sched_consistent', v:['No'] } },
+  { type:'heading', label:'Team Tryouts' },
+  { k:'has_tryouts', label:'Does this team have tryouts?', type:'yes_no', req:true },
+  { k:'tryout_dates',    label:'Tryout date(s)', type:'short_text', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_times',    label:'Tryout time(s)', type:'short_text', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_location', label:'Tryout location', type:'short_text', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_cost',     label:'Tryout cost (optional)', type:'currency', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_capacity', label:'Maximum tryout capacity (optional)', type:'number', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_bring',    label:'What should athletes bring to tryouts?', type:'long_text', hint:'e.g. basketball, reversible jersey, water bottle', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { k:'tryout_collect',  label:'What information do you want to collect from tryout applicants?', type:'long_text', hint:'e.g. height, position, current team, highlight film, parent info, GPA', showIf:{ k:'has_tryouts', v:['Yes'] } },
+  { type:'heading', label:'Competition' },
+  { k:'leagues',          label:'What league(s) will this team participate in?', type:'short_text' },
+  { k:'tournaments',      label:'What tournament(s) will this team participate in?', type:'long_text' },
+  { k:'tournament_count', label:'Approximately how many tournaments will this team attend?', type:'number' },
+  { type:'heading', label:'Team Pricing' },
+  { k:'team_fee',          label:'Team fee / cost', type:'currency' },
+  { k:'payment_structure', label:'Payment structure', type:'single_choice', options:['Full payment','Monthly installments','Custom'] },
+  { k:'additional_fees',   label:'Are there any additional fees?', type:'long_text', hint:'e.g. uniforms, travel, tournament fees' },
+  { k:'team_discounts',    label:'Are there any discounts available?', type:'short_text', hint:'e.g. Sibling discount → 2SIBLING' },
+  { type:'heading', label:'Agreements & Policies' },
+  { type:'note', label:'Please upload a document or folder that contains all required agreements / policies for this team.' },
+  { k:'agreements',      label:'Confirm which agreements / policies your upload contains', type:'multi_choice', options:['Waiver','Media Release','Refund Policy','Cancellation Policy'] },
+  { k:'agreement_files', label:'Upload team agreements / policies', type:'files' },
+  { type:'note', label:CONFIRM_NOTE },
+  { type:'heading', label:'Team Onboarding' },
+  { k:'notify',        label:'Who should get notified when a player registers for this team?', type:'staff_select' },
+  { k:'communication', label:'How will players / parents primarily be communicated with throughout the season?', type:'long_text', hint:'e.g. TeamSnap, WhatsApp, Email, Instagram, Text, weekly newsletters, group chats' },
+  { type:'heading', label:'Welcome / Onboarding Message' },
+  { k:'welcome_msg',   label:'What welcome message should players / parents receive after joining?', type:'long_text' },
+  { k:'welcome_files', label:'Files to send with the welcome message', type:'files', hint:'Welcome packets, schedules, PDFs, intro videos' },
+  { type:'heading', label:'Team Assets' },
+  { k:'assets', label:'Upload team graphics / photos (optional)', type:'files' },
+  { k:'notes',  label:'Any additional notes about this team?', type:'long_text' }
+];
+
+// ── Sections ───────────────────────────────────────────────────────
+const RAW = [
+  { id:'business', name:'Business Basics',
+    purpose:'Core identity, your locations, and your staff — the foundation everything else builds on.',
+    questions:[
+      q({text:'What is your business display name?', type:'short_text', mandatory:true, hint:'How customers know you'}),
+      q({text:'What is your legal business name?', type:'short_text', mandatory:true}),
+      q({text:'What is your business address?', type:'long_text', mandatory:true}),
+      q({text:'What is your business entity type?', type:'single_choice', mandatory:true, options:['LLC','Sole Proprietorship','S-Corp','C-Corp','Partnership','Other']}),
+      q({text:'What is your EIN?', type:'short_text', mandatory:true}),
+      q({text:'Best contact phone number', type:'phone', mandatory:true}),
+      q({text:'Best contact email', type:'email', mandatory:true}),
+      q({text:'Your training locations', type:'builder', role:'locations', mandatory:true, hint:'Add every location you train at — you can pick these later when setting up schedules', fields:['Location name','Address']}),
+      q({text:'Your staff', type:'builder', role:'staff', mandatory:true, hint:'Add everyone on your team — you can pick them later for notifications', fields:[{label:'Name'},{label:'Phone'},{label:'Email'},{label:'Role'},{label:'Bio for website',type:'textarea'},{label:'Show on website',type:'checkbox'}]})
+    ]},
+  { id:'brand', name:'Branding',
+    purpose:'Your logos — the visual identity for your site and ads.',
+    questions:[
+      q({text:'Upload all your logo files', type:'files', mandatory:true, hint:'Dark, light, icon — add every version you have'})
+    ]},
+  { id:'website', name:'Website',
+    purpose:'What we need to build or refresh your website and booking funnel.',
+    questions:[
+      q({text:'Do you have an existing website?', type:'yes_no', mandatory:true}),
+      q({text:'Existing website URL', type:'url', showIf:{ k:'website_0', v:['Yes'] }}),
+      q({text:'Do you want a new site built, or your current one improved?', type:'single_choice', mandatory:true, options:['Build a new site','Keep and improve current site']}),
+      q({text:'What would you change or improve about your current site?', type:'long_text', mandatory:true, showIf:{ k:'website_2', v:['Keep and improve current site'] }}),
+      q({text:'Which domain provider do you use?', type:'single_choice', mandatory:true, options:['GoDaddy','Squarespace','Wix','Namecheap','Google Domains','Cloudflare','Other',"I don't have one yet"]}),
+      q({text:'Key stats or proof points to feature on the site', type:'long_text'}),
+      q({text:'Share 2-3 websites or brands whose look you love', type:'long_text'}),
+      q({text:'Upload your photos and videos', type:'files', hint:'Any images or video you want on the site — add as many as you like'})
+    ]},
+  { id:'training', name:'Training Setup',
+    purpose:'Every training offer you sell — add one for each. Each offer walks through its own full setup.',
+    questions:[
+      q({text:'Your training offers', type:'records', form:OFFER_FORM, recordLabel:'offer', titleKey:'name', badgeKey:'pricing_type', mandatory:true, hint:'Add an offer for each thing you sell. Each one has its own scheduling, pricing, agreements, and onboarding.'})
+    ]},
+  { id:'teams', name:'Team Programs',
+    purpose:'For academies that run competitive teams — your organization, then each team you run.',
+    questions:[
+      q({text:'Do you run competitive teams?', type:'yes_no', mandatory:true}),
+      q({text:'Organization-wide information', type:'heading', showIf:{ k:'teams_0', v:['Yes'] }}),
+      q({text:'What is the name of your club / team organization?', type:'short_text', mandatory:true, showIf:{ k:'teams_0', v:['Yes'] }}),
+      q({text:'Give a short description of your organization', type:'long_text', showIf:{ k:'teams_0', v:['Yes'] }}),
+      q({text:'What sets your program apart from other clubs?', type:'long_text', showIf:{ k:'teams_0', v:['Yes'] }, hint:'e.g. player development focus, exposure opportunities, culture, elite coaching, family environment, college recruitment support'}),
+      q({text:'Upload your team logo and branding assets', type:'files', showIf:{ k:'teams_0', v:['Yes'] }, hint:'Logo, jerseys, graphics, photos, brand guide'}),
+      q({text:'Your coaches / directors', type:'staff_select', showIf:{ k:'teams_0', v:['Yes'] }, hint:'Pick from your staff, or add new people'}),
+      q({text:'What are the main reasons parents / players choose your program?', type:'long_text', showIf:{ k:'teams_0', v:['Yes'] }, hint:'e.g. college exposure, skill development, winning culture, high-level competition, experienced coaches, character development, playing time philosophy'}),
+      q({text:'Your teams', type:'heading', showIf:{ k:'teams_0', v:['Yes'] }}),
+      q({text:'Your competitive teams', type:'records', form:TEAM_FORM, recordLabel:'team', titleKey:'team_name', badgeKey:'age_group', mandatory:true, showIf:{ k:'teams_0', v:['Yes'] }, hint:'Add every competitive team you run — each has its own schedule, tryouts, pricing, and onboarding.'})
+    ]},
+  { id:'connect', name:'Connect Accounts',
+    purpose:'Link the tools that run your payments, CRM, and ads.',
+    questions:[
+      q({text:'What is your current payment processor?', type:'single_choice', mandatory:true, options:['Stripe','Square','Other','None yet']}),
+      q({text:'Connect your Stripe account', type:'connect', mandatory:true}),
+      q({text:'Set up your GoHighLevel account', type:'link', mandatory:true,
+         hint:'BAM runs your CRM inside GoHighLevel. Click below to get your subscription set up — then come back and continue.'}),
+      q({text:'Other tools you currently use', type:'multi_choice', options:['CoachIQ','Acuity Scheduling','Square','Constant Contact','Mailchimp','Google Voice','Other']}),
+      q({text:'Connect your Meta / Facebook ad account', type:'connect', mandatory:true}),
+      q({text:'CSV of all contacts', type:'files', hint:'Drop in your contact export(s) — leads, prospects, anyone. You can attach files or paste links.'}),
+      q({text:'CSV of your current clients / members', type:'files', hint:'Drop in your client / member export(s)'})
+    ]}
+];
+
+// Build CONFIG with stable ids
+let CONFIG = [];
+function loadConfig(){
+  CONFIG = RAW.map(sec => {
+    // every section ends with an open "extra notes for our team" box
+    const questions = sec.questions.concat([
+      q({ text:'Extra notes for our team', type:'long_text',
+          hint:'Anything else about this section you want our team to know — optional' })
+    ]);
+    return {
+      id: sec.id, name: sec.name, purpose: sec.purpose,
+      questions: questions.map((qq,i) => Object.assign({}, qq, { id: sec.id + '_' + i }))
+    };
+  });
+}
+
+// ── State + persistence ────────────────────────────────────────────
+let state = { answers:{}, sectionIdx:0, completed:[], started:false, openOffer:null };
+
+function saveProgress(){
+  state.updated_at = new Date().toISOString();
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(state)); flashSaved(); } catch(e){}
+  syncToSupabase();
+}
+function loadProgress(){
+  try { const s = JSON.parse(localStorage.getItem(PROGRESS_KEY)); if (s && s.answers) return s; } catch(e){}
+  return null;
+}
+function clearProgress(){ try { localStorage.removeItem(PROGRESS_KEY); } catch(e){} }
+let saveFlagTimer;
+function flashSaved(){
+  const f = document.getElementById('save-flag'); if(!f) return;
+  f.classList.add('show'); clearTimeout(saveFlagTimer);
+  saveFlagTimer = setTimeout(()=>f.classList.remove('show'), 1600);
+}
+
+// ── Visibility / progress ──────────────────────────────────────────
+function visible(qq){
+  if (!qq.showIf) return true;
+  const a = state.answers[qq.showIf.k];
+  if (Array.isArray(a)) return qq.showIf.v.some(v=>a.includes(v));
+  return qq.showIf.v.includes(a);
+}
+function visibleQuestions(){
+  const out = [];
+  CONFIG.forEach(s => s.questions.forEach(qq => { if (visible(qq)) out.push(qq); }));
+  return out;
+}
+function overallPct(){
+  // Progress tracks REQUIRED completion — 100% means the client can finish.
+  const req = visibleQuestions().filter(qq=>qq.mandatory);
+  if (!req.length) return 100;
+  return Math.round(req.filter(answered).length / req.length * 100);
+}
+function sectionStats(sec){
+  const req = sec.questions.filter(qq=>visible(qq) && qq.mandatory);
+  return { done: req.filter(answered).length, total: req.length };
+}
+function updateProgress(){
+  const pct = overallPct();
+  const of = document.getElementById('overall-fill');
+  const op = document.getElementById('overall-pct');
+  if (of) of.style.width = pct + '%';
+  if (op) op.textContent = pct + '% complete';
+  const sec = CONFIG[state.sectionIdx];
+  if (sec){
+    const st = sectionStats(sec);
+    const sf = document.getElementById('sec-fill');
+    const sl = document.getElementById('sec-prog-label');
+    if (sf) sf.style.width = (st.total ? Math.round(st.done/st.total*100) : 100) + '%';
+    if (sl) sl.textContent = st.total ? (st.done + ' of ' + st.total + ' required') : 'all set';
+  }
+}
+
+// ── Boot / welcome ─────────────────────────────────────────────────
+function boot(){
+  loadConfig();
+  const saved = loadProgress();
+  const btns = document.getElementById('welcome-btns');
+  if (saved && saved.started && !saved.completedAll) {
+    state = Object.assign({ openOffer:null }, saved);
+    const sec = CONFIG[Math.min(state.sectionIdx, CONFIG.length-1)];
+    const pct = overallPct();
+    const note = document.getElementById('resume-note');
+    note.classList.remove('hidden');
+    note.innerHTML =
+      '<div class="rn-row"><span>Last on</span><b>'+sec.name+'</b></div>'+
+      '<div class="rn-row"><span>Sections done</span><b>'+state.completed.length+' of '+CONFIG.length+'</b></div>'+
+      '<div class="bar"><div class="bar-fill" style="width:'+pct+'%"></div></div>';
+    document.getElementById('welcome-title').textContent = 'Welcome back.';
+    document.getElementById('welcome-sub').textContent = 'Your setup is saved. Pick up where you left off, or start fresh.';
+    btns.innerHTML =
+      '<button class="btn btn-primary" onclick="startWizard(false)">Resume setup</button>'+
+      '<button class="btn btn-ghost" onclick="startOver()">Start over</button>';
+  } else {
+    btns.innerHTML = '<button class="btn btn-primary" onclick="startWizard(true)">Start setup</button>';
+  }
+}
+function startOver(){
+  if (!confirm('Start over? Everything you entered will be cleared.')) return;
+  clearProgress();
+  state = { answers:{}, sectionIdx:0, completed:[], started:false, openOffer:null };
+  startWizard(true);
+}
+function startWizard(fresh){
+  if (fresh) state.sectionIdx = 0;
+  state.started = true;
+  saveProgress();
+  enterWizard();
+}
+function resumeFromExit(){ enterWizard(); }
+function reviewAgain(){ state.sectionIdx = 0; enterWizard(); }
+function enterWizard(){
+  show('wizard');
+  document.getElementById('prog').classList.remove('hidden');
+  document.getElementById('footbar').classList.remove('hidden');
+  renderSection(true);
+}
+function show(which){
+  ['welcome','wizard','complete','exited'].forEach(id=>{
+    document.getElementById(id).classList.toggle('hidden', id!==which);
+  });
+  if (which!=='wizard'){
+    document.getElementById('prog').classList.add('hidden');
+    document.getElementById('footbar').classList.add('hidden');
+  }
+}
+
+// ── Render section ─────────────────────────────────────────────────
+function esc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function findQ(id){ for(const s of CONFIG){ for(const qq of s.questions){ if(qq.id===id) return qq; } } return null; }
+function isDriver(id){ return CONFIG.some(s=>s.questions.some(x=>x.showIf && x.showIf.k===id)); }
+
+function renderSection(scrollTop){
+  const sec = CONFIG[state.sectionIdx];
+  document.getElementById('pips').innerHTML = CONFIG.map((s,i)=>{
+    const done = state.completed.includes(s.id);
+    const isActive = i===state.sectionIdx;
+    const cls = 'step'+(isActive?' active':done?' done':'')+(isActive?'':' clickable');
+    const short = esc((s.name.split(' ')[0])||s.name);
+    return '<div class="'+cls+'" title="'+esc(s.name)+'"'+(isActive?'':' onclick="jumpTo('+i+')"')+'>'+
+      '<div class="step-bar2"></div><div class="step-name">'+short+'</div></div>';
+  }).join('');
+  document.getElementById('prog-label').textContent = 'Section '+(state.sectionIdx+1)+' of '+CONFIG.length;
+
+  let html = '<div class="eyebrow">Step '+(state.sectionIdx+1)+' — '+esc(sec.name)+'</div>';
+  html += '<h1 class="sec-title">'+esc(sec.name)+'</h1>';
+  html += '<p class="sec-purpose">'+esc(sec.purpose)+'</p>';
+  html += '<div class="sec-prog"><div class="bar"><div class="bar-fill" id="sec-fill"></div></div>'+
+          '<span class="sec-prog-label" id="sec-prog-label"></span></div>';
+  sec.questions.forEach(qq=>{ if (visible(qq)) html += renderQuestion(qq); });
+  document.getElementById('wizard').innerHTML = html;
+
+  document.getElementById('back-btn').disabled = state.sectionIdx===0;
+  document.getElementById('next-btn').textContent = state.sectionIdx===CONFIG.length-1 ? 'Finish' : 'Continue';
+  if (scrollTop) window.scrollTo(0,0);
+  updateProgress();
+}
+function jumpTo(i){
+  if (i===state.sectionIdx || i<0 || i>=CONFIG.length) return;
+  // free navigation — jump to any section, forward or back, anytime
+  state.sectionIdx = i; state.openOffer = null; saveProgress(); renderSection(true);
+}
+
+function renderQuestion(qq){
+  if(qq.type==='heading') return '<div class="sec-subhead">'+esc(qq.text)+'</div>';
+  const a = state.answers[qq.id];
+  const req = qq.mandatory ? '<span class="q-req">*</span>' : '';
+  let body = '';
+  switch(qq.type){
+    case 'short_text': case 'email': case 'phone': case 'url': {
+      const it = qq.type==='email'?'email':qq.type==='phone'?'tel':qq.type==='url'?'url':'text';
+      body = '<input class="field" type="'+it+'" value="'+esc(a||'')+'" oninput="setText(\''+qq.id+'\',this.value)">';
+      break;
+    }
+    case 'long_text': {
+      const tid='ta_'+qq.id;
+      body = '<div class="ta-wrap"><textarea class="field" id="'+tid+'" oninput="setText(\''+qq.id+'\',this.value)">'+esc(a||'')+'</textarea>'+micBtn(tid)+'</div>';
+      break;
+    }
+    case 'number':
+      body = '<input class="field" type="number" value="'+esc(a||'')+'" oninput="setText(\''+qq.id+'\',this.value)">';
+      break;
+    case 'currency':
+      body = '<div class="field-pre"><span class="pre">$</span><input class="field" type="number" step="0.01" value="'+esc(a||'')+'" oninput="setText(\''+qq.id+'\',this.value)"></div>';
+      break;
+    case 'yes_no':
+      body = '<div class="yn">'+['Yes','No'].map(v=>'<div class="yn-btn'+(a===v?' sel':'')+'" onclick="setYN(\''+qq.id+'\',\''+v+'\')">'+v+'</div>').join('')+'</div>';
+      break;
+    case 'single_choice':
+      body = '<div class="opts">'+qq.options.map((o,oi)=>'<div class="opt'+(a===o?' sel':'')+'" onclick="setOption(\''+qq.id+'\','+oi+')"><div class="opt-mark radio">'+(a===o?'●':'')+'</div><div class="opt-txt">'+esc(o)+'</div></div>').join('')+'</div>';
+      body += otherBox(qq.id, qq.options, a==='Other', qq.otherBig);
+      break;
+    case 'multi_choice': {
+      const arr = Array.isArray(a)?a:[];
+      body = '<div class="opts">'+qq.options.map((o,oi)=>'<div class="opt'+(arr.includes(o)?' sel':'')+'" onclick="toggleMulti(\''+qq.id+'\','+oi+')"><div class="opt-mark check">'+(arr.includes(o)?'✓':'')+'</div><div class="opt-txt">'+esc(o)+'</div></div>').join('')+'</div>';
+      body += otherBox(qq.id, qq.options, arr.indexOf('Other')>=0, qq.otherBig);
+      break;
+    }
+    case 'staff_select': {
+      const staff=getStaff(), arr=Array.isArray(a)?a:[];
+      body = '<div class="opts">'+staff.map((s,si)=>{
+        const nm=(s&&s['Name'])||('Staff '+(si+1));
+        return '<div class="opt'+(arr.includes(nm)?' sel':'')+'" onclick="staffPick(\''+qq.id+'\','+si+')"><div class="opt-mark check">'+(arr.includes(nm)?'✓':'')+'</div><div class="opt-txt">'+esc(nm)+'</div></div>';
+      }).join('')+'</div>';
+      body += '<div class="link-add"><input class="field link-add-input" id="sa_'+qq.id+'" type="text" placeholder="Add a new person…"><button type="button" class="link-add-btn" onclick="staffAdd(\''+qq.id+'\')">Add</button></div>';
+      break;
+    }
+    case 'file':
+      body = '<div class="dropzone'+(a?' has':'')+'" onclick="document.getElementById(\'f_'+qq.id+'\').click()">'+
+        (a?'✓ '+esc(a):'↑ Click to attach a file')+
+        '<input type="file" id="f_'+qq.id+'" style="display:none" onchange="setFile(\''+qq.id+'\',this)"></div>';
+      break;
+    case 'files': {
+      const arr = Array.isArray(a)?a:[];
+      const list = arr.map((n,fi)=>{
+        const isLink=/^https?:\/\//i.test(n);
+        return '<div class="file-row">'+(isLink?'🔗':'✓')+' '+esc(n)+
+          '<button type="button" class="file-x" onclick="event.stopPropagation();removeFile(\''+qq.id+'\','+fi+')">×</button></div>';
+      }).join('');
+      body = '<div class="dropzone'+(arr.length?' has':'')+'" onclick="document.getElementById(\'f_'+qq.id+'\').click()">'+
+        (arr.length ? list+'<div class="dz-more">+ click to add more</div>' : '↑ Click to attach files — pick as many as you need')+
+        '<input type="file" id="f_'+qq.id+'" multiple style="display:none" onchange="setFiles(\''+qq.id+'\',this)"></div>'+
+        '<div class="link-add"><input class="field link-add-input" id="lk_'+qq.id+'" type="url" placeholder="…or paste a Google Drive / file link">'+
+        '<button type="button" class="link-add-btn" onclick="addFileLink(\''+qq.id+'\')">Add link</button></div>';
+      break;
+    }
+    case 'connect': {
+      const done = a==='connected';
+      body = '<button class="connect-btn'+(done?' done':'')+'" '+(done?'disabled':'onclick="doConnect(\''+qq.id+'\')"')+'>'+(done?'✓ Connected':'Connect →')+'</button>';
+      break;
+    }
+    case 'link': {
+      const done = a==='done';
+      body = '<div class="link-box"><p>'+esc(qq.hint||'')+'</p>'+
+        '<button class="link-btn" onclick="doLink(\''+qq.id+'\')">Get your GoHighLevel →</button>'+
+        (done?'<div class="link-done">✓ Opened — finish in the new tab, then continue here.</div>':'')+'</div>';
+      break;
+    }
+    case 'builder':
+      body = renderBuilder(qq, a);
+      break;
+    case 'records':
+      body = renderOffers(qq, a);
+      break;
+    default:
+      body = '<input class="field" type="text" value="'+esc(a||'')+'" oninput="setText(\''+qq.id+'\',this.value)">';
+  }
+  const hint = (qq.hint && qq.type!=='link') ? '<div class="q-hint">'+esc(qq.hint)+'</div>' : '';
+  return '<div class="q" id="qw_'+qq.id+'"><div class="q-label">'+esc(qq.type==='link'?qq.text:qq.text)+req+'</div>'+hint+body+'</div>';
+}
+
+// ── Cross-section data (staff + locations defined in Business Basics) ──
+function getStaff(){
+  for(const s of CONFIG){ for(const qq of s.questions){ if(qq.role==='staff') return Array.isArray(state.answers[qq.id])?state.answers[qq.id]:[]; } }
+  return [];
+}
+function getLocations(){
+  for(const s of CONFIG){ for(const qq of s.questions){ if(qq.role==='locations') return Array.isArray(state.answers[qq.id])?state.answers[qq.id]:[]; } }
+  return [];
+}
+// ── "Other → please specify" box — auto-applied to any choice with an "Other" option ──
+function otherBox(id, options, shown, big){
+  if(!shown || (options||[]).indexOf('Other')<0) return '';
+  const set='setText(\''+id+'__other\',this.value)', cur=esc(state.answers[id+'__other']||'');
+  if(big) return '<textarea class="field other-box" placeholder="Please describe…" oninput="'+set+'">'+cur+'</textarea>';
+  return '<input class="field other-box" type="text" placeholder="Please specify…" value="'+cur+'" oninput="'+set+'">';
+}
+function offerOtherBox(qid,oi,of,k,options,shown,big){
+  if(!shown || (options||[]).indexOf('Other')<0) return '';
+  const set='offerText(\''+qid+'\','+oi+',\''+k+'__other\',this.value)', cur=esc(of[k+'__other']||'');
+  if(big) return '<textarea class="field other-box" placeholder="Please describe…" oninput="'+set+'">'+cur+'</textarea>';
+  return '<input class="field other-box" type="text" placeholder="Please specify…" value="'+cur+'" oninput="'+set+'">';
+}
+// ── Builder ────────────────────────────────────────────────────────
+// A builder field is a string (= text) or { label, type, options }.
+function builderCell(fd, val, setPrefix, toggleCall){
+  const type=(fd && typeof fd==='object' && fd.type) || 'text';
+  const label=(fd && typeof fd==='object') ? fd.label : fd;
+  if(type==='checkbox'){
+    const on=val===true;
+    return '<div class="bchk'+(on?' on':'')+'" onclick="'+toggleCall+'"><div class="bchk-box">'+(on?'✓':'')+'</div><div class="bchk-label">'+esc(label)+'</div></div>';
+  }
+  let input;
+  if(type==='textarea'){
+    input='<textarea class="field" oninput="'+setPrefix+',this.value)">'+esc(val||'')+'</textarea>';
+  } else if(type==='time'){
+    input='<input class="field" type="time" value="'+esc(val||'')+'" onchange="'+setPrefix+',this.value)">';
+  } else if(type==='combo'){
+    const dl='dl'+(builderCell._n=(builderCell._n||0)+1);
+    input='<input class="field" list="'+dl+'" value="'+esc(val||'')+'" oninput="'+setPrefix+',this.value)">'+
+      '<datalist id="'+dl+'">'+((fd.options)||[]).map(o=>'<option value="'+esc(o)+'"></option>').join('')+'</datalist>';
+  } else if(type==='location'){
+    const locs=getLocations();
+    input='<select class="field" onchange="'+setPrefix+',this.value)"><option value="">Select a location…</option>'+
+      locs.map(l=>{const n=(l&&l['Location name'])||'';return n?('<option value="'+esc(n)+'"'+(val===n?' selected':'')+'>'+esc(n)+'</option>'):'';}).join('')+'</select>';
+  } else {
+    input='<input class="field" type="text" value="'+esc(val||'')+'" oninput="'+setPrefix+',this.value)">';
+  }
+  return '<div><div class="builder-sub-label">'+esc(label)+'</div>'+input+'</div>';
+}
+function renderBuilder(qq, a){
+  const rows = Array.isArray(a)?a:[];
+  let html = '<div class="builder-box">';
+  if (!rows.length) html += '<div class="builder-empty">None added yet.</div>';
+  rows.forEach((row,ri)=>{
+    html += '<div class="builder-row"><button class="builder-remove" onclick="builderRemove(\''+qq.id+'\','+ri+')">×</button>'+
+      '<div class="builder-row-head">'+esc(qq.text)+' '+(ri+1)+'</div>';
+    qq.fields.forEach(fd=>{
+      const label=(fd && typeof fd==='object')?fd.label:fd;
+      const eL=esc(label).replace(/'/g,"\\'");
+      const setPrefix="builderSet('"+qq.id+"',"+ri+",'"+eL+"'";
+      const toggleCall="builderToggle('"+qq.id+"',"+ri+",'"+eL+"')";
+      html += builderCell(fd, row[label], setPrefix, toggleCall);
+    });
+    html += '</div>';
+  });
+  html += '<button class="builder-add" onclick="builderAdd(\''+qq.id+'\')">+ Add</button></div>';
+  return html;
+}
+
+// ── Offers (conditional builder) ───────────────────────────────────
+// Generic repeating-record builder — used for both offers and teams.
+function renderOffers(qq, a){
+  const recs = Array.isArray(a)?a:[];
+  const form = qq.form||[], rl = qq.recordLabel||'offer';
+  let html = '<div class="offers-box">';
+  if (!recs.length) html += '<div class="builder-empty">No '+esc(rl)+'s yet.</div>';
+  recs.forEach((of,oi)=>{
+    const open = state.openOffer===oi;
+    const bv = qq.badgeKey ? of[qq.badgeKey] : '';
+    const badge = bv ? '<span class="offer-badge">'+esc(bv)+'</span>' : '';
+    const title = (qq.titleKey && of[qq.titleKey]) ? esc(of[qq.titleKey]) : ('Untitled '+esc(rl));
+    html += '<div class="offer-card">'+
+      '<div class="offer-head" onclick="toggleOffer('+oi+')">'+
+        '<span class="offer-caret">'+(open?'▾':'▸')+'</span>'+
+        '<span class="offer-title">'+title+'</span>'+badge+
+        '<button class="offer-x" onclick="event.stopPropagation();removeOffer(\''+qq.id+'\','+oi+')">×</button>'+
+      '</div>';
+    if (open){
+      html += '<div class="offer-form">';
+      form.forEach(f=>{
+        if (f.showIf && !f.showIf.v.includes(of[f.showIf.k])) return;
+        html += renderOfferField(qq.id, oi, of, f);
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '<button class="builder-add" onclick="addOffer(\''+qq.id+'\')">+ Add a '+esc(rl)+'</button></div>';
+  return html;
+}
+function renderOfferField(qid, oi, of, f){
+  if(f.type==='heading') return '<div class="offer-heading">'+esc(f.label)+'</div>';
+  if(f.type==='note') return '<div class="offer-note">'+esc(f.label)+'</div>';
+  if(f.type==='confirm'){
+    const on=of[f.k]===true;
+    return '<div class="offer-field"><div class="confirm-box'+(on?' on':'')+'" onclick="offerConfirmToggle(\''+qid+'\','+oi+',\''+f.k+'\')">'+
+      '<div class="confirm-mark">'+(on?'✓':'')+'</div>'+
+      '<div class="confirm-txt">'+esc(f.label)+(f.req?' <span class="q-req">*</span>':'')+'</div></div></div>';
+  }
+  const v = of[f.k];
+  const req = f.req ? '<span class="q-req">*</span>' : '';
+  let inner = '';
+  switch(f.type){
+    case 'short_text':
+      inner = '<input class="field" type="text" value="'+esc(v||'')+'" oninput="offerText(\''+qid+'\','+oi+',\''+f.k+'\',this.value)">';
+      break;
+    case 'long_text': {
+      const tid='ota_'+qid+'_'+oi+'_'+f.k;
+      inner = '<div class="ta-wrap"><textarea class="field" id="'+tid+'" oninput="offerText(\''+qid+'\','+oi+',\''+f.k+'\',this.value)">'+esc(v||'')+'</textarea>'+micBtn(tid)+'</div>';
+      break;
+    }
+    case 'number':
+      inner = '<input class="field" type="number" value="'+esc(v||'')+'" oninput="offerText(\''+qid+'\','+oi+',\''+f.k+'\',this.value)">';
+      break;
+    case 'currency':
+      inner = '<div class="field-pre"><span class="pre">$</span><input class="field" type="number" step="0.01" value="'+esc(v||'')+'" oninput="offerText(\''+qid+'\','+oi+',\''+f.k+'\',this.value)"></div>';
+      break;
+    case 'single_choice':
+      inner = '<div class="opts">'+f.options.map((o,k)=>'<div class="opt'+(v===o?' sel':'')+'" onclick="offerChoice(\''+qid+'\','+oi+',\''+f.k+'\','+k+')"><div class="opt-mark radio">'+(v===o?'●':'')+'</div><div class="opt-txt">'+esc(o)+'</div></div>').join('')+'</div>';
+      inner += offerOtherBox(qid,oi,of,f.k,f.options,v==='Other',f.otherBig);
+      break;
+    case 'multi_choice': {
+      const arr=Array.isArray(v)?v:[];
+      inner = '<div class="opts">'+f.options.map((o,k)=>'<div class="opt'+(arr.includes(o)?' sel':'')+'" onclick="offerMulti(\''+qid+'\','+oi+',\''+f.k+'\','+k+')"><div class="opt-mark check">'+(arr.includes(o)?'✓':'')+'</div><div class="opt-txt">'+esc(o)+'</div></div>').join('')+'</div>';
+      inner += offerOtherBox(qid,oi,of,f.k,f.options,arr.indexOf('Other')>=0,f.otherBig);
+      break;
+    }
+    case 'staff_select': {
+      const staff=getStaff(), arr=Array.isArray(v)?v:[];
+      inner='<div class="opts">'+staff.map((s,si)=>{
+        const nm=(s&&s['Name'])||('Staff '+(si+1));
+        return '<div class="opt'+(arr.includes(nm)?' sel':'')+'" onclick="offerStaffPick(\''+qid+'\','+oi+',\''+f.k+'\','+si+')"><div class="opt-mark check">'+(arr.includes(nm)?'✓':'')+'</div><div class="opt-txt">'+esc(nm)+'</div></div>';
+      }).join('')+'</div>';
+      const lid='osa_'+qid+'_'+oi+'_'+f.k;
+      inner+='<div class="link-add"><input class="field link-add-input" id="'+lid+'" type="text" placeholder="Add a new person…"><button type="button" class="link-add-btn" onclick="offerStaffAdd(\''+qid+'\','+oi+',\''+f.k+'\')">Add</button></div>';
+      break;
+    }
+    case 'yes_no':
+      inner = '<div class="yn">'+['Yes','No'].map(o=>'<div class="yn-btn'+(v===o?' sel':'')+'" onclick="offerYN(\''+qid+'\','+oi+',\''+f.k+'\',\''+o+'\')">'+o+'</div>').join('')+'</div>';
+      break;
+    case 'files': {
+      const arr=Array.isArray(v)?v:[];
+      const fid='of_'+qid+'_'+oi+'_'+f.k, lid='olk_'+qid+'_'+oi+'_'+f.k;
+      const list=arr.map((n,fi)=>{
+        const isLink=/^https?:\/\//i.test(n);
+        return '<div class="file-row">'+(isLink?'🔗':'✓')+' '+esc(n)+'<button type="button" class="file-x" onclick="event.stopPropagation();offerFileRemove(\''+qid+'\','+oi+',\''+f.k+'\','+fi+')">×</button></div>';
+      }).join('');
+      inner = '<div class="dropzone'+(arr.length?' has':'')+'" onclick="document.getElementById(\''+fid+'\').click()">'+
+        (arr.length ? list+'<div class="dz-more">+ click to add more</div>' : '↑ Click to attach files — pick as many as you need')+
+        '<input type="file" id="'+fid+'" multiple style="display:none" onchange="offerFiles(\''+qid+'\','+oi+',\''+f.k+'\',this)"></div>'+
+        '<div class="link-add"><input class="field link-add-input" id="'+lid+'" type="url" placeholder="…or paste a Google Drive / file link">'+
+        '<button type="button" class="link-add-btn" onclick="offerFileLink(\''+qid+'\','+oi+',\''+f.k+'\')">Add link</button></div>';
+      break;
+    }
+    case 'builder': {
+      const rows=Array.isArray(v)?v:[];
+      let b='<div class="builder-box">';
+      if(!rows.length) b+='<div class="builder-empty">None added yet.</div>';
+      rows.forEach((row,ri)=>{
+        b+='<div class="builder-row"><button class="builder-remove" onclick="offerBuilderRemove(\''+qid+'\','+oi+',\''+f.k+'\','+ri+')">×</button>'+
+          '<div class="builder-row-head">'+esc(f.label)+' '+(ri+1)+'</div>';
+        f.fields.forEach(fd=>{
+          const label=(fd && typeof fd==='object')?fd.label:fd;
+          const eL=esc(label).replace(/'/g,"\\'");
+          const setPrefix="offerBuilderSet('"+qid+"',"+oi+",'"+f.k+"',"+ri+",'"+eL+"'";
+          const toggleCall="offerBuilderToggle('"+qid+"',"+oi+",'"+f.k+"',"+ri+",'"+eL+"')";
+          b+=builderCell(fd, row[label], setPrefix, toggleCall);
+        });
+        b+='</div>';
+      });
+      b+='<button class="builder-add" onclick="offerBuilderAdd(\''+qid+'\','+oi+',\''+f.k+'\')">+ Add</button></div>';
+      inner=b;
+      break;
+    }
+  }
+  return '<div class="offer-field"><div class="q-label">'+esc(f.label)+req+'</div>'+
+    (f.hint?'<div class="q-hint">'+esc(f.hint)+'</div>':'')+inner+'</div>';
+}
+
+// ── Answer handlers ────────────────────────────────────────────────
+function setText(id,val){ state.answers[id]=val; saveProgress(); clearMissing(id); updateProgress(); }
+function setYN(id,val){
+  state.answers[id]=val; saveProgress(); clearMissing(id);
+  if (isDriver(id)) { renderSection(); return; } // re-render only if it gates other questions
+  const wrap=document.getElementById('qw_'+id);
+  wrap.querySelectorAll('.yn-btn').forEach(el=>el.classList.toggle('sel', el.textContent===val));
+  updateProgress();
+}
+function setOption(id,idx){
+  const qq=findQ(id); if(!qq) return;
+  state.answers[id]=qq.options[idx]; saveProgress(); clearMissing(id);
+  if (isDriver(id)) { renderSection(); return; } // re-render only if it gates other questions
+  const wrap=document.getElementById('qw_'+id);
+  wrap.querySelectorAll('.opt').forEach((el,i)=>{
+    const on=i===idx;
+    el.classList.toggle('sel',on);
+    const m=el.querySelector('.opt-mark'); if(m) m.textContent=on?'●':'';
+  });
+  updateProgress();
+}
+function toggleMulti(id,idx){
+  const qq=findQ(id); if(!qq) return;
+  const val=qq.options[idx];
+  let arr=Array.isArray(state.answers[id])?state.answers[id]:[];
+  const i=arr.indexOf(val);
+  if(i===-1) arr.push(val); else arr.splice(i,1);
+  state.answers[id]=arr; saveProgress(); clearMissing(id);
+  const wrap=document.getElementById('qw_'+id);
+  wrap.querySelectorAll('.opt').forEach((el,oi)=>{
+    const on=arr.includes(qq.options[oi]);
+    el.classList.toggle('sel',on);
+    const m=el.querySelector('.opt-mark'); if(m) m.textContent=on?'✓':'';
+  });
+  updateProgress();
+}
+function setFile(id,input){
+  const f=input.files&&input.files[0];
+  state.answers[id]=f?f.name:''; saveProgress(); clearMissing(id); renderSection();
+}
+function setFiles(id,input){
+  const names=input.files?Array.prototype.slice.call(input.files).map(f=>f.name):[];
+  if(!names.length) return;
+  const prev=Array.isArray(state.answers[id])?state.answers[id]:[];
+  state.answers[id]=prev.concat(names);
+  input.value=''; saveProgress(); clearMissing(id); renderSection();
+}
+function removeFile(id,fi){
+  if(Array.isArray(state.answers[id])) state.answers[id].splice(fi,1);
+  saveProgress(); clearMissing(id); renderSection();
+}
+function addFileLink(id){
+  const inp=document.getElementById('lk_'+id);
+  const v=(inp && inp.value || '').trim();
+  if(!v){ toast('Paste a link first'); return; }
+  const prev=Array.isArray(state.answers[id])?state.answers[id]:[];
+  state.answers[id]=prev.concat([v]);
+  saveProgress(); clearMissing(id); renderSection();
+}
+function doConnect(id){
+  state.answers[id]='connected'; saveProgress(); clearMissing(id); renderSection();
+  toast('Connected (demo — real OAuth wires in later)');
+}
+function doLink(id){
+  state.answers[id]='done'; saveProgress(); clearMissing(id);
+  try { window.open(GHL_SIGNUP_URL,'_blank'); } catch(e){}
+  renderSection();
+}
+
+// builder
+function builderAdd(id){ if(!Array.isArray(state.answers[id])) state.answers[id]=[]; state.answers[id].push({}); saveProgress(); renderSection(); }
+function builderRemove(id,ri){ if(Array.isArray(state.answers[id])) state.answers[id].splice(ri,1); saveProgress(); clearMissing(id); renderSection(); }
+function builderSet(id,ri,field,val){
+  if(!Array.isArray(state.answers[id])) state.answers[id]=[];
+  if(!state.answers[id][ri]) state.answers[id][ri]={};
+  state.answers[id][ri][field]=val; saveProgress(); clearMissing(id); updateProgress();
+}
+function builderToggle(id,ri,field){
+  if(!Array.isArray(state.answers[id])) state.answers[id]=[];
+  if(!state.answers[id][ri]) state.answers[id][ri]={};
+  state.answers[id][ri][field]=!state.answers[id][ri][field];
+  saveProgress(); clearMissing(id); renderSection();
+}
+
+// offers
+function addOffer(id){
+  if(!Array.isArray(state.answers[id])) state.answers[id]=[];
+  state.answers[id].push({});
+  state.openOffer=state.answers[id].length-1;
+  saveProgress(); renderSection();
+}
+function removeOffer(id,oi){
+  if(Array.isArray(state.answers[id])) state.answers[id].splice(oi,1);
+  if(state.openOffer===oi) state.openOffer=null;
+  else if(typeof state.openOffer==='number' && state.openOffer>oi) state.openOffer--;
+  saveProgress(); clearMissing(id); renderSection();
+}
+function toggleOffer(oi){ state.openOffer = state.openOffer===oi?null:oi; renderSection(); }
+function offerText(id,oi,k,val){
+  state.answers[id][oi][k]=val; saveProgress(); clearMissing(id); updateProgress();
+}
+function offerChoice(id,oi,k,idx){
+  const form=(findQ(id)||{}).form||[];
+  const f=form.find(x=>x.k===k);
+  state.answers[id][oi][k]=f.options[idx]; saveProgress(); clearMissing(id); renderSection();
+}
+function offerYN(id,oi,k,val){ state.answers[id][oi][k]=val; saveProgress(); renderSection(); }
+function offerFile(id,oi,k,input){
+  const f=input.files&&input.files[0];
+  state.answers[id][oi][k]=f?f.name:''; saveProgress(); renderSection();
+}
+function offerMulti(id,oi,k,idx){
+  const form=(findQ(id)||{}).form||[];
+  const f=form.find(x=>x.k===k); const val=f.options[idx];
+  let arr=Array.isArray(state.answers[id][oi][k])?state.answers[id][oi][k]:[];
+  const i=arr.indexOf(val); if(i===-1) arr.push(val); else arr.splice(i,1);
+  state.answers[id][oi][k]=arr; saveProgress(); renderSection();
+}
+function offerFiles(id,oi,k,input){
+  const names=input.files?Array.prototype.slice.call(input.files).map(f=>f.name):[];
+  if(!names.length) return;
+  const prev=Array.isArray(state.answers[id][oi][k])?state.answers[id][oi][k]:[];
+  state.answers[id][oi][k]=prev.concat(names); input.value='';
+  saveProgress(); renderSection();
+}
+function offerFileLink(id,oi,k){
+  const inp=document.getElementById('olk_'+id+'_'+oi+'_'+k);
+  const v=(inp && inp.value || '').trim();
+  if(!v){ toast('Paste a link first'); return; }
+  const prev=Array.isArray(state.answers[id][oi][k])?state.answers[id][oi][k]:[];
+  state.answers[id][oi][k]=prev.concat([v]); saveProgress(); renderSection();
+}
+function offerFileRemove(id,oi,k,fi){
+  if(Array.isArray(state.answers[id][oi][k])) state.answers[id][oi][k].splice(fi,1);
+  saveProgress(); renderSection();
+}
+function offerBuilderAdd(id,oi,k){
+  if(!Array.isArray(state.answers[id][oi][k])) state.answers[id][oi][k]=[];
+  state.answers[id][oi][k].push({}); saveProgress(); renderSection();
+}
+function offerBuilderSet(id,oi,k,ri,field,val){
+  if(!Array.isArray(state.answers[id][oi][k])) state.answers[id][oi][k]=[];
+  if(!state.answers[id][oi][k][ri]) state.answers[id][oi][k][ri]={};
+  state.answers[id][oi][k][ri][field]=val; saveProgress();
+}
+function offerBuilderRemove(id,oi,k,ri){
+  if(Array.isArray(state.answers[id][oi][k])) state.answers[id][oi][k].splice(ri,1);
+  saveProgress(); renderSection();
+}
+function offerBuilderToggle(id,oi,k,ri,field){
+  if(!Array.isArray(state.answers[id][oi][k])) state.answers[id][oi][k]=[];
+  if(!state.answers[id][oi][k][ri]) state.answers[id][oi][k][ri]={};
+  state.answers[id][oi][k][ri][field]=!state.answers[id][oi][k][ri][field];
+  saveProgress(); renderSection();
+}
+function offerConfirmToggle(id,oi,k){
+  state.answers[id][oi][k]=!state.answers[id][oi][k];
+  saveProgress(); renderSection();
+}
+function offerStaffPick(id,oi,k,si){
+  const staff=getStaff(), s=staff[si]; if(!s) return;
+  const nm=(s['Name'])||('Staff '+(si+1));
+  let arr=Array.isArray(state.answers[id][oi][k])?state.answers[id][oi][k]:[];
+  const i=arr.indexOf(nm); if(i===-1) arr.push(nm); else arr.splice(i,1);
+  state.answers[id][oi][k]=arr; saveProgress(); renderSection();
+}
+function addStaffMember(name){
+  for(const s of CONFIG){ for(const qq of s.questions){ if(qq.role==='staff'){
+    if(!Array.isArray(state.answers[qq.id])) state.answers[qq.id]=[];
+    state.answers[qq.id].push({Name:name}); return true;
+  } } }
+  return false;
+}
+function staffPick(id,si){
+  const staff=getStaff(), s=staff[si]; if(!s) return;
+  const nm=(s['Name'])||('Staff '+(si+1));
+  let arr=Array.isArray(state.answers[id])?state.answers[id]:[];
+  const i=arr.indexOf(nm); if(i===-1) arr.push(nm); else arr.splice(i,1);
+  state.answers[id]=arr; saveProgress(); clearMissing(id); renderSection();
+}
+function staffAdd(id){
+  const inp=document.getElementById('sa_'+id);
+  const nm=(inp && inp.value || '').trim();
+  if(!nm){ toast('Type a name first'); return; }
+  addStaffMember(nm);
+  let arr=Array.isArray(state.answers[id])?state.answers[id]:[];
+  arr.push(nm); state.answers[id]=arr;
+  saveProgress(); clearMissing(id); renderSection();
+}
+function offerStaffAdd(id,oi,k){
+  const inp=document.getElementById('osa_'+id+'_'+oi+'_'+k);
+  const nm=(inp && inp.value || '').trim();
+  if(!nm){ toast('Type a name first'); return; }
+  addStaffMember(nm);
+  let arr=Array.isArray(state.answers[id][oi][k])?state.answers[id][oi][k]:[];
+  arr.push(nm); state.answers[id][oi][k]=arr;
+  saveProgress(); renderSection();
+}
+
+// ── Validation ─────────────────────────────────────────────────────
+function answered(qq){
+  const a=state.answers[qq.id];
+  if(a==null) return false;
+  if(qq.type==='multi_choice') return Array.isArray(a)&&a.length>0;
+  if(qq.type==='builder') return Array.isArray(a)&&a.some(r=>Object.values(r).some(v=>v!==true&&v!==false&&String(v||'').trim()));
+  if(qq.type==='records') return Array.isArray(a)&&a.some(o=>o&&String(o[qq.titleKey]||'').trim());
+  if(qq.type==='files') return Array.isArray(a)&&a.length>0;
+  if(qq.type==='confirm') return a===true;
+  if(qq.type==='staff_select') return Array.isArray(a)&&a.length>0;
+  if(qq.type==='connect') return a==='connected';
+  if(qq.type==='link') return a==='done';
+  return String(a).trim().length>0;
+}
+function clearMissing(id){ const el=document.getElementById('qw_'+id); if(el) el.classList.remove('missing'); }
+
+// ── Navigation ─────────────────────────────────────────────────────
+function nextSection(){
+  const sec=CONFIG[state.sectionIdx];
+  const miss=sec.questions.filter(qq=>qq.mandatory && visible(qq) && !answered(qq));
+  if(miss.length){
+    sec.questions.forEach(qq=>{
+      const el=document.getElementById('qw_'+qq.id);
+      if(el) el.classList.toggle('missing', qq.mandatory && visible(qq) && !answered(qq));
+    });
+    const first=document.getElementById('qw_'+miss[0].id);
+    if(first && first.scrollIntoView) first.scrollIntoView({behavior:'smooth',block:'center'});
+    toast(miss.length+' required '+(miss.length>1?'questions':'question')+' still need an answer');
+    return;
+  }
+  if(!state.completed.includes(sec.id)) state.completed.push(sec.id);
+  if(state.sectionIdx===CONFIG.length-1){ finishWizard(); return; }
+  state.sectionIdx++; state.openOffer=null; saveProgress(); renderSection(true);
+}
+function prevSection(){
+  if(state.sectionIdx===0) return;
+  state.sectionIdx--; state.openOffer=null; saveProgress(); renderSection(true);
+}
+function finishWizard(){
+  state.completedAll=true; state.completed_at=new Date().toISOString();
+  saveProgress(); show('complete');
+}
+function saveAndExit(){ saveProgress(); show('exited'); }
+
+// ── Toast ──────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ── Voice input (Web Speech API) ───────────────────────────────────
+function micBtn(taId){
+  if(!SPEECH_OK) return '';
+  return '<button type="button" class="mic-btn" id="mic_'+taId+'" title="Speak to fill this in" onclick="micToggle(\''+taId+'\')">&#127908;</button>';
+}
+let _recog=null,_recogTarget=null;
+function micToggle(taId){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toast('Voice input is not supported in this browser'); return; }
+  if(_recog){ const same=_recogTarget===taId; try{_recog.stop();}catch(e){} _recog=null; _recogTarget=null; if(same) return; }
+  const ta=document.getElementById(taId), btn=document.getElementById('mic_'+taId);
+  if(!ta) return;
+  const r=new SR();
+  r.lang='en-US'; r.continuous=true; r.interimResults=false;
+  _recog=r; _recogTarget=taId;
+  if(btn) btn.classList.add('listening');
+  r.onresult=function(e){
+    let txt='';
+    for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) txt+=e.results[i][0].transcript; }
+    txt=txt.trim();
+    if(txt){
+      ta.value=(ta.value && ta.value.trim() ? ta.value.trim()+' ' : '')+txt;
+      ta.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  };
+  r.onerror=function(e){
+    if(btn) btn.classList.remove('listening'); _recog=null; _recogTarget=null;
+    toast(e.error==='not-allowed' ? 'Microphone blocked — allow mic access to use voice' : 'Voice input error: '+(e.error||'unknown'));
+  };
+  r.onend=function(){ if(btn) btn.classList.remove('listening'); if(_recogTarget===taId){_recog=null;_recogTarget=null;} };
+  try{ r.start(); toast('Listening — click the mic again to stop'); }
+  catch(err){ if(btn) btn.classList.remove('listening'); _recog=null; _recogTarget=null; }
+}
+
+boot();
+</script>
+</body>
+</html>
