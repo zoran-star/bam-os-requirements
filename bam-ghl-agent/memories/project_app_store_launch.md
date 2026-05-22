@@ -128,6 +128,19 @@ review notes, final checklist).
   reloads this work, prints a 9-step status board, and continues the
   walkthrough.
 
+## Step 4 — Demo account (in progress, 2026-05-21)
+
+Demo reviewer account `zoran+appreview@byanymeansbball.com` / "Demo
+Academy" client created in the staff portal — auth user + clients row
+exist and are linked. Blocker hit: clicking the invite email landed on
+the **staff** portal HQ login, not the client portal.
+
+Root cause = the Supabase redirect_to → Site URL fallback bug; fixed in
+commit `d35d124` (see [[Client Portal Auth]] gotcha). Once that deploy
+lands, re-send the invite/reset for Demo Academy → it lands on the
+client portal → set the password → submit one sample ticket → Step 4
+done. The stale `CLIENT_PORTAL_URL` env var can be deleted from Vercel.
+
 ## Related notes
 - [[project_client_portal_mobile]] — the mobile/phone layout pass that made
   the portal phone-ready (prerequisite for the app)

@@ -118,6 +118,25 @@ Path A (Settings → New client) still uses staff-typed password for now — the
 **Required Supabase configuration:**
 - Authentication → URL Configuration → Redirect URLs must include `https://<portal-origin>/**` and `http://localhost:5173/**`
 
+### ⚠️ Gotcha — redirect_to → Site URL fallback (found + fixed 2026-05-21)
+
+If the `redirect_to` passed to Supabase Auth (`/invite`, `/recover`,
+`generate_link`) does NOT match the project's Redirect URL allow-list,
+Supabase **silently** drops it and substitutes the **Site URL** — which
+is `https://staff.byanymeansbusiness.com`. The user then lands on the
+staff portal HQ login instead of the client portal.
+
+Root cause: `portalUrls()` in `api/clients.js` built the client URL from
+the `CLIENT_PORTAL_URL` Vercel env var, which was misconfigured → the
+redirect_to never matched the allow-list → Site URL fallback. Every
+client invite, password reset, and team invite landed users on the staff
+portal. Proven via a live invite whose verify link came back with
+`redirect_to=https://staff.byanymeansbusiness.com`.
+
+Fix (commit `d35d124`): `clientUrl` is now a hardcoded constant
+(`https://portal.byanymeansbusiness.com`), not env-overridable. The stale
+`CLIENT_PORTAL_URL` env var can be deleted from Vercel.
+
 **Files touched:**
 - `bam-portal/api/clients.js` (action router + recover call + email/auth_user_id in shapeClient)
 - `bam-portal/public/client-portal.html` (recovery card + boot detection + submitNewPassword)
