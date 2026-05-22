@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-20 — BAM GTA member-management system incorporated into the client portal as a client-side "Members" feature. Phases 1+2 DONE — tab LIVE for BAM GTA (51 athletes migrated). Stripe model = Connect. Next = Phase 3 (billing actions). Resume via /member-management-continue.
+description: 2026-05-22 — Phase 3 SHIPPED. Stripe Connect OAuth route + 6 PATCH billing actions (pause/unpause/cancel/refund/change/payment-link/referred) + member-detail popup UI. Awaiting Zoran's live test once he sets Stripe Dashboard up + adds env vars.
 type: project
 ---
 
@@ -153,34 +153,81 @@ Member Management was built to match this:
 `clients.auth_user_id` resolve — the multi-user project (`/account-continue`)
 owns fixing those; not our concern here.
 
-## Where we left off
+## Phase 3 — SHIPPED 2026-05-22 (commit `0540dd7`)
 
-✅ GOAL MET (2026-05-20) — the Member Management tab is LIVE for BAM GTA.
+- **`api/stripe/connect.js`** (new) — Standard Connect OAuth route modeled
+  on the Meta OAuth pattern in `api/marketing.js`. POST=prepare (signed
+  state, returns Stripe authorize URL); GET=callback (verifies state,
+  exchanges code, writes `stripe_user_id` (`acct_...`) to clients row).
+  Method-based dispatch on a single path — no vercel.json rewrite needed.
+- **`api/members.js`** — expanded with PATCH actions for the 6 GTA billing
+  operations: `pause`, `unpause`, `cancel`, `refund`, `change`,
+  `payment-link`, `referred`. Each honors locked Stripe conventions
+  (trial_end pauses · NEVER pause_collection · 720-day indefinite cap ·
+  canonical plan→price map · idempotency key on refunds · audit row per
+  write). GET single-member now returns Stripe enrichment (price, next
+  payment, status) + recent history. GET list returns the academy's
+  stripe connect status alongside the roster.
+- **`public/client-portal.html`** — Stripe Connect status card at the top
+  of the Members tab (renders not_connected/onboarding/connected/disabled
+  states). Roster cards are clickable → member-detail popup with 5
+  sections (Athlete · Parent · Billing · Coaching · History) + 6 action
+  buttons. v1 action UX uses prompt/confirm (polish to real modals later).
+  Handles `?stripe_connect=connected|error` return redirect. Tour
+  verifier still passes.
+- **`env/.env.example`** — documented `STRIPE_CONNECT_CLIENT_ID` and
+  `STRIPE_CONNECT_STATE_SECRET`.
 
-- Schema applied to the portal Supabase (`jnojmfmpnsfmtqmwhopz`) via the
-  Management API: 5 tables + enums + per-client RLS + the clients Connect
-  columns.
-- BAM GTA's roster migrated: **51 athletes** (41 live · 7 paused · 3
-  payment-flagged) under `client_id 39875f07-0a4b-4429-a201-2249bc1f24df`.
-- `MEMBER_MGMT_ENABLED` flipped to `true` in client-portal.html → the tab
-  is visible on deploy. Tour verifier passes.
-- The migration ran via
-  `bam-portal/scripts/migration/run-member-management-migration.mjs`
-  (one-shot, needs a Supabase PAT; idempotent).
+Schema: no migration needed — all 5 tables + the `clients.stripe_connect_*`
+columns were already in place from Phase 1.
 
-Note: the flag is GLOBAL — every academy login sees a Members tab; non-GTA
-academies see an empty roster (their `members` rows = 0). Per-academy
-gating = a Phase 4 item.
+### Cancel semantics
 
-NEXT — Phase 3: Stripe Connect onboarding flow + billing PATCH actions
-(pause/unpause/cancel/refund/change/payment-link/refer). Also migrate
-cancellations/referrals/refunds history. The tab is READ-ONLY until Phase 3.
+`/cancel` action DELETES the row from `members` and inserts a row in
+`cancellations` (denormalized athlete/parent copies preserve history).
+This avoided a schema migration to add a "cancelled" status to the
+`member_status` enum. The cancellations table stays the source of truth
+for cancelled members.
 
-The Members tab is gated behind `MEMBER_MGMT_ENABLED` — a const in
-client-portal.html, currently `false` — so it is hidden from clients on
-deploy. Flip it to `true` once the schema SQL is run and the roster is
-migrated in. (`applyMemberMgmtNavState()` toggles the `[data-feature=
-"members"]` nav items; called in boot.)
+### Ahead of Zoran's first live test
+
+1. Stripe Dashboard — enable Connect, grab the live `ca_...` OAuth client
+   id, register redirect URI:
+   `https://portal.byanymeansbusiness.com/api/stripe/connect`
+   (also add `https://bam-portal-tawny.vercel.app/api/stripe/connect`).
+2. Vercel env vars: `STRIPE_CONNECT_CLIENT_ID` + `STRIPE_CONNECT_STATE_SECRET`
+   (state secret was generated 2026-05-22 — not stored in repo).
+3. Redeploy in Vercel.
+4. Test the Connect handshake on Members tab, then test each of the 6
+   actions on a live GTA member.
+
+### Data audit conclusion (2026-05-22)
+
+The 4 members with null `stripe_subscription_id` are CORRECT, not broken:
+Stefan Djeric (no Stripe by design — already blocked by the `/change`
+skill), Samuel + Santiago (paused mid-cycle with no current sub — need a
+new sub on resume), Tony Li (`payment_method_required` literally means
+"no active sub — use payment-link"). The PATCH handlers all guard on
+`stripe_subscription_id` and return clean 400s when it's missing. No
+data cleanup needed.
+
+### Polish work for after the live test
+
+- Replace `prompt`/`confirm` action inputs with real modal forms
+- Per-row Stripe enrichment in the roster (next payment, MRR)
+- Roster filters (live/paused/payment issues)
+- Handle Stripe `account.application.deauthorized` webhook → set
+  `stripe_connect_status='disabled'`
+- Per-academy `MEMBER_MGMT` gating (currently global — non-GTA academies
+  see an empty roster + a "Connect Stripe" CTA that errors until they get
+  their own setup)
+
+### Native-app firewall (verified intact)
+
+The Members tab is hidden inside the Capacitor wrapper via
+`showMembers = MEMBER_MGMT_ENABLED && !isNativeApp()` in
+`applyMemberMgmtNavState()`. App reviewers never see it. **Do not touch
+that guard.**
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
