@@ -9991,7 +9991,7 @@ const TOUR_DEMO_CONTAINERS = [
   },
   {
     id: 'marketing-campaigns-container',
-    onlyIfMissing: '.campaign-card',
+    onlyIfMissing: '.btn-change-campaign',
     html: `<div class="campaign-card tour-demo">
       <div class="campaign-card-main">
         <div class="card-title" style="margin-bottom:6px">Example: Skills Camp Lead Gen</div>
@@ -10119,9 +10119,11 @@ function _renderTourStep() {
     // Light dim, no center card
     overlay.classList.add('active');
     overlay.classList.add('spotlight');
-    // Wait a beat for the view switch to lay out, then position
+    // Wait a beat for the view switch to lay out, then (re-)assert the demo
+    // elements so every spotlight has a real target — even if the live data
+    // fetch finished (and overwrote a container) after the tour started.
     requestAnimationFrame(() => {
-      setTimeout(() => _positionSpotlight(step), 40);
+      setTimeout(() => { _tourSetupDemos(); _positionSpotlight(step); }, 40);
     });
     document.getElementById('tour-tooltip-title').innerHTML = step.title || '';
     document.getElementById('tour-tooltip-body').innerHTML = step.body || '';
@@ -10155,6 +10157,10 @@ function _positionSpotlight(step) {
     tooltip.removeAttribute('data-place');
     return;
   }
+  // Scroll the target into the middle of the viewport BEFORE measuring, so a
+  // target below the fold doesn't leave the spotlight pointing off-screen.
+  // Instant (non-smooth) scroll → getBoundingClientRect() right after is exact.
+  try { target.scrollIntoView({ block: 'center', inline: 'nearest' }); } catch (_) {}
   tooltip.style.transform = '';
   const r = target.getBoundingClientRect();
   // Pulse ring sized slightly bigger than the target
