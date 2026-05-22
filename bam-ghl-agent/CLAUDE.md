@@ -99,7 +99,7 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 
 **Status as of 2026-05-17 — portal is live in production, public onboarding URL is shareable, focus is hardening + filling round-3 gaps.**
 
-**Shareable signup URL:** `https://bam-portal-tawny.vercel.app/onboarding.html` — new clients/testers sign up there. See [[memories/project_public_onboarding.md]] for the flow.
+**Portal URL:** `https://portal.byanymeansbusiness.com` (custom domain — replaced `bam-portal-tawny.vercel.app`; the old `.vercel.app` URL still resolves but the custom domain is canonical). Shareable signup: `/onboarding.html`. See [[memories/project_public_onboarding.md]] for the flow.
 
 ### What's live end-to-end
 - **bam-portal-tawny.vercel.app** — staff + client portals deployed on Vercel Pro (no fn cap).
