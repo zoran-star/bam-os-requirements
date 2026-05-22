@@ -345,8 +345,8 @@
    ════════════════════════════════════════════════════════════════ */
 
 const PROGRESS_KEY = 'onboarding_reloaded_progress_v2';
-// TODO (Zoran): real BAM GoHighLevel subscription link goes here.
-const GHL_SIGNUP_URL = 'https://link.byanymeansbball.com/ghl-signup';
+// BAM GoHighLevel subscription — Stripe checkout link.
+const GHL_SIGNUP_URL = 'https://buy.stripe.com/bJeaEZ1vC4NX6PvgM1gnK0z';
 const SPEECH_OK = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
 // ── Supabase sync — mirrors each submission to the onboarding_reloaded table ──
@@ -560,14 +560,13 @@ const RAW = [
       q({text:'Your competitive teams', type:'records', form:TEAM_FORM, recordLabel:'team', titleKey:'team_name', badgeKey:'age_group', mandatory:true, showIf:{ k:'teams_0', v:['Yes'] }, hint:'Add every competitive team you run — each has its own schedule, tryouts, pricing, and onboarding.'})
     ]},
   { id:'connect', name:'Connect Accounts',
-    purpose:'Link the tools that run your payments, CRM, and ads.',
+    purpose:'Link the tools that run your payments and CRM.',
     questions:[
       q({text:'What is your current payment processor?', type:'single_choice', mandatory:true, options:['Stripe','Square','Other','None yet']}),
       q({text:'Connect your Stripe account', type:'connect', mandatory:true}),
       q({text:'Set up your GoHighLevel account', type:'link', mandatory:true,
          hint:'BAM runs your CRM inside GoHighLevel. Click below to get your subscription set up — then come back and continue.'}),
       q({text:'Other tools you currently use', type:'multi_choice', options:['CoachIQ','Acuity Scheduling','Square','Constant Contact','Mailchimp','Google Voice','Other']}),
-      q({text:'Connect your Meta / Facebook ad account', type:'connect', mandatory:true}),
       q({text:'CSV of all contacts', type:'files', hint:'Drop in your contact export(s) — leads, prospects, anyone. You can attach files or paste links.'}),
       q({text:'CSV of your current clients / members', type:'files', hint:'Drop in your client / member export(s)'})
     ]}

@@ -5309,6 +5309,9 @@
 
         <div class="content">
 
+          <!-- Ad account connection gate (Leadsie) — populated by _renderAdConnectGate() -->
+          <div id="ad-connect-gate"></div>
+
           <div class="readout">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
@@ -7302,12 +7305,15 @@ function _buildDemoCampaignsHTML(_metaConnected) {
   // Meta is staff-managed — clients never connect Meta or pick ad accounts
   // themselves. When no real campaigns are available, show sample data with
   // a passive banner ("BAM is setting this up") and no CTA.
+  const _bannerMsg = _adStatus() === 'connected'
+    ? "Your BAM team is setting up your campaigns. Real numbers will appear here soon."
+    : "Connect your ad account above so your BAM team can launch real campaigns for you.";
   const banner = `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.3);border-radius:8px">
       <div style="font-size:18px">✨</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:600;color:var(--text)">Sample data shown below</div>
-        <div style="font-size:12px;color:var(--text-sub);margin-top:2px">Your BAM team is setting up your Meta ad account. Real campaigns will appear here once it's wired up.</div>
+        <div style="font-size:12px;color:var(--text-sub);margin-top:2px">${_bannerMsg}</div>
       </div>
     </div>`;
   const cards = _DEMO_CAMPAIGNS.map(c => `
@@ -7325,6 +7331,93 @@ function _buildDemoCampaignsHTML(_metaConnected) {
   return banner + cards;
 }
 
+// ── Ad account connection (Leadsie) ───────────────────────────────────
+// Self-reported onboarding step on the Marketing page. A new academy
+// connects its existing ad account to BAM through a Leadsie share link,
+// then checks it off. Moved here out of the onboarding flow per Zoran.
+// Prototype-grade: state persists in localStorage.
+const LEADSIE_CONNECT_URL = 'https://app.leadsie.com/connect/2e577265b0ca5239/manage';
+const AD_STATUS_KEY = 'bam_ad_account_status';
+
+function _adStatus() {
+  try { return localStorage.getItem(AD_STATUS_KEY) || ''; } catch (e) { return ''; }
+}
+function _setAdStatus(v) {
+  try { localStorage.setItem(AD_STATUS_KEY, v); } catch (e) {}
+  _renderAdConnectGate();
+}
+
+function openAdAccountModal() {
+  const m = document.getElementById('adAccountModal');
+  if (m) m.style.display = 'flex';
+}
+function closeAdAccountModal() {
+  const m = document.getElementById('adAccountModal');
+  if (m) m.style.display = 'none';
+}
+// Modal answer — Yes keeps the current account (Leadsie connect step),
+// No starts fresh (skipped state, flagged as not recommended).
+function adAccountKeep(keep) {
+  closeAdAccountModal();
+  _setAdStatus(keep ? 'leadsie' : 'skipped');
+}
+function adAccountMarkConnected() { _setAdStatus('connected'); }
+function adAccountReset() { _setAdStatus(''); }
+
+// Renders the ad-account connection card at the top of the Marketing view.
+// States: '' not started · 'leadsie' connect pending · 'connected' · 'skipped'.
+function _renderAdConnectGate() {
+  const el = document.getElementById('ad-connect-gate');
+  if (!el) return;
+  const status = _adStatus();
+  let html = '';
+
+  if (status === 'connected') {
+    html = `
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;margin-bottom:18px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.32);border-radius:10px">
+        <div style="font-size:15px">✓</div>
+        <div style="flex:1;font-size:12.5px;color:var(--text-sub)"><strong style="color:var(--text)">Ad account connected.</strong> Your BAM team can now run and manage campaigns for you.</div>
+        <button onclick="adAccountReset()" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline">Redo</button>
+      </div>`;
+  } else if (status === 'leadsie') {
+    html = `
+      <div style="padding:18px;margin-bottom:18px;background:rgba(232,197,71,0.06);border:1px solid rgba(232,197,71,0.38);border-radius:12px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">Connect your ad account</div>
+        <div style="font-size:12.5px;color:var(--text-sub);line-height:1.55;margin-bottom:14px"><strong style="color:var(--text)">Step 1</strong> — open the secure link and grant BAM access to your ad account. <strong style="color:var(--text)">Step 2</strong> — come back and check the box below.</div>
+        <a href="${LEADSIE_CONNECT_URL}" target="_blank" rel="noopener" class="btn-modal-primary" style="display:inline-block;text-decoration:none">Open connection link ↗</a>
+        <label style="display:flex;align-items:center;gap:10px;margin-top:16px;cursor:pointer;font-size:13px;color:var(--text)">
+          <input type="checkbox" onchange="if(this.checked)adAccountMarkConnected()" style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer">
+          I've connected my ad account
+        </label>
+      </div>`;
+  } else if (status === 'skipped') {
+    html = `
+      <div style="padding:15px 16px;margin-bottom:18px;background:rgba(240,170,70,0.08);border:1px solid rgba(240,170,70,0.34);border-radius:11px">
+        <div style="display:flex;align-items:flex-start;gap:11px">
+          <div style="font-size:16px">⚠️</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">No ad account connected</div>
+            <div style="font-size:12px;color:var(--text-sub);margin-top:3px;line-height:1.55">You chose to start fresh. We don't recommend it — you lose your ad history, audiences, and tracking. You can connect an existing account any time.</div>
+            <button class="btn-modal-secondary" onclick="openAdAccountModal()" style="margin-top:11px">Connect an ad account</button>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    html = `
+      <div style="padding:18px;margin-bottom:18px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.4);border-radius:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="font-size:20px">📣</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px">Connect your ad account</div>
+            <div style="font-size:12.5px;color:var(--text-sub);line-height:1.55">Before your BAM team can run ads, we need access to an ad account. It only takes a minute.</div>
+          </div>
+        </div>
+        <button class="btn-modal-primary" style="margin-top:14px" onclick="openAdAccountModal()">Get started →</button>
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
 // Client-side Meta OAuth has been removed. Meta is staff-managed —
 // BAM staff wire each client's ad account on the per-client Setup
 // tab in the staff portal. The two helpers that used to live here
@@ -7338,6 +7431,7 @@ function _buildDemoCampaignsHTML(_metaConnected) {
 //   connected, has ad account, 0 campaigns → empty state
 //   connected, has ad account, N campaigns → real campaign cards
 async function _renderMarketingCampaigns() {
+  _renderAdConnectGate();
   const containerEl = document.getElementById('marketing-campaigns-container');
   if (!containerEl) return;
 
@@ -10671,6 +10765,19 @@ function toggleTheme() {
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeCancelRequestModal()">Keep it</button>
       <button class="btn-modal-danger" onclick="confirmCancelRequest()">Yes, Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Keep current ad account modal ── -->
+<div id="adAccountModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeAdAccountModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Marketing</div>
+    <div class="modal-title">Keep your current ad account?</div>
+    <div class="modal-sub">If you already run ads, connecting your existing ad account keeps your history, audiences, and tracking intact. Starting fresh loses all of that — we don't recommend it.</div>
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="adAccountKeep(false)">No, start fresh</button>
+      <button class="btn-modal-primary" onclick="adAccountKeep(true)">Yes, keep it</button>
     </div>
   </div>
 </div>

@@ -7,7 +7,7 @@ Resume work on **Onboarding Reloaded** — the reworked BAM Business client onbo
 ## Step 1 — Pull + read state
 - Run `git pull`.
 - Read `bam-ghl-agent/memories/project_onboarding_reloaded.md` in full. That note is the source of truth for where this work stands.
-- Open `bam-ghl-agent/onboarding-reloaded.html` if you need to inspect the flow itself.
+- Open `bam-ghl-agent/bam-portal/public/onboarding-reloaded.html` if you need to inspect the flow itself.
 
 ## Step 2 — Summarize for Zoran
 Short + visual. Tell him:
