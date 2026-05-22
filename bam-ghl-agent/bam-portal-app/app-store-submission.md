@@ -38,17 +38,19 @@ in and sees these tabs:
 | **Messages** | Support tickets + back-and-forth action threads with BAM | Live |
 | **Marketing** | Ad performance (Meta) + marketing/content requests | Live |
 | **Members** | Athlete roster — **hidden in the app for v1**, live on web | Web only |
-| **Team** | Invite teammates into the portal, revoke access | Live |
+| **Team** | Invite teammates + revoke access — **hidden in the app for v1**, live on web | Web only |
 | Push notifications | Native push prompt on login; tokens captured | Live (sending side is later) |
 | First-login tour | 8-step guided tour for new users | Live |
 
-**Decided (2026-05-20):**
-- **Members is hidden in the app for v1.** The portal is one codebase for
-  web + app, so `isNativeApp()` in `client-portal.html` hides the Members
-  tab inside the native wrapper while it stays live on the web. Members
-  keeps developing on the real web portal; when its billing actions
-  (Phase 3) are ready, delete the `&& !isNativeApp()` check and resubmit.
-- **The app's v1 = 4 tabs** — Systems, Messages, Marketing, Team — plus
+**Decided (2026-05-20, updated 2026-05-22):**
+- **Members and Team are hidden in the app for v1.** The portal is one
+  codebase for web + app, so `isNativeApp()` in `client-portal.html`
+  hides the Members and Team tabs inside the native wrapper while they
+  stay live on the web. Members keeps developing on the web portal; when
+  its billing actions (Phase 3) are ready, remove its `isNativeApp()`
+  check and resubmit. Team is simply out of app v1 scope — no billing,
+  no App Store risk, just a scoping call.
+- **The app's v1 = 3 tabs** — Systems, Messages, Marketing — plus
   push notifications and the first-login tour.
 - Push **capture** works; staff **sending** notifications is a later
   build. The app still ships — it just won't send anything yet.
@@ -271,12 +273,12 @@ build is on TestFlight, or use a browser at the exact pixel sizes.
 - **Tablet:** 7" and 10" shots (since the app is universal)
 - **Feature graphic:** 1024 × 500 px — required by Play
 
-**Shoot these 5 screens** (signed in as the demo account):
+**Shoot these 3 screens** — the app's actual tabs. Open the portal with
+`?native=1` in a browser to see the exact app view (Members + Team
+hidden), signed in as the demo account:
 1. **Systems** — the home overview · caption: "Your academy at a glance"
 2. **Messages** — a ticket thread · caption: "A direct line to your team"
 3. **Marketing** — ad performance · caption: "Track every campaign"
-4. **Members** — the roster · caption: "Your whole roster, organized"
-5. **Team** — the team list · caption: "Bring your whole staff in"
 
 Keep the demo account's data clean — no real client names in any shot.
 
@@ -346,7 +348,7 @@ Demo account for review:
   Password: [paste the password you set]
 
 After signing in, the reviewer can browse every tab — Systems, Messages,
-Marketing, and Team — and receive push notifications. The app contains no
+and Marketing — and receive push notifications. The app contains no
 public user-generated content, no ads, and no tracking.
 
 Contact: zoran@byanymeansbball.com
