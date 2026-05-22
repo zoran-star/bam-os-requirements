@@ -5725,10 +5725,12 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
+        <div id="stripe-connect-card" style="margin-bottom:18px"></div>
         <div class="readout">Your Roster</div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0">Loading members…</div>
         </div>
+        <div id="member-modal-host"></div>
       </div>
     </div>
 
@@ -7155,16 +7157,23 @@ async function _safeJson(res) {
 }
 
 // ══════════════════════════════════════════════════════════
-// MEMBERS — academy roster (Phase 2: read-only)
-// GET /api/members?scope=client — see bam-portal/api/members.js
+// MEMBERS — academy roster + 6 billing actions
+// GET   /api/members?scope=client&client_id=...   → roster + stripe status
+// GET   /api/members?id=...                       → one member + Stripe detail
+// PATCH /api/members?id=...  { action, ... }      → pause/unpause/cancel/
+//                                                   refund/change/payment-link/
+//                                                   referred
+// Backend: bam-portal/api/members.js + api/stripe/connect.js
 // ══════════════════════════════════════════════════════════
 
 async function fetchAndRenderMembers() {
+  // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
+  _stripeConnectReturnCheck();
+
   const container = document.getElementById('members-list-container');
   if (!container) return;
   try {
     const token = await _mreqAuthToken();
-    // Multi-user model: scope the request to the active academy.
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
       ? '?scope=client&client_id=' + encodeURIComponent(CLIENT_ID)
       : '?scope=client';
@@ -7173,6 +7182,7 @@ async function fetchAndRenderMembers() {
     });
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    renderStripeConnectCard(json.stripe || { status: 'not_connected' });
     renderMembers(json.members || []);
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
@@ -7204,7 +7214,7 @@ function renderMembers(members) {
   const summary = `<div style="font-size:13px;color:var(--text-mute);margin-bottom:14px">${members.length} total · ${live} live · ${paused} paused</div>`;
 
   const rows = members.map(m => `
-    <div class="card" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div class="card" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       <div style="flex:1;min-width:160px">
         <div style="font-weight:700;font-size:15px">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
@@ -7215,6 +7225,294 @@ function renderMembers(members) {
     </div>`).join('');
 
   container.innerHTML = summary + rows;
+}
+
+// ── Stripe Connect status card (top of Members tab) ──────────
+function renderStripeConnectCard(stripe) {
+  const host = document.getElementById('stripe-connect-card');
+  if (!host) return;
+  const status = stripe?.status || 'not_connected';
+  if (status === 'connected') {
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #1f7a3d;background:rgba(31,122,61,0.08);border-radius:6px">
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#1f7a3d;color:#fff">● Stripe connected</span>
+        <span style="font-size:12px;color:var(--text-mute)">Billing actions enabled.</span>
+      </div>`;
+  } else if (status === 'onboarding') {
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #8a6d1f;background:rgba(138,109,31,0.08);border-radius:6px">
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#8a6d1f;color:#fff">● Finishing setup</span>
+        <span style="font-size:12px;color:var(--text-mute);flex:1">Stripe connection didn't finish.</span>
+        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 14px;font-weight:600;border-radius:4px;cursor:pointer">Continue</button>
+      </div>`;
+  } else if (status === 'disabled') {
+    host.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #9a3b2f;background:rgba(154,59,47,0.08);border-radius:6px">
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#9a3b2f;color:#fff">● Disconnected</span>
+        <span style="font-size:12px;color:var(--text-mute);flex:1">Stripe connection was revoked.</span>
+        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 14px;font-weight:600;border-radius:4px;cursor:pointer">Reconnect</button>
+      </div>`;
+  } else {
+    host.innerHTML = `
+      <div style="padding:16px 18px;border:1px solid var(--border);background:var(--surface);border-radius:6px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Connect your Stripe account</div>
+        <div style="font-size:13px;color:var(--text-mute);margin-bottom:12px">Billing actions (pause, cancel, refund, change plan) need access to your academy's Stripe. One-click connect — your account stays under your control.</div>
+        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:8px 18px;font-weight:700;border-radius:4px;cursor:pointer">Connect Stripe</button>
+      </div>`;
+  }
+}
+
+async function connectStripe() {
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/stripe/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok || !json.redirect_url) throw new Error(json.error || ('HTTP ' + res.status));
+    window.location.href = json.redirect_url;
+  } catch (e) {
+    alert("Couldn't start Stripe connection — " + e.message);
+  }
+}
+
+function _stripeConnectReturnCheck() {
+  const params = new URLSearchParams(window.location.search);
+  const sc = params.get('stripe_connect');
+  if (!sc) return;
+  const msg = params.get('msg');
+  history.replaceState(null, '', window.location.pathname + window.location.hash);
+  if (sc === 'connected') {
+    setTimeout(() => alert('✅ Stripe connected.'), 100);
+  } else {
+    alert('Stripe connection failed' + (msg ? ' — ' + msg : ''));
+  }
+}
+
+function _stripeConnectMaybeSwitch() {
+  const sc = new URLSearchParams(window.location.search).get('stripe_connect');
+  if (sc && typeof switchView === 'function') switchView('members');
+}
+
+// ── Member detail popup ──────────────────────────────────────
+async function openMemberPopup(memberId) {
+  const host = document.getElementById('member-modal-host');
+  if (!host) return;
+  host.innerHTML = `
+    <div id="member-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto" onclick="if(event.target.id==='member-modal')closeMemberPopup()">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:560px;width:100%;padding:24px;color:var(--text)">
+        <div id="member-modal-body"><div class="req-empty" style="padding:24px 0">Loading…</div></div>
+      </div>
+    </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/members?id=' + encodeURIComponent(memberId), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    _renderMemberModalBody(json.member, json.stripe, json.history);
+  } catch (e) {
+    const body = document.getElementById('member-modal-body');
+    if (body) body.innerHTML = `<div style="padding:24px 0;color:#9a3b2f">Couldn't load — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function closeMemberPopup() {
+  const host = document.getElementById('member-modal-host');
+  if (host) host.innerHTML = '';
+}
+
+function _renderMemberModalBody(m, stripe, history) {
+  const body = document.getElementById('member-modal-body');
+  if (!body) return;
+
+  const fmtMoney = (cents, cur) => (cents == null) ? '—' : `$${(cents/100).toFixed(2)} ${(cur||'CAD').toUpperCase()}`;
+  const fmtDate  = (unix)       => unix ? new Date(unix*1000).toISOString().slice(0,10) : '—';
+
+  let billingLines;
+  if (stripe && stripe.status) {
+    billingLines = [
+      `Plan: ${escapeHTML(m.plan || '—')} (${fmtMoney(stripe.amount_cents, stripe.currency)})`,
+      `Stripe status: ${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`,
+      stripe.trial_end ? `Paused until: ${fmtDate(stripe.trial_end)}` : `Next payment: ${fmtDate(stripe.current_period_end)}`,
+      `Customer: ${escapeHTML(m.stripe_customer_id || '—')}`,
+    ];
+  } else if (stripe && stripe.error) {
+    billingLines = [`Couldn't reach Stripe — ${escapeHTML(stripe.error)}`];
+  } else if (m.stripe_subscription_id) {
+    billingLines = ['Loading Stripe…'];
+  } else {
+    billingLines = ['No Stripe subscription on file.'];
+  }
+
+  const btn = (label, onclick) => `<button onclick="${onclick}" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px">${label}</button>`;
+  const actionRow = m.status === 'paused'
+    ? btn('Unpause', `mUnpause('${m.id}')`)
+    : btn('Pause', `mPause('${m.id}')`);
+
+  body.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:20px">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:18px">${escapeHTML(m.athlete_name)}</div>
+        <div style="margin-top:6px">${_memberStatusPill(m.status)}</div>
+      </div>
+      <button onclick="closeMemberPopup()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:14px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">ATHLETE</div>
+        <div style="font-size:13px">${escapeHTML(m.archetype || '—')} · Group ${escapeHTML(String(m.group_num || '—'))} · Joined ${escapeHTML(m.joined_date || '—')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">PARENT</div>
+        <div style="font-size:13px">${escapeHTML(m.parent_name || '—')}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHTML(m.parent_email || '—')} · ${escapeHTML(m.parent_phone || '—')}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">BILLING</div>
+        ${billingLines.map(l => `<div style="font-size:13px;margin-top:2px">${l}</div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">COACHING</div>
+        <div style="font-size:13px">Trainer: ${escapeHTML(m.trainer || '—')} · Engagement: ${escapeHTML(m.engagement || '—')}</div>
+        ${m.skill_notes ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px">Notes: ${escapeHTML(m.skill_notes)}</div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">HISTORY</div>
+        ${(history && history.length)
+          ? history.map(h => `<div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHTML(h.action_type)} · ${escapeHTML(h.performed_by_name || '—')} · ${h.created_at ? h.created_at.slice(0,10) : ''}</div>`).join('')
+          : '<div style="font-size:12px;color:var(--text-mute)">No actions yet.</div>'}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
+      ${actionRow}
+      ${btn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`)}
+      ${btn('Refund',      `mRefund('${m.id}')`)}
+      ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
+      ${btn('Payment link',`mPaymentLink('${m.id}')`)}
+      ${btn('Referred',    `mReferred('${m.id}')`)}
+    </div>
+  `;
+}
+
+// ── Billing action calls ────────────────────────────────────
+async function _memberAction(memberId, action, body) {
+  const token = await _mreqAuthToken();
+  const res = await fetch('/api/members?id=' + encodeURIComponent(memberId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ action, ...body }),
+  });
+  const json = await _safeJson(res);
+  if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
+  return json;
+}
+
+async function mPause(memberId) {
+  const dur = prompt('Pause for how long?\n  • leave blank → INDEFINITE (720 days)\n  • or N weeks (just a number, e.g. "4")\n  • or until date (e.g. "2026-09-15")', '');
+  if (dur === null) return;
+  const body = {};
+  const t = dur.trim();
+  if (!t) { /* indefinite */ }
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(t)) body.until = t;
+  else if (/^\d+$/.test(t)) body.weeks = parseInt(t, 10);
+  else { alert('Not a recognized format.'); return; }
+  const reason = prompt('Pause reason (optional)', '');
+  if (reason && reason.trim()) body.reason = reason.trim();
+  try {
+    await _memberAction(memberId, 'pause', body);
+    alert('Paused.');
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Pause failed: ' + e.message); }
+}
+
+async function mUnpause(memberId) {
+  const newDate = prompt('Unpause:\n  • leave blank → resume NOW\n  • or new end date (YYYY-MM-DD) to SHIFT the pause', '');
+  if (newDate === null) return;
+  const body = {};
+  if (newDate.trim()) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim())) { alert('Date must be YYYY-MM-DD.'); return; }
+    body.new_until = newDate.trim();
+  }
+  try {
+    await _memberAction(memberId, 'unpause', body);
+    alert(body.new_until ? 'Pause shifted.' : 'Unpaused.');
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Unpause failed: ' + e.message); }
+}
+
+async function mCancel(memberId, athleteName) {
+  if (!confirm(`Cancel ${athleteName}? They'll be removed from the active roster (cancellation history preserved).`)) return;
+  const reason = prompt('Reason (optional)', '');
+  const immediate = confirm('Cancel IMMEDIATELY?\n  OK = cancel sub now\n  Cancel = cancel at period end');
+  try {
+    await _memberAction(memberId, 'cancel', { reason: reason || null, immediate });
+    alert('Cancelled.');
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Cancel failed: ' + e.message); }
+}
+
+async function mRefund(memberId) {
+  const chargeId = prompt('Stripe charge ID to refund (ch_...)\nFind in Stripe → Customer → Payments', '');
+  if (!chargeId || !chargeId.trim()) return;
+  const amountStr = prompt('Refund amount in CENTS (e.g. 9039 = $90.39)\nLeave blank for FULL refund', '');
+  if (amountStr === null) return;
+  const reason = prompt('Reason / note (e.g. "Plan downgrade — May cycle difference")', '');
+  const body = { charge_id: chargeId.trim() };
+  if (amountStr.trim()) body.amount_cents = parseInt(amountStr.trim(), 10);
+  if (reason && reason.trim()) body.notes = reason.trim();
+  try {
+    const r = await _memberAction(memberId, 'refund', body);
+    alert(`Refunded $${(r.refund.amount_cents/100).toFixed(2)}\nStripe id: ${r.refund.id}`);
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Refund failed: ' + e.message); }
+}
+
+async function mChange(memberId, currentPlan) {
+  const newPlan = prompt(`Change plan from "${currentPlan}" to:\n  • 1/wk   (Steady $226)\n  • 2/wk   (Accelerated $316)\n  • 3/wk   (Elevate $378)\n  • unlmtd (Dominate $638)`, '');
+  if (!newPlan || !newPlan.trim()) return;
+  const valid = ['1/wk','2/wk','3/wk','unlmtd'];
+  if (!valid.includes(newPlan.trim())) { alert('Invalid plan. Use: ' + valid.join(' · ')); return; }
+  const prorate = confirm('Prorate the difference NOW?\n  OK = prorated charge now (upgrades only)\n  Cancel = no proration');
+  try {
+    const r = await _memberAction(memberId, 'change', { new_plan: newPlan.trim(), prorate });
+    alert(`Changed to ${newPlan.trim()} (${r.direction}${r.prorated ? ' · prorated' : ''}).`);
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Change failed: ' + e.message); }
+}
+
+async function mPaymentLink(memberId) {
+  try {
+    const r = await _memberAction(memberId, 'payment-link', {});
+    if (navigator.clipboard) navigator.clipboard.writeText(r.url).catch(() => {});
+    alert(`Payment link created (copied to clipboard):\n\n${r.url}`);
+    window.open(r.url, '_blank');
+  } catch (e) { alert('Payment link failed: ' + e.message); }
+}
+
+async function mReferred(memberId) {
+  const countStr = prompt('How many people did they refer? (1-10)\nEach referral = +4 weeks added to their next charge.', '1');
+  if (!countStr) return;
+  const count = parseInt(countStr.trim(), 10);
+  if (!Number.isFinite(count) || count < 1 || count > 10) { alert('Enter a number 1-10.'); return; }
+  if (!confirm(`Credit ${count} referral${count>1?'s':''} = ${count*4} weeks added. OK?`)) return;
+  try {
+    const r = await _memberAction(memberId, 'referred', { count });
+    const newDate = new Date(r.new_trial_end*1000).toISOString().slice(0,10);
+    alert(`Credited ${r.weeks_added} weeks.\nNext charge: ${newDate}${r.capped_to_730d ? '\n(capped to Stripe 730-day max)' : ''}`);
+    closeMemberPopup();
+    fetchAndRenderMembers();
+  } catch (e) { alert('Referred failed: ' + e.message); }
 }
 
 async function _mreqCreateTicket(payload) {
@@ -10752,6 +11050,7 @@ async function boot() {
   MARKETING_INCLUDED = clientRow.marketing_included !== false;
   applyMarketingNavState();
   applyMemberMgmtNavState();
+  _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
 
