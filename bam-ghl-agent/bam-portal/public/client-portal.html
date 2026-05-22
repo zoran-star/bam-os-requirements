@@ -5011,6 +5011,9 @@
 
         <div class="content">
 
+        <!-- Systems setup (onboarding) progress card — populated by _renderSystemsOnboardingCard() -->
+        <div id="systems-onboarding-card"></div>
+
         <!-- 3 ticket-type tiles (Full Control slabs) -->
         <div class="readout">Open a new request</div>
         <div class="ticket-types">
@@ -5282,6 +5285,21 @@
 
           </div>
         </div>
+      </div>
+
+      <!-- ONBOARDING SUB-SCREEN — embeds the systems-setup flow (onboarding-reloaded.html) -->
+      <div id="systems-onboarding" style="display:none">
+        <div class="topbar" style="border-bottom:none;padding-bottom:14px">
+          <div style="display:flex;align-items:center;gap:16px;width:100%">
+            <button class="detail-back" onclick="closeSystemsOnboarding()" aria-label="Back to Systems">←</button>
+            <div>
+              <span class="topbar-kicker">§ 01 · Systems</span>
+              <div class="topbar-title">Systems Setup</div>
+            </div>
+          </div>
+        </div>
+        <iframe id="systems-onboarding-frame" title="Systems setup"
+          style="width:100%;height:calc(100vh - 150px);min-height:480px;border:0;display:block"></iframe>
       </div>
     </div>
 
@@ -5848,6 +5866,9 @@ function switchView(name, el) {
   // When entering Team, load the portal-access list
   if (name === 'team') fetchAndRenderTeam();
 
+  // When entering Systems, refresh the setup-progress card
+  if (name === 'systems') _renderSystemsOnboardingCard();
+
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
 }
@@ -5867,6 +5888,93 @@ function mobileSwitchView(name) {
     .find(el => (el.getAttribute('onclick') || '').includes("'" + name + "'"));
   if (sidebarItem) switchView(name, sidebarItem);
   else syncMobileNav(name);
+}
+
+// ── Systems setup (onboarding) ────────────────────────────────────────
+// The systems-setup flow (onboarding-reloaded.html — "everything but the
+// Meta/ad stuff") is embedded on the Systems page. A progress card shows
+// how far the client has gotten; the flow itself opens as a sub-screen in
+// an iframe. The flow saves/syncs its own progress — the card just reads
+// it. Same-origin, so we read the flow's localStorage directly.
+const ONB_PROGRESS_KEY = 'onboarding_reloaded_progress_v2';
+const ONB_SECTION_COUNT = 6;
+
+function _onbProgress() {
+  try {
+    const s = JSON.parse(localStorage.getItem(ONB_PROGRESS_KEY) || 'null');
+    return (s && s.answers) ? s : null;
+  } catch (e) { return null; }
+}
+
+// Renders the setup-progress card at the top of the Systems page.
+function _renderSystemsOnboardingCard() {
+  const el = document.getElementById('systems-onboarding-card');
+  if (!el) return;
+  const s = _onbProgress();
+  let html = '';
+
+  if (s && s.completedAll) {
+    html = `
+      <div style="display:flex;align-items:center;gap:11px;padding:13px 16px;margin-bottom:22px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.32);border-radius:11px">
+        <div style="font-size:16px">✓</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:var(--text)">Systems setup complete</div>
+          <div style="font-size:12px;color:var(--text-sub);margin-top:1px">You can review or update your answers anytime.</div>
+        </div>
+        <button class="btn-modal-secondary" onclick="openSystemsOnboarding()">Review / update</button>
+      </div>`;
+  } else if (s && s.started) {
+    const pct = Math.max(0, Math.min(100, s.pct || 0));
+    const done = Array.isArray(s.completed) ? s.completed.length : 0;
+    html = `
+      <div style="padding:18px;margin-bottom:22px;background:rgba(232,197,71,0.06);border:1px solid rgba(232,197,71,0.38);border-radius:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+          <div style="font-size:14px;font-weight:700;color:var(--text)">Your systems setup</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--gold)">${pct}% complete</div>
+        </div>
+        <div style="height:7px;background:var(--surface-el);border-radius:99px;overflow:hidden;margin-bottom:7px">
+          <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:99px;transition:width .3s"></div>
+        </div>
+        <div style="font-size:11.5px;color:var(--text-sub);margin-bottom:14px">${done} of ${ONB_SECTION_COUNT} sections done · your progress saves automatically</div>
+        <button class="btn-modal-primary" onclick="openSystemsOnboarding()">Continue setup →</button>
+      </div>`;
+  } else {
+    html = `
+      <div style="padding:18px;margin-bottom:22px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.4);border-radius:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="font-size:20px">🚀</div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px">Set up your systems</div>
+            <div style="font-size:12.5px;color:var(--text-sub);line-height:1.55">Tell us about your academy so your BAM team can build everything out. Takes about 15 minutes — save and come back anytime.</div>
+          </div>
+        </div>
+        <button class="btn-modal-primary" style="margin-top:14px" onclick="openSystemsOnboarding()">Start setup →</button>
+      </div>`;
+  }
+  el.innerHTML = html;
+}
+
+// Opens the setup flow as a sub-screen of the Systems view.
+function openSystemsOnboarding() {
+  const frame = document.getElementById('systems-onboarding-frame');
+  if (frame && !frame.src) frame.src = 'onboarding-reloaded.html';
+  const list = document.getElementById('systems-list');
+  const detail = document.getElementById('systems-detail');
+  const intake = document.getElementById('systems-intake');
+  const onb = document.getElementById('systems-onboarding');
+  if (list) list.style.display = 'none';
+  if (detail) detail.style.display = 'none';
+  if (intake) intake.style.display = 'none';
+  if (onb) onb.style.display = 'block';
+}
+
+// Returns to the Systems list and refreshes the progress card.
+function closeSystemsOnboarding() {
+  const onb = document.getElementById('systems-onboarding');
+  const list = document.getElementById('systems-list');
+  if (onb) onb.style.display = 'none';
+  if (list) list.style.display = 'block';
+  _renderSystemsOnboardingCard();
 }
 
 // Apply the greyed-out look to the Marketing nav item when marketing
@@ -10711,6 +10819,7 @@ setTimeout(_hideBootSplash, 12000); // safety net if boot ever hangs
 boot().catch(e => console.error('[boot]', e)).finally(_hideBootSplash);
 _renderMonthProgress();
 renderMarketingRequests();  // initial empty render
+_renderSystemsOnboardingCard();  // Systems page setup-progress card
 
 // Dev/support preview: ?preview=tour opens the tour overlay immediately,
 // bypassing the login + onboarding_completed_at check. The login overlay is

@@ -48,11 +48,19 @@ Meta/ad-account connect was pulled out of onboarding Section 6 and rebuilt as a 
 - State persists in localStorage `bam_ad_account_status` (`'' | leadsie | connected | skipped`). Prototype-grade — not wired to Supabase.
 - Functions: `_renderAdConnectGate`, `openAdAccountModal`, `adAccountKeep`, `adAccountMarkConnected`, `adAccountReset`.
 
+## Systems-page integration — added 2026-05-22
+The setup flow is embedded into the **Systems page** of `client-portal.html` (per Zoran — "systems onboarding initiated on the systems page"):
+- A progress card sits at the top of the Systems view (`#systems-onboarding-card`) with three states — not started / in-progress (% bar + sections done) / complete.
+- "Start / Continue setup" opens `#systems-onboarding`, a sub-screen that iframes `onboarding-reloaded.html` (same origin).
+- The flow persists `state.pct` into its localStorage progress (`onboarding_reloaded_progress_v2`); the portal reads that key directly to drive the card. `_renderSystemsOnboardingCard` runs on boot + on every switch to Systems.
+- Functions in client-portal.html: `_renderSystemsOnboardingCard`, `openSystemsOnboarding`, `closeSystemsOnboarding`, `_onbProgress`.
+
 ## Open items
 - [x] ~~Table created + end-to-end sync verified~~ — done 2026-05-21.
 - [x] ~~GoHighLevel signup link~~ — set to Stripe checkout `buy.stripe.com/bJeaEZ1vC4NX6PvgM1gnK0z` (2026-05-21).
 - [x] ~~Deploy to `bam-portal/public/`~~ — done 2026-05-21; Vercel serves it at `/onboarding-reloaded.html`.
-- [ ] Not wired into the authed client portal (no client_id/auth; RLS is prototype-grade anon-open). Entry URL still TBD.
+- [x] ~~Embed into the client portal Systems page~~ — done 2026-05-22 (iframe sub-screen + progress card).
+- [ ] Embedded copy is still the standalone flow — no per-`client_id` auth/RLS scoping; submissions keyed only by an anon `submission_key`.
 - [ ] Decide whether onboarding-reloaded replaces the current `onboarding.html` public signup.
 - [ ] Final click-through approval from Zoran.
 

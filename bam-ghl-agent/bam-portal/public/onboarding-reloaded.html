@@ -593,6 +593,7 @@ let state = { answers:{}, sectionIdx:0, completed:[], started:false, openOffer:n
 
 function saveProgress(){
   state.updated_at = new Date().toISOString();
+  state.pct = overallPct();  // surfaced so the host portal's Systems page can show a progress bar
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(state)); flashSaved(); } catch(e){}
   syncToSupabase();
 }
