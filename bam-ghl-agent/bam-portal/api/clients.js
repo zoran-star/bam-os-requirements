@@ -194,7 +194,7 @@ function buildResetPasswordEmail(actionLink) {
                 If you didn't ask for a password reset, you can ignore this email — your password won't change.
               </p>
               <p style="margin:14px 0 0;font-size:11px;color:#AAA;">
-                BAM Business · <a href="https://bam-portal-tawny.vercel.app/client-portal.html" style="color:#AAA;text-decoration:underline;">Client portal</a>
+                BAM Business · <a href="https://portal.byanymeansbusiness.com/client-portal.html" style="color:#AAA;text-decoration:underline;">Client portal</a>
               </p>
             </td>
           </tr>

@@ -8,9 +8,9 @@ type: project
 
 | Purpose | URL |
 |---|---|
-| **Public onboarding** (share with new clients/testers) | `https://bam-portal-tawny.vercel.app/onboarding.html` |
-| Client portal sign-in | `https://bam-portal-tawny.vercel.app/client-portal.html` |
-| Staff portal | `https://bam-portal-tawny.vercel.app/` |
+| **Public onboarding** (share with new clients/testers) | `https://portal.byanymeansbusiness.com/onboarding.html` |
+| Client portal sign-in | `https://portal.byanymeansbusiness.com/client-portal.html` |
+| Staff portal | `https://portal.byanymeansbusiness.com/` |
 
 ## What the onboarding flow does
 
@@ -43,7 +43,7 @@ Cards are slightly faded (opacity 0.85) with a `SAMPLE` pill on the title. Banne
 
 - **Meta is in Development mode** — only BAM Meta app developers/testers can complete the client-side OAuth. To open to anyone, BAM needs to submit for Meta App Review.
 - **Resend rate limits**: 100/day on free tier. Plenty for invites but watch if running large test waves.
-- **Email confirmation**: Supabase Site URL is `/client-portal.html`. Auth Allowed Redirect URLs include `https://bam-portal-tawny.vercel.app/client-portal.html?type=invite`.
+- **Email confirmation**: Supabase Site URL is `/client-portal.html`. Auth Allowed Redirect URLs include `https://portal.byanymeansbusiness.com/client-portal.html?type=invite`.
 
 ## Related notes
 

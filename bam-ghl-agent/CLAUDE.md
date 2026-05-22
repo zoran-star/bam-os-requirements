@@ -102,7 +102,7 @@ Where BAM staff operates on everything the customer portal produces. Cole built 
 **Portal URL:** `https://portal.byanymeansbusiness.com` (custom domain — replaced `bam-portal-tawny.vercel.app`; the old `.vercel.app` URL still resolves but the custom domain is canonical). Shareable signup: `/onboarding.html`. See [[memories/project_public_onboarding.md]] for the flow.
 
 ### What's live end-to-end
-- **bam-portal-tawny.vercel.app** — staff + client portals deployed on Vercel Pro (no fn cap).
+- **portal.byanymeansbusiness.com** — staff + client portals deployed on Vercel Pro (no fn cap).
 - **Supabase** — project ref `jnojmfmpnsfmtqmwhopz`. Tables: `clients` (13 GHL locations seeded), `staff`, `marketing_tickets`, `content_tickets`, `staff_meta_tokens`, `client_meta_tokens` (legacy), `Questions Database` (202 rows), plus auth.
 - **Meta API (staff-side)** — one BAM staff token powers every client's campaigns + creatives. Client Setup page bulk-wires clients to ad accounts. See `[[project_meta_api_integration]]`.
 - **Marketing/content two-stage flow** — clients submit raw assets, content team produces finals, marketing team launches. See `[[project_marketing_content_flow]]`.

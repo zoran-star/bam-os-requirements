@@ -126,4 +126,4 @@ Upload paths:
 ## Test data
 
 - Client `test business` (id `71d01c0f-...`, auth user `543cc072-...`, email `zoransavic2000@gmail.com`) is the safe sandbox. Use this account on the client portal.
-- Same user is also Zoran's admin staff row, so the dual-role scope logic kicks in. Sign in to bam-portal-tawny.vercel.app as staff with `zoran@byanymeansbball.com` / `systems` to access staff side as pure-admin.
+- Same user is also Zoran's admin staff row, so the dual-role scope logic kicks in. Sign in to portal.byanymeansbusiness.com as staff with `zoran@byanymeansbball.com` / `systems` to access staff side as pure-admin.

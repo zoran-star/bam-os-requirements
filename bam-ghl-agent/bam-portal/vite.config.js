@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://bam-portal-tawny.vercel.app',
+        target: 'https://portal.byanymeansbusiness.com',
         changeOrigin: true,
         secure: true,
       },

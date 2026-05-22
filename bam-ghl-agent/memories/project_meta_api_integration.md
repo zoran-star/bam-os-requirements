@@ -1,6 +1,6 @@
 ---
 name: Meta Marketing API integration
-description: Real Meta campaigns wired into bam-portal-tawny via HYBRID OAuth — either a BAM staff token (shared across all clients) OR the client's own connected Meta token. Plus sample-data fallback when neither is wired so the Marketing tab is demo-able.
+description: Real Meta campaigns wired into the BAM portal via HYBRID OAuth — either a BAM staff token (shared across all clients) OR the client's own connected Meta token. Plus sample-data fallback when neither is wired so the Marketing tab is demo-able.
 type: project
 ---
 

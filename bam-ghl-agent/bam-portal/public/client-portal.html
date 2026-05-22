@@ -5957,7 +5957,7 @@ function _renderSystemsOnboardingCard() {
 // Opens the setup flow as a sub-screen of the Systems view.
 function openSystemsOnboarding() {
   const frame = document.getElementById('systems-onboarding-frame');
-  if (frame && !frame.src) frame.src = 'onboarding-reloaded.html';
+  if (frame && !frame.src) frame.src = 'onboarding-reloaded.html?embed=1';
   const list = document.getElementById('systems-list');
   const detail = document.getElementById('systems-detail');
   const intake = document.getElementById('systems-intake');

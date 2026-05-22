@@ -42,7 +42,7 @@ org would need ABM).
   Zoran confirmed done.
 - **`server.url` verified** — 2026-05-20: curled both candidate URLs;
   `portal.byanymeansbusiness.com/client-portal.html` and the raw
-  `bam-portal-tawny.vercel.app` serve byte-identical content. Config keeps
+  `portal.byanymeansbusiness.com` serve byte-identical content. Config keeps
   the custom domain (branded + stable). No change needed.
 - **Push notifications (wrapper-complete)** — 2026-05-20: `@capacitor/push-notifications`
   installed; `capacitor.config.json` configured; `client-portal.html`
