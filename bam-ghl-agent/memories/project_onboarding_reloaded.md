@@ -29,17 +29,18 @@ Every section ends with an "Extra notes for our team" box.
 - Auto **"Other → specify"** box on any choice with an "Other" option (`otherBig` flag → big textarea).
 - **Voice input** (mic, Web Speech API) on every long-text box. **Progress bars** throughout (overall + per-section, tracks required completion). **Free navigation** — every section clickable in the stepper. **Pause/resume** via localStorage.
 
-## Supabase sync — STATUS: wired, table NOT yet created
-- Every save upserts the submission to a `onboarding_reloaded` table (project `jnojmfmpnsfmtqmwhopz`), keyed by a localStorage `submission_key`. Null-guarded — flow works with or without the table.
-- ⚠️ **The table does not exist yet.** Zoran must run `onboarding-reloaded-schema.sql` in the Supabase SQL editor (dashboard → SQL Editor). Until then, syncs silently no-op.
-- The Supabase MCP is configured in `~/.mcp.json` but was not connected this session.
+## Supabase sync — STATUS: live, table created + verified end-to-end
+- Every save upserts the submission to the `onboarding_reloaded` table (project `jnojmfmpnsfmtqmwhopz`), keyed by a localStorage `submission_key`. Null-guarded — flow works with or without the table.
+- ✅ **Table created 2026-05-21** via Supabase MCP migration `create_onboarding_reloaded_table` (DDL matches `onboarding-reloaded-schema.sql`).
+- ✅ **End-to-end sync verified 2026-05-21** — anon-key insert (201) / upsert with merge-duplicates on `submission_key` (200) / select (200) all pass against the live RLS policies.
+- Supabase MCP is connected (project `jnojmfmpnsfmtqmwhopz`).
 
 ## Testing
 - 51 automated jsdom render/interaction checks pass. Harness: `/tmp/jsdomtest.cjs`, jsdom at `/tmp/onbtest` (re-install if gone: `npm install jsdom --prefix /tmp/onbtest`). To re-run: extract the `<script>` block to a `.js` file, `node --check` it, then `node /tmp/jsdomtest.cjs`.
 - Not yet done: end-to-end Supabase sync test (needs the table), Zoran's final hands-on click-through approval.
 
 ## Open items
-- [ ] Zoran runs `onboarding-reloaded-schema.sql` → then verify sync end-to-end (push a test submission via the anon key).
+- [x] ~~Table created + end-to-end sync verified~~ — done 2026-05-21.
 - [ ] GoHighLevel signup link is a placeholder (`link.byanymeansbball.com/ghl-signup`) — needs the real URL.
 - [ ] Flow is a standalone prototype — not deployed to `bam-portal/public/`, not wired into the authed client portal (no client_id/auth; RLS is prototype-grade anon-open).
 - [ ] Final approval from Zoran.
