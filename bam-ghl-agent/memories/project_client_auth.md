@@ -137,6 +137,23 @@ Fix (commit `d35d124`): `clientUrl` is now a hardcoded constant
 (`https://portal.byanymeansbusiness.com`), not env-overridable. The stale
 `CLIENT_PORTAL_URL` env var can be deleted from Vercel.
 
+### ⚠️ Gotcha — owner needs a `client_users` row (found + fixed 2026-05-22)
+
+The multi-user portal resolves access ONLY from `client_users` (via the
+`my_client_ids()` RLS predicate). `clients.auth_user_id` alone does NOT
+grant portal access — the owner just sees "Your account is not linked to
+a client."
+
+All three client-creation paths in `api/clients.js` (staff "New client"
+default path, public signup, `setup-account`) created the `clients` row +
+auth user but never created the owner's `client_users` row. Only the
+2026-05-20 multi-user migration backfilled owner rows for clients that
+existed then; anything created after hit the wall.
+
+Fix: `ensureOwnerMembership()` helper in `api/clients.js`, called from
+all three create paths — idempotently inserts/reactivates the owner's
+`client_users` row (`role=owner, status=active`).
+
 **Files touched:**
 - `bam-portal/api/clients.js` (action router + recover call + email/auth_user_id in shapeClient)
 - `bam-portal/public/client-portal.html` (recovery card + boot detection + submitNewPassword)

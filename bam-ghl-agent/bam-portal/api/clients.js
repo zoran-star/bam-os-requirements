@@ -482,6 +482,40 @@ async function supabaseInsert(path, body) {
   return res.json();
 }
 
+// Ensures the academy OWNER has a client_users membership row. The
+// multi-user client portal resolves access ONLY from client_users — a
+// clients row (even with clients.auth_user_id set) is NOT enough; without
+// this row the owner sees "your account is not linked to a client".
+// Idempotent: reactivates an old/revoked row, no-op if already active.
+// Best-effort — logs on failure rather than breaking client creation.
+async function ensureOwnerMembership({ clientId, authUserId, name, email }) {
+  if (!clientId || !authUserId) return;
+  try {
+    const existing = await supabaseSelect(
+      `client_users?user_id=eq.${authUserId}&client_id=eq.${clientId}&select=id`
+    );
+    if (existing?.length) {
+      await fetch(`${SUPABASE_URL}/rest/v1/client_users?id=eq.${existing[0].id}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "owner", status: "active" }),
+      });
+      return;
+    }
+    await supabaseInsert("client_users", {
+      user_id: authUserId, client_id: clientId,
+      name: name || "", email: email || "",
+      role: "owner", status: "active",
+    });
+  } catch (err) {
+    console.error("ensureOwnerMembership failed:", err?.message || err);
+  }
+}
+
 // Resolves the canonical staff + client portal URLs used to build invite
 // and password-recovery redirect links in emails / Slack messages.
 //
@@ -791,8 +825,14 @@ export default async function handler(req, res) {
         }
 
         try {
-          await supabaseInsert("clients", {
+          const newRows = await supabaseInsert("clients", {
             business_name, owner_name, email, status: "onboarding", auth_user_id,
+          });
+          const newClient = Array.isArray(newRows) ? newRows[0] : newRows;
+          // Wire the owner into client_users so they can log in to the
+          // multi-user portal (clients.auth_user_id alone is not enough).
+          await ensureOwnerMembership({
+            clientId: newClient?.id, authUserId: auth_user_id, name: owner_name, email,
           });
           await logAttempt(true);
           return res.status(200).json(GENERIC_RESPONSE);
@@ -1665,6 +1705,14 @@ export default async function handler(req, res) {
           }
         }
 
+        // Wire the owner into client_users so they can log in to the
+        // multi-user portal (clients.auth_user_id alone is not enough).
+        // Runs for every mode incl. resend — idempotent, so it also
+        // backfills any client invited before this wiring existed.
+        await ensureOwnerMembership({
+          clientId: client_id, authUserId: auth_user_id, name: owner_name, email: newEmail,
+        });
+
         // Notify via Resend + Slack in parallel. For 'link-existing' the
         // copy is more about "you now have access" than "set your password",
         // but the invite email template is generic enough either way.
@@ -1825,6 +1873,11 @@ export default async function handler(req, res) {
           business_name, owner_name, email, status, auth_user_id,
         });
         const row = Array.isArray(rows) ? rows[0] : rows;
+        // Wire the owner into client_users so they can actually log in to
+        // the multi-user portal (clients.auth_user_id alone is not enough).
+        await ensureOwnerMembership({
+          clientId: row?.id, authUserId: auth_user_id, name: owner_name, email,
+        });
         return res.status(200).json({ id: row?.id, business_name: row?.business_name, email, invited: true });
       } catch (insertErr) {
         // Roll back the auth user if the clients insert fails so they don't get orphaned
