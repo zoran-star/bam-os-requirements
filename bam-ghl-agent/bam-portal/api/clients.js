@@ -485,12 +485,11 @@ async function supabaseInsert(path, body) {
 // Resolves the canonical staff + client portal URLs used to build invite
 // and password-recovery redirect links in emails / Slack messages.
 //
-// Production: env vars STAFF_PORTAL_URL + CLIENT_PORTAL_URL are set in
-// Vercel (e.g. https://staff.byanymeansbusiness.com and
-// https://portal.byanymeansbusiness.com). Falls back to the request's
-// own origin so localhost + preview deployments still work without env
-// vars. This matters because an invite sent from the staff portal needs
-// to land the client on the CLIENT portal, not whichever URL staff is on.
+// staffUrl honours the STAFF_PORTAL_URL env var. clientUrl is a hardcoded
+// constant — NOT env-overridable (see the note on the return). Both fall
+// back to the request's own origin on localhost so dev still works. This
+// matters because an invite sent from the staff portal must land the
+// client on the CLIENT portal, not whichever URL staff is on.
 function portalUrls(req) {
   const origin = req.headers.origin || `https://${req.headers.host}` || "";
   // Supabase only honours redirect_to URLs that match its allow-list. An
@@ -502,7 +501,14 @@ function portalUrls(req) {
   const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
   return {
     staffUrl: process.env.STAFF_PORTAL_URL || base,
-    clientUrl: process.env.CLIENT_PORTAL_URL || base,
+    // clientUrl is intentionally NOT env-overridable. A misconfigured
+    // CLIENT_PORTAL_URL silently breaks every client invite + password
+    // reset: Supabase rejects the off-allow-list redirect_to and falls
+    // back to the Site URL (the staff portal), landing clients on the
+    // wrong app. The client portal domain is stable — pin it. Confirmed
+    // 2026-05-21: a real invite's redirect_to came back as the staff
+    // Site URL because CLIENT_PORTAL_URL was set wrong in Vercel.
+    clientUrl: isLocal ? origin : "https://portal.byanymeansbusiness.com",
   };
 }
 
