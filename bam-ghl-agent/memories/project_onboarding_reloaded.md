@@ -60,7 +60,7 @@ The setup flow is embedded into the **Systems page** of `client-portal.html` (pe
 - [x] ~~GoHighLevel signup link~~ — set to Stripe checkout `buy.stripe.com/bJeaEZ1vC4NX6PvgM1gnK0z` (2026-05-21).
 - [x] ~~Deploy to `bam-portal/public/`~~ — done 2026-05-21; Vercel serves it at `/onboarding-reloaded.html`.
 - [x] ~~Embed into the client portal Systems page~~ — done 2026-05-22 (iframe sub-screen + progress card).
-- [ ] Embedded copy is still the standalone flow — no per-`client_id` auth/RLS scoping; submissions keyed only by an anon `submission_key`.
+- [x] ~~Per-`client_id` DB scoping~~ — done 2026-05-22. Schema: nullable `client_id uuid REFERENCES clients(id) ON DELETE CASCADE` + partial unique index. Parent passes `?client_id=<uuid>` into the iframe URL; `PARENT_CLIENT_ID` in onboarding-reloaded.html drives the upsert conflict target (`client_id` when present, `submission_key` otherwise). On boot, async `loadFromSupabaseByClient()` seeds localStorage from the DB when the DB row is newer — that's the cross-device resume path. Anon standalone path (no `client_id` in URL) still works via `submission_key`.
 - [ ] Decide whether onboarding-reloaded replaces the current `onboarding.html` public signup.
 - [ ] Final click-through approval from Zoran.
 

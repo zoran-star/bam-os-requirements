@@ -366,10 +366,19 @@ const IS_EMBED = (function(){
 if (IS_EMBED) document.documentElement.classList.add('embed');
 
 // ── Supabase sync — mirrors each submission to the onboarding_reloaded table ──
+// When embedded in the client portal with ?client_id=<uuid>, progress is keyed
+// by client_id (one row per client, cross-device resume). Standalone visits
+// fall back to a localStorage submission_key (anon, single-browser).
 const SB_URL = 'https://jnojmfmpnsfmtqmwhopz.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2ptZm1wbnNmbXRxbXdob3B6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2MjI1ODQsImV4cCI6MjA5MDE5ODU4NH0.8vUj-MHg73yUtQR5i3VAbgrTyjvmTCMM6-U3mGxbGGo';
 let _sb = null;
 try { if (window.supabase) _sb = window.supabase.createClient(SB_URL, SB_ANON); } catch(e){}
+const PARENT_CLIENT_ID = (function(){
+  try {
+    const v = new URLSearchParams(location.search).get('client_id');
+    return /^[a-f0-9-]{36}$/i.test(v || '') ? v : null;
+  } catch(e){ return null; }
+})();
 function submissionKey(){
   let k=null;
   try { k=localStorage.getItem('onboarding_reloaded_key'); } catch(e){}
@@ -393,11 +402,27 @@ function syncToSupabase(){
       updated_at: new Date().toISOString(),
       completed_at: state.completedAll ? (state.completed_at || new Date().toISOString()) : null
     };
+    if (PARENT_CLIENT_ID) row.client_id = PARENT_CLIENT_ID;
+    const onConflict = PARENT_CLIENT_ID ? 'client_id' : 'submission_key';
     try {
-      _sb.from('onboarding_reloaded').upsert(row,{onConflict:'submission_key'})
+      _sb.from('onboarding_reloaded').upsert(row,{onConflict:onConflict})
         .then(function(r){ if(r && r.error) console.warn('[onboarding sync]', r.error.message); });
     } catch(e){ console.warn('[onboarding sync]', e); }
   }, 1200);
+}
+
+// Load the most recent saved row for this client from the DB. Returns the
+// raw row or null. Used on boot to seed cross-device resume.
+async function loadFromSupabaseByClient(){
+  if(!_sb || !PARENT_CLIENT_ID) return null;
+  try {
+    const { data, error } = await _sb.from('onboarding_reloaded')
+      .select('answers, section_idx, status, completed_at, updated_at')
+      .eq('client_id', PARENT_CLIENT_ID)
+      .maybeSingle();
+    if (error) { console.warn('[onboarding load]', error.message); return null; }
+    return data || null;
+  } catch(e){ console.warn('[onboarding load]', e); return null; }
 }
 
 function q(o){ return Object.assign({ mandatory:false, hint:'', options:[], fields:[] }, o); }
@@ -664,8 +689,37 @@ function updateProgress(){
 }
 
 // ── Boot / welcome ─────────────────────────────────────────────────
-function boot(){
+async function boot(){
   loadConfig();
+  // If we know which client this is (embedded in the portal with
+  // ?client_id=<uuid>), pull the latest saved row from Supabase BEFORE
+  // reading localStorage. That gives us cross-device resume: the
+  // localStorage on this device might be empty/older, but the DB has the
+  // canonical state.
+  if (PARENT_CLIENT_ID) {
+    const dbRow = await loadFromSupabaseByClient();
+    if (dbRow && dbRow.answers && Object.keys(dbRow.answers).length > 0) {
+      const dbUpdated = dbRow.updated_at ? new Date(dbRow.updated_at).getTime() : 0;
+      const local = loadProgress();
+      const localUpdated = local && local.updated_at ? new Date(local.updated_at).getTime() : 0;
+      // Prefer the newer side. DB wins on a fresh device, local wins if
+      // the user just typed something here and hasn't synced yet.
+      if (dbUpdated >= localUpdated) {
+        const seeded = {
+          answers: dbRow.answers,
+          sectionIdx: dbRow.section_idx || 0,
+          completed: (local && local.completed) || [],
+          started: true,
+          completedAll: dbRow.status === 'completed',
+          completed_at: dbRow.completed_at || null,
+          updated_at: dbRow.updated_at || null,
+          pct: 0,
+          openOffer: null
+        };
+        try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(seeded)); } catch(e){}
+      }
+    }
+  }
   const saved = loadProgress();
   const btns = document.getElementById('welcome-btns');
   if (saved && saved.started && !saved.completedAll) {

@@ -6165,9 +6165,18 @@ function _renderSystemsOnboardingCard() {
 }
 
 // Opens the setup flow as a sub-screen of the Systems view.
+// Passes the active client_id so onboarding-reloaded.html scopes its DB
+// writes/reads per-client (cross-device resume via the onboarding_reloaded
+// table) instead of relying on a localStorage submission_key.
 function openSystemsOnboarding() {
   const frame = document.getElementById('systems-onboarding-frame');
-  if (frame && !frame.src) frame.src = 'onboarding-reloaded.html?embed=1';
+  if (frame) {
+    const cid = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
+      ? '&client_id=' + encodeURIComponent(CLIENT_ID)
+      : '';
+    const want = new URL('onboarding-reloaded.html?embed=1' + cid, location.href).href;
+    if (frame.src !== want) frame.src = want;
+  }
   const list = document.getElementById('systems-list');
   const detail = document.getElementById('systems-detail');
   const intake = document.getElementById('systems-intake');
