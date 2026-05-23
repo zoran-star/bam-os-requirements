@@ -26,6 +26,7 @@ const ContentView          = lazy(() => import('./views/ContentView'));
 const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 const InboxView            = lazy(() => import('./views/InboxView'));
+const ResourcesView        = lazy(() => import('./views/ResourcesView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -147,6 +148,7 @@ export default function BAMPortal() {
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
+  const canSeeResources = me?.role === "admin";
   // Feedback tab: ZORAN-ONLY (email-gated, not role-gated). The widget that
   // submits feedback is universal (any user, any page), but only Zoran can
   // see the list + check items off as resolved.
@@ -394,6 +396,7 @@ export default function BAMPortal() {
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
     feedback: ["Feedback", "Bug reports + portal feedback (admin only)"],
+    resources: ["Resources", "Library shown to all clients"],
     settings: ["Settings", "Preferences & integrations"],
   };
   const [pageTitle, pageDesc] = titles[nav] || ["Portal", ""];
@@ -413,6 +416,7 @@ export default function BAMPortal() {
     content: IconKnowledge,
     team: IconClients,
     training: IconTraining,
+    resources: IconKnowledge,
     settings: IconSettings,
   };
 
@@ -434,6 +438,7 @@ export default function BAMPortal() {
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
+        ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
         { label: "SM Training", key: "training", href: "/training" },
       ];
@@ -828,6 +833,7 @@ export default function BAMPortal() {
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
             </Suspense>
             </div>
           </div>

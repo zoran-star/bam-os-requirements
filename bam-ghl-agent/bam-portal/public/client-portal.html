@@ -4927,6 +4927,16 @@
         Marketing
       </div>
 
+      <div class="nav-item" onclick="switchView('resources', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </span>
+        Resources
+      </div>
+
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5777,6 +5787,194 @@ Then the call to action."]</div>
       }
     </style>
 
+    <!-- ══════════════════════════════
+         RESOURCES VIEW (admin-published library, all clients see it)
+    ══════════════════════════════ -->
+    <style>
+      #view-resources .res-toolbar {
+        display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+        margin-bottom:18px;
+      }
+      #view-resources .res-search {
+        flex:1; min-width:220px;
+        padding:10px 14px;
+        background:var(--surface); border:1px solid var(--border-med);
+        border-radius:10px; color:var(--text); font-size:14px; font-family:inherit;
+        outline:none;
+      }
+      #view-resources .res-search:focus { border-color:var(--accent-border); }
+      #view-resources .res-cats {
+        display:flex; gap:6px; flex-wrap:wrap;
+      }
+      #view-resources .res-cat-pill {
+        padding:6px 12px; border-radius:999px;
+        background:transparent; border:1px solid var(--border-med);
+        color:var(--text-sub); font-size:12px; font-weight:600;
+        cursor:pointer; font-family:inherit;
+        transition: all 0.12s ease;
+      }
+      #view-resources .res-cat-pill.active {
+        background:var(--accent-ghost); border-color:var(--accent-border); color:var(--accent);
+      }
+      #view-resources .res-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap:14px;
+      }
+      #view-resources .res-tile {
+        background:var(--surface);
+        border:1px solid var(--border-med);
+        border-radius:14px;
+        padding:18px;
+        cursor:pointer;
+        transition: transform 0.12s ease, border-color 0.12s ease;
+        display:flex; flex-direction:column; gap:10px;
+        min-height:140px;
+      }
+      #view-resources .res-tile:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-str);
+      }
+      #view-resources .res-tile-cat {
+        display:inline-block; padding:3px 9px; border-radius:999px;
+        font-size:10px; font-weight:700; letter-spacing:0.04em;
+        text-transform:uppercase;
+        align-self:flex-start;
+      }
+      #view-resources .res-tile-title {
+        font-size:15px; font-weight:600; color:var(--text);
+        line-height:1.35;
+      }
+      #view-resources .res-tile-desc {
+        font-size:12px; color:var(--text-sub);
+        line-height:1.55;
+        display:-webkit-box;
+        -webkit-line-clamp:3;
+        -webkit-box-orient:vertical;
+        overflow:hidden;
+      }
+      #view-resources .res-empty {
+        padding:60px 20px; text-align:center;
+        background:var(--surface); border:1px dashed var(--border-med);
+        border-radius:14px;
+        color:var(--text-sub); font-size:13px;
+      }
+      /* Detail page */
+      #view-resources .res-detail {
+        max-width:760px; margin:0 auto;
+      }
+      #view-resources .res-back {
+        display:inline-flex; align-items:center; gap:6px;
+        background:transparent; border:none; color:var(--text-sub);
+        cursor:pointer; font-size:13px; padding:6px 0; margin-bottom:18px;
+        font-family:inherit;
+      }
+      #view-resources .res-back:hover { color:var(--text); }
+      #view-resources .res-detail-cat {
+        display:inline-block; padding:4px 10px; border-radius:999px;
+        font-size:10px; font-weight:700; letter-spacing:0.04em;
+        text-transform:uppercase; margin-bottom:12px;
+      }
+      #view-resources .res-detail-title {
+        font-size:24px; font-weight:700; color:var(--text);
+        line-height:1.25; margin-bottom:8px;
+      }
+      #view-resources .res-detail-meta {
+        font-size:12px; color:var(--text-mute); margin-bottom:18px;
+      }
+      #view-resources .res-detail-desc {
+        font-size:14px; color:var(--text-sub); line-height:1.7;
+        margin-bottom:24px;
+        white-space:pre-wrap;
+      }
+      #view-resources .res-files-label {
+        font-size:11px; font-weight:600; letter-spacing:0.06em;
+        text-transform:uppercase; color:var(--text-mute);
+        margin-bottom:10px;
+      }
+      #view-resources .res-file {
+        display:flex; align-items:center; gap:14px;
+        padding:14px 16px;
+        background:var(--surface);
+        border:1px solid var(--border-med);
+        border-radius:10px;
+        margin-bottom:8px;
+      }
+      #view-resources .res-file-info { flex:1; min-width:0; }
+      #view-resources .res-file-name {
+        font-size:14px; color:var(--text); font-weight:500;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #view-resources .res-file-meta {
+        font-size:11px; color:var(--text-mute); margin-top:2px;
+      }
+      #view-resources .res-file-actions { display:flex; gap:6px; flex-shrink:0; }
+      #view-resources .res-file-btn {
+        padding:6px 12px; border-radius:6px;
+        background:transparent; border:1px solid var(--border-med);
+        color:var(--text-sub); font-size:12px; cursor:pointer;
+        font-family:inherit; text-decoration:none;
+        display:inline-flex; align-items:center;
+      }
+      #view-resources .res-file-btn:hover {
+        color:var(--text); border-color:var(--border-str);
+      }
+      /* Inline viewer */
+      #view-resources .res-viewer {
+        background:var(--surface);
+        border:1px solid var(--border-med);
+        border-radius:10px;
+        overflow:hidden;
+        margin-bottom:8px;
+      }
+      #view-resources .res-viewer iframe,
+      #view-resources .res-viewer video,
+      #view-resources .res-viewer img {
+        width:100%; display:block; max-width:100%;
+      }
+      #view-resources .res-viewer iframe { height:70vh; border:0; }
+      #view-resources .res-viewer video { max-height:70vh; background:#000; }
+      @media (max-width: 720px) {
+        #view-resources .res-detail-title { font-size:20px; }
+      }
+    </style>
+
+    <div class="view" id="view-resources">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Resources</span>
+          <div class="topbar-title">Resources</div>
+        </div>
+      </div>
+      <div class="content">
+
+        <!-- LIST PANEL -->
+        <div id="resources-list-panel">
+          <div class="res-toolbar">
+            <input class="res-search" id="resources-search" type="text" placeholder="Search title or description…" oninput="renderResourcesList()">
+          </div>
+          <div class="res-cats" id="resources-cats">
+            <button class="res-cat-pill active" data-cat="all" onclick="setResourcesCat('all')">All</button>
+          </div>
+          <div style="margin-top:18px">
+            <div id="resources-grid" class="res-grid">
+              <div class="res-empty">Loading resources…</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DETAIL PANEL -->
+        <div id="resources-detail-panel" class="res-detail" style="display:none">
+          <button class="res-back" onclick="closeResourceDetail()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            Back to resources
+          </button>
+          <div id="resources-detail-body"></div>
+        </div>
+
+      </div>
+    </div>
+
     <div class="view" id="view-team">
       <div class="topbar">
         <div>
@@ -5818,6 +6016,13 @@ Then the call to action."]</div>
         <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
       </svg>
       <span class="mobile-nav-label">Marketing</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-view="resources" onclick="mobileSwitchView('resources')" aria-label="Resources">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <span class="mobile-nav-label">Resources</span>
     </button>
     <button type="button" class="mobile-nav-item" data-feature="members" style="display:none" data-view="members" onclick="mobileSwitchView('members')" aria-label="Members">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -5870,6 +6075,9 @@ function switchView(name, el) {
 
   // When entering Systems, refresh the setup-progress card
   if (name === 'systems') _renderSystemsOnboardingCard();
+
+  // When entering Resources, load + render the library
+  if (name === 'resources') openResourcesView();
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
@@ -6080,6 +6288,255 @@ function renderClientSwitcher() {
 let TEAM_ROWS = [];
 let TEAM_MY_ROLE = null;
 let _revokeTeamMemberId = null;
+
+// ══════════════════════════════════════════════════════════════════════
+// RESOURCES VIEW — admin-published library, all clients see all resources
+// ══════════════════════════════════════════════════════════════════════
+const RESOURCES_BUCKET = 'resources';
+let _resourcesData = null;       // { resources: [...], categories: [...] }
+let _resourcesCat  = 'all';      // current category filter
+let _resourcesLoading = false;
+
+function _escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+function _formatBytes(n) {
+  if (n == null) return '';
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1024*1024*1024) return (n/(1024*1024)).toFixed(1) + ' MB';
+  return (n/(1024*1024*1024)).toFixed(2) + ' GB';
+}
+function _formatRelative(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const min = 60_000, hr = 60*min, day = 24*hr;
+  if (diff < min)     return 'just now';
+  if (diff < hr)      return Math.round(diff/min) + ' min ago';
+  if (diff < day)     return Math.round(diff/hr)  + ' hr ago';
+  if (diff < 2*day)   return 'yesterday';
+  if (diff < 7*day)   return Math.round(diff/day) + ' days ago';
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+function _resourceFileUrl(path) {
+  // Public bucket — direct URL
+  const { data } = _sb.storage.from(RESOURCES_BUCKET).getPublicUrl(path);
+  return data?.publicUrl || '';
+}
+function _resourceCanPreview(mime) {
+  if (!mime) return false;
+  return mime.startsWith('image/')
+      || mime.startsWith('video/')
+      || mime === 'application/pdf';
+}
+
+async function openResourcesView() {
+  // Render container + load if not loaded
+  if (!_resourcesData && !_resourcesLoading) await loadResources();
+  // Handle deep link
+  const hashId = _resourceIdFromHash();
+  if (hashId) renderResourceDetail(hashId);
+  else renderResourcesList();
+}
+
+async function loadResources() {
+  _resourcesLoading = true;
+  try {
+    const [resQ, catQ] = await Promise.all([
+      _sb.from('resources').select('*, resource_files(*)').order('created_at', { ascending:false }),
+      _sb.from('resource_categories').select('*').order('sort_order'),
+    ]);
+    if (resQ.error) throw resQ.error;
+    if (catQ.error) throw catQ.error;
+    // Sort files inside each resource by sort_order
+    const resources = (resQ.data || []).map(r => ({
+      ...r,
+      resource_files: (r.resource_files || []).sort((a,b) => (a.sort_order||0) - (b.sort_order||0)),
+    }));
+    _resourcesData = { resources, categories: catQ.data || [] };
+    _renderResourcesCats();
+  } catch (e) {
+    console.error('[resources] load failed', e);
+    _resourcesData = { resources: [], categories: [] };
+    const grid = document.getElementById('resources-grid');
+    if (grid) grid.innerHTML = '<div class="res-empty">Couldn’t load resources. Try again.</div>';
+  } finally {
+    _resourcesLoading = false;
+  }
+}
+
+function _renderResourcesCats() {
+  const wrap = document.getElementById('resources-cats');
+  if (!wrap || !_resourcesData) return;
+  const cats = _resourcesData.categories;
+  const parts = [`<button class="res-cat-pill ${_resourcesCat==='all'?'active':''}" data-cat="all" onclick="setResourcesCat('all')">All</button>`];
+  cats.forEach(c => {
+    const active = _resourcesCat === c.id;
+    parts.push(
+      `<button class="res-cat-pill ${active?'active':''}" data-cat="${c.id}" `
+      + `style="${active ? `color:${c.color};border-color:${c.color}55;background:${c.color}1a` : ''}" `
+      + `onclick="setResourcesCat('${c.id}')">${_escapeHtml(c.name)}</button>`
+    );
+  });
+  wrap.innerHTML = parts.join('');
+}
+
+function setResourcesCat(catId) {
+  _resourcesCat = catId;
+  _renderResourcesCats();
+  renderResourcesList();
+}
+
+function renderResourcesList() {
+  const grid = document.getElementById('resources-grid');
+  const listPanel = document.getElementById('resources-list-panel');
+  const detailPanel = document.getElementById('resources-detail-panel');
+  if (!grid) return;
+
+  // Showing list, not detail
+  if (listPanel) listPanel.style.display = '';
+  if (detailPanel) detailPanel.style.display = 'none';
+
+  if (!_resourcesData) {
+    grid.innerHTML = '<div class="res-empty">Loading resources…</div>';
+    return;
+  }
+
+  const q = (document.getElementById('resources-search')?.value || '').trim().toLowerCase();
+  const catById = {};
+  _resourcesData.categories.forEach(c => { catById[c.id] = c; });
+
+  const filtered = _resourcesData.resources.filter(r => {
+    if (_resourcesCat !== 'all' && r.category_id !== _resourcesCat) return false;
+    if (!q) return true;
+    return (r.title || '').toLowerCase().includes(q)
+        || (r.description || '').toLowerCase().includes(q);
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="res-empty">${
+      _resourcesData.resources.length === 0
+        ? 'No resources have been published yet.'
+        : 'No resources match your search.'
+    }</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(r => {
+    const c = catById[r.category_id];
+    const cBg = c ? `${c.color}1a` : 'var(--accent-ghost)';
+    const cBorder = c ? `${c.color}55` : 'var(--accent-border)';
+    const cColor = c ? c.color : 'var(--accent)';
+    return `
+      <div class="res-tile" onclick="openResourceDetail('${r.id}')">
+        <span class="res-tile-cat" style="background:${cBg};color:${cColor};border:1px solid ${cBorder}">
+          ${_escapeHtml(c ? c.name : '—')}
+        </span>
+        <div class="res-tile-title">${_escapeHtml(r.title)}</div>
+        ${r.description ? `<div class="res-tile-desc">${_escapeHtml(r.description)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function _resourceIdFromHash() {
+  const m = (window.location.hash || '').match(/resource=([a-f0-9-]+)/i);
+  return m ? m[1] : null;
+}
+
+function openResourceDetail(id) {
+  // Update hash so detail page is shareable
+  const newHash = `#resource=${id}`;
+  if (window.location.hash !== newHash) {
+    history.pushState(null, '', window.location.pathname + window.location.search + newHash);
+  }
+  renderResourceDetail(id);
+}
+
+function closeResourceDetail() {
+  if (window.location.hash.includes('resource=')) {
+    history.pushState(null, '', window.location.pathname + window.location.search);
+  }
+  renderResourcesList();
+}
+
+function renderResourceDetail(id) {
+  if (!_resourcesData) return;
+  const r = _resourcesData.resources.find(x => x.id === id);
+  const listPanel = document.getElementById('resources-list-panel');
+  const detailPanel = document.getElementById('resources-detail-panel');
+  const body = document.getElementById('resources-detail-body');
+  if (!detailPanel || !body) return;
+
+  if (!r) {
+    if (listPanel) listPanel.style.display = 'none';
+    detailPanel.style.display = '';
+    body.innerHTML = `<div class="res-empty">Resource not found.</div>`;
+    return;
+  }
+
+  if (listPanel) listPanel.style.display = 'none';
+  detailPanel.style.display = '';
+
+  const c = _resourcesData.categories.find(x => x.id === r.category_id);
+  const cBg = c ? `${c.color}1a` : 'var(--accent-ghost)';
+  const cBorder = c ? `${c.color}55` : 'var(--accent-border)';
+  const cColor = c ? c.color : 'var(--accent)';
+  const files = r.resource_files || [];
+
+  body.innerHTML = `
+    <span class="res-detail-cat" style="background:${cBg};color:${cColor};border:1px solid ${cBorder}">
+      ${_escapeHtml(c ? c.name : '—')}
+    </span>
+    <div class="res-detail-title">${_escapeHtml(r.title)}</div>
+    <div class="res-detail-meta">Added ${_formatRelative(r.created_at)}</div>
+    ${r.description ? `<div class="res-detail-desc">${_escapeHtml(r.description)}</div>` : ''}
+    <div class="res-files-label">${files.length} file${files.length === 1 ? '' : 's'}</div>
+    ${files.map(f => _renderResourceFileBlock(f)).join('')}
+  `;
+}
+
+function _renderResourceFileBlock(f) {
+  const url = _resourceFileUrl(f.storage_path);
+  const canPreview = _resourceCanPreview(f.mime_type);
+  let viewer = '';
+  if (canPreview && url) {
+    if (f.mime_type.startsWith('image/')) {
+      viewer = `<div class="res-viewer"><img src="${_escapeHtml(url)}" alt="${_escapeHtml(f.filename)}"></div>`;
+    } else if (f.mime_type.startsWith('video/')) {
+      viewer = `<div class="res-viewer"><video controls src="${_escapeHtml(url)}"></video></div>`;
+    } else if (f.mime_type === 'application/pdf') {
+      viewer = `<div class="res-viewer"><iframe src="${_escapeHtml(url)}#view=FitH" title="${_escapeHtml(f.filename)}"></iframe></div>`;
+    }
+  }
+  return `
+    ${viewer}
+    <div class="res-file">
+      <div class="res-file-info">
+        <div class="res-file-name">${_escapeHtml(f.filename)}</div>
+        <div class="res-file-meta">${_formatBytes(f.size_bytes)}${f.mime_type ? ' · ' + _escapeHtml(f.mime_type) : ''}</div>
+      </div>
+      <div class="res-file-actions">
+        ${url && !canPreview ? `<a class="res-file-btn" href="${_escapeHtml(url)}" target="_blank" rel="noopener">Open</a>` : ''}
+        ${url ? `<a class="res-file-btn" href="${_escapeHtml(url)}" download="${_escapeHtml(f.filename)}">Download</a>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// Browser back/forward should switch between list and detail
+window.addEventListener('popstate', () => {
+  // Only react when Resources is the active view
+  const activeView = document.querySelector('.view.active');
+  if (!activeView || activeView.id !== 'view-resources') return;
+  const hashId = _resourceIdFromHash();
+  if (hashId) renderResourceDetail(hashId);
+  else renderResourcesList();
+});
 
 async function fetchAndRenderTeam() {
   const box = document.getElementById('team-list-container');
