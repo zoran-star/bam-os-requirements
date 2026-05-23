@@ -180,15 +180,15 @@
 
     <div class="var-card training">
       <span class="var-tag">Type: training</span>
-      <h3 class="var-name">Training Class</h3>
-      <p class="var-desc">Ongoing skill development. Recurring weekly schedule. Athletes sign up for a class slot.</p>
+      <h3 class="var-name">Training</h3>
+      <p class="var-desc">Any ongoing skill-development program with a recurring schedule. Covers everything from a single drop-in class to a full multi-pillar youth academy — same data shape, different marketing.</p>
       <div class="var-extras">
         <div class="var-extras-label">Type-specific</div>
         <ul>
-          <li>Class capacity</li>
+          <li>Capacity (per slot)</li>
           <li>Closed dates</li>
-          <li>Skill level</li>
           <li>Recurring weekly schedule</li>
+          <li>"Program structure" long-form (used by academy-style offers)</li>
         </ul>
       </div>
     </div>
@@ -252,31 +252,17 @@
       </div>
     </div>
 
-    <div class="var-card academy">
-      <span class="var-tag">Type: academy</span>
-      <h3 class="var-name">Youth Academy</h3>
-      <p class="var-desc">All-in program. Often year-round, multi-pillar (skills + games + character). Higher-touch onboarding.</p>
+    <div class="var-card rental" style="border-style:solid;opacity:1;border-top:3px solid var(--red)">
+      <span class="var-tag">Type: gym_rental</span>
+      <h3 class="var-name">Gym Rental</h3>
+      <p class="var-desc">Selling court time to outside groups, teams, or events. Per-hour pricing, often B2B. Different buyer than the athlete-side offers, same overall data shape.</p>
       <div class="var-extras">
         <div class="var-extras-label">Type-specific</div>
-        <ul>
-          <li>Program structure description</li>
-          <li>What makes it different</li>
-          <li>Closed dates</li>
-          <li>Discovery call required</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="var-card rental">
-      <span class="var-tag">Type: facility (?)</span>
-      <h3 class="var-name">Gym Rental</h3>
-      <p class="var-desc">Selling court time to outside groups. Per-hour pricing. <b style="color:var(--red)">Open question:</b> is this an Offer or does it stay in the build menu?</p>
-      <div class="var-extras">
-        <div class="var-extras-label">Type-specific (if Offer)</div>
         <ul>
           <li>Per-hour rate + minimum block</li>
           <li>Court availability windows</li>
           <li>Insurance / waiver requirements</li>
+          <li>Setup / teardown time</li>
         </ul>
       </div>
     </div>
@@ -292,7 +278,7 @@
       <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
     </thead>
     <tbody>
-      <tr><td class="label">Type<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Training / Team / Camp / League / Tournament / Academy / (Gym Rental?)</td></tr>
+      <tr><td class="label">Type<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Training / Team / Camp / League / Tournament / Gym Rental</td></tr>
       <tr><td class="label">Name<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "Middle School Skill Training", "BAM 15U Black"</td></tr>
       <tr><td class="label">Description</td><td class="type">Open-Ended</td><td class="notes">Short blurb for the landing page</td></tr>
       <tr><td class="label">Age range</td><td class="type">Text Input</td><td class="notes">e.g. "U12-U14", "Grades 5-8"</td></tr>
@@ -391,8 +377,8 @@
     <tbody>
       <tr>
         <td class="item">Youth Academy</td>
-        <td><span class="pill offer">Offer type: Academy</span></td>
-        <td>It's a paid program with sales flow + registration + notifications — that's an offer.</td>
+        <td><span class="pill offer">Offer type: Training</span></td>
+        <td>Same data shape as a class. "Academy" is marketing positioning, not a different structure — folded in.</td>
       </tr>
       <tr>
         <td class="item">Camps / Clinics</td>
@@ -406,8 +392,8 @@
       </tr>
       <tr>
         <td class="item">Gym Rental</td>
-        <td><span class="pill offer">Offer type: Facility?</span> &nbsp; <i style="color:var(--text-mute);font-size:12px">— or stays in build menu</i></td>
-        <td>Selling court time is technically an offer. But the buyer is usually another org (B2B), not an athlete/parent. <b style="color:var(--red)">Open question.</b></td>
+        <td><span class="pill offer">Offer type: Gym Rental</span></td>
+        <td>Confirmed as an offer. B2B sales motion (different buyer) but the same data shape — pricing tiers, agreements, notifications, etc.</td>
       </tr>
       <tr>
         <td class="item">Upsells</td>
@@ -447,14 +433,12 @@
     </tbody>
   </table>
 
-  <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, <b>(Gym Rental?)</b>, + the existing "Build something else" overflow. The 4 offer-types (Academy, Camp, Tournament, Class) get configured under Business Blueprint &gt; Offers instead.</p>
+  <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, + the existing "Build something else" overflow. The 6 offer-types (Training, Team, Camp, League, Tournament, Gym Rental) get configured under Business Blueprint &gt; Offers instead.</p>
 
   <!-- ── Open questions ─────────────────────────────────────────────── -->
   <div class="questions">
     <h2>Open questions for you</h2>
     <ol>
-      <li><b>Gym Rental — Offer or build item?</b><br>
-        If Offer: B2B variation (different sales flow). If build item: stays as-is in the menu. My read: keep it in the build menu — different buyer, different motion.</li>
       <li><b>Other Business Blueprint cards?</b><br>
         I proposed: Offers, Branding, Website. Should there be more? (e.g. Brand voice, Selling points / mission, Pricing philosophy, Coach bios?)</li>
       <li><b>What about the Class flow on /class-setup.html?</b><br>
