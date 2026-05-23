@@ -300,6 +300,121 @@
     </tbody>
   </table>
 
+  <!-- ── Scheduling per type ────────────────────────────────────────── -->
+  <h2>Scheduling — by offer type</h2>
+  <p class="sub">Every offer has a <b>Schedule</b> section, but the questions inside it change based on Type. A camp asks "start and end dates"; a class asks "weekly schedule"; a gym rental asks "available booking windows". Same section, conditional fields.</p>
+
+  <div class="variations">
+
+    <div class="var-card training">
+      <span class="var-tag">Training schedule</span>
+      <h3 class="var-name">Recurring weekly</h3>
+      <p class="var-desc">Same blocks repeat every week (with break windows). Athletes show up to their slot.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Schedule consistency: Y/N</li>
+          <li>Weekly blocks: <i>day · start · end · location</i> (builder)</li>
+          <li>Capacity per slot</li>
+          <li>Closed dates / break windows</li>
+          <li>Year-round or seasonal?</li>
+          <li>If irregular → how is the schedule communicated?</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card team">
+      <span class="var-tag">Team schedule</span>
+      <h3 class="var-name">Season + tryouts + games</h3>
+      <p class="var-desc">Practice is recurring during the season. Game schedule usually comes from an external league.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Season start / end dates</li>
+          <li>Tryouts: Y/N → date(s), time(s), location, capacity</li>
+          <li>Practice schedule (weekly builder, during season)</li>
+          <li>League name(s) — where games come from</li>
+          <li>Tournament commitments (rough count)</li>
+          <li>Game calendar link (external)</li>
+          <li>Off-season activity (optional)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card camp">
+      <span class="var-tag">Camp schedule</span>
+      <h3 class="var-name">Multi-day intensive</h3>
+      <p class="var-desc">Fixed dates. Single block of days. Daily timetable usually repeats.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Start date / end date</li>
+          <li>Days included (e.g. Mon-Fri vs M/W/F)</li>
+          <li>Daily timeline same every day? Y/N</li>
+          <li>If yes → start / end time + lunch break</li>
+          <li>If no → per-day schedule builder</li>
+          <li>Sessions-per-day (single / double-session AM+PM)</li>
+          <li>Registration deadline</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card league">
+      <span class="var-tag">League schedule</span>
+      <h3 class="var-name">Recurring season</h3>
+      <p class="var-desc">Like a team but in-house. Games on a recurring day; full season has registration → games → playoffs.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Season start / end</li>
+          <li>Game day(s) + time window (e.g. Sat 10am-2pm)</li>
+          <li>Number of weeks</li>
+          <li>Registration opens / closes</li>
+          <li>Playoff week(s)</li>
+          <li>Awards / banquet date (optional)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card tourney">
+      <span class="var-tag">Tournament schedule</span>
+      <h3 class="var-name">Single event (1-3 days)</h3>
+      <p class="var-desc">One-time event. Game schedule generated after registration closes.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Event date(s) — single day or weekend range</li>
+          <li>Check-in time</li>
+          <li>First game time / estimated end time</li>
+          <li>Registration deadline</li>
+          <li>Schedule generation: pre-set OR generated post-reg</li>
+          <li>Awards / closing time</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card rental" style="border-style:solid;opacity:1;border-top:3px solid var(--red)">
+      <span class="var-tag">Rental schedule</span>
+      <h3 class="var-name">On-demand booking windows</h3>
+      <p class="var-desc">Customer books a block within the gym's available windows. No fixed event date.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Fields</div>
+        <ul>
+          <li>Available windows (builder: <i>day-of-week · start · end</i>)</li>
+          <li>Minimum block (hours)</li>
+          <li>Maximum block (hours)</li>
+          <li>Buffer between rentals (minutes)</li>
+          <li>Advance notice required</li>
+          <li>Blackout dates / unavailable periods</li>
+          <li>Booking method: real-time calendar / request / phone</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="sub" style="margin-top:-8px"><b style="color:var(--gold)">Shared across all types:</b> Location (pick from the Settings &gt; Locations list), staff/coaches assigned, "who notify when schedule changes".</p>
+
   <!-- ── Pricing variants ───────────────────────────────────────────── -->
   <h2>Pricing variants (conditional on the "Pricing model" pick)</h2>
   <p class="sub">Same pattern that exists today inside the iframe's OFFER_FORM — just exposed cleaner now. Each variant has its own tier-builder + agreement notes.</p>
@@ -436,13 +551,23 @@
   <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, + the existing "Build something else" overflow. The 6 offer-types (Training, Team, Camp, League, Tournament, Gym Rental) get configured under Business Blueprint &gt; Offers instead.</p>
 
   <!-- ── Open questions ─────────────────────────────────────────────── -->
+  <!-- ── Settled decisions ──────────────────────────────────────────── -->
+  <div class="insight" style="border-color:rgba(74,222,128,0.25); border-left-color:var(--green); background:linear-gradient(180deg, rgba(74,222,128,0.05), rgba(74,222,128,0.01));">
+    <div class="kicker" style="color:var(--green)">Settled · 2026-05-23</div>
+    <p style="margin-bottom:4px"><b style="color:var(--green)">✓</b> Youth Academy folds into Training (same data shape — academy framing is marketing, not structure).</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Gym Rental is an offer (B2B variation, same skeleton).</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Branding is a Business Blueprint card.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Each offer has a type-aware Schedule section (recurring / season / event / on-demand all live in the same form, conditional on Type).</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Add-ons becomes a builder (name + price + description), required on every offer.</p>
+  </div>
+
   <div class="questions">
     <h2>Open questions for you</h2>
     <ol>
       <li><b>Other Business Blueprint cards?</b><br>
-        I proposed: Offers, Branding, Website. Should there be more? (e.g. Brand voice, Selling points / mission, Pricing philosophy, Coach bios?)</li>
-      <li><b>What about the Class flow on /class-setup.html?</b><br>
-        That standalone onboarding page exists today as part of the 3-step Class · Offer · Parent Onboarding flow. If "Class" is now just "Offer type: Training", does /class-setup.html get deprecated / replaced by the Business Blueprint &gt; Offers editor?</li>
+        Confirmed so far: Offers, Branding, Website. Should there be more? (e.g. Brand voice, Selling points / mission, Pricing philosophy, Coach bios, Marketing assets?)</li>
+      <li><b>/class-setup.html deprecation timing?</b><br>
+        Now that Class is just "Offer type: Training" with proper type-aware scheduling, the standalone 3-step flow (Class &middot; Offer &middot; Parent Onboarding) becomes redundant once the Offers editor ships. Path forward = build the editor, redirect class-setup.html to it. Confirm the timing — same release, or keep both running during transition?</li>
       <li><b>Does "Upsells" deprecate entirely, or stay for non-add-on upsell campaigns?</b><br>
         e.g. "Buy 10 sessions get 1 free" is technically a pricing thing not an add-on. Could stay in build menu as a discount-campaign tile.</li>
       <li><b>Existing offer data in <code>onboarding_reloaded</code> — migrate or start fresh?</b><br>
