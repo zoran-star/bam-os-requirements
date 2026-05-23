@@ -202,6 +202,16 @@
     border-top: 1px dashed var(--border);
   }
   .offer-detail-body h4:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .offer-detail-body h5 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 16px 0 6px;
+    padding: 0;
+    border: 0;
+  }
+  .offer-detail-body h5:first-of-type { margin-top: 8px; }
   .offer-detail-body .field-table { margin-bottom: 0; }
   .offer-detail-body .field-table th { background: rgba(255,255,255,0.02); }
   .offer-detail-body .ref {
@@ -510,71 +520,103 @@
     </summary>
     <div class="offer-detail-body">
 
-      <h4>General info</h4>
-      <p style="font-size:12px; color:var(--text-mute); margin:0 0 10px; font-style:italic;">Team is a <b style="color:var(--gold)">program-level</b> offer — one offer = one travel/competitive program. Add each specific team inside the Teams builder below.</p>
+      <h4>General</h4>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">Program-wide info that applies to <b>every team</b> in the program. The umbrella stuff — overall identity, value, pricing model, sales process, onboarding flow.</p>
+
+      <h5>Identity</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Program title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "BAM Elite Travel" or "BAM Spring AAU" — the umbrella program</td></tr>
+        <tr><td class="label">Program title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "BAM Elite Travel" or "BAM Spring AAU"</td></tr>
         <tr><td class="label">Short description</td><td class="type">Open-Ended</td><td class="notes">One-liner for the landing page</td></tr>
-        <tr><td class="label">Age range covered<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Overall range across all teams in the program (e.g. "U10-U18")</td></tr>
+        <tr><td class="label">Age range covered<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Overall across all teams (e.g. "U10-U18")</td></tr>
         <tr><td class="label">Gender(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls</td></tr>
         <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
-        <tr><td class="label"><b style="color:var(--gold)">Teams</b><span class="req">required</span></td><td class="type">Block Builder</td><td class="notes"><b style="color:var(--gold)">Add a row per specific team.</b> Sub-fields per team: Team title (e.g. "15U Black") · Age group (e.g. "15U") · Level (Local / Rep / AAU / Elite) · Gender · Coach assigned (Staff Selector) · Roster capacity · Practice location · Practice schedule (day · start · end) · Team-specific fee (optional override)</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
-      </tbody></table>
-
-      <h4>Schedule</h4>
-      <p style="font-size:12px; color:var(--text-mute); margin:0 0 10px; font-style:italic;">Program-wide scheduling. Each team's practice schedule lives inside its row in the Teams builder above.</p>
-      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When the program's season runs (e.g. "March 1 → July 31")</td></tr>
-        <tr><td class="label">Tryouts?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Tryout style</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Tryouts = Yes</span> Unified (all teams together) / Per team (each team runs its own)</td></tr>
-        <tr><td class="label">Unified tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Tryout style = Unified</span> date(s), time(s), location, cost, capacity, what to bring</td></tr>
-        <tr><td class="label">League(s) competing in</td><td class="type">Text Input</td><td class="notes">Where games come from (program-wide)</td></tr>
-        <tr><td class="label">Game schedule link</td><td class="type">Link Input</td><td class="notes">External game calendar URL (if league provides one)</td></tr>
+        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When the program's season runs (e.g. "Mar 1 → Jul 31")</td></tr>
+        <tr><td class="label">League(s) competing in</td><td class="type">Text Input</td><td class="notes">Where games come from</td></tr>
         <tr><td class="label">Tournament count</td><td class="type">Text Input</td><td class="notes">Approx. # of tournaments per team per season</td></tr>
-        <tr><td class="label">Off-season activity</td><td class="type">Open-Ended</td><td class="notes">Optional — what the program does after the regular season</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
+        <tr><td class="label">Off-season activity</td><td class="type">Open-Ended</td><td class="notes">What the program does after the regular season</td></tr>
       </tbody></table>
 
-      <h4>Value</h4>
+      <h5>Value</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the team operates — practices, games, off-season, philosophy</td></tr>
-        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this team vs. other competitive programs</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
+        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the program operates — practice rhythm, games, season arc, philosophy</td></tr>
+        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this program vs. other competitive programs</td></tr>
       </tbody></table>
 
-      <h4>Pricing</h4>
+      <h5>Pricing structure</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Team fee<span class="req">required</span></td><td class="type">Text Input (currency)</td><td class="notes">Total season cost</td></tr>
+        <tr><td class="label">Default team fee<span class="req">required</span></td><td class="type">Text Input (currency)</td><td class="notes">Base season cost per team (each team in the builder can override)</td></tr>
         <tr><td class="label">Payment structure</td><td class="type">Check One</td><td class="notes">Full upfront / Monthly installments / Custom</td></tr>
         <tr><td class="label">Tryout fee</td><td class="type">Text Input (currency)</td><td class="notes">If any — collected at registration or at door</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Uniforms, travel, tournament fees, gear bundles</td></tr>
         <tr><td class="label">Discount codes</td><td class="type">Text Input</td><td class="notes">Sibling, multi-team, etc.</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
-      <h4>Sales</h4>
+      <h5>Sales process</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Tryouts?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
+        <tr><td class="label">Tryout style</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Tryouts = Yes</span> Unified (all teams together) / Per team (details on each team's row)</td></tr>
+        <tr><td class="label">Unified tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Tryout style = Unified</span> date(s), time(s), location, capacity, what to bring</td></tr>
         <tr><td class="label">Tryout registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Age · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Position · Height · Current team · Highlight film URL · GPA · School · Goals · Anything else (custom)</td></tr>
         <tr><td class="label">Selection process</td><td class="type">Check One</td><td class="notes">Open tryouts / invite-only / hybrid</td></tr>
         <tr><td class="label">Selection notification timing</td><td class="type">Text Input</td><td class="notes">e.g. "within 48 hours of last tryout"</td></tr>
-        <tr><td class="label">Spot-offer message</td><td class="type">Open-Ended</td><td class="notes">Email/SMS template for selected players</td></tr>
-        <tr><td class="label">Spot acceptance deadline</td><td class="type">Text Input</td><td class="notes">How many days to accept</td></tr>
-        <tr><td class="label">Deposit / payment plan</td><td class="type">Open-Ended</td><td class="notes">Full / monthly / partial + balance</td></tr>
-        <tr><td class="label">Waitlist for non-selected</td><td class="type">Check One</td><td class="notes">Y/N — "we'll let you know if a spot opens"</td></tr>
-        <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Target offer + description ("Cut player → offer skill training")</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
+        <tr><td class="label">Spot-offer message</td><td class="type">Open-Ended</td><td class="notes">Email/SMS template sent to selected players</td></tr>
+        <tr><td class="label">Spot acceptance deadline</td><td class="type">Text Input</td><td class="notes">How many days the player has to accept</td></tr>
+        <tr><td class="label">Waitlist for non-selected</td><td class="type">Check One</td><td class="notes">Yes / No — "we'll let you know if a spot opens"</td></tr>
+        <tr><td class="label">Notify on new lead</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a tryout signup comes in</td></tr>
+        <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Target offer + description ("Cut player → pitch skill training")</td></tr>
       </tbody></table>
 
-      <h4>Onboarding</h4>
+      <h5>Onboarding</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, player code of conduct, parent code of conduct, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, player + parent codes of conduct, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the player + parent get at the start — roster welcome message, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to team chat. Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Uniform sizing collection</td><td class="type">Check Many</td><td class="notes">Jersey · Shorts · Warm-up · Shoe size · (optional: dietary, allergies)</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered</td></tr>
+      </tbody></table>
+
+      <h5>Extra notes</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Anything program-wide we missed</td><td class="type">Open-Ended</td><td class="notes">Catch-all for the General section</td></tr>
+      </tbody></table>
+
+      <h4>Per team</h4>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">A repeating <b style="color:var(--gold)">Block Builder</b> — add one row for every specific team in the program (15U Black, 16U Black, U14 Girls, etc.). Each team gets its own identity, practice schedule, and overrides.</p>
+
+      <h5>Per-team identity</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Team title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "15U Black"</td></tr>
+        <tr><td class="label">Age group<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "15U"</td></tr>
+        <tr><td class="label">Level<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Local / Rep / AAU / Elite / Other</td></tr>
+        <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Boys / Girls</td></tr>
+        <tr><td class="label">Head coach<span class="req">required</span></td><td class="type">Staff Selector</td><td class="notes">Who runs the team</td></tr>
+        <tr><td class="label">Assistant coaches</td><td class="type">Staff Selector</td><td class="notes">Optional</td></tr>
+        <tr><td class="label">Roster capacity</td><td class="type">Text Input</td><td class="notes">Max players (e.g. 12)</td></tr>
+      </tbody></table>
+
+      <h5>Per-team schedule</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Practice location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
+        <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Day · start · end (e.g. Mon 6-8pm, Wed 6-8pm)</td></tr>
+        <tr><td class="label">Season override</td><td class="type">Text Input</td><td class="notes">Only if this team's season differs from the program-wide dates above</td></tr>
+        <tr><td class="label">Per-team tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if program Tryout style = Per team</span> date(s), time(s), location, cost, what to bring</td></tr>
+      </tbody></table>
+
+      <h5>Per-team pricing override</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Team fee override</td><td class="type">Text Input (currency)</td><td class="notes">Only if this team's fee differs from the program default. Leave blank to inherit.</td></tr>
+        <tr><td class="label">Team-specific add-ons</td><td class="type">Block Builder</td><td class="notes">Only this team's unique add-ons (e.g. uniform that only Elite teams get). Program-wide add-ons inherit automatically.</td></tr>
+      </tbody></table>
+
+      <h5>Per-team onboarding</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Season kickoff event?</td><td class="type">Check One</td><td class="notes">Yes / No (meet-the-coach, team photo, etc.)</td></tr>
-        <tr><td class="label">Kickoff date + location</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Kickoff = Yes</span> When and where</td></tr>
-        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered (point of contact)</td></tr>
-        <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
+        <tr><td class="label">Kickoff date + location</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Kickoff = Yes</span> When and where for this specific team</td></tr>
+        <tr><td class="label">Team communication channel</td><td class="type">Open-Ended</td><td class="notes">Optional — if this team uses a different group chat / TeamSnap board than the program default</td></tr>
+      </tbody></table>
+
+      <h5>Per-team extra notes</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Anything team-specific we missed</td><td class="type">Open-Ended</td><td class="notes">Catch-all for this team's row</td></tr>
       </tbody></table>
 
     </div>
