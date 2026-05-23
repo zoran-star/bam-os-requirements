@@ -121,8 +121,11 @@ async function resolveUser(req) {
 // ─────────────────────────────────────────────────────────
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
+  // Platform key — required for connected-account writes (Stripe-Account header).
+  // Falls back to STRIPE_SECRET_KEY if STRIPE_CONNECT_SECRET_KEY isn't set.
+  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   const headers = {
-    Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+    Authorization: `Bearer ${stripeSecret}`,
   };
   if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
   if (stripeAccount) headers["Stripe-Account"] = stripeAccount;

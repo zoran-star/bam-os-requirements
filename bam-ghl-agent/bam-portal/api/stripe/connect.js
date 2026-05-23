@@ -14,8 +14,14 @@
 //   GET  /api/stripe/connect?code=...&state=...      → 302 back to portal
 //
 // Env vars:
-//   STRIPE_SECRET_KEY            platform secret key (already exists; used as
-//                                client_secret in the OAuth token exchange)
+//   STRIPE_CONNECT_SECRET_KEY    PLATFORM secret key (the account where Connect
+//                                is enabled). Used as client_secret in the OAuth
+//                                token exchange. Falls back to STRIPE_SECRET_KEY
+//                                if unset — so when the platform & the legacy
+//                                STRIPE_SECRET_KEY are the same account, no new
+//                                var needed; when they're different (e.g. BAM
+//                                Business platform vs BAM Toronto financials),
+//                                set this explicitly to the platform key.
 //   STRIPE_CONNECT_CLIENT_ID     OAuth client id from Stripe Connect settings
 //                                (the ca_xxxxx string)
 //   STRIPE_CONNECT_STATE_SECRET  HMAC secret for the state token
@@ -219,8 +225,10 @@ async function handleCallback(req, res) {
   catch (e) { return redirectBack(res, "error", `state: ${e.message}`); }
   if (!payload.client_id) return redirectBack(res, "error", "state missing client_id");
 
-  const stripeSecret = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecret) return redirectBack(res, "error", "STRIPE_SECRET_KEY not configured");
+  // Use the platform secret key for token exchange. Falls back to the legacy
+  // STRIPE_SECRET_KEY if STRIPE_CONNECT_SECRET_KEY isn't set.
+  const stripeSecret = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecret) return redirectBack(res, "error", "STRIPE_CONNECT_SECRET_KEY (or STRIPE_SECRET_KEY) not configured");
 
   // Exchange code for the connected-account id (`stripe_user_id` = acct_...).
   // For Standard accounts we don't store the returned `access_token` — we use
