@@ -494,7 +494,7 @@
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets at the start — welcome message (email + SMS copy), welcome packet, first-session prep (what to bring, parking, who to ask for, what to wear). Attach any number of PDFs / videos / images.</td></tr>
         <tr><td class="label">Parent intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Parent name · Phone · Email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Medical / allergies · School · Grade · Goals · Experience level · Jersey size · Anything else (custom)</td></tr>
-        <tr><td class="label">Onboarding notify</td><td class="type">Staff Selector</td><td class="notes">Point of contact for the new athlete</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when someone signs up for this offer (point of contact for the new athlete)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -565,15 +565,12 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
-        <tr><td class="label">Roster welcome message</td><td class="type">Open-Ended</td><td class="notes">Sent to player + parent on roster confirmation</td></tr>
-        <tr><td class="label">Uniform sizing collection</td><td class="type">Check Many</td><td class="notes">Jersey, shorts, warm-up, shoe size</td></tr>
-        <tr><td class="label">Player code of conduct</td><td class="type">File Upload</td><td class="notes">Signed at onboarding</td></tr>
-        <tr><td class="label">Parent code of conduct</td><td class="type">File Upload</td><td class="notes">Signed at onboarding</td></tr>
-        <tr><td class="label">Schedule delivery channel</td><td class="type">Check One</td><td class="notes">TeamSnap / WhatsApp / Email / SportsEngine / etc.</td></tr>
-        <tr><td class="label">Communication channel setup</td><td class="type">Open-Ended</td><td class="notes">How parents/players get added to the team chat</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, player code of conduct, parent code of conduct, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the player + parent get at the start — roster welcome message, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to team chat. Attach PDFs / videos / images.</td></tr>
+        <tr><td class="label">Uniform sizing collection</td><td class="type">Check Many</td><td class="notes">Jersey · Shorts · Warm-up · Shoe size · (optional: dietary, allergies)</td></tr>
         <tr><td class="label">Season kickoff event?</td><td class="type">Check One</td><td class="notes">Yes / No (meet-the-coach, team photo, etc.)</td></tr>
         <tr><td class="label">Kickoff date + location</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Kickoff = Yes</span> When and where</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered (point of contact)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -642,13 +639,10 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
-        <tr><td class="label">Day-before reminder</td><td class="type">Open-Ended</td><td class="notes">Email + SMS copy with logistics</td></tr>
-        <tr><td class="label">What to bring</td><td class="type">Open-Ended</td><td class="notes">Ball, water bottle, lunch, basketball shoes</td></tr>
-        <tr><td class="label">Check-in / parking instructions</td><td class="type">Open-Ended</td><td class="notes">Where to drop off, parking, who to ask for</td></tr>
-        <tr><td class="label">Medical / emergency contact form</td><td class="type">Check Many</td><td class="notes">Required fields, allergies, meds, contact</td></tr>
-        <tr><td class="label">Photo / video release</td><td class="type">File Upload</td><td class="notes">Signed before day 1</td></tr>
-        <tr><td class="label">Daily schedule to parents</td><td class="type">Check One</td><td class="notes">Y/N — sent night before each day</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, photo / video release, medical, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets before day 1 — day-before reminder (email + SMS), what to bring (ball, water, lunch, shoes), check-in / parking instructions. Attach PDFs / videos / images.</td></tr>
+        <tr><td class="label">Daily schedule to parents?</td><td class="type">Check One</td><td class="notes">Yes / No — sent night before each day</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when someone registers (point of contact)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -720,12 +714,10 @@
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
-        <tr><td class="label">Roster confirmation</td><td class="type">Open-Ended</td><td class="notes">Email to captain + all players once roster is locked</td></tr>
-        <tr><td class="label">Schedule release</td><td class="type">Open-Ended</td><td class="notes">When + how published</td></tr>
-        <tr><td class="label">Rulebook delivery</td><td class="type">File Upload</td><td class="notes">PDF sent at onboarding</td></tr>
-        <tr><td class="label">Equipment requirements</td><td class="type">Open-Ended</td><td class="notes">What players need to bring</td></tr>
+        <tr><td class="label">Rulebook</td><td class="type">File Upload</td><td class="notes">PDF sent at onboarding — game rules, conduct, scoring</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything captains + players get at the start — roster confirmation, when/how the schedule is released, equipment to bring, comm channel setup (TeamSnap / WhatsApp / Slack / Email). Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Standings page link</td><td class="type">Link Input</td><td class="notes">URL where standings live</td></tr>
-        <tr><td class="label">Communication channel</td><td class="type">Check One</td><td class="notes">TeamSnap / WhatsApp / Slack / Email</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a team / player registers</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -801,12 +793,11 @@
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Rules document</td><td class="type">File Upload</td><td class="notes">Tournament rules — distributed at registration + check-in</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything teams get before the event — game schedule delivery (email + posted at venue), check-in process (where, when, by whom, what to bring), parking / drop-off / restrooms / concessions info. Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Bracket release timing</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Brackets = Yes</span> Week-of / 48hr / day-of</td></tr>
-        <tr><td class="label">Game schedule delivery</td><td class="type">Open-Ended</td><td class="notes">Email + posted at venue</td></tr>
-        <tr><td class="label">Check-in process</td><td class="type">Open-Ended</td><td class="notes">Where, when, by whom, what to bring</td></tr>
-        <tr><td class="label">Rules document</td><td class="type">File Upload</td><td class="notes">Distributed at registration + check-in</td></tr>
-        <tr><td class="label">Score-keeper assignments</td><td class="type">Staff Selector</td><td class="notes">Who runs the table per court</td></tr>
-        <tr><td class="label">Parking / venue info</td><td class="type">Open-Ended</td><td class="notes">Parking, drop-off, restrooms, concessions</td></tr>
+        <tr><td class="label">Score-keeper assignments</td><td class="type">Staff Selector</td><td class="notes">Who runs the table per court (operational)</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a team / player registers</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -878,14 +869,11 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
-        <tr><td class="label">Booking confirmation comms</td><td class="type">Open-Ended</td><td class="notes">Email + calendar invite after contract + deposit</td></tr>
-        <tr><td class="label">Access instructions</td><td class="type">Open-Ended</td><td class="notes">Gate code / lockbox / staff meets / key card</td></tr>
-        <tr><td class="label">Equipment access notes</td><td class="type">Open-Ended</td><td class="notes">Where equipment is stored, what's accessible</td></tr>
-        <tr><td class="label">House rules document</td><td class="type">File Upload</td><td class="notes">Noise, cleanup, food/drink rules</td></tr>
-        <tr><td class="label">Emergency / first aid info</td><td class="type">Open-Ended</td><td class="notes">First aid location, AED, exits</td></tr>
-        <tr><td class="label">Day-of point of contact</td><td class="type">Staff Selector</td><td class="notes">Who renter calls if something goes wrong</td></tr>
-        <tr><td class="label">Day-before reminder</td><td class="type">Check One</td><td class="notes">Y/N — sent 24h before</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, house rules — noise / cleanup / food, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the renter gets before the rental — booking confirmation (email + calendar invite), access instructions (gate code / lockbox / staff meets / key card), equipment access notes, emergency + first aid info, day-before reminder. Attach PDFs / videos / images.</td></tr>
+        <tr><td class="label">Day-before reminder?</td><td class="type">Check One</td><td class="notes">Yes / No — sent 24h before</td></tr>
+        <tr><td class="label">Day-of point of contact</td><td class="type">Staff Selector</td><td class="notes">Who renter calls during the rental if something goes wrong</td></tr>
+        <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a new booking is made</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
