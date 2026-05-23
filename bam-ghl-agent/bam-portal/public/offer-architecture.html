@@ -493,11 +493,8 @@
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets at the start — welcome message (email + SMS copy), welcome packet, first-session prep (what to bring, parking, who to ask for, what to wear). Attach any number of PDFs / videos / images.</td></tr>
-        <tr><td class="label">Parent intake form fields</td><td class="type">Check Many</td><td class="notes">Emergency contact, medical, school, goals, experience, jersey size, etc.</td></tr>
+        <tr><td class="label">Parent intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Parent name · Phone · Email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Medical / allergies · School · Grade · Goals · Experience level · Jersey size · Anything else (custom)</td></tr>
         <tr><td class="label">Onboarding notify</td><td class="type">Staff Selector</td><td class="notes">Point of contact for the new athlete</td></tr>
-        <tr><td class="label">30-day check-in?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Check-in cadence + who reaches out</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if 30-day check-in = Yes</span> e.g. "After 30 days, head coach calls"</td></tr>
-        <tr><td class="label">New-customer survey timing</td><td class="type">Text Input</td><td class="notes">After 2 weeks / after first month / never</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -555,7 +552,7 @@
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Tryout registration form fields</td><td class="type">Check Many</td><td class="notes">Name, age, position, height, current team, parent, highlight film, GPA</td></tr>
+        <tr><td class="label">Tryout registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Age · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Position · Height · Current team · Highlight film URL · GPA · School · Goals · Anything else (custom)</td></tr>
         <tr><td class="label">Selection process</td><td class="type">Check One</td><td class="notes">Open tryouts / invite-only / hybrid</td></tr>
         <tr><td class="label">Selection notification timing</td><td class="type">Text Input</td><td class="notes">e.g. "within 48 hours of last tryout"</td></tr>
         <tr><td class="label">Spot-offer message</td><td class="type">Open-Ended</td><td class="notes">Email/SMS template for selected players</td></tr>
@@ -635,7 +632,7 @@
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Registration form fields</td><td class="type">Check Many</td><td class="notes">Athlete + parent info, dietary, t-shirt size, photo release</td></tr>
+        <tr><td class="label">Registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Athlete name · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Age · Skill level · Dietary restrictions · T-shirt size · Photo / video release · Medical / allergies · Anything else (custom)</td></tr>
         <tr><td class="label">Waitlist when full</td><td class="type">Check One</td><td class="notes">Y/N</td></tr>
         <tr><td class="label">Last-call reminder cadence</td><td class="type">Open-Ended</td><td class="notes">When reminders go out (T-7 / T-3 / T-1 days)</td></tr>
         <tr><td class="label">Convert-to-program incentive</td><td class="type">Open-Ended</td><td class="notes">Discount on regular training if grad signs up within X days</td></tr>
@@ -710,8 +707,8 @@
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Team registration form fields</td><td class="type">Check Many</td><td class="notes">Captain info, team name, roster, primary contact</td></tr>
-        <tr><td class="label">Individual registration form fields</td><td class="type">Check Many</td><td class="notes">Player info, preferred position, height, parent</td></tr>
+        <tr><td class="label">Team registration form fields</td><td class="type">Check Many</td><td class="notes"><span class="dep">↳ if unit = Team or Both</span> <b style="color:var(--gold)">Defaults (always on):</b> Team name · Captain name · Captain phone · Captain email · Roster (player names). <b>Optional add-ons:</b> Age division · Jersey colors · Preferred game time · Coach name + phone · Anything else (custom)</td></tr>
+        <tr><td class="label">Individual registration form fields</td><td class="type">Check Many</td><td class="notes"><span class="dep">↳ if unit = Individual or Both</span> <b style="color:var(--gold)">Defaults (always on):</b> Player name · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Position · Height · Skill level · Anything else (custom)</td></tr>
         <tr><td class="label">Roster min / max</td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Registration open / close dates</td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Free-agent matching?</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Registration unit = Individual or Both</span> Yes / No — do we match individuals to teams?</td></tr>
@@ -793,7 +790,7 @@
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Registration form fields</td><td class="type">Check Many</td><td class="notes">Team name, captain, roster, age division, contact</td></tr>
+        <tr><td class="label">Registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Team name · Captain name · Captain phone · Captain email · Age division · Roster (player names). <b>Optional add-ons:</b> Coach name + phone · Jersey colors · Out-of-state Y/N · Anything else (custom)</td></tr>
         <tr><td class="label">Hard registration deadline</td><td class="type">Text Input</td><td class="notes">Cutoff date</td></tr>
         <tr><td class="label">Bracket cap</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Brackets = Yes</span> Max teams per division</td></tr>
         <tr><td class="label">Minimum teams threshold</td><td class="type">Text Input</td><td class="notes">If under X, event cancels and refunds</td></tr>
