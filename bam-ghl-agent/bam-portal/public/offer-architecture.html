@@ -243,9 +243,9 @@
        Portal preferences
 
 <span style="color:var(--text-mute)">─── First-time-only ───────────────────────────</span>
-<span class="new">★ Onboarding Tracker (top-right)</span>  <span style="color:var(--text-mute)">← 4 circle checkboxes:</span>
-   ◯ Meta Ads · ◯ Website · ◯ Branding · ◯ Offers   <span style="color:var(--text-mute)">click jumps to section</span>
-                                                  <span style="color:var(--text-mute)">(Website lives inside BB &gt; Other)</span></div>
+<span class="new">★ Onboarding Tracker (top-right)</span>  <span style="color:var(--text-mute)">← 6 circle checkboxes:</span>
+   ◯ Meta Ads · ◯ Website · ◯ Branding · ◯ Offers · ◯ Staff · ◯ Locations
+   <span style="color:var(--text-mute)">click any circle → jumps to that section (Website / Staff / Locations live inside BB &gt; Other)</span></div>
 
   <!-- ── Settled ─────────────────────────────────────────────────────── -->
   <div class="insight" style="border-color:rgba(74,222,128,0.25); border-left-color:var(--green); background:linear-gradient(180deg, rgba(74,222,128,0.05), rgba(74,222,128,0.01));">
@@ -257,7 +257,7 @@
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Upsells = linkage between offers (target offer + description). Lives as a sub-area inside <b>Sales</b>.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Business Blueprint cards: Offers · Branding · <b>Other</b>. The "Other" card cascades into 4 sub-areas: Business basics · Website · Staff · Locations.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Settings shrinks to Integrations (Stripe / GHL / Meta) + portal preferences.</p>
-    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> New Onboarding Tracker (top-right, first-time only): Meta Ads · Website · Branding · Offers. Circle checkbox per section, click jumps there.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> New Onboarding Tracker (top-right, first-time only): 6 circle checkboxes — Meta Ads · Website · Branding · Offers · Staff · Locations. Click any circle jumps there.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Existing iframe onboarding data = wiped (test data only).</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Tracking section deferred — revisit after Member Management lands.</p>
   </div>
@@ -271,8 +271,18 @@
   <!-- ── Onboarding tracker ──────────────────────────────────────────── -->
   <div class="insight" style="border-color:rgba(167,139,250,0.25); border-left-color:var(--purple); background:linear-gradient(180deg, rgba(167,139,250,0.05), rgba(167,139,250,0.01)); margin-top:24px;">
     <div class="kicker" style="color:var(--purple)">Onboarding tracker · top-right widget</div>
-    <p>When an academy first lands in the portal, a tracker sits in the <b>top-right</b> of the screen with 4 circle-checkbox sections: <b>Meta Ads · Website · Branding · Offers</b>. Each is clickable and jumps the user to that section. Each section has an <i>"I'm done here"</i> button so the user can declare completion (not every field is mandatory, so we need explicit done-ness).</p>
+    <p>When an academy first lands in the portal, a tracker sits in the <b>top-right</b> of the screen with 6 circle-checkbox sections: <b>Meta Ads · Website · Branding · Offers · Staff · Locations</b>. Each is clickable and jumps the user to that section. Each section has an <i>"I'm done here"</i> button so the user can declare completion (not every field is mandatory, so we need explicit done-ness).</p>
     <p style="margin-top:8px;color:var(--text-sub);font-size:13px"><b style="color:var(--purple)">To audit later:</b> once the editor is mostly built, scan the field lists below to mark which fields are <b style="color:var(--gold)">mandatory</b> (block completion until filled) vs. <b>optional</b>, and confirm which sections need an explicit <i>"I'm done"</i> button vs. which can auto-complete when all required fields are filled.</p>
+  </div>
+
+  <!-- ── Offer concept visual ────────────────────────────────────────── -->
+  <div class="insight" style="border-color:rgba(232,197,71,0.25); border-left-color:var(--gold); background:linear-gradient(180deg, rgba(232,197,71,0.04), rgba(232,197,71,0.01)); margin-top:24px;">
+    <div class="kicker">Customer-facing explainer · for the portal</div>
+    <p>This is the sketch we'll surface inside the BB &gt; Offers card as a <i>"what is an offer?"</i> explainer for new academy owners (probably an expandable info block or first-time tooltip). Same concept as the form below, just in plain English — and <b>includes Tracking</b> as the 6th spoke even though we're deferring the Tracking section in the form until Member Management lands.</p>
+    <div style="margin-top:14px; text-align:center; background:#FAFAF6; padding:16px; border-radius:10px;">
+      <img src="offer-concept.png" alt="Offer concept: hub-and-spoke with sales, schedule, price, value, tracking, onboarding around a central OFFER node" style="max-width:100%; width:760px; height:auto; display:inline-block;">
+    </div>
+    <p style="margin-top:10px;color:var(--text-mute);font-size:11px;text-align:center"><code>bam-portal/public/offer-concept.png</code> · saved in [[project_offer_concept_visual]]</p>
   </div>
 
   <!-- ── The main: 6 offers × 5 sections ─────────────────────────────── -->
