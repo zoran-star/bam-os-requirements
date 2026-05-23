@@ -511,25 +511,28 @@
     <div class="offer-detail-body">
 
       <h4>General info</h4>
+      <p style="font-size:12px; color:var(--text-mute); margin:0 0 10px; font-style:italic;">Team is a <b style="color:var(--gold)">program-level</b> offer — one offer = one travel/competitive program. Add each specific team inside the Teams builder below.</p>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "BAM 15U Black"</td></tr>
-        <tr><td class="label">Team level<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Local / Rep / AAU / Elite / Other</td></tr>
-        <tr><td class="label">Age group<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "15U"</td></tr>
-        <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Boys / Girls</td></tr>
+        <tr><td class="label">Program title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "BAM Elite Travel" or "BAM Spring AAU" — the umbrella program</td></tr>
+        <tr><td class="label">Short description</td><td class="type">Open-Ended</td><td class="notes">One-liner for the landing page</td></tr>
+        <tr><td class="label">Age range covered<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Overall range across all teams in the program (e.g. "U10-U18")</td></tr>
+        <tr><td class="label">Gender(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls</td></tr>
         <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
+        <tr><td class="label"><b style="color:var(--gold)">Teams</b><span class="req">required</span></td><td class="type">Block Builder</td><td class="notes"><b style="color:var(--gold)">Add a row per specific team.</b> Sub-fields per team: Team title (e.g. "15U Black") · Age group (e.g. "15U") · Level (Local / Rep / AAU / Elite) · Gender · Coach assigned (Staff Selector) · Roster capacity · Practice location · Practice schedule (day · start · end) · Team-specific fee (optional override)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
       <h4>Schedule</h4>
+      <p style="font-size:12px; color:var(--text-mute); margin:0 0 10px; font-style:italic;">Program-wide scheduling. Each team's practice schedule lives inside its row in the Teams builder above.</p>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Start / end (e.g. March → July)</td></tr>
+        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When the program's season runs (e.g. "March 1 → July 31")</td></tr>
         <tr><td class="label">Tryouts?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Tryouts = Yes</span> date(s), time(s), location, cost, capacity, what to bring</td></tr>
-        <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Recurring weekly during season — day · start · end · location</td></tr>
-        <tr><td class="label">League(s) competing in</td><td class="type">Text Input</td><td class="notes">Where games come from (most teams are in an external league)</td></tr>
+        <tr><td class="label">Tryout style</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Tryouts = Yes</span> Unified (all teams together) / Per team (each team runs its own)</td></tr>
+        <tr><td class="label">Unified tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Tryout style = Unified</span> date(s), time(s), location, cost, capacity, what to bring</td></tr>
+        <tr><td class="label">League(s) competing in</td><td class="type">Text Input</td><td class="notes">Where games come from (program-wide)</td></tr>
         <tr><td class="label">Game schedule link</td><td class="type">Link Input</td><td class="notes">External game calendar URL (if league provides one)</td></tr>
-        <tr><td class="label">Tournament count</td><td class="type">Text Input</td><td class="notes">Approx. # of tournaments per season</td></tr>
-        <tr><td class="label">Off-season activity</td><td class="type">Open-Ended</td><td class="notes">Optional — what the team does after the regular season</td></tr>
+        <tr><td class="label">Tournament count</td><td class="type">Text Input</td><td class="notes">Approx. # of tournaments per team per season</td></tr>
+        <tr><td class="label">Off-season activity</td><td class="type">Open-Ended</td><td class="notes">Optional — what the program does after the regular season</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
