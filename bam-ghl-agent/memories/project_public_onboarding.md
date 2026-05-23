@@ -19,7 +19,7 @@ type: project
 3. User clicks email link → Supabase verifies → redirects to `/client-portal.html?type=invite#access_token=...`
 4. Client portal `boot()` detects either the URL flag OR `user_metadata.needs_password=true` and shows the "Welcome — choose your password" form
 5. User sets password (`updateUser({ password, data: { needs_password: false } })`) → reloads as logged-in client
-6. Lands on Marketing tab with **4 sample campaign cards** + "Connect Meta" CTA
+6. **Lands on the Systems tab** (the sidebar's default-active nav item) — the Systems tab hosts the "Start setup" progress card that opens the 6-section onboarding-reloaded.html flow in an iframe sub-screen. The Marketing tab still has the sample campaign cards + Connect Meta CTA, but the client lands on Systems first because that's where setup happens.
 
 ## Connect Meta flow (optional, post-onboarding)
 
