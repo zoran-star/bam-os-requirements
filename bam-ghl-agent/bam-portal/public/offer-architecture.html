@@ -457,11 +457,8 @@
 
       <h4>Value</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Selling points<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">What makes this different / worth buying</td></tr>
-        <tr><td class="label">What's covered</td><td class="type">Open-Ended</td><td class="notes">Skill areas, focus topics, what athletes learn</td></tr>
-        <tr><td class="label">Program structure</td><td class="type">Open-Ended</td><td class="notes">Long-form — used by academy-style offers</td></tr>
-        <tr><td class="label">Outcomes / progression</td><td class="type">Open-Ended</td><td class="notes">What an athlete will be able to do after X months</td></tr>
-        <tr><td class="label">Assigned coach(es)</td><td class="type">Staff Selector</td><td class="notes">Who teaches this</td></tr>
+        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the program is structured — phases, pillars, what a week looks like</td></tr>
+        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this program vs. other programs in your area</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -472,20 +469,21 @@
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Repeating: name + price + description (e.g. shooting program, 1-on-1)</td></tr>
         <tr><td class="label">Discount codes</td><td class="type">Text Input</td><td class="notes">e.g. "Sibling discount → 2SIBLING"</td></tr>
         <tr><td class="label">Taxes / extra fees</td><td class="type">Text Input</td><td class="notes">Anything beyond the listed price</td></tr>
-        <tr><td class="label">Agreement / waiver</td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Sales path<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Free trial / Discovery call first / Direct signup / Other — gates the next set of questions</td></tr>
+        <tr><td class="label">Trial duration + price</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Sales path = Free trial</span> e.g. "1 session, free" or "2 weeks, $25"</td></tr>
+        <tr><td class="label">Trial-to-paid follow-up</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Free trial</span> When + how we follow up after the trial</td></tr>
+        <tr><td class="label">Which discovery-call calendar</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> Calendar link to use</td></tr>
+        <tr><td class="label">Discovery call agenda</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> What's covered on the call</td></tr>
+        <tr><td class="label">Direct-signup confirmation</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Direct signup</span> What the buyer sees / receives immediately after signing up</td></tr>
+        <tr><td class="label">Describe the path</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Other</span> How leads become customers in this offer</td></tr>
         <tr><td class="label">Lead source(s)</td><td class="type">Check Many</td><td class="notes">Website form / Walk-in / Referral / Ads / Other</td></tr>
-        <tr><td class="label">Free trial?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Free trial duration + price</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Free trial = Yes</span> e.g. "1 session, free" or "2 weeks, $25"</td></tr>
-        <tr><td class="label">Discovery call before signup?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Which discovery-call calendar</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Discovery call = Yes</span> Calendar link to use</td></tr>
         <tr><td class="label">Lead notify</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged on new lead</td></tr>
         <tr><td class="label">Lead nurture sequence</td><td class="type">Open-Ended</td><td class="notes">Touchpoints + cadence before "abandoned"</td></tr>
-        <tr><td class="label">Trial-to-paid follow-up</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Free trial = Yes</span> When + how we follow up after a free trial</td></tr>
         <tr><td class="label">Payment collected at</td><td class="type">Check One</td><td class="notes">Signup / Before first session / At first session</td></tr>
         <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Target offer + description ("After 6 months, pitch private lessons")</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
@@ -493,9 +491,8 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Welcome message</td><td class="type">Open-Ended</td><td class="notes">Email + SMS copy sent right after signup</td></tr>
-        <tr><td class="label">Welcome packet</td><td class="type">File Upload</td><td class="notes">PDF or video</td></tr>
-        <tr><td class="label">First-session prep</td><td class="type">Open-Ended</td><td class="notes">What to bring, parking, who to ask for, what to wear</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets at the start — welcome message (email + SMS copy), welcome packet, first-session prep (what to bring, parking, who to ask for, what to wear). Attach any number of PDFs / videos / images.</td></tr>
         <tr><td class="label">Parent intake form fields</td><td class="type">Check Many</td><td class="notes">Emergency contact, medical, school, goals, experience, jersey size, etc.</td></tr>
         <tr><td class="label">Onboarding notify</td><td class="type">Staff Selector</td><td class="notes">Point of contact for the new athlete</td></tr>
         <tr><td class="label">30-day check-in?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
@@ -541,11 +538,8 @@
 
       <h4>Value</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Selling points<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">What makes the program different</td></tr>
-        <tr><td class="label">Program differentiators</td><td class="type">Open-Ended</td><td class="notes">College exposure, playing time philosophy, culture, etc.</td></tr>
-        <tr><td class="label">Coach credentials / bios</td><td class="type">Open-Ended</td><td class="notes">Why these coaches</td></tr>
-        <tr><td class="label">Cultural / character focus</td><td class="type">Open-Ended</td><td class="notes">Beyond basketball — what kids/families get</td></tr>
-        <tr><td class="label">Assigned coach(es)</td><td class="type">Staff Selector</td><td class="notes">Who runs the team</td></tr>
+        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the team operates — practices, games, off-season, philosophy</td></tr>
+        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this team vs. other competitive programs</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -556,7 +550,6 @@
         <tr><td class="label">Tryout fee</td><td class="type">Text Input (currency)</td><td class="notes">If any — collected at registration or at door</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Uniforms, travel, tournament fees, gear bundles</td></tr>
         <tr><td class="label">Discount codes</td><td class="type">Text Input</td><td class="notes">Sibling, multi-team, etc.</td></tr>
-        <tr><td class="label">Agreement / waiver</td><td class="type">File Upload</td><td class="notes">Waiver, refund, cancellation policy</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -575,6 +568,7 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Roster welcome message</td><td class="type">Open-Ended</td><td class="notes">Sent to player + parent on roster confirmation</td></tr>
         <tr><td class="label">Uniform sizing collection</td><td class="type">Check Many</td><td class="notes">Jersey, shorts, warm-up, shoe size</td></tr>
         <tr><td class="label">Player code of conduct</td><td class="type">File Upload</td><td class="notes">Signed at onboarding</td></tr>
@@ -623,10 +617,8 @@
 
       <h4>Value</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Selling points<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why come to this camp</td></tr>
-        <tr><td class="label">What's covered</td><td class="type">Open-Ended</td><td class="notes">Skill areas, special guests, daily focus</td></tr>
-        <tr><td class="label">Intensity / format</td><td class="type">Open-Ended</td><td class="notes">Drills, scrimmages, film, classroom?</td></tr>
-        <tr><td class="label">Coach(es) / guest coaches</td><td class="type">Staff Selector</td><td class="notes">Who's running it</td></tr>
+        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the camp/clinic flows — drills, scrimmages, special focuses, daily breakdown</td></tr>
+        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this camp vs. other camps</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -638,7 +630,6 @@
         <tr><td class="label">Group / sibling discount?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
         <tr><td class="label">Discount rule</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Group/sibling = Yes</span> e.g. "2+ siblings 10% off, 5+ group 15% off"</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">T-shirt, water bottle, photo pack, swag</td></tr>
-        <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">Up to X days before = full refund, etc.</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -654,6 +645,7 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Day-before reminder</td><td class="type">Open-Ended</td><td class="notes">Email + SMS copy with logistics</td></tr>
         <tr><td class="label">What to bring</td><td class="type">Open-Ended</td><td class="notes">Ball, water bottle, lunch, basketball shoes</td></tr>
         <tr><td class="label">Check-in / parking instructions</td><td class="type">Open-Ended</td><td class="notes">Where to drop off, parking, who to ask for</td></tr>
@@ -698,10 +690,8 @@
 
       <h4>Value</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Selling points<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why join this league</td></tr>
-        <tr><td class="label">What's covered</td><td class="type">Open-Ended</td><td class="notes">Competition, fun, skill-building, social</td></tr>
-        <tr><td class="label">Format</td><td class="type">Check One</td><td class="notes">Round robin / divisional / open</td></tr>
-        <tr><td class="label">Coaches / refs</td><td class="type">Staff Selector</td><td class="notes">Who's involved</td></tr>
+        <tr><td class="label">Program structure<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Format, divisions, game flow, playoff path, awards</td></tr>
+        <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this league vs. other leagues</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -715,7 +705,6 @@
         <tr><td class="label">Late registration fee?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
         <tr><td class="label">Late fee amount + cutoff</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Late fee = Yes</span> e.g. "+$15 after Mar 15"</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">League shirt, awards, photos, jersey upgrade</td></tr>
-        <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">If league cancels / if player drops</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -733,6 +722,7 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Roster confirmation</td><td class="type">Open-Ended</td><td class="notes">Email to captain + all players once roster is locked</td></tr>
         <tr><td class="label">Schedule release</td><td class="type">Open-Ended</td><td class="notes">When + how published</td></tr>
         <tr><td class="label">Rulebook delivery</td><td class="type">File Upload</td><td class="notes">PDF sent at onboarding</td></tr>
@@ -798,7 +788,6 @@
         <tr><td class="label">Spectator pricing?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
         <tr><td class="label">Spectator rates</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Spectator = Yes</span> Adult / kid / family pricing</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Spectator gear, photo packages, food vouchers</td></tr>
-        <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">If event canceled / no-show</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -814,6 +803,7 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Bracket release timing</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Brackets = Yes</span> Week-of / 48hr / day-of</td></tr>
         <tr><td class="label">Game schedule delivery</td><td class="type">Open-Ended</td><td class="notes">Email + posted at venue</td></tr>
         <tr><td class="label">Check-in process</td><td class="type">Open-Ended</td><td class="notes">Where, when, by whom, what to bring</td></tr>
@@ -873,7 +863,6 @@
         <tr><td class="label">Recurring booking discount</td><td class="type">Open-Ended</td><td class="notes">Weekly / monthly bookings</td></tr>
         <tr><td class="label">Damage deposit</td><td class="type">Text Input (currency)</td><td class="notes">Refundable</td></tr>
         <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Equipment rental, photo service, supervision, score-keeper</td></tr>
-        <tr><td class="label">Cancellation / refund policy</td><td class="type">File Upload</td><td class="notes"></td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -892,6 +881,7 @@
 
       <h4>Onboarding</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Booking confirmation comms</td><td class="type">Open-Ended</td><td class="notes">Email + calendar invite after contract + deposit</td></tr>
         <tr><td class="label">Access instructions</td><td class="type">Open-Ended</td><td class="notes">Gate code / lockbox / staff meets / key card</td></tr>
         <tr><td class="label">Equipment access notes</td><td class="type">Open-Ended</td><td class="notes">Where equipment is stored, what's accessible</td></tr>
