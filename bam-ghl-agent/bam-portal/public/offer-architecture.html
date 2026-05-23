@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Unified Offer — Architecture Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0B0B0D;
+    --bg-el: #131318;
+    --bg-card: #16161C;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #F5F5F7;
+    --text-sub: #B0B0BA;
+    --text-mute: #6E6E78;
+    --gold: #E8C547;
+    --green: #4ADE80;
+    --red: #ED7969;
+    --amber: #F5A524;
+    --blue: #7AB8F5;
+    --purple: #C78EF5;
+    --pink: #F590C7;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; }
+  .page { max-width: 1240px; margin: 0 auto; padding: 48px 24px 96px; }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--gold); text-transform: uppercase; margin-bottom: 12px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 40px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 14px; line-height: 1.05; }
+  h2 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 56px 0 18px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h3 { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; margin: 18px 0 10px; color: var(--text); }
+  .sub { font-size: 16px; color: var(--text-sub); margin: 0 0 32px; line-height: 1.6; max-width: 820px; }
+  a { color: var(--gold); }
+
+  /* Insight box */
+  .insight {
+    background: linear-gradient(180deg, rgba(232,197,71,0.06), rgba(232,197,71,0.02));
+    border: 1px solid rgba(232,197,71,0.25);
+    border-left: 4px solid var(--gold);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .insight .kicker { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--gold); text-transform: uppercase; margin-bottom: 8px; }
+  .insight p { font-size: 15px; color: var(--text); line-height: 1.65; margin: 0; }
+  .insight p + p { margin-top: 10px; }
+  .insight b { color: var(--gold); }
+
+  /* Variation cards */
+  .variations { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 36px; }
+  .var-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .var-card.training { border-top: 3px solid var(--blue); }
+  .var-card.team     { border-top: 3px solid var(--gold); }
+  .var-card.camp     { border-top: 3px solid var(--green); }
+  .var-card.league   { border-top: 3px solid var(--purple); }
+  .var-card.tourney  { border-top: 3px solid var(--amber); }
+  .var-card.academy  { border-top: 3px solid var(--pink); }
+  .var-card.rental   { border-top: 3px solid var(--red); border-style: dashed; opacity: 0.85; }
+
+  .var-name { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 600; color: var(--text); margin: 0; }
+  .var-tag { display: inline-block; font-size: 10px; font-family: 'JetBrains Mono', monospace; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.06); color: var(--text-sub); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; align-self: flex-start; }
+  .var-desc { font-size: 13px; color: var(--text-sub); line-height: 1.55; margin: 0; }
+  .var-extras { margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .var-extras-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-mute); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+  .var-extras ul { margin: 0; padding-left: 18px; }
+  .var-extras li { font-size: 12px; color: var(--text); line-height: 1.55; margin-bottom: 3px; }
+  .var-extras li.none { color: var(--text-mute); list-style: none; margin-left: -18px; }
+
+  /* Field tables */
+  .field-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .field-table th, .field-table td { text-align: left; padding: 11px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .field-table th { background: var(--bg-el); color: var(--text-mute); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-table td.label { color: var(--text); font-weight: 500; }
+  .field-table td.type { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-sub); }
+  .field-table td.notes { color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+  .field-table .req { color: var(--gold); font-family: 'JetBrains Mono', monospace; font-size: 10px; margin-left: 4px; }
+  .field-table .badge {
+    display: inline-block; padding: 1px 7px; border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    background: rgba(255,255,255,0.06); color: var(--text-sub);
+    margin-left: 6px; vertical-align: middle;
+  }
+  .field-table .badge.new { background: rgba(74,222,128,0.15); color: var(--green); }
+
+  /* Pricing variants */
+  .pricing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .pricing-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .pricing-card h4 { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; margin: 0 0 8px; color: var(--gold); }
+  .pricing-card ul { margin: 0; padding-left: 18px; }
+  .pricing-card li { font-size: 12px; color: var(--text-sub); line-height: 1.55; margin-bottom: 3px; }
+
+  /* IA tree */
+  .ia { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 24px; margin-bottom: 24px; font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre; overflow-x: auto; }
+  .ia .b { color: var(--gold); }
+  .ia .new { color: var(--green); }
+  .ia .gone { color: var(--text-mute); text-decoration: line-through; }
+  .ia .moved { color: var(--blue); }
+
+  /* Shake-out table */
+  .shake-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
+  .shake-table th, .shake-table td { text-align: left; padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .shake-table th { background: var(--bg-el); color: var(--text-mute); font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .shake-table tr:last-child td { border-bottom: none; }
+  .shake-table td.item { font-family: 'JetBrains Mono', monospace; color: var(--text); }
+  .shake-table .arrow { color: var(--text-mute); margin: 0 8px; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .pill.offer { background: rgba(232,197,71,0.15); color: var(--gold); }
+  .pill.build { background: rgba(255,255,255,0.06); color: var(--text-sub); }
+  .pill.addon { background: rgba(122,184,245,0.15); color: var(--blue); }
+  .pill.archive { background: rgba(110,110,120,0.2); color: var(--text-mute); }
+
+  /* Questions panel */
+  .questions {
+    background: rgba(74,222,128,0.04);
+    border: 1px solid rgba(74,222,128,0.25);
+    border-left: 4px solid var(--green);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-top: 32px;
+  }
+  .questions h2 { color: var(--green); border-bottom: none; margin-top: 0; padding-bottom: 6px; font-size: 18px; }
+  .questions ol { margin: 0; padding-left: 22px; }
+  .questions li { font-size: 14px; color: var(--text); line-height: 1.7; margin-bottom: 12px; }
+  .questions li b { color: var(--green); }
+
+  .footer-note { font-size: 12px; color: var(--text-mute); margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">BAM OS · Architecture · 2026-05-23</div>
+  <h1>The Unified Offer</h1>
+  <p class="sub">Today the academy onboarding has a section for Training, a section for Teams, and the build menu has separate items for Youth Academy, Camps/Clinics, and Internal Tournaments. Most of these ask the same questions in different words. This spec collapses them all into one thing — an <b>Offer</b> — with a small set of variations that only differ by pricing model, time horizon, and a few flavor-specific fields.</p>
+
+  <!-- ── Insight ───────────────────────────────────────────────────── -->
+  <div class="insight">
+    <div class="kicker">Core insight</div>
+    <p>Everything an academy sells to an athlete or parent is an <b>Offer</b>. Classes, teams, camps, leagues, tournaments — same shape, different flavor.</p>
+    <p>Pricing and add-ons are the differentiators. Every offer has them. Every offer also has the same skeleton: who it's for, when it runs, how to sign up, who gets notified, what the registration form asks, and what assets go with it.</p>
+  </div>
+
+  <!-- ── New IA ─────────────────────────────────────────────────────── -->
+  <h2>The new shape (where things live)</h2>
+
+  <div class="ia"><span style="color:var(--text-mute)">Client portal sidebar</span>
+
+  Messages
+  Systems              <span style="color:var(--text-mute)">← support tickets only (Error / Change / Build)</span>
+  <span class="new">★ Business Blueprint</span>     <span style="color:var(--text-mute)">← NEW top-level tab</span>
+    └─ Cards:
+       <span class="b">• Offers</span>          <span style="color:var(--text-mute)">← unified editor (all variations)</span>
+       <span class="b">• Branding</span>        <span style="color:var(--text-mute)">← logos / colors</span>
+       <span class="b">• Website</span>         <span style="color:var(--text-mute)">← site spec + photos</span>
+  Marketing
+  Resources
+  Team                 <span style="color:var(--text-mute)">← portal teammates (different concept than "team offer")</span>
+  Settings
+    └─ <span class="moved">Business basics</span>   <span style="color:var(--text-mute)">← name, address, EIN, phone (was Onboarding Section 1)</span>
+       <span class="moved">Locations</span>         <span style="color:var(--text-mute)">← (was Onboarding Section 1)</span>
+       <span class="moved">Staff</span>             <span style="color:var(--text-mute)">← people who work at the academy</span>
+       <span class="moved">Integrations</span>      <span style="color:var(--text-mute)">← Stripe, GHL, Meta (was Onboarding Section 6)</span></div>
+
+  <!-- ── Variations ─────────────────────────────────────────────────── -->
+  <h2>Offer variations</h2>
+  <p class="sub">Six flavors. Every flavor has the common skeleton plus a few extras. The "Type" field on an offer picks which extras show.</p>
+
+  <div class="variations">
+
+    <div class="var-card training">
+      <span class="var-tag">Type: training</span>
+      <h3 class="var-name">Training Class</h3>
+      <p class="var-desc">Ongoing skill development. Recurring weekly schedule. Athletes sign up for a class slot.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Class capacity</li>
+          <li>Closed dates</li>
+          <li>Skill level</li>
+          <li>Recurring weekly schedule</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card team">
+      <span class="var-tag">Type: team</span>
+      <h3 class="var-name">Team</h3>
+      <p class="var-desc">Competitive team. Has tryouts, a season, leagues, and tournaments. Players commit to the whole season.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Team level (Local / AAU / Elite)</li>
+          <li>Season dates</li>
+          <li>Tryouts (yes/no → dates, cost, capacity, what to bring)</li>
+          <li>Competition (leagues + tournaments)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card camp">
+      <span class="var-tag">Type: camp</span>
+      <h3 class="var-name">Camp / Clinic</h3>
+      <p class="var-desc">Short-term intensive. Fixed start/end dates. Sign up once.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Start and end dates</li>
+          <li>Schedule / format (per-day breakdown)</li>
+          <li>Bring-with list</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card league">
+      <span class="var-tag">Type: league</span>
+      <h3 class="var-name">Internal League</h3>
+      <p class="var-desc">Recurring in-house league. Athletes register for a season. Brackets and standings tracked.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Season start / end</li>
+          <li>Registration window</li>
+          <li>Brackets / divisions</li>
+          <li>Individual vs. team signup</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card tourney">
+      <span class="var-tag">Type: tournament</span>
+      <h3 class="var-name">Internal Tournament</h3>
+      <p class="var-desc">One-off competitive event. Brackets, rules, registration deadline. Sign up once.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Event dates</li>
+          <li>Brackets (yes/no → describe)</li>
+          <li>Individual signups allowed</li>
+          <li>Rules</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card academy">
+      <span class="var-tag">Type: academy</span>
+      <h3 class="var-name">Youth Academy</h3>
+      <p class="var-desc">All-in program. Often year-round, multi-pillar (skills + games + character). Higher-touch onboarding.</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific</div>
+        <ul>
+          <li>Program structure description</li>
+          <li>What makes it different</li>
+          <li>Closed dates</li>
+          <li>Discovery call required</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="var-card rental">
+      <span class="var-tag">Type: facility (?)</span>
+      <h3 class="var-name">Gym Rental</h3>
+      <p class="var-desc">Selling court time to outside groups. Per-hour pricing. <b style="color:var(--red)">Open question:</b> is this an Offer or does it stay in the build menu?</p>
+      <div class="var-extras">
+        <div class="var-extras-label">Type-specific (if Offer)</div>
+        <ul>
+          <li>Per-hour rate + minimum block</li>
+          <li>Court availability windows</li>
+          <li>Insurance / waiver requirements</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Common skeleton ────────────────────────────────────────────── -->
+  <h2>The common skeleton (every offer has these)</h2>
+  <p class="sub">These fields exist on every Offer regardless of variation. ~80% of what's asked.</p>
+
+  <table class="field-table">
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="label">Type<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Training / Team / Camp / League / Tournament / Academy / (Gym Rental?)</td></tr>
+      <tr><td class="label">Name<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "Middle School Skill Training", "BAM 15U Black"</td></tr>
+      <tr><td class="label">Description</td><td class="type">Open-Ended</td><td class="notes">Short blurb for the landing page</td></tr>
+      <tr><td class="label">Age range</td><td class="type">Text Input</td><td class="notes">e.g. "U12-U14", "Grades 5-8"</td></tr>
+      <tr><td class="label">Skill level</td><td class="type">Check One</td><td class="notes">Beginner / Intermediate / Advanced / All</td></tr>
+      <tr><td class="label">Gender</td><td class="type">Check Many</td><td class="notes">Boys / Girls</td></tr>
+      <tr><td class="label">Location(s)</td><td class="type">Check Many</td><td class="notes">Pick from the Locations list in Settings</td></tr>
+      <tr><td class="label">Selling points<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">"What makes this offer different / worth buying"</td></tr>
+      <tr><td class="label">Pricing model<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Membership / Package / Single Session / Per-event / Custom</td></tr>
+      <tr><td class="label">Pricing tiers / amount<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Conditional fields based on Pricing model (see Pricing section below)</td></tr>
+      <tr><td class="label">Add-ons<span class="badge new">new</span></td><td class="type">Block Builder</td><td class="notes">Repeating: name + price + description. Replaces today's open-ended "any add-ons?" text box.</td></tr>
+      <tr><td class="label">Sales flow<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Direct signup / Free trial first / Discovery call first / Application required</td></tr>
+      <tr><td class="label">Discovery call calendar</td><td class="type">Text Input</td><td class="notes">Only shown if Sales flow needs a call</td></tr>
+      <tr><td class="label">Registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Which fields appear on the public registration form (name, email, phone, age, parent, emergency, medical, jersey, school, experience, goals, …)</td></tr>
+      <tr><td class="label">Agreements / waivers</td><td class="type">File Upload</td><td class="notes">Upload waiver/refund/cancellation/media docs + checkbox which it contains</td></tr>
+      <tr><td class="label">Notify on registration<span class="req">required</span></td><td class="type">Staff Selector</td><td class="notes">Who gets the SMS/email when someone signs up</td></tr>
+      <tr><td class="label">Welcome message</td><td class="type">Open-Ended</td><td class="notes">What the athlete/parent sees after signing up</td></tr>
+      <tr><td class="label">Welcome files</td><td class="type">File Upload</td><td class="notes">PDFs / schedules / intro videos sent with the welcome</td></tr>
+      <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Graphics / photos / promo images for landing page + ads</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ── Pricing variants ───────────────────────────────────────────── -->
+  <h2>Pricing variants (conditional on the "Pricing model" pick)</h2>
+  <p class="sub">Same pattern that exists today inside the iframe's OFFER_FORM — just exposed cleaner now. Each variant has its own tier-builder + agreement notes.</p>
+
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <h4>Membership</h4>
+      <ul>
+        <li>Tier name</li>
+        <li>Billing cycle (monthly / 4-week / biweekly)</li>
+        <li>Price per cycle</li>
+        <li>Discount to highlight</li>
+        <li>Discount codes</li>
+      </ul>
+    </div>
+    <div class="pricing-card">
+      <h4>Package</h4>
+      <ul>
+        <li>Package name</li>
+        <li># of sessions</li>
+        <li>Total cost</li>
+        <li>Expiry window</li>
+        <li>Discount codes</li>
+      </ul>
+    </div>
+    <div class="pricing-card">
+      <h4>Single Session</h4>
+      <ul>
+        <li>Per-session cost</li>
+        <li>Taxes / fees</li>
+        <li>Discount codes</li>
+      </ul>
+    </div>
+    <div class="pricing-card">
+      <h4>Per-event</h4>
+      <ul>
+        <li>Event price</li>
+        <li>Team-rate option (for tournaments/leagues)</li>
+        <li>Early-bird pricing</li>
+      </ul>
+    </div>
+    <div class="pricing-card">
+      <h4>Custom / Other</h4>
+      <ul>
+        <li>Free-text description</li>
+        <li>Optional file upload (pricing sheet)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── Add-ons spec ───────────────────────────────────────────────── -->
+  <h2>Add-ons <span class="badge new" style="font-size:11px;padding:3px 9px">new</span></h2>
+  <p class="sub">Today add-ons are an open-ended text question. You wanted them as a structured builder on every offer.</p>
+
+  <table class="field-table">
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="label">Add-on name</td><td class="type">Text Input</td><td class="notes">e.g. "Game film review", "1-on-1 coaching", "Team jersey"</td></tr>
+      <tr><td class="label">Price</td><td class="type">Text Input (currency)</td><td class="notes">One-time or recurring — note in description if recurring</td></tr>
+      <tr><td class="label">Description</td><td class="type">Open-Ended</td><td class="notes">What's included, who it's for, any conditions</td></tr>
+    </tbody>
+  </table>
+  <p class="sub" style="margin-top:-8px">Repeating builder. 0..n rows per offer. Empty list is fine — most offers won't have add-ons at launch.</p>
+
+  <!-- ── Build menu shake-out ───────────────────────────────────────── -->
+  <h2>What this does to the "Build something new" menu</h2>
+  <p class="sub">Today the build menu has 10 tiles. Some are actually offer-builders (Youth Academy, Camps, Internal Tournament). Those move under the Offers card on Business Blueprint. The menu shrinks and stays focused on <b>ad-hoc build requests</b> that aren't about selling something to athletes.</p>
+
+  <table class="shake-table">
+    <thead>
+      <tr><th>Build menu item today</th><th>What it becomes</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="item">Youth Academy</td>
+        <td><span class="pill offer">Offer type: Academy</span></td>
+        <td>It's a paid program with sales flow + registration + notifications — that's an offer.</td>
+      </tr>
+      <tr>
+        <td class="item">Camps / Clinics</td>
+        <td><span class="pill offer">Offer type: Camp</span></td>
+        <td>Same. Just with start/end dates instead of recurring schedule.</td>
+      </tr>
+      <tr>
+        <td class="item">Internal Tournament</td>
+        <td><span class="pill offer">Offer type: Tournament</span></td>
+        <td>One-off paid event. Brackets and registration windows are type-specific extras.</td>
+      </tr>
+      <tr>
+        <td class="item">Gym Rental</td>
+        <td><span class="pill offer">Offer type: Facility?</span> &nbsp; <i style="color:var(--text-mute);font-size:12px">— or stays in build menu</i></td>
+        <td>Selling court time is technically an offer. But the buyer is usually another org (B2B), not an athlete/parent. <b style="color:var(--red)">Open question.</b></td>
+      </tr>
+      <tr>
+        <td class="item">Upsells</td>
+        <td><span class="pill addon">Folds into Add-ons</span></td>
+        <td>Add-ons IS the upsell mechanism now. The "Upsells" build flow likely deprecates.</td>
+      </tr>
+      <tr>
+        <td class="item">Player Intake</td>
+        <td><span class="pill build">Stays in build menu</span></td>
+        <td>It's a form/process, not something the academy sells.</td>
+      </tr>
+      <tr>
+        <td class="item">New Hire</td>
+        <td><span class="pill build">Stays in build menu</span></td>
+        <td>HR workflow, not an offer.</td>
+      </tr>
+      <tr>
+        <td class="item">Staff Member</td>
+        <td><span class="pill build">Stays in build menu</span></td>
+        <td>Setup for a staff member's profile and access, not an offer.</td>
+      </tr>
+      <tr>
+        <td class="item">Sponsor Inquiry</td>
+        <td><span class="pill build">Stays in build menu</span></td>
+        <td>B2B sponsorship intake — different business model, different sales motion.</td>
+      </tr>
+      <tr>
+        <td class="item">Promo</td>
+        <td><span class="pill build">Stays in build menu</span></td>
+        <td>It's a marketing campaign / discount, not an offer.</td>
+      </tr>
+      <tr>
+        <td class="item">Class</td>
+        <td><span class="pill offer">Offer type: Training</span></td>
+        <td>"Class" is just an offer with the Training type. Onboarding's separate Class flow goes away.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, <b>(Gym Rental?)</b>, + the existing "Build something else" overflow. The 4 offer-types (Academy, Camp, Tournament, Class) get configured under Business Blueprint &gt; Offers instead.</p>
+
+  <!-- ── Open questions ─────────────────────────────────────────────── -->
+  <div class="questions">
+    <h2>Open questions for you</h2>
+    <ol>
+      <li><b>Gym Rental — Offer or build item?</b><br>
+        If Offer: B2B variation (different sales flow). If build item: stays as-is in the menu. My read: keep it in the build menu — different buyer, different motion.</li>
+      <li><b>Other Business Blueprint cards?</b><br>
+        I proposed: Offers, Branding, Website. Should there be more? (e.g. Brand voice, Selling points / mission, Pricing philosophy, Coach bios?)</li>
+      <li><b>What about the Class flow on /class-setup.html?</b><br>
+        That standalone onboarding page exists today as part of the 3-step Class · Offer · Parent Onboarding flow. If "Class" is now just "Offer type: Training", does /class-setup.html get deprecated / replaced by the Business Blueprint &gt; Offers editor?</li>
+      <li><b>Does "Upsells" deprecate entirely, or stay for non-add-on upsell campaigns?</b><br>
+        e.g. "Buy 10 sessions get 1 free" is technically a pricing thing not an add-on. Could stay in build menu as a discount-campaign tile.</li>
+      <li><b>Existing offer data in <code>onboarding_reloaded</code> — migrate or start fresh?</b><br>
+        The iframe has been collecting offer data scoped by submission_key / now client_id. If we collapse Training + Teams + standalone offers into one unified table, do we migrate the in-flight rows or start clean?</li>
+    </ol>
+  </div>
+
+  <div class="footer-note">
+    File: <code>bam-portal/public/offer-architecture.html</code> · Live: <a href="https://portal.byanymeansbusiness.com/offer-architecture.html">portal.byanymeansbusiness.com/offer-architecture.html</a>
+  </div>
+
+</div>
+</body>
+</html>
