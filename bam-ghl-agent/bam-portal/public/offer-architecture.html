@@ -135,6 +135,75 @@
   .questions li b { color: var(--green); }
 
   .footer-note { font-size: 12px; color: var(--text-mute); margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+
+  /* Per-offer dropdowns */
+  .offer-detail {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .offer-detail summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 600;
+    color: var(--text);
+    user-select: none;
+    transition: background 0.12s;
+  }
+  .offer-detail summary::-webkit-details-marker { display: none; }
+  .offer-detail summary:hover { background: var(--bg-el); }
+  .offer-detail summary::after {
+    content: '▸';
+    margin-left: auto;
+    font-size: 14px; color: var(--text-mute);
+    transition: transform 0.15s;
+  }
+  .offer-detail[open] summary::after { transform: rotate(90deg); }
+  .offer-detail[open] summary { border-bottom: 1px solid var(--border); }
+  .offer-detail .type-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .offer-detail.training .type-dot { background: var(--blue); }
+  .offer-detail.team     .type-dot { background: var(--gold); }
+  .offer-detail.camp     .type-dot { background: var(--green); }
+  .offer-detail.league   .type-dot { background: var(--purple); }
+  .offer-detail.tourney  .type-dot { background: var(--amber); }
+  .offer-detail.rental   .type-dot { background: var(--red); }
+  .offer-detail .summary-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 500;
+    color: var(--text-mute);
+    margin-left: 8px;
+  }
+  .offer-detail-body { padding: 18px 22px 22px; }
+  .offer-detail-body h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-mute);
+    margin: 20px 0 8px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .offer-detail-body h4:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+  .offer-detail-body .field-table { margin-bottom: 0; }
+  .offer-detail-body .field-table th { background: rgba(255,255,255,0.02); }
+  .offer-detail-body .ref {
+    display: inline-block;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-size: 12px; color: var(--text-sub);
+    margin: 4px 0 12px;
+  }
+  .offer-detail-body .ref code {
+    color: var(--gold);
+    font-size: 11px;
+  }
 </style>
 </head>
 <body>
@@ -162,7 +231,7 @@
     └─ Cards:
        <span class="b">• Offers</span>          <span style="color:var(--text-mute)">← unified editor (all variations)</span>
        <span class="b">• Branding</span>        <span style="color:var(--text-mute)">← logos / colors</span>
-       <span class="b">• Website</span>         <span style="color:var(--text-mute)">← site spec + photos</span>
+       <span class="gone">• Website</span>         <span style="color:var(--text-mute)">← NOT on BB. Placement TBD (open question).</span>
   Marketing
   Resources
   Team                 <span style="color:var(--text-mute)">← portal teammates (different concept than "team offer")</span>
@@ -209,13 +278,13 @@
     </div>
 
     <div class="var-card camp">
-      <span class="var-tag">Type: camp</span>
-      <h3 class="var-name">Camp / Clinic</h3>
-      <p class="var-desc">Short-term intensive. Fixed start/end dates. Sign up once.</p>
+      <span class="var-tag">Type: camp_clinic</span>
+      <h3 class="var-name">Camps / Clinics</h3>
+      <p class="var-desc">Short-term intensive. Fixed start/end dates. A clinic is just a one-day camp. Sign up once.</p>
       <div class="var-extras">
         <div class="var-extras-label">Type-specific</div>
         <ul>
-          <li>Start and end dates</li>
+          <li>Start and end dates (same day = clinic)</li>
           <li>Schedule / format (per-day breakdown)</li>
           <li>Bring-with list</li>
         </ul>
@@ -342,9 +411,9 @@
     </div>
 
     <div class="var-card camp">
-      <span class="var-tag">Camp schedule</span>
-      <h3 class="var-name">Multi-day intensive</h3>
-      <p class="var-desc">Fixed dates. Single block of days. Daily timetable usually repeats.</p>
+      <span class="var-tag">Camps / Clinics schedule</span>
+      <h3 class="var-name">Single day OR multi-day intensive</h3>
+      <p class="var-desc">Fixed dates. One day = clinic. Multiple days = camp. Daily timetable usually repeats.</p>
       <div class="var-extras">
         <div class="var-extras-label">Fields</div>
         <ul>
@@ -414,6 +483,328 @@
   </div>
 
   <p class="sub" style="margin-top:-8px"><b style="color:var(--gold)">Shared across all types:</b> Location (pick from the Settings &gt; Locations list), staff/coaches assigned, "who notify when schedule changes".</p>
+
+  <!-- ── Per-offer: Sales / Onboarding / Tracking ───────────────────── -->
+  <h2>Per-offer process: Sales · Onboarding · Tracking</h2>
+  <p class="sub">Beyond identity / scheduling / pricing (shared concepts above), each offer type has its own flavor of how leads convert, how customers get onboarded, and what gets tracked once they're in. Click a type to expand. <i>Pick at it</i> — these are first drafts.</p>
+
+  <!-- TRAINING -->
+  <details class="offer-detail training">
+    <summary>
+      <span class="type-dot"></span>
+      Training
+      <span class="summary-sub">recurring · class / academy</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Lead source(s)</td><td class="type">Check Many</td><td class="notes">Website form / Walk-in / Referral / Ads / Other</td></tr>
+          <tr><td class="label">Free trial offered?</td><td class="type">Check One</td><td class="notes">Y/N → trial duration + price (if not free)</td></tr>
+          <tr><td class="label">Discovery call before signup?</td><td class="type">Check One</td><td class="notes">Y/N → which calendar</td></tr>
+          <tr><td class="label">Lead nurture sequence</td><td class="type">Open-Ended</td><td class="notes">How many touchpoints (email/SMS) before "abandoned"</td></tr>
+          <tr><td class="label">Trial-to-paid sequence</td><td class="type">Open-Ended</td><td class="notes">When + how often we follow up after a trial session</td></tr>
+          <tr><td class="label">Payment collected at</td><td class="type">Check One</td><td class="notes">Signup / Before first session / First session</td></tr>
+          <tr><td class="label">Lead notify</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged on new lead</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Welcome message</td><td class="type">Open-Ended</td><td class="notes">SMS + email copy sent immediately after signup</td></tr>
+          <tr><td class="label">Welcome packet</td><td class="type">File Upload</td><td class="notes">PDF or video sent with welcome</td></tr>
+          <tr><td class="label">First-session prep</td><td class="type">Open-Ended</td><td class="notes">What to bring, parking, who to ask for, what to wear</td></tr>
+          <tr><td class="label">Parent intake form</td><td class="type">Check Many</td><td class="notes">Emergency contact, medical, school, goals, basketball experience, jersey size, etc.</td></tr>
+          <tr><td class="label">Onboarding notify</td><td class="type">Staff Selector</td><td class="notes">Who's the point of contact for the new athlete</td></tr>
+          <tr><td class="label">30-day check-in</td><td class="type">Check One</td><td class="notes">Y/N → cadence + who reaches out</td></tr>
+          <tr><td class="label">New-customer survey timing</td><td class="type">Text Input</td><td class="notes">After 2 weeks / after first month / never</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Attendance tracking</td><td class="type">Check One</td><td class="notes">Method: CoachIQ / Mindbody / paper / app / not tracked</td></tr>
+          <tr><td class="label">Skill progression</td><td class="type">Check One</td><td class="notes">Y/N → method (assessment rubric, video, coach notes)</td></tr>
+          <tr><td class="label">Parent reports cadence</td><td class="type">Check One</td><td class="notes">Weekly / Monthly / Quarterly / None</td></tr>
+          <tr><td class="label">Renewal trigger</td><td class="type">Open-Ended</td><td class="notes">e.g. "5 sessions before package expiry" or "membership renewal date"</td></tr>
+          <tr><td class="label">Cancellation reason logging</td><td class="type">Check One</td><td class="notes">Y/N — collected on cancellation to feed marketing/retention</td></tr>
+          <tr><td class="label">At-risk indicators</td><td class="type">Open-Ended</td><td class="notes">What triggers an "at risk of churn" alert (e.g. 3 missed sessions in 2 weeks)</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
+
+  <!-- TEAM -->
+  <details class="offer-detail team">
+    <summary>
+      <span class="type-dot"></span>
+      Team
+      <span class="summary-sub">season · tryouts · competition</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Tryout registration form</td><td class="type">Check Many</td><td class="notes">Name, age, position, height, current team, parent, highlight film, GPA</td></tr>
+          <tr><td class="label">Tryout fee</td><td class="type">Check One</td><td class="notes">Y/N → amount; collected at registration or at door</td></tr>
+          <tr><td class="label">Selection process</td><td class="type">Check One</td><td class="notes">Open tryouts / invite-only / hybrid</td></tr>
+          <tr><td class="label">Selection notification timing</td><td class="type">Text Input</td><td class="notes">e.g. "within 48 hours of last tryout"</td></tr>
+          <tr><td class="label">Spot-offer message</td><td class="type">Open-Ended</td><td class="notes">Email/SMS template sent to selected players</td></tr>
+          <tr><td class="label">Spot acceptance deadline</td><td class="type">Text Input</td><td class="notes">How many days the player has to accept the roster spot</td></tr>
+          <tr><td class="label">Deposit / payment plan</td><td class="type">Open-Ended</td><td class="notes">Full upfront / monthly / partial deposit + balance</td></tr>
+          <tr><td class="label">Waitlist for non-selected</td><td class="type">Check One</td><td class="notes">Y/N → "we'll let you know if a spot opens"</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Roster welcome message</td><td class="type">Open-Ended</td><td class="notes">Sent to player + parent on roster confirmation</td></tr>
+          <tr><td class="label">Uniform sizing collection</td><td class="type">Check Many</td><td class="notes">Jersey size, shorts size, warm-up, shoe (if provided)</td></tr>
+          <tr><td class="label">Schedule delivery channel</td><td class="type">Check One</td><td class="notes">TeamSnap / WhatsApp / Email / SportsEngine / etc.</td></tr>
+          <tr><td class="label">Player code of conduct</td><td class="type">File Upload</td><td class="notes">Signed agreement required at onboarding</td></tr>
+          <tr><td class="label">Parent code of conduct</td><td class="type">File Upload</td><td class="notes">Same</td></tr>
+          <tr><td class="label">Season kickoff event</td><td class="type">Check One</td><td class="notes">Y/N → date + location (meet-the-coach, team photo, etc.)</td></tr>
+          <tr><td class="label">Communication channel setup</td><td class="type">Open-Ended</td><td class="notes">How parents/players get added to the team chat</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Practice attendance</td><td class="type">Check One</td><td class="notes">Tool used (coach app / paper / TeamSnap)</td></tr>
+          <tr><td class="label">Game attendance / availability</td><td class="type">Check One</td><td class="notes">How players confirm availability for each game</td></tr>
+          <tr><td class="label">Performance stats</td><td class="type">Open-Ended</td><td class="notes">What's tracked (points, assists, plus-minus, custom) and how</td></tr>
+          <tr><td class="label">Playing-time tracking</td><td class="type">Check One</td><td class="notes">Y/N — for parent transparency</td></tr>
+          <tr><td class="label">Parent comm cadence</td><td class="type">Check One</td><td class="notes">Weekly recap / Monthly / Game-by-game / On request</td></tr>
+          <tr><td class="label">Season-end report card</td><td class="type">Check One</td><td class="notes">Y/N → format (PDF / call / video review)</td></tr>
+          <tr><td class="label">Retention trigger</td><td class="type">Open-Ended</td><td class="notes">When + how the early-bird re-signup goes out for next season</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
+
+  <!-- CAMP / CLINIC -->
+  <details class="offer-detail camp">
+    <summary>
+      <span class="type-dot"></span>
+      Camps / Clinics
+      <span class="summary-sub">single-day OR multi-day intensive</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Registration form fields</td><td class="type">Check Many</td><td class="notes">Athlete + parent info, age, skill, dietary, t-shirt size, photo release</td></tr>
+          <tr><td class="label">Capacity / waitlist</td><td class="type">Text Input + Check One</td><td class="notes">Cap; auto-waitlist when full Y/N</td></tr>
+          <tr><td class="label">Early-bird pricing window</td><td class="type">Check One</td><td class="notes">Y/N → end date + discount</td></tr>
+          <tr><td class="label">Group / sibling discount</td><td class="type">Check One</td><td class="notes">Y/N → rule (e.g. 2+ siblings 10% off, group of 5+ 15% off)</td></tr>
+          <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">Up to X days before = full refund, etc.</td></tr>
+          <tr><td class="label">Last-call reminder cadence</td><td class="type">Open-Ended</td><td class="notes">When reminders go out (T-7 / T-3 / T-1 days)</td></tr>
+          <tr><td class="label">Convert-to-program incentive</td><td class="type">Open-Ended</td><td class="notes">Discount on regular training if camp grad signs up within X days</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Day-before reminder</td><td class="type">Open-Ended</td><td class="notes">Email + SMS copy with all logistics</td></tr>
+          <tr><td class="label">What to bring</td><td class="type">Open-Ended</td><td class="notes">Ball, water bottle, lunch, basketball shoes, etc.</td></tr>
+          <tr><td class="label">Check-in / parking instructions</td><td class="type">Open-Ended</td><td class="notes">Where to drop off, parking, who to ask for</td></tr>
+          <tr><td class="label">Medical / emergency contact form</td><td class="type">Check Many</td><td class="notes">Required fields, allergies, meds, contact</td></tr>
+          <tr><td class="label">Photo / video release</td><td class="type">File Upload</td><td class="notes">Signed before day 1</td></tr>
+          <tr><td class="label">Daily schedule to parents</td><td class="type">Check One</td><td class="notes">Y/N → sent the night before each day</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Daily attendance check-in</td><td class="type">Check One</td><td class="notes">Method (app / paper / parent text)</td></tr>
+          <tr><td class="label">Group / coach assignments</td><td class="type">Open-Ended</td><td class="notes">How athletes get sorted into groups + which coach</td></tr>
+          <tr><td class="label">Post-camp survey</td><td class="type">Check One</td><td class="notes">Y/N → when sent (day after / 3 days after)</td></tr>
+          <tr><td class="label">Photo / video delivery</td><td class="type">Check One</td><td class="notes">Y/N → channel (Google Drive link / email)</td></tr>
+          <tr><td class="label">Repeat-attendee tracking</td><td class="type">Check One</td><td class="notes">Y/N — flag athletes who were at last year's camp</td></tr>
+          <tr><td class="label">Convert to recurring program</td><td class="type">Open-Ended</td><td class="notes">Post-camp sequence: email + call to pitch ongoing training</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
+
+  <!-- INTERNAL LEAGUE -->
+  <details class="offer-detail league">
+    <summary>
+      <span class="type-dot"></span>
+      Internal League
+      <span class="summary-sub">recurring season · games · playoffs</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Registration unit</td><td class="type">Check One</td><td class="notes">Team / Individual / Both</td></tr>
+          <tr><td class="label">Team registration form</td><td class="type">Check Many</td><td class="notes">Captain info, team name, roster, primary contact</td></tr>
+          <tr><td class="label">Individual registration form</td><td class="type">Check Many</td><td class="notes">Player info, preferred position, height, parent</td></tr>
+          <tr><td class="label">Roster min / max</td><td class="type">Text Input</td><td class="notes">Min players per team; max</td></tr>
+          <tr><td class="label">Registration open / close</td><td class="type">Text Input</td><td class="notes">Dates</td></tr>
+          <tr><td class="label">Late registration fee</td><td class="type">Check One</td><td class="notes">Y/N → amount + when "late" starts</td></tr>
+          <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">If league cancels / if player drops</td></tr>
+          <tr><td class="label">Free-agent matching</td><td class="type">Check One</td><td class="notes">Y/N — how individuals get placed onto teams</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Roster confirmation</td><td class="type">Open-Ended</td><td class="notes">Email sent to captain + all players once roster is locked</td></tr>
+          <tr><td class="label">Schedule release</td><td class="type">Open-Ended</td><td class="notes">When + how the season schedule is published</td></tr>
+          <tr><td class="label">Rulebook delivery</td><td class="type">File Upload</td><td class="notes">PDF sent at onboarding</td></tr>
+          <tr><td class="label">Equipment requirements</td><td class="type">Open-Ended</td><td class="notes">What players need to bring (jersey, ball, etc.)</td></tr>
+          <tr><td class="label">Standings page link</td><td class="type">Link Input</td><td class="notes">URL where standings live</td></tr>
+          <tr><td class="label">Communication channel</td><td class="type">Check One</td><td class="notes">TeamSnap / WhatsApp / Slack / Email</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Score reporting</td><td class="type">Check One</td><td class="notes">Who enters (ref / captain / staff) + how (form, app)</td></tr>
+          <tr><td class="label">Standings update cadence</td><td class="type">Check One</td><td class="notes">Live / nightly / weekly</td></tr>
+          <tr><td class="label">Stats tracked</td><td class="type">Check Many</td><td class="notes">PPG, APG, RPG, +/- , custom</td></tr>
+          <tr><td class="label">Playoff seeding logic</td><td class="type">Open-Ended</td><td class="notes">Win % / head-to-head / tiebreakers</td></tr>
+          <tr><td class="label">Awards delivery</td><td class="type">Open-Ended</td><td class="notes">When + how trophies / medals get to winners</td></tr>
+          <tr><td class="label">Re-enrollment push for next season</td><td class="type">Open-Ended</td><td class="notes">Early-bird deadline + comm sequence</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
+
+  <!-- INTERNAL TOURNAMENT -->
+  <details class="offer-detail tourney">
+    <summary>
+      <span class="type-dot"></span>
+      Internal Tournament
+      <span class="summary-sub">single event · brackets</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Registration unit</td><td class="type">Check One</td><td class="notes">Team / Individual / Both</td></tr>
+          <tr><td class="label">Registration form</td><td class="type">Check Many</td><td class="notes">Team name, captain, roster, age division, contact</td></tr>
+          <tr><td class="label">Hard registration deadline</td><td class="type">Text Input</td><td class="notes">Cutoff date</td></tr>
+          <tr><td class="label">Bracket cap</td><td class="type">Text Input</td><td class="notes">Max teams per bracket / division</td></tr>
+          <tr><td class="label">Minimum-teams threshold</td><td class="type">Text Input</td><td class="notes">If under X, event cancels and refunds</td></tr>
+          <tr><td class="label">Refund policy</td><td class="type">File Upload</td><td class="notes">If event canceled / no-show</td></tr>
+          <tr><td class="label">Early-bird pricing</td><td class="type">Check One</td><td class="notes">Y/N → discount + deadline</td></tr>
+          <tr><td class="label">Spectator pricing</td><td class="type">Check One</td><td class="notes">Y/N → adult / kid / family rates</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Bracket release timing</td><td class="type">Check One</td><td class="notes">Week-of / 48hr before / day-of</td></tr>
+          <tr><td class="label">Game schedule delivery</td><td class="type">Open-Ended</td><td class="notes">Email + posted at venue</td></tr>
+          <tr><td class="label">Check-in process</td><td class="type">Open-Ended</td><td class="notes">Where, when, by whom, what to bring (waivers, IDs)</td></tr>
+          <tr><td class="label">Rules document</td><td class="type">File Upload</td><td class="notes">Distributed at registration + at check-in</td></tr>
+          <tr><td class="label">Score-keeper assignments</td><td class="type">Staff Selector</td><td class="notes">Who runs the table per court</td></tr>
+          <tr><td class="label">Parking / venue info</td><td class="type">Open-Ended</td><td class="notes">Where to park, drop-off, restrooms, concessions</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Live bracket updates</td><td class="type">Check One</td><td class="notes">Who updates (ref / staff / parent volunteer) + how (sheet / app)</td></tr>
+          <tr><td class="label">Score recording</td><td class="type">Check One</td><td class="notes">Paper scorebook / app / both</td></tr>
+          <tr><td class="label">Photo / video coverage</td><td class="type">Check One</td><td class="notes">In-house / hired / none — and how it gets distributed</td></tr>
+          <tr><td class="label">Awards / trophies tracking</td><td class="type">Open-Ended</td><td class="notes">Which awards (1st, 2nd, MVP) + how they're presented</td></tr>
+          <tr><td class="label">Post-event survey</td><td class="type">Check One</td><td class="notes">Y/N → sent within 24h</td></tr>
+          <tr><td class="label">Highlight reel for next year's marketing</td><td class="type">Check One</td><td class="notes">Y/N — used for promo when next year opens</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
+
+  <!-- GYM RENTAL -->
+  <details class="offer-detail rental">
+    <summary>
+      <span class="type-dot"></span>
+      Gym Rental
+      <span class="summary-sub">B2B · on-demand booking</span>
+    </summary>
+    <div class="offer-detail-body">
+
+      <h4>Sales process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Inquiry form</td><td class="type">Check Many</td><td class="notes">Org name, event type, expected attendees, dates, contact, prior renter Y/N</td></tr>
+          <tr><td class="label">Quote / rate sheet</td><td class="type">File Upload</td><td class="notes">Auto-sent on inquiry, or manual response template</td></tr>
+          <tr><td class="label">Rate negotiation policy</td><td class="type">Check One</td><td class="notes">Fixed / negotiable for X+ hours / always custom</td></tr>
+          <tr><td class="label">Contract template</td><td class="type">File Upload</td><td class="notes">Auto-generated, e-signable</td></tr>
+          <tr><td class="label">Deposit policy</td><td class="type">Open-Ended</td><td class="notes">How much, when collected, refundable conditions</td></tr>
+          <tr><td class="label">Insurance certificate required</td><td class="type">Check One</td><td class="notes">Y/N → liability minimum + how to submit</td></tr>
+          <tr><td class="label">Booking confirmation comms</td><td class="type">Open-Ended</td><td class="notes">Email + calendar invite sent after contract signed + deposit paid</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Onboarding process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Access instructions</td><td class="type">Open-Ended</td><td class="notes">Gate code / lockbox / staff meets / key card</td></tr>
+          <tr><td class="label">Equipment access</td><td class="type">Open-Ended</td><td class="notes">What's included (hoops, scoreboard, balls, sound) vs. bring-your-own</td></tr>
+          <tr><td class="label">House rules document</td><td class="type">File Upload</td><td class="notes">Signed at contract — noise, cleanup, food/drink rules</td></tr>
+          <tr><td class="label">Emergency / first aid info</td><td class="type">Open-Ended</td><td class="notes">First aid location, AED location, emergency exits</td></tr>
+          <tr><td class="label">Day-of point of contact</td><td class="type">Staff Selector</td><td class="notes">Who renter calls if anything goes wrong</td></tr>
+          <tr><td class="label">Day-before reminder</td><td class="type">Check One</td><td class="notes">Y/N — sent 24h before rental</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Tracking process</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="label">Usage log</td><td class="type">Open-Ended</td><td class="notes">In/out times recorded by staff or self-report</td></tr>
+          <tr><td class="label">Damage reporting</td><td class="type">Open-Ended</td><td class="notes">Process for inspecting after rental + charging deposit if damaged</td></tr>
+          <tr><td class="label">Repeat-customer flag</td><td class="type">Check One</td><td class="notes">Y/N — auto-tag returning renters for discount eligibility</td></tr>
+          <tr><td class="label">Renewal / recurring booking offer</td><td class="type">Open-Ended</td><td class="notes">Sequence to convert one-off into weekly/monthly</td></tr>
+          <tr><td class="label">Invoice / payment status</td><td class="type">Check One</td><td class="notes">Tool used (Stripe / QuickBooks / manual)</td></tr>
+          <tr><td class="label">Customer satisfaction survey</td><td class="type">Check One</td><td class="notes">Y/N — sent 24h after rental</td></tr>
+        </tbody>
+      </table>
+
+    </div>
+  </details>
 
   <!-- ── Pricing variants ───────────────────────────────────────────── -->
   <h2>Pricing variants (conditional on the "Pricing model" pick)</h2>
@@ -497,8 +888,8 @@
       </tr>
       <tr>
         <td class="item">Camps / Clinics</td>
-        <td><span class="pill offer">Offer type: Camp</span></td>
-        <td>Same. Just with start/end dates instead of recurring schedule.</td>
+        <td><span class="pill offer">Offer type: Camp / Clinic</span></td>
+        <td>Same. Start/end dates instead of recurring schedule. Single-day = clinic, multi-day = camp.</td>
       </tr>
       <tr>
         <td class="item">Internal Tournament</td>
@@ -548,7 +939,7 @@
     </tbody>
   </table>
 
-  <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, + the existing "Build something else" overflow. The 6 offer-types (Training, Team, Camp, League, Tournament, Gym Rental) get configured under Business Blueprint &gt; Offers instead.</p>
+  <p class="sub" style="margin-top:14px">After this shake-out the build menu is: <b>Player Intake</b>, <b>New Hire</b>, <b>Staff Member</b>, <b>Sponsor Inquiry</b>, <b>Promo</b>, + the existing "Build something else" overflow. The 6 offer-types (Training, Team, Camp/Clinic, League, Tournament, Gym Rental) get configured under Business Blueprint &gt; Offers instead.</p>
 
   <!-- ── Open questions ─────────────────────────────────────────────── -->
   <!-- ── Settled decisions ──────────────────────────────────────────── -->
@@ -559,17 +950,28 @@
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Branding is a Business Blueprint card.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Each offer has a type-aware Schedule section (recurring / season / event / on-demand all live in the same form, conditional on Type).</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Add-ons becomes a builder (name + price + description), required on every offer.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Camps renamed to "Camps / Clinics" — a clinic is just a one-time camp.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Website is <i>not</i> a Business Blueprint card. Placement TBD.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Each offer has its own Sales / Onboarding / Tracking process (see dropdowns below).</p>
+  </div>
+
+  <!-- ── Coming soon: user guides ───────────────────────────────────── -->
+  <div class="insight" style="border-color:rgba(122,184,245,0.25); border-left-color:var(--blue); background:linear-gradient(180deg, rgba(122,184,245,0.05), rgba(122,184,245,0.01)); margin-top:24px;">
+    <div class="kicker" style="color:var(--blue)">Coming soon · highlight</div>
+    <p><b style="color:var(--blue)">User guides per offer type.</b> When an offer is created, the system will spit out a build checklist: <b>websites</b> to update, <b>funnels</b> to wire, <b>automations</b> to launch, <b>pipelines</b> to configure, <b>settings</b> to flip. Staff claims the guide and works through it. Designed-out later — flagging now so it stays in mind as the Offers editor gets built.</p>
   </div>
 
   <div class="questions">
     <h2>Open questions for you</h2>
     <ol>
-      <li><b>Other Business Blueprint cards?</b><br>
-        Confirmed so far: Offers, Branding, Website. Should there be more? (e.g. Brand voice, Selling points / mission, Pricing philosophy, Coach bios, Marketing assets?)</li>
+      <li><b>Where does "Website" live now?</b><br>
+        Confirmed it's not a Business Blueprint card. Options: Settings &gt; Website subsection · its own top-level tab · folded under each offer (each offer has a "what should the landing page say" sub-block) · deferred entirely. Which?</li>
+      <li><b>Beyond Offers + Branding, what else is on Business Blueprint?</b><br>
+        Two cards confirmed. Anything else belong there? (e.g. Brand voice, Mission / selling points, Pricing philosophy, Coach bios, Marketing assets, Brand book / style guide?)</li>
       <li><b>/class-setup.html deprecation timing?</b><br>
-        Now that Class is just "Offer type: Training" with proper type-aware scheduling, the standalone 3-step flow (Class &middot; Offer &middot; Parent Onboarding) becomes redundant once the Offers editor ships. Path forward = build the editor, redirect class-setup.html to it. Confirm the timing — same release, or keep both running during transition?</li>
+        Now that Class is just "Offer type: Training" with proper type-aware scheduling, the standalone 3-step flow (Class &middot; Offer &middot; Parent Onboarding) becomes redundant once the Offers editor ships. Same release, or keep both running during transition?</li>
       <li><b>Does "Upsells" deprecate entirely, or stay for non-add-on upsell campaigns?</b><br>
-        e.g. "Buy 10 sessions get 1 free" is technically a pricing thing not an add-on. Could stay in build menu as a discount-campaign tile.</li>
+        e.g. "Buy 10 sessions get 1 free" is a pricing thing not an add-on. Could stay in the build menu as a discount-campaign tile.</li>
       <li><b>Existing offer data in <code>onboarding_reloaded</code> — migrate or start fresh?</b><br>
         The iframe has been collecting offer data scoped by submission_key / now client_id. If we collapse Training + Teams + standalone offers into one unified table, do we migrate the in-flight rows or start clean?</li>
     </ol>
