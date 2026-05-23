@@ -476,7 +476,12 @@
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Sales path<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Free trial / Discovery call first / Direct signup / Other — gates the next set of questions</td></tr>
         <tr><td class="label">Trial duration + price</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Sales path = Free trial</span> e.g. "1 session, free" or "2 weeks, $25"</td></tr>
-        <tr><td class="label">Which discovery-call calendar</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> Calendar link to use</td></tr>
+        <tr><td class="label">Discovery-call calendar</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> Use existing calendar / Create a new one</td></tr>
+        <tr><td class="label">Existing calendar link</td><td class="type">Link Input</td><td class="notes"><span class="dep">↳ if Calendar = Use existing</span> Paste the booking link</td></tr>
+        <tr><td class="label">Call host</td><td class="type">Staff Selector</td><td class="notes"><span class="dep">↳ if Calendar = Create new</span> Who takes the call</td></tr>
+        <tr><td class="label">Call duration</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Calendar = Create new</span> 15 / 30 / 45 / 60 min</td></tr>
+        <tr><td class="label">Availability windows</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Calendar = Create new</span> Day · start · end</td></tr>
+        <tr><td class="label">Buffer between calls</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Calendar = Create new</span> 0 / 15 / 30 min</td></tr>
         <tr><td class="label">Discovery call agenda</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> What's covered on the call</td></tr>
         <tr><td class="label">Direct-signup confirmation</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Direct signup</span> What the buyer sees / receives immediately after signing up</td></tr>
         <tr><td class="label">Describe the path</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Other</span> How leads become customers in this offer</td></tr>
