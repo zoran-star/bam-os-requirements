@@ -230,8 +230,11 @@
     └─ Cards:
        <span class="b">• Offers</span>            <span style="color:var(--text-mute)">← unified editor (6 offer types)</span>
        <span class="b">• Branding</span>          <span style="color:var(--text-mute)">← logos / colors / brand assets</span>
-       <span class="b">• Website</span>           <span style="color:var(--text-mute)">← site-specific spec (existing site, refs, stats, photos)</span>
-       <span class="new">• General Business</span>  <span style="color:var(--text-mute)">← NEW: business basics, domain, staff, locations</span>
+       <span class="new">• Other</span>             <span style="color:var(--text-mute)">← umbrella card, cascades down:</span>
+          ├─ <span class="b">Business basics</span>   <span style="color:var(--text-mute)">← display name, legal name, address, entity, EIN, phone, email</span>
+          ├─ <span class="b">Website</span>          <span style="color:var(--text-mute)">← existing site, refs, stats, photos, domain</span>
+          ├─ <span class="b">Staff</span>            <span style="color:var(--text-mute)">← people who work at the academy</span>
+          └─ <span class="b">Locations</span>        <span style="color:var(--text-mute)">← every place you train at</span>
   Marketing            <span style="color:var(--text-mute)">← Meta ads / Leadsie connect</span>
   Resources
   Team                 <span style="color:var(--text-mute)">← portal teammates (not the "team" offer type)</span>
@@ -241,17 +244,18 @@
 
 <span style="color:var(--text-mute)">─── First-time-only ───────────────────────────</span>
 <span class="new">★ Onboarding Tracker (top-right)</span>  <span style="color:var(--text-mute)">← 4 circle checkboxes:</span>
-   ◯ Meta Ads · ◯ Website · ◯ Branding · ◯ Offers   <span style="color:var(--text-mute)">click jumps to section</span></div>
+   ◯ Meta Ads · ◯ Website · ◯ Branding · ◯ Offers   <span style="color:var(--text-mute)">click jumps to section</span>
+                                                  <span style="color:var(--text-mute)">(Website lives inside BB &gt; Other)</span></div>
 
   <!-- ── Settled ─────────────────────────────────────────────────────── -->
   <div class="insight" style="border-color:rgba(74,222,128,0.25); border-left-color:var(--green); background:linear-gradient(180deg, rgba(74,222,128,0.05), rgba(74,222,128,0.01));">
     <div class="kicker" style="color:var(--green)">Settled · 2026-05-23</div>
     <p style="margin-bottom:4px"><b style="color:var(--green)">✓</b> 6 offer types: Training · Team · Camps/Clinics · Internal League · Internal Tournament · Gym Rental.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Youth Academy folds into Training. Class folds into Training. <code>/class-setup.html</code> converts into the Offers editor.</p>
-    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Each offer collects answers in 5 sections: <b>General Info · Value · Pricing · Sales · Onboarding</b>.</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Each offer collects answers in 6 sections: <b>General Info · Schedule · Value · Pricing · Sales · Onboarding</b>.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Add-ons = repeating builder (name + price + description) under Pricing.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Upsells = linkage between offers (target offer + description). Lives as a sub-area inside <b>Sales</b>.</p>
-    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Business Blueprint cards: Offers · Branding · Website · <b>General Business</b> (new — holds business basics, domain, staff, locations).</p>
+    <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Business Blueprint cards: Offers · Branding · <b>Other</b>. The "Other" card cascades into 4 sub-areas: Business basics · Website · Staff · Locations.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Settings shrinks to Integrations (Stripe / GHL / Meta) + portal preferences.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> New Onboarding Tracker (top-right, first-time only): Meta Ads · Website · Branding · Offers. Circle checkbox per section, click jumps there.</p>
     <p style="margin:4px 0"><b style="color:var(--green)">✓</b> Existing iframe onboarding data = wiped (test data only).</p>
@@ -273,7 +277,7 @@
 
   <!-- ── The main: 6 offers × 5 sections ─────────────────────────────── -->
   <h2>The 6 offer types — what gets asked</h2>
-  <p class="sub">5 sections per offer: <b>General Info · Value · Pricing · Sales · Onboarding</b>. Click a type to expand and pick at the field list.</p>
+  <p class="sub">6 sections per offer: <b>General Info · Schedule · Value · Pricing · Sales · Onboarding</b>. Click a type to expand and pick at the field list.</p>
 
   <!-- ─── TRAINING ─── -->
   <details class="offer-detail training" open>
@@ -291,11 +295,16 @@
         <tr><td class="label">Age range<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "Grades 5-8", "U12-U14"</td></tr>
         <tr><td class="label">Skill level<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Beginner / Intermediate / Advanced / All</td></tr>
         <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls</td></tr>
-        <tr><td class="label">Location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; General Business &gt; Locations</td></tr>
+        <tr><td class="label">Location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Weekly schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Day · start · end · location (one row per slot)</td></tr>
         <tr><td class="label">Capacity per slot</td><td class="type">Text Input</td><td class="notes">Athletes per session</td></tr>
         <tr><td class="label">Year-round or seasonal?</td><td class="type">Check One</td><td class="notes">If seasonal → start/end dates</td></tr>
         <tr><td class="label">Closed dates / breaks</td><td class="type">Open-Ended</td><td class="notes">Holidays, summer break, etc.</td></tr>
+        <tr><td class="label">Schedule consistency</td><td class="type">Check One</td><td class="notes">Same every week? If no → how athletes are informed of changes</td></tr>
       </tbody></table>
 
       <h4>Value</h4>
@@ -358,12 +367,18 @@
         <tr><td class="label">Team level<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Local / Rep / AAU / Elite / Other</td></tr>
         <tr><td class="label">Age group<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "15U"</td></tr>
         <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Boys / Girls</td></tr>
-        <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; General Business &gt; Locations</td></tr>
+        <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Start / end (e.g. March → July)</td></tr>
         <tr><td class="label">Tryouts?</td><td class="type">Check One</td><td class="notes">Y/N → date(s), time(s), location, cost, capacity, what to bring</td></tr>
         <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Recurring weekly during season — day · start · end · location</td></tr>
         <tr><td class="label">League(s) competing in</td><td class="type">Text Input</td><td class="notes">Where games come from (most teams are in an external league)</td></tr>
+        <tr><td class="label">Game schedule link</td><td class="type">Link Input</td><td class="notes">External game calendar URL (if league provides one)</td></tr>
         <tr><td class="label">Tournament count</td><td class="type">Text Input</td><td class="notes">Approx. # of tournaments per season</td></tr>
+        <tr><td class="label">Off-season activity</td><td class="type">Open-Ended</td><td class="notes">Optional — what the team does after the regular season</td></tr>
       </tbody></table>
 
       <h4>Value</h4>
@@ -426,12 +441,17 @@
         <tr><td class="label">Age range<span class="req">required</span></td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Skill level<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Beginner / Intermediate / Advanced / All</td></tr>
         <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls</td></tr>
-        <tr><td class="label">Location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Pick from Locations</td></tr>
-        <tr><td class="label">Start date / end date<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Same date = clinic. Different = camp.</td></tr>
+        <tr><td class="label">Location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
+        <tr><td class="label">Capacity / max attendees</td><td class="type">Text Input</td><td class="notes">Triggers waitlist when full</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Start date / end date<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Same date = clinic. Different dates = camp.</td></tr>
         <tr><td class="label">Days included</td><td class="type">Check Many</td><td class="notes">Mon-Fri vs M/W/F (skip if single-day clinic)</td></tr>
         <tr><td class="label">Daily schedule same each day?</td><td class="type">Check One</td><td class="notes">Y → start/end time + lunch. N → per-day builder</td></tr>
-        <tr><td class="label">Sessions per day</td><td class="type">Check One</td><td class="notes">Single / Double AM+PM</td></tr>
-        <tr><td class="label">Capacity / max attendees</td><td class="type">Text Input</td><td class="notes">Triggers waitlist when full</td></tr>
+        <tr><td class="label">Sessions per day</td><td class="type">Check One</td><td class="notes">Single / Double (AM+PM)</td></tr>
+        <tr><td class="label">Registration deadline</td><td class="type">Text Input</td><td class="notes">Date registration closes (or "until full")</td></tr>
       </tbody></table>
 
       <h4>Value</h4>
@@ -489,9 +509,14 @@
         <tr><td class="label">Skill level / division</td><td class="type">Check Many</td><td class="notes">Allow multiple divisions in one league</td></tr>
         <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls / Co-ed</td></tr>
         <tr><td class="label">Location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Where games are played</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Season start / end<span class="req">required</span></td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Game day(s) + time window<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">e.g. Saturdays 10am-2pm</td></tr>
         <tr><td class="label">Number of weeks</td><td class="type">Text Input</td><td class="notes">Total weeks in the season</td></tr>
+        <tr><td class="label">Registration open / close</td><td class="type">Text Input</td><td class="notes">When players can sign up</td></tr>
         <tr><td class="label">Playoff week(s)</td><td class="type">Text Input</td><td class="notes">Last X weeks of the season</td></tr>
         <tr><td class="label">Awards / banquet date</td><td class="type">Text Input</td><td class="notes">Optional</td></tr>
       </tbody></table>
@@ -554,12 +579,19 @@
         <tr><td class="label">Level / division</td><td class="type">Check Many</td><td class="notes">Allow multiple divisions</td></tr>
         <tr><td class="label">Gender<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls / Co-ed</td></tr>
         <tr><td class="label">Location<span class="req">required</span></td><td class="type">Check One</td><td class="notes"></td></tr>
+        <tr><td class="label">Brackets / divisions</td><td class="type">Check One</td><td class="notes">Y/N → describe each bracket</td></tr>
+        <tr><td class="label">Individual signups allowed</td><td class="type">Check One</td><td class="notes">Y/N — can a single player register or only full teams?</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Event date(s)<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Single day or weekend range</td></tr>
-        <tr><td class="label">Check-in time</td><td class="type">Time Picker</td><td class="notes"></td></tr>
+        <tr><td class="label">Check-in time</td><td class="type">Time Picker</td><td class="notes">When teams arrive</td></tr>
         <tr><td class="label">First game time</td><td class="type">Time Picker</td><td class="notes"></td></tr>
         <tr><td class="label">Estimated end time</td><td class="type">Time Picker</td><td class="notes"></td></tr>
-        <tr><td class="label">Brackets / divisions</td><td class="type">Check One</td><td class="notes">Y/N → describe</td></tr>
-        <tr><td class="label">Individual signups allowed</td><td class="type">Check One</td><td class="notes">Y/N</td></tr>
+        <tr><td class="label">Game schedule generation</td><td class="type">Check One</td><td class="notes">Pre-set bracket times / generated after registration closes</td></tr>
+        <tr><td class="label">Awards / closing time</td><td class="type">Time Picker</td><td class="notes">When the trophy ceremony happens</td></tr>
+        <tr><td class="label">Registration deadline</td><td class="type">Text Input</td><td class="notes">When registration hard-closes</td></tr>
       </tbody></table>
 
       <h4>Value</h4>
@@ -613,15 +645,20 @@
 
       <h4>General info</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Facility / location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Which gym (from Locations)</td></tr>
+        <tr><td class="label">Facility / location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Which gym (from BB &gt; Other &gt; Locations)</td></tr>
         <tr><td class="label">Capacity (max occupancy)</td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Amenities</td><td class="type">Check Many</td><td class="notes">Courts, scoreboard, sound, AC, locker rooms, etc.</td></tr>
+      </tbody></table>
+
+      <h4>Schedule</h4>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Available booking windows<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Day-of-week + start + end</td></tr>
         <tr><td class="label">Minimum block (hours)</td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Maximum block (hours)</td><td class="type">Text Input</td><td class="notes"></td></tr>
         <tr><td class="label">Buffer between rentals</td><td class="type">Text Input</td><td class="notes">Minutes</td></tr>
         <tr><td class="label">Advance notice required</td><td class="type">Text Input</td><td class="notes">e.g. "48 hours minimum"</td></tr>
         <tr><td class="label">Blackout dates / unavailable periods</td><td class="type">Open-Ended</td><td class="notes">When gym is closed</td></tr>
+        <tr><td class="label">Booking method</td><td class="type">Check One</td><td class="notes">Real-time calendar / request approval / phone</td></tr>
       </tbody></table>
 
       <h4>Value</h4>
