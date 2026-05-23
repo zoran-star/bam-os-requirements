@@ -204,6 +204,127 @@
     color: var(--gold);
     font-size: 11px;
   }
+
+  /* ── Mobile (≤720px) ───────────────────────────────────────────── */
+  @media (max-width: 720px) {
+    .page { padding: 24px 14px 64px; }
+
+    .eyebrow { font-size: 10px; }
+    h1 { font-size: 26px; line-height: 1.15; margin-bottom: 10px; }
+    h2 { font-size: 18px; margin: 36px 0 12px; padding-bottom: 8px; }
+    h3 { font-size: 14px; }
+    .sub { font-size: 14px; margin-bottom: 22px; }
+
+    .insight { padding: 16px 18px; }
+    .insight p { font-size: 13px; line-height: 1.55; }
+
+    /* IA tree — scrolls horizontally on small screens */
+    .ia {
+      font-size: 11px;
+      padding: 16px 14px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Pricing-grid + variations — single column */
+    .variations { grid-template-columns: 1fr; gap: 10px; }
+    .pricing-grid { grid-template-columns: 1fr; }
+
+    .var-card { padding: 16px; }
+    .var-name { font-size: 16px; }
+    .var-desc { font-size: 13px; }
+
+    /* Offer dropdown chrome */
+    .offer-detail summary { padding: 14px 16px; font-size: 15px; gap: 10px; }
+    .offer-detail summary::after { font-size: 12px; }
+    .offer-detail .summary-sub {
+      display: block;
+      margin-left: 0;
+      margin-top: 3px;
+      font-size: 10px;
+    }
+    .offer-detail-body { padding: 16px 14px 18px; }
+    .offer-detail-body h4 { margin-top: 18px; padding-top: 14px; }
+
+    /* Field tables → stacked cards (3 cols on desktop don't work on phones) */
+    .field-table,
+    .field-table thead,
+    .field-table tbody,
+    .field-table tr,
+    .field-table td {
+      display: block;
+      width: 100%;
+    }
+    .field-table thead { display: none; }
+    .field-table tr {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .field-table tr:last-child { border-bottom: none; }
+    .field-table td {
+      padding: 2px 0;
+      border: none;
+    }
+    .field-table td.label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .field-table td.type {
+      display: inline-block;
+      padding: 2px 8px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-bottom: 6px;
+      width: auto;
+    }
+    .field-table td.notes {
+      font-size: 12px;
+      color: var(--text-sub);
+      line-height: 1.55;
+    }
+    .field-table .req { font-size: 9px; }
+
+    /* Build menu shake-out → stacked cards */
+    .shake-table,
+    .shake-table thead,
+    .shake-table tbody,
+    .shake-table tr,
+    .shake-table td {
+      display: block;
+      width: 100%;
+    }
+    .shake-table thead { display: none; }
+    .shake-table tr {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .shake-table tr:last-child { border-bottom: none; }
+    .shake-table td {
+      padding: 3px 0;
+      border: none;
+      font-size: 13px;
+    }
+    .shake-table td.item {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .pill { font-size: 10px; padding: 2px 8px; }
+
+    /* Questions panel */
+    .questions { padding: 16px 18px; }
+    .questions h2 { font-size: 16px; }
+    .questions li { font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+
+    /* Concept image: don't bleed past container */
+    img { max-width: 100%; height: auto; }
+  }
 </style>
 </head>
 <body>
