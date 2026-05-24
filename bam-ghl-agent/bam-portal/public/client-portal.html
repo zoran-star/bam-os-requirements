@@ -7702,7 +7702,8 @@ function renderStripeConnectCard(stripe) {
     host.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #1f7a3d;background:rgba(31,122,61,0.08);border-radius:6px">
         <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#1f7a3d;color:#fff">● Stripe connected</span>
-        <span style="font-size:12px;color:var(--text-mute)">Billing actions enabled.</span>
+        <span style="font-size:12px;color:var(--text-mute);flex:1">Billing actions enabled.</span>
+        <button onclick="connectStripe()" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline;padding:4px 6px">Reconnect / switch account</button>
       </div>`;
   } else if (status === 'onboarding') {
     host.innerHTML = `
