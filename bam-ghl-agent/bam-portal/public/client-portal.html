@@ -7666,6 +7666,16 @@ function _memberStatusPill(status) {
   return `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
 }
 
+function _memberEngagementChip(eng) {
+  if (!eng) return '';
+  const map = {
+    consistent: ['consistent', '#1f7a3d'],
+    at_risk:    ['at risk',    '#c47424'],
+  };
+  const [label, color] = map[eng] || [eng, '#555'];
+  return `<span style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid ${color};color:${color}">${escapeHTML(label)}</span>`;
+}
+
 function renderMembers(members) {
   const container = document.getElementById('members-list-container');
   if (!container) return;
@@ -7687,7 +7697,7 @@ function renderMembers(members) {
       </div>
       <div style="font-size:13px;min-width:70px">${escapeHTML(m.plan || '—')}</div>
       <div style="font-size:13px;min-width:90px;color:var(--text-mute)">${escapeHTML(m.trainer || '—')}</div>
-      <div>${_memberStatusPill(m.status)}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
     </div>`).join('');
 
   container.innerHTML = summary + rows;
