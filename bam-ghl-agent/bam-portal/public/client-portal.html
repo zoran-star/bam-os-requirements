@@ -7788,15 +7788,23 @@ function _stripeConnectMaybeSwitch() {
 }
 
 // ── Member detail popup ──────────────────────────────────────
+// Right-side drawer (not centered modal): slides in from the edge,
+// stacks above a dimmed backdrop. Backdrop click closes.
 async function openMemberPopup(memberId) {
   const host = document.getElementById('member-modal-host');
   if (!host) return;
   host.innerHTML = `
-    <div id="member-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto" onclick="if(event.target.id==='member-modal')closeMemberPopup()">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:560px;width:100%;padding:24px;color:var(--text)">
-        <div id="member-modal-body"><div class="req-empty" style="padding:24px 0">Loading…</div></div>
-      </div>
+    <div id="member-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;opacity:0;transition:opacity 0.2s ease" onclick="closeMemberPopup()"></div>
+    <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:9999;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
+      <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0">Loading…</div></div>
     </div>`;
+  // Slide in on next frame so the transition fires.
+  requestAnimationFrame(() => {
+    const bd = document.getElementById('member-drawer-backdrop');
+    const dr = document.getElementById('member-drawer');
+    if (bd) bd.style.opacity = '1';
+    if (dr) dr.style.transform = 'translateX(0)';
+  });
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/members?id=' + encodeURIComponent(memberId), {
@@ -7812,8 +7820,19 @@ async function openMemberPopup(memberId) {
 }
 
 function closeMemberPopup() {
-  const host = document.getElementById('member-modal-host');
-  if (host) host.innerHTML = '';
+  const bd = document.getElementById('member-drawer-backdrop');
+  const dr = document.getElementById('member-drawer');
+  if (!bd && !dr) {
+    const host = document.getElementById('member-modal-host');
+    if (host) host.innerHTML = '';
+    return;
+  }
+  if (bd) bd.style.opacity = '0';
+  if (dr) dr.style.transform = 'translateX(100%)';
+  setTimeout(() => {
+    const host = document.getElementById('member-modal-host');
+    if (host) host.innerHTML = '';
+  }, 250);
 }
 
 function _renderMemberModalBody(m, stripe, history) {
@@ -7823,65 +7842,94 @@ function _renderMemberModalBody(m, stripe, history) {
   const fmtMoney = (cents, cur) => (cents == null) ? '—' : `$${(cents/100).toFixed(2)} ${(cur||'CAD').toUpperCase()}`;
   const fmtDate  = (unix)       => unix ? new Date(unix*1000).toISOString().slice(0,10) : '—';
 
-  let billingLines;
+  // Per GTA schema-decisions enums.
+  const ARCHETYPES  = ['Underdog','Butterfly','Cruiser','Die Hard','Caterpillar','Culture Kid','Eeyore'];
+  const TRAINERS    = ['Filip','Zoran','Adrian','Sergio'];
+  const ENGAGEMENTS = ['consistent','at_risk'];
+
+  // Inline editable select. onChange fires the update + re-renders.
+  const selectField = (field, current, options) => {
+    const opts = ['<option value="">— pick —</option>']
+      .concat(options.map(o =>
+        `<option value="${escapeHTML(o)}"${current === o ? ' selected' : ''}>${escapeHTML(o)}</option>`))
+      .join('');
+    return `<select onchange="_memberUpdateField('${m.id}','${field}',this.value)" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;min-width:140px">${opts}</select>`;
+  };
+
+  let billingRows;
   if (stripe && stripe.status) {
-    billingLines = [
-      `Plan: ${escapeHTML(m.plan || '—')} (${fmtMoney(stripe.amount_cents, stripe.currency)})`,
-      `Stripe status: ${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`,
-      stripe.trial_end ? `Paused until: ${fmtDate(stripe.trial_end)}` : `Next payment: ${fmtDate(stripe.current_period_end)}`,
-      `Customer: ${escapeHTML(m.stripe_customer_id || '—')}`,
+    billingRows = [
+      ['Plan',     `${escapeHTML(m.plan || '—')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span>`],
+      ['Status',   `${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`],
+      [stripe.trial_end ? 'Paused until' : 'Next payment', fmtDate(stripe.trial_end || stripe.current_period_end)],
+      ['Customer', `<code style="font-size:11px;color:var(--text-mute)">${escapeHTML(m.stripe_customer_id || '—')}</code>`],
     ];
   } else if (stripe && stripe.error) {
-    billingLines = [`Couldn't reach Stripe — ${escapeHTML(stripe.error)}`];
+    billingRows = [['Stripe', escapeHTML(stripe.error)]];
   } else if (m.stripe_subscription_id) {
-    billingLines = ['Loading Stripe…'];
+    billingRows = [['Status', 'Loading Stripe…']];
   } else {
-    billingLines = ['No Stripe subscription on file.'];
+    billingRows = [['Status', 'No Stripe subscription on file.']];
   }
 
-  const btn = (label, onclick) => `<button onclick="${onclick}" style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px">${label}</button>`;
-  const actionRow = m.status === 'paused'
+  const labelCss   = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase';
+  const divider    = '<div style="height:1px;background:var(--border);margin:22px 0"></div>';
+  const rowGrid    = (rows) => `<div style="display:grid;grid-template-columns:120px 1fr;gap:10px 14px;font-size:13px;align-items:center">${rows.map(([l, v]) => `<div style="color:var(--text-mute)">${l}</div><div>${v}</div>`).join('')}</div>`;
+
+  const btn = (label, onclick, primary) =>
+    `<button onclick="${onclick}" style="background:${primary ? 'var(--gold,#E8C547)' : 'transparent'};color:${primary ? '#0B0B0D' : 'var(--text)'};border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">${label}</button>`;
+  const toggleBtn = m.status === 'paused'
     ? btn('Unpause', `mUnpause('${m.id}')`)
-    : btn('Pause', `mPause('${m.id}')`);
+    : btn('Pause',   `mPause('${m.id}')`);
 
   body.innerHTML = `
-    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:20px">
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:18px">${escapeHTML(m.athlete_name)}</div>
-        <div style="margin-top:6px">${_memberStatusPill(m.status)}</div>
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:22px;line-height:1.15">${escapeHTML(m.athlete_name)}</div>
+        <div style="font-size:13px;color:var(--text-mute);margin-top:6px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
+        <div style="margin-top:10px">${_memberStatusPill(m.status)}</div>
       </div>
-      <button onclick="closeMemberPopup()" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+      <button onclick="closeMemberPopup()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;margin-top:-4px">×</button>
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr;gap:14px">
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">ATHLETE</div>
-        <div style="font-size:13px">${escapeHTML(m.archetype || '—')} · Group ${escapeHTML(String(m.group_num || '—'))} · Joined ${escapeHTML(m.joined_date || '—')}</div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">PARENT</div>
-        <div style="font-size:13px">${escapeHTML(m.parent_name || '—')}</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHTML(m.parent_email || '—')} · ${escapeHTML(m.parent_phone || '—')}</div>
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">BILLING</div>
-        ${billingLines.map(l => `<div style="font-size:13px;margin-top:2px">${l}</div>`).join('')}
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">COACHING</div>
-        <div style="font-size:13px">Trainer: ${escapeHTML(m.trainer || '—')} · Engagement: ${escapeHTML(m.engagement || '—')}</div>
-        ${m.skill_notes ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px">Notes: ${escapeHTML(m.skill_notes)}</div>` : ''}
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;margin-bottom:4px">HISTORY</div>
-        ${(history && history.length)
-          ? history.map(h => `<div style="font-size:12px;color:var(--text-mute);margin-top:2px">${escapeHTML(h.action_type)} · ${escapeHTML(h.performed_by_name || '—')} · ${h.created_at ? h.created_at.slice(0,10) : ''}</div>`).join('')
-          : '<div style="font-size:12px;color:var(--text-mute)">No actions yet.</div>'}
-      </div>
-    </div>
+    ${divider}
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:24px">
-      ${actionRow}
+    <!-- Athlete (editable) -->
+    <div style="${labelCss};margin-bottom:12px">Athlete</div>
+    ${rowGrid([
+      ['Archetype',  selectField('archetype',  m.archetype,  ARCHETYPES)],
+      ['Trainer',    selectField('trainer',    m.trainer,    TRAINERS)],
+      ['Engagement', selectField('engagement', m.engagement, ENGAGEMENTS)],
+      ['Group',      escapeHTML(String(m.group_num || '—'))],
+      ['Joined',     escapeHTML(m.joined_date || '—')],
+    ])}
+
+    ${divider}
+
+    <!-- Parent -->
+    <div style="${labelCss};margin-bottom:12px">Parent</div>
+    ${rowGrid([
+      ['Email', escapeHTML(m.parent_email || '—')],
+      ['Phone', escapeHTML(m.parent_phone || '—')],
+    ])}
+
+    ${divider}
+
+    <!-- Billing -->
+    <div style="${labelCss};margin-bottom:12px">Billing</div>
+    ${rowGrid(billingRows)}
+
+    ${m.skill_notes ? `${divider}<div style="${labelCss};margin-bottom:10px">Notes</div><div style="font-size:13px;color:var(--text);line-height:1.5">${escapeHTML(m.skill_notes)}</div>` : ''}
+
+    ${(history && history.length) ? `${divider}<div style="${labelCss};margin-bottom:10px">History</div><div style="display:grid;gap:6px">${history.map(h => `<div style="font-size:12px;color:var(--text-mute)"><span style="color:var(--text)">${escapeHTML(h.action_type)}</span> · ${escapeHTML(h.performed_by_name || '—')} · ${h.created_at ? h.created_at.slice(0,10) : ''}</div>`).join('')}</div>` : ''}
+
+    ${divider}
+
+    <!-- Actions -->
+    <div style="${labelCss};margin-bottom:12px">Actions</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      ${toggleBtn}
       ${btn('Change plan', `mChange('${m.id}','${escapeHTML(m.plan||'')}')`)}
       ${btn('Refund',      `mRefund('${m.id}')`)}
       ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
@@ -7889,6 +7937,18 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('Referred',    `mReferred('${m.id}')`)}
     </div>
   `;
+}
+
+// Inline-edit handler — saves a single field, then re-renders the drawer
+// with fresh data (re-fetches member + Stripe enrichment + history).
+async function _memberUpdateField(memberId, field, value) {
+  try {
+    await _memberAction(memberId, 'update-profile', { fields: { [field]: value } });
+    await openMemberPopup(memberId);
+    fetchAndRenderMembers();  // also refresh the roster behind the drawer
+  } catch (e) {
+    alert('Update failed: ' + e.message);
+  }
 }
 
 // ── Billing action calls ────────────────────────────────────

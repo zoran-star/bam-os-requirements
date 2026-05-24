@@ -315,6 +315,17 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: "not your member" });
     }
 
+    // Profile updates are pure DB writes — no Stripe needed. Handle them
+    // BEFORE the Stripe-connection gate so the user can edit member info
+    // (archetype, trainer, engagement, notes) even when Stripe isn't wired.
+    if (action === "update-profile") {
+      try {
+        return await actionUpdateProfile(res, member, ctx, body);
+      } catch (e) {
+        return res.status(500).json({ error: e.message });
+      }
+    }
+
     // Load the academy's client row → connect account
     const client = await loadClientRow(member.client_id);
     if (!client) return res.status(404).json({ error: "academy not found" });
@@ -811,4 +822,50 @@ async function actionReferred(res, member, stripeAccount, ctx, body) {
     new_trial_end: sub.trial_end,
     capped_to_730d: cappedToMax,
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// Action: UPDATE-PROFILE  (no Stripe involvement)
+// ─────────────────────────────────────────────────────────
+// body: { fields: { archetype?, trainer?, engagement?, skill_notes?,
+//                   parent_email?, parent_phone? } }
+// Pure DB write — used for inline edits in the member-detail drawer.
+
+const PROFILE_EDITABLE_FIELDS = new Set([
+  "archetype", "trainer", "engagement", "skill_notes",
+  "parent_email", "parent_phone", "parent_archetype", "group_num",
+]);
+
+async function actionUpdateProfile(res, member, ctx, body) {
+  const fields = (body.fields && typeof body.fields === "object") ? body.fields : {};
+  const updates = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (!PROFILE_EDITABLE_FIELDS.has(k)) continue;
+    // Empty string → null (so "pick — " clears the field).
+    updates[k] = (v === "" || v === undefined) ? null : v;
+  }
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: "no editable fields provided" });
+  }
+  updates.updated_at = nowIso();
+
+  const rows = await sb(`members?id=eq.${member.id}&select=*`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify(updates),
+  });
+  const updated = Array.isArray(rows) && rows[0] ? rows[0] : null;
+
+  await writeAudit({
+    client_id: member.client_id,
+    member_id: member.id,
+    action_type: "update-profile",
+    args: { fields: updates },
+    performed_by: ctx.user.id,
+    performed_by_name: ctx.staff?.name || null,
+    stripe_response: null,
+    db_changes: { members: { id: member.id, updated_keys: Object.keys(updates) } },
+  });
+
+  return res.status(200).json({ ok: true, member: updated });
 }
