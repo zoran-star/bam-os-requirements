@@ -7635,7 +7635,8 @@ async function _safeJson(res) {
 // Members tab — list view state (module-scope so search/filter survive
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
-let _MEMBERS_FILTER = { q: '', status: 'all' };
+let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all' };
+let _MEMBERS_FILTER_OPEN = false;
 
 async function fetchAndRenderMembers() {
   // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
@@ -7703,6 +7704,8 @@ function _filterMembers(all) {
     if (f.status === 'live'   && m.status !== 'live')   return false;
     if (f.status === 'paused' && m.status !== 'paused') return false;
     if (f.status === 'issues' && !isIssue(m.status))    return false;
+    if (f.trainer    !== 'all' && (m.trainer    || '') !== f.trainer)    return false;
+    if (f.engagement !== 'all' && (m.engagement || '') !== f.engagement) return false;
     if (f.q) {
       const q = f.q.toLowerCase();
       const hay = ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase();
@@ -7717,8 +7720,20 @@ function _membersSetSearch(q) {
   _renderMembersView();
 }
 
-function _membersSetFilter(status) {
-  _MEMBERS_FILTER.status = status;
+function _membersSetFilterField(field, value) {
+  _MEMBERS_FILTER[field] = value;
+  _renderMembersView();
+}
+
+function _membersClearFilters() {
+  _MEMBERS_FILTER.status     = 'all';
+  _MEMBERS_FILTER.trainer    = 'all';
+  _MEMBERS_FILTER.engagement = 'all';
+  _renderMembersView();
+}
+
+function _membersToggleFilterPopover() {
+  _MEMBERS_FILTER_OPEN = !_MEMBERS_FILTER_OPEN;
   _renderMembersView();
 }
 
@@ -7738,24 +7753,68 @@ function _renderMembersView() {
   const filtered = _filterMembers(all);
   const f = _MEMBERS_FILTER;
 
-  const chip = (key, label, count) => {
-    const active = f.status === key;
-    return `<button onclick="_membersSetFilter('${key}')" style="background:${active ? 'var(--gold,#E8C547)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text)'};border:1px solid ${active ? 'var(--gold,#E8C547)' : 'var(--border)'};padding:6px 12px;font-size:12px;font-weight:600;border-radius:999px;cursor:pointer;font-family:inherit">${label} <span style="opacity:0.7">${count}</span></button>`;
+  // Unique trainers in the data, GTA canonical order first then any extras.
+  const trainerSet = new Set(all.map(m => m.trainer).filter(Boolean));
+  const trainerList = ['Filip','Zoran','Adrian','Sergio']
+    .filter(t => trainerSet.has(t))
+    .concat([...trainerSet].filter(t => !['Filip','Zoran','Adrian','Sergio'].includes(t)).sort());
+
+  const activeFilterCount = ['status','trainer','engagement'].filter(k => f[k] !== 'all').length;
+
+  // Pill-style chip used inside the filter popover.
+  const filterChip = (field, value, label, count) => {
+    const active = f[field] === value;
+    const countSpan = (count !== undefined && count !== null) ? ` <span style="opacity:0.65">${count}</span>` : '';
+    return `<button onclick="_membersSetFilterField('${field}','${escapeHTML(String(value))}')" style="background:${active ? 'var(--gold,#E8C547)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text)'};border:1px solid ${active ? 'var(--gold,#E8C547)' : 'var(--border)'};padding:5px 11px;font-size:12px;font-weight:600;border-radius:999px;cursor:pointer;font-family:inherit">${escapeHTML(label)}${countSpan}</button>`;
   };
 
+  const popoverLabel = 'font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase';
+
+  const popover = !_MEMBERS_FILTER_OPEN ? '' : `
+    <div style="position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:16px;box-shadow:0 10px 28px rgba(0,0,0,0.35);z-index:50;min-width:300px;max-width:360px">
+      <div style="${popoverLabel};margin-bottom:8px">Status</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+        ${filterChip('status','all','All',     all.length)}
+        ${filterChip('status','live','Live',   liveCount)}
+        ${filterChip('status','paused','Paused', pausedCount)}
+        ${filterChip('status','issues','Issues', issuesCount)}
+      </div>
+      <div style="${popoverLabel};margin-bottom:8px">Trainer</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+        ${filterChip('trainer','all','Any')}
+        ${trainerList.map(t => filterChip('trainer', t, t)).join('')}
+      </div>
+      <div style="${popoverLabel};margin-bottom:8px">Engagement</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${filterChip('engagement','all','Any')}
+        ${filterChip('engagement','consistent','Consistent')}
+        ${filterChip('engagement','at_risk','At risk')}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:12px;border-top:1px solid var(--border)">
+        <button onclick="_membersClearFilters()" style="background:transparent;border:none;color:var(--text-mute);font-size:12px;cursor:pointer;text-decoration:underline;padding:4px 0">Clear all</button>
+        <button onclick="_membersToggleFilterPopover()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 16px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit">Done</button>
+      </div>
+    </div>
+  `;
+
+  const filterBtnActive = activeFilterCount > 0 || _MEMBERS_FILTER_OPEN;
   const toolbar = `
+    <style>
+      .member-card { transition: background 0.15s ease, border-color 0.15s ease; }
+      .member-card:hover { background: rgba(232,197,71,0.06); border-color: rgba(232,197,71,0.45); }
+    </style>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
       <input type="text" data-members-search placeholder="🔍  Search athlete or parent…" value="${escapeHTML(f.q)}"
              oninput="_membersSetSearch(this.value)"
              style="flex:1;min-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font:inherit;font-size:13px;outline:none">
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${chip('all',    'All',    all.length)}
-        ${chip('live',   'Live',   liveCount)}
-        ${chip('paused', 'Paused', pausedCount)}
-        ${chip('issues', 'Issues', issuesCount)}
+      <div style="position:relative">
+        <button onclick="_membersToggleFilterPopover()" style="background:${filterBtnActive ? 'var(--gold,#E8C547)' : 'transparent'};color:${filterBtnActive ? '#0B0B0D' : 'var(--text)'};border:1px solid ${filterBtnActive ? 'var(--gold,#E8C547)' : 'var(--border)'};padding:8px 14px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+          Filter${activeFilterCount ? ` · ${activeFilterCount}` : ''} <span style="font-size:10px">▾</span>
+        </button>
+        ${popover}
       </div>
     </div>
-    <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${filtered.length} shown${(f.q || f.status !== 'all') ? ` of ${all.length}` : ''}</div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${filtered.length} shown${(f.q || activeFilterCount) ? ` of ${all.length}` : ''}</div>
   `;
 
   if (!all.length) {
@@ -7768,16 +7827,17 @@ function _renderMembersView() {
     return;
   }
 
+  // Grid layout — keeps every column aligned across all cards.
   const cards = filtered.map(m => `
-    <div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+    <div class="card member-card" style="display:grid;grid-template-columns:38px minmax(160px,1fr) 70px 100px 200px;gap:14px;align-items:center;padding:12px 16px;margin-bottom:8px;cursor:pointer" onclick="openMemberPopup('${escapeHTML(m.id)}')">
       ${_memberAvatar(m, 38)}
-      <div style="flex:1;min-width:160px">
-        <div style="font-weight:700;font-size:15px">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
-        <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
-      <div style="font-size:13px;min-width:70px">${escapeHTML(m.plan || '—')}</div>
-      <div style="font-size:13px;min-width:90px;color:var(--text-mute)">${escapeHTML(m.trainer || '—')}</div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
+      <div style="font-size:13px">${escapeHTML(m.plan || '—')}</div>
+      <div style="font-size:13px;color:var(--text-mute)">${escapeHTML(m.trainer || '—')}</div>
+      <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
     </div>`).join('');
 
   container.innerHTML = toolbar + cards;
