@@ -621,11 +621,8 @@
       <h4>Schedule</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Start date / end date<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">Same date = clinic. Different dates = camp.</td></tr>
-        <tr><td class="label">Days included</td><td class="type">Check Many</td><td class="notes">Mon-Fri vs M/W/F (skip if single-day clinic)</td></tr>
-        <tr><td class="label">Daily schedule same each day?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
-        <tr><td class="label">Daily start / end time + lunch break</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Same = Yes</span> e.g. "9am-3pm, 12-1 lunch"</td></tr>
-        <tr><td class="label">Per-day schedule</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Same = No</span> Day-by-day breakdown</td></tr>
-        <tr><td class="label">Sessions per day</td><td class="type">Check One</td><td class="notes">Single / Double (AM+PM)</td></tr>
+        <tr><td class="label">Start and end times<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "9am - 3pm daily" or "Day 1: 9am-12pm, Day 2: 9am-3pm"</td></tr>
+        <tr><td class="label">Any special scheduling considerations?</td><td class="type">Open-Ended</td><td class="notes">Lunch break, sessions split AM/PM, days off mid-camp, late check-in option, anything else</td></tr>
         <tr><td class="label">Registration deadline</td><td class="type">Text Input</td><td class="notes">Date registration closes (or "until full")</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
