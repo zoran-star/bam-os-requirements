@@ -7745,12 +7745,33 @@ async function connectStripe() {
   }
 }
 
-function _stripeConnectReturnCheck() {
-  const params = new URLSearchParams(window.location.search);
-  const sc = params.get('stripe_connect');
+// Stash the OAuth return params to sessionStorage IMMEDIATELY on page load,
+// before any auth check runs. If the user's session got wiped by the OAuth
+// round-trip and the portal shows the login screen, the stash survives so
+// after they re-log in, the post-login boot can still flip to Members +
+// show the "Stripe connected" confirmation. Cleans the URL too.
+(function _stripeConnectStashOnLoad() {
+  const p = new URLSearchParams(window.location.search);
+  const sc = p.get('stripe_connect');
   if (!sc) return;
-  const msg = params.get('msg');
+  sessionStorage.setItem('stripe_connect_return', sc);
+  const msg = p.get('msg');
+  if (msg) sessionStorage.setItem('stripe_connect_msg', msg);
+  else    sessionStorage.removeItem('stripe_connect_msg');
   history.replaceState(null, '', window.location.pathname + window.location.hash);
+})();
+
+function _stripeConnectReturnCheck() {
+  // Read from URL OR the sessionStorage stash (survives a login bounce).
+  const params = new URLSearchParams(window.location.search);
+  let sc = params.get('stripe_connect') || sessionStorage.getItem('stripe_connect_return');
+  let msg = params.get('msg')          || sessionStorage.getItem('stripe_connect_msg');
+  if (!sc) return;
+  sessionStorage.removeItem('stripe_connect_return');
+  sessionStorage.removeItem('stripe_connect_msg');
+  if (params.get('stripe_connect')) {
+    history.replaceState(null, '', window.location.pathname + window.location.hash);
+  }
   if (sc === 'connected') {
     setTimeout(() => alert('✅ Stripe connected.'), 100);
   } else {
@@ -7759,7 +7780,10 @@ function _stripeConnectReturnCheck() {
 }
 
 function _stripeConnectMaybeSwitch() {
-  const sc = new URLSearchParams(window.location.search).get('stripe_connect');
+  // Either fresh URL OR a survived stash → switch to Members so the
+  // greenpill renders + fetchAndRenderMembers consumes the stash.
+  const sc = new URLSearchParams(window.location.search).get('stripe_connect')
+          || sessionStorage.getItem('stripe_connect_return');
   if (sc && typeof switchView === 'function') switchView('members');
 }
 
