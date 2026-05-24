@@ -5728,19 +5728,20 @@ Then the call to action."]</div>
          MEMBERS VIEW (academy roster + billing)
     ══════════════════════════════ -->
     <div class="view" id="view-members">
-      <div class="topbar">
+      <div class="topbar" style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
         <div>
           <span class="topbar-kicker">§ 03 · Members</span>
           <div class="topbar-title">Member Management</div>
         </div>
+        <div id="stripe-connect-button-host" style="margin-top:6px"></div>
       </div>
       <div class="content">
-        <div id="stripe-connect-card" style="margin-bottom:18px"></div>
         <div class="readout">Your Roster</div>
         <div id="members-list-container">
           <div class="req-empty" style="padding:20px 0">Loading members…</div>
         </div>
         <div id="member-modal-host"></div>
+        <div id="stripe-modal-host"></div>
       </div>
     </div>
 
@@ -7654,7 +7655,7 @@ async function fetchAndRenderMembers() {
     });
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
-    renderStripeConnectCard(json.stripe || { status: 'not_connected' });
+    renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
     _renderMembersView();
   } catch (e) {
@@ -7883,39 +7884,94 @@ async function _uploadMemberAvatar(memberId, evt) {
 }
 
 // ── Stripe Connect status card (top of Members tab) ──────────
-function renderStripeConnectCard(stripe) {
-  const host = document.getElementById('stripe-connect-card');
+// Compact Stripe-Connect button in the Members topbar (right corner).
+// Click → modal with full status + action. Keeps the roster page clean.
+let _STRIPE_CONNECT_STATE = null;
+
+function renderStripeConnectButton(stripe) {
+  _STRIPE_CONNECT_STATE = stripe || { status: 'not_connected' };
+  const host = document.getElementById('stripe-connect-button-host');
   if (!host) return;
-  const status = stripe?.status || 'not_connected';
+  const status = (stripe && stripe.status) || 'not_connected';
+
+  // Per-status visuals.
+  const map = {
+    connected:     { dot:'#1f7a3d', label:'Stripe connected',  bg:'transparent',         color:'#2e9e54', border:'#1f7a3d' },
+    onboarding:    { dot:'#c4922f', label:'Stripe setup pending', bg:'transparent',      color:'#c4922f', border:'#8a6d1f' },
+    disabled:      { dot:'#9a3b2f', label:'Stripe disconnected', bg:'transparent',       color:'#c4634f', border:'#9a3b2f' },
+    not_connected: { dot:'#0B0B0D', label:'Connect Stripe',    bg:'var(--gold,#E8C547)', color:'#0B0B0D', border:'var(--gold,#E8C547)' },
+  };
+  const c = map[status] || map.not_connected;
+
+  host.innerHTML = `
+    <button onclick="openStripeConnectModal()" title="Stripe Connect — click for details" style="background:${c.bg};color:${c.color};border:1px solid ${c.border};padding:6px 12px;font-size:12px;font-weight:600;border-radius:999px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px;line-height:1">
+      <span style="width:7px;height:7px;border-radius:50%;background:${c.dot};display:inline-block"></span>
+      ${escapeHTML(c.label)}
+    </button>`;
+}
+
+function openStripeConnectModal() {
+  const host = document.getElementById('stripe-modal-host');
+  if (!host) return;
+  const stripe = _STRIPE_CONNECT_STATE || { status: 'not_connected' };
+  const status = stripe.status || 'not_connected';
+
+  const pillMap = {
+    connected:     ['● Connected to Stripe',  '#1f7a3d'],
+    onboarding:    ['● Setup pending',         '#8a6d1f'],
+    disabled:      ['● Disconnected',          '#9a3b2f'],
+    not_connected: ['● Not connected',         '#555'],
+  };
+  const [pillLabel, pillColor] = pillMap[status] || pillMap.not_connected;
+
+  let bodyHtml;
+  let primaryBtn;
   if (status === 'connected') {
-    host.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid #1f7a3d;background:rgba(31,122,61,0.08);border-radius:6px">
-        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#1f7a3d;color:#fff">● Stripe connected</span>
-        <span style="font-size:12px;color:var(--text-mute);flex:1">Billing actions enabled.</span>
-        <button onclick="connectStripe()" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer;text-decoration:underline;padding:4px 6px">Reconnect / switch account</button>
-      </div>`;
+    bodyHtml = `
+      <div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">
+        Billing actions (pause, cancel, refund, change plan, payment link, referrals) are enabled and act on the academy's connected Stripe account.
+      </div>
+      ${stripe.account_id ? `
+        <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.5px;text-transform:uppercase;margin-bottom:4px">Connected account</div>
+        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;margin-bottom:14px;word-break:break-all;color:var(--text-mute)">${escapeHTML(stripe.account_id)}</div>
+      ` : ''}`;
+    primaryBtn = `<button onclick="connectStripe()" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 16px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect / switch account</button>`;
   } else if (status === 'onboarding') {
-    host.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #8a6d1f;background:rgba(138,109,31,0.08);border-radius:6px">
-        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#8a6d1f;color:#fff">● Finishing setup</span>
-        <span style="font-size:12px;color:var(--text-mute);flex:1">Stripe connection didn't finish.</span>
-        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 14px;font-weight:600;border-radius:4px;cursor:pointer">Continue</button>
-      </div>`;
+    bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe connection didn't finish — start the OAuth flow again to complete it.</div>`;
+    primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Continue setup</button>`;
   } else if (status === 'disabled') {
-    host.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #9a3b2f;background:rgba(154,59,47,0.08);border-radius:6px">
-        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:#9a3b2f;color:#fff">● Disconnected</span>
-        <span style="font-size:12px;color:var(--text-mute);flex:1">Stripe connection was revoked.</span>
-        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:6px 14px;font-weight:600;border-radius:4px;cursor:pointer">Reconnect</button>
-      </div>`;
+    bodyHtml = `<div style="font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.5">Stripe access was revoked. Reconnect to resume billing actions.</div>`;
+    primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Reconnect Stripe</button>`;
   } else {
-    host.innerHTML = `
-      <div style="padding:16px 18px;border:1px solid var(--border);background:var(--surface);border-radius:6px">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px">Connect your Stripe account</div>
-        <div style="font-size:13px;color:var(--text-mute);margin-bottom:12px">Billing actions (pause, cancel, refund, change plan) need access to your academy's Stripe. One-click connect — your account stays under your control.</div>
-        <button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:8px 18px;font-weight:700;border-radius:4px;cursor:pointer">Connect Stripe</button>
-      </div>`;
+    bodyHtml = `
+      <div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">Connect your academy's Stripe account to enable billing actions (pause, cancel, refund, change plan, payment link, referrals).</div>
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px;line-height:1.5">One-click connect via Stripe — your account stays under your control.</div>`;
+    primaryBtn = `<button onclick="connectStripe()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:8px 16px;font-weight:700;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Connect Stripe</button>`;
   }
+
+  host.innerHTML = `
+    <div id="stripe-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:80px 16px;overflow-y:auto" onclick="if(event.target.id==='stripe-modal')closeStripeConnectModal()">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:440px;width:100%;padding:24px;color:var(--text)">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:6px">
+          <div>
+            <div style="font-weight:700;font-size:17px;margin-bottom:10px">Stripe Connect</div>
+            <span style="display:inline-block;font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;background:${pillColor};color:#fff">${escapeHTML(pillLabel)}</span>
+          </div>
+          <button onclick="closeStripeConnectModal()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:24px;cursor:pointer;line-height:1;padding:0 4px">×</button>
+        </div>
+        <div style="height:1px;background:var(--border);margin:18px 0"></div>
+        ${bodyHtml}
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+          <button onclick="closeStripeConnectModal()" style="background:transparent;color:var(--text-mute);border:1px solid var(--border);padding:8px 16px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">Close</button>
+          ${primaryBtn}
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeStripeConnectModal() {
+  const host = document.getElementById('stripe-modal-host');
+  if (host) host.innerHTML = '';
 }
 
 async function connectStripe() {
