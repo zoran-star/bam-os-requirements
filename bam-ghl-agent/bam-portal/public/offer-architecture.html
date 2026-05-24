@@ -521,27 +521,13 @@
     <div class="offer-detail-body">
 
       <h4>General</h4>
-      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">The <b>brand umbrella</b> — what the team programs are called, who they're for, what makes them different, and the program-wide policies (one waiver template, one set of discount codes, etc.). All operational config — ages, schedules, tryouts, sales, onboarding — lives <b>per team</b> below.</p>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">Just the program-wide identity — the name, what it is, what makes it different. Everything else lives per-team.</p>
 
       <h5>Brand &amp; identity</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Program title<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">e.g. "BAM Elite Travel" or "BAM Spring AAU"</td></tr>
         <tr><td class="label">Short description</td><td class="type">Open-Ended</td><td class="notes">One-liner for the landing page</td></tr>
-        <tr><td class="label">Gender(s) served<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Boys / Girls (across the program)</td></tr>
-        <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Where the program operates — each team picks from this list</td></tr>
-      </tbody></table>
-
-      <h5>Value (the vibe)</h5>
-      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">What makes it different<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">Why this program vs. every other competitive program in the area</td></tr>
-        <tr><td class="label">Program structure / vibe<span class="req">required</span></td><td class="type">Open-Ended</td><td class="notes">How the program operates overall — practice rhythm, season arc, off-season, culture, philosophy</td></tr>
-      </tbody></table>
-
-      <h5>Program-wide policies</h5>
-      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">One template signed by every rostered player. Covers waiver, media release, codes of conduct, refund, cancellation.</td></tr>
-        <tr><td class="label">Discount codes</td><td class="type">Text Input</td><td class="notes">Academy-wide promos (sibling, multi-team, etc.)</td></tr>
-        <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Cross-sell to other offers ("Cut player → pitch skill training")</td></tr>
       </tbody></table>
 
       <h5>Extra notes</h5>
@@ -550,7 +536,7 @@
       </tbody></table>
 
       <h4>Per team</h4>
-      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">A repeating <b style="color:var(--gold)">Block Builder</b> — add one row per specific team (15U Black, 16U Black, U14 Girls, etc.). Each team is essentially a <b>mini-offer</b>: it has its own age, schedule, tryouts, sales flow, pricing, and onboarding.</p>
+      <p style="font-size:13px; color:var(--text-sub); margin:0 0 14px;">A repeating <b style="color:var(--gold)">Block Builder</b> — add one row per specific team (15U Black, 16U Black, U14 Girls, etc.). Each team is a <b>mini-offer</b> with its own identity, schedule, competition lineup, sales flow, pricing, and onboarding.</p>
 
       <h5>Identity</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
@@ -561,15 +547,21 @@
         <tr><td class="label">Head coach<span class="req">required</span></td><td class="type">Staff Selector</td><td class="notes">Who runs the team</td></tr>
         <tr><td class="label">Assistant coaches</td><td class="type">Staff Selector</td><td class="notes">Optional</td></tr>
         <tr><td class="label">Roster capacity</td><td class="type">Text Input</td><td class="notes">Max players (e.g. 12)</td></tr>
+        <tr><td class="label">Home location(s)<span class="req">required</span></td><td class="type">Check Many</td><td class="notes">Pick from BB &gt; Other &gt; Locations</td></tr>
       </tbody></table>
 
-      <h5>Schedule &amp; competition</h5>
+      <h5>Schedule</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Practice location<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Pick from program's Home locations</td></tr>
-        <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes">Day · start · end (e.g. Mon 6-8pm, Wed 6-8pm)</td></tr>
-        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When this team plays (e.g. "Mar 1 → Jul 31")</td></tr>
-        <tr><td class="label">League(s) this team plays in</td><td class="type">Text Input</td><td class="notes">Where games come from</td></tr>
-        <tr><td class="label">Tournament count</td><td class="type">Text Input</td><td class="notes">Approx. # of tournaments per season</td></tr>
+        <tr><td class="label">Consistent practice schedule every week?<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Yes / No — gates the next two questions</td></tr>
+        <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Consistent = Yes</span> Day · start · end · location (one row per practice block)</td></tr>
+        <tr><td class="label">How players are informed of schedule</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Consistent = No</span> e.g. "Weekly text on Sunday with the upcoming week"</td></tr>
+        <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When this team's season runs (e.g. "Mar 1 → Jul 31")</td></tr>
+      </tbody></table>
+
+      <h5>Competition</h5>
+      <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">League(s) this team plays in</td><td class="type">Text Input</td><td class="notes">Where regular-season games come from</td></tr>
+        <tr><td class="label">Tournaments</td><td class="type">Block Builder</td><td class="notes">List every tournament this team plays. Sub-fields per row: Tournament name · date(s) · location · format (Single elim / Double elim / Round robin / Pool play / Other) · entry fee · registration deadline · notes</td></tr>
       </tbody></table>
 
       <h5>Sales</h5>
@@ -577,28 +569,23 @@
         <tr><td class="label">Tryouts?</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
         <tr><td class="label">Tryout details</td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Tryouts = Yes</span> date(s) · time(s) · location · capacity · fee · what to bring</td></tr>
         <tr><td class="label">Tryout registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Age · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Position · Height · Current team · Highlight film URL · GPA · School · Goals · Anything else (custom)</td></tr>
-        <tr><td class="label">Selection process</td><td class="type">Check One</td><td class="notes">Open tryouts / invite-only / hybrid</td></tr>
-        <tr><td class="label">Selection notification timing</td><td class="type">Text Input</td><td class="notes">e.g. "within 48 hours of last tryout"</td></tr>
-        <tr><td class="label">Spot-offer message</td><td class="type">Open-Ended</td><td class="notes">Email / SMS template sent to selected players</td></tr>
-        <tr><td class="label">Spot acceptance deadline</td><td class="type">Text Input</td><td class="notes">How many days to accept</td></tr>
-        <tr><td class="label">Waitlist for non-selected</td><td class="type">Check One</td><td class="notes">Yes / No</td></tr>
         <tr><td class="label">Notify on new lead</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a tryout signup comes in for this team</td></tr>
+        <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Target offer + description ("Cut player → pitch skill training")</td></tr>
       </tbody></table>
 
       <h5>Pricing</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Team fee<span class="req">required</span></td><td class="type">Text Input (currency)</td><td class="notes">Total season cost for this team</td></tr>
         <tr><td class="label">Payment structure</td><td class="type">Check One</td><td class="notes">Full upfront / Monthly installments / Custom</td></tr>
-        <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">This team's add-ons — uniforms, travel, tournament fees, gear bundles</td></tr>
+        <tr><td class="label">Add-ons</td><td class="type">Block Builder</td><td class="notes">Uniforms, travel, tournament fees, gear bundles</td></tr>
+        <tr><td class="label">Discount codes</td><td class="type">Text Input</td><td class="notes">Sibling, multi-team, etc.</td></tr>
       </tbody></table>
 
       <h5>Onboarding</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
-        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Welcome message, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to the team chat. Attach PDFs / videos / images.</td></tr>
-        <tr><td class="label">Uniform sizing fields</td><td class="type">Check Many</td><td class="notes">What sizes to collect (Jersey · Shorts · Warm-up · Shoe · optional: dietary, allergies)</td></tr>
-        <tr><td class="label">Season kickoff event?</td><td class="type">Check One</td><td class="notes">Yes / No (meet-the-coach, team photo, etc.)</td></tr>
-        <tr><td class="label">Kickoff date + location</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Kickoff = Yes</span> When and where</td></tr>
-        <tr><td class="label">Team comm channel</td><td class="type">Open-Ended</td><td class="notes">Where the team chats — TeamSnap board, WhatsApp group, etc.</td></tr>
+        <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, player + parent codes of conduct, refund, cancellation, etc.)</td></tr>
+        <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the player + parent get at the start — roster welcome, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to the team chat. Attach PDFs / videos / images.</td></tr>
+        <tr><td class="label">Roster intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Parent name · Phone · Email · Emergency contact name · Emergency contact phone · Jersey size · Shorts size · Shoe size. <b>Optional add-ons:</b> Warm-up size · Dietary restrictions · Allergies · Medical notes · Anything else (custom)</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered to this team</td></tr>
       </tbody></table>
 
