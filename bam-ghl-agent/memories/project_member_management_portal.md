@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-22 — Phase 3 SHIPPED. Stripe Connect OAuth route + 6 PATCH billing actions (pause/unpause/cancel/refund/change/payment-link/referred) + member-detail popup UI. Awaiting Zoran's live test once he sets Stripe Dashboard up + adds env vars.
+description: 2026-05-24 — Phase 3 SHIPPED + handshake verified. Stripe Connect OAuth route + 6 PATCH billing actions + member-detail popup UI. Sandbox connect proven end-to-end (acct_1Tadj7RjDVVdFueQ stored on BAM GTA clients row). Live-mode billing-action testing blocked on Stripe's live-mode verification of BAM Business platform.
 type: project
 ---
 
@@ -189,17 +189,64 @@ This avoided a schema migration to add a "cancelled" status to the
 `member_status` enum. The cancellations table stays the source of truth
 for cancelled members.
 
-### Ahead of Zoran's first live test
+### Sandbox handshake — VERIFIED 2026-05-24
 
-1. Stripe Dashboard — enable Connect, grab the live `ca_...` OAuth client
-   id, register redirect URI:
-   `https://portal.byanymeansbusiness.com/api/stripe/connect`
-   (also add `https://bam-portal-tawny.vercel.app/api/stripe/connect`).
-2. Vercel env vars: `STRIPE_CONNECT_CLIENT_ID` + `STRIPE_CONNECT_STATE_SECRET`
-   (state secret was generated 2026-05-22 — not stored in repo).
-3. Redeploy in Vercel.
-4. Test the Connect handshake on Members tab, then test each of the 6
-   actions on a live GTA member.
+- Stripe Connect set up in **sandbox** on `By Any Means Business` (the
+  intended platform account — confirmed via the existing
+  `rk_live_...tgVB` restricted key on that account named "bam business
+  portal", proving it's the account that powers the portal).
+- 3 Vercel env vars set via CLI (`vercel env add ... production`):
+  `STRIPE_CONNECT_CLIENT_ID`, `STRIPE_CONNECT_SECRET_KEY` (sandbox
+  `sk_test_...s98K`), `STRIPE_CONNECT_STATE_SECRET` (fresh hex).
+  Redeploy triggered via empty commit.
+- Zoran logged in as **info@byanymeanstoronto.ca** (the BAM GTA owner in
+  `client_users`), clicked Connect Stripe, OAuth bounced him to Stripe
+  sandbox, he created/picked a test connected account, OAuth returned.
+- Result in `clients` (id `39875f07-...`):
+  `stripe_connect_status = 'connected'`,
+  `stripe_connect_account_id = 'acct_1Tadj7RjDVVdFueQ'` (sandbox test
+  acct — no real subs on it),
+  `stripe_connect_connected_at = 2026-05-24 15:14 UTC`.
+
+No `member_audit_log` rows yet — sandbox connected account has no athlete
+subs, so the 6 PATCH actions can't be meaningfully tested here. The action
+code is a faithful port of GTA's existing terminal skills (which run
+daily), so it's tested-by-equivalence pending live-mode billing trial.
+
+### UX nit observed during handshake
+
+Right after Stripe's callback redirected back to `/client-portal.html?stripe_connect=connected#members`,
+Zoran's portal session appeared lost — he had to log in via a separate tab
+to land on the green pill. Likely a multi-tab Supabase localStorage timing
+issue (the original tab's session was stale; logging in elsewhere refreshed
+the shared session). Not blocking, worth a small follow-up.
+
+### Live-mode plumbing — blocked on Stripe verification
+
+Settings → Connect → OAuth in **live mode** on BAM Business shows:
+- `Live client ID: Unavailable`
+- `Enable OAuth` toggle is **disabled** (greyed out)
+- "No redirect URIs set"
+
+→ Stripe gates live Connect behind "Go live" / platform identity
+verification. To unblock real-data action testing:
+
+1. In the BAM Business Stripe account: complete the Setup Guide's
+   "Go live" / payments capability / identity verification steps.
+2. Once live Connect is enabled, the live `ca_...` will appear in
+   the same OAuth screen. Add the redirect URI in live mode too:
+   `https://portal.byanymeansbusiness.com/api/stripe/connect`.
+3. Grab the live `sk_live_...G6rC` from Developers → API keys (Reveal).
+4. Update the 3 Vercel env vars to live values (replace sandbox ones).
+   The code's `STRIPE_CONNECT_SECRET_KEY` env var (with fallback to
+   `STRIPE_SECRET_KEY`) was added precisely so live Connect can use a
+   different platform key than the existing financials endpoint.
+5. Redeploy.
+6. Click Connect Stripe again, this time OAuth with the real BAM Toronto
+   account (`acct_1P7kUCRxInSEtAh8`). The clients row's
+   `stripe_connect_account_id` will update to the live acct id.
+7. Then test each of the 6 actions on a real GTA member (start with a
+   low-stakes one like `/payment-link` which doesn't write to billing).
 
 ### Data audit conclusion (2026-05-22)
 
@@ -213,6 +260,10 @@ data cleanup needed.
 
 ### Polish work for after the live test
 
+- **Multi-tab session handoff on OAuth return** — the session-drop after
+  the Stripe callback (observed 2026-05-24). Fix by either re-fetching
+  the session in the URL-param check or redirecting to a stable URL
+  that's resilient to a lost-then-recovered session.
 - Replace `prompt`/`confirm` action inputs with real modal forms
 - Per-row Stripe enrichment in the roster (next payment, MRR)
 - Roster filters (live/paused/payment issues)
