@@ -7632,6 +7632,11 @@ async function _safeJson(res) {
 // Backend: bam-portal/api/members.js + api/stripe/connect.js
 // ══════════════════════════════════════════════════════════
 
+// Members tab — list view state (module-scope so search/filter survive
+// re-renders without re-fetching).
+let _MEMBERS_ALL = [];
+let _MEMBERS_FILTER = { q: '', status: 'all' };
+
 async function fetchAndRenderMembers() {
   // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
   _stripeConnectReturnCheck();
@@ -7649,7 +7654,8 @@ async function fetchAndRenderMembers() {
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
     renderStripeConnectCard(json.stripe || { status: 'not_connected' });
-    renderMembers(json.members || []);
+    _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
   }
@@ -7676,21 +7682,95 @@ function _memberEngagementChip(eng) {
   return `<span style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid ${color};color:${color}">${escapeHTML(label)}</span>`;
 }
 
-function renderMembers(members) {
+// Circular avatar — uses uploaded image if present, otherwise initials on
+// a deterministic colored circle.
+function _memberAvatar(m, size) {
+  size = size || 38;
+  if (m.avatar_url) {
+    return `<img src="${escapeHTML(m.avatar_url)}" alt="" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex:0 0 ${size}px;display:block">`;
+  }
+  const name = (m.athlete_name || '?').trim();
+  const initials = name.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase() || '?';
+  const palette = ['#1f7a3d','#8a6d1f','#9a3b2f','#4a5a8a','#5a4a8a','#8a4a5a','#6b5a2f','#3f6b5a'];
+  const c = palette[Math.abs((name.charCodeAt(0)||0) + (name.charCodeAt(1)||0)) % palette.length];
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${c};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${Math.max(10, Math.floor(size * 0.4))}px;flex:0 0 ${size}px">${escapeHTML(initials)}</div>`;
+}
+
+function _filterMembers(all) {
+  const f = _MEMBERS_FILTER;
+  const isIssue = (s) => s === 'payment_failed' || s === 'payment_method_required';
+  return all.filter(m => {
+    if (f.status === 'live'   && m.status !== 'live')   return false;
+    if (f.status === 'paused' && m.status !== 'paused') return false;
+    if (f.status === 'issues' && !isIssue(m.status))    return false;
+    if (f.q) {
+      const q = f.q.toLowerCase();
+      const hay = ((m.athlete_name || '') + ' ' + (m.parent_name || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function _membersSetSearch(q) {
+  _MEMBERS_FILTER.q = q;
+  _renderMembersView();
+}
+
+function _membersSetFilter(status) {
+  _MEMBERS_FILTER.status = status;
+  _renderMembersView();
+}
+
+function _renderMembersView() {
   const container = document.getElementById('members-list-container');
   if (!container) return;
 
-  if (!members.length) {
+  // Preserve search focus + cursor across re-renders.
+  const oldInput = container.querySelector('input[data-members-search]');
+  const wasFocused = oldInput && document.activeElement === oldInput;
+  const cursorPos = wasFocused ? oldInput.selectionStart : null;
+
+  const all = _MEMBERS_ALL;
+  const liveCount   = all.filter(m => m.status === 'live').length;
+  const pausedCount = all.filter(m => m.status === 'paused').length;
+  const issuesCount = all.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required').length;
+  const filtered = _filterMembers(all);
+  const f = _MEMBERS_FILTER;
+
+  const chip = (key, label, count) => {
+    const active = f.status === key;
+    return `<button onclick="_membersSetFilter('${key}')" style="background:${active ? 'var(--gold,#E8C547)' : 'transparent'};color:${active ? '#0B0B0D' : 'var(--text)'};border:1px solid ${active ? 'var(--gold,#E8C547)' : 'var(--border)'};padding:6px 12px;font-size:12px;font-weight:600;border-radius:999px;cursor:pointer;font-family:inherit">${label} <span style="opacity:0.7">${count}</span></button>`;
+  };
+
+  const toolbar = `
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <input type="text" data-members-search placeholder="🔍  Search athlete or parent…" value="${escapeHTML(f.q)}"
+             oninput="_membersSetSearch(this.value)"
+             style="flex:1;min-width:220px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font:inherit;font-size:13px;outline:none">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${chip('all',    'All',    all.length)}
+        ${chip('live',   'Live',   liveCount)}
+        ${chip('paused', 'Paused', pausedCount)}
+        ${chip('issues', 'Issues', issuesCount)}
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${filtered.length} shown${(f.q || f.status !== 'all') ? ` of ${all.length}` : ''}</div>
+  `;
+
+  if (!all.length) {
     container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
+  if (!filtered.length) {
+    container.innerHTML = toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
+    if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+    return;
+  }
 
-  const live = members.filter(m => m.status === 'live').length;
-  const paused = members.filter(m => m.status === 'paused').length;
-  const summary = `<div style="font-size:13px;color:var(--text-mute);margin-bottom:14px">${members.length} total · ${live} live · ${paused} paused</div>`;
-
-  const rows = members.map(m => `
-    <div class="card" style="padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+  const cards = filtered.map(m => `
+    <div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;cursor:pointer" onclick="openMemberPopup('${escapeHTML(m.id)}')">
+      ${_memberAvatar(m, 38)}
       <div style="flex:1;min-width:160px">
         <div style="font-weight:700;font-size:15px">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
         <div style="font-size:12px;color:var(--text-mute);margin-top:2px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
@@ -7700,7 +7780,46 @@ function renderMembers(members) {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
     </div>`).join('');
 
-  container.innerHTML = summary + rows;
+  container.innerHTML = toolbar + cards;
+  if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+}
+
+function _membersRestoreSearchFocus(cursorPos) {
+  setTimeout(() => {
+    const input = document.querySelector('#members-list-container input[data-members-search]');
+    if (input) {
+      input.focus();
+      if (cursorPos !== null && cursorPos !== undefined) {
+        try { input.setSelectionRange(cursorPos, cursorPos); } catch (_) {}
+      }
+    }
+  }, 0);
+}
+
+// Upload an avatar to Supabase Storage (public bucket `member-avatars`)
+// then save the resulting URL via update-profile. The path is namespaced
+// by member_id + timestamp so we don't have to overwrite the previous file.
+async function _uploadMemberAvatar(memberId, evt) {
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('Please pick an image file.'); return; }
+  if (file.size > 5 * 1024 * 1024)     { alert('Max file size is 5 MB.'); return; }
+  try {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+    const path = `${memberId}/${Date.now()}.${ext}`;
+    const { error: upErr } = await _sb.storage.from('member-avatars').upload(path, file, {
+      upsert: true,
+      contentType: file.type,
+      cacheControl: '3600',
+    });
+    if (upErr) throw upErr;
+    const { data: pub } = _sb.storage.from('member-avatars').getPublicUrl(path);
+    await _memberAction(memberId, 'update-profile', { fields: { avatar_url: pub.publicUrl } });
+    await openMemberPopup(memberId);
+    fetchAndRenderMembers();
+  } catch (e) {
+    alert('Avatar upload failed: ' + e.message);
+  }
 }
 
 // ── Stripe Connect status card (top of Members tab) ──────────
@@ -7893,12 +8012,17 @@ function _renderMemberModalBody(m, stripe, history) {
     : btn('Pause',   `mPause('${m.id}')`);
 
   body.innerHTML = `
-    <!-- Header -->
-    <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:6px">
+    <!-- Header — avatar (click to upload) + name + status + close -->
+    <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:6px">
+      <label style="cursor:pointer;position:relative;display:inline-block;flex:0 0 64px" title="Click to upload an avatar">
+        ${_memberAvatar(m, 64)}
+        <div style="position:absolute;bottom:0;right:0;width:22px;height:22px;border-radius:50%;background:var(--gold,#E8C547);color:#0B0B0D;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;border:2px solid var(--surface);pointer-events:none">✎</div>
+        <input type="file" accept="image/*" onchange="_uploadMemberAvatar('${m.id}', event)" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+      </label>
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:22px;line-height:1.15">${escapeHTML(m.athlete_name)}</div>
         <div style="font-size:13px;color:var(--text-mute);margin-top:6px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
-        <div style="margin-top:10px">${_memberStatusPill(m.status)}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
       </div>
       <button onclick="closeMemberPopup()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;margin-top:-4px">×</button>
     </div>

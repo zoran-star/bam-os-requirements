@@ -834,6 +834,7 @@ async function actionReferred(res, member, stripeAccount, ctx, body) {
 const PROFILE_EDITABLE_FIELDS = new Set([
   "archetype", "trainer", "engagement", "skill_notes",
   "parent_email", "parent_phone", "parent_archetype", "group_num",
+  "avatar_url",
 ]);
 
 async function actionUpdateProfile(res, member, ctx, body) {
