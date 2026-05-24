@@ -186,24 +186,35 @@ async function handleSubCreated(event, connectedAccount, res) {
     return res.status(200).json({ skipped: "no pending member for email", email });
   }
 
+  // Derive plan from the price the sub was created against (when the price
+  // is in our canonical PRICE_TO_PLAN map). Lets us auto-populate plan
+  // from what the parent actually bought on the funnel, so staff don't
+  // have to set it manually.
+  const priceId = sub.items && sub.items.data && sub.items.data[0]
+    && sub.items.data[0].price && sub.items.data[0].price.id;
+  const planFromPrice = priceId ? PRICE_TO_PLAN[priceId] : null;
+
+  const patch = {
+    status:                 "live",
+    stripe_customer_id:     customerId,
+    stripe_subscription_id: sub.id,
+    updated_at:             nowIso(),
+  };
+  if (planFromPrice) patch.plan = planFromPrice;
+
   await sb(`members?id=eq.${target.id}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({
-      status:                 "live",
-      stripe_customer_id:     customerId,
-      stripe_subscription_id: sub.id,
-      updated_at:             nowIso(),
-    }),
+    body: JSON.stringify(patch),
   });
 
   await writeAudit({
     client_id:       target.client_id,
     member_id:       target.id,
     action_type:     "intake-stripe-link",
-    args:            { event_id: event.id, sub_id: sub.id, customer_id: customerId },
+    args:            { event_id: event.id, sub_id: sub.id, customer_id: customerId, price_id: priceId, plan_from_price: planFromPrice },
     stripe_response: { id: sub.id, status: sub.status },
-    db_changes:      { members: { status: "payment_method_required → live", linked: true } },
+    db_changes:      { members: { status: "payment_method_required → live", linked: true, plan: planFromPrice || "(unchanged — non-canonical price)" } },
   });
 
   return res.status(200).json({ ok: true, linked_member_id: target.id });
