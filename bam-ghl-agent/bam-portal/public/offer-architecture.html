@@ -556,12 +556,13 @@
         <tr><td class="label">Practice schedule<span class="req">required</span></td><td class="type">Block Builder</td><td class="notes"><span class="dep">↳ if Consistent = Yes</span> Day · start · end · location (one row per practice block)</td></tr>
         <tr><td class="label">How players are informed of schedule</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Consistent = No</span> e.g. "Weekly text on Sunday with the upcoming week"</td></tr>
         <tr><td class="label">Season dates<span class="req">required</span></td><td class="type">Text Input</td><td class="notes">When this team's season runs (e.g. "Mar 1 → Jul 31")</td></tr>
+        <tr><td class="label">Blackout days</td><td class="type">Open-Ended</td><td class="notes">Days the team doesn't practice — holidays, school breaks, tournament travel, etc.</td></tr>
       </tbody></table>
 
       <h5>Competition</h5>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">League(s) this team plays in</td><td class="type">Text Input</td><td class="notes">Where regular-season games come from</td></tr>
-        <tr><td class="label">Tournaments</td><td class="type">Block Builder</td><td class="notes">List every tournament this team plays. Sub-fields per row: Tournament name · date(s) · location · format (Single elim / Double elim / Round robin / Pool play / Other) · entry fee · registration deadline · notes</td></tr>
+        <tr><td class="label">Tournaments</td><td class="type">Text Input</td><td class="notes">Free-form — list the tournaments this team plays (name, dates, location). Block Builder later if structure becomes useful.</td></tr>
       </tbody></table>
 
       <h5>Sales</h5>
@@ -585,7 +586,7 @@
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, player + parent codes of conduct, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the player + parent get at the start — roster welcome, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to the team chat. Attach PDFs / videos / images.</td></tr>
-        <tr><td class="label">Roster intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Parent name · Phone · Email · Emergency contact name · Emergency contact phone · Jersey size · Shorts size · Shoe size. <b>Optional add-ons:</b> Warm-up size · Dietary restrictions · Allergies · Medical notes · Anything else (custom)</td></tr>
+        <tr><td class="label">Roster intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Parent name · Phone · Email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Jersey size · Shorts size · Shoe size · Warm-up size · Dietary restrictions · Allergies · Medical notes · Anything else (custom)</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered to this team</td></tr>
       </tbody></table>
 
