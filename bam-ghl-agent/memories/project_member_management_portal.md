@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-24 — Phase 3 SHIPPED + handshake verified. Stripe Connect OAuth route + 6 PATCH billing actions + member-detail popup UI. Sandbox connect proven end-to-end (acct_1Tadj7RjDVVdFueQ stored on BAM GTA clients row). Live-mode billing-action testing blocked on Stripe's live-mode verification of BAM Business platform.
+description: 2026-05-24 (Session 2) — LIVE Connect verified (real acct_1P7kUCRxInSEtAh8) + UI polished + onboarding automation shipped. Drawer popup w/ editable fields, search + multi-filter popover, circular avatars, Stripe in a topbar pill + modal. GHL→portal intake webhook + Stripe→portal sync webhook (4 events) both verified working end-to-end. Pending: real-signup Stripe-leg test (intake leg already proven with live GHL submission).
 type: project
 ---
 
@@ -279,6 +279,183 @@ The Members tab is hidden inside the Capacitor wrapper via
 `showMembers = MEMBER_MGMT_ENABLED && !isNativeApp()` in
 `applyMemberMgmtNavState()`. App reviewers never see it. **Do not touch
 that guard.**
+
+## Session 2 — 2026-05-24 — UI polish + LIVE Stripe + onboarding automation
+
+### LIVE Stripe Connect (replaced the sandbox one from earlier this day)
+
+- BAM Business live OAuth enabled (Settings → Connect → Onboarding options).
+- Live `ca_UZXbIVcgsHzDVh1YZVi3u4QugpQeLM3L` + live `sk_live_…MO9I` swapped
+  into Vercel env vars via CLI. The 3rd env var (`STRIPE_CONNECT_STATE_SECRET`)
+  is mode-independent and was unchanged.
+- Zoran logged in as `info@byanymeanstoronto.ca` (BAM GTA owner), clicked
+  Reconnect, OAuth bounced through Stripe LIVE, came back green.
+- **`clients.stripe_connect_account_id` is now `acct_1P7kUCRxInSEtAh8`** —
+  the REAL Toronto account, matching what the Stripe MCP reports. The
+  6 PATCH billing actions can now act on real GTA athlete subs.
+- Live secret key was pasted in chat once; **rotate it** post-session
+  (Stripe Dashboard → Developers → API keys → ⋯ → Roll key on the
+  "bam business portal connect" key → paste new value into Vercel
+  `STRIPE_CONNECT_SECRET_KEY` → redeploy).
+
+### UI polish landed this session (all in `bam-portal/public/client-portal.html`)
+
+- **Right-side drawer** replaced the centered modal for the member-detail
+  popup. Slides in 250ms, backdrop fade, click-outside to close.
+- **Cleaner popup layout** — bigger athlete name, parent as subtitle,
+  status + engagement pills, 2-col key/value grid for Athlete / Parent /
+  Billing / Coaching / History sections. Avatar at top-left.
+- **Inline editable fields** in the Athlete section: Archetype / Trainer /
+  Engagement as native `<select>`s. onChange fires a save via the new
+  `update-profile` PATCH action.
+- **Backend `update-profile` action** in `api/members.js` — handled
+  BEFORE the Stripe-connect gate so member info can be edited even when
+  Stripe isn't wired. Whitelist: archetype, trainer, engagement,
+  skill_notes, parent_email, parent_phone, parent_archetype, group_num,
+  avatar_url.
+- **Avatars** — migration `add_member_avatars` added `members.avatar_url`
+  + public `member-avatars` Supabase storage bucket (5 MB, image/*) +
+  4 RLS policies. Card avatar is a 38px circle (uploaded image OR
+  initials on a deterministic colored circle). Popup header has a 64px
+  circle with a gold ✎ edit overlay; click opens file picker, uploads
+  via `_sb.storage.from('member-avatars').upload(...)`, saves URL via
+  `update-profile`.
+- **Search + filter popover** — toolbar replaces the previous full-width
+  Stripe card. `🔍 Search` matches athlete OR parent name. Filter button
+  opens a popover (right-anchored) with three sections: Status / Trainer /
+  Engagement. Trainer chips are derived from data (GTA canonical order:
+  Filip / Zoran / Adrian / Sergio first). Filter-button shows active-
+  count badge + turns gold when filters set.
+- **Grid card layout** (38 | 1fr | 70 | 100 | 200) replaced flex-wrap
+  so every column lines up; long names ellipsis.
+- **Hover effect** — `.member-card:hover` gets a gold-tinted background
+  + border highlight, 150ms transition.
+- **Engagement chip** added next to status pill on both card + popup
+  header (green outlined for consistent, amber for at_risk).
+- **Stripe Connect moved to a topbar pill + modal.** No more loud card
+  at top of roster. Right-corner button color-coded by status (gold CTA
+  when not_connected, outlined green/amber/red otherwise). Click opens a
+  centered modal with status + connected acct id + contextual action.
+- **Reconnect link** on the connected-state Stripe modal so the user can
+  re-run OAuth (e.g. when switching from sandbox to live).
+- **Multi-tab session-drop fix** for OAuth return. An early-load IIFE
+  stashes `?stripe_connect=` params to sessionStorage before any auth
+  check runs; post-login boot reads from URL OR stash so the green-pill
+  alert + Members switch survive a login bounce.
+
+### Onboarding automation — SHIPPED 2026-05-24
+
+Two-leg auto-add flow: GHL form submission creates a pending member,
+Stripe payment flips it to live.
+
+```
+Parent fills GHL Onboarding Form
+       │
+       ▼
+GHL Workflow → POST /api/members/intake
+       │  (header: X-Webhook-Secret: <GHL_INTAKE_WEBHOOK_SECRET>)
+       │  (body: customData wrapper with athlete_name + parent fields)
+       ▼
+members row inserted  status='payment_method_required'
+
+Parent picks plan on funnel + pays
+       │
+       ▼
+Stripe creates sub on BAM Toronto connected account
+       │
+       ▼
+Stripe → POST /api/stripe/webhook  (Connect-scoped endpoint)
+       │  customer.subscription.created event
+       ▼
+matches pending member by parent_email FIFO → flips status to 'live',
+  populates stripe_customer_id + stripe_subscription_id, auto-derives
+  members.plan from sub.items[0].price.id via PRICE_TO_PLAN map.
+```
+
+**New files:**
+- `bam-portal/api/members/intake.js` — GHL webhook landing. Shared-secret
+  auth via `X-Webhook-Secret`. Idempotent on (athlete_name, parent_email).
+  Flattens `body.customData` / `body.custom_data` if GHL nests fields one
+  level deep (it does — see field-mapping note below).
+- `bam-portal/api/stripe/webhook.js` — raw-body Stripe signature
+  verification (`bodyParser: false`), 4 event handlers:
+  - `customer.subscription.created` — intake link + plan auto-set
+  - `customer.subscription.deleted` — auto-cancel (cancellations row +
+    delete members row), mirroring `/cancel`
+  - `customer.subscription.updated` — sync `members.plan` if price ∈
+    PRICE_TO_PLAN
+  - `invoice.payment_failed` — flag `status='payment_failed'`
+  Always returns 200 to prevent Stripe retry storms; errors logged.
+
+**GHL field-mapping gotcha:** GHL's webhook payload is huge — every
+custom field on the contact at the top level — but our 5 custom-data
+rows arrive nested under `body.customData`. The intake endpoint
+auto-flattens that. Mapping that works:
+
+```
+Custom Data row    GHL token (picked via 🏷 icon)
+─────────────────  ──────────────────────────────
+athlete_name       "Athlete's Full Name" custom field
+                   (query_key athletes_full_name)
+parent_name        "Parent's Full Name"
+parent_email       "Parent's Email"   (or {{contact.email}})
+parent_phone       "Parent's Phone"   (or {{contact.phone}})
+ghl_contact_id     "Contact ID"       ({{contact.id}})
+```
+
+**Plan derivation:** not captured on the GHL form (plan is selected on
+the funnel page → carried into Stripe checkout). The Stripe webhook
+auto-sets `members.plan` from the sub's price_id via PRICE_TO_PLAN.
+
+**Env vars (set in Vercel):**
+- `GHL_INTAKE_WEBHOOK_SECRET = 94488bfa…c75f` (generated 2026-05-24)
+- `STRIPE_WEBHOOK_SECRET     = whsec_…eTv4`   (from Stripe webhook dashboard)
+
+**Stripe webhook config:**
+- Endpoint: `https://portal.byanymeansbusiness.com/api/stripe/webhook`
+- Scope: **Connected accounts** (NOT 'events on your account')
+- 4 events: `customer.subscription.created` / `deleted` / `updated`,
+  `invoice.payment_failed`
+
+**GHL Workflow config:**
+- Trigger: Form Submitted on the "Onboarding Form (Boys)" form
+- Action: Webhook (POST to `/api/members/intake`)
+- Headers: `X-Webhook-Secret` + `Content-Type: application/json`
+- Custom Data: 5 rows (see field-mapping above)
+
+**Verified working end-to-end (intake leg):** 2026-05-24 — Zoran submitted
+the real GHL form, audit log captured `intake-ghl` with full body, member
+row created. **Stripe leg untested with a real payment yet** — code is
+logically equivalent to the proven `/cancel` etc. flows, but a real
+payment is the final confirmation.
+
+### Debug aids left in place
+
+- `api/members/intake.js` logs every received body to Vercel function
+  logs (`console.log("[intake] received body:", ...)`).
+- On validation failure (missing athlete_name OR parent_email), writes
+  an `intake-ghl-failed` audit row with the full received body + key list
+  so you can query Supabase to inspect.
+- Once intake is reliably stable: prune the debug log + failure-audit
+  if the noise becomes annoying.
+
+### Useful Supabase queries during testing
+
+```sql
+-- latest intake activity (success or failure)
+select action_type, args, created_at
+from member_audit_log
+where created_at > now() - interval '1 hour'
+  and action_type like 'intake-%'
+order by created_at desc;
+
+-- pending members waiting for Stripe linkage
+select id, athlete_name, parent_email, created_at
+from members
+where status = 'payment_method_required'
+  and stripe_subscription_id is null
+order by created_at desc;
+```
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
