@@ -505,6 +505,7 @@
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets at the start — welcome message (email + SMS copy), welcome packet, first-session prep (what to bring, parking, who to ask for, what to wear). Attach any number of PDFs / videos / images.</td></tr>
         <tr><td class="label">Parent intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Parent name · Phone · Email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Medical / allergies · School · Grade · Goals · Experience level · Jersey size · Anything else (custom)</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when someone signs up for this offer (point of contact for the new athlete)</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Marketing / promo material — graphics, photos, posters, social cards</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -588,6 +589,7 @@
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the player + parent get at the start — roster welcome, schedule delivery (TeamSnap / WhatsApp / Email / etc.), how they get added to the team chat. Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Roster intake form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Player name · Parent name · Phone · Email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Jersey size · Shorts size · Shoe size · Warm-up size · Dietary restrictions · Allergies · Medical notes · Anything else (custom)</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a player is rostered to this team</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Team-specific marketing / promo — graphics, photos, jerseys mockups</td></tr>
       </tbody></table>
 
       <h5>Extra notes</h5>
@@ -644,7 +646,11 @@
 
       <h4>Sales</h4>
       <table class="field-table"><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>
+        <tr><td class="label">Sales path<span class="req">required</span></td><td class="type">Check One</td><td class="notes">Direct signup / Discovery call first / Other — gates the next set of questions</td></tr>
+        <tr><td class="label">Which discovery-call calendar</td><td class="type">Text Input</td><td class="notes"><span class="dep">↳ if Sales path = Discovery call</span> Calendar link or "create new"</td></tr>
+        <tr><td class="label">Describe the path</td><td class="type">Open-Ended</td><td class="notes"><span class="dep">↳ if Sales path = Other</span> How leads become customers for this camp / clinic</td></tr>
         <tr><td class="label">Registration form fields<span class="req">required</span></td><td class="type">Check Many</td><td class="notes"><b style="color:var(--gold)">Defaults (always on):</b> Athlete name · Parent name · Parent phone · Parent email · Emergency contact name · Emergency contact phone. <b>Optional add-ons:</b> Age · Skill level · Dietary restrictions · T-shirt size · Photo / video release · Medical / allergies · Anything else (custom)</td></tr>
+        <tr><td class="label">Notify on new lead</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when someone signs up</td></tr>
         <tr><td class="label"><b style="color:var(--blue)">Upsells</b></td><td class="type">Block Builder</td><td class="notes">Target offer + description ("After this clinic, pitch the academy")</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
@@ -654,6 +660,7 @@
         <tr><td class="label">Agreement / waiver<span class="req">required</span></td><td class="type">File Upload</td><td class="notes">PDF + checkbox confirming what it covers (waiver, media release, photo / video release, medical, refund, cancellation, etc.)</td></tr>
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything the athlete / parent gets before day 1 — day-before reminder (email + SMS), what to bring (ball, water, lunch, shoes), check-in / parking instructions. Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when someone registers (point of contact)</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Marketing / promo material — graphics, photos, posters, social cards</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -729,6 +736,7 @@
         <tr><td class="label">Onboarding messaging<span class="req">required</span></td><td class="type">Open-Ended + Files (multi)</td><td class="notes">Everything captains + players get at the start — roster confirmation, when/how the schedule is released, equipment to bring, comm channel setup (TeamSnap / WhatsApp / Slack / Email). Attach PDFs / videos / images.</td></tr>
         <tr><td class="label">Standings page link</td><td class="type">Link Input</td><td class="notes">URL where standings live</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a team / player registers</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Marketing / promo material — graphics, photos, posters, social cards</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -809,6 +817,7 @@
         <tr><td class="label">Bracket release timing</td><td class="type">Check One</td><td class="notes"><span class="dep">↳ if Brackets = Yes</span> Week-of / 48hr / day-of</td></tr>
         <tr><td class="label">Score-keeper assignments</td><td class="type">Staff Selector</td><td class="notes">Who runs the table per court (operational)</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a team / player registers</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Marketing / promo material — graphics, photos, bracket templates, social cards</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
@@ -885,6 +894,7 @@
         <tr><td class="label">Day-before reminder?</td><td class="type">Check One</td><td class="notes">Yes / No — sent 24h before</td></tr>
         <tr><td class="label">Day-of point of contact</td><td class="type">Staff Selector</td><td class="notes">Who renter calls during the rental if something goes wrong</td></tr>
         <tr><td class="label">Notify on new sign-up</td><td class="type">Staff Selector</td><td class="notes">Who gets pinged when a new booking is made</td></tr>
+        <tr><td class="label">Assets</td><td class="type">File Upload</td><td class="notes">Marketing / promo material — graphics, photos, social cards (separate from floor plan above)</td></tr>
         <tr><td class="label">Extra notes</td><td class="type">Open-Ended</td><td class="notes">Anything else about this section we should know</td></tr>
       </tbody></table>
 
