@@ -51,15 +51,41 @@ export default async function handler(req, res) {
 
   const body = (req.body && typeof req.body === "object") ? req.body : {};
 
-  // Normalize: GHL field names vary by template; accept a few common shapes.
-  const athleteName = body.athlete_name || body.athleteName || body.name || null;
-  const parentName  = body.parent_name  || body.parentName  || body.full_name || null;
-  const parentEmail = (body.parent_email || body.parentEmail || body.email || "").toLowerCase().trim() || null;
-  const parentPhone = body.parent_phone || body.parentPhone || body.phone || null;
-  const plan        = body.plan || null;
+  // Diagnostic: log incoming body to Vercel logs + write failures to the
+  // audit log so we can query exactly what GHL sent. Remove once intake
+  // is stable.
+  console.log("[intake] received body:", JSON.stringify(body));
 
-  if (!athleteName) return res.status(400).json({ error: "athlete_name required" });
-  if (!parentEmail) return res.status(400).json({ error: "parent_email required" });
+  // GHL custom data may arrive nested under `customData` or `custom_data`
+  // depending on the workflow template — flatten if so.
+  const flat = (body.customData && typeof body.customData === "object") ? { ...body, ...body.customData }
+             : (body.custom_data && typeof body.custom_data === "object") ? { ...body, ...body.custom_data }
+             : body;
+
+  // Normalize: GHL field names vary by template; accept a few common shapes.
+  const athleteName = flat.athlete_name || flat.athleteName || flat.athletes_full_name || flat.name || null;
+  const parentName  = flat.parent_name  || flat.parentName  || flat.parents_full_name  || flat.full_name || null;
+  const parentEmail = (flat.parent_email || flat.parentEmail || flat.parents_email     || flat.email || "").toLowerCase().trim() || null;
+  const parentPhone = flat.parent_phone || flat.parentPhone || flat.parents_phone     || flat.phone || null;
+  const plan        = flat.plan || null;
+
+  async function logIntakeFailure(reason) {
+    try {
+      await sb(`member_audit_log`, {
+        method: "POST",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify([{
+          client_id:         BAM_GTA_CLIENT_ID,
+          action_type:       "intake-ghl-failed",
+          args:              { reason, received_body: body, keys: Object.keys(body || {}) },
+          performed_by_name: "GHL Workflow (validation failed)",
+        }]),
+      });
+    } catch (_) {}
+  }
+
+  if (!athleteName) { await logIntakeFailure("athlete_name missing"); return res.status(400).json({ error: "athlete_name required", received_keys: Object.keys(body) }); }
+  if (!parentEmail) { await logIntakeFailure("parent_email missing"); return res.status(400).json({ error: "parent_email required", received_keys: Object.keys(body) }); }
 
   // Idempotency — avoid dupes from accidental resubmits.
   const existing = await sb(
