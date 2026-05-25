@@ -27,6 +27,29 @@ async function supabaseSelect(path) {
   return res.json();
 }
 
+// Look up an auth user by email. The /auth/v1/admin/users endpoint
+// doesn't support a `?filter=email.eq.X` query — that param is silently
+// ignored and the default first page is returned, so the lookup misses
+// any user past row ~50. This hits the auth schema directly via
+// PostgREST with the Accept-Profile header (service-role only), which
+// supports proper filtering.
+async function findAuthUserByEmail(email) {
+  if (!email) return null;
+  const lowered = String(email).toLowerCase();
+  const url = `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(lowered)}&select=id,email&limit=1`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Accept-Profile": "auth",
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) return null;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
 async function getStripeRevenue(customerId) {
   if (!customerId || !STRIPE_KEY) return null;
 
@@ -975,12 +998,7 @@ export default async function handler(req, res) {
             actionLink = inviteRes.actionLink;
             memberUserId = inviteRes.authUserId;
           } else if (inviteRes.status === 422 || /already/i.test(inviteRes.text || "")) {
-            const lookupRes = await fetch(
-              `${SUPABASE_URL}/auth/v1/admin/users?filter=email.eq.${encodeURIComponent(email)}`,
-              { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
-            );
-            const lookupJson = await lookupRes.json().catch(() => ({}));
-            const existingUser = (lookupJson?.users || []).find(u => (u?.email || "").toLowerCase() === email);
+            const existingUser = await findAuthUserByEmail(email);
             if (!existingUser?.id) {
               return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
             }
@@ -1655,12 +1673,7 @@ export default async function handler(req, res) {
             auth_user_id = inviteRes.authUserId;
           } else if (inviteRes.status === 422 || /already/i.test(inviteRes.text || "")) {
             // User already exists — look up by email and link
-            const lookupRes = await fetch(
-              `${SUPABASE_URL}/auth/v1/admin/users?filter=email.eq.${encodeURIComponent(newEmail)}`,
-              { headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` } }
-            );
-            const lookupJson = await lookupRes.json().catch(() => ({}));
-            const existingUser = (lookupJson?.users || []).find(u => (u?.email || "").toLowerCase() === newEmail);
+            const existingUser = await findAuthUserByEmail(newEmail);
             if (!existingUser?.id) {
               return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
             }
