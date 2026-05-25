@@ -7280,6 +7280,8 @@ const _bbOfferConfigs = {
       { key:'classes', type:'block_builder', label:'Classes', addLabel:'class', required:true,
         hint:'Segment your schedule by class. Each class is defined by age, skill level, gender, plus its own weekly times.',
         subFields:[
+          { key:'title', type:'text', label:'Title', required:true,
+            hint:'e.g. "U10 Boys Beginner" or "Skills A"' },
           { key:'age', type:'text', label:'Age', required:true,
             hint:'e.g. "U10" or "Grades 5-8"' },
           { key:'skill_level', type:'check_one', label:'Skill level',
