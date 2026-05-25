@@ -10360,13 +10360,20 @@ function _renderMemberModalBody(m, stripe, history) {
     return `<select onchange="_memberUpdateField('${m.id}','${field}',this.value)" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font:inherit;font-size:13px;cursor:pointer;min-width:140px">${opts}</select>`;
   };
 
+  // Inline editable number input. Sends Number() on change so the PG int
+  // column gets a real integer, not a string. Empty → null via the API.
+  const numField = (field, current, min, max) => {
+    const val = (current == null || current === '') ? '' : String(current);
+    return `<input type="number" min="${min}" max="${max}" value="${escapeHTML(val)}" onchange="_memberUpdateField('${m.id}','${field}',this.value === '' ? '' : Number(this.value))" style="background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 8px;font:inherit;font-size:13px;width:90px">`;
+  };
+
   let billingRows;
   if (stripe && stripe.status) {
     billingRows = [
       ['Plan',     `${escapeHTML(m.plan || '—')} <span style="color:var(--text-mute)">(${fmtMoney(stripe.amount_cents, stripe.currency)})</span>`],
       ['Status',   `${escapeHTML(stripe.status)}${stripe.cancel_at_period_end ? ' · cancel at period end' : ''}`],
       [stripe.trial_end ? 'Paused until' : 'Next payment', fmtDate(stripe.trial_end || stripe.current_period_end)],
-      ['Customer', `<code style="font-size:11px;color:var(--text-mute)">${escapeHTML(m.stripe_customer_id || '—')}</code>`],
+      ['Subscription', `<code style="font-size:11px;color:var(--text-mute)">${escapeHTML(m.stripe_subscription_id || '—')}</code>`],
     ];
   } else if (stripe && stripe.error) {
     billingRows = [['Stripe', escapeHTML(stripe.error)]];
@@ -10410,8 +10417,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ['Archetype',  selectField('archetype',  m.archetype,  ARCHETYPES)],
       ['Trainer',    selectField('trainer',    m.trainer,    TRAINERS)],
       ['Engagement', selectField('engagement', m.engagement, ENGAGEMENTS)],
-      ['Group',      escapeHTML(String(m.group_num || '—'))],
-      ['Joined',     escapeHTML(m.joined_date || '—')],
+      ['Group',      numField('group_num', m.group_num, 1, 99)],
     ])}
 
     ${divider}
