@@ -13082,6 +13082,7 @@ async function submitNewPassword() {
   const err = document.getElementById('rec-error');
   const btn = document.getElementById('rec-submit');
   err.textContent = '';
+  err.innerHTML = '';
   if (!p1 || p1.length < 8) { err.textContent = 'Password must be at least 8 characters'; return; }
   if (p1 !== p2) { err.textContent = 'Passwords do not match'; return; }
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -13092,10 +13093,72 @@ async function submitNewPassword() {
     data: { needs_password: false },
   });
   btn.disabled = false; btn.textContent = 'Save password →';
-  if (error) { err.textContent = error.message; return; }
+  if (error) {
+    // "Auth session missing" / expired-link case — the magic-link hash
+    // was already consumed (link clicked twice, browser localStorage
+    // cleared, link opened in a different browser, or link expired).
+    // Show recovery UI with email field + fresh-link button instead of
+    // the raw error string.
+    const msg = (error.message || '').toLowerCase();
+    const isSessionMissing = msg.includes('session missing') || msg.includes('auth session') || msg.includes('not authenticated') || msg.includes('jwt expired');
+    if (isSessionMissing) {
+      _showFreshLinkRecovery(err);
+      return;
+    }
+    err.textContent = error.message;
+    return;
+  }
   // Strip the recovery hash + reload into normal logged-in flow
   history.replaceState(null, '', window.location.pathname);
   location.reload();
+}
+
+// Renders the "your link expired — get a fresh one" recovery block
+// inside the password card's error slot. Asks the user for their email,
+// fires Supabase resetPasswordForEmail (works without an active session)
+// and shows confirmation.
+function _showFreshLinkRecovery(errEl) {
+  if (!errEl) return;
+  errEl.innerHTML = `
+    <div style="text-align:left;background:rgba(251,113,133,0.05);border:1px solid rgba(251,113,133,0.25);border-radius:10px;padding:14px 16px;color:var(--text);font-size:13px;line-height:1.55">
+      <div style="font-weight:600;margin-bottom:6px;color:var(--red, #fb7185)">⚠ Your invite link expired or was already used</div>
+      <div style="color:var(--text-sub);margin-bottom:12px">This can happen if the link was clicked twice, your browser cleared cookies, or 24 hours have passed. Enter your email and we'll send a fresh one.</div>
+      <input id="rec-freshlink-email" type="email" placeholder="you@academy.com" autocomplete="email"
+        style="width:100%;padding:10px 12px;background:var(--surface-alt,var(--surface));border:1px solid var(--border-med);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:10px;box-sizing:border-box" />
+      <button onclick="_sendFreshLink()" id="rec-freshlink-btn"
+        style="width:100%;padding:10px 14px;border:0;border-radius:8px;background:var(--gold,var(--accent));color:#0A0A0B;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Send me a fresh link</button>
+      <div id="rec-freshlink-msg" style="margin-top:10px;font-size:12px;color:var(--text-mute)"></div>
+    </div>
+  `;
+}
+
+async function _sendFreshLink() {
+  const emailEl = document.getElementById('rec-freshlink-email');
+  const btn = document.getElementById('rec-freshlink-btn');
+  const msgEl = document.getElementById('rec-freshlink-msg');
+  const email = (emailEl?.value || '').trim();
+  if (!email || !/^.+@.+\..+$/.test(email)) {
+    msgEl.style.color = 'var(--red, #fb7185)';
+    msgEl.textContent = 'Please enter a valid email address.';
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Sending…';
+  msgEl.style.color = 'var(--text-mute)';
+  msgEl.textContent = '';
+  try {
+    const { error } = await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + '/client-portal.html?type=recovery'
+    });
+    if (error) throw error;
+    msgEl.style.color = 'var(--green, #34d399)';
+    msgEl.textContent = '✓ Fresh link sent. Check your inbox (and spam folder).';
+    btn.textContent = 'Sent ✓';
+    btn.style.opacity = '0.6';
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Send me a fresh link';
+    msgEl.style.color = 'var(--red, #fb7185)';
+    msgEl.textContent = e?.message || 'Failed to send. Try again or reach out to your BAM team.';
+  }
 }
 
 // ── Admin feedback widget ────────────────────────────────────────
