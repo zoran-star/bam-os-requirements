@@ -42,7 +42,8 @@ export default function BAMPortal() {
   const [authLoading, setAuthLoading] = useState(true);
   const [accessChecking, setAccessChecking] = useState(false);
   const [dark, setDark] = useState(true);
-  const [nav, setNav] = useState("dashboard");
+  // Dashboard is hidden for all staff right now — land on Inbox instead.
+  const [nav, setNav] = useState("inbox");
   // Dashboard click-to-detail: parent stashes the client id, ClientsCombinedView
   // consumes it once via initialClientId then clears it so reopening the tab
   // fresh doesn't keep re-jumping.
@@ -421,26 +422,22 @@ export default function BAMPortal() {
   };
 
   const isSystemsTeam = me?.role === "systems_manager" || me?.role === "systems_executor";
+  // Tasks · Calendar · Financials · Knowledge Base · SM Training · Dashboard
+  // are temporarily hidden for ALL staff. Will bring back once Zoran
+  // re-greenlights each one individually.
   const navItems = isSystemsTeam
     ? [
         { label: "Systems", key: "systems" },
-        { label: "SM Training", key: "training", href: "/training" },
       ]
     : [
-        { label: "Dashboard", key: "dashboard" },
         { label: "Inbox", key: "inbox" },
         { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
-        { label: "Tasks", key: "tasks", count: taskCount, alert: taskAlert },
-        { label: "Calendar", key: "calendar" },
-        { label: "Knowledge Base", key: "knowledge" },
-        ...(canSeeFinancials ? [{ label: "Financials", key: "financials" }] : []),
         ...(canSeeSystems ? [{ label: "Systems", key: "systems" }] : []),
         ...(canSeeMarketing ? [{ label: "Marketing", key: "marketing" }] : []),
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
-        { label: "SM Training", key: "training", href: "/training" },
       ];
 
   return (
@@ -616,63 +613,9 @@ export default function BAMPortal() {
         {/* MAIN */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
 
-          {/* Global Notification Bar */}
-          {(() => {
-            const failedCount = financialAlerts.failedPayments?.length || 0;
-            const overdueTasks = actionItems.filter(a => a.status === "Open" && a.urgency === "Urgent").length;
-            const criticalClients = [...onboardingClients, ...activeClients].filter(c => c.healthStatus === "critical").length;
-            const hasAlerts = (failedCount > 0 || overdueTasks > 0 || criticalClients > 0) && !notifDismissed;
-            if (!hasAlerts) return null;
-            const parts = [];
-            if (failedCount > 0) parts.push(`${failedCount} failed payment${failedCount !== 1 ? "s" : ""}`);
-            if (overdueTasks > 0) parts.push(`${overdueTasks} overdue task${overdueTasks !== 1 ? "s" : ""}`);
-            if (criticalClients > 0) parts.push(`${criticalClients} critical client${criticalClients !== 1 ? "s" : ""}`);
-            const isRed = failedCount > 0 || criticalClients > 0;
-            return (
-              <div style={{
-                height: 32, display: "flex", alignItems: "center", justifyContent: "center",
-                gap: 10, fontSize: 12, fontWeight: 600, flexShrink: 0,
-                background: isRed ? tk.redSoft : tk.amberSoft,
-                color: isRed ? tk.red : tk.amber,
-                borderBottom: `1px solid ${isRed ? tk.red + "30" : tk.amber + "30"}`,
-                position: "relative",
-              }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                <span style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                  {failedCount > 0 && (
-                    <span onClick={() => { setNav("financials"); setNotifDismissed(true); }} style={{ cursor: "pointer", transition: "opacity 0.12s" }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-                      onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                    >{failedCount} failed payment{failedCount !== 1 ? "s" : ""}</span>
-                  )}
-                  {failedCount > 0 && overdueTasks > 0 && <span style={{ margin: "0 6px", opacity: 0.5 }}>&middot;</span>}
-                  {overdueTasks > 0 && (
-                    <span onClick={() => { setNav("tasks"); setNotifDismissed(true); }} style={{ cursor: "pointer", transition: "opacity 0.12s" }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-                      onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                    >{overdueTasks} overdue task{overdueTasks !== 1 ? "s" : ""}</span>
-                  )}
-                  {(failedCount > 0 || overdueTasks > 0) && criticalClients > 0 && <span style={{ margin: "0 6px", opacity: 0.5 }}>&middot;</span>}
-                  {criticalClients > 0 && (
-                    <span onClick={() => { setNav("clients"); setNotifDismissed(true); }} style={{ cursor: "pointer", transition: "opacity 0.12s" }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-                      onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-                    >{criticalClients} critical client{criticalClients !== 1 ? "s" : ""}</span>
-                  )}
-                </span>
-                <div onClick={() => setNotifDismissed(true)} style={{
-                  position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-                  cursor: "pointer", fontSize: 16, lineHeight: 1, opacity: 0.7,
-                  transition: "opacity 0.12s",
-                }}
-                  onMouseEnter={e => e.currentTarget.style.opacity = "1"}
-                  onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
-                >&times;</div>
-              </div>
-            );
-          })()}
+          {/* Global Notification Bar — removed (was showing failed payments /
+              overdue tasks / critical clients). Bring back later when those
+              views are unhidden. */}
 
           {/* Topbar */}
           <div style={{
