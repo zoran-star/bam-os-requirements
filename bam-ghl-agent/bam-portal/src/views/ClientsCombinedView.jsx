@@ -99,6 +99,11 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
 
+  // Map of client_id -> bool. TRUE = a non-BAM-staff client_user has
+  // activity within the last 2 minutes (green online dot in the list).
+  // Refreshed every 30s while the Clients view is mounted.
+  const [onlineMap, setOnlineMap] = useState({});
+
   // If parent passed an initialClientId (e.g. Dashboard click), open that client.
   // One-shot: parent clears it via onInitialClientHandled so reopening the
   // Clients tab fresh doesn't keep re-jumping into the same client.
@@ -120,6 +125,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
   // is a defensive safety net.
   useEffect(() => {
     let cancelled = false;
+    let presenceInterval = null;
     setLoading(true);
     (async () => {
       const [c, s] = await Promise.all([
@@ -130,8 +136,22 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
       setClients(c);
       setStaff(s);
       setLoading(false);
+
+      // Initial online-status fetch + 30s refresh cadence
+      const loadOnline = async () => {
+        const { data } = await supabase.rpc('clients_online_status');
+        if (cancelled || !Array.isArray(data)) return;
+        const map = {};
+        data.forEach(r => { if (r.is_online) map[r.client_id] = true; });
+        setOnlineMap(map);
+      };
+      loadOnline();
+      presenceInterval = setInterval(loadOnline, 30 * 1000);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (presenceInterval) clearInterval(presenceInterval);
+    };
   }, [refreshCounter]);
 
   const staffMap = useMemo(() => Object.fromEntries(staff.map(s => [s.id, s])), [staff]);
@@ -276,6 +296,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
               client={c}
               staff={staffMap[c.scaling_manager_id]}
               tokens={t}
+              isOnline={!!onlineMap[c.id]}
               onClick={() => setSelectedId(c.id)}
             />
           ))}
@@ -326,7 +347,7 @@ function SegmentedControl({ value, onChange, options, tokens }) {
 }
 
 // ─── Single row in the list ─────────────────────────────────────────────────
-function ClientRow({ client, staff, tokens, onClick }) {
+function ClientRow({ client, staff, tokens, isOnline, onClick }) {
   const [hov, setHov] = useState(false);
   const t = tokens;
   const derived = deriveClientStatus(client, t);
@@ -347,7 +368,20 @@ function ClientRow({ client, staff, tokens, onClick }) {
         alignItems: "center",
       }}
     >
-      <div style={{ fontWeight: 600, color: t.text, fontSize: 14 }}>{client.business_name || "(unnamed)"}</div>
+      <div style={{ fontWeight: 600, color: t.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+        {isOnline && (
+          <span
+            title="A client teammate is online now"
+            style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: "#22C55E",
+              boxShadow: "0 0 0 2px rgba(34,197,94,0.18)",
+              flexShrink: 0,
+            }}
+          />
+        )}
+        <span>{client.business_name || "(unnamed)"}</span>
+      </div>
       <div style={{ fontSize: 13, color: t.textSub }}>{client.owner_name || <span style={{ color: t.textMute, fontStyle: "italic" }}>none</span>}</div>
       <div style={{ fontSize: 13, color: t.textSub }}>{staff?.name || <span style={{ color: t.textMute, fontStyle: "italic" }}>unassigned</span>}</div>
       <div>

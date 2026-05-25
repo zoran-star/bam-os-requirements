@@ -6576,6 +6576,38 @@ function applyMarketingNavState() {
   if (mNav) mNav.classList.toggle('disabled', !MARKETING_INCLUDED);
 }
 
+// ── Presence heartbeat ─────────────────────────────────────────────────
+// Updates last_seen_at on every active client_users row for this auth
+// user every 30 seconds. The staff Clients page reads these timestamps
+// (filtered to NON-BAM-staff users) to show a green online dot beside
+// the academy name when anyone on the client side has activity within
+// the last 2 minutes.
+let _presenceTimer = null;
+async function startPresenceHeartbeat(userId) {
+  if (!userId || !_sb) return;
+  const ping = async () => {
+    try {
+      // Update every active membership row for this user. Fire-and-forget.
+      await _sb.from('client_users')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('status', 'active');
+    } catch (e) { /* silent — never block the UI */ }
+  };
+  await ping();                            // initial ping on login
+  if (_presenceTimer) clearInterval(_presenceTimer);
+  _presenceTimer = setInterval(ping, 30 * 1000);
+  // Stop pinging when the tab is hidden, resume when it comes back
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
+    } else {
+      ping();
+      if (!_presenceTimer) _presenceTimer = setInterval(ping, 30 * 1000);
+    }
+  });
+}
+
 // ── Onboarding gate ────────────────────────────────────────────────────
 // When staff flips off "Is onboarding?" on the client profile (overview
 // tab in bam-portal), the client portal hides every nav item except
@@ -14088,6 +14120,11 @@ async function boot() {
   await loadTickets();
   subscribeTicketsRealtime();
   subscribeAllConversationsRealtime();
+
+  // Presence heartbeat — updates last_seen_at on every client_users row
+  // for this user so the staff Clients page can show a green online dot.
+  // Fires immediately, then every 30s while the portal is open.
+  startPresenceHeartbeat(session.user.id);
 
   // Admin-only floating red feedback button (no-op if user isn't admin/scaling)
   setupAdminFeedbackWidget();
