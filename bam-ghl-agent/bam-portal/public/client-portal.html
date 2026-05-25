@@ -5343,9 +5343,6 @@
 
         <div class="content">
 
-          <!-- Ad account connection gate (Leadsie) — populated by _renderAdConnectGate() -->
-          <div id="ad-connect-gate"></div>
-
           <div class="readout">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
@@ -10833,9 +10830,12 @@ function adAccountKeep(keep) {
 function adAccountMarkConnected() { _setAdStatus('connected'); }
 function adAccountReset() { _setAdStatus(''); }
 
-// Renders the ad-account connection card at the top of the Marketing view.
-// States: '' not started · 'leadsie' connect pending · 'connected' · 'skipped'.
-function _renderAdConnectGate() {
+// Ad-account connection gate (Leadsie) — DISABLED per Zoran. The card
+// at the top of the Marketing view was removed. Functions left as
+// no-ops in case anything still calls them.
+function _renderAdConnectGate() { return; /* disabled */ }
+// eslint-disable-next-line no-unused-vars
+function _renderAdConnectGate_legacy_DISABLED() {
   const el = document.getElementById('ad-connect-gate');
   if (!el) return;
   const status = _adStatus();
@@ -14255,18 +14255,7 @@ function toggleTheme() {
   </div>
 </div>
 
-<!-- ── Keep current ad account modal ── -->
-<div id="adAccountModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeAdAccountModal()">
-  <div class="modal-card" onclick="event.stopPropagation()">
-    <div class="modal-kicker">§ Marketing</div>
-    <div class="modal-title">Keep your current ad account?</div>
-    <div class="modal-sub">If you already run ads, connecting your existing ad account keeps your history, audiences, and tracking intact. Starting fresh loses all of that — we don't recommend it.</div>
-    <div class="modal-footer">
-      <button class="btn-modal-secondary" onclick="adAccountKeep(false)">No, start fresh</button>
-      <button class="btn-modal-primary" onclick="adAccountKeep(true)">Yes, keep it</button>
-    </div>
-  </div>
-</div>
+<!-- "Keep current ad account?" modal — removed per Zoran (flow disabled) -->
 
 <!-- ── Invite teammate modal ── -->
 <div id="inviteTeamModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeInviteTeamModal()">
