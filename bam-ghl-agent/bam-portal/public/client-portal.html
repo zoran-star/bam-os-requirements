@@ -6332,6 +6332,53 @@ Then the call to action."]</div>
         border-top:1px solid var(--border-med);
       }
 
+      /* Unscoped input styles for modals (they live outside #view-blueprint) */
+      .bb-loc-modal .bb-field {
+        margin-bottom:14px;
+      }
+      .bb-loc-modal .bb-field-label {
+        font-size:11px; font-weight:600; letter-spacing:0.06em;
+        text-transform:uppercase; color:var(--text-mute);
+        margin-bottom:6px; display:flex; align-items:center; gap:6px;
+        font-family:inherit;
+      }
+      .bb-loc-modal .bb-field-req { color:var(--accent); font-size:9px; }
+      .bb-loc-modal .bb-input,
+      .bb-loc-modal .bb-textarea {
+        width:100%; padding:10px 12px;
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        border-radius:8px; color:var(--text); font-size:14px;
+        font-family:inherit; outline:none;
+        box-sizing:border-box;
+      }
+      .bb-loc-modal .bb-input:focus,
+      .bb-loc-modal .bb-textarea:focus { border-color:var(--accent-border); }
+      .bb-loc-modal .bb-textarea {
+        resize:vertical; min-height:80px;
+      }
+      .bb-loc-modal .btn-primary-bb {
+        padding:9px 16px; border:0; border-radius:8px;
+        background:var(--accent); color:#0A0A0B;
+        font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;
+      }
+      .bb-loc-modal .btn-primary-bb[disabled] { opacity:0.6; cursor:not-allowed; }
+      .bb-loc-modal .btn-secondary-bb {
+        padding:9px 16px; border-radius:8px;
+        background:var(--surface); border:1px solid var(--border-med);
+        color:var(--text); font-size:13px; font-weight:500;
+        cursor:pointer; font-family:inherit;
+      }
+
+      /* Type picker modal — same unscope */
+      .bb-modal .bb-field,
+      .bb-modal .bb-input,
+      .bb-modal .bb-textarea,
+      .bb-modal .btn-primary-bb,
+      .bb-modal .btn-secondary-bb {
+        /* inherits via existing rules; this just hoists in case scope was needed */
+        font-family:inherit;
+      }
+
       @media (max-width: 720px) {
         #view-blueprint .bb-wizard-body { padding:18px 14px; }
         #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
@@ -7230,8 +7277,8 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
-      { key:'groups', type:'block_builder', label:'Groups', required:true,
-        hint:'Segment your schedule by group. Each group is defined by age, skill level, gender, plus its own weekly times.',
+      { key:'classes', type:'block_builder', label:'Classes', addLabel:'class', required:true,
+        hint:'Segment your schedule by class. Each class is defined by age, skill level, gender, plus its own weekly times.',
         subFields:[
           { key:'age', type:'text', label:'Age', required:true,
             hint:'e.g. "U10" or "Grades 5-8"' },
@@ -7240,8 +7287,8 @@ const _bbOfferConfigs = {
           { key:'gender', type:'check_many', label:'Gender',
             options:['Boys','Girls'] },
           { key:'notes', type:'textarea', label:'Other notes',
-            hint:'Anything specific about this group' },
-          { key:'consistent', type:'check_one', label:'Same time every week for this group?',
+            hint:'Anything specific about this class' },
+          { key:'consistent', type:'check_one', label:'Same time every week for this class?',
             options:['Yes','No'] },
           { key:'weekly_times', type:'block_builder', label:'Weekly times',
             dep:{ key:'consistent', equals:'Yes' },
@@ -7796,18 +7843,23 @@ function _bbRenderField(field, sectionId) {
       const rows = Array.isArray(val) ? val : [];
       body = `
         <div class="bb-block-builder">
-          ${rows.map((row, i) => `
+          ${rows.map((row, i) => {
+            const rowLabel = field.addLabel
+              ? field.addLabel.charAt(0).toUpperCase() + field.addLabel.slice(1)
+              : 'Row';
+            return `
             <div class="bb-block-row">
               <div class="bb-block-row-head">
-                <div style="font-size:11px;color:var(--text-mute)">Row ${i+1}</div>
+                <div style="font-size:11px;color:var(--text-mute)">${_bbEscapeHtml(rowLabel)} ${i+1}</div>
                 <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
               </div>
               <div class="bb-block-fields">
                 ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
               </div>
             </div>
-          `).join('')}
-          <button class="btn-secondary-bb" onclick="_bbBlockAdd('${sectionId}','${field.key}')">+ Add row</button>
+          `;
+          }).join('')}
+          <button class="btn-secondary-bb" onclick="_bbBlockAdd('${sectionId}','${field.key}')">+ Add ${_bbEscapeHtml(field.addLabel || 'row')}</button>
         </div>
       `;
       break;
