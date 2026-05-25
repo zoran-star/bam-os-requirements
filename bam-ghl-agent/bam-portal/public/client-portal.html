@@ -7241,16 +7241,34 @@ const _bbCommonExtraNotes = {
   hint:'Anything else about this section we should know'
 };
 
-// Pricing section is similar across most types (Training as ref)
+// Pricing section is similar across most types (Training as ref).
+// Clients can offer multiple pricing options on the same offer
+// (e.g. a Membership AND a Package). Each pricing option is a row.
 const _bbStdPricing = [
-  { key:'pricing_model', type:'check_one', label:'Pricing model', required:true,
-    options:['Membership','Package','Single Session','Other'] },
-  { key:'pricing_tiers', type:'block_builder', label:'Pricing tiers', required:true,
-    hint:'Shape varies by model — membership: tier name/cycle/price · package: sessions/cost · single: price',
+  { key:'pricing_offerings', type:'block_builder', label:'Pricing options', required:true,
+    addLabel:'pricing option',
+    collapsible:true,
+    summaryKeys:['title','type','price'],
+    hint:'Add one row per pricing option. A single offer can have multiple (e.g. both a Membership and a Package).',
     subFields:[
-      { key:'name', type:'text', label:'Tier name / label' },
-      { key:'amount', type:'currency', label:'Amount' },
-      { key:'cycle', type:'text', label:'Cycle / sessions / unit' }
+      { key:'title', type:'text', label:'Title', required:true,
+        hint:'e.g. "Unlimited Monthly" or "10-session Pack"' },
+      { key:'type', type:'check_one', label:'Pricing type', required:true,
+        options:['Membership','Package','Single Session','Other'] },
+      { key:'price', type:'currency', label:'Price', required:true,
+        hint:'Headline number — e.g. monthly fee, package total, or per-session cost' },
+      { key:'billing_cycle', type:'text', label:'Billing cycle',
+        dep:{ key:'type', equals:'Membership' },
+        hint:'e.g. "monthly", "every 4 weeks", "biweekly"' },
+      { key:'sessions_included', type:'number', label:'Sessions included',
+        dep:{ key:'type', equals:'Package' } },
+      { key:'expires_after', type:'text', label:'Expires after',
+        dep:{ key:'type', equals:'Package' },
+        hint:'e.g. "3 months", "end of season"' },
+      { key:'other_description', type:'textarea', label:'Describe this pricing',
+        dep:{ key:'type', equals:'Other' } },
+      { key:'description', type:'textarea', label:'Notes',
+        hint:'Anything else about this pricing option' }
     ] },
   { key:'addons', type:'block_builder', label:'Add-ons',
     hint:'Repeating: name + price + description (e.g. shooting program, 1-on-1)',
