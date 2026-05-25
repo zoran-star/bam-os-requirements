@@ -354,7 +354,7 @@ async function postInviteToSlack({ slackChannelId, businessName, ownerName, emai
   try {
     const token = process.env.SLACK_BOT_TOKEN;
     if (!token || !slackChannelId) return { ok: false, skipped: true };
-    const greet = ownerName ? `Hey ${ownerName.split(/\s+/)[0]}!` : "Hey!";
+    const greet = "Hi team!";
     const biz = businessName ? ` for ${businessName}` : "";
     const text = [
       `${greet} Your BAM Business portal${biz} is ready 🎉`,
