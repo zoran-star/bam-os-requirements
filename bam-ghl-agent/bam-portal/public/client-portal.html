@@ -6581,7 +6581,7 @@ function applyMarketingNavState() {
 // tab in bam-portal), the client portal hides every nav item except
 // Systems + Marketing. Mobile bottom-nav mirrors the same hide.
 let ONBOARDING_IN_PROGRESS = true;
-const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing']);
+const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing', 'team', 'resources']);
 
 function applyOnboardingNavState(inProgress) {
   ONBOARDING_IN_PROGRESS = !!inProgress;
@@ -14066,8 +14066,8 @@ async function boot() {
   CLIENT_ID = clientRow.id;
   MARKETING_INCLUDED = clientRow.marketing_included !== false;
   applyMarketingNavState();
-  applyOnboardingNavState(clientRow.onboarding_in_progress !== false);
   applyMemberMgmtNavState();
+  applyOnboardingNavState(clientRow.onboarding_in_progress !== false);
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
