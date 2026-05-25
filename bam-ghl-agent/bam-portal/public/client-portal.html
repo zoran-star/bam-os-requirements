@@ -6250,6 +6250,29 @@ Then the call to action."]</div>
       }
       #view-blueprint .bb-block-fields > .bb-field:last-child { margin-bottom:0; }
 
+      /* Collapsible Block Builder row */
+      #view-blueprint .bb-block-toggle {
+        background:transparent; border:1px solid var(--accent-border);
+        color:var(--accent); font-family:inherit;
+        width:26px; height:26px; border-radius:6px;
+        cursor:pointer; font-size:13px;
+        display:flex; align-items:center; justify-content:center;
+      }
+      #view-blueprint .bb-block-row-info {
+        flex:1; min-width:0;
+      }
+      #view-blueprint .bb-block-row-title {
+        font-size:14px; font-weight:600; color:var(--text);
+        margin:0; line-height:1.3;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #view-blueprint .bb-block-row-meta {
+        font-size:11px; color:var(--text-mute); font-family:'JetBrains Mono', monospace;
+        margin-top:2px;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
+      #view-blueprint .bb-block-row-meta .empty { color:var(--text-mute); opacity:0.5; }
+
       /* Default + optional explanation for Check Many w/ defaults */
       #view-blueprint .bb-defaults-info {
         font-size:11px; color:var(--text-mute); margin-bottom:8px; line-height:1.55;
@@ -7278,6 +7301,8 @@ const _bbOfferConfigs = {
     ]},
     { id:'schedule', label:'Schedule', fields:[
       { key:'classes', type:'block_builder', label:'Classes', addLabel:'class', required:true,
+        collapsible:true,
+        summaryKeys:['title','age','skill_level','gender'],
         hint:'Segment your schedule by class. Each class is defined by age, skill level, gender, plus its own weekly times.',
         subFields:[
           { key:'title', type:'text', label:'Title', required:true,
@@ -7316,9 +7341,9 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'value', label:'Value', fields:[
-      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+      { key:'program_structure', type:'textarea', label:'Program structure',
         hint:'How the program is structured — phases, pillars, what a week looks like' },
-      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true,
+      { key:'what_makes_different', type:'textarea', label:'What makes it different',
         hint:'Why this program vs. other programs in your area' },
       _bbCommonExtraNotes
     ]},
@@ -7405,9 +7430,9 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'value', label:'Value', fields:[
-      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+      { key:'program_structure', type:'textarea', label:'Program structure',
         hint:'How the camp / clinic flows — drills, scrimmages, special focuses, daily breakdown' },
-      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different' },
       _bbCommonExtraNotes
     ]},
     { id:'pricing', label:'Pricing', fields:[
@@ -7476,9 +7501,9 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'value', label:'Value', fields:[
-      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+      { key:'program_structure', type:'textarea', label:'Program structure',
         hint:'Format, divisions, game flow, playoff path, awards' },
-      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different' },
       _bbCommonExtraNotes
     ]},
     { id:'pricing', label:'Pricing', fields:[
@@ -7746,7 +7771,7 @@ const _bbOfferConfigs = {
         hint:'e.g. "BAM Elite Travel" or "BAM Spring AAU"' },
       { key:'description', type:'textarea', label:'Short description',
         hint:'One-liner for the landing page' },
-      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true,
+      { key:'what_makes_different', type:'textarea', label:'What makes it different',
         hint:'Why this program vs. every other competitive program in the area' },
       _bbCommonExtraNotes
     ]},
@@ -7849,17 +7874,38 @@ function _bbRenderField(field, sectionId) {
             const rowLabel = field.addLabel
               ? field.addLabel.charAt(0).toUpperCase() + field.addLabel.slice(1)
               : 'Row';
+            if (field.collapsible) {
+              const expanded = _bbBlockIsExpanded(sectionId, field.key, i);
+              const summary = _bbBlockSummaryHtml(row, field.subFields, field.summaryKeys);
+              return `
+                <div class="bb-block-row">
+                  <div class="bb-block-row-head">
+                    <button class="bb-block-toggle" onclick="_bbBlockToggleExpand('${sectionId}','${field.key}',${i})" title="${expanded ? 'Collapse' : 'Expand'}">${expanded ? '▾' : '▸'}</button>
+                    <div class="bb-block-row-info">
+                      <div class="bb-block-row-title">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}</div>
+                      <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
+                    </div>
+                    <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
+                  </div>
+                  ${expanded ? `
+                    <div class="bb-block-fields" style="margin-top:14px">
+                      ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              `;
+            }
             return `
-            <div class="bb-block-row">
-              <div class="bb-block-row-head">
-                <div style="font-size:11px;color:var(--text-mute)">${_bbEscapeHtml(rowLabel)} ${i+1}</div>
-                <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
+              <div class="bb-block-row">
+                <div class="bb-block-row-head">
+                  <div style="font-size:11px;color:var(--text-mute)">${_bbEscapeHtml(rowLabel)} ${i+1}</div>
+                  <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
+                </div>
+                <div class="bb-block-fields">
+                  ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
+                </div>
               </div>
-              <div class="bb-block-fields">
-                ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
-              </div>
-            </div>
-          `;
+            `;
           }).join('')}
           <button class="btn-secondary-bb" onclick="_bbBlockAdd('${sectionId}','${field.key}')">+ Add ${_bbEscapeHtml(field.addLabel || 'row')}</button>
         </div>
@@ -8080,6 +8126,47 @@ function _bbRenderNestedSubField(sectionId, parentKey, parentIdx, nestedKey, nes
       ${hint}
     </div>
   `;
+}
+
+// Collapsible Block Builder — per-(section,key) Set of expanded row indexes
+let _bbExpandedBlocks = {};
+
+function _bbBlockKey(section, key) { return section + '/' + key; }
+
+function _bbBlockIsExpanded(section, key, idx) {
+  const s = _bbExpandedBlocks[_bbBlockKey(section, key)];
+  return s ? s.has(idx) : false;
+}
+
+function _bbBlockToggleExpand(section, key, idx) {
+  const k = _bbBlockKey(section, key);
+  if (!_bbExpandedBlocks[k]) _bbExpandedBlocks[k] = new Set();
+  const s = _bbExpandedBlocks[k];
+  if (s.has(idx)) s.delete(idx); else s.add(idx);
+  _bbRenderWizardBody();
+}
+
+// Build collapsed-row summary: {title, meta} from summaryKeys
+function _bbBlockSummaryHtml(row, subFields, summaryKeys) {
+  if (!summaryKeys || !summaryKeys.length) return { title:'', meta:'' };
+  const titleKey = summaryKeys[0];
+  const metaKeys = summaryKeys.slice(1);
+  const titleVal = row[titleKey];
+  let titleHtml = '';
+  if (titleVal != null && titleVal !== '' && !(Array.isArray(titleVal) && titleVal.length === 0)) {
+    titleHtml = _bbEscapeHtml(Array.isArray(titleVal) ? titleVal.join(', ') : String(titleVal));
+  }
+  const metaParts = metaKeys.map(k => {
+    const sf = (subFields || []).find(s => s.key === k);
+    let v = row[k];
+    if (v == null || v === '' || (Array.isArray(v) && v.length === 0)) return '';
+    if (Array.isArray(v)) v = v.join(', ');
+    return _bbEscapeHtml(sf ? sf.label : k) + ': ' + _bbEscapeHtml(String(v));
+  }).filter(Boolean);
+  return {
+    title: titleHtml,
+    meta: metaParts.join(' · ')
+  };
 }
 
 // Block Builder Check Many mutator (per-row array toggle)
