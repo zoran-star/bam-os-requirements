@@ -6255,6 +6255,83 @@ Then the call to action."]</div>
         font-size:11px; color:var(--text-mute); margin-bottom:8px; line-height:1.55;
       }
 
+      /* Location picker chip */
+      #view-blueprint .bb-loc-pick {
+        display:flex; align-items:center; gap:10px;
+        padding:10px 12px;
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        border-radius:8px; cursor:pointer; color:var(--text);
+        font-size:14px; font-family:inherit;
+        width:100%; text-align:left;
+      }
+      #view-blueprint .bb-loc-pick:hover { border-color:var(--accent-border); }
+      #view-blueprint .bb-loc-pick.empty { color:var(--text-mute); }
+      #view-blueprint .bb-loc-pick-chev { margin-left:auto; color:var(--text-mute); }
+
+      /* Location picker modal */
+      .bb-loc-modal-overlay {
+        position:fixed; inset:0; z-index:9200;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:center; justify-content:center;
+        padding:40px 16px; overflow-y:auto;
+      }
+      .bb-loc-modal {
+        width:100%; max-width:480px; max-height:80vh;
+        background:var(--surface); border:1px solid var(--border-med);
+        border-radius:14px; display:flex; flex-direction:column;
+      }
+      .bb-loc-head {
+        padding:18px 22px 12px;
+        border-bottom:1px solid var(--border-med);
+        display:flex; align-items:center; justify-content:space-between; gap:10px;
+      }
+      .bb-loc-title { font-size:16px; font-weight:700; color:var(--text); }
+      .bb-loc-close {
+        background:transparent; border:none; color:var(--text-sub);
+        cursor:pointer; font-size:22px; line-height:1; padding:4px;
+      }
+      .bb-loc-search {
+        margin:14px 22px 0;
+        padding:10px 12px;
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        border-radius:8px; color:var(--text); font-size:14px; font-family:inherit;
+        outline:none;
+      }
+      .bb-loc-list {
+        flex:1; overflow-y:auto;
+        padding:8px 12px;
+      }
+      .bb-loc-item {
+        padding:10px 12px; cursor:pointer; border-radius:8px;
+        font-size:14px; color:var(--text);
+      }
+      .bb-loc-item:hover { background:var(--surface-alt); }
+      .bb-loc-item .bb-loc-item-addr {
+        font-size:12px; color:var(--text-mute); margin-top:2px;
+      }
+      .bb-loc-empty {
+        padding:24px 12px; text-align:center;
+        color:var(--text-mute); font-size:13px;
+      }
+      .bb-loc-foot {
+        padding:10px 22px 18px;
+        border-top:1px solid var(--border-med);
+      }
+      .bb-loc-add-link {
+        padding:10px 12px; border-radius:8px;
+        background:var(--accent-ghost); border:1px solid var(--accent-border);
+        color:var(--accent); font-size:13px; font-weight:600;
+        cursor:pointer; font-family:inherit;
+        width:100%; text-align:center;
+      }
+      .bb-loc-form { padding:18px 22px; }
+      .bb-loc-form .bb-field { margin-bottom:14px; }
+      .bb-loc-form-foot {
+        display:flex; justify-content:flex-end; gap:10px;
+        padding:12px 22px 18px;
+        border-top:1px solid var(--border-med);
+      }
+
       @media (max-width: 720px) {
         #view-blueprint .bb-wizard-body { padding:18px 14px; }
         #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
@@ -6999,6 +7076,7 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbTeamLoadedFor = null;        // reset team cache when switching offers
   _bbTeamRows = [];
   _bbExpandedTeams = new Set();
+  _bbLoadLocations();             // warm the locations cache for pickers
   _bbRenderWizardBody();
 }
 
@@ -7147,8 +7225,8 @@ const _bbOfferConfigs = {
         options:['Beginner','Intermediate','Advanced','All'] },
       { key:'gender', type:'check_many', label:'Gender', required:true,
         options:['Boys','Girls'] },
-      { key:'location', type:'text', label:'Location(s)', required:true,
-        hint:'Will pick from BB > Locations once that page ships' },
+      { key:'location', type:'location_picker', label:'Primary location', required:true,
+        hint:'Pick from your saved locations or add a new one' },
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
@@ -7167,13 +7245,13 @@ const _bbOfferConfigs = {
             options:['Yes','No'] },
           { key:'weekly_times', type:'block_builder', label:'Weekly times',
             dep:{ key:'consistent', equals:'Yes' },
-            hint:'Day · start · end · location — add one row per slot',
+            hint:'Pick day(s), set start/end times, and the location for each slot. One row covers multiple days at the same time.',
             subFields:[
-              { key:'day', type:'check_one', label:'Day',
+              { key:'days', type:'check_many', label:'Days',
                 options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
               { key:'start', type:'time', label:'Start' },
               { key:'end', type:'time', label:'End' },
-              { key:'location', type:'text', label:'Location' }
+              { key:'location', type:'location_picker', label:'Location' }
             ] },
           { key:'schedule_info', type:'textarea', label:'How is the schedule communicated?',
             dep:{ key:'consistent', equals:'No' },
@@ -7260,7 +7338,8 @@ const _bbOfferConfigs = {
         options:['Beginner','Intermediate','Advanced','All'] },
       { key:'gender', type:'check_many', label:'Gender', required:true,
         options:['Boys','Girls'] },
-      { key:'location', type:'text', label:'Location', required:true },
+      { key:'location', type:'location_picker', label:'Location', required:true,
+        hint:'Pick from your saved locations or add a new one' },
       { key:'capacity', type:'number', label:'Capacity / max attendees',
         hint:'Triggers waitlist when full' },
       _bbCommonExtraNotes
@@ -7333,7 +7412,8 @@ const _bbOfferConfigs = {
         hint:'Allow multiple divisions in one league' },
       { key:'gender', type:'check_many', label:'Gender', required:true,
         options:['Boys','Girls','Co-ed'] },
-      { key:'location', type:'text', label:'Location(s)', required:true },
+      { key:'location', type:'location_picker', label:'Location', required:true,
+        hint:'Pick from your saved locations or add a new one' },
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
@@ -7416,7 +7496,8 @@ const _bbOfferConfigs = {
         options:['Beginner','Intermediate','Advanced','Mixed'] },
       { key:'gender', type:'check_many', label:'Gender', required:true,
         options:['Boys','Girls','Co-ed'] },
-      { key:'location', type:'text', label:'Location', required:true },
+      { key:'location', type:'location_picker', label:'Location', required:true,
+        hint:'Pick from your saved locations or add a new one' },
       { key:'brackets', type:'check_one', label:'Brackets / divisions?',
         options:['Yes','No'] },
       { key:'brackets_describe', type:'textarea', label:'Describe each bracket',
@@ -7506,8 +7587,8 @@ const _bbOfferConfigs = {
     { id:'general_info', label:'General Info', fields:[
       { key:'__title__', type:'text', label:'Title', required:true,
         hint:'e.g. "Main Gym Court Rental"' },
-      { key:'facility', type:'text', label:'Facility / location', required:true,
-        hint:'Which gym (from BB > Locations)' },
+      { key:'facility', type:'location_picker', label:'Facility / location', required:true,
+        hint:'Pick from your saved locations or add a new one' },
       { key:'capacity', type:'number', label:'Capacity (max occupancy)' },
       { key:'amenities', type:'check_many', label:'Amenities',
         options:['Courts','Scoreboard','Sound system','AC','Locker rooms','Wi-Fi','Parking','Concessions','First aid'] },
@@ -7739,6 +7820,14 @@ function _bbRenderField(field, sectionId) {
     case 'staff_select':
       body = `<input type="text" class="bb-input" placeholder="Staff selector coming once Staff card ships (Stage 2)" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
       break;
+    case 'location_picker': {
+      const loc = val ? _bbLocationById(val) : null;
+      body = `<button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerFor('${sectionId}','${field.key}')">
+        <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
+        <span class="bb-loc-pick-chev">▾</span>
+      </button>`;
+      break;
+    }
     case 'info':
       return `<div class="bb-field"><div style="padding:10px 14px;background:var(--accent-ghost);border:1px solid var(--accent-border);border-radius:8px;color:var(--text);font-size:12px;line-height:1.55">${_bbEscapeHtml(field.label)}</div></div>`;
     default:
@@ -7803,6 +7892,21 @@ function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal, row) {
     `;
   }
 
+  // Location picker (sub-field in a top-level Block Builder)
+  if (sf.type === 'location_picker') {
+    const loc = v ? _bbLocationById(v) : null;
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+        <button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerForSub('${sectionId}','${parentKey}',${rowIdx},'${sf.key}')">
+          <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
+          <span class="bb-loc-pick-chev">▾</span>
+        </button>
+        ${hint}
+      </div>
+    `;
+  }
+
   // Nested Block Builder
   if (sf.type === 'block_builder') {
     const nestedRows = Array.isArray(v) ? v : [];
@@ -7860,6 +7964,35 @@ function _bbRenderNestedSubField(sectionId, parentKey, parentIdx, nestedKey, nes
   const reqMark = nsf.required ? '<span class="bb-field-req">*</span>' : '';
   const hint = nsf.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(nsf.hint)}</div>` : '';
   const handler = `_bbNestedBlockUpdate('${sectionId}','${parentKey}',${parentIdx},'${nestedKey}',${nestedIdx},'${nsf.key}',this.value)`;
+
+  // Check Many — toggle array per nested row
+  if (nsf.type === 'check_many') {
+    const arr = Array.isArray(v) ? v : [];
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(nsf.label)} ${reqMark}</div>
+        <div class="bb-choice-row">${(nsf.options || []).map(opt => `
+          <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbNestedToggleMany('${sectionId}','${parentKey}',${parentIdx},'${nestedKey}',${nestedIdx},'${nsf.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+        `).join('')}</div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  // Location picker
+  if (nsf.type === 'location_picker') {
+    const loc = v ? _bbLocationById(v) : null;
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(nsf.label)} ${reqMark}</div>
+        <button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerForNested('${sectionId}','${parentKey}',${parentIdx},'${nestedKey}',${nestedIdx},'${nsf.key}')">
+          <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
+          <span class="bb-loc-pick-chev">▾</span>
+        </button>
+        ${hint}
+      </div>
+    `;
+  }
 
   if (nsf.type === 'check_one') {
     return `
@@ -7926,6 +8059,22 @@ function _bbNestedBlockRemove(section, parentKey, parentIdx, nestedKey, nestedId
   if (!out[parentIdx]) return;
   const cur = Array.isArray(out[parentIdx][nestedKey]) ? [...out[parentIdx][nestedKey]] : [];
   cur.splice(nestedIdx, 1);
+  out[parentIdx] = { ...out[parentIdx], [nestedKey]: cur };
+  _bbUpdateField(section, parentKey, out);
+  _bbRenderWizardBody();
+}
+
+function _bbNestedToggleMany(section, parentKey, parentIdx, nestedKey, nestedIdx, subKey, val) {
+  const rows = ((_bbState.offer.data || {})[section] || {})[parentKey];
+  const out = Array.isArray(rows) ? [...rows] : [];
+  if (!out[parentIdx]) out[parentIdx] = {};
+  const cur = Array.isArray(out[parentIdx][nestedKey]) ? [...out[parentIdx][nestedKey]] : [];
+  if (!cur[nestedIdx]) cur[nestedIdx] = {};
+  const existing = Array.isArray(cur[nestedIdx][subKey]) ? cur[nestedIdx][subKey] : [];
+  const next = [...existing];
+  const i = next.indexOf(val);
+  if (i >= 0) next.splice(i, 1); else next.push(val);
+  cur[nestedIdx] = { ...cur[nestedIdx], [subKey]: next };
   out[parentIdx] = { ...out[parentIdx], [nestedKey]: cur };
   _bbUpdateField(section, parentKey, out);
   _bbRenderWizardBody();
@@ -8189,6 +8338,180 @@ function _bbRenderStepFields(offer, sectionId) {
 }
 
 let _bbTeamLoadedFor = null;
+
+// ──────────────────────────────────────────────────────────────────
+// Locations — table-backed cache + picker modal + add-new modal
+// ──────────────────────────────────────────────────────────────────
+let _bbLocations = [];
+let _bbLocationsLoadedFor = null;
+let _bbLocPickerCtx = null; // { onSelect(locationId, location), multi: bool }
+
+async function _bbLoadLocations() {
+  if (!_sb || !CLIENT_ID) return [];
+  if (_bbLocationsLoadedFor === CLIENT_ID) return _bbLocations;
+  const { data } = await _sb.from('locations')
+    .select('*').eq('client_id', CLIENT_ID).order('sort_order').order('created_at', { ascending:false });
+  _bbLocations = data || [];
+  _bbLocationsLoadedFor = CLIENT_ID;
+  return _bbLocations;
+}
+
+function _bbLocationById(id) {
+  return _bbLocations.find(l => l.id === id) || null;
+}
+
+function _bbOpenLocationPicker(onSelect) {
+  _bbLocPickerCtx = { onSelect };
+  const overlay = document.createElement('div');
+  overlay.className = 'bb-loc-modal-overlay';
+  overlay.id = 'bb-loc-picker';
+  overlay.onclick = (e) => { if (e.target.id === 'bb-loc-picker') _bbCloseLocationPicker(); };
+  overlay.innerHTML = `
+    <div class="bb-loc-modal">
+      <div class="bb-loc-head">
+        <div class="bb-loc-title">Pick a location</div>
+        <button class="bb-loc-close" onclick="_bbCloseLocationPicker()">×</button>
+      </div>
+      <input class="bb-loc-search" id="bb-loc-search" placeholder="Search locations…" oninput="_bbRenderLocationList()" autofocus>
+      <div class="bb-loc-list" id="bb-loc-list"><div class="bb-loc-empty">Loading…</div></div>
+      <div class="bb-loc-foot">
+        <button class="bb-loc-add-link" onclick="_bbOpenAddLocationFromPicker()">+ Add a new location</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  _bbLoadLocations().then(() => _bbRenderLocationList());
+}
+
+function _bbCloseLocationPicker() {
+  const m = document.getElementById('bb-loc-picker');
+  if (m) m.remove();
+  _bbLocPickerCtx = null;
+}
+
+function _bbRenderLocationList() {
+  const list = document.getElementById('bb-loc-list');
+  const search = document.getElementById('bb-loc-search');
+  if (!list) return;
+  const q = (search ? search.value : '').trim().toLowerCase();
+  const matches = _bbLocations.filter(l =>
+    !q || (l.title || '').toLowerCase().includes(q) || (l.address || '').toLowerCase().includes(q)
+  );
+  if (matches.length === 0) {
+    list.innerHTML = `<div class="bb-loc-empty">${
+      _bbLocations.length === 0 ? 'No locations yet. Add one below.' : 'No matches.'
+    }</div>`;
+    return;
+  }
+  list.innerHTML = matches.map(l => `
+    <div class="bb-loc-item" onclick="_bbPickLocation('${l.id}')">
+      <div>${_bbEscapeHtml(l.title || '(no title)')}</div>
+      ${l.address ? `<div class="bb-loc-item-addr">${_bbEscapeHtml(l.address)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function _bbPickLocation(locationId) {
+  const loc = _bbLocationById(locationId);
+  const ctx = _bbLocPickerCtx;
+  _bbCloseLocationPicker();
+  if (ctx && ctx.onSelect) ctx.onSelect(locationId, loc);
+}
+
+function _bbOpenAddLocationFromPicker() {
+  const savedCtx = _bbLocPickerCtx;
+  _bbCloseLocationPicker();
+  _bbOpenAddLocationModal((newLoc) => {
+    if (savedCtx && savedCtx.onSelect && newLoc) {
+      savedCtx.onSelect(newLoc.id, newLoc);
+    }
+  });
+}
+
+function _bbOpenAddLocationModal(onSaved) {
+  const overlay = document.createElement('div');
+  overlay.className = 'bb-loc-modal-overlay';
+  overlay.id = 'bb-loc-add';
+  overlay.onclick = (e) => { if (e.target.id === 'bb-loc-add') _bbCloseAddLocationModal(); };
+  overlay.innerHTML = `
+    <div class="bb-loc-modal">
+      <div class="bb-loc-head">
+        <div class="bb-loc-title">Add a new location</div>
+        <button class="bb-loc-close" onclick="_bbCloseAddLocationModal()">×</button>
+      </div>
+      <div class="bb-loc-form">
+        <div class="bb-field">
+          <div class="bb-field-label">Title <span class="bb-field-req">*</span></div>
+          <input type="text" class="bb-input" id="bb-loc-add-title" placeholder='e.g. "Main Gym"' autofocus>
+        </div>
+        <div class="bb-field">
+          <div class="bb-field-label">Address</div>
+          <input type="text" class="bb-input" id="bb-loc-add-address" placeholder="Street, city, state, ZIP">
+        </div>
+        <div class="bb-field">
+          <div class="bb-field-label">Notes</div>
+          <textarea class="bb-textarea" id="bb-loc-add-notes" placeholder="Parking, entrance, special instructions…"></textarea>
+        </div>
+      </div>
+      <div class="bb-loc-form-foot">
+        <button class="btn-secondary-bb" onclick="_bbCloseAddLocationModal()">Cancel</button>
+        <button class="btn-primary-bb" id="bb-loc-add-save" onclick="_bbSaveNewLocation()">Save location</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  window._bbLocAddOnSaved = onSaved;
+}
+
+function _bbCloseAddLocationModal() {
+  const m = document.getElementById('bb-loc-add');
+  if (m) m.remove();
+  window._bbLocAddOnSaved = null;
+}
+
+// Open location picker for a top-level offer field (sets offer.data.<section>.<key>)
+function _bbOpenLocationPickerFor(section, key) {
+  _bbOpenLocationPicker((locationId) => {
+    _bbUpdateField(section, key, locationId);
+    _bbRenderWizardBody();
+  });
+}
+
+// Open location picker for a sub-field inside a Block Builder row
+function _bbOpenLocationPickerForSub(section, parentKey, rowIdx, subKey) {
+  _bbOpenLocationPicker((locationId) => {
+    _bbBlockUpdate(section, parentKey, rowIdx, subKey, locationId);
+    _bbRenderWizardBody();
+  });
+}
+
+// Open location picker for a sub-field inside a nested Block Builder row
+function _bbOpenLocationPickerForNested(section, parentKey, parentIdx, nestedKey, nestedIdx, subKey) {
+  _bbOpenLocationPicker((locationId) => {
+    _bbNestedBlockUpdate(section, parentKey, parentIdx, nestedKey, nestedIdx, subKey, locationId);
+    _bbRenderWizardBody();
+  });
+}
+
+async function _bbSaveNewLocation() {
+  if (!_sb || !CLIENT_ID) return alert('Sign-in required');
+  const title = (document.getElementById('bb-loc-add-title')?.value || '').trim();
+  if (!title) return alert('Title is required');
+  const address = (document.getElementById('bb-loc-add-address')?.value || '').trim() || null;
+  const notes = (document.getElementById('bb-loc-add-notes')?.value || '').trim() || null;
+  const btn = document.getElementById('bb-loc-add-save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const { data, error } = await _sb.from('locations').insert({
+    client_id: CLIENT_ID, title, address, notes,
+    sort_order: _bbLocations.length
+  }).select().single();
+  if (btn) { btn.disabled = false; btn.textContent = 'Save location'; }
+  if (error) return alert("Couldn't save location — " + error.message);
+  _bbLocations.push(data);
+  const cb = window._bbLocAddOnSaved;
+  _bbCloseAddLocationModal();
+  if (cb) cb(data);
+}
 
 function _bbUpdateTitle(val) {
   if (!_bbState.offer) return;
