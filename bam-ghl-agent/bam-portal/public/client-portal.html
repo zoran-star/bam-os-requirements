@@ -4937,6 +4937,15 @@
         Resources
       </div>
 
+      <div class="nav-item" onclick="switchView('blueprint', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
+          </svg>
+        </span>
+        Business Blueprint
+      </div>
+
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('members', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5020,9 +5029,6 @@
         </div>
 
         <div class="content">
-
-        <!-- Systems setup (onboarding) progress card — populated by _renderSystemsOnboardingCard() -->
-        <div id="systems-onboarding-card"></div>
 
         <!-- 3 ticket-type tiles (Full Control slabs) -->
         <div class="readout">Open a new request</div>
@@ -5297,20 +5303,6 @@
         </div>
       </div>
 
-      <!-- ONBOARDING SUB-SCREEN — embeds the systems-setup flow (onboarding-reloaded.html) -->
-      <div id="systems-onboarding" style="display:none">
-        <div class="topbar" style="border-bottom:none;padding-bottom:14px">
-          <div style="display:flex;align-items:center;gap:16px;width:100%">
-            <button class="detail-back" onclick="closeSystemsOnboarding()" aria-label="Back to Systems">←</button>
-            <div>
-              <span class="topbar-kicker">§ 01 · Systems</span>
-              <div class="topbar-title">Systems Setup</div>
-            </div>
-          </div>
-        </div>
-        <iframe id="systems-onboarding-frame" title="Systems setup"
-          style="width:100%;height:calc(100vh - 150px);min-height:480px;border:0;display:block"></iframe>
-      </div>
     </div>
 
     <!-- ══════════════════════════════
@@ -5976,6 +5968,271 @@ Then the call to action."]</div>
       </div>
     </div>
 
+    <!-- ══════════════════════════════
+         BUSINESS BLUEPRINT VIEW
+         5 cards: General · Staff · Locations · Brand · Offers
+         + Offers wizard inline
+    ══════════════════════════════ -->
+    <style>
+      /* ── BB landing ── */
+      #view-blueprint .bb-back {
+        display:inline-flex; align-items:center; gap:6px;
+        background:transparent; border:none; color:var(--text-sub);
+        cursor:pointer; font-size:13px; padding:6px 0; margin-bottom:18px;
+        font-family:inherit;
+      }
+      #view-blueprint .bb-back:hover { color:var(--text); }
+
+      #view-blueprint .bb-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap:14px;
+      }
+      #view-blueprint .bb-card {
+        background:var(--surface);
+        border:1px solid var(--border-med);
+        border-radius:14px;
+        padding:22px;
+        cursor:pointer;
+        transition: transform 0.12s ease, border-color 0.12s ease;
+        display:flex; flex-direction:column; gap:8px;
+        min-height:160px;
+      }
+      #view-blueprint .bb-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-str);
+      }
+      #view-blueprint .bb-card-name {
+        font-size:17px; font-weight:600; color:var(--text);
+        margin-top:6px;
+      }
+      #view-blueprint .bb-card-desc {
+        font-size:13px; color:var(--text-sub); line-height:1.5;
+      }
+      #view-blueprint .bb-card-icon {
+        width:36px; height:36px; border-radius:9px;
+        background:var(--accent-ghost);
+        border:1px solid var(--accent-border);
+        display:flex; align-items:center; justify-content:center;
+        color:var(--accent);
+      }
+      #view-blueprint .bb-card-icon svg { width:18px; height:18px; }
+
+      /* ── BB sub-page header ── */
+      #view-blueprint .bb-page-head {
+        display:flex; align-items:center; justify-content:space-between;
+        gap:12px; margin-bottom:20px; flex-wrap:wrap;
+      }
+      #view-blueprint .bb-page-title {
+        font-size:22px; font-weight:700; color:var(--text);
+        letter-spacing:-0.01em;
+      }
+      #view-blueprint .bb-page-sub {
+        font-size:13px; color:var(--text-sub); margin-top:2px;
+      }
+
+      /* ── Offer list ── */
+      #view-blueprint .bb-offers-toolbar {
+        display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+        margin-bottom:18px;
+      }
+      #view-blueprint .btn-primary-bb {
+        padding:10px 16px; border:0; border-radius:8px;
+        background:var(--accent); color:#0A0A0B;
+        font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;
+      }
+      #view-blueprint .btn-secondary-bb {
+        padding:10px 16px; border-radius:8px;
+        background:var(--surface); border:1px solid var(--border-med);
+        color:var(--text); font-size:13px; font-weight:500;
+        cursor:pointer; font-family:inherit;
+      }
+      #view-blueprint .bb-offer-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap:14px;
+      }
+      #view-blueprint .bb-offer-tile {
+        background:var(--surface);
+        border:1px solid var(--border-med);
+        border-radius:12px;
+        padding:18px;
+        cursor:pointer;
+        transition: transform 0.12s ease, border-color 0.12s ease;
+        display:flex; flex-direction:column; gap:8px;
+        min-height:130px;
+      }
+      #view-blueprint .bb-offer-tile:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-str);
+      }
+      #view-blueprint .bb-offer-tile-title {
+        font-size:15px; font-weight:600; color:var(--text);
+      }
+      #view-blueprint .bb-offer-tile-meta {
+        font-size:11px; color:var(--text-mute); font-family:'JetBrains Mono', monospace;
+        margin-top:auto; display:flex; gap:8px; align-items:center;
+      }
+      #view-blueprint .bb-type-pill {
+        display:inline-block; padding:3px 9px; border-radius:999px;
+        font-size:10px; font-weight:700; letter-spacing:0.04em;
+        text-transform:uppercase;
+      }
+      #view-blueprint .bb-status-pill {
+        display:inline-block; padding:3px 9px; border-radius:999px;
+        font-size:10px; font-weight:600; letter-spacing:0.04em;
+        text-transform:uppercase;
+        background:rgba(255,255,255,0.06); color:var(--text-mute);
+      }
+      #view-blueprint .bb-status-pill.published { background:rgba(74,222,128,0.12); color:#4ade80; }
+
+      #view-blueprint .bb-empty {
+        padding:60px 20px; text-align:center;
+        background:var(--surface); border:1px dashed var(--border-med);
+        border-radius:14px;
+        color:var(--text-sub); font-size:14px;
+      }
+
+      /* ── Type picker modal ── */
+      .bb-modal-overlay {
+        position:fixed; inset:0; z-index:9100;
+        background:rgba(0,0,0,0.55);
+        display:flex; align-items:flex-start; justify-content:center;
+        padding:60px 16px; overflow-y:auto;
+      }
+      .bb-modal {
+        width:100%; max-width:640px;
+        background:var(--surface); border:1px solid var(--border-med);
+        border-radius:14px; padding:24px;
+      }
+      .bb-modal-head {
+        display:flex; align-items:center; justify-content:space-between;
+        margin-bottom:6px;
+      }
+      .bb-modal-title { font-size:18px; font-weight:700; color:var(--text); }
+      .bb-modal-close {
+        background:transparent; border:none; color:var(--text-sub);
+        cursor:pointer; font-size:22px; line-height:1; padding:4px;
+      }
+      .bb-modal-sub { font-size:13px; color:var(--text-sub); margin-bottom:18px; }
+      .bb-type-grid {
+        display:grid;
+        grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+        gap:10px;
+      }
+      .bb-type-card {
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        border-radius:10px; padding:14px; cursor:pointer;
+        transition: border-color 0.12s, background 0.12s;
+      }
+      .bb-type-card:hover { border-color:var(--accent-border); background:var(--accent-ghost); }
+      .bb-type-card-name { font-size:13px; font-weight:600; color:var(--text); }
+      .bb-type-card-desc { font-size:11px; color:var(--text-mute); margin-top:4px; line-height:1.4; }
+
+      /* ── Wizard chrome ── */
+      #view-blueprint .bb-wizard-steps {
+        display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap;
+      }
+      #view-blueprint .bb-step-dot {
+        flex:1; min-width:60px;
+        height:34px; padding:0 12px;
+        background:transparent; border:1px solid var(--border-med);
+        border-radius:8px; cursor:pointer;
+        display:flex; align-items:center; gap:8px;
+        font-size:12px; color:var(--text-sub); font-family:inherit;
+      }
+      #view-blueprint .bb-step-dot.done { color:var(--text); border-color:var(--accent-border); }
+      #view-blueprint .bb-step-dot.current { background:var(--accent-ghost); border-color:var(--accent-border); color:var(--accent); font-weight:600; }
+      #view-blueprint .bb-step-num {
+        width:18px; height:18px; border-radius:50%;
+        background:rgba(255,255,255,0.08);
+        display:flex; align-items:center; justify-content:center;
+        font-size:10px; font-weight:700;
+      }
+      #view-blueprint .bb-step-dot.done .bb-step-num { background:var(--accent); color:#0A0A0B; }
+      #view-blueprint .bb-step-dot.current .bb-step-num { background:var(--accent); color:#0A0A0B; }
+
+      #view-blueprint .bb-wizard-body {
+        background:var(--surface); border:1px solid var(--border-med);
+        border-radius:14px; padding:28px;
+        margin-bottom:18px;
+      }
+      #view-blueprint .bb-wizard-step-head { margin-bottom:18px; }
+      #view-blueprint .bb-wizard-step-name {
+        font-size:18px; font-weight:700; color:var(--text); margin-bottom:6px;
+      }
+      #view-blueprint .bb-wizard-step-sub {
+        font-size:13px; color:var(--text-sub); line-height:1.55;
+      }
+
+      /* Field rendering inside wizard */
+      #view-blueprint .bb-field { margin-bottom:18px; }
+      #view-blueprint .bb-field-label {
+        font-size:11px; font-weight:600; letter-spacing:0.06em;
+        text-transform:uppercase; color:var(--text-mute);
+        margin-bottom:6px; display:flex; align-items:center; gap:6px;
+      }
+      #view-blueprint .bb-field-req { color:var(--accent); font-size:9px; }
+      #view-blueprint .bb-field-hint {
+        font-size:11px; color:var(--text-mute); margin-top:4px; line-height:1.5;
+      }
+      #view-blueprint .bb-input, #view-blueprint .bb-textarea, #view-blueprint .bb-select {
+        width:100%; padding:10px 12px;
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        border-radius:8px; color:var(--text); font-size:14px;
+        font-family:inherit; outline:none;
+      }
+      #view-blueprint .bb-input:focus,
+      #view-blueprint .bb-textarea:focus,
+      #view-blueprint .bb-select:focus { border-color:var(--accent-border); }
+      #view-blueprint .bb-textarea { resize:vertical; min-height:80px; }
+      #view-blueprint .bb-choice-row {
+        display:flex; gap:8px; flex-wrap:wrap;
+      }
+      #view-blueprint .bb-choice {
+        padding:8px 14px; border-radius:8px;
+        background:var(--surface-alt); border:1px solid var(--border-med);
+        color:var(--text-sub); font-size:13px; cursor:pointer;
+        font-family:inherit;
+      }
+      #view-blueprint .bb-choice.selected {
+        background:var(--accent-ghost); border-color:var(--accent-border); color:var(--accent); font-weight:600;
+      }
+
+      #view-blueprint .bb-wizard-foot {
+        display:flex; justify-content:space-between; align-items:center; gap:10px;
+      }
+      #view-blueprint .bb-save-state {
+        font-size:11px; color:var(--text-mute); font-family:'JetBrains Mono', monospace;
+      }
+      #view-blueprint .bb-save-state.saving { color:var(--accent); }
+      #view-blueprint .bb-save-state.saved { color:#4ade80; }
+
+      #view-blueprint .bb-error-banner {
+        background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3);
+        color:#f87171; padding:10px 14px; border-radius:8px;
+        font-size:13px; margin-bottom:14px;
+      }
+
+      @media (max-width: 720px) {
+        #view-blueprint .bb-wizard-body { padding:18px 14px; }
+        #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
+        #view-blueprint .bb-step-dot .bb-step-num { margin:0; }
+      }
+    </style>
+
+    <div class="view" id="view-blueprint">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Business Blueprint</span>
+          <div class="topbar-title" id="bb-topbar-title">Business Blueprint</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="bb-panel"><!-- rendered by openBlueprintView() based on hash --></div>
+      </div>
+    </div>
+
     <div class="view" id="view-team">
       <div class="topbar">
         <div>
@@ -6024,6 +6281,12 @@ Then the call to action."]</div>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
       </svg>
       <span class="mobile-nav-label">Resources</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-view="blueprint" onclick="mobileSwitchView('blueprint')" aria-label="Business Blueprint">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
+      </svg>
+      <span class="mobile-nav-label">Blueprint</span>
     </button>
     <button type="button" class="mobile-nav-item" data-feature="members" style="display:none" data-view="members" onclick="mobileSwitchView('members')" aria-label="Members">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -6074,11 +6337,11 @@ function switchView(name, el) {
   // When entering Team, load the portal-access list
   if (name === 'team') fetchAndRenderTeam();
 
-  // When entering Systems, refresh the setup-progress card
-  if (name === 'systems') _renderSystemsOnboardingCard();
-
   // When entering Resources, load + render the library
   if (name === 'resources') openResourcesView();
+
+  // When entering Business Blueprint, render based on hash route
+  if (name === 'blueprint') openBlueprintView();
 
   // Keep the mobile bottom nav in sync with the active view
   syncMobileNav(name);
@@ -6099,102 +6362,6 @@ function mobileSwitchView(name) {
     .find(el => (el.getAttribute('onclick') || '').includes("'" + name + "'"));
   if (sidebarItem) switchView(name, sidebarItem);
   else syncMobileNav(name);
-}
-
-// ── Systems setup (onboarding) ────────────────────────────────────────
-// The systems-setup flow (onboarding-reloaded.html — "everything but the
-// Meta/ad stuff") is embedded on the Systems page. A progress card shows
-// how far the client has gotten; the flow itself opens as a sub-screen in
-// an iframe. The flow saves/syncs its own progress — the card just reads
-// it. Same-origin, so we read the flow's localStorage directly.
-const ONB_PROGRESS_KEY = 'onboarding_reloaded_progress_v2';
-const ONB_SECTION_COUNT = 6;
-
-function _onbProgress() {
-  try {
-    const s = JSON.parse(localStorage.getItem(ONB_PROGRESS_KEY) || 'null');
-    return (s && s.answers) ? s : null;
-  } catch (e) { return null; }
-}
-
-// Renders the setup-progress card at the top of the Systems page.
-function _renderSystemsOnboardingCard() {
-  const el = document.getElementById('systems-onboarding-card');
-  if (!el) return;
-  const s = _onbProgress();
-  let html = '';
-
-  if (s && s.completedAll) {
-    html = `
-      <div style="display:flex;align-items:center;gap:11px;padding:13px 16px;margin-bottom:22px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.32);border-radius:11px">
-        <div style="font-size:16px">✓</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">Systems setup complete</div>
-          <div style="font-size:12px;color:var(--text-sub);margin-top:1px">You can review or update your answers anytime.</div>
-        </div>
-        <button class="btn-modal-secondary" onclick="openSystemsOnboarding()">Review / update</button>
-      </div>`;
-  } else if (s && s.started) {
-    const pct = Math.max(0, Math.min(100, s.pct || 0));
-    const done = Array.isArray(s.completed) ? s.completed.length : 0;
-    html = `
-      <div style="padding:18px;margin-bottom:22px;background:rgba(232,197,71,0.06);border:1px solid rgba(232,197,71,0.38);border-radius:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
-          <div style="font-size:14px;font-weight:700;color:var(--text)">Your systems setup</div>
-          <div style="font-family:var(--mono);font-size:11px;color:var(--gold)">${pct}% complete</div>
-        </div>
-        <div style="height:7px;background:var(--surface-el);border-radius:99px;overflow:hidden;margin-bottom:7px">
-          <div style="height:100%;width:${pct}%;background:var(--gold);border-radius:99px;transition:width .3s"></div>
-        </div>
-        <div style="font-size:11.5px;color:var(--text-sub);margin-bottom:14px">${done} of ${ONB_SECTION_COUNT} sections done · your progress saves automatically</div>
-        <button class="btn-modal-primary" onclick="openSystemsOnboarding()">Continue setup →</button>
-      </div>`;
-  } else {
-    html = `
-      <div style="padding:18px;margin-bottom:22px;background:rgba(232,197,71,0.08);border:1px solid rgba(232,197,71,0.4);border-radius:12px">
-        <div style="display:flex;align-items:flex-start;gap:12px">
-          <div style="font-size:20px">🚀</div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px">Set up your systems</div>
-            <div style="font-size:12.5px;color:var(--text-sub);line-height:1.55">Tell us about your academy so your BAM team can build everything out. Takes about 15 minutes — save and come back anytime.</div>
-          </div>
-        </div>
-        <button class="btn-modal-primary" style="margin-top:14px" onclick="openSystemsOnboarding()">Start setup →</button>
-      </div>`;
-  }
-  el.innerHTML = html;
-}
-
-// Opens the setup flow as a sub-screen of the Systems view.
-// Passes the active client_id so onboarding-reloaded.html scopes its DB
-// writes/reads per-client (cross-device resume via the onboarding_reloaded
-// table) instead of relying on a localStorage submission_key.
-function openSystemsOnboarding() {
-  const frame = document.getElementById('systems-onboarding-frame');
-  if (frame) {
-    const cid = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID)
-      ? '&client_id=' + encodeURIComponent(CLIENT_ID)
-      : '';
-    const want = new URL('onboarding-reloaded.html?embed=1' + cid, location.href).href;
-    if (frame.src !== want) frame.src = want;
-  }
-  const list = document.getElementById('systems-list');
-  const detail = document.getElementById('systems-detail');
-  const intake = document.getElementById('systems-intake');
-  const onb = document.getElementById('systems-onboarding');
-  if (list) list.style.display = 'none';
-  if (detail) detail.style.display = 'none';
-  if (intake) intake.style.display = 'none';
-  if (onb) onb.style.display = 'block';
-}
-
-// Returns to the Systems list and refreshes the progress card.
-function closeSystemsOnboarding() {
-  const onb = document.getElementById('systems-onboarding');
-  const list = document.getElementById('systems-list');
-  if (onb) onb.style.display = 'none';
-  if (list) list.style.display = 'block';
-  _renderSystemsOnboardingCard();
 }
 
 // Apply the greyed-out look to the Marketing nav item when marketing
@@ -6546,6 +6713,408 @@ window.addEventListener('popstate', () => {
   const hashId = _resourceIdFromHash();
   if (hashId) renderResourceDetail(hashId);
   else renderResourcesList();
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// BUSINESS BLUEPRINT — BB tab + 5 cards + Offers wizard
+// Hash routing: #bb=<card>[/<id>[?step=N]]
+// ══════════════════════════════════════════════════════════════════════
+const _bbOfferTypes = [
+  { id:'training',    label:'Training',           desc:'Recurring weekly classes / academy' },
+  { id:'team',        label:'Team',               desc:'Competitive team — season + tryouts' },
+  { id:'camp_clinic', label:'Camps / Clinics',    desc:'Single or multi-day intensive' },
+  { id:'league',      label:'Internal League',    desc:'Recurring season + playoffs' },
+  { id:'tournament',  label:'Internal Tournament',desc:'Single event + brackets' },
+  { id:'gym_rental',  label:'Gym Rental',         desc:'B2B on-demand booking' }
+];
+const _bbTypeColors = {
+  training:'#60A5FA', team:'#E8C547', camp_clinic:'#4ADE80',
+  league:'#A78BFA', tournament:'#F59E0B', gym_rental:'#F87171'
+};
+const _bbSections = ['general_info','schedule','value','pricing','sales','onboarding'];
+const _bbSectionLabels = {
+  general_info:'General Info', schedule:'Schedule', value:'Value',
+  pricing:'Pricing', sales:'Sales', onboarding:'Onboarding'
+};
+const _bbTeamSections = ['general','per_team'];
+const _bbTeamSectionLabels = { general:'General', per_team:'Per team' };
+
+const _bbCards = [
+  { id:'general',   label:'General',   desc:'Business basics: name, address, EIN, phone, email' },
+  { id:'staff',     label:'Staff',     desc:'People who work at the academy (also portal teammates)' },
+  { id:'locations', label:'Locations', desc:'Every place you operate from' },
+  { id:'brand',     label:'Brand',     desc:'Logos, colors, fonts, website spec, photos' },
+  { id:'offers',    label:'Offers',    desc:'Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals' }
+];
+
+let _bbState = {
+  card: null, offerId: null, step: 1,
+  offer: null, saveState: 'idle', _saveTimer: null
+};
+
+function _bbEscapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function _bbParseHash() {
+  const h = window.location.hash || '';
+  const m = h.match(/#bb=([^/?]+)(?:\/([^?]+))?(?:\?(.+))?/);
+  if (!m) return { card: null };
+  return {
+    card: m[1],
+    id: m[2] || null,
+    query: m[3] ? Object.fromEntries(new URLSearchParams(m[3])) : {}
+  };
+}
+
+function _bbBuildHash(card, id, query) {
+  let h = '#bb=' + card;
+  if (id) h += '/' + id;
+  if (query && Object.keys(query).length) h += '?' + new URLSearchParams(query).toString();
+  return h;
+}
+
+function _bbNavigate(card, id, query) {
+  const newHash = card ? _bbBuildHash(card, id, query) : '';
+  if (window.location.hash !== newHash) {
+    history.pushState(null, '', window.location.pathname + window.location.search + newHash);
+  }
+  _bbRenderFromHash();
+}
+
+async function openBlueprintView() { _bbRenderFromHash(); }
+
+function _bbRenderFromHash() {
+  const { card, id, query } = _bbParseHash();
+  _bbState.card = card;
+  _bbState.offerId = (card === 'offers' && id && id !== 'new') ? id : null;
+  _bbState.step = parseInt((query && query.step) || '1', 10);
+
+  const titleEl = document.getElementById('bb-topbar-title');
+  if (titleEl) {
+    if (!card) titleEl.textContent = 'Business Blueprint';
+    else if (card === 'offers' && id) titleEl.textContent = 'Edit Offer';
+    else titleEl.textContent = (_bbCards.find(c => c.id === card)||{}).label || 'Business Blueprint';
+  }
+
+  const panel = document.getElementById('bb-panel');
+  if (!panel) return;
+
+  if (!card) return _bbRenderLanding(panel);
+  if (card === 'offers' && id === 'new') return _bbStartNewOffer(query && query.type);
+  if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
+  if (card === 'offers') return _bbRenderOffersList(panel);
+  return _bbRenderCardPlaceholder(panel, card);
+}
+
+function _bbRenderLanding(panel) {
+  panel.innerHTML = `
+    <p style="font-size:14px;color:var(--text-sub);margin:0 0 18px;line-height:1.55;max-width:680px">
+      Your academy at a glance. Five cards cover everything from business basics to every offer you sell. Start with whichever feels easiest — the order doesn't matter.
+    </p>
+    <div class="bb-grid">${_bbCards.map(c => `
+      <div class="bb-card" onclick="_bbNavigate('${c.id}')">
+        <div class="bb-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3zM3 9h18M9 21V9"/></svg>
+        </div>
+        <div class="bb-card-name">${_bbEscapeHtml(c.label)}</div>
+        <div class="bb-card-desc">${_bbEscapeHtml(c.desc)}</div>
+      </div>
+    `).join('')}</div>
+  `;
+}
+
+function _bbRenderCardPlaceholder(panel, card) {
+  const meta = _bbCards.find(c => c.id === card);
+  if (!meta) return _bbRenderLanding(panel);
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+    </div>
+    <div class="bb-empty">Coming soon — this section ships in Stage 2 of the BB build.</div>
+  `;
+}
+
+async function _bbRenderOffersList(panel) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">Offers</div>
+        <div class="bb-page-sub">Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals.</div>
+      </div>
+      <button class="btn-primary-bb" onclick="_bbOpenTypePicker()">+ Add offer</button>
+    </div>
+    <div id="bb-offers-list"><div class="bb-empty">Loading offers…</div></div>
+  `;
+
+  if (!CLIENT_ID || !_sb) {
+    document.getElementById('bb-offers-list').innerHTML = '<div class="bb-empty">Sign-in required.</div>';
+    return;
+  }
+
+  const { data, error } = await _sb.from('offers')
+    .select('id, type, title, status, updated_at')
+    .eq('client_id', CLIENT_ID)
+    .order('sort_order')
+    .order('created_at', { ascending: false });
+
+  const list = document.getElementById('bb-offers-list');
+  if (!list) return;
+  if (error) {
+    list.innerHTML = `<div class="bb-empty">Couldn't load offers — ${_bbEscapeHtml(error.message)}</div>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="bb-empty">No offers yet. Click "+ Add offer" to get started.</div>';
+    return;
+  }
+
+  list.innerHTML = `<div class="bb-offer-grid">${data.map(o => {
+    const typeMeta = _bbOfferTypes.find(t => t.id === o.type);
+    const color = _bbTypeColors[o.type] || '#888';
+    return `
+      <div class="bb-offer-tile" onclick="_bbNavigate('offers','${o.id}')">
+        <div class="bb-offer-tile-title">${_bbEscapeHtml(o.title || '(untitled)')}</div>
+        <div class="bb-offer-tile-meta">
+          <span class="bb-type-pill" style="background:${color}1a;color:${color};border:1px solid ${color}55">${_bbEscapeHtml(typeMeta?.label || o.type)}</span>
+          <span class="bb-status-pill ${o.status === 'published' ? 'published' : ''}">${_bbEscapeHtml(o.status)}</span>
+        </div>
+      </div>
+    `;
+  }).join('')}</div>`;
+}
+
+function _bbOpenTypePicker() {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = `
+    <div class="bb-modal-overlay" id="bb-type-picker" onclick="if(event.target.id==='bb-type-picker') _bbCloseTypePicker()">
+      <div class="bb-modal">
+        <div class="bb-modal-head">
+          <div class="bb-modal-title">Pick the offer type</div>
+          <button class="bb-modal-close" onclick="_bbCloseTypePicker()">×</button>
+        </div>
+        <p class="bb-modal-sub">An offer is anything you sell — pick which kind you're building. You'll fill in the details on the next screen.</p>
+        <div class="bb-type-grid">
+          ${_bbOfferTypes.map(t => `
+            <div class="bb-type-card" onclick="_bbStartNewOffer('${t.id}')">
+              <div class="bb-type-card-name">${_bbEscapeHtml(t.label)}</div>
+              <div class="bb-type-card-desc">${_bbEscapeHtml(t.desc)}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrapper.firstElementChild);
+}
+
+function _bbCloseTypePicker() {
+  const m = document.getElementById('bb-type-picker');
+  if (m) m.remove();
+}
+
+async function _bbStartNewOffer(type) {
+  _bbCloseTypePicker();
+  if (!CLIENT_ID || !_sb) return alert('Sign-in required');
+  if (!_bbOfferTypes.find(t => t.id === type)) return alert('Unknown offer type');
+
+  const { data, error } = await _sb.from('offers').insert({
+    client_id: CLIENT_ID, type: type, title: '(untitled)', status: 'draft', data: {}
+  }).select().single();
+
+  if (error) return alert("Couldn't create offer — " + error.message);
+  _bbNavigate('offers', data.id, { step: 1 });
+}
+
+async function _bbRenderOfferWizard(panel, offerId) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate('offers')">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Offers
+    </button>
+    <div id="bb-wizard-container"><div class="bb-empty">Loading offer…</div></div>
+  `;
+
+  if (!_sb) return;
+  const { data: offer, error } = await _sb.from('offers').select('*').eq('id', offerId).maybeSingle();
+  if (error || !offer) {
+    document.getElementById('bb-wizard-container').innerHTML = '<div class="bb-empty">Offer not found.</div>';
+    return;
+  }
+  _bbState.offer = offer;
+  _bbRenderWizardBody();
+}
+
+function _bbWizardSections(offer) {
+  if (offer.type === 'team') return _bbTeamSections.map(s => ({ id: s, label: _bbTeamSectionLabels[s] }));
+  return _bbSections.map(s => ({ id: s, label: _bbSectionLabels[s] }));
+}
+
+function _bbRenderWizardBody() {
+  const offer = _bbState.offer;
+  const container = document.getElementById('bb-wizard-container');
+  if (!container || !offer) return;
+
+  const sections = _bbWizardSections(offer);
+  const stepIdx = Math.min(Math.max(_bbState.step, 1), sections.length);
+  const currentSection = sections[stepIdx - 1];
+  const typeLabel = (_bbOfferTypes.find(t => t.id === offer.type) || {}).label || offer.type;
+
+  const stepsHtml = sections.map((s, i) => {
+    const n = i + 1;
+    const cls = n < stepIdx ? 'done' : (n === stepIdx ? 'current' : '');
+    return `<button class="bb-step-dot ${cls}" onclick="_bbGoToStep(${n})">
+      <span class="bb-step-num">${n}</span><span>${_bbEscapeHtml(s.label)}</span>
+    </button>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(offer.title || '(untitled)')}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(typeLabel)} · ${_bbEscapeHtml(offer.status)}</div>
+      </div>
+      <button class="btn-secondary-bb" onclick="_bbNavigate('offers')">Save &amp; close</button>
+    </div>
+    <div class="bb-wizard-steps">${stepsHtml}</div>
+    <div class="bb-wizard-body">
+      <div class="bb-wizard-step-head">
+        <div class="bb-wizard-step-name">${_bbEscapeHtml(currentSection.label)}</div>
+        <div class="bb-wizard-step-sub">Step ${stepIdx} of ${sections.length}</div>
+      </div>
+      <div id="bb-step-fields">${_bbRenderStepFields(offer, currentSection.id)}</div>
+    </div>
+    <div class="bb-wizard-foot">
+      <div class="bb-save-state" id="bb-save-state">${_bbSaveStateLabel()}</div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-secondary-bb" onclick="_bbGoToStep(${stepIdx - 1})" ${stepIdx === 1 ? 'disabled style="opacity:0.4;cursor:not-allowed"' : ''}>← Back</button>
+        ${stepIdx < sections.length
+          ? `<button class="btn-primary-bb" onclick="_bbGoToStep(${stepIdx + 1})">Next →</button>`
+          : `<button class="btn-primary-bb" onclick="_bbFinishOffer()">Finish</button>`}
+      </div>
+    </div>
+  `;
+}
+
+function _bbSaveStateLabel() {
+  if (_bbState.saveState === 'saving') return '… saving';
+  if (_bbState.saveState === 'saved')  return '✓ saved';
+  if (_bbState.saveState === 'error')  return '⚠ save failed';
+  return '';
+}
+
+function _bbGoToStep(n) {
+  if (n < 1 || !_bbState.offer) return;
+  _bbState.step = n;
+  _bbNavigate('offers', _bbState.offer.id, { step: n });
+}
+
+async function _bbFinishOffer() {
+  if (!_bbState.offer || !_sb) return;
+  const { error } = await _sb.from('offers').update({ status: 'published' }).eq('id', _bbState.offer.id);
+  if (error) return alert("Couldn't finish — " + error.message);
+  _bbNavigate('offers');
+}
+
+function _bbRenderStepFields(offer, sectionId) {
+  const data = offer.data || {};
+  const sec = data[sectionId] || {};
+  if (sectionId === 'general_info' || sectionId === 'general') {
+    return `
+      <div class="bb-field">
+        <div class="bb-field-label">Title <span class="bb-field-req">*</span></div>
+        <input type="text" class="bb-input"
+          value="${_bbEscapeHtml(offer.title || '')}"
+          oninput="_bbUpdateTitle(this.value)"
+          onblur="_bbAutoSave()" />
+        <div class="bb-field-hint">e.g. "Middle School Skill Training"</div>
+      </div>
+      <div class="bb-field">
+        <div class="bb-field-label">Short description</div>
+        <textarea class="bb-textarea"
+          oninput="_bbUpdateField('${sectionId}','description', this.value)"
+          onblur="_bbAutoSave()">${_bbEscapeHtml(sec.description || '')}</textarea>
+        <div class="bb-field-hint">One-liner for the landing page</div>
+      </div>
+      <p style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.6;font-style:italic">
+        More fields for this section land in the next build pass (type-specific form rendering, task #15).
+      </p>
+    `;
+  }
+  return `
+    <p style="font-size:13px;color:var(--text-sub);line-height:1.6">
+      Fields for <b>${_bbEscapeHtml(_bbSectionLabels[sectionId] || _bbTeamSectionLabels[sectionId] || sectionId)}</b> coming in the next build pass.
+    </p>
+    <p style="font-size:12px;color:var(--text-mute);margin-top:8px;line-height:1.6;font-style:italic">
+      You can click Next / Back to walk the wizard. Title is editable on the first step.
+    </p>
+  `;
+}
+
+function _bbUpdateTitle(val) {
+  if (!_bbState.offer) return;
+  _bbState.offer.title = val || '';
+  _bbState.saveState = 'idle';
+  _bbScheduleSave();
+}
+
+function _bbUpdateField(section, key, val) {
+  if (!_bbState.offer) return;
+  _bbState.offer.data = _bbState.offer.data || {};
+  _bbState.offer.data[section] = _bbState.offer.data[section] || {};
+  _bbState.offer.data[section][key] = val;
+  _bbState.saveState = 'idle';
+  _bbScheduleSave();
+}
+
+function _bbScheduleSave() {
+  clearTimeout(_bbState._saveTimer);
+  _bbState._saveTimer = setTimeout(_bbAutoSave, 600);
+}
+
+async function _bbAutoSave() {
+  clearTimeout(_bbState._saveTimer);
+  if (!_bbState.offer || !_sb) return;
+  _bbState.saveState = 'saving';
+  _bbUpdateSaveStateLabel();
+  const { error } = await _sb.from('offers').update({
+    title: _bbState.offer.title || '(untitled)',
+    data:  _bbState.offer.data || {}
+  }).eq('id', _bbState.offer.id);
+
+  _bbState.saveState = error ? 'error' : 'saved';
+  _bbUpdateSaveStateLabel();
+  if (!error) {
+    setTimeout(() => {
+      if (_bbState.saveState === 'saved') { _bbState.saveState = 'idle'; _bbUpdateSaveStateLabel(); }
+    }, 1600);
+  }
+}
+
+function _bbUpdateSaveStateLabel() {
+  const el = document.getElementById('bb-save-state');
+  if (!el) return;
+  el.textContent = _bbSaveStateLabel();
+  el.className = 'bb-save-state' + (_bbState.saveState === 'saving' ? ' saving' : '') + (_bbState.saveState === 'saved' ? ' saved' : '');
+}
+
+// popstate listener for BB hash routing
+window.addEventListener('popstate', () => {
+  const activeView = document.querySelector('.view.active');
+  if (activeView && activeView.id === 'view-blueprint') _bbRenderFromHash();
 });
 
 async function fetchAndRenderTeam() {
@@ -11925,7 +12494,6 @@ setTimeout(_hideBootSplash, 12000); // safety net if boot ever hangs
 boot().catch(e => console.error('[boot]', e)).finally(_hideBootSplash);
 _renderMonthProgress();
 renderMarketingRequests();  // initial empty render
-_renderSystemsOnboardingCard();  // Systems page setup-progress card
 
 // Dev/support preview: ?preview=tour opens the tour overlay immediately,
 // bypassing the login + onboarding_completed_at check. The login overlay is
