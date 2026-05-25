@@ -6214,6 +6214,47 @@ Then the call to action."]</div>
         font-size:13px; margin-bottom:14px;
       }
 
+      /* Conditional/dep marker on field labels */
+      #view-blueprint .bb-dep-badge {
+        display:inline-block;
+        font-family:'JetBrains Mono', monospace;
+        font-size:9px;
+        color:var(--accent);
+        background:var(--accent-ghost);
+        border:1px solid var(--accent-border);
+        padding:1px 6px;
+        border-radius:4px;
+        margin-right:6px;
+        text-transform:none;
+        letter-spacing:0;
+        white-space:nowrap;
+      }
+
+      /* Block Builder */
+      #view-blueprint .bb-block-builder { display:flex; flex-direction:column; gap:10px; }
+      #view-blueprint .bb-block-row {
+        background:var(--surface-alt);
+        border:1px solid var(--border-med);
+        border-radius:8px;
+        padding:14px;
+      }
+      #view-blueprint .bb-block-row-head {
+        display:flex; align-items:center; justify-content:space-between;
+        margin-bottom:10px;
+      }
+      #view-blueprint .bb-block-remove {
+        padding:4px 10px; border-radius:5px;
+        background:transparent; border:1px solid var(--border-med);
+        color:var(--text-sub); font-size:11px; cursor:pointer;
+        font-family:inherit;
+      }
+      #view-blueprint .bb-block-fields > .bb-field:last-child { margin-bottom:0; }
+
+      /* Default + optional explanation for Check Many w/ defaults */
+      #view-blueprint .bb-defaults-info {
+        font-size:11px; color:var(--text-mute); margin-bottom:8px; line-height:1.55;
+      }
+
       @media (max-width: 720px) {
         #view-blueprint .bb-wizard-body { padding:18px 14px; }
         #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
@@ -6955,6 +6996,9 @@ async function _bbRenderOfferWizard(panel, offerId) {
     return;
   }
   _bbState.offer = offer;
+  _bbTeamLoadedFor = null;        // reset team cache when switching offers
+  _bbTeamRows = [];
+  _bbExpandedTeams = new Set();
   _bbRenderWizardBody();
 }
 
@@ -7029,40 +7073,955 @@ async function _bbFinishOffer() {
   _bbNavigate('offers');
 }
 
-function _bbRenderStepFields(offer, sectionId) {
-  const data = offer.data || {};
-  const sec = data[sectionId] || {};
-  if (sectionId === 'general_info' || sectionId === 'general') {
-    return `
-      <div class="bb-field">
-        <div class="bb-field-label">Title <span class="bb-field-req">*</span></div>
-        <input type="text" class="bb-input"
-          value="${_bbEscapeHtml(offer.title || '')}"
-          oninput="_bbUpdateTitle(this.value)"
-          onblur="_bbAutoSave()" />
-        <div class="bb-field-hint">e.g. "Middle School Skill Training"</div>
-      </div>
-      <div class="bb-field">
-        <div class="bb-field-label">Short description</div>
-        <textarea class="bb-textarea"
-          oninput="_bbUpdateField('${sectionId}','description', this.value)"
-          onblur="_bbAutoSave()">${_bbEscapeHtml(sec.description || '')}</textarea>
-        <div class="bb-field-hint">One-liner for the landing page</div>
-      </div>
-      <p style="font-size:12px;color:var(--text-mute);margin-top:18px;line-height:1.6;font-style:italic">
-        More fields for this section land in the next build pass (type-specific form rendering, task #15).
-      </p>
-    `;
+// ──────────────────────────────────────────────────────────────────
+// Config-driven offer-type form rendering. Per type, per section, an
+// array of field configs. The renderer walks the config + the offer
+// data and emits HTML.
+//
+// Field shape:
+//   { key, type, label, required?, hint?, options?, defaultOptions?,
+//     addonOptions?, dep?, subFields? }
+//   dep: { key: 'parent_key', equals: 'Yes' | ['A','B'] }
+//   type: text | textarea | link | phone | email | currency | number |
+//         check_one | check_many | check_many_defaults | block_builder |
+//         file | files | text_files | staff_select | info | title
+//
+// Reusable section snippets
+// ──────────────────────────────────────────────────────────────────
+const _bbCommonExtraNotes = {
+  key:'extra_notes', type:'textarea', label:'Extra notes',
+  hint:'Anything else about this section we should know'
+};
+
+// Pricing section is similar across most types (Training as ref)
+const _bbStdPricing = [
+  { key:'pricing_model', type:'check_one', label:'Pricing model', required:true,
+    options:['Membership','Package','Single Session','Other'] },
+  { key:'pricing_tiers', type:'block_builder', label:'Pricing tiers', required:true,
+    hint:'Shape varies by model — membership: tier name/cycle/price · package: sessions/cost · single: price',
+    subFields:[
+      { key:'name', type:'text', label:'Tier name / label' },
+      { key:'amount', type:'currency', label:'Amount' },
+      { key:'cycle', type:'text', label:'Cycle / sessions / unit' }
+    ] },
+  { key:'addons', type:'block_builder', label:'Add-ons',
+    hint:'Repeating: name + price + description (e.g. shooting program, 1-on-1)',
+    subFields:[
+      { key:'name', type:'text', label:'Add-on name' },
+      { key:'price', type:'currency', label:'Price' },
+      { key:'description', type:'textarea', label:'Description' }
+    ] },
+  { key:'discount_codes', type:'text', label:'Discount codes',
+    hint:'e.g. "Sibling discount → 2SIBLING"' },
+  { key:'taxes_fees', type:'text', label:'Taxes / extra fees' },
+  _bbCommonExtraNotes
+];
+
+// Onboarding section common to most non-team types
+const _bbStdOnboarding = (intakeFieldDefaults, intakeFieldAddons) => ([
+  { key:'agreement', type:'file', label:'Agreement / waiver', required:true,
+    hint:'PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)' },
+  { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
+    hint:'Welcome message + prep info. Attach PDFs / videos / images.' },
+  { key:'intake_form_fields', type:'check_many_defaults', label:'Intake form fields', required:true,
+    defaultOptions: intakeFieldDefaults,
+    addonOptions: intakeFieldAddons },
+  { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
+    hint:'Who gets pinged when someone signs up' },
+  { key:'assets', type:'files', label:'Assets',
+    hint:'Marketing / promo material — graphics, photos, posters, social cards' },
+  _bbCommonExtraNotes
+]);
+
+const _bbOfferConfigs = {
+  // ───────── TRAINING ─────────
+  training: [
+    { id:'general_info', label:'General Info', fields:[
+      { key:'__title__', type:'text', label:'Title', required:true,
+        hint:'e.g. "Middle School Skill Training"' },
+      { key:'description', type:'textarea', label:'Short description',
+        hint:'One-liner for the landing page' },
+      { key:'age_range', type:'text', label:'Age range', required:true,
+        hint:'e.g. "Grades 5-8", "U12-U14"' },
+      { key:'skill_level', type:'check_one', label:'Skill level', required:true,
+        options:['Beginner','Intermediate','Advanced','All'] },
+      { key:'gender', type:'check_many', label:'Gender', required:true,
+        options:['Boys','Girls'] },
+      { key:'location', type:'text', label:'Location(s)', required:true,
+        hint:'Will pick from BB > Locations once that page ships' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'schedule', label:'Schedule', fields:[
+      { key:'consistent', type:'check_one', label:'Consistent schedule every week?', required:true,
+        options:['Yes','No'], hint:'Gates the next two questions' },
+      { key:'weekly_schedule', type:'block_builder', label:'Weekly schedule', required:true,
+        hint:'Day · start · end · location — one row per slot',
+        dep:{ key:'consistent', equals:'Yes' },
+        subFields:[
+          { key:'day', type:'check_one', label:'Day',
+            options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+          { key:'start', type:'time', label:'Start' },
+          { key:'end', type:'time', label:'End' },
+          { key:'location', type:'text', label:'Location' }
+        ] },
+      { key:'comm_method', type:'textarea', label:'How are athletes informed of schedule?',
+        dep:{ key:'consistent', equals:'No' },
+        hint:'e.g. "Weekly WhatsApp group every Sunday"' },
+      { key:'capacity', type:'number', label:'Capacity per slot',
+        hint:'Athletes per session' },
+      { key:'year_round', type:'check_one', label:'Year-round or seasonal?',
+        options:['Year-round','Seasonal'] },
+      { key:'season_dates', type:'text', label:'Season start / end dates',
+        dep:{ key:'year_round', equals:'Seasonal' },
+        hint:'When the season runs (e.g. "Sept 5 - May 30")' },
+      { key:'closed_dates', type:'textarea', label:'Closed dates / breaks',
+        hint:'Holidays, summer break, etc.' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'value', label:'Value', fields:[
+      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+        hint:'How the program is structured — phases, pillars, what a week looks like' },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true,
+        hint:'Why this program vs. other programs in your area' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'pricing', label:'Pricing', fields:_bbStdPricing },
+    { id:'sales', label:'Sales', fields:[
+      { key:'sales_path', type:'check_one', label:'Sales path', required:true,
+        options:['Free trial','Discovery call first','Direct signup','Other'],
+        hint:'Gates the next set of questions' },
+      { key:'trial_duration_price', type:'text', label:'Trial duration + price',
+        dep:{ key:'sales_path', equals:'Free trial' },
+        hint:'e.g. "1 session, free" or "2 weeks, $25"' },
+      { key:'discovery_call_calendar', type:'check_one', label:'Discovery-call calendar',
+        dep:{ key:'sales_path', equals:'Discovery call first' },
+        options:['Use existing calendar','Create a new one'] },
+      { key:'existing_calendar_link', type:'link', label:'Existing calendar link',
+        dep:{ key:'discovery_call_calendar', equals:'Use existing calendar' },
+        hint:'Paste the booking link' },
+      { key:'call_host', type:'staff_select', label:'Call host',
+        dep:{ key:'discovery_call_calendar', equals:'Create a new one' },
+        hint:'Who takes the call' },
+      { key:'call_duration', type:'check_one', label:'Call duration',
+        dep:{ key:'discovery_call_calendar', equals:'Create a new one' },
+        options:['15 min','30 min','45 min','60 min'] },
+      { key:'avail_windows', type:'block_builder', label:'Availability windows',
+        dep:{ key:'discovery_call_calendar', equals:'Create a new one' },
+        hint:'Day · start · end',
+        subFields:[
+          { key:'day', type:'check_one', label:'Day',
+            options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+          { key:'start', type:'time', label:'Start' },
+          { key:'end', type:'time', label:'End' }
+        ] },
+      { key:'buffer', type:'check_one', label:'Buffer between calls',
+        dep:{ key:'discovery_call_calendar', equals:'Create a new one' },
+        options:['0 min','15 min','30 min'] },
+      { key:'describe_path', type:'textarea', label:'Describe the path',
+        dep:{ key:'sales_path', equals:'Other' },
+        hint:'How leads become customers in this offer' },
+      { key:'info_collect', type:'check_many_defaults', label:'Info to collect from leads', required:true,
+        defaultOptions:['Parent name','Email','Phone','Athlete name'],
+        addonOptions:['Proximity to location','Experience level (Beg/Int/Adv)','Desired start date','School / grade','Position','Goals','Anything else (custom)'] },
+      { key:'lead_notify', type:'staff_select', label:'Lead notify',
+        hint:'Who gets pinged on new lead' },
+      { key:'upsells', type:'block_builder', label:'Upsells',
+        hint:'Target offer + description ("After 6 months, pitch private lessons")',
+        subFields:[
+          { key:'target', type:'text', label:'Target offer' },
+          { key:'description', type:'textarea', label:'How it works' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'onboarding', label:'Onboarding', fields:_bbStdOnboarding(
+      ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
+      ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Anything else (custom)']
+    )}
+  ],
+
+  // ───────── CAMPS / CLINICS ─────────
+  camp_clinic: [
+    { id:'general_info', label:'General Info', fields:[
+      { key:'__title__', type:'text', label:'Title', required:true,
+        hint:'e.g. "Summer Shooting Clinic"' },
+      { key:'description', type:'textarea', label:'Short description' },
+      { key:'age_range', type:'text', label:'Age range', required:true },
+      { key:'skill_level', type:'check_one', label:'Skill level', required:true,
+        options:['Beginner','Intermediate','Advanced','All'] },
+      { key:'gender', type:'check_many', label:'Gender', required:true,
+        options:['Boys','Girls'] },
+      { key:'location', type:'text', label:'Location', required:true },
+      { key:'capacity', type:'number', label:'Capacity / max attendees',
+        hint:'Triggers waitlist when full' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'schedule', label:'Schedule', fields:[
+      { key:'date_range', type:'text', label:'Start / end dates', required:true,
+        hint:'Same date = clinic. Different dates = camp.' },
+      { key:'times', type:'text', label:'Start and end times', required:true,
+        hint:'e.g. "9am - 3pm daily" or "Day 1: 9am-12pm, Day 2: 9am-3pm"' },
+      { key:'special', type:'textarea', label:'Any special scheduling considerations?',
+        hint:'Lunch break, AM/PM split, days off mid-camp, late check-in, anything else' },
+      { key:'registration_deadline', type:'text', label:'Registration deadline',
+        hint:'Date registration closes (or "until full")' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'value', label:'Value', fields:[
+      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+        hint:'How the camp / clinic flows — drills, scrimmages, special focuses, daily breakdown' },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true },
+      _bbCommonExtraNotes
+    ]},
+    { id:'pricing', label:'Pricing', fields:[
+      { key:'fee', type:'currency', label:'Per-attendee fee', required:true },
+      { key:'addons', type:'block_builder', label:'Add-ons',
+        hint:'T-shirt, water bottle, photo pack, swag',
+        subFields:[
+          { key:'name', type:'text', label:'Name' },
+          { key:'price', type:'currency', label:'Price' },
+          { key:'description', type:'textarea', label:'Description' }
+        ] },
+      { key:'discounts', type:'textarea', label:'Any discounts?',
+        hint:'Free-form — early-bird, group, sibling. e.g. "Until May 1: $50 off · 2+ siblings: 10% off"' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'sales', label:'Sales', fields:[
+      { key:'sales_path', type:'check_one', label:'Sales path', required:true,
+        options:['Direct signup','Discovery call first','Other'] },
+      { key:'discovery_calendar', type:'text', label:'Which discovery-call calendar',
+        dep:{ key:'sales_path', equals:'Discovery call first' },
+        hint:'Calendar link or "create new"' },
+      { key:'describe_path', type:'textarea', label:'Describe the path',
+        dep:{ key:'sales_path', equals:'Other' } },
+      { key:'reg_form_fields', type:'check_many_defaults', label:'Registration form fields', required:true,
+        defaultOptions:['Athlete name','Parent name','Parent phone','Parent email','Emergency contact name','Emergency contact phone'],
+        addonOptions:['Age','Skill level','Dietary restrictions','T-shirt size','Photo / video release','Medical / allergies','Anything else (custom)'] },
+      { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
+      { key:'upsells', type:'block_builder', label:'Upsells',
+        hint:'Target offer + description ("After this clinic, pitch the academy")',
+        subFields:[
+          { key:'target', type:'text', label:'Target offer' },
+          { key:'description', type:'textarea', label:'How it works' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'onboarding', label:'Onboarding', fields:_bbStdOnboarding(
+      ['Athlete name','Parent name','Parent phone','Parent email','Emergency contact name','Emergency contact phone'],
+      ['Age','Skill level','Dietary restrictions','T-shirt size','Photo / video release','Medical / allergies','Anything else (custom)']
+    )}
+  ],
+
+  // ───────── INTERNAL LEAGUE ─────────
+  league: [
+    { id:'general_info', label:'General Info', fields:[
+      { key:'__title__', type:'text', label:'Title', required:true,
+        hint:'e.g. "BAM Winter League"' },
+      { key:'description', type:'textarea', label:'Short description' },
+      { key:'age_range', type:'text', label:'Age range', required:true },
+      { key:'skill_level', type:'check_many', label:'Skill level / division',
+        options:['Beginner','Intermediate','Advanced','Mixed'],
+        hint:'Allow multiple divisions in one league' },
+      { key:'gender', type:'check_many', label:'Gender', required:true,
+        options:['Boys','Girls','Co-ed'] },
+      { key:'location', type:'text', label:'Location(s)', required:true },
+      _bbCommonExtraNotes
+    ]},
+    { id:'schedule', label:'Schedule', fields:[
+      { key:'season_dates', type:'text', label:'Season start / end', required:true },
+      { key:'game_window', type:'text', label:'Game day(s) + time window', required:true,
+        hint:'e.g. "Saturdays 10am-2pm"' },
+      { key:'num_weeks', type:'number', label:'Number of weeks' },
+      { key:'registration_window', type:'text', label:'Registration open / close' },
+      { key:'playoff_weeks', type:'text', label:'Playoff week(s)' },
+      { key:'awards_date', type:'text', label:'Awards / banquet date' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'value', label:'Value', fields:[
+      { key:'program_structure', type:'textarea', label:'Program structure', required:true,
+        hint:'Format, divisions, game flow, playoff path, awards' },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true },
+      _bbCommonExtraNotes
+    ]},
+    { id:'pricing', label:'Pricing', fields:[
+      { key:'registration_unit', type:'check_one', label:'Registration unit', required:true,
+        options:['Team','Individual','Both'] },
+      { key:'team_fee', type:'currency', label:'Per-team fee',
+        dep:{ key:'registration_unit', equals:['Team','Both'] } },
+      { key:'individual_fee', type:'currency', label:'Per-individual fee',
+        dep:{ key:'registration_unit', equals:['Individual','Both'] } },
+      { key:'addons', type:'block_builder', label:'Add-ons',
+        hint:'League shirt, awards, photos, jersey upgrade',
+        subFields:[
+          { key:'name', type:'text', label:'Name' },
+          { key:'price', type:'currency', label:'Price' },
+          { key:'description', type:'textarea', label:'Description' }
+        ] },
+      { key:'discounts', type:'textarea', label:'Any discounts?' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'sales', label:'Sales', fields:[
+      { key:'team_reg_form', type:'check_many_defaults', label:'Team registration form fields',
+        defaultOptions:['Team name','Captain name','Captain phone','Captain email','Roster (player names)'],
+        addonOptions:['Age division','Jersey colors','Preferred game time','Coach name + phone','Anything else (custom)'] },
+      { key:'individual_reg_form', type:'check_many_defaults', label:'Individual registration form fields',
+        defaultOptions:['Player name','Parent name','Parent phone','Parent email','Emergency contact name','Emergency contact phone'],
+        addonOptions:['Position','Height','Skill level','Anything else (custom)'] },
+      { key:'roster_min_max', type:'text', label:'Roster min / max' },
+      { key:'free_agent_matching', type:'check_one', label:'Free-agent matching?',
+        dep:{ key:'registration_unit', equals:['Individual','Both'] },
+        options:['Yes','No'] },
+      { key:'matching_how', type:'textarea', label:'How matching works',
+        dep:{ key:'free_agent_matching', equals:'Yes' } },
+      { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
+      { key:'upsells', type:'block_builder', label:'Upsells',
+        subFields:[
+          { key:'target', type:'text', label:'Target offer' },
+          { key:'description', type:'textarea', label:'How it works' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'onboarding', label:'Onboarding', fields:[
+      { key:'agreement', type:'file', label:'Agreement / waiver', required:true,
+        hint:'PDF + checkbox confirming what it covers' },
+      { key:'rulebook', type:'file', label:'Rulebook',
+        hint:'PDF sent at onboarding — game rules, conduct, scoring' },
+      { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
+        hint:'Roster confirmation, schedule release, equipment, comm channel. Attach files.' },
+      { key:'standings_link', type:'link', label:'Standings page link' },
+      { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
+      { key:'assets', type:'files', label:'Assets',
+        hint:'Marketing / promo material' },
+      _bbCommonExtraNotes
+    ]}
+  ],
+
+  // ───────── INTERNAL TOURNAMENT ─────────
+  tournament: [
+    { id:'general_info', label:'General Info', fields:[
+      { key:'__title__', type:'text', label:'Title', required:true,
+        hint:'e.g. "Spring Showdown 14U"' },
+      { key:'description', type:'textarea', label:'Short description' },
+      { key:'age_range', type:'text', label:'Age range', required:true },
+      { key:'level', type:'check_many', label:'Level / division',
+        options:['Beginner','Intermediate','Advanced','Mixed'] },
+      { key:'gender', type:'check_many', label:'Gender', required:true,
+        options:['Boys','Girls','Co-ed'] },
+      { key:'location', type:'text', label:'Location', required:true },
+      { key:'brackets', type:'check_one', label:'Brackets / divisions?',
+        options:['Yes','No'] },
+      { key:'brackets_describe', type:'textarea', label:'Describe each bracket',
+        dep:{ key:'brackets', equals:'Yes' },
+        hint:'e.g. "U12 Boys A / U12 Boys B / U14 Mixed"' },
+      { key:'individual_signups', type:'check_one', label:'Individual signups allowed?',
+        options:['Yes','No'] },
+      { key:'individuals_assignment', type:'textarea', label:'How individuals get placed onto teams',
+        dep:{ key:'individual_signups', equals:'Yes' } },
+      _bbCommonExtraNotes
+    ]},
+    { id:'schedule', label:'Schedule', fields:[
+      { key:'event_dates', type:'text', label:'Event date(s)', required:true,
+        hint:'Single day or weekend range' },
+      { key:'check_in_time', type:'time', label:'Check-in time' },
+      { key:'first_game_time', type:'time', label:'First game time' },
+      { key:'end_time', type:'time', label:'Estimated end time' },
+      { key:'schedule_gen', type:'check_one', label:'Game schedule generation',
+        options:['Pre-set','Generated after registration closes'] },
+      { key:'awards_time', type:'time', label:'Awards / closing time' },
+      { key:'registration_deadline', type:'text', label:'Registration deadline' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'value', label:'Value', fields:[
+      { key:'selling_points', type:'textarea', label:'Selling points', required:true,
+        hint:'Why enter this tournament' },
+      { key:'format', type:'check_one', label:'Format',
+        options:['Single elim','Double elim','Round robin','Pool play'] },
+      { key:'awards', type:'textarea', label:'Awards / trophies',
+        hint:'What winners get' },
+      { key:'special_activities', type:'textarea', label:'Special activities',
+        hint:'Skills competition, dunk contest, awards ceremony' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'pricing', label:'Pricing', fields:[
+      { key:'team_fee', type:'currency', label:'Per-team fee', required:true },
+      { key:'individual_fee', type:'currency', label:'Per-individual fee',
+        dep:{ key:'individual_signups', equals:'Yes' } },
+      { key:'addons', type:'block_builder', label:'Add-ons',
+        hint:'Spectator gear, photo packages, food vouchers',
+        subFields:[
+          { key:'name', type:'text', label:'Name' },
+          { key:'price', type:'currency', label:'Price' },
+          { key:'description', type:'textarea', label:'Description' }
+        ] },
+      { key:'discounts', type:'textarea', label:'Any discounts?',
+        hint:'Early-bird, spectator pricing, etc.' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'sales', label:'Sales', fields:[
+      { key:'reg_form_fields', type:'check_many_defaults', label:'Registration form fields', required:true,
+        defaultOptions:['Team name','Captain name','Captain phone','Captain email','Age division','Roster (player names)'],
+        addonOptions:['Coach name + phone','Jersey colors','Out-of-state Y/N','Anything else (custom)'] },
+      { key:'bracket_cap', type:'number', label:'Bracket cap',
+        dep:{ key:'brackets', equals:'Yes' },
+        hint:'Max teams per division' },
+      { key:'min_teams', type:'number', label:'Minimum teams threshold',
+        hint:'If under X, event cancels and refunds' },
+      { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
+      { key:'upsells', type:'block_builder', label:'Upsells',
+        subFields:[
+          { key:'target', type:'text', label:'Target offer' },
+          { key:'description', type:'textarea', label:'How it works' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'onboarding', label:'Onboarding', fields:[
+      { key:'agreement', type:'file', label:'Agreement / waiver', required:true },
+      { key:'rules_doc', type:'file', label:'Rules document',
+        hint:'Tournament rules — distributed at registration + check-in' },
+      { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
+        hint:'Game schedule, check-in process, parking / venue info. Attach files.' },
+      { key:'bracket_release', type:'check_one', label:'Bracket release timing',
+        dep:{ key:'brackets', equals:'Yes' },
+        options:['Week-of','48hr','Day-of'] },
+      { key:'scorekeeper', type:'staff_select', label:'Score-keeper assignments',
+        hint:'Who runs the table per court (operational)' },
+      { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
+      { key:'assets', type:'files', label:'Assets',
+        hint:'Marketing / promo + bracket templates, social cards' },
+      _bbCommonExtraNotes
+    ]}
+  ],
+
+  // ───────── GYM RENTAL ─────────
+  gym_rental: [
+    { id:'general_info', label:'General Info', fields:[
+      { key:'__title__', type:'text', label:'Title', required:true,
+        hint:'e.g. "Main Gym Court Rental"' },
+      { key:'facility', type:'text', label:'Facility / location', required:true,
+        hint:'Which gym (from BB > Locations)' },
+      { key:'capacity', type:'number', label:'Capacity (max occupancy)' },
+      { key:'amenities', type:'check_many', label:'Amenities',
+        options:['Courts','Scoreboard','Sound system','AC','Locker rooms','Wi-Fi','Parking','Concessions','First aid'] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'schedule', label:'Schedule', fields:[
+      { key:'booking_windows', type:'block_builder', label:'Available booking windows', required:true,
+        hint:'Day · start · end',
+        subFields:[
+          { key:'day', type:'check_one', label:'Day',
+            options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+          { key:'start', type:'time', label:'Start' },
+          { key:'end', type:'time', label:'End' }
+        ] },
+      { key:'min_block', type:'number', label:'Minimum block (hours)' },
+      { key:'max_block', type:'number', label:'Maximum block (hours)' },
+      { key:'buffer', type:'text', label:'Buffer between rentals',
+        hint:'Minutes' },
+      { key:'advance_notice', type:'text', label:'Advance notice required',
+        hint:'e.g. "48 hours minimum"' },
+      { key:'blackout_dates', type:'textarea', label:'Blackout dates / unavailable periods',
+        hint:'When gym is closed' },
+      { key:'booking_method', type:'check_one', label:'Booking method',
+        options:['Real-time calendar','Request approval','Phone'] },
+      { key:'approver', type:'textarea', label:'Approver + turnaround time',
+        dep:{ key:'booking_method', equals:'Request approval' },
+        hint:'Who approves and how fast' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'value', label:'Value', fields:[
+      { key:'selling_points', type:'textarea', label:'Selling points', required:true,
+        hint:'Location, parking, equipment, court quality' },
+      { key:'whats_included', type:'textarea', label:"What's included",
+        hint:'Equipment, staff, utilities' },
+      { key:'whats_not', type:'textarea', label:"What's NOT included",
+        hint:'What renter brings themselves' },
+      { key:'photos', type:'files', label:'Photos / floor plan',
+        hint:'Visual marketing for inquiries' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'pricing', label:'Pricing', fields:[
+      { key:'hourly_rate', type:'currency', label:'Per-hour rate', required:true,
+        hint:'Peak rate; off-peak rate optional' },
+      { key:'block_discount', type:'textarea', label:'Block discount',
+        hint:'e.g. 4+ hours = 10% off' },
+      { key:'recurring_discount', type:'textarea', label:'Recurring booking discount',
+        hint:'Weekly / monthly bookings' },
+      { key:'damage_deposit', type:'currency', label:'Damage deposit',
+        hint:'Refundable' },
+      { key:'addons', type:'block_builder', label:'Add-ons',
+        hint:'Equipment rental, photo service, supervision, score-keeper',
+        subFields:[
+          { key:'name', type:'text', label:'Name' },
+          { key:'price', type:'currency', label:'Price' },
+          { key:'description', type:'textarea', label:'Description' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'sales', label:'Sales', fields:[
+      { key:'inquiry_form_fields', type:'check_many_defaults', label:'Inquiry form fields',
+        defaultOptions:['Org name','Event type','Expected attendees','Dates','Contact name','Contact phone','Contact email'],
+        addonOptions:['Prior renter Y/N','Insurance status','Special requests','Anything else (custom)'] },
+      { key:'rate_sheet', type:'file', label:'Quote / rate sheet',
+        hint:'Auto-sent on inquiry' },
+      { key:'negotiation_policy', type:'check_one', label:'Rate negotiation policy',
+        options:['Fixed','Negotiable for X+ hours','Always custom'] },
+      { key:'contract_template', type:'file', label:'Contract template',
+        hint:'E-signable' },
+      { key:'deposit_policy', type:'textarea', label:'Deposit policy',
+        hint:'How much, when collected, refund conditions' },
+      { key:'insurance_required', type:'check_one', label:'Insurance certificate required?',
+        options:['Yes','No'] },
+      { key:'liability_minimum', type:'text', label:'Liability minimum + how to submit',
+        dep:{ key:'insurance_required', equals:'Yes' },
+        hint:'e.g. "$1M general liability, email PDF to ops@"' },
+      { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
+      { key:'upsells', type:'block_builder', label:'Upsells',
+        subFields:[
+          { key:'target', type:'text', label:'Target offer' },
+          { key:'description', type:'textarea', label:'How it works' }
+        ] },
+      _bbCommonExtraNotes
+    ]},
+    { id:'onboarding', label:'Onboarding', fields:[
+      { key:'agreement', type:'file', label:'Agreement / waiver', required:true,
+        hint:'PDF + checkbox (waiver, house rules, refund, cancellation, etc.)' },
+      { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
+        hint:'Booking confirmation, access, equipment, emergency info, day-before reminder. Attach files.' },
+      { key:'day_before_reminder', type:'check_one', label:'Day-before reminder?',
+        options:['Yes','No'] },
+      { key:'day_of_contact', type:'staff_select', label:'Day-of point of contact',
+        hint:'Who renter calls during the rental' },
+      { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up' },
+      { key:'assets', type:'files', label:'Assets',
+        hint:'Marketing / promo material (separate from floor plan)' },
+      _bbCommonExtraNotes
+    ]}
+  ],
+
+  // ───────── TEAM ─────────
+  // Team is special: 2 steps (general + per_team). per_team is a builder
+  // backed by the offer_teams table (rendered by _bbRenderTeamPerTeam).
+  team: [
+    { id:'general', label:'General', fields:[
+      { key:'__title__', type:'text', label:'Program title', required:true,
+        hint:'e.g. "BAM Elite Travel" or "BAM Spring AAU"' },
+      { key:'description', type:'textarea', label:'Short description',
+        hint:'One-liner for the landing page' },
+      { key:'what_makes_different', type:'textarea', label:'What makes it different', required:true,
+        hint:'Why this program vs. every other competitive program in the area' },
+      _bbCommonExtraNotes
+    ]},
+    { id:'per_team', label:'Per team', fields:'__TEAM_BUILDER__' }
+  ]
+};
+
+// ──────────────────────────────────────────────────────────────────
+// Renderer engine
+// ──────────────────────────────────────────────────────────────────
+function _bbEscapeAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+}
+
+function _bbGetVal(field, sectionId) {
+  const offer = _bbState.offer;
+  if (field.key === '__title__') return offer.title || '';
+  const sec = (offer.data || {})[sectionId] || {};
+  return sec[field.key] != null ? sec[field.key] : '';
+}
+
+function _bbIsDepVisible(field, sectionId) {
+  if (!field.dep) return true;
+  const sec = ((_bbState.offer.data || {})[sectionId]) || {};
+  const v = sec[field.dep.key];
+  if (v == null) return false;
+  const want = Array.isArray(field.dep.equals) ? field.dep.equals : [field.dep.equals];
+  if (Array.isArray(v)) return v.some(x => want.includes(x));
+  return want.includes(v);
+}
+
+function _bbRenderField(field, sectionId) {
+  if (!_bbIsDepVisible(field, sectionId)) return '';
+
+  const val = _bbGetVal(field, sectionId);
+  const reqMark = field.required ? '<span class="bb-field-req">*</span>' : '';
+  const hint = field.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(field.hint)}</div>` : '';
+  const depBadge = field.dep
+    ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(field.dep.key)} = ${_bbEscapeHtml(Array.isArray(field.dep.equals) ? field.dep.equals.join(' / ') : field.dep.equals)}</span>`
+    : '';
+
+  const onInputHandler = field.key === '__title__'
+    ? `_bbUpdateTitle(this.value)`
+    : `_bbUpdateField('${sectionId}','${field.key}',this.value)`;
+
+  let body = '';
+
+  switch (field.type) {
+    case 'text':
+    case 'link':
+    case 'phone':
+    case 'email':
+    case 'currency':
+    case 'number':
+    case 'time': {
+      const inputType = field.type === 'link' ? 'url'
+        : field.type === 'phone' ? 'tel'
+        : field.type === 'email' ? 'email'
+        : (field.type === 'number' || field.type === 'currency') ? 'number'
+        : field.type === 'time' ? 'time'
+        : 'text';
+      body = `<input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
+      break;
+    }
+    case 'textarea':
+      body = `<textarea class="bb-textarea" oninput="${onInputHandler}" onblur="_bbAutoSave()">${_bbEscapeHtml(val)}</textarea>`;
+      break;
+    case 'check_one':
+      body = `<div class="bb-choice-row">${(field.options || []).map(opt => `
+        <button type="button" class="bb-choice ${val === opt ? 'selected' : ''}" onclick="_bbPickOne('${sectionId}','${field.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    case 'check_many': {
+      const arr = Array.isArray(val) ? val : [];
+      body = `<div class="bb-choice-row">${(field.options || []).map(opt => `
+        <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    }
+    case 'check_many_defaults': {
+      const arr = Array.isArray(val) ? val : [];
+      const defaults = field.defaultOptions || [];
+      const addons = field.addonOptions || [];
+      body = `
+        <div class="bb-defaults-info">
+          <b style="color:var(--accent)">Defaults (always on):</b> ${defaults.map(d => _bbEscapeHtml(d)).join(' · ')}
+        </div>
+        <div class="bb-defaults-info" style="margin-top:0">Optional add-ons:</div>
+        <div class="bb-choice-row">${addons.map(opt => `
+          <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbToggleMany('${sectionId}','${field.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+        `).join('')}</div>
+      `;
+      break;
+    }
+    case 'block_builder': {
+      const rows = Array.isArray(val) ? val : [];
+      body = `
+        <div class="bb-block-builder">
+          ${rows.map((row, i) => `
+            <div class="bb-block-row">
+              <div class="bb-block-row-head">
+                <div style="font-size:11px;color:var(--text-mute)">Row ${i+1}</div>
+                <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
+              </div>
+              <div class="bb-block-fields">
+                ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key])).join('')}
+              </div>
+            </div>
+          `).join('')}
+          <button class="btn-secondary-bb" onclick="_bbBlockAdd('${sectionId}','${field.key}')">+ Add row</button>
+        </div>
+      `;
+      break;
+    }
+    case 'file':
+    case 'files':
+    case 'text_files':
+      body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">📎 File upload coming in the next build pass — saves to the <code>offers</code> Supabase storage bucket. For now, describe the file in Extra notes if needed.</div>`;
+      break;
+    case 'staff_select':
+      body = `<input type="text" class="bb-input" placeholder="Staff selector coming once Staff card ships (Stage 2)" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
+      break;
+    case 'info':
+      return `<div class="bb-field"><div style="padding:10px 14px;background:var(--accent-ghost);border:1px solid var(--accent-border);border-radius:8px;color:var(--text);font-size:12px;line-height:1.55">${_bbEscapeHtml(field.label)}</div></div>`;
+    default:
+      body = `<input type="text" class="bb-input" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
   }
+
   return `
-    <p style="font-size:13px;color:var(--text-sub);line-height:1.6">
-      Fields for <b>${_bbEscapeHtml(_bbSectionLabels[sectionId] || _bbTeamSectionLabels[sectionId] || sectionId)}</b> coming in the next build pass.
-    </p>
-    <p style="font-size:12px;color:var(--text-mute);margin-top:8px;line-height:1.6;font-style:italic">
-      You can click Next / Back to walk the wizard. Title is editable on the first step.
-    </p>
+    <div class="bb-field">
+      <div class="bb-field-label">${depBadge}${_bbEscapeHtml(field.label)} ${reqMark}</div>
+      ${body}
+      ${hint}
+    </div>
   `;
 }
+
+function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal) {
+  const v = subVal != null ? subVal : '';
+  const handler = `_bbBlockUpdate('${sectionId}','${parentKey}',${rowIdx},'${sf.key}',this.value)`;
+  if (sf.type === 'check_one') {
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+        <div class="bb-choice-row">${(sf.options || []).map(opt => `
+          <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbBlockUpdate('${sectionId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}'); _bbRenderWizardBody()">${_bbEscapeHtml(opt)}</button>
+        `).join('')}</div>
+      </div>
+    `;
+  }
+  if (sf.type === 'textarea') {
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+        <textarea class="bb-textarea" oninput="${handler}" onblur="_bbAutoSave()">${_bbEscapeHtml(v)}</textarea>
+      </div>
+    `;
+  }
+  const inputType = sf.type === 'time' ? 'time'
+    : (sf.type === 'currency' || sf.type === 'number') ? 'number'
+    : 'text';
+  return `
+    <div class="bb-field" style="margin-bottom:10px">
+      <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+      <input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbAutoSave()" />
+    </div>
+  `;
+}
+
+// State mutations
+function _bbPickOne(section, key, val) {
+  _bbUpdateField(section, key, val);
+  _bbRenderWizardBody();
+}
+function _bbToggleMany(section, key, val) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  const next = Array.isArray(arr) ? [...arr] : [];
+  const i = next.indexOf(val);
+  if (i >= 0) next.splice(i, 1); else next.push(val);
+  _bbUpdateField(section, key, next);
+  _bbRenderWizardBody();
+}
+function _bbBlockAdd(section, key) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  const next = Array.isArray(arr) ? [...arr, {}] : [{}];
+  _bbUpdateField(section, key, next);
+  _bbRenderWizardBody();
+}
+function _bbBlockRemove(section, key, idx) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  if (!Array.isArray(arr)) return;
+  const next = [...arr];
+  next.splice(idx, 1);
+  _bbUpdateField(section, key, next);
+  _bbRenderWizardBody();
+}
+function _bbBlockUpdate(section, key, idx, subKey, val) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  const next = Array.isArray(arr) ? [...arr] : [];
+  if (!next[idx]) next[idx] = {};
+  next[idx] = { ...next[idx], [subKey]: val };
+  _bbUpdateField(section, key, next);
+  // No re-render — preserve typing focus
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Team's Per team builder — backed by offer_teams table rows
+// ──────────────────────────────────────────────────────────────────
+let _bbTeamRows = []; // cached on wizard open
+let _bbExpandedTeams = new Set();
+
+async function _bbLoadTeamRows() {
+  if (!_sb || !_bbState.offer) return [];
+  const { data } = await _sb.from('offer_teams')
+    .select('*').eq('offer_id', _bbState.offer.id).order('sort_order');
+  _bbTeamRows = data || [];
+  return _bbTeamRows;
+}
+
+function _bbRenderTeamPerTeam() {
+  return `
+    <div style="font-size:13px;color:var(--text-sub);margin-bottom:14px;line-height:1.55">
+      Add each specific team in the program (15U Black, 16U Black, U14 Girls, etc.). Each team is a <b>mini-offer</b> with its own identity, schedule, sales, pricing, and onboarding.
+    </div>
+    <div id="bb-team-rows">${_bbTeamRows.map((t, i) => _bbRenderTeamRow(t, i)).join('')}</div>
+    <button class="btn-secondary-bb" onclick="_bbAddTeam()" style="margin-top:14px">+ Add team</button>
+    ${_bbTeamRows.length === 0 ? '<div class="bb-empty" style="margin-top:12px">No teams yet — click "+ Add team" to start.</div>' : ''}
+  `;
+}
+
+function _bbRenderTeamRow(t, idx) {
+  const expanded = _bbExpandedTeams.has(t.id);
+  const d = t.data || {};
+  return `
+    <div class="bb-block-row" style="margin-bottom:10px">
+      <div class="bb-block-row-head">
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="bb-block-remove" onclick="_bbToggleTeamExpand('${t.id}')" style="border-color:var(--accent-border);color:var(--accent)">${expanded ? '▾' : '▸'}</button>
+          <input type="text" class="bb-input" style="font-weight:600;max-width:280px"
+            value="${_bbEscapeHtml(t.title || '')}"
+            oninput="_bbUpdateTeamTitle('${t.id}', this.value)"
+            onblur="_bbSaveTeam('${t.id}')"
+            placeholder="Team title (e.g. 15U Black)" />
+        </div>
+        <button class="bb-block-remove" onclick="_bbRemoveTeam('${t.id}')">Remove team</button>
+      </div>
+      ${expanded ? `
+        <div class="bb-block-fields" style="margin-top:14px">
+          ${_bbTeamSubsections.map(s => `
+            <details ${s.openByDefault ? 'open' : ''} style="margin-bottom:8px;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:8px 14px">
+              <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;padding:6px 0">${s.label}</summary>
+              <div style="padding:12px 0 4px">
+                ${s.fields.map(f => _bbRenderTeamSubField(t.id, f, d[f.key])).join('')}
+              </div>
+            </details>
+          `).join('')}
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function _bbRenderTeamSubField(teamId, f, val) {
+  const v = val != null ? val : '';
+  const handler = `_bbUpdateTeamData('${teamId}','${f.key}',this.value)`;
+  let body;
+  if (f.type === 'textarea') {
+    body = `<textarea class="bb-textarea" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')">${_bbEscapeHtml(v)}</textarea>`;
+  } else if (f.type === 'check_one') {
+    body = `<div class="bb-choice-row">${(f.options || []).map(opt => `
+      <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbUpdateTeamData('${teamId}','${f.key}','${_bbEscapeAttr(opt)}'); _bbSaveTeam('${teamId}'); _bbRenderWizardBody()">${_bbEscapeHtml(opt)}</button>
+    `).join('')}</div>`;
+  } else {
+    const inputType = f.type === 'time' ? 'time'
+      : (f.type === 'currency' || f.type === 'number') ? 'number'
+      : 'text';
+    body = `<input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
+  }
+  return `
+    <div class="bb-field" style="margin-bottom:10px">
+      <div class="bb-field-label">${_bbEscapeHtml(f.label)} ${f.required ? '<span class="bb-field-req">*</span>' : ''}</div>
+      ${body}
+      ${f.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(f.hint)}</div>` : ''}
+    </div>
+  `;
+}
+
+const _bbTeamSubsections = [
+  { id:'identity', label:'Identity', openByDefault:true, fields:[
+    { key:'age_group', type:'text', label:'Age group', required:true, hint:'e.g. "15U"' },
+    { key:'level', type:'check_one', label:'Level', required:true,
+      options:['Local','Rep','AAU','Elite','Other'] },
+    { key:'gender', type:'check_one', label:'Gender', required:true,
+      options:['Boys','Girls'] },
+    { key:'head_coach', type:'text', label:'Head coach', required:true,
+      hint:'Staff selector coming in Stage 2' },
+    { key:'assistant_coaches', type:'text', label:'Assistant coaches' },
+    { key:'roster_capacity', type:'number', label:'Roster capacity',
+      hint:'Max players (e.g. 12)' },
+    { key:'home_locations', type:'text', label:'Home location(s)', required:true,
+      hint:'Pick from BB > Locations once that page ships' }
+  ]},
+  { id:'schedule', label:'Schedule', fields:[
+    { key:'consistent', type:'check_one', label:'Consistent practice schedule every week?',
+      options:['Yes','No'] },
+    { key:'practice_schedule', type:'textarea', label:'Practice schedule',
+      hint:'Day · start · end · location (one per row, free-form for now)' },
+    { key:'comm_method', type:'textarea', label:'How players are informed of schedule' },
+    { key:'season_dates', type:'text', label:'Season dates', required:true },
+    { key:'blackout_days', type:'textarea', label:'Blackout days',
+      hint:'Holidays, school breaks, tournament travel, etc.' }
+  ]},
+  { id:'competition', label:'Competition', fields:[
+    { key:'leagues', type:'text', label:'League(s) this team plays in',
+      hint:'Where regular-season games come from' },
+    { key:'tournaments', type:'textarea', label:'Tournaments',
+      hint:'Free-form list (name, dates, location)' }
+  ]},
+  { id:'sales', label:'Sales', fields:[
+    { key:'tryouts', type:'check_one', label:'Tryouts?',
+      options:['Yes','No'] },
+    { key:'tryout_details', type:'textarea', label:'Tryout details',
+      hint:'Date(s) · time(s) · location · capacity · fee · what to bring' },
+    { key:'reg_form_fields', type:'textarea', label:'Tryout reg form fields',
+      hint:'Defaults: player + parent contact + emergency contact. Optional: position, height, current team, highlight film, GPA, school, goals' },
+    { key:'lead_notify', type:'text', label:'Notify on new lead',
+      hint:'Staff selector coming Stage 2' },
+    { key:'upsells', type:'textarea', label:'Upsells',
+      hint:'Target offer + description (e.g. "Cut player → pitch skill training")' }
+  ]},
+  { id:'pricing', label:'Pricing', fields:[
+    { key:'team_fee', type:'currency', label:'Team fee', required:true },
+    { key:'payment_structure', type:'check_one', label:'Payment structure',
+      options:['Full upfront','Monthly installments','Custom'] },
+    { key:'addons', type:'textarea', label:'Add-ons',
+      hint:'Uniforms, travel, tournament fees, gear bundles' },
+    { key:'discount_codes', type:'text', label:'Discount codes' }
+  ]},
+  { id:'onboarding', label:'Onboarding', fields:[
+    { key:'agreement', type:'text', label:'Agreement / waiver',
+      hint:'File upload coming next pass' },
+    { key:'onboarding_messaging', type:'textarea', label:'Onboarding messaging' },
+    { key:'intake_form_fields', type:'textarea', label:'Roster intake form fields',
+      hint:'Defaults: player + parent contact + emergency contact. Optional: jersey/shorts/shoe size, dietary, allergies' },
+    { key:'notify_on_signup', type:'text', label:'Notify on new sign-up' }
+  ]}
+];
+
+async function _bbAddTeam() {
+  if (!_sb || !_bbState.offer) return;
+  const { data, error } = await _sb.from('offer_teams').insert({
+    offer_id: _bbState.offer.id,
+    title: '(untitled team)',
+    data: {},
+    sort_order: _bbTeamRows.length
+  }).select().single();
+  if (error) return alert("Couldn't add team — " + error.message);
+  _bbTeamRows.push(data);
+  _bbExpandedTeams.add(data.id);
+  _bbRenderWizardBody();
+}
+
+async function _bbRemoveTeam(teamId) {
+  if (!confirm('Remove this team?')) return;
+  if (!_sb) return;
+  await _sb.from('offer_teams').delete().eq('id', teamId);
+  _bbTeamRows = _bbTeamRows.filter(t => t.id !== teamId);
+  _bbExpandedTeams.delete(teamId);
+  _bbRenderWizardBody();
+}
+
+function _bbToggleTeamExpand(teamId) {
+  if (_bbExpandedTeams.has(teamId)) _bbExpandedTeams.delete(teamId);
+  else _bbExpandedTeams.add(teamId);
+  _bbRenderWizardBody();
+}
+
+function _bbUpdateTeamTitle(teamId, val) {
+  const t = _bbTeamRows.find(x => x.id === teamId);
+  if (t) t.title = val || '(untitled team)';
+}
+
+function _bbUpdateTeamData(teamId, key, val) {
+  const t = _bbTeamRows.find(x => x.id === teamId);
+  if (!t) return;
+  t.data = { ...(t.data || {}), [key]: val };
+}
+
+async function _bbSaveTeam(teamId) {
+  const t = _bbTeamRows.find(x => x.id === teamId);
+  if (!t || !_sb) return;
+  await _sb.from('offer_teams').update({ title: t.title, data: t.data || {} }).eq('id', teamId);
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Top-level section renderer — config-aware
+// ──────────────────────────────────────────────────────────────────
+function _bbRenderStepFields(offer, sectionId) {
+  const config = (_bbOfferConfigs[offer.type] || []).find(s => s.id === sectionId);
+  if (!config) return `<p style="font-size:13px;color:var(--text-sub)">No config for this section.</p>`;
+
+  // Special: Team's per_team section
+  if (config.fields === '__TEAM_BUILDER__') {
+    if (_bbTeamLoadedFor !== offer.id) {
+      _bbTeamLoadedFor = offer.id;
+      _bbLoadTeamRows().then(() => _bbRenderWizardBody());
+      return `<div class="bb-empty">Loading teams…</div>`;
+    }
+    return _bbRenderTeamPerTeam();
+  }
+
+  return config.fields.map(f => _bbRenderField(f, sectionId)).join('');
+}
+
+let _bbTeamLoadedFor = null;
 
 function _bbUpdateTitle(val) {
   if (!_bbState.offer) return;
