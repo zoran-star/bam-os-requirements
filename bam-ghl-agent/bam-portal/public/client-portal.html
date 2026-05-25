@@ -14092,9 +14092,13 @@ async function boot() {
   // Admin-only floating red feedback button (no-op if user isn't admin/scaling)
   setupAdminFeedbackWidget();
 
-  // First-login product tour: fires once when the client has never finished onboarding.
-  // Skipping or completing writes onboarding_completed_at so it doesn't fire again.
-  if (!clientRow?.onboarding_completed_at) {
+  // First-login product tour: fires once when the client has never finished
+  // the tour AND staff has flipped onboarding_in_progress = false (i.e. the
+  // client is in the trimmed-nav post-onboarding state — the tour spotlights
+  // Systems / Marketing flows which assume that trimmed nav). Skipping or
+  // completing the tour writes onboarding_completed_at so it doesn't fire
+  // again. Clients still in onboarding (BB visible) don't get the tour.
+  if (!clientRow?.onboarding_completed_at && clientRow?.onboarding_in_progress === false) {
     setTimeout(() => startOnboardingTour(), 600);
   }
 
