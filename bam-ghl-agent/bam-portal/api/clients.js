@@ -1403,6 +1403,14 @@ export default async function handler(req, res) {
           patch.marketing_included = v;
         }
 
+        if (wasSet("onboarding_in_progress")) {
+          const v = body.onboarding_in_progress;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "onboarding_in_progress must be a boolean" });
+          }
+          patch.onboarding_in_progress = v;
+        }
+
         if (wasSet("onboarding_method")) {
           const m = body.onboarding_method;
           if (m !== null && !["call", "send_link"].includes(m)) {

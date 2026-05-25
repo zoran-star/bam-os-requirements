@@ -450,7 +450,34 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const t = tokens;
   const [revenue, setRevenue] = useState(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
+  const [savingOnb, setSavingOnb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
+
+  // Onboarding toggle: when ON, client sees full portal; when OFF, client
+  // only sees Systems + Marketing tabs.
+  const onboardingInProgress = client.onboarding_in_progress !== false; // default ON if unset
+
+  async function toggleOnboarding(next) {
+    setSavingOnb(true);
+    const tok = session?.access_token;
+    try {
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, onboarding_in_progress: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert("Couldn't save: " + (j.error || res.statusText));
+      } else if (onChanged) {
+        onChanged();
+      }
+    } catch (e) {
+      alert("Couldn't save: " + (e?.message || e));
+    } finally {
+      setSavingOnb(false);
+    }
+  }
 
   useEffect(() => {
     if (!canViewFinancials || !client.stripe_customer_id) return;
@@ -487,6 +514,33 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
         <Field k="Scaling Manager" v={staffMap[client.scaling_manager_id]?.name} tokens={t} />
         <Field k="Status" v={client.status} tokens={t} cap />
         <Field k="Created" v={client.created_at ? new Date(client.created_at).toLocaleDateString() : null} tokens={t} />
+
+        <div style={{
+          marginTop: 14, padding: "12px 14px",
+          background: onboardingInProgress ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${onboardingInProgress ? t.accentBorder : t.border}`,
+          borderRadius: 8,
+        }}>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 10,
+            cursor: "pointer", fontSize: 13, color: t.text,
+          }}>
+            <input
+              type="checkbox"
+              checked={onboardingInProgress}
+              disabled={savingOnb}
+              onChange={(e) => toggleOnboarding(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
+            />
+            <span style={{ fontWeight: 600 }}>Is onboarding?</span>
+            {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
+          </label>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
+            {onboardingInProgress
+              ? "Full portal: Messages, Systems, Marketing, Resources, Business Blueprint, Team."
+              : "Client sees ONLY Systems + Marketing. All other tabs are hidden."}
+          </div>
+        </div>
 
         {canViewFinancials && (
           <>
