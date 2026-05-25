@@ -7152,23 +7152,33 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
-      { key:'consistent', type:'check_one', label:'Consistent schedule every week?', required:true,
-        options:['Yes','No'], hint:'Gates the next two questions' },
-      { key:'weekly_schedule', type:'block_builder', label:'Weekly schedule', required:true,
-        hint:'Day · start · end · location — one row per slot',
-        dep:{ key:'consistent', equals:'Yes' },
+      { key:'groups', type:'block_builder', label:'Groups', required:true,
+        hint:'Segment your schedule by group. Each group is defined by age, skill level, gender, plus its own weekly times.',
         subFields:[
-          { key:'day', type:'check_one', label:'Day',
-            options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
-          { key:'start', type:'time', label:'Start' },
-          { key:'end', type:'time', label:'End' },
-          { key:'location', type:'text', label:'Location' }
+          { key:'age', type:'text', label:'Age', required:true,
+            hint:'e.g. "U10" or "Grades 5-8"' },
+          { key:'skill_level', type:'check_one', label:'Skill level',
+            options:['Beginner','Intermediate','Advanced','All'] },
+          { key:'gender', type:'check_many', label:'Gender',
+            options:['Boys','Girls'] },
+          { key:'notes', type:'textarea', label:'Other notes',
+            hint:'Anything specific about this group' },
+          { key:'consistent', type:'check_one', label:'Same time every week for this group?',
+            options:['Yes','No'] },
+          { key:'weekly_times', type:'block_builder', label:'Weekly times',
+            dep:{ key:'consistent', equals:'Yes' },
+            hint:'Day · start · end · location — add one row per slot',
+            subFields:[
+              { key:'day', type:'check_one', label:'Day',
+                options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+              { key:'start', type:'time', label:'Start' },
+              { key:'end', type:'time', label:'End' },
+              { key:'location', type:'text', label:'Location' }
+            ] },
+          { key:'schedule_info', type:'textarea', label:'How is the schedule communicated?',
+            dep:{ key:'consistent', equals:'No' },
+            hint:'e.g. "Weekly WhatsApp on Sundays"' }
         ] },
-      { key:'comm_method', type:'textarea', label:'How are athletes informed of schedule?',
-        dep:{ key:'consistent', equals:'No' },
-        hint:'e.g. "Weekly WhatsApp group every Sunday"' },
-      { key:'capacity', type:'number', label:'Capacity per slot',
-        hint:'Athletes per session' },
       { key:'year_round', type:'check_one', label:'Year-round or seasonal?',
         options:['Year-round','Seasonal'] },
       { key:'season_dates', type:'text', label:'Season start / end dates',
@@ -7712,7 +7722,7 @@ function _bbRenderField(field, sectionId) {
                 <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
               </div>
               <div class="bb-block-fields">
-                ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key])).join('')}
+                ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
               </div>
             </div>
           `).join('')}
@@ -7744,36 +7754,193 @@ function _bbRenderField(field, sectionId) {
   `;
 }
 
-function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal) {
+// Check whether a sub-field's dep is satisfied by sibling values in the same row
+function _bbIsSubDepVisible(sf, row) {
+  if (!sf.dep) return true;
+  const v = row[sf.dep.key];
+  if (v == null) return false;
+  const want = Array.isArray(sf.dep.equals) ? sf.dep.equals : [sf.dep.equals];
+  if (Array.isArray(v)) return v.some(x => want.includes(x));
+  return want.includes(v);
+}
+
+function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal, row) {
+  // Sibling-aware conditional visibility
+  if (!_bbIsSubDepVisible(sf, row || {})) return '';
+
   const v = subVal != null ? subVal : '';
+  const depBadge = sf.dep
+    ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(sf.dep.key)} = ${_bbEscapeHtml(Array.isArray(sf.dep.equals) ? sf.dep.equals.join(' / ') : sf.dep.equals)}</span>`
+    : '';
+  const reqMark = sf.required ? '<span class="bb-field-req">*</span>' : '';
+  const hint = sf.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(sf.hint)}</div>` : '';
   const handler = `_bbBlockUpdate('${sectionId}','${parentKey}',${rowIdx},'${sf.key}',this.value)`;
+
+  // Check One — re-renders to update conditional siblings
   if (sf.type === 'check_one') {
     return `
       <div class="bb-field" style="margin-bottom:10px">
-        <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
         <div class="bb-choice-row">${(sf.options || []).map(opt => `
           <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbBlockUpdate('${sectionId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}'); _bbRenderWizardBody()">${_bbEscapeHtml(opt)}</button>
         `).join('')}</div>
+        ${hint}
       </div>
     `;
   }
+
+  // Check Many — store array per row
+  if (sf.type === 'check_many') {
+    const arr = Array.isArray(v) ? v : [];
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+        <div class="bb-choice-row">${(sf.options || []).map(opt => `
+          <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbBlockToggleMany('${sectionId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+        `).join('')}</div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  // Nested Block Builder
+  if (sf.type === 'block_builder') {
+    const nestedRows = Array.isArray(v) ? v : [];
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+        ${hint}
+        <div class="bb-block-builder">
+          ${nestedRows.map((nr, ni) => `
+            <div class="bb-block-row" style="background:var(--surface)">
+              <div class="bb-block-row-head">
+                <div style="font-size:11px;color:var(--text-mute)">Slot ${ni+1}</div>
+                <button class="bb-block-remove" onclick="_bbNestedBlockRemove('${sectionId}','${parentKey}',${rowIdx},'${sf.key}',${ni})">Remove</button>
+              </div>
+              <div class="bb-block-fields">
+                ${(sf.subFields || []).map(nsf => _bbRenderNestedSubField(sectionId, parentKey, rowIdx, sf.key, ni, nsf, nr[nsf.key], nr)).join('')}
+              </div>
+            </div>
+          `).join('')}
+          <button class="btn-secondary-bb" onclick="_bbNestedBlockAdd('${sectionId}','${parentKey}',${rowIdx},'${sf.key}')">+ Add ${_bbEscapeHtml(sf.label.toLowerCase())}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Textarea
   if (sf.type === 'textarea') {
     return `
       <div class="bb-field" style="margin-bottom:10px">
-        <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
         <textarea class="bb-textarea" oninput="${handler}" onblur="_bbAutoSave()">${_bbEscapeHtml(v)}</textarea>
+        ${hint}
       </div>
     `;
   }
+
+  // Scalar inputs (text / time / number / currency)
   const inputType = sf.type === 'time' ? 'time'
     : (sf.type === 'currency' || sf.type === 'number') ? 'number'
     : 'text';
   return `
     <div class="bb-field" style="margin-bottom:10px">
-      <div class="bb-field-label">${_bbEscapeHtml(sf.label)}</div>
+      <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
       <input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbAutoSave()" />
+      ${hint}
     </div>
   `;
+}
+
+// Renders a sub-field nested inside a nested Block Builder row.
+// Path: data.<section>.<parentKey>[<parentIdx>].<nestedKey>[<nestedIdx>].<subKey>
+function _bbRenderNestedSubField(sectionId, parentKey, parentIdx, nestedKey, nestedIdx, nsf, nval, nrow) {
+  if (nsf.dep && !_bbIsSubDepVisible(nsf, nrow || {})) return '';
+  const v = nval != null ? nval : '';
+  const reqMark = nsf.required ? '<span class="bb-field-req">*</span>' : '';
+  const hint = nsf.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(nsf.hint)}</div>` : '';
+  const handler = `_bbNestedBlockUpdate('${sectionId}','${parentKey}',${parentIdx},'${nestedKey}',${nestedIdx},'${nsf.key}',this.value)`;
+
+  if (nsf.type === 'check_one') {
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(nsf.label)} ${reqMark}</div>
+        <div class="bb-choice-row">${(nsf.options || []).map(opt => `
+          <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbNestedBlockUpdate('${sectionId}','${parentKey}',${parentIdx},'${nestedKey}',${nestedIdx},'${nsf.key}','${_bbEscapeAttr(opt)}'); _bbRenderWizardBody()">${_bbEscapeHtml(opt)}</button>
+        `).join('')}</div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  if (nsf.type === 'textarea') {
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${_bbEscapeHtml(nsf.label)} ${reqMark}</div>
+        <textarea class="bb-textarea" oninput="${handler}" onblur="_bbAutoSave()">${_bbEscapeHtml(v)}</textarea>
+        ${hint}
+      </div>
+    `;
+  }
+
+  const inputType = nsf.type === 'time' ? 'time'
+    : (nsf.type === 'currency' || nsf.type === 'number') ? 'number'
+    : 'text';
+  return `
+    <div class="bb-field" style="margin-bottom:10px">
+      <div class="bb-field-label">${_bbEscapeHtml(nsf.label)} ${reqMark}</div>
+      <input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbAutoSave()" />
+      ${hint}
+    </div>
+  `;
+}
+
+// Block Builder Check Many mutator (per-row array toggle)
+function _bbBlockToggleMany(section, key, rowIdx, subKey, val) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  const rows = Array.isArray(arr) ? [...arr] : [];
+  if (!rows[rowIdx]) rows[rowIdx] = {};
+  const cur = Array.isArray(rows[rowIdx][subKey]) ? rows[rowIdx][subKey] : [];
+  const next = [...cur];
+  const i = next.indexOf(val);
+  if (i >= 0) next.splice(i, 1); else next.push(val);
+  rows[rowIdx] = { ...rows[rowIdx], [subKey]: next };
+  _bbUpdateField(section, key, rows);
+  _bbRenderWizardBody();
+}
+
+// Nested Block Builder mutators (Block-inside-Block)
+function _bbNestedBlockAdd(section, parentKey, parentIdx, nestedKey) {
+  const rows = ((_bbState.offer.data || {})[section] || {})[parentKey];
+  const out = Array.isArray(rows) ? [...rows] : [];
+  if (!out[parentIdx]) out[parentIdx] = {};
+  const cur = Array.isArray(out[parentIdx][nestedKey]) ? out[parentIdx][nestedKey] : [];
+  out[parentIdx] = { ...out[parentIdx], [nestedKey]: [...cur, {}] };
+  _bbUpdateField(section, parentKey, out);
+  _bbRenderWizardBody();
+}
+
+function _bbNestedBlockRemove(section, parentKey, parentIdx, nestedKey, nestedIdx) {
+  const rows = ((_bbState.offer.data || {})[section] || {})[parentKey];
+  const out = Array.isArray(rows) ? [...rows] : [];
+  if (!out[parentIdx]) return;
+  const cur = Array.isArray(out[parentIdx][nestedKey]) ? [...out[parentIdx][nestedKey]] : [];
+  cur.splice(nestedIdx, 1);
+  out[parentIdx] = { ...out[parentIdx], [nestedKey]: cur };
+  _bbUpdateField(section, parentKey, out);
+  _bbRenderWizardBody();
+}
+
+function _bbNestedBlockUpdate(section, parentKey, parentIdx, nestedKey, nestedIdx, subKey, val) {
+  const rows = ((_bbState.offer.data || {})[section] || {})[parentKey];
+  const out = Array.isArray(rows) ? [...rows] : [];
+  if (!out[parentIdx]) out[parentIdx] = {};
+  const cur = Array.isArray(out[parentIdx][nestedKey]) ? [...out[parentIdx][nestedKey]] : [];
+  if (!cur[nestedIdx]) cur[nestedIdx] = {};
+  cur[nestedIdx] = { ...cur[nestedIdx], [subKey]: val };
+  out[parentIdx] = { ...out[parentIdx], [nestedKey]: cur };
+  _bbUpdateField(section, parentKey, out);
+  // No re-render — keep typing focus
 }
 
 // State mutations
