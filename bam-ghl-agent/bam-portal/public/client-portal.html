@@ -4626,6 +4626,11 @@
   /* Bottom tab bar — hidden on desktop, revealed ≤768px */
   .mobile-nav { display: none; }
 
+  /* Draggable FAB — phone-only, hidden on desktop */
+  .fab,
+  .fab-backdrop,
+  .fab-modal { display: none; }
+
   @keyframes sheetIn {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
@@ -4642,55 +4647,137 @@
     /* Sidebar fully removed on phones */
     .sidebar { display: none !important; }
 
-    /* ── Bottom tab bar ── */
-    .mobile-nav {
-      display: flex;
+    /* ── Bottom tab bar — replaced by the draggable FAB below.
+           The <nav class="mobile-nav"> markup stays in the DOM so the
+           existing JS (syncMobileNav, applyOnboardingNavState,
+           applyMarketingNavState, updateUnreadBadge, tour fallback)
+           keeps working — the FAB modal mirrors it. ── */
+    .mobile-nav,
+    .mobile-nav-item,
+    .mobile-nav-badge { display: none !important; }
+    :root { --mobnav-h: 0px; }
+
+    /* ── Draggable FAB (floating menu) ── */
+    .fab { display: flex; }
+    .fab-backdrop { display: block; }
+    .fab {
       position: fixed;
-      left: 0; right: 0; bottom: 0;
-      z-index: 900;
-      background: var(--ink);
-      border-top: 1px solid var(--line);
-      box-shadow: 0 -2px 14px rgba(0,0,0,0.35);
-      padding-bottom: env(safe-area-inset-bottom);
+      width: 60px; height: 60px;
+      left: 16px;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      border: 0;
+      border-radius: 50%;
+      background: var(--gold);
+      color: #0B0B0D;
+      cursor: grab;
+      z-index: 910;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
     }
-    .mobile-nav-item {
-      flex: 1;
+    .fab:active { cursor: grabbing; }
+    .fab.dragging {
+      transition: none;
+      transform: scale(1.06);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.65), 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .fab svg { width: 26px; height: 26px; pointer-events: none; }
+    .fab-badge {
+      position: absolute;
+      top: -3px; right: -3px;
+      min-width: 20px; height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #0B0B0D;
+      font-family: var(--mono);
+      font-size: 10px; font-weight: 700;
+      display: none;
+      align-items: center; justify-content: center;
+      border: 2px solid var(--ink);
+      pointer-events: none;
+    }
+
+    /* ── FAB modal (grid of views) ── */
+    .fab-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      z-index: 915;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .fab-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .fab-modal {
+      position: fixed;
+      z-index: 920;
+      width: min(320px, calc(100vw - 28px));
+      max-height: 70dvh;
+      overflow-y: auto;
+      background: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      transform: scale(0.3);
+      transform-origin: center center;
+      opacity: 0;
+      pointer-events: none;
+      visibility: hidden;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  opacity 0.18s ease,
+                  visibility 0s linear 0.24s;
+    }
+    .fab-modal.open {
+      transform: scale(1);
+      opacity: 1;
+      pointer-events: auto;
+      visibility: visible;
+      transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  opacity 0.18s ease,
+                  visibility 0s linear 0s;
+    }
+
+    .fab-option {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 4px;
-      height: var(--mobnav-h);
-      background: transparent;
-      border: 0;
-      cursor: pointer;
-      color: var(--text-mute);
+      gap: 6px;
+      padding: 14px 6px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      color: var(--text);
       font-family: var(--mono);
       font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
+      cursor: pointer;
       position: relative;
-      user-select: none;
       -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
-    .mobile-nav-item svg { width: 21px; height: 21px; display: block; }
-    .mobile-nav-item.active { color: var(--gold); }
-    .mobile-nav-item.active::before {
-      content: "";
+    .fab-option svg { width: 22px; height: 22px; color: inherit; }
+    .fab-option:active { background: var(--ink); transform: scale(0.97); }
+    .fab-option.active { color: var(--gold); border-color: var(--gold); }
+    .fab-option.disabled { opacity: 0.32; pointer-events: none; }
+    .fab-option-badge {
       position: absolute;
-      top: 0; left: 50%;
-      transform: translateX(-50%);
-      width: 30px; height: 2px;
-      background: var(--gold);
-      border-radius: 0 0 2px 2px;
-    }
-    .mobile-nav-item:active { background: var(--surface); }
-    .mobile-nav-item.disabled { opacity: 0.32; pointer-events: none; }
-    .mobile-nav-badge {
-      position: absolute;
-      top: 5px; left: calc(50% + 6px);
+      top: 6px; right: 6px;
       min-width: 16px; height: 16px;
       padding: 0 4px;
       border-radius: 999px;
@@ -6506,6 +6593,27 @@ Then the call to action."]</div>
       <span class="mobile-nav-label">Team</span>
     </button>
   </nav>
+
+  <!-- ── Draggable FAB + expanding menu modal (phones only) ──
+       Replaces the mobile bottom tab bar. The FAB can be dragged
+       anywhere on screen; tap to open the grid of available views.
+       Options are populated from .mobile-nav-item buttons above. -->
+  <button type="button" class="fab" id="fab" aria-label="Open menu" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="6" cy="6" r="2"/>
+      <circle cx="12" cy="6" r="2"/>
+      <circle cx="18" cy="6" r="2"/>
+      <circle cx="6" cy="12" r="2"/>
+      <circle cx="12" cy="12" r="2"/>
+      <circle cx="18" cy="12" r="2"/>
+      <circle cx="6" cy="18" r="2"/>
+      <circle cx="12" cy="18" r="2"/>
+      <circle cx="18" cy="18" r="2"/>
+    </svg>
+    <span class="fab-badge" id="fab-badge"></span>
+  </button>
+  <div class="fab-backdrop" id="fab-backdrop"></div>
+  <div class="fab-modal" id="fab-modal" role="dialog" aria-modal="true" aria-label="Navigate"></div>
 </div>
 
 <script>
@@ -6561,6 +6669,222 @@ function mobileSwitchView(name) {
     .find(el => (el.getAttribute('onclick') || '').includes("'" + name + "'"));
   if (sidebarItem) switchView(name, sidebarItem);
   else syncMobileNav(name);
+}
+
+// ── Draggable FAB (replaces the mobile bottom tab bar on phones) ──
+// The .mobile-nav element stays in the DOM and remains the source of
+// truth for which views this client has access to (per-feature
+// visibility, onboarding gate, marketing greying). The FAB modal
+// clones the visible buttons into a grid every time it opens, so
+// per-client state is automatically respected.
+const FAB_POS_KEY = 'fab-pos-v1';
+let _fabOpen = false;
+
+function _fabClampPos(x, y) {
+  const fab = document.getElementById('fab');
+  if (!fab) return { x, y };
+  const r = fab.getBoundingClientRect();
+  const m = 8;
+  return {
+    x: Math.max(m, Math.min(x, window.innerWidth - r.width - m)),
+    y: Math.max(m, Math.min(y, window.innerHeight - r.height - m)),
+  };
+}
+
+function _fabApplyPos(x, y) {
+  const fab = document.getElementById('fab');
+  if (!fab) return;
+  const c = _fabClampPos(x, y);
+  fab.style.left = c.x + 'px';
+  fab.style.top = c.y + 'px';
+  fab.style.right = 'auto';
+  fab.style.bottom = 'auto';
+}
+
+function _fabRestorePos() {
+  try {
+    const raw = localStorage.getItem(FAB_POS_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (typeof p?.x === 'number' && typeof p?.y === 'number') _fabApplyPos(p.x, p.y);
+  } catch {}
+}
+
+function _fabSavePos(x, y) {
+  try { localStorage.setItem(FAB_POS_KEY, JSON.stringify({ x, y })); } catch {}
+}
+
+function _fabRenderModal() {
+  const modal = document.getElementById('fab-modal');
+  if (!modal) return;
+  modal.innerHTML = '';
+  document.querySelectorAll('.mobile-nav .mobile-nav-item').forEach(src => {
+    // Respect per-client visibility — source button is hidden when the
+    // feature isn't included (display:none set by feature-gate / onboarding gate).
+    if (src.style.display === 'none') return;
+    const view = src.getAttribute('data-view');
+    if (!view) return;
+    const label = src.querySelector('.mobile-nav-label')?.textContent?.trim() || view;
+    const svgHtml = src.querySelector('svg')?.outerHTML || '';
+    const srcBadge = src.querySelector('.mobile-nav-badge');
+    const hasBadge = srcBadge && srcBadge.style.display !== 'none' && srcBadge.textContent;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fab-option' +
+      (src.classList.contains('active') ? ' active' : '') +
+      (src.classList.contains('disabled') ? ' disabled' : '');
+    btn.dataset.view = view;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML =
+      svgHtml +
+      '<span>' + label + '</span>' +
+      (hasBadge ? '<span class="fab-option-badge">' + srcBadge.textContent + '</span>' : '');
+    btn.addEventListener('click', () => {
+      mobileSwitchView(view);
+      _fabCloseModal();
+    });
+    modal.appendChild(btn);
+  });
+}
+
+function _fabPositionModal() {
+  const fab = document.getElementById('fab');
+  const modal = document.getElementById('fab-modal');
+  if (!fab || !modal) return;
+  const fr = fab.getBoundingClientRect();
+  const fabCx = fr.left + fr.width / 2;
+  const fabCy = fr.top + fr.height / 2;
+
+  // Measure the modal off-screen at scale 1 so we know its real size.
+  const prev = { left: modal.style.left, top: modal.style.top, vis: modal.style.visibility, tr: modal.style.transform };
+  modal.style.visibility = 'hidden';
+  modal.style.left = '-9999px';
+  modal.style.top = '0px';
+  modal.style.transform = 'scale(1)';
+  const mr = modal.getBoundingClientRect();
+  modal.style.transform = prev.tr || '';
+
+  const margin = 12;
+  let left = fabCx - mr.width / 2;
+  let top = fabCy - mr.height / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - mr.width - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - mr.height - margin));
+
+  modal.style.left = left + 'px';
+  modal.style.top = top + 'px';
+  // Expand FROM the FAB's center — set transform-origin in % of modal.
+  const ox = ((fabCx - left) / mr.width) * 100;
+  const oy = ((fabCy - top) / mr.height) * 100;
+  modal.style.transformOrigin = ox + '% ' + oy + '%';
+  modal.style.visibility = prev.vis || '';
+}
+
+function _fabOpenModal() {
+  if (_fabOpen) return;
+  _fabOpen = true;
+  _fabRenderModal();
+  _fabPositionModal();
+  // Force a frame so the transform-origin / transition kick in cleanly.
+  requestAnimationFrame(() => {
+    document.getElementById('fab-modal').classList.add('open');
+    document.getElementById('fab-backdrop').classList.add('open');
+  });
+  document.getElementById('fab').setAttribute('aria-expanded', 'true');
+}
+
+function _fabCloseModal() {
+  if (!_fabOpen) return;
+  _fabOpen = false;
+  document.getElementById('fab-modal').classList.remove('open');
+  document.getElementById('fab-backdrop').classList.remove('open');
+  document.getElementById('fab').setAttribute('aria-expanded', 'false');
+}
+
+function _fabSyncBadge() {
+  const src = document.getElementById('mnav-messages-badge');
+  const dst = document.getElementById('fab-badge');
+  if (!src || !dst) return;
+  const show = src.style.display !== 'none' && src.textContent;
+  dst.style.display = show ? 'flex' : 'none';
+  dst.textContent = show ? src.textContent : '';
+}
+
+function initFab() {
+  const fab = document.getElementById('fab');
+  const backdrop = document.getElementById('fab-backdrop');
+  if (!fab || !backdrop) return;
+
+  _fabRestorePos();
+  _fabSyncBadge();
+
+  // Mirror message-unread badge from the (hidden) mobile-nav badge.
+  const srcBadge = document.getElementById('mnav-messages-badge');
+  if (srcBadge && 'MutationObserver' in window) {
+    new MutationObserver(_fabSyncBadge).observe(srcBadge, {
+      attributes: true, attributeFilter: ['style'],
+      childList: true, characterData: true, subtree: true,
+    });
+  }
+
+  // Drag detection: any pointer movement past the threshold counts as a drag;
+  // anything below it counts as a tap that toggles the modal.
+  let startX = 0, startY = 0, origX = 0, origY = 0;
+  let dragging = false, moved = false;
+  const DRAG_THRESHOLD = 6;
+
+  fab.addEventListener('pointerdown', (e) => {
+    if (_fabOpen) return;
+    dragging = true;
+    moved = false;
+    const r = fab.getBoundingClientRect();
+    origX = r.left;
+    origY = r.top;
+    startX = e.clientX;
+    startY = e.clientY;
+    fab.classList.add('dragging');
+    try { fab.setPointerCapture(e.pointerId); } catch {}
+  });
+
+  fab.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!moved && Math.hypot(dx, dy) > DRAG_THRESHOLD) moved = true;
+    if (moved) _fabApplyPos(origX + dx, origY + dy);
+  });
+
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    fab.classList.remove('dragging');
+    try { fab.releasePointerCapture(e.pointerId); } catch {}
+    if (moved) {
+      const r = fab.getBoundingClientRect();
+      _fabSavePos(r.left, r.top);
+    } else {
+      // Tap (not drag) → toggle modal
+      if (_fabOpen) _fabCloseModal();
+      else _fabOpenModal();
+    }
+  };
+  fab.addEventListener('pointerup', endDrag);
+  fab.addEventListener('pointercancel', endDrag);
+
+  backdrop.addEventListener('click', _fabCloseModal);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && _fabOpen) _fabCloseModal(); });
+
+  // Re-clamp if viewport size changes (orientation flip, browser chrome).
+  window.addEventListener('resize', () => {
+    const r = fab.getBoundingClientRect();
+    if (r.width > 0) _fabApplyPos(r.left, r.top);
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initFab);
+} else {
+  initFab();
 }
 
 // Apply the greyed-out look to the Marketing nav item when marketing
