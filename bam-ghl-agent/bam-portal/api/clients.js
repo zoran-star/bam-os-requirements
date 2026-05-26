@@ -808,6 +808,96 @@ export default async function handler(req, res) {
         return res.status(200).json(GENERIC_RESET_RESPONSE);
       }
 
+      // ── Post-welcome-slack — fires when a client finishes setting up
+      // their portal account (first password set via invite link).
+      // Idempotent: only posts the first time (welcome_slack_sent_at IS NULL).
+      // Auth: Bearer token from the client's authed session — we resolve
+      // the client_id from auth_user_id, so the client can't trigger this
+      // for any other client.
+      if (publicSignupAction === "post-welcome-slack") {
+        if (!hasAuth) return res.status(401).json({ error: "auth required" });
+        const tokenStr = (req.headers.authorization || "").slice(7);
+        let authUser = null;
+        try {
+          const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${tokenStr}` },
+          });
+          if (r.ok) authUser = await r.json();
+        } catch (_) { /* unauth */ }
+        if (!authUser?.id) return res.status(401).json({ error: "invalid session" });
+
+        // Find any client this user belongs to that hasn't had the
+        // welcome posted yet. Owner first via auth_user_id; fall back
+        // to client_users join for teammates.
+        let clientRow = null;
+        try {
+          const owned = await supabaseSelect(
+            `clients?auth_user_id=eq.${authUser.id}&welcome_slack_sent_at=is.null&select=id,business_name,slack_channel_id,owner_name,welcome_slack_sent_at&limit=1`
+          );
+          clientRow = owned?.[0] || null;
+        } catch (_) { /* keep null */ }
+        if (!clientRow) {
+          // No owned row needing welcome → no-op (200 to avoid leaking)
+          return res.status(200).json({ ok: true, skipped: true });
+        }
+        if (!clientRow.slack_channel_id) {
+          // No Slack channel mapped → mark sent (so we don't retry every
+          // login) and bail.
+          await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${clientRow.id}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({ welcome_slack_sent_at: new Date().toISOString() }),
+          });
+          return res.status(200).json({ ok: true, slack_skipped: "no channel" });
+        }
+
+        // Post the welcome.
+        const token = process.env.SLACK_BOT_TOKEN;
+        if (!token) {
+          return res.status(200).json({ ok: true, slack_skipped: "no bot token" });
+        }
+        const biz = clientRow.business_name || "your academy";
+        const ownerLabel = clientRow.owner_name ? ` (${clientRow.owner_name})` : "";
+        const text = [
+          `🎉 Welcome to BAM, ${biz}!${ownerLabel} just set up the portal account.`,
+          ``,
+          `*This channel is where notifications live for now.* When something needs your attention — a ticket update, an action request, a content drop, anything — it'll land here.`,
+          ``,
+          `Portal: https://portal.byanymeansbusiness.com/client-portal.html`,
+        ].join("\n");
+        try {
+          const r = await fetch("https://slack.com/api/chat.postMessage", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({ channel: clientRow.slack_channel_id, text, unfurl_links: false }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!j.ok) {
+            // Don't mark sent if Slack rejected — gives us a retry next login.
+            return res.status(200).json({ ok: false, slack_error: j.error });
+          }
+        } catch (e) {
+          return res.status(200).json({ ok: false, slack_error: e?.message });
+        }
+        // Mark sent so we don't post again.
+        await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${clientRow.id}`, {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ welcome_slack_sent_at: new Date().toISOString() }),
+        });
+        return res.status(200).json({ ok: true, posted: true });
+      }
+
       // ── Public submit-feedback path ──
       // Universal feedback widget on every page (client portal, signup page,
       // staff portal). Accepts anonymous submissions (no auth header) AND

@@ -6460,93 +6460,141 @@ Then the call to action."]</div>
         #view-blueprint .bb-step-dot .bb-step-num { margin:0; }
       }
 
-      /* ─── Onboarding Tracker widget (Stage 3) ───────────────────────── */
-      /* Floating top-right pill on desktop showing 6 BB-section circles. */
-      /* Auto-hides when client.onboarding_in_progress=false, when */
-      /* tracker_dismissed=true, or when all 6 sections are done. */
+      /* ─── Onboarding Tracker (Stage 3, redesigned 2026-05-26) ────────── */
+      /* Top-right pill button. Always visible while onboarding is in */
+      /* progress (staff-controlled). Click → drops down the 6 circles. */
+      /* Auto-disappears only when staff flips onboarding_in_progress off, */
+      /* or when all 6 sections are done. No client-side dismiss. */
       #obt-widget {
         position: fixed;
-        top: 70px;
+        top: 18px;
         right: 24px;
         z-index: 1200;
-        width: 280px;
-        background: var(--surface);
-        border: 1px solid var(--border-med);
-        border-radius: 12px;
-        padding: 12px 14px 14px;
-        box-shadow: 0 4px 18px rgba(0,0,0,0.35);
         font-family: inherit;
         display: none;
       }
       #obt-widget[data-visible="true"] { display: block; }
-      #obt-widget .obt-head {
+      #obt-widget .obt-pill {
         display: flex; align-items: center; gap: 8px;
-        margin-bottom: 10px;
+        padding: 9px 14px 9px 12px;
+        background: var(--surface);
+        border: 1px solid var(--accent-border);
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 13px; font-weight: 500;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        transition: background 0.15s, border-color 0.15s, transform 0.12s;
+        font-family: inherit;
       }
-      #obt-widget .obt-title {
-        font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+      #obt-widget .obt-pill:hover {
+        background: var(--accent-ghost);
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+      #obt-widget .obt-pill-icon {
+        width: 18px; height: 18px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--accent);
+      }
+      #obt-widget .obt-pill-icon svg { width: 18px; height: 18px; }
+      #obt-widget .obt-pill-label {
+        font-size: 12px; color: var(--text); font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      #obt-widget .obt-pill-count {
+        font-size: 11px; color: var(--accent); font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        padding: 2px 8px; border-radius: 999px;
+        background: var(--accent-ghost);
+        border: 1px solid var(--accent-border);
+      }
+      #obt-widget .obt-pill-chev {
+        color: var(--text-mute); transition: transform 0.2s;
+      }
+      #obt-widget[data-open="true"] .obt-pill-chev {
+        transform: rotate(180deg); color: var(--accent);
+      }
+
+      /* Expanded panel — drops down from under the pill */
+      #obt-widget .obt-panel {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        width: 320px;
+        background: var(--surface);
+        border: 1px solid var(--border-med);
+        border-radius: 14px;
+        padding: 16px 16px 18px;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+        display: none;
+        animation: obt-fade-in 0.16s ease-out;
+      }
+      #obt-widget[data-open="true"] .obt-panel { display: block; }
+      @keyframes obt-fade-in {
+        from { opacity: 0; transform: translateY(-4px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      #obt-widget .obt-panel-head {
+        display: flex; align-items: baseline; gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border-med);
+      }
+      #obt-widget .obt-panel-title {
+        font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
         text-transform: uppercase; color: var(--text-sub);
         flex: 1;
       }
-      #obt-widget .obt-progress {
-        font-size: 11px; font-weight: 600;
-        color: var(--accent); font-variant-numeric: tabular-nums;
+      #obt-widget .obt-panel-sub {
+        font-size: 11px; color: var(--text-mute);
+        margin: -6px 0 12px;
       }
-      #obt-widget .obt-dismiss {
-        background: transparent; border: 0;
-        color: var(--text-mute);
-        font-size: 18px; line-height: 1;
-        cursor: pointer; padding: 0 4px;
-      }
-      #obt-widget .obt-dismiss:hover { color: var(--text); }
       #obt-widget .obt-grid {
         display: grid;
         grid-template-columns: 1fr 1fr 1fr;
         gap: 6px;
       }
       #obt-widget .obt-circle {
-        display: flex; flex-direction: column; align-items: center; gap: 4px;
-        padding: 8px 4px;
+        display: flex; flex-direction: column; align-items: center; gap: 5px;
+        padding: 10px 4px;
         background: transparent; border: 1px solid transparent;
-        border-radius: 8px;
+        border-radius: 9px;
         cursor: pointer; font-family: inherit;
         transition: background 0.15s, border-color 0.15s;
       }
       #obt-widget .obt-circle:hover {
-        background: var(--surface-alt, rgba(255,255,255,0.03));
-        border-color: var(--border-soft, var(--border-med));
+        background: var(--accent-ghost);
+        border-color: var(--accent-border);
       }
       #obt-widget .obt-dot {
-        width: 22px; height: 22px; border-radius: 50%;
+        width: 26px; height: 26px; border-radius: 50%;
         border: 1.5px solid var(--border-med);
         background: transparent;
         display: flex; align-items: center; justify-content: center;
-        font-size: 11px; color: var(--text-mute);
+        font-size: 12px; color: var(--text-mute);
       }
       #obt-widget .obt-circle.done .obt-dot {
         background: var(--accent); border-color: var(--accent);
         color: #0A0A0B; font-weight: 600;
       }
       #obt-widget .obt-circle.done .obt-dot::before {
-        content: '✓'; font-size: 12px;
+        content: '✓'; font-size: 13px;
       }
       #obt-widget .obt-label {
         font-size: 10px; color: var(--text-sub);
         line-height: 1.2; text-align: center;
       }
-      #obt-widget .obt-circle.done .obt-label { color: var(--text); }
+      #obt-widget .obt-circle.done .obt-label { color: var(--text); font-weight: 500; }
 
       @media (max-width: 720px) {
         #obt-widget {
-          top: auto;
-          bottom: 76px;          /* sit above the mobile bottom nav */
-          left: 12px; right: 12px;
-          width: auto;
-          padding: 10px 12px 12px;
+          top: 14px; right: 12px;
         }
-        #obt-widget .obt-grid { grid-template-columns: repeat(6, 1fr); gap: 4px; }
-        #obt-widget .obt-circle { padding: 6px 2px; }
-        #obt-widget .obt-label { font-size: 9px; }
+        #obt-widget .obt-panel {
+          width: min(320px, calc(100vw - 24px));
+          right: 0;
+        }
       }
 
       /* ─── New-version banner ─────────────────────────────────────────── */
@@ -8150,6 +8198,10 @@ async function _obtLoadProgress(opts) {
   }
 }
 
+// Open/closed UI state. Persists across re-renders so a section nav
+// click → render doesn't snap the panel shut underneath the user.
+let _obtPanelOpen = false;
+
 function _obtRender() {
   let widget = document.getElementById('obt-widget');
   const p = _obtProgress;
@@ -8158,16 +8210,14 @@ function _obtRender() {
     return;
   }
 
-  // Visibility gates:
-  //   1) client must still be in onboarding (staff hasn't flipped the switch off)
-  //   2) user hasn't dismissed
-  //   3) at least one section is still undone
+  // Visibility gates: no client-side dismiss anymore — only staff
+  // hides the tracker by flipping onboarding_in_progress off, or it
+  // auto-hides once every section is done.
   const inProgress = p.in_progress === true;
-  const dismissed = p.tracker_dismissed === true;
   const doneCount = _obtSections.filter(s => p[s.key]).length;
   const allDone = doneCount === _obtSections.length;
 
-  if (!inProgress || dismissed || allDone) {
+  if (!inProgress || allDone) {
     if (widget) widget.setAttribute('data-visible', 'false');
     return;
   }
@@ -8176,24 +8226,56 @@ function _obtRender() {
     widget = document.createElement('div');
     widget.id = 'obt-widget';
     document.body.appendChild(widget);
+    // Click outside the widget → collapse panel. Bound once on creation.
+    document.addEventListener('click', (e) => {
+      const w = document.getElementById('obt-widget');
+      if (!w || !_obtPanelOpen) return;
+      if (!w.contains(e.target)) {
+        _obtPanelOpen = false;
+        w.setAttribute('data-open', 'false');
+      }
+    });
   }
 
   widget.innerHTML = `
-    <div class="obt-head">
-      <span class="obt-title">Onboarding setup</span>
-      <span class="obt-progress">${doneCount}/${_obtSections.length}</span>
-      <button class="obt-dismiss" onclick="_obtDismiss()" title="Hide this">×</button>
-    </div>
-    <div class="obt-grid">
-      ${_obtSections.map(s => `
-        <button class="obt-circle ${p[s.key] ? 'done' : ''}" onclick="_obtClick('${s.id}')">
-          <div class="obt-dot"></div>
-          <div class="obt-label">${s.label}</div>
-        </button>
-      `).join('')}
+    <button type="button" class="obt-pill" onclick="_obtTogglePanel(event)">
+      <span class="obt-pill-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+        </svg>
+      </span>
+      <span class="obt-pill-label">Onboarding</span>
+      <span class="obt-pill-count">${doneCount}/${_obtSections.length}</span>
+      <span class="obt-pill-chev">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </span>
+    </button>
+
+    <div class="obt-panel" onclick="event.stopPropagation()">
+      <div class="obt-panel-head">
+        <span class="obt-panel-title">Onboarding setup</span>
+        <span style="font-size:11px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums">${doneCount}/${_obtSections.length}</span>
+      </div>
+      <div class="obt-panel-sub">Tap a circle to jump to that section. Disappears when your BAM team marks onboarding complete.</div>
+      <div class="obt-grid">
+        ${_obtSections.map(s => `
+          <button class="obt-circle ${p[s.key] ? 'done' : ''}" onclick="_obtClick('${s.id}')">
+            <div class="obt-dot"></div>
+            <div class="obt-label">${s.label}</div>
+          </button>
+        `).join('')}
+      </div>
     </div>
   `;
   widget.setAttribute('data-visible', 'true');
+  widget.setAttribute('data-open', _obtPanelOpen ? 'true' : 'false');
+}
+
+function _obtTogglePanel(ev) {
+  if (ev) ev.stopPropagation();
+  _obtPanelOpen = !_obtPanelOpen;
+  const w = document.getElementById('obt-widget');
+  if (w) w.setAttribute('data-open', _obtPanelOpen ? 'true' : 'false');
 }
 
 function _obtClick(sectionId) {
@@ -8203,6 +8285,11 @@ function _obtClick(sectionId) {
     _obtToggleDone(sectionId);
     return;
   }
+  // Collapse the panel after picking a section so the user sees the
+  // page they navigated to without a floating overlay in the way.
+  _obtPanelOpen = false;
+  const w = document.getElementById('obt-widget');
+  if (w) w.setAttribute('data-open', 'false');
   try { s.nav(); } catch (_) { /* nav helpers chain via OR */ }
 }
 
@@ -14535,6 +14622,25 @@ async function submitNewPassword() {
     err.textContent = error.message;
     return;
   }
+  // Fire-and-forget: post the welcome message to the client's Slack
+  // channel. Idempotent server-side (only posts if welcome_slack_sent_at
+  // is null), so safe to call on every password-set — both invite
+  // acceptance AND password reset. Recovery flow harmlessly no-ops
+  // because the column is already set from the original signup.
+  try {
+    const { data: { session: sess } } = await _sb.auth.getSession();
+    if (sess?.access_token) {
+      fetch('/api/clients?action=post-welcome-slack', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + sess.access_token,
+        },
+        body: '{}',
+      }).catch(() => {});
+    }
+  } catch (_) { /* don't block the reload on welcome-post errors */ }
+
   // Strip the recovery hash + reload into normal logged-in flow
   history.replaceState(null, '', window.location.pathname);
   location.reload();
