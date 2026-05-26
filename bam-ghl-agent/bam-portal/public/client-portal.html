@@ -7192,22 +7192,8 @@ function _bbRenderCardPlaceholder(panel, card) {
   // Real cards dispatch to dedicated renderers
   if (card === 'staff')     return _bbRenderStaffCard(panel, meta);
   if (card === 'locations') return _bbRenderLocationsCard(panel, meta);
-
-  // Brand is a "mark-done" section in the tracker — until the real Brand
-  // editor ships, surface a Mark-done button on the placeholder so the
-  // client can still flip the tracker circle. Other placeholders (general)
-  // get no button (their done state is auto-derived from data).
-  const alreadyDone = !!(_obtProgress && _obtProgress[card + '_done']);
-  const markDoneCta = card === 'brand'
-    ? `<div style="margin-top:16px">
-         <button class="btn-primary-bb" onclick="_bbBrandMarkDone(this)" ${alreadyDone ? 'disabled' : ''}>
-           ${alreadyDone ? '✓ Marked done' : "I'm done with Brand"}
-         </button>
-         <div style="font-size:11px;color:var(--text-mute);margin-top:8px;line-height:1.5">
-           Marks the Brand circle in the onboarding tracker. The full Brand editor (logos, colors, fonts, website spec) is coming in a later release.
-         </div>
-       </div>`
-    : '';
+  if (card === 'general')   return _bbRenderGeneralCard(panel, meta);
+  if (card === 'brand')     return _bbRenderBrandCard(panel, meta);
 
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
@@ -7220,9 +7206,323 @@ function _bbRenderCardPlaceholder(panel, card) {
         <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
       </div>
     </div>
-    <div class="bb-empty">Coming soon — this section ships in Stage 2 of the BB build.</div>
-    ${markDoneCta}
+    <div class="bb-empty">Coming soon.</div>
   `;
+}
+
+// Renders a "Mark this section done" CTA for the BB cards that use
+// manual flip (Brand / Staff / Locations). Returns the HTML string —
+// caller embeds it inline.
+function _bbMarkDoneCta(section, label) {
+  const alreadyDone = !!(_obtProgress && _obtProgress[section + '_done']);
+  return `
+    <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border-med)">
+      <button class="btn-primary-bb" onclick="_bbSectionMarkDone('${section}', this, '${_bbEscapeAttr(label)}')" ${alreadyDone ? 'disabled' : ''}>
+        ${alreadyDone ? '✓ Marked done' : "I'm done with " + _bbEscapeHtml(label)}
+      </button>
+      ${alreadyDone ? `
+        <button class="btn-secondary-bb" onclick="_bbSectionUnmark('${section}', this, '${_bbEscapeAttr(label)}')" style="margin-left:8px">
+          Un-mark
+        </button>` : ''}
+    </div>
+  `;
+}
+
+async function _bbSectionMarkDone(section, btn, label) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const ok = await _obtMarkSectionDone(section, true);
+  if (ok) _bbRenderFromHash();  // re-render so the un-mark button appears
+  else if (btn) { btn.disabled = false; btn.textContent = "I'm done with " + label; }
+}
+async function _bbSectionUnmark(section, btn, label) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Un-marking…'; }
+  const ok = await _obtMarkSectionDone(section, false);
+  if (ok) _bbRenderFromHash();
+  else if (btn) { btn.disabled = false; btn.textContent = 'Un-mark'; }
+}
+
+// Helper: persist a clients-row patch via the SECURITY DEFINER RPC. Used
+// by the General + Brand BB cards (and any future client-editable card).
+// Returns success bool. Debounced via _bbBasicsScheduleSave below.
+async function _bbSaveClientBasics(patch) {
+  if (!CLIENT_ID || !_sb) return false;
+  const { error } = await _sb.rpc('update_client_basics', {
+    p_client_id: CLIENT_ID, p_patch: patch || {}
+  });
+  if (error) {
+    console.warn('basics save failed:', error.message);
+    return false;
+  }
+  // Reflect on the cached CLIENT_ROWS so subsequent renders use the new
+  // values without a full reload.
+  const row = (CLIENT_ROWS || []).find(c => c.id === CLIENT_ID);
+  if (row) {
+    if (patch.brand_data) row.brand_data = { ...(row.brand_data || {}), ...patch.brand_data };
+    Object.keys(patch).forEach(k => {
+      if (k !== 'brand_data') row[k] = patch[k];
+    });
+  }
+  _obtScheduleRefresh && _obtScheduleRefresh();
+  return true;
+}
+let _bbBasicsSaveTimer = null;
+function _bbBasicsScheduleSave(getter) {
+  if (_bbBasicsSaveTimer) clearTimeout(_bbBasicsSaveTimer);
+  _bbBasicsSaveTimer = setTimeout(async () => {
+    const patch = getter();
+    if (!patch) return;
+    await _bbSaveClientBasics(patch);
+  }, 600);
+}
+
+// ─── BB GENERAL CARD ────────────────────────────────────────────────────
+// Business basics: name, legal name, owner, contact, address, EIN.
+// All fields persist to the clients row via update_client_basics RPC,
+// debounced 600ms on every keystroke (auto-save, no Save button).
+function _bbRenderGeneralCard(panel, meta) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const v = (k) => _bbEscapeHtml(c[k] || '');
+  const entityType = c.entity_type || '';
+  const entityOpts = ['LLC','Corp','Sole prop','Partnership','Non-profit','Other'];
+
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Business name <span class="bb-field-req">*</span></div>
+      <input id="bb-gen-business_name" type="text" class="bb-input" value="${v('business_name')}"
+        oninput="_bbGenChanged()" />
+      <div class="bb-field-hint">How customers know you — appears on funnels, emails, the portal header.</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Legal name</div>
+      <input id="bb-gen-legal_name" type="text" class="bb-input" value="${v('legal_name')}"
+        oninput="_bbGenChanged()" />
+      <div class="bb-field-hint">If different from business name (e.g. "DBA" vs incorporated entity).</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Owner / point of contact <span class="bb-field-req">*</span></div>
+      <input id="bb-gen-owner_name" type="text" class="bb-input" value="${v('owner_name')}"
+        oninput="_bbGenChanged()" />
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Owner email <span class="bb-field-req">*</span></div>
+      <input id="bb-gen-email" type="email" class="bb-input" value="${v('email')}"
+        oninput="_bbGenChanged()" />
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Phone</div>
+      <input id="bb-gen-phone" type="tel" class="bb-input" value="${v('phone')}"
+        oninput="_bbGenChanged()" />
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Address</div>
+      <textarea id="bb-gen-address" class="bb-textarea" oninput="_bbGenChanged()">${v('address')}</textarea>
+      <div class="bb-field-hint">Mailing address for the business. Locations you operate from live under BB &gt; Locations.</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Entity type</div>
+      <div class="bb-choice-row">${entityOpts.map(opt => `
+        <button type="button" class="bb-choice ${entityType === opt ? 'selected' : ''}" onclick="_bbGenSetEntity('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">EIN</div>
+      <input id="bb-gen-ein" type="text" class="bb-input" value="${v('ein')}"
+        oninput="_bbGenChanged()" placeholder="XX-XXXXXXX" />
+      <div class="bb-field-hint">Federal tax ID. Required if you want us to set up Stripe Connect under your business.</div>
+    </div>
+
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
+  `;
+}
+
+function _bbGenChanged() {
+  _bbBasicsScheduleSave(() => ({
+    business_name: document.getElementById('bb-gen-business_name')?.value || '',
+    legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
+    owner_name:    document.getElementById('bb-gen-owner_name')?.value || '',
+    email:         document.getElementById('bb-gen-email')?.value || '',
+    phone:         document.getElementById('bb-gen-phone')?.value || '',
+    address:       document.getElementById('bb-gen-address')?.value || '',
+    ein:           document.getElementById('bb-gen-ein')?.value || '',
+  }));
+}
+
+async function _bbGenSetEntity(opt) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  const next = (c?.entity_type === opt) ? '' : opt;   // click again to unselect
+  if (c) c.entity_type = next;
+  await _bbSaveClientBasics({ entity_type: next });
+  _bbRenderFromHash();
+}
+
+// ─── BB BRAND CARD ──────────────────────────────────────────────────────
+// All brand data lives in clients.brand_data jsonb. Same auto-save
+// pattern as General. Includes a Mark-done CTA at the bottom that
+// flips brand_marked_done_at via the mark_onboarding_section RPC.
+function _bbRenderBrandCard(panel, meta) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const bd = c.brand_data || {};
+  const v = (k) => _bbEscapeHtml(bd[k] || '');
+  const websiteStatus = bd.website_status || '';
+  const statusOpts = [
+    'Have one, happy with it',
+    'Have one, want it improved',
+    'Have one, want to rebuild',
+    'No website yet',
+  ];
+
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+    </div>
+
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Colors</h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div class="bb-field">
+        <div class="bb-field-label">Primary</div>
+        <input id="bb-brand-color_primary" type="text" class="bb-input" value="${v('color_primary')}"
+          oninput="_bbBrandChanged()" placeholder="#E8C547" />
+      </div>
+      <div class="bb-field">
+        <div class="bb-field-label">Secondary</div>
+        <input id="bb-brand-color_secondary" type="text" class="bb-input" value="${v('color_secondary')}"
+          oninput="_bbBrandChanged()" placeholder="#000000" />
+      </div>
+      <div class="bb-field">
+        <div class="bb-field-label">Accent</div>
+        <input id="bb-brand-color_accent" type="text" class="bb-input" value="${v('color_accent')}"
+          oninput="_bbBrandChanged()" placeholder="#FFFFFF" />
+      </div>
+    </div>
+
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Fonts</h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="bb-field">
+        <div class="bb-field-label">Display / headlines</div>
+        <input id="bb-brand-font_display" type="text" class="bb-input" value="${v('font_display')}"
+          oninput="_bbBrandChanged()" placeholder="e.g. Bebas Neue, Space Grotesk" />
+      </div>
+      <div class="bb-field">
+        <div class="bb-field-label">Body / paragraph</div>
+        <input id="bb-brand-font_body" type="text" class="bb-input" value="${v('font_body')}"
+          oninput="_bbBrandChanged()" placeholder="e.g. Inter, Helvetica" />
+      </div>
+    </div>
+
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Logos</h3>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Logo (dark background)</div>
+      <input id="bb-brand-logo_dark_url" type="url" class="bb-input" value="${v('logo_dark_url')}"
+        oninput="_bbBrandChanged()" placeholder="https://… (paste a URL or upload to your drive)" />
+      <div class="bb-field-hint">File upload comes in the next pass — paste a URL for now (Drive / Dropbox / S3).</div>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Logo (light background)</div>
+      <input id="bb-brand-logo_light_url" type="url" class="bb-input" value="${v('logo_light_url')}"
+        oninput="_bbBrandChanged()" placeholder="https://…" />
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Icon / favicon</div>
+      <input id="bb-brand-icon_url" type="url" class="bb-input" value="${v('icon_url')}"
+        oninput="_bbBrandChanged()" placeholder="https://… (square, 512×512+)" />
+    </div>
+
+    <h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin:24px 0 10px;letter-spacing:0.02em">Website</h3>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Current website status</div>
+      <div class="bb-choice-row">${statusOpts.map(opt => `
+        <button type="button" class="bb-choice ${websiteStatus === opt ? 'selected' : ''}" onclick="_bbBrandSetWebsiteStatus('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>
+    </div>
+
+    <div class="bb-field">
+      <div class="bb-field-label">Existing site URL</div>
+      <input id="bb-brand-website_url" type="url" class="bb-input" value="${v('website_url')}"
+        oninput="_bbBrandChanged()" placeholder="https://" />
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Domain you want to use</div>
+      <input id="bb-brand-domain" type="text" class="bb-input" value="${v('domain')}"
+        oninput="_bbBrandChanged()" placeholder="e.g. youracademy.com" />
+      <div class="bb-field-hint">If we're building or rebuilding, we'll wire DNS to this domain.</div>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Reference sites you like</div>
+      <textarea id="bb-brand-references" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Paste 2-4 URLs — we'll pull inspiration from these for the build">${v('references')}</textarea>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Brand stats / proof points</div>
+      <textarea id="bb-brand-stats" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="e.g. '15 years coaching · 200+ alumni in college ball · trained 12 D1 players'">${v('stats')}</textarea>
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Anything else about brand?</div>
+      <textarea id="bb-brand-notes" class="bb-textarea" oninput="_bbBrandChanged()" placeholder="Voice, tone, what NOT to do, etc.">${v('notes')}</textarea>
+    </div>
+
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
+
+    ${_bbMarkDoneCta('brand', 'Brand')}
+  `;
+}
+
+function _bbBrandChanged() {
+  _bbBasicsScheduleSave(() => {
+    const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    const cur = (c && c.brand_data) || {};
+    const next = { ...cur,
+      color_primary:   document.getElementById('bb-brand-color_primary')?.value || '',
+      color_secondary: document.getElementById('bb-brand-color_secondary')?.value || '',
+      color_accent:    document.getElementById('bb-brand-color_accent')?.value || '',
+      font_display:    document.getElementById('bb-brand-font_display')?.value || '',
+      font_body:       document.getElementById('bb-brand-font_body')?.value || '',
+      logo_dark_url:   document.getElementById('bb-brand-logo_dark_url')?.value || '',
+      logo_light_url:  document.getElementById('bb-brand-logo_light_url')?.value || '',
+      icon_url:        document.getElementById('bb-brand-icon_url')?.value || '',
+      website_url:     document.getElementById('bb-brand-website_url')?.value || '',
+      domain:          document.getElementById('bb-brand-domain')?.value || '',
+      references:      document.getElementById('bb-brand-references')?.value || '',
+      stats:           document.getElementById('bb-brand-stats')?.value || '',
+      notes:           document.getElementById('bb-brand-notes')?.value || '',
+    };
+    return { brand_data: next };
+  });
+}
+
+async function _bbBrandSetWebsiteStatus(opt) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+  const cur = (c && c.brand_data) || {};
+  const next = (cur.website_status === opt) ? '' : opt;
+  await _bbSaveClientBasics({ brand_data: { ...cur, website_status: next } });
+  _bbRenderFromHash();
 }
 
 // ─── BB STAFF CARD ──────────────────────────────────────────────────────
@@ -7245,6 +7545,7 @@ async function _bbRenderStaffCard(panel, meta) {
       <button class="btn-primary-bb" onclick="openInviteTeamModal()">+ Invite teammate</button>
     </div>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
+    ${_bbMarkDoneCta('staff', 'Staff')}
   `;
 
   if (!CLIENT_ID || !_sb) {
@@ -7314,6 +7615,7 @@ async function _bbRenderLocationsCard(panel, meta) {
       <button class="btn-primary-bb" onclick="_bbOpenAddLocationModal(_bbAfterLocAdd)">+ Add location</button>
     </div>
     <div id="bb-locations-list"><div class="bb-empty">Loading…</div></div>
+    ${_bbMarkDoneCta('locations', 'Locations')}
   `;
 
   await _bbLoadLocations();
@@ -7355,11 +7657,10 @@ async function _bbDeleteLocation(locationId) {
   _obtScheduleRefresh && _obtScheduleRefresh();
 }
 
+// Kept as a shim for any historical onclick that still calls
+// _bbBrandMarkDone (none in this file after the dispatcher refactor).
 async function _bbBrandMarkDone(btn) {
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
-  const ok = await _obtMarkBrandDone();
-  if (ok && btn) { btn.textContent = '✓ Marked done'; }
-  else if (btn) { btn.disabled = false; btn.textContent = "I'm done with Brand"; }
+  return _bbSectionMarkDone('brand', btn, 'Brand');
 }
 
 async function _bbRenderOffersList(panel) {
@@ -7558,20 +7859,20 @@ async function _bbFinishOffer() {
 // persisted. Hidden when client.onboarding_in_progress=false, when the
 // user explicitly dismissed it, or when all 6 sections are done.
 // ══════════════════════════════════════════════════════════════════════
-// Per-section done-state strategy (set 2026-05-26 by Zoran):
-//   general/locations/offers  — derived from data (rpc reads tables)
-//   staff                      — manual: client toggles by clicking the tracker circle
-//   brand                      — manual: client marks done on the Brand BB card
-//   meta_ads                   — manual: BAM staff toggles from staff portal overview
-// 'toggle' means clicking the circle directly flips the done flag (no nav).
-// 'nav' means clicking navigates to the relevant section in the portal.
+// Per-section done-state strategy (refined 2026-05-26 by Zoran):
+//   general / offers          — auto-derived from data (rpc reads tables)
+//   staff / locations / brand — manual: Mark-done button on the BB card
+//   meta_ads                  — manual: BAM staff toggles from staff portal
+// All 6 tracker circles just navigate now. The done-state is flipped on
+// the destination card (Brand/Staff/Locations) or upstream (Meta Ads
+// from staff side).
 const _obtSections = [
-  { id:'general',   key:'general_done',   label:'General',   action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('general') },
-  { id:'staff',     key:'staff_done',     label:'Staff',     action:'toggle' },
-  { id:'locations', key:'locations_done', label:'Locations', action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('locations') },
-  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('brand') },
-  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('offers') },
-  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav',    nav:() => switchView('marketing') }
+  { id:'general',   key:'general_done',   label:'General',   action:'nav', nav:() => switchView('blueprint') || _bbNavigate('general') },
+  { id:'staff',     key:'staff_done',     label:'Staff',     action:'nav', nav:() => switchView('blueprint') || _bbNavigate('staff') },
+  { id:'locations', key:'locations_done', label:'Locations', action:'nav', nav:() => switchView('blueprint') || _bbNavigate('locations') },
+  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav', nav:() => switchView('blueprint') || _bbNavigate('brand') },
+  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav', nav:() => switchView('blueprint') || _bbNavigate('offers') },
+  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav', nav:() => switchView('marketing') }
 ];
 let _obtProgress = null;
 
@@ -7666,15 +7967,15 @@ async function _obtToggleDone(sectionId) {
   }
 }
 
-// Marks a Mark-done-style section (currently 'brand') as completed. Called
-// from the "I'm done with Brand" button on the Brand BB card placeholder.
-// Returns the call result so the caller can update its own UI.
-async function _obtMarkBrandDone() {
+// Generic Mark-done flipper used by Brand / Staff / Locations BB cards.
+// Each card's "I'm done with X" button calls this. Returns success bool
+// so the caller can update its own button label.
+async function _obtMarkSectionDone(section, done) {
   if (!CLIENT_ID || !_sb) return false;
   const { error } = await _sb.rpc('mark_onboarding_section', {
-    p_client_id: CLIENT_ID, p_section: 'brand', p_done: true,
+    p_client_id: CLIENT_ID, p_section: section, p_done: done !== false,
   });
-  if (error) { console.warn('obt: brand mark-done failed', error.message); return false; }
+  if (error) { console.warn('obt: mark-done failed', error.message); return false; }
   _obtLoadProgress();
   return true;
 }
