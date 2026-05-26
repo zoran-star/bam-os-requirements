@@ -100,12 +100,16 @@ function stripInternalMessages(ticket) {
 // no-ops if the client doesn't have slack_channel_id set or the bot
 // token is missing.
 function clientPortalLinkForTicket(req, kind, ticketId) {
-  const origin = (req.headers["x-forwarded-host"] && `https://${req.headers["x-forwarded-host"]}`)
-    || (req.headers.origin)
-    || `https://${req.headers.host}`;
+  // Pinned to the canonical client portal domain — never derive from
+  // request headers. Otherwise Slack notifications posted via Vercel's
+  // auto-generated *.vercel.app URLs leak that hostname into
+  // client-facing links. Same reasoning as portalUrls() in api/clients.js.
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
   // We don't have deep-links to a specific ticket yet — Marketing tab on
   // the client portal is the right landing for now.
-  return `${origin}/client-portal.html`;
+  return `${base}/client-portal.html`;
 }
 
 async function postClientSlackNotification(clientId, text, req) {

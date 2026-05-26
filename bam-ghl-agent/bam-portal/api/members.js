@@ -721,9 +721,12 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
   if (!member.stripe_customer_id) {
     return res.status(400).json({ error: "member has no Stripe customer — can't make a portal link" });
   }
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  const returnUrl = body.return_url || `${proto}://${host}/client-portal.html#members`;
+  // Pin to canonical client domain unless caller overrides (Stripe customer
+  // portal return URL should never be a *.vercel.app preview hostname).
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
+  const returnUrl = body.return_url || `${base}/client-portal.html#members`;
 
   const session = await stripeFetch(`/billing_portal/sessions`, {
     method: "POST",

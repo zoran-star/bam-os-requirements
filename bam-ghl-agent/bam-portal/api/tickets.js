@@ -35,10 +35,16 @@ async function sbPatch(path, body) {
 // Mirrors postClientSlackNotification in api/marketing.js. Fire-and-forget,
 // silently no-ops if SLACK_BOT_TOKEN unset or client has no slack_channel_id.
 function clientPortalLink(req) {
-  const origin = (req.headers["x-forwarded-host"] && `https://${req.headers["x-forwarded-host"]}`)
-    || (req.headers.origin)
-    || `https://${req.headers.host}`;
-  return `${origin}/client-portal.html`;
+  // Pinned to the canonical client portal domain — never derive from
+  // request headers. Otherwise tickets posted via Vercel's auto-generated
+  // *.vercel.app URLs leak that hostname into client-facing Slack links
+  // (e.g. https://bam-portal-tawny.vercel.app/client-portal.html). Local
+  // dev falls back to the request origin. Same reasoning as portalUrls()
+  // in api/clients.js — see comment there.
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+  const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
+  return `${base}/client-portal.html`;
 }
 
 async function postClientSlackNotification(clientId, text, req) {
