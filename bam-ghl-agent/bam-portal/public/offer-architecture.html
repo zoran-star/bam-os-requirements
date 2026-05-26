@@ -987,5 +987,170 @@
   </div>
 
 </div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Spec-page comment widget — BAM team only.
+     Floating button bottom-right → modal with name + comment textarea.
+     Submits to /api/clients?action=submit-feedback with portal='spec'
+     so it lands in Zoran's Feedback tab in the staff portal.
+     ════════════════════════════════════════════════════════════════════ -->
+<style>
+  #spec-fb-btn {
+    position: fixed; bottom: 22px; right: 22px;
+    background: var(--gold); color: #0A0A0B;
+    border: 0; border-radius: 999px;
+    padding: 12px 18px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    display: flex; align-items: center; gap: 8px;
+    transition: transform 0.15s;
+  }
+  #spec-fb-btn:hover { transform: translateY(-2px); }
+  #spec-fb-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1100;
+  }
+  #spec-fb-overlay[data-open="true"] { display: flex; }
+  #spec-fb-modal {
+    background: var(--bg-card); border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    padding: 24px; width: min(520px, calc(100vw - 32px));
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  #spec-fb-modal h3 {
+    margin: 0 0 6px; font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px; color: var(--text); font-weight: 600;
+  }
+  #spec-fb-modal .sub {
+    font-size: 12px; color: var(--text-sub); margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  #spec-fb-modal label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.4px;
+    margin-bottom: 6px; margin-top: 12px;
+  }
+  #spec-fb-modal input, #spec-fb-modal textarea {
+    width: 100%; box-sizing: border-box;
+    background: var(--bg-el); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px;
+    padding: 10px 12px; font-size: 13px; font-family: inherit;
+    outline: none;
+  }
+  #spec-fb-modal input:focus, #spec-fb-modal textarea:focus {
+    border-color: var(--gold);
+  }
+  #spec-fb-modal textarea { min-height: 120px; resize: vertical; }
+  #spec-fb-actions {
+    display: flex; gap: 10px; margin-top: 18px; justify-content: flex-end;
+  }
+  #spec-fb-actions button {
+    padding: 9px 16px; border-radius: 8px;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 0;
+  }
+  #spec-fb-cancel { background: var(--bg-el); color: var(--text); border: 1px solid var(--border); }
+  #spec-fb-submit { background: var(--gold); color: #0A0A0B; }
+  #spec-fb-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  #spec-fb-msg { font-size: 12px; margin-top: 10px; min-height: 16px; }
+  #spec-fb-msg.ok { color: var(--green); }
+  #spec-fb-msg.err { color: var(--red); }
+</style>
+
+<button id="spec-fb-btn" onclick="specFbOpen()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+  Comment on this spec
+</button>
+
+<div id="spec-fb-overlay" onclick="if(event.target.id==='spec-fb-overlay') specFbClose()">
+  <div id="spec-fb-modal">
+    <h3>Comment on the Offer spec</h3>
+    <div class="sub">Your comment goes to Zoran's feedback inbox. Be specific — call out the section/heading you mean and what you'd change.</div>
+    <label for="spec-fb-name">Your email (so Zoran knows who it's from)</label>
+    <input id="spec-fb-name" type="email" placeholder="you@byanymeansbball.com" autocomplete="email" />
+    <label for="spec-fb-body">Comment</label>
+    <textarea id="spec-fb-body" placeholder="What's confusing, missing, or wrong about this spec?"></textarea>
+    <div id="spec-fb-msg"></div>
+    <div id="spec-fb-actions">
+      <button id="spec-fb-cancel" onclick="specFbClose()">Cancel</button>
+      <button id="spec-fb-submit" onclick="specFbSubmit()">Send to Zoran</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SPEC_FB_KEY = 'spec_fb_email';
+  function specFbOpen() {
+    const overlay = document.getElementById('spec-fb-overlay');
+    overlay.setAttribute('data-open', 'true');
+    // Prefill remembered email
+    try {
+      const saved = localStorage.getItem(SPEC_FB_KEY);
+      if (saved) document.getElementById('spec-fb-name').value = saved;
+    } catch (_) {}
+    setTimeout(() => document.getElementById('spec-fb-body').focus(), 50);
+  }
+  function specFbClose() {
+    document.getElementById('spec-fb-overlay').setAttribute('data-open', 'false');
+    document.getElementById('spec-fb-msg').textContent = '';
+    document.getElementById('spec-fb-msg').className = '';
+  }
+  async function specFbSubmit() {
+    const emailEl = document.getElementById('spec-fb-name');
+    const bodyEl = document.getElementById('spec-fb-body');
+    const msgEl = document.getElementById('spec-fb-msg');
+    const btn = document.getElementById('spec-fb-submit');
+    const email = (emailEl.value || '').trim();
+    const body = (bodyEl.value || '').trim();
+    msgEl.textContent = ''; msgEl.className = '';
+    if (!body) {
+      msgEl.textContent = 'Comment is required.'; msgEl.className = 'err';
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msgEl.textContent = 'Email looks off — fix or leave blank.'; msgEl.className = 'err';
+      return;
+    }
+    btn.disabled = true;
+    const origLabel = btn.textContent;
+    btn.textContent = 'Sending…';
+    try {
+      // Remember the email locally so the next comment prefills it.
+      if (email) { try { localStorage.setItem(SPEC_FB_KEY, email); } catch (_) {} }
+      const res = await fetch('/api/clients?action=submit-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body,
+          kind: 'feature',                       // comments on a spec are feature-shaped, not bugs
+          portal: 'spec',
+          page: 'offer-architecture.html',
+          submitter_email: email || null,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || ('HTTP ' + res.status));
+      }
+      msgEl.textContent = '✓ Sent to Zoran. Thanks!';
+      msgEl.className = 'ok';
+      bodyEl.value = '';
+      setTimeout(specFbClose, 1400);
+    } catch (e) {
+      msgEl.textContent = 'Failed to send: ' + (e.message || 'unknown error');
+      msgEl.className = 'err';
+      btn.disabled = false;
+      btn.textContent = origLabel;
+    } finally {
+      if (!btn.disabled) {
+        btn.disabled = false;
+        btn.textContent = origLabel;
+      }
+    }
+  }
+</script>
 </body>
 </html>

@@ -821,7 +821,7 @@ export default async function handler(req, res) {
         const fileUrl = typeof fb.file_url === "string" ? fb.file_url.trim() : null;
         const fileName = typeof fb.file_name === "string" ? fb.file_name.trim() : null;
         const page = typeof fb.page === "string" ? fb.page.trim().slice(0, 500) : "";
-        const portalKind = fb.portal === "client" || fb.portal === "staff" || fb.portal === "signup"
+        const portalKind = ["client", "staff", "signup", "spec"].includes(fb.portal)
           ? fb.portal : "client";
         if (!fbBody) return res.status(400).json({ error: "feedback body required" });
 

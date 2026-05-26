@@ -148,6 +148,7 @@ export default function FeedbackView({ tokens, dark, me, session }) {
             { value: "client", label: `Client portal` },
             { value: "staff", label: `Staff portal` },
             { value: "signup", label: `Signup page` },
+            { value: "spec", label: `Offer spec` },
           ]}
           value={portalFilter}
           onChange={setPortalFilter}
@@ -211,9 +212,11 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved }) {
   const resolved = !!f.resolved_at;
   const portalColor = f.portal === "client" ? t.amber
     : f.portal === "signup" ? "#6EB4FF"
+    : f.portal === "spec" ? "#E8C547"
     : t.green;
   const portalLabel = f.portal === "client" ? "Client portal"
     : f.portal === "signup" ? "Signup page"
+    : f.portal === "spec" ? "Offer spec"
     : "Staff portal";
   const kindColor = f.kind === "feature" ? "#C787FF" : (t.red || "#ED7969");
   const kindLabel = f.kind === "feature" ? "✨ Feature" : "🐛 Bug";
