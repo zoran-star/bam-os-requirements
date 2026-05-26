@@ -137,6 +137,23 @@ Fix (commit `d35d124`): `clientUrl` is now a hardcoded constant
 (`https://portal.byanymeansbusiness.com`), not env-overridable. The stale
 `CLIENT_PORTAL_URL` env var can be deleted from Vercel.
 
+### ⚠️ Gotcha — "Auth session missing!" on the password-set screen (found + fixed 2026-05-25)
+
+When a client clicks the invite/recovery link, the URL fragment `#access_token=...` is consumed by Supabase JS to create the session. If they click the link a second time, reload the page after the hash is stripped, open it in a different browser, clear cookies/localStorage, or wait >24h — the session is gone. `_sb.auth.updateUser({ password })` then throws `AuthSessionMissingError: Auth session missing!`, which the form was surfacing as a raw error string and a dead-end.
+
+Most-recent report: **Basketball+ (Jake)** — 2026-05-25. Same root cause has been hit by others silently (probably explains some "I never got a chance to set my password" tickets).
+
+Fix (commit `706bd4c`): `submitNewPassword()` now matches `session missing` / `auth session` / `not authenticated` / `jwt expired` substrings and renders an inline recovery card inside the existing error slot:
+
+> ⚠ Your invite link expired or was already used
+> [email field] [Send me a fresh link]
+
+Button fires `_sb.auth.resetPasswordForEmail(email, { redirectTo: '<origin>/client-portal.html?type=recovery' })` (works without a session). All other `updateUser` errors still surface their raw message — we did not generalize.
+
+**Functions:** `_showFreshLinkRecovery(errEl)` + `_sendFreshLink()` in `bam-portal/public/client-portal.html` around line 13095.
+
+**Open follow-up:** Basketball+'s `clients.slack_channel_id` = `C0AA9RFL87J` is invalid (bot returns `channel_not_found` on both `conversations.info` and `conversations.list`). Bot was likely removed from that channel, or ID is stale. Until corrected: no Slack post will land for that client, and the BAM-side "Reset password" trigger for Jake silently fails on Slack notification (the email still sends). Worth a one-time DB cleanup pass for invalid channel IDs across all clients.
+
 ### ⚠️ Gotcha — owner needs a `client_users` row (found + fixed 2026-05-22)
 
 The multi-user portal resolves access ONLY from `client_users` (via the

@@ -50,6 +50,94 @@ async function findAuthUserByEmail(email) {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+// Lists candidates for the auto-resend-invite cron. A candidate is a
+// client_users row whose linked auth user has never signed in AND never
+// confirmed email — i.e. they got an invite at some point but never
+// followed through. Filters out test domains, anyone we've already
+// retried 7+ times, and anyone we already sent something to in the
+// last 20 hours. Joins client_users + auth.users + clients in one round
+// trip via PostgREST embedded resources.
+async function listInviteResendCandidates({ hoursSince = 20, maxRetries = 7, limit = 50 } = {}) {
+  // PostgREST cannot embed auth.users from public.client_users without a
+  // declared FK in the public schema and `Accept-Profile: auth` quirks,
+  // so we do two passes: pull pending-looking client_users rows, then
+  // fetch their auth.users in a single `id=in.(...)` round trip.
+  const cuRows = await supabaseSelect(
+    `client_users?select=id,user_id,client_id,email,name,last_invite_sent_at,invite_retry_count` +
+    `&user_id=not.is.null&email=not.is.null&invite_retry_count=lt.${maxRetries}&limit=${limit}`
+  );
+  if (!Array.isArray(cuRows) || cuRows.length === 0) return [];
+
+  const userIds = cuRows.map((r) => r.user_id).filter(Boolean);
+  if (userIds.length === 0) return [];
+  const inList = userIds.map((u) => encodeURIComponent(u)).join(",");
+  const authUrl = `${SUPABASE_URL}/rest/v1/users?id=in.(${inList})` +
+    `&select=id,email,invited_at,confirmation_sent_at,recovery_sent_at,last_sign_in_at,email_confirmed_at`;
+  const authRes = await fetch(authUrl, {
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Accept-Profile": "auth",
+      "Content-Type": "application/json",
+    },
+  });
+  if (!authRes.ok) throw new Error(`auth.users lookup ${authRes.status}: ${await authRes.text()}`);
+  const authRows = await authRes.json();
+  const authById = new Map(authRows.map((u) => [u.id, u]));
+
+  const clientIds = [...new Set(cuRows.map((r) => r.client_id).filter(Boolean))];
+  const cInList = clientIds.map((c) => encodeURIComponent(c)).join(",");
+  const clients = await supabaseSelect(
+    `clients?id=in.(${cInList})&select=id,business_name,slack_channel_id`
+  );
+  const clientById = new Map((clients || []).map((c) => [c.id, c]));
+
+  const cutoff = Date.now() - hoursSince * 60 * 60 * 1000;
+  const isTestEmail = (e) => /@example\.com$|@example-not-real\.com$|@test\.|@localhost$/i.test(e || "");
+
+  return cuRows
+    .map((cu) => {
+      const au = authById.get(cu.user_id);
+      const c = clientById.get(cu.client_id);
+      if (!au || !c) return null;
+      if (au.last_sign_in_at) return null;
+      if (au.email_confirmed_at) return null;
+      if (isTestEmail(cu.email)) return null;
+      const lastOutbound = cu.last_invite_sent_at || au.recovery_sent_at || au.confirmation_sent_at || au.invited_at;
+      if (lastOutbound && new Date(lastOutbound).getTime() > cutoff) return null;
+      return {
+        cu_id: cu.id,
+        user_id: cu.user_id,
+        client_id: cu.client_id,
+        email: cu.email,
+        name: cu.name || "",
+        retry_count: cu.invite_retry_count || 0,
+        last_outbound: lastOutbound,
+        business_name: c.business_name || "",
+        slack_channel_id: c.slack_channel_id || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function markInviteResent({ cuId, retryCount }) {
+  const url = `${SUPABASE_URL}/rest/v1/client_users?id=eq.${encodeURIComponent(cuId)}`;
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      last_invite_sent_at: new Date().toISOString(),
+      invite_retry_count: (retryCount || 0) + 1,
+    }),
+  });
+  if (!res.ok) throw new Error(`mark resent ${res.status}: ${await res.text()}`);
+}
+
 async function getStripeRevenue(customerId) {
   if (!customerId || !STRIPE_KEY) return null;
 
@@ -572,6 +660,101 @@ function portalUrls(req) {
 export default async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing (need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)" });
+  }
+
+  // ── Cron job: auto-resend invite links to clients who never accepted ──
+  // Vercel cron triggers this hourly (configured in vercel.json). Auth is
+  // a bearer token matching CRON_SECRET. For each candidate (never signed
+  // in, never confirmed, last outbound >20h ago, retry_count < 7) we
+  // generate a fresh invite/recovery link via the same machinery as the
+  // staff-triggered reset-password flow and email it via Resend. Stops
+  // pinging Slack after 3 attempts so we don't spam channels.
+  if (req.query.action === "cron-resend-invites") {
+    const auth = req.headers.authorization || "";
+    const expected = process.env.CRON_SECRET;
+    if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    if (auth !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ error: "RESEND_API_KEY not configured" });
+    }
+
+    try {
+      const candidates = await listInviteResendCandidates({});
+      if (candidates.length === 0) {
+        return res.status(200).json({ ok: true, processed: 0, sent: 0, errors: 0, skipped: 0 });
+      }
+
+      const { clientUrl } = portalUrls(req);
+      const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
+      let sent = 0, errors = 0, skipped = 0;
+      const results = [];
+
+      for (const cand of candidates) {
+        try {
+          const link = await generateLinkForResetOrInvite({
+            supabaseUrl: SUPABASE_URL,
+            serviceKey: SUPABASE_SERVICE_KEY,
+            email: cand.email,
+            redirectTo,
+          });
+          if (link.notFound || !link.ok) {
+            skipped += 1;
+            results.push({ email: cand.email, status: "skipped", reason: link.notFound ? "no auth user" : "link gen failed" });
+            continue;
+          }
+
+          const sendRes = link.kind === "invite"
+            ? await sendInviteEmail({
+                to: cand.email,
+                actionLink: link.actionLink,
+                businessName: cand.business_name,
+                resendApiKey: process.env.RESEND_API_KEY,
+              })
+            : await sendResetPasswordEmail({
+                to: cand.email,
+                actionLink: link.actionLink,
+                resendApiKey: process.env.RESEND_API_KEY,
+              });
+          if (!sendRes.ok) {
+            errors += 1;
+            results.push({ email: cand.email, status: "error", reason: "email failed" });
+            continue;
+          }
+
+          // Slack notify on attempts 0,1,2 — silent after that to avoid
+          // channel spam for stale invites that may never be accepted.
+          if (link.kind === "invite" && cand.slack_channel_id && cand.retry_count < 3) {
+            await postInviteToSlack({
+              slackChannelId: cand.slack_channel_id,
+              businessName: cand.business_name,
+              ownerName: cand.name,
+              email: cand.email,
+              actionLink: link.actionLink,
+            }).catch(() => {});
+          }
+
+          await markInviteResent({ cuId: cand.cu_id, retryCount: cand.retry_count });
+          sent += 1;
+          results.push({ email: cand.email, status: "sent", kind: link.kind, retry_count: cand.retry_count + 1 });
+        } catch (e) {
+          errors += 1;
+          results.push({ email: cand.email, status: "error", reason: e.message?.slice(0, 200) });
+        }
+      }
+
+      console.log(`[cron-resend-invites] processed=${candidates.length} sent=${sent} errors=${errors} skipped=${skipped}`);
+      return res.status(200).json({
+        ok: true,
+        processed: candidates.length,
+        sent,
+        errors,
+        skipped,
+        results,
+      });
+    } catch (err) {
+      console.error("/api/clients?action=cron-resend-invites error:", err.message);
+      return res.status(500).json({ error: err.message });
+    }
   }
 
   if (req.method === "POST") {

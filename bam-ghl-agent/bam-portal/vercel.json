@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/clients?action=cron-resend-invites",
+      "schedule": "0 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
