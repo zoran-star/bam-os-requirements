@@ -6713,7 +6713,7 @@ async function startPresenceHeartbeat(userId) {
 // tab in bam-portal), the client portal hides every nav item except
 // Systems + Marketing. Mobile bottom-nav mirrors the same hide.
 let ONBOARDING_IN_PROGRESS = true;
-const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing', 'team', 'resources']);
+const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing', 'team', 'resources', 'blueprint']);
 
 function applyOnboardingNavState(inProgress) {
   ONBOARDING_IN_PROGRESS = !!inProgress;
@@ -7189,10 +7189,14 @@ function _bbRenderCardPlaceholder(panel, card) {
   const meta = _bbCards.find(c => c.id === card);
   if (!meta) return _bbRenderLanding(panel);
 
+  // Real cards dispatch to dedicated renderers
+  if (card === 'staff')     return _bbRenderStaffCard(panel, meta);
+  if (card === 'locations') return _bbRenderLocationsCard(panel, meta);
+
   // Brand is a "mark-done" section in the tracker — until the real Brand
-  // card ships in Stage 2, surface a Mark-done button on the placeholder
-  // so the client can still flip the tracker circle. Other placeholders
-  // get no button (their done state is auto-derived or staff-controlled).
+  // editor ships, surface a Mark-done button on the placeholder so the
+  // client can still flip the tracker circle. Other placeholders (general)
+  // get no button (their done state is auto-derived from data).
   const alreadyDone = !!(_obtProgress && _obtProgress[card + '_done']);
   const markDoneCta = card === 'brand'
     ? `<div style="margin-top:16px">
@@ -7219,6 +7223,136 @@ function _bbRenderCardPlaceholder(panel, card) {
     <div class="bb-empty">Coming soon — this section ships in Stage 2 of the BB build.</div>
     ${markDoneCta}
   `;
+}
+
+// ─── BB STAFF CARD ──────────────────────────────────────────────────────
+// List of academy teammates (client_users rows). Uses the same
+// invite/revoke modals that the existing Team tab uses — they're already
+// wired up, just rendered inside the BB panel here. Done-state of the
+// Staff tracker circle is the manual click-to-toggle on the circle
+// itself, so this card doesn't need a Mark-done button.
+async function _bbRenderStaffCard(panel, meta) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+      <button class="btn-primary-bb" onclick="openInviteTeamModal()">+ Invite teammate</button>
+    </div>
+    <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
+  `;
+
+  if (!CLIENT_ID || !_sb) {
+    document.getElementById('bb-staff-list').innerHTML = '<div class="bb-empty">Sign-in required.</div>';
+    return;
+  }
+
+  // Pull the list straight from client_users — same source as the
+  // existing Team tab. Mirror its TEAM_ROWS / TEAM_MY_ROLE side-effects
+  // so the invite/revoke modals (which read those globals) keep working.
+  const { data, error } = await _sb.from('client_users')
+    .select('id, name, email, role, user_id')
+    .eq('client_id', CLIENT_ID)
+    .eq('status', 'active');
+  const list = document.getElementById('bb-staff-list');
+  if (!list) return;
+  if (error) { list.innerHTML = `<div class="bb-empty">Couldn't load — ${_bbEscapeHtml(error.message)}</div>`; return; }
+
+  if (typeof TEAM_ROWS !== 'undefined') TEAM_ROWS = data || [];
+  const { data: { session } } = await _sb.auth.getSession();
+  const myId = session?.user?.id || null;
+  const myRow = (data || []).find(r => r.user_id === myId);
+  if (typeof TEAM_MY_ROLE !== 'undefined') TEAM_MY_ROLE = myRow?.role || null;
+
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="bb-empty">No teammates yet. Click "+ Invite teammate" to add the first one.</div>';
+    return;
+  }
+
+  // Owner first, then members alphabetically
+  const sorted = [...data].sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'owner' ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  list.innerHTML = sorted.map(r => {
+    const isOwner = r.role === 'owner';
+    const isMe = r.user_id === myId;
+    const canRevoke = myRow?.role === 'owner' && !isOwner && !isMe;
+    const initial = (r.name || r.email || '?').trim().slice(0, 1).toUpperCase();
+    return `<div class="team-row" style="margin-bottom:8px">
+      <div class="team-avatar">${escapeHTML(initial)}</div>
+      <div class="team-meta">
+        <div class="team-name">${escapeHTML(r.name || '(no name)')}${isMe ? '<span class="team-you">You</span>' : ''}</div>
+        <div class="team-email">${escapeHTML(r.email || '')}</div>
+      </div>
+      <div class="team-role-badge${isOwner ? ' owner' : ''}">${isOwner ? 'Owner' : 'Member'}</div>
+      ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ─── BB LOCATIONS CARD ──────────────────────────────────────────────────
+// Standalone list + add/edit/delete for the locations table. Same table
+// that powers the location_picker inside the offer wizard, so adding a
+// location here makes it pickable everywhere else immediately.
+async function _bbRenderLocationsCard(panel, meta) {
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+      <button class="btn-primary-bb" onclick="_bbOpenAddLocationModal(_bbAfterLocAdd)">+ Add location</button>
+    </div>
+    <div id="bb-locations-list"><div class="bb-empty">Loading…</div></div>
+  `;
+
+  await _bbLoadLocations();
+  _bbRenderLocationsListInPanel();
+}
+
+function _bbAfterLocAdd() {
+  // After saving a new location, just re-render the list.
+  _bbRenderLocationsListInPanel();
+  _obtScheduleRefresh && _obtScheduleRefresh();
+}
+
+function _bbRenderLocationsListInPanel() {
+  const list = document.getElementById('bb-locations-list');
+  if (!list) return;
+  if (!_bbLocations || _bbLocations.length === 0) {
+    list.innerHTML = '<div class="bb-empty">No locations yet. Click "+ Add location" to add your first one.</div>';
+    return;
+  }
+  list.innerHTML = _bbLocations.map(loc => `
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border-med);border-radius:10px;margin-bottom:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${_bbEscapeHtml(loc.title || '(untitled location)')}</div>
+        ${loc.address ? `<div style="font-size:12px;color:var(--text-sub);margin-bottom:4px">${_bbEscapeHtml(loc.address)}</div>` : ''}
+        ${loc.notes ? `<div style="font-size:11px;color:var(--text-mute);font-style:italic">${_bbEscapeHtml(loc.notes)}</div>` : ''}
+      </div>
+      <button class="bb-block-remove" onclick="_bbDeleteLocation('${loc.id}')" title="Delete location">Remove</button>
+    </div>
+  `).join('');
+}
+
+async function _bbDeleteLocation(locationId) {
+  if (!_sb || !locationId) return;
+  if (!confirm('Delete this location? Any offers using it will lose the reference.')) return;
+  const { error } = await _sb.from('locations').delete().eq('id', locationId);
+  if (error) return alert("Couldn't delete — " + error.message);
+  _bbLocations = _bbLocations.filter(l => l.id !== locationId);
+  _bbRenderLocationsListInPanel();
+  _obtScheduleRefresh && _obtScheduleRefresh();
 }
 
 async function _bbBrandMarkDone(btn) {
@@ -8676,14 +8810,18 @@ function _bbRenderTeamRow(t, idx) {
       </div>
       ${expanded ? `
         <div class="bb-block-fields" style="margin-top:14px">
-          ${_bbTeamSubsections.map(s => `
-            <details ${s.openByDefault ? 'open' : ''} style="margin-bottom:8px;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:8px 14px">
+          ${(() => { _bbTeamInitSubsExpanded(t.id); return ''; })()}
+          ${_bbTeamSubsections.map(s => {
+            const subKey = t.id + '::' + s.id;
+            const isOpen = _bbTeamExpandedSubs.has(subKey);
+            return `
+            <details ${isOpen ? 'open' : ''} ontoggle="_bbTeamSubToggled('${t.id}','${s.id}', this.open)" style="margin-bottom:8px;background:var(--surface);border:1px solid var(--border-med);border-radius:8px;padding:8px 14px">
               <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);letter-spacing:0.08em;text-transform:uppercase;padding:6px 0">${s.label}</summary>
               <div style="padding:12px 0 4px">
                 ${s.fields.map(f => _bbRenderTeamSubField(t.id, f, d[f.key])).join('')}
               </div>
             </details>
-          `).join('')}
+          `;}).join('')}
         </div>
       ` : ''}
     </div>
@@ -8698,6 +8836,27 @@ function _bbRenderTeamRow(t, idx) {
 
 const _bbTeamExpandedBlocks = {};
 function _bbTeamBlockKey(teamId, key) { return teamId + '::' + key; }
+
+// Tracks which team subsections (identity/schedule/competition/sales/
+// pricing/onboarding) are expanded per team. Initialized lazily on first
+// render with each subsection's `openByDefault`. Then we listen for the
+// native <details> toggle event so re-renders preserve open state — fixes
+// the bug where clicking a check_one inside an expanded subsection
+// triggered _bbRenderWizardBody() and re-emitted <details> without `open`.
+const _bbTeamExpandedSubs = new Set();
+const _bbTeamSubsInited = new Set();
+function _bbTeamInitSubsExpanded(teamId) {
+  if (_bbTeamSubsInited.has(teamId)) return;
+  _bbTeamSubsInited.add(teamId);
+  _bbTeamSubsections.forEach(s => {
+    if (s.openByDefault) _bbTeamExpandedSubs.add(teamId + '::' + s.id);
+  });
+}
+function _bbTeamSubToggled(teamId, subId, isOpen) {
+  const key = teamId + '::' + subId;
+  if (isOpen) _bbTeamExpandedSubs.add(key);
+  else _bbTeamExpandedSubs.delete(key);
+}
 function _bbTeamGetData(teamId) {
   const t = _bbTeamRows.find(x => x.id === teamId);
   return t ? (t.data || {}) : {};
@@ -9000,20 +9159,33 @@ function _bbRenderTeamBlockSubField(teamId, parentKey, rowIdx, sf, subVal, row) 
   `;
 }
 
+// Per-team subsection-level "Extra notes" — distinct key per subsection
+// because all team data lives flat at team.data.<key> (no nesting like
+// the offer-scope's data[sectionId][fieldKey]). Without prefixing, every
+// subsection's notes would collide on the same key.
+function _bbTeamExtraNotes(subId) {
+  return {
+    key: subId + '_extra_notes',
+    type: 'textarea',
+    label: 'Extra notes',
+    hint: 'Anything else about this section we should know'
+  };
+}
+
 const _bbTeamSubsections = [
   { id:'identity', label:'Identity', openByDefault:true, fields:[
     { key:'age_group', type:'text', label:'Age group', required:true, hint:'e.g. "15U"' },
-    { key:'level', type:'check_one', label:'Level', required:true,
-      options:['Local','Rep','AAU','Elite','Other'] },
     { key:'gender', type:'check_one', label:'Gender', required:true,
       options:['Boys','Girls'] },
     { key:'head_coach', type:'staff_select', label:'Head coach', required:true,
       hint:'Will populate from your Staff card once Stage 2 ships' },
-    { key:'assistant_coaches', type:'staff_select', label:'Assistant coaches' },
+    { key:'coaches', type:'staff_select', label:'Coaches',
+      hint:'Other coaches on this team' },
     { key:'roster_capacity', type:'number', label:'Roster capacity',
       hint:'Max players (e.g. 12)' },
     { key:'home_locations', type:'location_picker', label:'Home location', required:true,
-      hint:'Pick from your saved locations or add a new one' }
+      hint:'Pick from your saved locations or add a new one' },
+    _bbTeamExtraNotes('identity')
   ]},
   { id:'schedule', label:'Schedule', fields:[
     { key:'consistent', type:'check_one', label:'Consistent practice schedule every week?',
@@ -9035,13 +9207,15 @@ const _bbTeamSubsections = [
     { key:'comm_method', type:'textarea', label:'How players are informed of schedule' },
     { key:'season_dates', type:'text', label:'Season dates', required:true },
     { key:'blackout_days', type:'textarea', label:'Blackout days',
-      hint:'Holidays, school breaks, tournament travel, etc.' }
+      hint:'Holidays, school breaks, tournament travel, etc.' },
+    _bbTeamExtraNotes('schedule')
   ]},
   { id:'competition', label:'Competition', fields:[
     { key:'leagues', type:'text', label:'League(s) this team plays in',
       hint:'Where regular-season games come from' },
     { key:'tournaments', type:'textarea', label:'Tournaments',
-      hint:'Free-form list (name, dates, location)' }
+      hint:'Free-form list (name, dates, location)' },
+    _bbTeamExtraNotes('competition')
   ]},
   { id:'sales', label:'Sales', fields:[
     { key:'tryouts', type:'check_one', label:'Tryouts?',
@@ -9055,7 +9229,8 @@ const _bbTeamSubsections = [
     { key:'lead_notify', type:'staff_select', label:'Notify on new lead',
       hint:'Will populate from your Staff card once Stage 2 ships' },
     { key:'upsells', type:'textarea', label:'Upsells',
-      hint:'Target offer + description (e.g. "Cut player → pitch skill training")' }
+      hint:'Target offer + description (e.g. "Cut player → pitch skill training")' },
+    _bbTeamExtraNotes('sales')
   ]},
   { id:'pricing', label:'Pricing', fields:[
     { key:'team_fee', type:'currency', label:'Team fee', required:true },
@@ -9063,7 +9238,8 @@ const _bbTeamSubsections = [
       options:['Full upfront','Monthly installments','Custom'] },
     { key:'addons', type:'textarea', label:'Add-ons',
       hint:'Uniforms, travel, tournament fees, gear bundles' },
-    { key:'discount_codes', type:'text', label:'Discount codes' }
+    { key:'discount_codes', type:'text', label:'Discount codes' },
+    _bbTeamExtraNotes('pricing')
   ]},
   { id:'onboarding', label:'Onboarding', fields:[
     { key:'agreement', type:'file', label:'Agreement / waiver',
@@ -9072,7 +9248,8 @@ const _bbTeamSubsections = [
     { key:'intake_form_fields', type:'textarea', label:'Roster intake form fields',
       hint:'Defaults: player + parent contact + emergency contact. Optional: jersey/shorts/shoe size, dietary, allergies' },
     { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
-      hint:'Will populate from your Staff card once Stage 2 ships' }
+      hint:'Will populate from your Staff card once Stage 2 ships' },
+    _bbTeamExtraNotes('onboarding')
   ]}
 ];
 
