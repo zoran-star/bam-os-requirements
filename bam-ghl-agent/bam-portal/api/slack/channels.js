@@ -18,6 +18,16 @@ function getWriteClient(jwt) {
   });
 }
 
+// Pinned to the canonical staff URL — Slack's registered redirect_uri
+// must match exactly. Otherwise Vercel's *.vercel.app preview hostname
+// leaks into the redirect_uri and Slack rejects with "bad_redirect_uri".
+function staffBaseUrl(req) {
+  if (process.env.STAFF_PORTAL_URL) return process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
+  return "https://staff.byanymeansbusiness.com";
+}
+
 // ─── Helpers ───
 
 async function resolveSlackToken(req) {
@@ -109,9 +119,7 @@ async function handleOAuthStart(req, res) {
   if (!token) return res.status(400).json({ error: "Missing auth token" });
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: "Invalid auth token" });
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  const redirectUri = `${proto}://${host}/api/slack/channels?action=oauth-callback`;
+  const redirectUri = `${staffBaseUrl(req)}/api/slack/channels?action=oauth-callback`;
   const slackUrl = new URL("https://slack.com/oauth/v2/authorize");
   slackUrl.searchParams.set("client_id", clientId);
   slackUrl.searchParams.set("user_scope", SCOPES);
@@ -130,9 +138,7 @@ async function handleOAuthCallback(req, res) {
   const clientId = process.env.SLACK_CLIENT_ID;
   const clientSecret = process.env.SLACK_CLIENT_SECRET;
   if (!clientId || !clientSecret) return res.redirect(302, "/?nav=settings&slack=error");
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  const redirectUri = `${proto}://${host}/api/slack/channels?action=oauth-callback`;
+  const redirectUri = `${staffBaseUrl(req)}/api/slack/channels?action=oauth-callback`;
   try {
     const tokenRes = await fetch("https://slack.com/api/oauth.v2.access", {
       method: "POST",

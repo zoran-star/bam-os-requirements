@@ -29,9 +29,22 @@ async function verifySupabaseUser(token) {
   }
 }
 
+// Canonical staff URL — used everywhere we generate OAuth redirect URIs.
+// Otherwise Vercel's *.vercel.app preview hostname leaks into Google's
+// allow-list mismatch (and into Slack notifications, etc). Pinned to
+// STAFF_PORTAL_URL env, else canonical staff.byanymeansbusiness.com.
+// Dev/localhost falls through. The registered redirect URI in the
+// Google Cloud Console MUST match the canonical staff URL.
+function staffBaseUrl(req) {
+  if (process.env.STAFF_PORTAL_URL) return process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
+  return "https://staff.byanymeansbusiness.com";
+}
+
 export default async function handler(req, res) {
   const step = req.query.step;
-  const redirectUri = `https://${req.headers.host}/api/auth/google/callback`;
+  const redirectUri = `${staffBaseUrl(req)}/api/auth/google/callback`;
 
   // ── LOGIN: send the staff member to Google's consent screen ──
   if (step === "login") {

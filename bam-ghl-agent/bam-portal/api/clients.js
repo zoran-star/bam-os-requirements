@@ -1573,6 +1573,17 @@ export default async function handler(req, res) {
           patch.onboarding_in_progress = v;
         }
 
+        // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
+        // body sends a boolean, we store NOW() / NULL on the timestamp
+        // column. The client-portal tracker reads it via get_onboarding_progress().
+        if (wasSet("meta_ads_marked_done")) {
+          const v = body.meta_ads_marked_done;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "meta_ads_marked_done must be a boolean" });
+          }
+          patch.meta_ads_marked_done_at = v ? new Date().toISOString() : null;
+        }
+
         if (wasSet("onboarding_method")) {
           const m = body.onboarding_method;
           if (m !== null && !["call", "send_link"].includes(m)) {

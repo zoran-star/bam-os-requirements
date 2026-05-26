@@ -927,9 +927,14 @@ const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
 const META_OAUTH_SCOPES = ["ads_read", "public_profile"];
 
 function metaGetOrigin(req) {
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  return `${proto}://${host}`;
+  // Pinned to the canonical staff URL — the Meta OAuth redirect URI
+  // registered in the Meta app config must match exactly. Without this,
+  // Vercel's *.vercel.app preview hostname leaks into the redirect_uri
+  // param and Meta rejects with "URL Blocked".
+  if (process.env.STAFF_PORTAL_URL) return process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
+  return "https://staff.byanymeansbusiness.com";
 }
 
 function metaSignState(payload) {

@@ -45,13 +45,17 @@ function nowIso() {
 }
 
 function getOrigin(req) {
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host;
-  return `${proto}://${host}`;
+  // Pinned to canonical staff URL — Stripe Connect's registered redirect
+  // URI must match exactly, and we don't want *.vercel.app preview
+  // hostnames sneaking into the URI. The canonical
+  // staff.byanymeansbusiness.com is the one registered in Stripe.
+  if (process.env.STAFF_PORTAL_URL) return process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  const origin = req.headers.origin || `https://${req.headers.host || ""}`;
+  if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
+  return "https://staff.byanymeansbusiness.com";
 }
 
 // The redirect URI registered in the Stripe Connect dashboard must match this.
-// Register the canonical custom domain + the .vercel.app fallback.
 function redirectUri(req) {
   return `${getOrigin(req)}/api/stripe/connect`;
 }

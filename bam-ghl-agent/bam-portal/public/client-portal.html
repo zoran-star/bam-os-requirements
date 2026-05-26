@@ -7188,6 +7188,23 @@ function _bbRenderLanding(panel) {
 function _bbRenderCardPlaceholder(panel, card) {
   const meta = _bbCards.find(c => c.id === card);
   if (!meta) return _bbRenderLanding(panel);
+
+  // Brand is a "mark-done" section in the tracker — until the real Brand
+  // card ships in Stage 2, surface a Mark-done button on the placeholder
+  // so the client can still flip the tracker circle. Other placeholders
+  // get no button (their done state is auto-derived or staff-controlled).
+  const alreadyDone = !!(_obtProgress && _obtProgress[card + '_done']);
+  const markDoneCta = card === 'brand'
+    ? `<div style="margin-top:16px">
+         <button class="btn-primary-bb" onclick="_bbBrandMarkDone(this)" ${alreadyDone ? 'disabled' : ''}>
+           ${alreadyDone ? '✓ Marked done' : "I'm done with Brand"}
+         </button>
+         <div style="font-size:11px;color:var(--text-mute);margin-top:8px;line-height:1.5">
+           Marks the Brand circle in the onboarding tracker. The full Brand editor (logos, colors, fonts, website spec) is coming in a later release.
+         </div>
+       </div>`
+    : '';
+
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -7200,7 +7217,15 @@ function _bbRenderCardPlaceholder(panel, card) {
       </div>
     </div>
     <div class="bb-empty">Coming soon — this section ships in Stage 2 of the BB build.</div>
+    ${markDoneCta}
   `;
+}
+
+async function _bbBrandMarkDone(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const ok = await _obtMarkBrandDone();
+  if (ok && btn) { btn.textContent = '✓ Marked done'; }
+  else if (btn) { btn.disabled = false; btn.textContent = "I'm done with Brand"; }
 }
 
 async function _bbRenderOffersList(panel) {
@@ -7399,13 +7424,20 @@ async function _bbFinishOffer() {
 // persisted. Hidden when client.onboarding_in_progress=false, when the
 // user explicitly dismissed it, or when all 6 sections are done.
 // ══════════════════════════════════════════════════════════════════════
+// Per-section done-state strategy (set 2026-05-26 by Zoran):
+//   general/locations/offers  — derived from data (rpc reads tables)
+//   staff                      — manual: client toggles by clicking the tracker circle
+//   brand                      — manual: client marks done on the Brand BB card
+//   meta_ads                   — manual: BAM staff toggles from staff portal overview
+// 'toggle' means clicking the circle directly flips the done flag (no nav).
+// 'nav' means clicking navigates to the relevant section in the portal.
 const _obtSections = [
-  { id:'general',   key:'general_done',   label:'General',   nav:() => switchView('blueprint') || _bbNavigate('general') },
-  { id:'staff',     key:'staff_done',     label:'Staff',     nav:() => switchView('blueprint') || _bbNavigate('staff') },
-  { id:'locations', key:'locations_done', label:'Locations', nav:() => switchView('blueprint') || _bbNavigate('locations') },
-  { id:'brand',     key:'brand_done',     label:'Brand',     nav:() => switchView('blueprint') || _bbNavigate('brand') },
-  { id:'offers',    key:'offers_done',    label:'Offers',    nav:() => switchView('blueprint') || _bbNavigate('offers') },
-  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  nav:() => switchView('marketing') }
+  { id:'general',   key:'general_done',   label:'General',   action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('general') },
+  { id:'staff',     key:'staff_done',     label:'Staff',     action:'toggle' },
+  { id:'locations', key:'locations_done', label:'Locations', action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('locations') },
+  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('brand') },
+  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav',    nav:() => switchView('blueprint') || _bbNavigate('offers') },
+  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav',    nav:() => switchView('marketing') }
 ];
 let _obtProgress = null;
 
@@ -7470,7 +7502,47 @@ function _obtRender() {
 function _obtClick(sectionId) {
   const s = _obtSections.find(x => x.id === sectionId);
   if (!s) return;
+  if (s.action === 'toggle') {
+    _obtToggleDone(sectionId);
+    return;
+  }
   try { s.nav(); } catch (_) { /* nav helpers chain via OR */ }
+}
+
+// Flips a manual-done flag (currently only 'staff' from this UI; 'brand'
+// is flipped from the Brand BB card's Mark-done button instead). Optimistic
+// update — paint the circle immediately, roll back on RPC failure.
+async function _obtToggleDone(sectionId) {
+  if (!CLIENT_ID || !_sb || !_obtProgress) return;
+  const key = sectionId + '_done';
+  const before = !!_obtProgress[key];
+  _obtProgress[key] = !before;
+  _obtRender();
+  try {
+    const { error } = await _sb.rpc('mark_onboarding_section', {
+      p_client_id: CLIENT_ID,
+      p_section: sectionId,
+      p_done: !before,
+    });
+    if (error) throw error;
+  } catch (e) {
+    console.warn('obt: toggle failed', e.message);
+    _obtProgress[key] = before;  // rollback
+    _obtRender();
+  }
+}
+
+// Marks a Mark-done-style section (currently 'brand') as completed. Called
+// from the "I'm done with Brand" button on the Brand BB card placeholder.
+// Returns the call result so the caller can update its own UI.
+async function _obtMarkBrandDone() {
+  if (!CLIENT_ID || !_sb) return false;
+  const { error } = await _sb.rpc('mark_onboarding_section', {
+    p_client_id: CLIENT_ID, p_section: 'brand', p_done: true,
+  });
+  if (error) { console.warn('obt: brand mark-done failed', error.message); return false; }
+  _obtLoadProgress();
+  return true;
 }
 
 async function _obtDismiss() {

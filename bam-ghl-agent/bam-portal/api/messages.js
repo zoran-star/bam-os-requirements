@@ -132,8 +132,19 @@ async function notifyMentionedStaff({ mentioned_staff_ids, conversation, message
     businessName = cRows?.[0]?.business_name || "";
   } catch (_) {}
 
-  // Origin → staff portal link the receiver will click
-  const origin = (process.env.STAFF_PORTAL_URL || req.headers.origin || `https://${req.headers.host}` || "").replace(/\/+$/, "");
+  // Origin → staff portal link the receiver will click. Pinned to
+  // STAFF_PORTAL_URL, else canonical staff.byanymeansbusiness.com.
+  // Never derived from request headers — Slack DMs from .vercel.app
+  // preview origins would leak the preview hostname.
+  let origin;
+  if (process.env.STAFF_PORTAL_URL) {
+    origin = process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  } else {
+    const reqOrigin = req.headers.origin || `https://${req.headers.host || ""}`;
+    origin = /localhost|127\.0\.0\.1/.test(reqOrigin)
+      ? reqOrigin.replace(/\/+$/, "")
+      : "https://staff.byanymeansbusiness.com";
+  }
   const portalLink = `${origin}/?nav=inbox`;
 
   const preview = (message?.body || "").trim().slice(0, 180);

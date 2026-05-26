@@ -491,6 +491,13 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   // only sees Systems + Marketing tabs.
   const onboardingInProgress = client.onboarding_in_progress !== false; // default ON if unset
 
+  // Meta Ads onboarding-tracker flag. Staff flips this to fill the
+  // "Meta Ads" circle on the client's onboarding tracker — clients can't
+  // self-check it because BAM verifies the Meta connection from the staff
+  // side. Stored as timestamptz on clients (non-null = done).
+  const metaAdsDone = !!client.meta_ads_marked_done_at;
+  const [savingMetaAds, setSavingMetaAds] = useState(false);
+
   async function toggleOnboarding(next) {
     setSavingOnb(true);
     const tok = session?.access_token;
@@ -510,6 +517,28 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
       alert("Couldn't save: " + (e?.message || e));
     } finally {
       setSavingOnb(false);
+    }
+  }
+
+  async function toggleMetaAdsDone(next) {
+    setSavingMetaAds(true);
+    const tok = session?.access_token;
+    try {
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, meta_ads_marked_done: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert("Couldn't save: " + (j.error || res.statusText));
+      } else if (onChanged) {
+        onChanged();
+      }
+    } catch (e) {
+      alert("Couldn't save: " + (e?.message || e));
+    } finally {
+      setSavingMetaAds(false);
     }
   }
 
@@ -573,6 +602,31 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
             {onboardingInProgress
               ? "Full portal: Messages, Systems, Marketing, Resources, Business Blueprint, Team."
               : "Client sees ONLY Systems + Marketing. All other tabs are hidden."}
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 10, padding: "12px 14px",
+          background: metaAdsDone ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${metaAdsDone ? t.accentBorder : t.border}`,
+          borderRadius: 8,
+        }}>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 10,
+            cursor: "pointer", fontSize: 13, color: t.text,
+          }}>
+            <input
+              type="checkbox"
+              checked={metaAdsDone}
+              disabled={savingMetaAds}
+              onChange={(e) => toggleMetaAdsDone(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
+            />
+            <span style={{ fontWeight: 600 }}>Meta Ads onboarding complete?</span>
+            {savingMetaAds && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
+          </label>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
+            Fills the "Meta Ads" circle on the client's onboarding tracker. Check when Meta is wired + the ad account is producing data on the client's Marketing tab.
           </div>
         </div>
 
