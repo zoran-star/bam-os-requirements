@@ -6418,6 +6418,95 @@ Then the call to action."]</div>
         #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
         #view-blueprint .bb-step-dot .bb-step-num { margin:0; }
       }
+
+      /* ─── Onboarding Tracker widget (Stage 3) ───────────────────────── */
+      /* Floating top-right pill on desktop showing 6 BB-section circles. */
+      /* Auto-hides when client.onboarding_in_progress=false, when */
+      /* tracker_dismissed=true, or when all 6 sections are done. */
+      #obt-widget {
+        position: fixed;
+        top: 70px;
+        right: 24px;
+        z-index: 1200;
+        width: 280px;
+        background: var(--surface);
+        border: 1px solid var(--border-med);
+        border-radius: 12px;
+        padding: 12px 14px 14px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.35);
+        font-family: inherit;
+        display: none;
+      }
+      #obt-widget[data-visible="true"] { display: block; }
+      #obt-widget .obt-head {
+        display: flex; align-items: center; gap: 8px;
+        margin-bottom: 10px;
+      }
+      #obt-widget .obt-title {
+        font-size: 11px; font-weight: 600; letter-spacing: 0.4px;
+        text-transform: uppercase; color: var(--text-sub);
+        flex: 1;
+      }
+      #obt-widget .obt-progress {
+        font-size: 11px; font-weight: 600;
+        color: var(--accent); font-variant-numeric: tabular-nums;
+      }
+      #obt-widget .obt-dismiss {
+        background: transparent; border: 0;
+        color: var(--text-mute);
+        font-size: 18px; line-height: 1;
+        cursor: pointer; padding: 0 4px;
+      }
+      #obt-widget .obt-dismiss:hover { color: var(--text); }
+      #obt-widget .obt-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 6px;
+      }
+      #obt-widget .obt-circle {
+        display: flex; flex-direction: column; align-items: center; gap: 4px;
+        padding: 8px 4px;
+        background: transparent; border: 1px solid transparent;
+        border-radius: 8px;
+        cursor: pointer; font-family: inherit;
+        transition: background 0.15s, border-color 0.15s;
+      }
+      #obt-widget .obt-circle:hover {
+        background: var(--surface-alt, rgba(255,255,255,0.03));
+        border-color: var(--border-soft, var(--border-med));
+      }
+      #obt-widget .obt-dot {
+        width: 22px; height: 22px; border-radius: 50%;
+        border: 1.5px solid var(--border-med);
+        background: transparent;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; color: var(--text-mute);
+      }
+      #obt-widget .obt-circle.done .obt-dot {
+        background: var(--accent); border-color: var(--accent);
+        color: #0A0A0B; font-weight: 600;
+      }
+      #obt-widget .obt-circle.done .obt-dot::before {
+        content: '✓'; font-size: 12px;
+      }
+      #obt-widget .obt-label {
+        font-size: 10px; color: var(--text-sub);
+        line-height: 1.2; text-align: center;
+      }
+      #obt-widget .obt-circle.done .obt-label { color: var(--text); }
+
+      @media (max-width: 720px) {
+        #obt-widget {
+          top: auto;
+          bottom: 76px;          /* sit above the mobile bottom nav */
+          left: 12px; right: 12px;
+          width: auto;
+          padding: 10px 12px 12px;
+        }
+        #obt-widget .obt-grid { grid-template-columns: repeat(6, 1fr); gap: 4px; }
+        #obt-widget .obt-circle { padding: 6px 2px; }
+        #obt-widget .obt-label { font-size: 9px; }
+      }
     </style>
 
     <div class="view" id="view-blueprint">
@@ -7302,6 +7391,109 @@ async function _bbFinishOffer() {
   if (error) return alert("Couldn't finish — " + error.message);
   _bbNavigate('offers');
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// ONBOARDING TRACKER — Stage 3 of the BB build
+// 6-circle widget showing per-section completion. Derived live from data
+// presence via get_onboarding_progress() RPC; only the dismiss flag is
+// persisted. Hidden when client.onboarding_in_progress=false, when the
+// user explicitly dismissed it, or when all 6 sections are done.
+// ══════════════════════════════════════════════════════════════════════
+const _obtSections = [
+  { id:'general',   key:'general_done',   label:'General',   nav:() => switchView('blueprint') || _bbNavigate('general') },
+  { id:'staff',     key:'staff_done',     label:'Staff',     nav:() => switchView('blueprint') || _bbNavigate('staff') },
+  { id:'locations', key:'locations_done', label:'Locations', nav:() => switchView('blueprint') || _bbNavigate('locations') },
+  { id:'brand',     key:'brand_done',     label:'Brand',     nav:() => switchView('blueprint') || _bbNavigate('brand') },
+  { id:'offers',    key:'offers_done',    label:'Offers',    nav:() => switchView('blueprint') || _bbNavigate('offers') },
+  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  nav:() => switchView('marketing') }
+];
+let _obtProgress = null;
+
+async function _obtLoadProgress(opts) {
+  if (!CLIENT_ID || !_sb) return;
+  try {
+    const { data, error } = await _sb.rpc('get_onboarding_progress', { p_client_id: CLIENT_ID });
+    if (error) { console.warn('obt: rpc error', error.message); return; }
+    _obtProgress = data;
+    _obtRender();
+  } catch (e) {
+    console.warn('obt: load failed', e.message);
+  }
+}
+
+function _obtRender() {
+  let widget = document.getElementById('obt-widget');
+  const p = _obtProgress;
+  if (!p) {
+    if (widget) widget.setAttribute('data-visible', 'false');
+    return;
+  }
+
+  // Visibility gates:
+  //   1) client must still be in onboarding (staff hasn't flipped the switch off)
+  //   2) user hasn't dismissed
+  //   3) at least one section is still undone
+  const inProgress = p.in_progress === true;
+  const dismissed = p.tracker_dismissed === true;
+  const doneCount = _obtSections.filter(s => p[s.key]).length;
+  const allDone = doneCount === _obtSections.length;
+
+  if (!inProgress || dismissed || allDone) {
+    if (widget) widget.setAttribute('data-visible', 'false');
+    return;
+  }
+
+  if (!widget) {
+    widget = document.createElement('div');
+    widget.id = 'obt-widget';
+    document.body.appendChild(widget);
+  }
+
+  widget.innerHTML = `
+    <div class="obt-head">
+      <span class="obt-title">Onboarding setup</span>
+      <span class="obt-progress">${doneCount}/${_obtSections.length}</span>
+      <button class="obt-dismiss" onclick="_obtDismiss()" title="Hide this">×</button>
+    </div>
+    <div class="obt-grid">
+      ${_obtSections.map(s => `
+        <button class="obt-circle ${p[s.key] ? 'done' : ''}" onclick="_obtClick('${s.id}')">
+          <div class="obt-dot"></div>
+          <div class="obt-label">${s.label}</div>
+        </button>
+      `).join('')}
+    </div>
+  `;
+  widget.setAttribute('data-visible', 'true');
+}
+
+function _obtClick(sectionId) {
+  const s = _obtSections.find(x => x.id === sectionId);
+  if (!s) return;
+  try { s.nav(); } catch (_) { /* nav helpers chain via OR */ }
+}
+
+async function _obtDismiss() {
+  const widget = document.getElementById('obt-widget');
+  if (widget) widget.setAttribute('data-visible', 'false');
+  if (!CLIENT_ID || !_sb) return;
+  try {
+    await _sb.rpc('dismiss_onboarding_tracker', { p_client_id: CLIENT_ID });
+    if (_obtProgress) _obtProgress.tracker_dismissed = true;
+  } catch (e) {
+    console.warn('obt: dismiss failed', e.message);
+  }
+}
+
+// Refresh on hash change (user navigated away from a BB card — they may
+// have just completed it) and on switchClient (different client, fresh
+// state). Debounced so back-and-forth nav doesn't hammer the RPC.
+let _obtRefreshTimer = null;
+function _obtScheduleRefresh() {
+  if (_obtRefreshTimer) clearTimeout(_obtRefreshTimer);
+  _obtRefreshTimer = setTimeout(_obtLoadProgress, 400);
+}
+window.addEventListener('hashchange', _obtScheduleRefresh);
 
 // ──────────────────────────────────────────────────────────────────
 // Config-driven offer-type form rendering. Per type, per section, an
@@ -8961,6 +9153,7 @@ async function switchClient(newId) {
   await loadAcademyName();
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
+  _obtLoadProgress();           // refresh tracker for the new client's progress state
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -14230,6 +14423,12 @@ async function boot() {
   // for this user so the staff Clients page can show a green online dot.
   // Fires immediately, then every 30s while the portal is open.
   startPresenceHeartbeat(session.user.id);
+
+  // Onboarding tracker widget — 6 circles, hidden if dismissed / fully
+  // done / staff has flipped onboarding_in_progress=false. Loads after
+  // CLIENT_ID is set; auto-refreshes on hashchange (so completing an
+  // offer or filling in a BB card flips its circle live).
+  _obtLoadProgress();
 
   // Admin-only floating red feedback button (no-op if user isn't admin/scaling)
   setupAdminFeedbackWidget();
