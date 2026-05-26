@@ -4972,8 +4972,9 @@
         Members
       </div>
 
-      <div class="nav-item" data-feature="team" onclick="switchView('team', this)">
-        <span class="nav-icon" aria-hidden="true">
+      <!-- Team tab merged into Business Blueprint > Staff card (2026-05-26).
+           Removed: standalone Team nav. Staff = portal teammates. -->
+      <div class="nav-item" data-feature="team" onclick="switchView('team', this)" style="display:none"><span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -6585,7 +6586,9 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Members</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-feature="team" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team">
+    <!-- Mobile Team button removed — merged into BB > Staff card 2026-05-26.
+         Owners reach staff management via the Business Blueprint tab. -->
+    <button type="button" class="mobile-nav-item" data-feature="team" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
@@ -6713,7 +6716,10 @@ async function startPresenceHeartbeat(userId) {
 // tab in bam-portal), the client portal hides every nav item except
 // Systems + Marketing. Mobile bottom-nav mirrors the same hide.
 let ONBOARDING_IN_PROGRESS = true;
-const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing', 'team', 'resources', 'blueprint']);
+// Team merged into Business Blueprint > Staff card 2026-05-26 — no
+// standalone Team nav anymore. BB stays in this set so it shows on
+// the trimmed (post-onboarding) nav too.
+const ONBOARDING_VISIBLE_VIEWS = new Set(['systems', 'marketing', 'resources', 'blueprint']);
 
 function applyOnboardingNavState(inProgress) {
   ONBOARDING_IN_PROGRESS = !!inProgress;
@@ -7544,6 +7550,9 @@ async function _bbRenderStaffCard(panel, meta) {
       </div>
       <button class="btn-primary-bb" onclick="openInviteTeamModal()">+ Invite teammate</button>
     </div>
+    <p style="font-size:13px;color:var(--text-sub);line-height:1.55;margin:0 0 16px;max-width:680px">
+      Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; only the account owner can revoke access.
+    </p>
     <div id="bb-staff-list"><div class="bb-empty">Loading…</div></div>
     ${_bbMarkDoneCta('staff', 'Staff')}
   `;
@@ -7778,6 +7787,149 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbTeamRows = [];
   _bbExpandedTeams = new Set();
   _bbLoadLocations();             // warm the locations cache for pickers
+  await _bbLoadOfferFiles(offer.id);
+  _bbRenderWizardBody();
+}
+
+// ─── File uploads — offer-scope + team-scope ─────────────────────────────
+// Backed by the offer_files table + offers Supabase storage bucket
+// (public). One cache per wizard session, keyed by offer_id. Storage
+// path naming guarantees per-client isolation even though the bucket is
+// public:
+//   offer-scope: <client_id>/<offer_id>/<sectionId>/<fieldKey>/<filename>
+//   team-scope:  <client_id>/<offer_id>/teams/<team_id>/<fieldKey>/<filename>
+// offer_files.section stores the field identifier so we can query+
+// display files per field:
+//   offer-scope: '<sectionId>:<fieldKey>'   (sectionId disambiguates)
+//   team-scope:  '<fieldKey>'                (team data is flat)
+let _bbOfferFilesCache = [];
+let _bbOfferFilesLoadedFor = null;
+
+async function _bbLoadOfferFiles(offerId) {
+  if (!_sb || !offerId) return;
+  if (_bbOfferFilesLoadedFor === offerId) return _bbOfferFilesCache;
+  const { data, error } = await _sb.from('offer_files')
+    .select('*').eq('offer_id', offerId)
+    .order('created_at', { ascending: true });
+  if (error) { console.warn('offer_files load failed:', error.message); return; }
+  _bbOfferFilesCache = data || [];
+  _bbOfferFilesLoadedFor = offerId;
+}
+
+function _bbOfferFilePublicUrl(storagePath) {
+  if (!_sb) return '';
+  const { data } = _sb.storage.from('offers').getPublicUrl(storagePath);
+  return data?.publicUrl || '';
+}
+
+function _bbFilesForField(ctx) {
+  return _bbOfferFilesCache.filter(f =>
+    f.offer_id === ctx.offerId &&
+    (ctx.teamId ? f.team_id === ctx.teamId : !f.team_id) &&
+    f.section === ctx.sectionKey
+  );
+}
+
+// Renders the file widget (drop zone + uploaded files list + remove btn).
+// `multi` controls whether multiple files are accepted (field.type === 'files')
+function _bbRenderFileWidget(field, ctx) {
+  const files = _bbFilesForField(ctx);
+  const multi = field.type === 'files';
+  const inputId = 'bb-file-input-' + (ctx.teamId || 'offer') + '-' +
+    ctx.sectionKey.replace(/[^a-zA-Z0-9]/g, '_');
+  const teamArg = ctx.teamId ? `'${ctx.teamId}'` : 'null';
+  const filesHtml = files.length
+    ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">${files.map(f => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface-alt,var(--surface));border:1px solid var(--border-med);border-radius:8px">
+          <span style="font-size:14px">📎</span>
+          <a href="${_bbEscapeHtml(_bbOfferFilePublicUrl(f.storage_path))}" target="_blank" rel="noopener"
+             style="flex:1;font-size:13px;color:var(--accent);text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_bbEscapeHtml(f.filename)}</a>
+          <span style="font-size:11px;color:var(--text-mute);font-variant-numeric:tabular-nums">${_bbFormatFileSize(f.size_bytes)}</span>
+          <button type="button" class="bb-block-remove" onclick="_bbDeleteOfferFile('${f.id}')">Remove</button>
+        </div>
+      `).join('')}</div>`
+    : '';
+  const showUploadBtn = multi || files.length === 0;
+  return `
+    <div>
+      ${filesHtml}
+      ${showUploadBtn ? `
+        <label for="${inputId}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-sub);font-size:13px;cursor:pointer;font-family:inherit">
+          <span style="font-size:14px">📎</span>
+          <span>${files.length === 0 ? 'Upload file' : '+ Add another'}</span>
+        </label>
+        <input id="${inputId}" type="file" ${multi ? 'multiple' : ''} style="display:none"
+          onchange="_bbHandleFileUpload(this, '${ctx.offerId}', ${teamArg}, '${_bbEscapeAttr(ctx.sectionKey)}')" />
+      ` : ''}
+    </div>
+  `;
+}
+
+function _bbFormatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+async function _bbHandleFileUpload(inputEl, offerId, teamId, sectionKey) {
+  if (!_sb || !CLIENT_ID) return;
+  const files = Array.from(inputEl.files || []);
+  if (files.length === 0) return;
+  const teamSeg = teamId ? `teams/${teamId}` : sectionKey.split(':')[0];
+  const fieldSeg = teamId ? sectionKey : sectionKey.split(':').slice(1).join(':');
+  inputEl.disabled = true;
+
+  for (const file of files) {
+    // Storage path — UUID-prefixed filename to avoid clobbers.
+    const cleanName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const path = `${CLIENT_ID}/${offerId}/${teamSeg}/${fieldSeg}/${stamp}-${cleanName}`;
+
+    const { error: upErr } = await _sb.storage.from('offers').upload(path, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream'
+    });
+    if (upErr) {
+      alert("Couldn't upload " + file.name + " — " + upErr.message);
+      continue;
+    }
+    const { data: row, error: insErr } = await _sb.from('offer_files').insert({
+      offer_id: offerId,
+      team_id: teamId || null,
+      section: sectionKey,
+      filename: file.name,
+      storage_path: path,
+      mime_type: file.type || null,
+      size_bytes: file.size,
+      sort_order: _bbOfferFilesCache.filter(f =>
+        f.offer_id === offerId && f.section === sectionKey).length,
+    }).select().single();
+    if (insErr) {
+      alert("Uploaded but couldn't save metadata: " + insErr.message);
+      // Best-effort: roll back the storage object.
+      _sb.storage.from('offers').remove([path]).catch(() => {});
+      continue;
+    }
+    _bbOfferFilesCache.push(row);
+  }
+
+  inputEl.disabled = false;
+  inputEl.value = '';
+  _bbRenderWizardBody();
+}
+
+async function _bbDeleteOfferFile(fileId) {
+  if (!_sb) return;
+  if (!confirm('Remove this file?')) return;
+  const f = _bbOfferFilesCache.find(x => x.id === fileId);
+  if (!f) return;
+  // Delete storage first; if it fails, we still drop the DB row (object
+  // becomes orphan but won't surface in UI). Either way the user sees
+  // the row removed instantly.
+  await _sb.storage.from('offers').remove([f.storage_path]).catch(() => {});
+  const { error } = await _sb.from('offer_files').delete().eq('id', fileId);
+  if (error) { alert("Couldn't remove: " + error.message); return; }
+  _bbOfferFilesCache = _bbOfferFilesCache.filter(x => x.id !== fileId);
   _bbRenderWizardBody();
 }
 
@@ -8713,9 +8865,21 @@ function _bbRenderField(field, sectionId) {
     }
     case 'file':
     case 'files':
-    case 'text_files':
-      body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">📎 File upload coming in the next build pass — saves to the <code>offers</code> Supabase storage bucket. For now, describe the file in Extra notes if needed.</div>`;
+    case 'text_files': {
+      // Real upload — saves to offer_files + the offers storage bucket.
+      // Section key = "<sectionId>:<fieldKey>" so multiple file fields
+      // in the same section stay separate.
+      if (!_bbState.offer || !_bbState.offer.id) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then come back to upload files.</div>`;
+      } else {
+        body = _bbRenderFileWidget(field, {
+          offerId: _bbState.offer.id,
+          teamId: null,
+          sectionKey: sectionId + ':' + field.key,
+        });
+      }
       break;
+    }
     case 'staff_select':
       body = `<input type="text" class="bb-input" placeholder="Staff selector coming once Staff card ships (Stage 2)" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
       break;
@@ -9373,9 +9537,19 @@ function _bbRenderTeamSubField(teamId, f, val) {
       break;
     case 'file':
     case 'files':
-    case 'text_files':
-      body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">📎 File upload coming in the next build pass — saves to the <code>offers</code> Supabase storage bucket. For now, describe the file in Extra notes if needed.</div>`;
+    case 'text_files': {
+      if (!_bbState.offer || !_bbState.offer.id) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">Save the offer first, then come back to upload files.</div>`;
+      } else {
+        // Team-scope section key is just the field key — team data is flat.
+        body = _bbRenderFileWidget(f, {
+          offerId: _bbState.offer.id,
+          teamId,
+          sectionKey: f.key,
+        });
+      }
       break;
+    }
     default:
       body = `<input type="text" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
   }
