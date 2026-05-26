@@ -4972,18 +4972,7 @@
         Members
       </div>
 
-      <!-- Team tab merged into Business Blueprint > Staff card (2026-05-26).
-           Removed: standalone Team nav. Staff = portal teammates. -->
-      <div class="nav-item" data-feature="team" onclick="switchView('team', this)" style="display:none"><span class="nav-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-        </span>
-        Team
-      </div>
+      <!-- Standalone Team nav removed 2026-05-26 — merged into BB > Staff. -->
     </nav>
 
     <div class="sidebar-bottom">
@@ -6656,22 +6645,9 @@ Then the call to action."]</div>
       </div>
     </div>
 
-    <div class="view" id="view-team">
-      <div class="topbar">
-        <div>
-          <span class="topbar-kicker">§ 04 · Team</span>
-          <div class="topbar-title">Your Team</div>
-        </div>
-      </div>
-      <div class="content">
-        <div class="readout">Portal Access</div>
-        <p class="team-intro">Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; the account owner can revoke access.</p>
-        <button class="btn btn-primary" onclick="openInviteTeamModal()">+ Invite teammate</button>
-        <div id="team-list-container" style="margin-top:18px">
-          <div class="req-empty" style="padding:20px 0">Loading team…</div>
-        </div>
-      </div>
-    </div>
+    <!-- view-team removed 2026-05-26 — full Team management lives in
+         Business Blueprint > Staff. The invite + revoke modals (still
+         used by BB Staff) sit below in the modals block. -->
 
   </div>
 
@@ -6720,17 +6696,7 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Members</span>
     </button>
-    <!-- Mobile Team button removed — merged into BB > Staff card 2026-05-26.
-         Owners reach staff management via the Business Blueprint tab. -->
-    <button type="button" class="mobile-nav-item" data-feature="team" data-view="team" onclick="mobileSwitchView('team')" aria-label="Team" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-      </svg>
-      <span class="mobile-nav-label">Team</span>
-    </button>
+    <!-- Mobile Team button removed 2026-05-26 — merged into BB > Staff card. -->
   </nav>
 </div>
 
@@ -6759,8 +6725,8 @@ function switchView(name, el) {
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
 
-  // When entering Team, load the portal-access list
-  if (name === 'team') fetchAndRenderTeam();
+  // Team view removed 2026-05-26 — its surface now lives at
+  // Business Blueprint > Staff. Old #view-team gone, no on-enter loader.
 
   // When entering Resources, load + render the library
   if (name === 'resources') openResourcesView();
@@ -10292,24 +10258,35 @@ window.addEventListener('popstate', () => {
   if (activeView && activeView.id === 'view-blueprint') _bbRenderFromHash();
 });
 
+// Kept as a callback target for the invite + revoke modals. The
+// original #team-list-container is gone, so the legacy renderTeamList
+// path is a no-op. We DO refresh the BB Staff card if the user is
+// currently looking at it, so invite/revoke results appear immediately.
 async function fetchAndRenderTeam() {
-  const box = document.getElementById('team-list-container');
-  if (!box || !CLIENT_ID) return;
-  box.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading team…</div>';
+  if (!CLIENT_ID || !_sb) return;
+  // Hydrate the shared TEAM_ROWS / TEAM_MY_ROLE globals (the revoke
+  // modal reads them to look up names).
   try {
-    const { data: rows, error } = await _sb.from('client_users')
+    const { data: rows } = await _sb.from('client_users')
       .select('id, name, email, role, user_id')
       .eq('client_id', CLIENT_ID)
       .eq('status', 'active');
-    if (error) throw error;
     TEAM_ROWS = rows || [];
     const { data: { session } } = await _sb.auth.getSession();
     const myId = session?.user?.id || null;
-    const myRow = TEAM_ROWS.find(r => r.user_id === myId);
-    TEAM_MY_ROLE = myRow?.role || null;
-    renderTeamList(myId);
-  } catch (e) {
-    box.innerHTML = '<div class="req-empty" style="padding:20px 0">Couldn’t load the team. Refresh to try again.</div>';
+    TEAM_MY_ROLE = TEAM_ROWS.find(r => r.user_id === myId)?.role || null;
+  } catch (_) { /* swallow — UI fallback below */ }
+
+  // Legacy #team-list-container — gone but guard anyway.
+  if (document.getElementById('team-list-container')) renderTeamList();
+
+  // Re-render BB Staff if it's the active hash.
+  if ((window.location.hash || '').startsWith('#bb=staff')) {
+    const panel = document.getElementById('bb-panel');
+    const meta = (_bbCards || []).find(c => c.id === 'staff');
+    if (panel && meta && typeof _bbRenderStaffCard === 'function') {
+      _bbRenderStaffCard(panel, meta);
+    }
   }
 }
 
