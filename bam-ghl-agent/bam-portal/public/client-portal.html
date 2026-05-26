@@ -8690,27 +8690,312 @@ function _bbRenderTeamRow(t, idx) {
   `;
 }
 
-function _bbRenderTeamSubField(teamId, f, val) {
-  const v = val != null ? val : '';
-  const handler = `_bbUpdateTeamData('${teamId}','${f.key}',this.value)`;
-  let body;
-  if (f.type === 'textarea') {
-    body = `<textarea class="bb-textarea" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')">${_bbEscapeHtml(v)}</textarea>`;
-  } else if (f.type === 'check_one') {
-    body = `<div class="bb-choice-row">${(f.options || []).map(opt => `
-      <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbUpdateTeamData('${teamId}','${f.key}','${_bbEscapeAttr(opt)}'); _bbSaveTeam('${teamId}'); _bbRenderWizardBody()">${_bbEscapeHtml(opt)}</button>
-    `).join('')}</div>`;
-  } else {
-    const inputType = f.type === 'time' ? 'time'
-      : (f.type === 'currency' || f.type === 'number') ? 'number'
-      : 'text';
-    body = `<input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
+// Per-team scope helpers — parallel set to the offer-scoped ones so the
+// per-team builder can use the same field types (block_builder,
+// check_many, location_picker, staff_select, file, dep conditionals)
+// without the data leaking into offers.data. Each team's data lives at
+// _bbTeamRows[i].data — these helpers mutate that and call _bbSaveTeam.
+
+const _bbTeamExpandedBlocks = {};
+function _bbTeamBlockKey(teamId, key) { return teamId + '::' + key; }
+function _bbTeamGetData(teamId) {
+  const t = _bbTeamRows.find(x => x.id === teamId);
+  return t ? (t.data || {}) : {};
+}
+function _bbTeamSetField(teamId, key, val) {
+  const t = _bbTeamRows.find(x => x.id === teamId);
+  if (!t) return;
+  t.data = { ...(t.data || {}), [key]: val };
+}
+function _bbTeamIsDepVisible(teamId, field) {
+  if (!field.dep) return true;
+  const data = _bbTeamGetData(teamId);
+  const v = data[field.dep.key];
+  if (v == null) return false;
+  const want = Array.isArray(field.dep.equals) ? field.dep.equals : [field.dep.equals];
+  if (Array.isArray(v)) return v.some(x => want.includes(x));
+  return want.includes(v);
+}
+function _bbTeamPickOne(teamId, key, val) {
+  _bbTeamSetField(teamId, key, val);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+function _bbTeamToggleMany(teamId, key, val) {
+  const data = _bbTeamGetData(teamId);
+  const cur = Array.isArray(data[key]) ? data[key] : [];
+  const next = [...cur];
+  const i = next.indexOf(val);
+  if (i >= 0) next.splice(i, 1); else next.push(val);
+  _bbTeamSetField(teamId, key, next);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+function _bbTeamBlockAdd(teamId, key) {
+  const data = _bbTeamGetData(teamId);
+  const rows = Array.isArray(data[key]) ? [...data[key], {}] : [{}];
+  _bbTeamSetField(teamId, key, rows);
+  if (!_bbTeamExpandedBlocks[_bbTeamBlockKey(teamId, key)]) {
+    _bbTeamExpandedBlocks[_bbTeamBlockKey(teamId, key)] = new Set();
   }
+  _bbTeamExpandedBlocks[_bbTeamBlockKey(teamId, key)].add(rows.length - 1);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+function _bbTeamBlockRemove(teamId, key, idx) {
+  const data = _bbTeamGetData(teamId);
+  const rows = Array.isArray(data[key]) ? [...data[key]] : [];
+  rows.splice(idx, 1);
+  _bbTeamSetField(teamId, key, rows);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+function _bbTeamBlockIsExpanded(teamId, key, idx) {
+  const s = _bbTeamExpandedBlocks[_bbTeamBlockKey(teamId, key)];
+  return s ? s.has(idx) : false;
+}
+function _bbTeamBlockToggleExpand(teamId, key, idx) {
+  const k = _bbTeamBlockKey(teamId, key);
+  if (!_bbTeamExpandedBlocks[k]) _bbTeamExpandedBlocks[k] = new Set();
+  const s = _bbTeamExpandedBlocks[k];
+  if (s.has(idx)) s.delete(idx); else s.add(idx);
+  _bbRenderWizardBody();
+}
+function _bbTeamBlockSubUpdate(teamId, key, idx, subKey, val) {
+  const data = _bbTeamGetData(teamId);
+  const rows = Array.isArray(data[key]) ? [...data[key]] : [];
+  if (!rows[idx]) rows[idx] = {};
+  rows[idx] = { ...rows[idx], [subKey]: val };
+  _bbTeamSetField(teamId, key, rows);
+  // Don't re-render on every keystroke — onblur saves.
+}
+function _bbTeamBlockSubToggleMany(teamId, key, idx, subKey, val) {
+  const data = _bbTeamGetData(teamId);
+  const rows = Array.isArray(data[key]) ? [...data[key]] : [];
+  if (!rows[idx]) rows[idx] = {};
+  const cur = Array.isArray(rows[idx][subKey]) ? rows[idx][subKey] : [];
+  const next = [...cur];
+  const i = next.indexOf(val);
+  if (i >= 0) next.splice(i, 1); else next.push(val);
+  rows[idx] = { ...rows[idx], [subKey]: next };
+  _bbTeamSetField(teamId, key, rows);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+function _bbTeamBlockSubPickOne(teamId, key, idx, subKey, val) {
+  const data = _bbTeamGetData(teamId);
+  const rows = Array.isArray(data[key]) ? [...data[key]] : [];
+  if (!rows[idx]) rows[idx] = {};
+  rows[idx] = { ...rows[idx], [subKey]: val };
+  _bbTeamSetField(teamId, key, rows);
+  _bbSaveTeam(teamId);
+  _bbRenderWizardBody();
+}
+// Location picker hook that targets a team-scoped field. Mirrors the
+// offer-scope _bbOpenLocationPickerFor — opens the standard locations
+// modal, but on select writes to team.data[key] instead of
+// offer.data[section][key].
+function _bbOpenLocationPickerForTeam(teamId, key) {
+  _bbLocPickerCtx = {
+    onSelect: (locationId) => {
+      _bbTeamSetField(teamId, key, locationId);
+      _bbSaveTeam(teamId);
+      _bbCloseLocationPicker();
+      _bbRenderWizardBody();
+    }
+  };
+  _bbOpenLocationPicker();
+}
+function _bbOpenLocationPickerForTeamSub(teamId, parentKey, rowIdx, subKey) {
+  _bbLocPickerCtx = {
+    onSelect: (locationId) => {
+      _bbTeamBlockSubUpdate(teamId, parentKey, rowIdx, subKey, locationId);
+      _bbSaveTeam(teamId);
+      _bbCloseLocationPicker();
+      _bbRenderWizardBody();
+    }
+  };
+  _bbOpenLocationPicker();
+}
+
+// Renderer engine — per-team scope. Handles every field type the main
+// offer renderer does (text, textarea, link/phone/email/currency/number/
+// time, check_one, check_many, block_builder, location_picker, file,
+// staff_select, dep conditionals). Sibling-aware dep visibility via
+// _bbTeamIsDepVisible. Data reads/writes scoped to _bbTeamRows[*].data.
+function _bbRenderTeamSubField(teamId, f, val) {
+  if (!_bbTeamIsDepVisible(teamId, f)) return '';
+
+  const v = val != null ? val : '';
+  const reqMark = f.required ? '<span class="bb-field-req">*</span>' : '';
+  const hint = f.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(f.hint)}</div>` : '';
+  const depBadge = f.dep
+    ? `<span class="bb-dep-badge">↳ if ${_bbEscapeHtml(f.dep.key)} = ${_bbEscapeHtml(Array.isArray(f.dep.equals) ? f.dep.equals.join(' / ') : f.dep.equals)}</span>`
+    : '';
+  const handler = `_bbUpdateTeamData('${teamId}','${f.key}',this.value)`;
+
+  let body = '';
+  switch (f.type) {
+    case 'text':
+    case 'link':
+    case 'phone':
+    case 'email':
+    case 'currency':
+    case 'number':
+    case 'time': {
+      const inputType = f.type === 'link' ? 'url'
+        : f.type === 'phone' ? 'tel'
+        : f.type === 'email' ? 'email'
+        : (f.type === 'number' || f.type === 'currency') ? 'number'
+        : f.type === 'time' ? 'time'
+        : 'text';
+      body = `<input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
+      break;
+    }
+    case 'textarea':
+      body = `<textarea class="bb-textarea" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')">${_bbEscapeHtml(v)}</textarea>`;
+      break;
+    case 'check_one':
+      body = `<div class="bb-choice-row">${(f.options || []).map(opt => `
+        <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbTeamPickOne('${teamId}','${f.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    case 'check_many': {
+      const arr = Array.isArray(v) ? v : [];
+      body = `<div class="bb-choice-row">${(f.options || []).map(opt => `
+        <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbTeamToggleMany('${teamId}','${f.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    }
+    case 'block_builder': {
+      const rows = Array.isArray(v) ? v : [];
+      body = `
+        <div class="bb-block-builder">
+          ${rows.map((row, i) => {
+            const rowLabel = f.addLabel ? f.addLabel.charAt(0).toUpperCase() + f.addLabel.slice(1) : 'Row';
+            const expanded = _bbTeamBlockIsExpanded(teamId, f.key, i);
+            const summary = _bbBlockSummaryHtml(row || {}, f.subFields, f.summaryKeys || []);
+            return `
+              <div class="bb-block-row">
+                <div class="bb-block-row-head">
+                  <button class="bb-block-toggle" onclick="_bbTeamBlockToggleExpand('${teamId}','${f.key}',${i})">${expanded ? '▾' : '▸'}</button>
+                  <div class="bb-block-row-info">
+                    <div class="bb-block-row-title">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}</div>
+                    <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
+                  </div>
+                  <button class="bb-block-remove" onclick="_bbTeamBlockRemove('${teamId}','${f.key}',${i})">Remove</button>
+                </div>
+                ${expanded ? `
+                  <div class="bb-block-fields" style="margin-top:14px">
+                    ${(f.subFields || []).map(sf => _bbRenderTeamBlockSubField(teamId, f.key, i, sf, (row || {})[sf.key], row || {})).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }).join('')}
+          <button class="btn-secondary-bb" onclick="_bbTeamBlockAdd('${teamId}','${f.key}')">+ Add ${_bbEscapeHtml(f.addLabel || 'row')}</button>
+        </div>
+      `;
+      break;
+    }
+    case 'location_picker': {
+      const loc = v ? _bbLocationById(v) : null;
+      body = `<button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerForTeam('${teamId}','${f.key}')">
+        <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
+        <span class="bb-loc-pick-chev">▾</span>
+      </button>`;
+      break;
+    }
+    case 'staff_select':
+      // Same placeholder behaviour as the offer-scope renderer. The full
+      // staff picker ships once the BB Staff card lands in Stage 2.
+      body = `<input type="text" class="bb-input" placeholder="Staff selector coming once Staff card ships (Stage 2)" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
+      break;
+    case 'file':
+    case 'files':
+    case 'text_files':
+      body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">📎 File upload coming in the next build pass — saves to the <code>offers</code> Supabase storage bucket. For now, describe the file in Extra notes if needed.</div>`;
+      break;
+    default:
+      body = `<input type="text" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${handler}" onblur="_bbSaveTeam('${teamId}')" />`;
+  }
+
   return `
     <div class="bb-field" style="margin-bottom:10px">
-      <div class="bb-field-label">${_bbEscapeHtml(f.label)} ${f.required ? '<span class="bb-field-req">*</span>' : ''}</div>
+      <div class="bb-field-label">${depBadge}${_bbEscapeHtml(f.label)} ${reqMark}</div>
       ${body}
-      ${f.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(f.hint)}</div>` : ''}
+      ${hint}
+    </div>
+  `;
+}
+
+// Sub-field renderer for a row INSIDE a team-scoped block_builder
+// (e.g. each row of practice_schedule has day + start + end + location).
+// Sibling-aware dep visibility uses fields in the same row.
+function _bbRenderTeamBlockSubField(teamId, parentKey, rowIdx, sf, subVal, row) {
+  // Sibling dep check within the row
+  if (sf.dep) {
+    const v = (row || {})[sf.dep.key];
+    if (v == null) return '';
+    const want = Array.isArray(sf.dep.equals) ? sf.dep.equals : [sf.dep.equals];
+    const ok = Array.isArray(v) ? v.some(x => want.includes(x)) : want.includes(v);
+    if (!ok) return '';
+  }
+  const v = subVal != null ? subVal : '';
+  const reqMark = sf.required ? '<span class="bb-field-req">*</span>' : '';
+  const hint = sf.hint ? `<div class="bb-field-hint">${_bbEscapeHtml(sf.hint)}</div>` : '';
+  const updater = `_bbTeamBlockSubUpdate('${teamId}','${parentKey}',${rowIdx},'${sf.key}',this.value)`;
+
+  let body = '';
+  switch (sf.type) {
+    case 'text':
+    case 'link':
+    case 'phone':
+    case 'email':
+    case 'currency':
+    case 'number':
+    case 'time': {
+      const inputType = sf.type === 'link' ? 'url'
+        : sf.type === 'phone' ? 'tel'
+        : sf.type === 'email' ? 'email'
+        : (sf.type === 'number' || sf.type === 'currency') ? 'number'
+        : sf.type === 'time' ? 'time'
+        : 'text';
+      body = `<input type="${inputType}" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${updater}" onblur="_bbSaveTeam('${teamId}')" />`;
+      break;
+    }
+    case 'textarea':
+      body = `<textarea class="bb-textarea" oninput="${updater}" onblur="_bbSaveTeam('${teamId}')">${_bbEscapeHtml(v)}</textarea>`;
+      break;
+    case 'check_one':
+      body = `<div class="bb-choice-row">${(sf.options || []).map(opt => `
+        <button type="button" class="bb-choice ${v === opt ? 'selected' : ''}" onclick="_bbTeamBlockSubPickOne('${teamId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    case 'check_many': {
+      const arr = Array.isArray(v) ? v : [];
+      body = `<div class="bb-choice-row">${(sf.options || []).map(opt => `
+        <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbTeamBlockSubToggleMany('${teamId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
+      `).join('')}</div>`;
+      break;
+    }
+    case 'location_picker': {
+      const loc = v ? _bbLocationById(v) : null;
+      body = `<button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerForTeamSub('${teamId}','${parentKey}',${rowIdx},'${sf.key}')">
+        <span>${loc ? _bbEscapeHtml(loc.title) : 'Pick a location…'}</span>
+        <span class="bb-loc-pick-chev">▾</span>
+      </button>`;
+      break;
+    }
+    default:
+      body = `<input type="text" class="bb-input" value="${_bbEscapeHtml(v)}" oninput="${updater}" onblur="_bbSaveTeam('${teamId}')" />`;
+  }
+
+  return `
+    <div class="bb-field" style="margin-bottom:10px">
+      <div class="bb-field-label">${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+      ${body}
+      ${hint}
     </div>
   `;
 }
@@ -8722,19 +9007,31 @@ const _bbTeamSubsections = [
       options:['Local','Rep','AAU','Elite','Other'] },
     { key:'gender', type:'check_one', label:'Gender', required:true,
       options:['Boys','Girls'] },
-    { key:'head_coach', type:'text', label:'Head coach', required:true,
-      hint:'Staff selector coming in Stage 2' },
-    { key:'assistant_coaches', type:'text', label:'Assistant coaches' },
+    { key:'head_coach', type:'staff_select', label:'Head coach', required:true,
+      hint:'Will populate from your Staff card once Stage 2 ships' },
+    { key:'assistant_coaches', type:'staff_select', label:'Assistant coaches' },
     { key:'roster_capacity', type:'number', label:'Roster capacity',
       hint:'Max players (e.g. 12)' },
-    { key:'home_locations', type:'text', label:'Home location(s)', required:true,
-      hint:'Pick from BB > Locations once that page ships' }
+    { key:'home_locations', type:'location_picker', label:'Home location', required:true,
+      hint:'Pick from your saved locations or add a new one' }
   ]},
   { id:'schedule', label:'Schedule', fields:[
     { key:'consistent', type:'check_one', label:'Consistent practice schedule every week?',
       options:['Yes','No'] },
-    { key:'practice_schedule', type:'textarea', label:'Practice schedule',
-      hint:'Day · start · end · location (one per row, free-form for now)' },
+    { key:'practice_schedule', type:'block_builder', label:'Practice schedule', addLabel:'practice',
+      collapsible:true, summaryKeys:['day','start','end'],
+      dep:{ key:'consistent', equals:'Yes' },
+      hint:'One row per recurring practice slot. Pick the day, set start/end, choose the location.',
+      subFields:[
+        { key:'day', type:'check_one', label:'Day', required:true,
+          options:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] },
+        { key:'start', type:'time', label:'Start', required:true },
+        { key:'end', type:'time', label:'End', required:true },
+        { key:'location', type:'location_picker', label:'Location' }
+      ] },
+    { key:'schedule_info', type:'textarea', label:'How is the schedule communicated?',
+      dep:{ key:'consistent', equals:'No' },
+      hint:'e.g. "Weekly team WhatsApp" or "Coach posts to TeamSnap"' },
     { key:'comm_method', type:'textarea', label:'How players are informed of schedule' },
     { key:'season_dates', type:'text', label:'Season dates', required:true },
     { key:'blackout_days', type:'textarea', label:'Blackout days',
@@ -8750,11 +9047,13 @@ const _bbTeamSubsections = [
     { key:'tryouts', type:'check_one', label:'Tryouts?',
       options:['Yes','No'] },
     { key:'tryout_details', type:'textarea', label:'Tryout details',
+      dep:{ key:'tryouts', equals:'Yes' },
       hint:'Date(s) · time(s) · location · capacity · fee · what to bring' },
     { key:'reg_form_fields', type:'textarea', label:'Tryout reg form fields',
+      dep:{ key:'tryouts', equals:'Yes' },
       hint:'Defaults: player + parent contact + emergency contact. Optional: position, height, current team, highlight film, GPA, school, goals' },
-    { key:'lead_notify', type:'text', label:'Notify on new lead',
-      hint:'Staff selector coming Stage 2' },
+    { key:'lead_notify', type:'staff_select', label:'Notify on new lead',
+      hint:'Will populate from your Staff card once Stage 2 ships' },
     { key:'upsells', type:'textarea', label:'Upsells',
       hint:'Target offer + description (e.g. "Cut player → pitch skill training")' }
   ]},
@@ -8767,12 +9066,13 @@ const _bbTeamSubsections = [
     { key:'discount_codes', type:'text', label:'Discount codes' }
   ]},
   { id:'onboarding', label:'Onboarding', fields:[
-    { key:'agreement', type:'text', label:'Agreement / waiver',
-      hint:'File upload coming next pass' },
+    { key:'agreement', type:'file', label:'Agreement / waiver',
+      hint:'Upload the PDF / image of the team agreement parents sign at intake' },
     { key:'onboarding_messaging', type:'textarea', label:'Onboarding messaging' },
     { key:'intake_form_fields', type:'textarea', label:'Roster intake form fields',
       hint:'Defaults: player + parent contact + emergency contact. Optional: jersey/shorts/shoe size, dietary, allergies' },
-    { key:'notify_on_signup', type:'text', label:'Notify on new sign-up' }
+    { key:'notify_on_signup', type:'staff_select', label:'Notify on new sign-up',
+      hint:'Will populate from your Staff card once Stage 2 ships' }
   ]}
 ];
 
