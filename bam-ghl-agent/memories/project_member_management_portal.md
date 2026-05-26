@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-24 (Session 2) — LIVE Connect verified (real acct_1P7kUCRxInSEtAh8) + UI polished + onboarding automation shipped. Drawer popup w/ editable fields, search + multi-filter popover, circular avatars, Stripe in a topbar pill + modal. GHL→portal intake webhook + Stripe→portal sync webhook (4 events) both verified working end-to-end. Pending: real-signup Stripe-leg test (intake leg already proven with live GHL submission).
+description: 2026-05-25 (Session 3) — Sync audit done (50/50 in sync, Vedant cleaned from roster, Aarav re-flagged as payment_failed). Roster cards mobile-responsive (3-col grid <=640px), plan column removed, popup Group now editable as number input. Subscription ID shown instead of customer ID. Production-readiness checklist documented below.
 type: project
 ---
 
@@ -456,6 +456,176 @@ where status = 'payment_method_required'
   and stripe_subscription_id is null
 order by created_at desc;
 ```
+
+## Session 3 — 2026-05-25 — Sync audit + mobile polish + popup tweaks
+
+### Members ↔ Stripe sync audit
+
+Cross-referenced all 51 members against live Stripe account
+`acct_1P7kUCRxInSEtAh8` (BAM Toronto). Process:
+1. `select * from members where client_id = '39875f07-...'`
+2. `stripe.list_subscriptions({status: 'active'|'trialing'|'past_due'|'all'})`
+3. Match by `stripe_subscription_id`. Diff statuses.
+
+**Real mismatches found + fixed (2):**
+- **Vedant** — DB `paused` but Stripe sub `canceled` → moved to
+  cancellations (denorm copy), removed from members. Reason recorded
+  as "Cancelled in Stripe (outside portal) — sync cleanup 2026-05-25".
+- **Aarav Arora** — DB `live` but Stripe sub `past_due` → flipped to
+  `payment_failed` (now surfaces under the Members tab "Issues" filter).
+
+**Known-design exceptions (4):** Stefan Djeric (no Stripe by design,
+blocked from /change), Samuel + Santiago (paused, sub gone — expected
+per schema), Tony Li (payment_method_required = literally "no sub").
+
+**Tripped over (2 — both legit, NOT mismatches):**
+- **Jaxson** — Stripe shows `trialing` with trial_end pushed out, DB
+  `live`. Cause: `/refer` skill credit (each referral pushes trial_end
+  by 4 weeks). Same Stripe shape as a package payer rollover. CORRECT.
+- **Sergio** — Stripe sub not in active/trialing/past_due. DB already
+  flagged `payment_failed`. Correctly surfaced.
+
+**Final roster: 50 members, fully in sync.**
+
+### UI polish landed this session
+
+- **Plan column removed** from roster cards (still in popup BILLING).
+  Desktop card: avatar | name+parent | trainer | pills.
+- **Mobile-responsive grid** (≤640px): 3 cols only (avatar | name+parent
+  | pills), trainer column hidden, pills stack vertically right-aligned,
+  tighter padding. Everything fits in a 375px viewport.
+- **Card markup extracted** from inline-style to `.member-card-*` class
+  names so the media query can override cleanly. Hover transition
+  preserved.
+- **Popup Group field** is now an inline `<input type="number">` (1..99)
+  — saves via `update-profile` with `Number(value)` so the PG int column
+  gets a real int. Empty input → null via the API normalizer.
+- **Joined date** removed from popup Athlete section.
+- **Subscription ID replaced Customer ID** in popup BILLING section —
+  more actionable Stripe identifier and matches what the 6 action
+  handlers use.
+
+### Useful sync-audit playbook (for future Claude / Zoran)
+
+```sql
+-- 1. Get the current roster state
+SELECT id, athlete_name, status, plan, stripe_customer_id, stripe_subscription_id
+FROM members
+WHERE client_id = '39875f07-0a4b-4429-a201-2249bc1f24df'
+ORDER BY status, athlete_name;
+```
+
+```
+-- 2. Pull Stripe (via Stripe MCP), in this order:
+mcp__stripe__list_subscriptions(status: 'active',  limit: 100)
+mcp__stripe__list_subscriptions(status: 'trialing', limit: 100)
+mcp__stripe__list_subscriptions(status: 'past_due', limit: 100)
+mcp__stripe__list_subscriptions(status: 'unpaid',   limit: 100)
+mcp__stripe__list_subscriptions(status: 'canceled', limit: 100)
+```
+
+```
+-- 3. For each member, compare DB status vs Stripe sub status:
+   STRIPE active     → DB live              ✓
+   STRIPE trialing   → DB paused  (or live if /refer credit OR package rollover)
+   STRIPE past_due   → DB payment_failed    (fix if not)
+   STRIPE unpaid     → DB payment_failed    (fix if not)
+   STRIPE canceled   → DB cancelled (move to cancellations + delete from members)
+   No matching sub   → DB payment_method_required (or by-design exception)
+```
+
+```
+-- 4. For an out-of-band cancelled sub (Vedant pattern), the fix is:
+INSERT INTO cancellations (client_id, member_id, athlete_name, archetype,
+  parent_name, type, cancel_date, reason, stripe_subscription_id, stripe_customer_id)
+SELECT client_id, id, athlete_name, archetype, parent_name, 'cancel',
+       current_date, '<reason>', stripe_subscription_id, stripe_customer_id
+FROM members WHERE id = '<member_id>';
+
+DELETE FROM members WHERE id = '<member_id>';
+```
+
+## Production-readiness checklist for BAM GTA
+
+Path from "code shipped" to "Filip/Adrian/Sergio can rely on the portal":
+
+### 🟥 Must-do before staff starts using it
+
+```
+1. ROTATE the leaked sk_live_…MO9I key
+     Stripe → Developers → API keys → "bam business portal connect"
+     → ⋯ → Roll key → paste new value into Vercel
+     STRIPE_CONNECT_SECRET_KEY → redeploy.
+
+2. TEST a real billing action end-to-end on a real GTA member.
+     Safest: Payment link on Aarav (he's payment_failed, so the link
+     is actually useful). Confirms the platform key + Stripe-Account
+     header pipeline works against the real Toronto account.
+
+3. TEST one real /pause + /unpause on a member you control.
+     Verifies trial_end convention writes are firing correctly.
+
+4. STAFF TRAINING — walk Filip/Adrian/Sergio through:
+     - Where the Members tab is in the portal
+     - Click a member → drawer popup → 6 action buttons
+     - Inline edits (Archetype/Trainer/Engagement/Group)
+     - Confirm that Discord bot stays running too (portal is
+       ADDITIONAL, not replacement, per project-state.md).
+```
+
+### 🟧 Should-do for confidence
+
+```
+5. REPLACE prompt/confirm action UX with real modal forms.
+     Right now Pause/Cancel/Refund/Change/Referred use browser
+     prompts — works but ugly. Modal forms would:
+     - Validate inputs (e.g., refund amount must be a number)
+     - Show better confirm previews
+     - Match the rest of the portal's UI
+
+6. ADD MEMBER button on the Members tab.
+     For one-off / legacy migrations / pre-launch adds before the
+     GHL intake flow is the canonical path. Currently every member
+     has to come via GHL form OR via direct DB insert.
+
+7. STRIPE WEBHOOK CONNECT SCOPE check — open the webhook detail
+     page in Stripe Dashboard and confirm it says "Listening on:
+     Connect". (Never explicitly verified, but the LIVE Connect
+     handshake already worked, so it's probably set right.)
+```
+
+### 🟨 Nice-to-have polish
+
+```
+8. "Run sync check" admin button (one-click roster audit + fix)
+9. KPI bar at top of Members tab (MRR / Active / Paused / At-risk)
+10. Per-row Stripe enrichment in roster (next payment date + amount)
+11. Sort controls on roster (alphabetical / status / joined / etc.)
+12. Bulk actions (select multiple → cancel all, etc.)
+13. Per-academy MEMBER_MGMT gating (currently global flag — non-GTA
+     academies see an empty roster + a Connect Stripe CTA that errors
+     until they get their own setup)
+14. Stripe `account.application.deauthorized` webhook handler
+     (auto-set stripe_connect_status='disabled' if academy revokes)
+15. Audit-log viewer page (currently only visible via direct
+     Supabase access; the per-member History section in popup is
+     the only in-portal surface)
+```
+
+### Known quirks to document for staff
+
+- **Stefan Djeric** has no Stripe link — by design, blocked from
+  /change. Cancel/refund actions will reject. Pause shows error.
+  Use the Discord bot or terminal for any Stefan-specific action.
+- **Samuel + Santiago** are paused with no sub — they exited
+  mid-pause. When they resume, they'll need a new sub set up
+  (likely a payment_link first to capture card).
+- **Tony Li** is payment_method_required — needs a new sub setup.
+  Click Payment link button to send him the Customer Portal.
+- **Jaxson + the 6 package payers** (Scott/Chase/Luke/Bradley/
+  Krishay/Skylar) — Stripe will show 'trialing' but DB shows
+  'live'. This is correct — trial_end is being used for /refer
+  credit or package rollover, not a pause.
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
