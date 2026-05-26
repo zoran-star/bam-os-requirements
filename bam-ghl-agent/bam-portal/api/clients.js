@@ -58,66 +58,27 @@ async function findAuthUserByEmail(email) {
 // last 20 hours. Joins client_users + auth.users + clients in one round
 // trip via PostgREST embedded resources.
 async function listInviteResendCandidates({ hoursSince = 20, maxRetries = 7, limit = 50 } = {}) {
-  // PostgREST cannot embed auth.users from public.client_users without a
-  // declared FK in the public schema and `Accept-Profile: auth` quirks,
-  // so we do two passes: pull pending-looking client_users rows, then
-  // fetch their auth.users in a single `id=in.(...)` round trip.
-  const cuRows = await supabaseSelect(
-    `client_users?select=id,user_id,client_id,email,name,last_invite_sent_at,invite_retry_count` +
-    `&user_id=not.is.null&email=not.is.null&invite_retry_count=lt.${maxRetries}&limit=${limit}`
-  );
-  if (!Array.isArray(cuRows) || cuRows.length === 0) return [];
-
-  const userIds = cuRows.map((r) => r.user_id).filter(Boolean);
-  if (userIds.length === 0) return [];
-  const inList = userIds.map((u) => encodeURIComponent(u)).join(",");
-  const authUrl = `${SUPABASE_URL}/rest/v1/users?id=in.(${inList})` +
-    `&select=id,email,invited_at,confirmation_sent_at,recovery_sent_at,last_sign_in_at,email_confirmed_at`;
-  const authRes = await fetch(authUrl, {
+  // Single round-trip via Postgres RPC because PostgREST does not expose
+  // the `auth` schema on this project — embedding/filtering across the
+  // public.client_users → auth.users join can only happen server-side.
+  // See migration `client_users_resend_invite_candidates_rpc`.
+  const url = `${SUPABASE_URL}/rest/v1/rpc/resend_invite_candidates`;
+  const res = await fetch(url, {
+    method: "POST",
     headers: {
       apikey: SUPABASE_SERVICE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      "Accept-Profile": "auth",
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      p_hours_since: hoursSince,
+      p_max_retries: maxRetries,
+      p_limit: limit,
+    }),
   });
-  if (!authRes.ok) throw new Error(`auth.users lookup ${authRes.status}: ${await authRes.text()}`);
-  const authRows = await authRes.json();
-  const authById = new Map(authRows.map((u) => [u.id, u]));
-
-  const clientIds = [...new Set(cuRows.map((r) => r.client_id).filter(Boolean))];
-  const cInList = clientIds.map((c) => encodeURIComponent(c)).join(",");
-  const clients = await supabaseSelect(
-    `clients?id=in.(${cInList})&select=id,business_name,slack_channel_id`
-  );
-  const clientById = new Map((clients || []).map((c) => [c.id, c]));
-
-  const cutoff = Date.now() - hoursSince * 60 * 60 * 1000;
-  const isTestEmail = (e) => /@example\.com$|@example-not-real\.com$|@test\.|@localhost$/i.test(e || "");
-
-  return cuRows
-    .map((cu) => {
-      const au = authById.get(cu.user_id);
-      const c = clientById.get(cu.client_id);
-      if (!au || !c) return null;
-      if (au.last_sign_in_at) return null;
-      if (au.email_confirmed_at) return null;
-      if (isTestEmail(cu.email)) return null;
-      const lastOutbound = cu.last_invite_sent_at || au.recovery_sent_at || au.confirmation_sent_at || au.invited_at;
-      if (lastOutbound && new Date(lastOutbound).getTime() > cutoff) return null;
-      return {
-        cu_id: cu.id,
-        user_id: cu.user_id,
-        client_id: cu.client_id,
-        email: cu.email,
-        name: cu.name || "",
-        retry_count: cu.invite_retry_count || 0,
-        last_outbound: lastOutbound,
-        business_name: c.business_name || "",
-        slack_channel_id: c.slack_channel_id || null,
-      };
-    })
-    .filter(Boolean);
+  if (!res.ok) throw new Error(`rpc resend_invite_candidates ${res.status}: ${await res.text()}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function markInviteResent({ cuId, retryCount }) {
