@@ -53,7 +53,7 @@ function formatDate(s) {
 
 export default function SystemsView({ tokens: t, dark, me, session }) {
   const isManager = me?.role === "admin" || me?.role === "systems_manager";
-  const defaultTab = isManager ? "delegation" : "execution";
+  const defaultTab = isManager ? "delegation" : "ongoing";
 
   const [tab, setTab] = useState(defaultTab);
   const [tickets, setTickets] = useState([]);
@@ -101,6 +101,10 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
       if (isManager) return true;
       return x.assigned_to === me?.id;
     }
+    // Executor-only granular tabs
+    if (tab === "lobby") return x.status === "delegated" && x.assigned_to === me?.id;
+    if (tab === "ongoing") return ["in_progress","needs_rework"].includes(x.status) && x.assigned_to === me?.id;
+    if (tab === "awaiting") return x.status === "awaiting_client" && x.assigned_to === me?.id;
     return false;
   });
 
@@ -132,9 +136,11 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         { key: "import",     label: "Asana Import" },
       ]
     : [
-        { key: "execution", label: "My Tickets", count: tickets.filter(x => x.assigned_to === me?.id && ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
-        { key: "review",    label: "In review", count: tickets.filter(x => x.assigned_to === me?.id && x.status === "in_review").length },
-        { key: "completed", label: "Completed", count: completedCount },
+        { key: "lobby",     label: "Lobby",           count: tickets.filter(x => x.assigned_to === me?.id && x.status === "delegated").length },
+        { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => x.assigned_to === me?.id && ["in_progress","needs_rework"].includes(x.status)).length },
+        { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.assigned_to === me?.id && x.status === "awaiting_client").length },
+        { key: "review",    label: "In review",       count: tickets.filter(x => x.assigned_to === me?.id && x.status === "in_review").length },
+        { key: "completed", label: "Completed",       count: tickets.filter(x => x.assigned_to === me?.id && ["done","approved"].includes(x.status)).length },
       ];
 
   return (
