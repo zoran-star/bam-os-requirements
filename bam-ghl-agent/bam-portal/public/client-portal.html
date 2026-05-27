@@ -7072,6 +7072,37 @@ const CAL_SESSIONS = [
   { id:'s15', date:'2026-06-11', name:'Double 5/6', startHour:18,   endHour:20,   venue:'Alton', location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:10, capacity:14 },
   { id:'s16', date:'2026-06-13', name:'Single 4',   startHour:12,   endHour:14,   venue:'Alton', location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:6,  capacity:12 },
 ];
+
+// Linbrook — 7-9 PM on every access day (BAM's contracted access per
+// the Apr-Jun 2026 PDF; "NO ACCESS" days excluded). Names use the day
+// of week to match the Lakeshore pattern.
+const LINBROOK_DATES = [
+  '2026-04-01','2026-04-02','2026-04-04',
+  '2026-04-06','2026-04-07','2026-04-08','2026-04-09','2026-04-11',
+  '2026-04-13','2026-04-14','2026-04-15','2026-04-16','2026-04-18',
+  '2026-04-20','2026-04-21','2026-04-22','2026-04-23','2026-04-25',
+  '2026-04-29','2026-04-30',
+  '2026-05-02',
+  '2026-05-04','2026-05-05','2026-05-06','2026-05-07','2026-05-09',
+  '2026-05-11','2026-05-12','2026-05-14','2026-05-16',
+  '2026-05-18','2026-05-19','2026-05-20','2026-05-23',
+  '2026-05-25','2026-05-26','2026-05-27','2026-05-28','2026-05-30',
+  '2026-06-01','2026-06-13',
+  '2026-06-15','2026-06-16','2026-06-17','2026-06-18','2026-06-20',
+  '2026-06-22','2026-06-23','2026-06-24','2026-06-25','2026-06-27',
+  '2026-06-29','2026-06-30',
+];
+LINBROOK_DATES.forEach((dt, i) => {
+  const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    [new Date(dt + 'T00:00:00').getDay()];
+  CAL_SESSIONS.push({
+    id: `lb${i + 1}`, date: dt, name: dayName,
+    startHour: 19, endHour: 21,
+    venue: 'Linbrook', location: 'Linbrook',
+    description: 'Linbrook session.',
+    booked: (i * 3) % 12, capacity: 12,
+  });
+});
 function calDateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
