@@ -90,7 +90,11 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
   const visibleTickets = tickets.filter(x => {
     if (tab === "delegation") return x.status === "open";
-    if (tab === "review") return x.status === "in_review";
+    if (tab === "review") {
+      if (x.status !== "in_review") return false;
+      if (isManager) return true;
+      return x.assigned_to === me?.id;
+    }
     if (tab === "completed") return x.status === "done" || x.status === "approved";
     if (tab === "execution") {
       if (!["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)) return false;
@@ -129,6 +133,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
       ]
     : [
         { key: "execution", label: "My Tickets", count: tickets.filter(x => x.assigned_to === me?.id && ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
+        { key: "review",    label: "In review", count: tickets.filter(x => x.assigned_to === me?.id && x.status === "in_review").length },
         { key: "completed", label: "Completed", count: completedCount },
       ];
 
@@ -618,21 +623,20 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             />
           </Section>
 
-          {/* User guide — managers can always edit; executors edit while
-              the ticket is theirs and not yet in_review/done */}
+          {/* User guide — managers and assigned executors can edit until the ticket is done */}
           {(isManager || ticket.status === "in_progress" || ticket.status === "needs_rework" || ticket.status === "in_review" || ticket.status === "done") && (
             <Section title="User guide (shown to client on completion)" tokens={t}>
               <textarea
                 value={userGuide}
                 onChange={e => setUserGuide(e.target.value)}
                 onBlur={() => userGuide !== (ticket.user_guide || "") && wrap(() => saveUserGuide(ticket.id, userGuide))}
-                disabled={!isManager && (ticket.status === "in_review" || ticket.status === "done" || !canExec)}
+                disabled={!isManager && (ticket.status === "done" || !canExec)}
                 placeholder="Explain to the client what happens in their GHL…"
                 style={{
                   width: "100%", minHeight: 80, padding: 12,
                   background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8,
                   color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical",
-                  opacity: (ticket.status === "in_review" || ticket.status === "done") ? 0.7 : 1,
+                  opacity: ticket.status === "done" ? 0.7 : 1,
                 }}
               />
             </Section>
