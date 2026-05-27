@@ -719,10 +719,15 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
             </button>
           )}
 
-          {/* Executor: submit for review (assignee/manager only) */}
+          {/* Executor: submit for review (assignee/manager only).
+              onMouseDown preventDefault keeps the user guide textarea from
+              blurring → avoids a race where the blur autosave disables this
+              button before the click registers. submitForReview already
+              includes user_guide in its payload. */}
           {canExec && (ticket.status === "in_progress" || ticket.status === "needs_rework") && (
             <button
               disabled={busy}
+              onMouseDown={e => e.preventDefault()}
               onClick={() => wrap(() => submitForReview(ticket.id, userGuide))}
               style={btn(t, "primary")}
             >Submit for review</button>
@@ -731,8 +736,8 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
           {/* Manager: approve / deny on in_review */}
           {isManager && ticket.status === "in_review" && (
             <>
-              <button disabled={busy} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
-              {!showDeny && <button disabled={busy} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
+              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
+              {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
           )}
 
