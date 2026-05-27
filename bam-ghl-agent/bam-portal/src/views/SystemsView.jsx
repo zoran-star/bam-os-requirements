@@ -95,7 +95,11 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
       if (isManager) return true;
       return x.assigned_to === me?.id;
     }
-    if (tab === "completed") return x.status === "done" || x.status === "approved";
+    if (tab === "completed") {
+      if (!["done","approved","cancelled"].includes(x.status)) return false;
+      if (isManager) return true;
+      return x.assigned_to === me?.id;
+    }
     if (tab === "execution") {
       if (!["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)) return false;
       if (isManager) return true;
@@ -125,7 +129,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     new Map(tickets.filter(x => x.client?.id).map(x => [x.client.id, x.client.business_name])).entries()
   ).sort((a, b) => (a[1] || "").localeCompare(b[1] || ""));
 
-  const completedCount = tickets.filter(x => x.status === "done" || x.status === "approved").length;
+  const completedCount = tickets.filter(x => ["done","approved","cancelled"].includes(x.status)).length;
   const tabs = isManager
     ? [
         { key: "overview",   label: "Overview",   count: tickets.filter(x => x.status !== "done" && x.status !== "approved").length },
@@ -140,7 +144,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => x.assigned_to === me?.id && ["in_progress","needs_rework"].includes(x.status)).length },
         { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.assigned_to === me?.id && x.status === "awaiting_client").length },
         { key: "review",    label: "In review",       count: tickets.filter(x => x.assigned_to === me?.id && x.status === "in_review").length },
-        { key: "completed", label: "Completed",       count: tickets.filter(x => x.assigned_to === me?.id && ["done","approved"].includes(x.status)).length },
+        { key: "completed", label: "Completed",       count: tickets.filter(x => x.assigned_to === me?.id && ["done","approved","cancelled"].includes(x.status)).length },
       ];
 
   return (
@@ -533,6 +537,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
                 {hasFieldEdits && !fieldsLocked && (
                   <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
                     <button
+                      onMouseDown={e => e.preventDefault()}
                       onClick={async () => {
                         await wrap(() => saveTicketFields(ticket.id, fieldEdits));
                         setFieldEdits({});
@@ -569,7 +574,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
               {ticket.status === "awaiting_client" && canClientComm && (
                 <div style={{ marginBottom: 12, padding: 10, background: dark ? "rgba(232,191,96,0.08)" : "rgba(232,191,96,0.12)", border: `1px solid ${t.accent}33`, borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ fontSize: 12, color: t.text, fontWeight: 600 }}>⏳ Awaiting client response</div>
-                  <button onClick={() => wrap(() => cancelClientRequest(ticket.id))} disabled={busy} style={btn(t, "ghost")}>Cancel request</button>
+                  <button onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => cancelClientRequest(ticket.id))} disabled={busy} style={btn(t, "ghost")}>Cancel request</button>
                 </div>
               )}
               {(ticket.messages && ticket.messages.length > 0)
@@ -663,7 +668,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
               />
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button onClick={() => setShowRequest(false)} style={btn(t, "ghost")}>Cancel</button>
-                <button disabled={!clientRequest.trim() || busy} onClick={() => wrap(() => requestClientAction(ticket.id, clientRequest))} style={btn(t, "primary")}>Send to client</button>
+                <button disabled={!clientRequest.trim() || busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => requestClientAction(ticket.id, clientRequest))} style={btn(t, "primary")}>Send to client</button>
               </div>
             </Section>
           )}
@@ -683,7 +688,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
               />
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button onClick={() => setShowDeny(false)} style={btn(t, "ghost")}>Cancel</button>
-                <button disabled={!denyNotes.trim() || busy} onClick={() => wrap(() => denyTicket(ticket.id, denyNotes))} style={btn(t, "danger")}>Deny & send back</button>
+                <button disabled={!denyNotes.trim() || busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => denyTicket(ticket.id, denyNotes))} style={btn(t, "danger")}>Deny & send back</button>
               </div>
             </Section>
           )}
@@ -702,18 +707,18 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
                 <option value="">Choose executor…</option>
                 {(pool || []).map(p => <option key={p.id} value={p.id}>{p.name} ({p.role === "systems_manager" ? "Mgr" : "Exec"})</option>)}
               </select>
-              <button disabled={!assignee || busy} onClick={() => wrap(() => delegateTicket(ticket.id, assignee))} style={btn(t, "primary")}>
+              <button disabled={!assignee || busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => delegateTicket(ticket.id, assignee))} style={btn(t, "primary")}>
                 {ticket.status === "open" ? "Delegate" : "Reassign"}
               </button>
               {ticket.status === "open" && (
-                <button disabled={busy} onClick={() => wrap(() => delegateTicket(ticket.id, me.id))} style={btn(t, "ghost")}>Self-assign</button>
+                <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => delegateTicket(ticket.id, me.id))} style={btn(t, "ghost")}>Self-assign</button>
               )}
             </>
           )}
 
           {/* Executor: start */}
           {ticket.status === "delegated" && canExec && (
-            <button disabled={busy} onClick={() => wrap(() => startTicket(ticket.id))} style={btn(t, "primary")}>Start work</button>
+            <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => startTicket(ticket.id))} style={btn(t, "primary")}>Start work</button>
           )}
 
           {/* Anyone on systems team: request client action (works on any
@@ -809,6 +814,7 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                 <button onClick={() => setShowCancel(false)} disabled={busy} style={btn(t, "ghost")}>Keep ticket</button>
                 <button
+                  onMouseDown={e => e.preventDefault()}
                   onClick={async () => {
                     await wrap(() => cancelTicket(ticket.id, cancelReason));
                     setShowCancel(false);
