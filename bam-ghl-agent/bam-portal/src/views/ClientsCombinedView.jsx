@@ -487,9 +487,10 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const [savingOnb, setSavingOnb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
 
-  // Onboarding toggle: when ON, client sees full portal; when OFF, client
-  // only sees Systems + Marketing tabs.
-  const onboardingInProgress = client.onboarding_in_progress !== false; // default ON if unset
+  // V2 access toggle (renamed 2026-05-27 from "onboarding_in_progress").
+  // When ON, client sees the V2 portal — currently just adds the Members
+  // tab. Everything else (BB nav, tracker, etc.) is V1 = visible to all.
+  const v2Access = !!client.v2_access;
 
   // Meta Ads onboarding-tracker flag. Staff flips this to fill the
   // "Meta Ads" circle on the client's onboarding tracker — clients can't
@@ -498,14 +499,14 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const metaAdsDone = !!client.meta_ads_marked_done_at;
   const [savingMetaAds, setSavingMetaAds] = useState(false);
 
-  async function toggleOnboarding(next) {
+  async function toggleV2Access(next) {
     setSavingOnb(true);
     const tok = session?.access_token;
     try {
       const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, onboarding_in_progress: next }),
+        body: JSON.stringify({ client_id: client.id, v2_access: next }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -580,8 +581,8 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
 
         <div style={{
           marginTop: 14, padding: "12px 14px",
-          background: onboardingInProgress ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${onboardingInProgress ? t.accentBorder : t.border}`,
+          background: v2Access ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${v2Access ? t.accentBorder : t.border}`,
           borderRadius: 8,
         }}>
           <label style={{
@@ -590,18 +591,18 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
           }}>
             <input
               type="checkbox"
-              checked={onboardingInProgress}
+              checked={v2Access}
               disabled={savingOnb}
-              onChange={(e) => toggleOnboarding(e.target.checked)}
+              onChange={(e) => toggleV2Access(e.target.checked)}
               style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
             />
-            <span style={{ fontWeight: 600 }}>Is onboarding?</span>
+            <span style={{ fontWeight: 600 }}>V2 access</span>
             {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
           </label>
           <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            {onboardingInProgress
-              ? "Full portal: Messages, Systems, Marketing, Resources, Business Blueprint, Team."
-              : "Client sees ONLY Systems + Marketing. All other tabs are hidden."}
+            {v2Access
+              ? "V2 portal: Members tab is visible (in addition to the standard V1 nav)."
+              : "V1 portal — standard nav. Members tab is hidden until V2 is flipped on."}
           </div>
         </div>
 

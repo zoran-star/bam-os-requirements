@@ -1655,12 +1655,15 @@ export default async function handler(req, res) {
           patch.marketing_included = v;
         }
 
-        if (wasSet("onboarding_in_progress")) {
-          const v = body.onboarding_in_progress;
+        // v2_access — formerly named "onboarding_in_progress". Renamed
+        // 2026-05-27 to match its new semantics (V2 portal opt-in, not
+        // onboarding state). The staff "V2 access?" toggle posts this.
+        if (wasSet("v2_access")) {
+          const v = body.v2_access;
           if (typeof v !== "boolean") {
-            return res.status(400).json({ error: "onboarding_in_progress must be a boolean" });
+            return res.status(400).json({ error: "v2_access must be a boolean" });
           }
-          patch.onboarding_in_progress = v;
+          patch.v2_access = v;
         }
 
         // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
