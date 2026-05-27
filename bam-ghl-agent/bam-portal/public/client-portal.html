@@ -4972,6 +4972,18 @@
         Members
       </div>
 
+      <div class="nav-item" data-feature="calendar" style="display:none" onclick="switchView('calendar', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </span>
+        Calendar
+      </div>
+
       <!-- Standalone Team nav removed 2026-05-26 — merged into BB > Staff. -->
     </nav>
 
@@ -5736,6 +5748,156 @@ Then the call to action."]</div>
         <div id="member-modal-host"></div>
         <div id="stripe-modal-host"></div>
       </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         CALENDAR VIEW (weekly schedule, V2-gated)
+         Layout mirrors the BAM GTA staff app Classes page (Sessions.jsx)
+         but read-only and styled with client-portal CSS variables.
+    ══════════════════════════════ -->
+    <style>
+      #view-calendar .cal-toolbar {
+        display:flex; justify-content:space-between; align-items:center;
+        gap:14px; flex-wrap:wrap; margin-bottom:18px;
+      }
+      #view-calendar .cal-nav { display:flex; align-items:center; gap:10px; }
+      #view-calendar .cal-arrow {
+        background:transparent; border:1px solid var(--border); border-radius:6px;
+        width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+        color:var(--text-mute); cursor:pointer; transition:color 140ms, border-color 140ms;
+      }
+      #view-calendar .cal-arrow:hover { color:var(--text); border-color:var(--text-mute); }
+      #view-calendar .cal-today {
+        background:rgba(232,197,71,0.10); border:1px solid rgba(232,197,71,0.28);
+        border-radius:999px; padding:6px 16px; color:var(--accent);
+        font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;
+      }
+      #view-calendar .cal-range {
+        font-size:18px; font-weight:700; color:var(--text); margin-left:6px;
+      }
+      #view-calendar .cal-legend {
+        display:flex; gap:24px; margin-bottom:16px; font-size:12px; flex-wrap:wrap;
+      }
+      #view-calendar .cal-legend-item { display:flex; align-items:center; gap:6px; }
+      #view-calendar .cal-legend-dot { width:8px; height:8px; border-radius:50%; }
+      #view-calendar .cal-grid-wrap {
+        background:var(--surface); border:1px solid var(--border);
+        border-radius:10px; overflow:hidden;
+      }
+      #view-calendar .cal-day-headers {
+        display:grid; grid-template-columns:60px repeat(7, 1fr);
+        border-bottom:1px solid var(--border);
+      }
+      #view-calendar .cal-day-head {
+        text-align:center; padding:12px 0; border-left:1px solid var(--border);
+      }
+      #view-calendar .cal-day-short {
+        font-size:11px; font-weight:700; color:var(--text-mute); letter-spacing:0.06em;
+      }
+      #view-calendar .cal-day-num { font-size:16px; font-weight:800; color:var(--text); }
+      #view-calendar .cal-body {
+        display:grid; grid-template-columns:60px repeat(7, 1fr); position:relative;
+      }
+      #view-calendar .cal-time-col { position:relative; }
+      #view-calendar .cal-time-label {
+        position:absolute; display:flex; align-items:flex-start; justify-content:flex-end;
+        padding-right:8px; padding-top:4px; font-size:11px; color:var(--text-mute);
+        font-weight:500; width:100%;
+      }
+      #view-calendar .cal-day-col {
+        position:relative; border-left:1px solid var(--border);
+      }
+      #view-calendar .cal-hour-line {
+        position:absolute; left:0; right:0; border-top:1px solid var(--border);
+      }
+      #view-calendar .cal-session {
+        position:absolute; left:2px; right:2px; padding:8px 10px;
+        border-radius:8px; cursor:pointer; overflow:hidden;
+        transition:filter 140ms;
+      }
+      #view-calendar .cal-session:hover { filter:brightness(1.15); }
+      #view-calendar .cal-session-name {
+        font-weight:700; font-size:12px; line-height:1.2;
+      }
+      #view-calendar .cal-session-time {
+        margin-top:2px; font-size:10px; color:var(--text-mute);
+      }
+      #view-calendar .cal-capacity-badge {
+        position:absolute; bottom:6px; right:10px;
+        font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px;
+        color:#fff;
+      }
+      /* Drawer */
+      #cal-drawer-overlay {
+        position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px);
+        z-index:200; display:none; justify-content:flex-end;
+      }
+      #cal-drawer-overlay.open { display:flex; }
+      #cal-drawer {
+        width:100%; max-width:460px; background:var(--surface);
+        border-left:1px solid var(--border); padding:28px;
+        overflow-y:auto; display:flex; flex-direction:column; gap:18px;
+      }
+      #cal-drawer .cal-drawer-header {
+        display:flex; justify-content:space-between; align-items:flex-start; gap:14px;
+      }
+      #cal-drawer .cal-drawer-title { font-size:20px; font-weight:700; color:var(--text); }
+      #cal-drawer .cal-drawer-close {
+        background:transparent; border:none; color:var(--text-mute); cursor:pointer;
+      }
+      #cal-drawer .cal-drawer-grid {
+        display:grid; grid-template-columns:1fr 1fr; gap:14px; font-size:13px;
+      }
+      #cal-drawer .cal-drawer-label {
+        display:block; font-size:11px; color:var(--text-mute); margin-bottom:2px;
+        text-transform:uppercase; letter-spacing:0.05em;
+      }
+      #cal-drawer .cal-drawer-value { font-weight:600; color:var(--text); }
+      #cal-drawer .cal-drawer-desc {
+        font-size:13px; color:var(--text); line-height:1.55; white-space:pre-wrap;
+      }
+      #cal-drawer .cal-capacity-bar {
+        width:100%; height:6px; background:var(--border); border-radius:3px; overflow:hidden;
+      }
+      #cal-drawer .cal-capacity-fill { height:100%; background:var(--accent); }
+      @media (max-width:768px) {
+        #view-calendar .cal-grid-wrap { overflow-x:auto; }
+        #view-calendar .cal-day-headers,
+        #view-calendar .cal-body { min-width:720px; }
+        #cal-drawer { max-width:100%; border-left:none; }
+      }
+    </style>
+    <div class="view" id="view-calendar">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 04 · Calendar</span>
+          <div class="topbar-title">Weekly Schedule</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="cal-arrow" onclick="calShiftWeek(-1)" aria-label="Previous week">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="cal-today" onclick="calShiftWeek(0)">Today</button>
+            <button class="cal-arrow" onclick="calShiftWeek(1)" aria-label="Next week">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <span class="cal-range" id="cal-range-label">—</span>
+          </div>
+        </div>
+        <div class="cal-legend" id="cal-legend"></div>
+        <div class="cal-grid-wrap">
+          <div class="cal-day-headers" id="cal-day-headers"></div>
+          <div class="cal-body" id="cal-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar session detail drawer (read-only) -->
+    <div id="cal-drawer-overlay" onclick="if(event.target===this)closeCalDrawer()">
+      <div id="cal-drawer"></div>
     </div>
 
     <style>
@@ -6725,6 +6887,9 @@ function switchView(name, el) {
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
 
+  // When entering Calendar, render the weekly grid (mock data for now)
+  if (name === 'calendar') renderCalendar();
+
   // Team view removed 2026-05-26 — its surface now lives at
   // Business Blueprint > Staff. Old #view-team gone, no on-enter loader.
 
@@ -6819,8 +6984,9 @@ async function startPresenceHeartbeat(userId) {
 let V2_ACCESS = false;
 function applyV2NavState(v2Access) {
   V2_ACCESS = !!v2Access;
-  // Re-run member-mgmt gate, which now ANDs in V2_ACCESS.
+  // Re-run V2-gated feature gates.
   applyMemberMgmtNavState();
+  applyCalendarNavState();
 }
 
 // ── Member Management feature flag ──
@@ -6856,6 +7022,158 @@ function applyMemberMgmtNavState() {
   document.querySelectorAll('[data-feature="team"]').forEach(el => {
     el.style.display = showTeam ? '' : 'none';
   });
+}
+
+// Calendar is V2-only, web-only (same treatment as Members for now).
+const CALENDAR_ENABLED = true;
+function applyCalendarNavState() {
+  const showCalendar = CALENDAR_ENABLED && V2_ACCESS && !isNativeApp();
+  document.querySelectorAll('[data-feature="calendar"]').forEach(el => {
+    el.style.display = showCalendar ? '' : 'none';
+  });
+}
+
+// ── Calendar (read-only weekly schedule, mock data) ──────────────────────
+// Mirrors the BAM GTA staff Classes page layout. Mock sessions live here
+// until backend wiring lands. Times are stored as fractional hours.
+// Sessions are date-keyed (YYYY-MM-DD) so non-recurring schedules work.
+const CAL_SESSION_COLOR = { bg:'rgba(232,197,71,0.14)', border:'rgba(232,197,71,0.5)', text:'#E8C547' };
+const CAL_SESSIONS = [
+  // BAM GTA — actual schedule
+  { id:'s1', date:'2026-05-24', name:'Sunday AM', startHour:8.5,  endHour:10,   location:'Lakeshore Gym', description:'Morning skills session.', booked:8,  capacity:12 },
+  { id:'s2', date:'2026-05-24', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:11, capacity:14 },
+  { id:'s3', date:'2026-05-25', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:9,  capacity:12 },
+  { id:'s4', date:'2026-05-28', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:10, capacity:12 },
+  { id:'s5', date:'2026-05-31', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:12, capacity:14 },
+  { id:'s6', date:'2026-06-01', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:7,  capacity:12 },
+  { id:'s7', date:'2026-06-04', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:5,  capacity:12 },
+  { id:'s8', date:'2026-06-07', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:9,  capacity:14 },
+  { id:'s9', date:'2026-06-08', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:8,  capacity:12 },
+];
+function calDateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+const CAL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const CAL_DAY_SHORT = { Monday:'MON', Tuesday:'TUE', Wednesday:'WED', Thursday:'THU', Friday:'FRI', Saturday:'SAT', Sunday:'SUN' };
+const CAL_HOUR_START = 8;
+const CAL_HOUR_END = 22;
+const CAL_HOUR_HEIGHT = 60;
+let CAL_WEEK_OFFSET = 0;  // weeks from current
+
+function calStartOfWeek(offset) {
+  // Monday-start week, current week + offset
+  const d = new Date();
+  const dow = d.getDay();                 // 0 Sun .. 6 Sat
+  const diff = (dow === 0 ? -6 : 1 - dow); // shift to Monday
+  d.setDate(d.getDate() + diff + offset * 7);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function calFormatRange(start) {
+  const end = new Date(start); end.setDate(end.getDate() + 6);
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startStr = `${m[start.getMonth()]} ${start.getDate()}`;
+  const endStr = sameMonth ? `${end.getDate()}` : `${m[end.getMonth()]} ${end.getDate()}`;
+  return `${startStr} – ${endStr}, ${end.getFullYear()}`;
+}
+function calFormatHour(h) {
+  if (h === 12) return '12 PM';
+  if (h === 0)  return '12 AM';
+  return h > 12 ? `${h - 12} PM` : `${h} AM`;
+}
+function calFormatTime(h) {
+  const hr = Math.floor(h);
+  const min = Math.round((h - hr) * 60);
+  const period = hr >= 12 ? 'PM' : 'AM';
+  const display = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+  return `${display}:${String(min).padStart(2,'0')} ${period}`;
+}
+function calShiftWeek(delta) {
+  CAL_WEEK_OFFSET = (delta === 0) ? 0 : CAL_WEEK_OFFSET + delta;
+  renderCalendar();
+}
+function renderCalendar() {
+  const start = calStartOfWeek(CAL_WEEK_OFFSET);
+  document.getElementById('cal-range-label').textContent = calFormatRange(start);
+
+  // Legend left empty (no categories yet for the real GTA schedule)
+  document.getElementById('cal-legend').innerHTML = '';
+
+  // Day headers
+  const headers = document.getElementById('cal-day-headers');
+  headers.innerHTML = '<div></div>' + CAL_DAYS.map((day, i) => {
+    const d = new Date(start); d.setDate(d.getDate() + i);
+    return `<div class="cal-day-head"><div class="cal-day-short">${CAL_DAY_SHORT[day]}</div><div class="cal-day-num">${d.getDate()}</div></div>`;
+  }).join('');
+
+  // Body: time column + 7 day columns
+  const hours = [];
+  for (let h = CAL_HOUR_START; h < CAL_HOUR_END; h++) hours.push(h);
+  const totalHeight = hours.length * CAL_HOUR_HEIGHT;
+
+  const timeColInner = hours.map((h, i) => `
+    <div class="cal-time-label" style="top:${i * CAL_HOUR_HEIGHT}px;height:${CAL_HOUR_HEIGHT}px">${calFormatHour(h)}</div>`).join('');
+
+  const c = CAL_SESSION_COLOR;
+  const dayCols = CAL_DAYS.map((day, i) => {
+    const dayDate = new Date(start); dayDate.setDate(dayDate.getDate() + i);
+    const key = calDateKey(dayDate);
+    const hourLines = hours.map((_, hi) => `<div class="cal-hour-line" style="top:${hi * CAL_HOUR_HEIGHT}px"></div>`).join('');
+    const sessions = CAL_SESSIONS.filter(s => s.date === key).map(s => {
+      const top = (s.startHour - CAL_HOUR_START) * CAL_HOUR_HEIGHT;
+      const height = (s.endHour - s.startHour) * CAL_HOUR_HEIGHT - 2;
+      return `<div class="cal-session"
+                style="top:${top}px;height:${height}px;background:${c.bg};border:1px solid ${c.border}"
+                onclick="openCalDrawer('${s.id}')">
+        <div class="cal-session-name" style="color:${c.text}">${s.name}</div>
+        <div class="cal-session-time">${calFormatTime(s.startHour)}</div>
+        <span class="cal-capacity-badge" style="background:${c.border}">${s.booked}/${s.capacity}</span>
+      </div>`;
+    }).join('');
+    return `<div class="cal-day-col" style="height:${totalHeight}px">${hourLines}${sessions}</div>`;
+  }).join('');
+
+  document.getElementById('cal-body').innerHTML =
+    `<div class="cal-time-col" style="height:${totalHeight}px">${timeColInner}</div>${dayCols}`;
+}
+function openCalDrawer(id) {
+  const s = CAL_SESSIONS.find(x => x.id === id);
+  if (!s) return;
+  const pct = Math.min(100, Math.round((s.booked / s.capacity) * 100));
+  const dayDate = new Date(s.date + 'T00:00:00');
+  const dateStr = dayDate.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
+
+  document.getElementById('cal-drawer').innerHTML = `
+    <div class="cal-drawer-header">
+      <div>
+        <div class="cal-drawer-title">${s.name}</div>
+      </div>
+      <button class="cal-drawer-close" onclick="closeCalDrawer()" aria-label="Close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="cal-drawer-grid">
+      <div><span class="cal-drawer-label">Date</span><div class="cal-drawer-value">${dateStr}</div></div>
+      <div><span class="cal-drawer-label">Time</span><div class="cal-drawer-value">${calFormatTime(s.startHour)} – ${calFormatTime(s.endHour)}</div></div>
+      <div><span class="cal-drawer-label">Location</span><div class="cal-drawer-value">${s.location}</div></div>
+      <div><span class="cal-drawer-label">Capacity</span><div class="cal-drawer-value">${s.booked} / ${s.capacity} booked</div></div>
+    </div>
+    <div>
+      <span class="cal-drawer-label">Spots filled</span>
+      <div class="cal-capacity-bar" style="margin-top:6px"><div class="cal-capacity-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div>
+      <span class="cal-drawer-label">Description</span>
+      <div class="cal-drawer-desc" style="margin-top:6px">${s.description}</div>
+    </div>`;
+  document.getElementById('cal-drawer-overlay').classList.add('open');
+}
+function closeCalDrawer() {
+  document.getElementById('cal-drawer-overlay').classList.remove('open');
 }
 
 // Bottom-left account switcher. Only renders when this auth user is
