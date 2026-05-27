@@ -7039,16 +7039,27 @@ function applyCalendarNavState() {
 // Sessions are date-keyed (YYYY-MM-DD) so non-recurring schedules work.
 const CAL_SESSION_COLOR = { bg:'rgba(232,197,71,0.14)', border:'rgba(232,197,71,0.5)', text:'#E8C547' };
 const CAL_SESSIONS = [
-  // BAM GTA — actual schedule
-  { id:'s1', date:'2026-05-24', name:'Sunday AM', startHour:8.5,  endHour:10,   location:'Lakeshore Gym', description:'Morning skills session.', booked:8,  capacity:12 },
-  { id:'s2', date:'2026-05-24', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:11, capacity:14 },
-  { id:'s3', date:'2026-05-25', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:9,  capacity:12 },
-  { id:'s4', date:'2026-05-28', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:10, capacity:12 },
-  { id:'s5', date:'2026-05-31', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:12, capacity:14 },
-  { id:'s6', date:'2026-06-01', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:7,  capacity:12 },
-  { id:'s7', date:'2026-06-04', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:5,  capacity:12 },
-  { id:'s8', date:'2026-06-07', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:9,  capacity:14 },
-  { id:'s9', date:'2026-06-08', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:8,  capacity:12 },
+  // BAM GTA — Lakeshore Gym
+  { id:'s1',  date:'2026-05-24', name:'Sunday AM', startHour:8.5,  endHour:10,   location:'Lakeshore Gym', description:'Morning skills session.', booked:8,  capacity:12 },
+  { id:'s2',  date:'2026-05-24', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:11, capacity:14 },
+  { id:'s3',  date:'2026-05-25', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:9,  capacity:12 },
+  { id:'s4',  date:'2026-05-28', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:10, capacity:12 },
+  { id:'s5',  date:'2026-05-31', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:12, capacity:14 },
+  { id:'s6',  date:'2026-06-01', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:7,  capacity:12 },
+  { id:'s7',  date:'2026-06-04', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:5,  capacity:12 },
+  { id:'s8',  date:'2026-06-07', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:9,  capacity:14 },
+  { id:'s9',  date:'2026-06-08', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:8,  capacity:12 },
+
+  // Tansley Woods Community Centre (Burlington)
+  { id:'s10', date:'2026-06-02', name:'Single 1',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:6, capacity:12 },
+  { id:'s11', date:'2026-06-03', name:'Single 2',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:7, capacity:12 },
+  { id:'s12', date:'2026-06-09', name:'Single 1',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:8, capacity:12 },
+  { id:'s13', date:'2026-06-10', name:'Single 2',   startHour:19,   endHour:21,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:4, capacity:12 },
+
+  // Alton Community Centre (Burlington)
+  { id:'s14', date:'2026-06-06', name:'Single 6',   startHour:11.5, endHour:13.5, location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:5,  capacity:12 },
+  { id:'s15', date:'2026-06-11', name:'Double 5/6', startHour:18,   endHour:20,   location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:10, capacity:14 },
+  { id:'s16', date:'2026-06-13', name:'Single 4',   startHour:12,   endHour:14,   location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:6,  capacity:12 },
 ];
 function calDateKey(d) {
   const y = d.getFullYear();
