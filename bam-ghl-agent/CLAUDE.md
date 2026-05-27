@@ -21,6 +21,13 @@ Update memory **the moment** something changes, not at commit time. Commit-time 
 
 Run `/memory-audit` periodically. Memory drift wastes context — the cost of not updating is far higher than the cost of updating.
 
+### Mandatory-update notes
+
+A couple of memory notes are explicit sources of truth — if the underlying behavior changes and the note doesn't get updated in the same commit, future sessions will get the model wrong:
+
+- **[V2 Onboarding Model](memories/project_v2_onboarding_model.md)** — must be updated whenever the staff V2 toggle, BB cards, tracker pill, welcome Slack, first-login tour, or auto-resend invite cron changes. The note itself has a "When to update" checklist at the bottom.
+- **[Offer Architecture](memories/project_offer_architecture.md)** — must be updated on new offer types, field-renderer changes, or offers/offer_teams/offer_files schema changes.
+
 ## What this project is (plain english)
 
 **BAM Business** is a white-labeled GoHighLevel agency service. Clients are sports academies and (eventually) home services companies. BAM handles their CRM, automations, websites, funnels, pipelines, and communications inside GHL sub-accounts.

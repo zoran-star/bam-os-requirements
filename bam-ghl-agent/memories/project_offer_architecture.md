@@ -1,0 +1,131 @@
+# Offer Architecture
+
+The unified "Offer" concept that powers the Business Blueprint > Offers card on the client portal. Read this before touching anything under `_bbOfferConfigs`, the offers/offer_teams/offer_files tables, or the field-renderer engine.
+
+## The mental model
+
+An **Offer** is anything an academy sells. Every offer is one of **6 types** with type-specific data, all stored in the same `offers` table (jsonb payload). The shared shape: title + type + draft/published/archived status + a jsonb `data` blob with per-section values.
+
+## The 6 offer types
+
+| Type | Slug | What it is |
+|---|---|---|
+| Training | `training` | Recurring weekly classes / academy program. Block-builder for "Classes" — each class has age, skill, gender, weekly times. |
+| Team | `team` | Competitive team — season + tryouts. **Special** (see below). |
+| Camps / Clinics | `camp_clinic` | Single or multi-day intensive |
+| Internal League | `league` | Recurring season + playoffs |
+| Internal Tournament | `tournament` | Single event + brackets |
+| Gym Rental | `gym_rental` | B2B on-demand booking |
+
+## Sections (per offer)
+
+Five of the six types share the same 6 sections, walked through as a multi-step wizard:
+
+1. **General Info** — title, description, age, skill, gender, location
+2. **Schedule** — when it runs
+3. **Value** — program structure, what makes it different
+4. **Pricing** — multi-pricing block builder
+5. **Sales** — sales path, lead capture, upsells
+6. **Onboarding** — agreement files, intake form fields, notify-on-signup
+
+Each section is a list of fields in `_bbOfferConfigs[<type>]` keyed by section id.
+
+## Team is special
+
+The Team type has only **2 top-level sections** (General + Per team), because Team is an umbrella for *multiple* specific teams under one program brand.
+
+- **General** — program-level identity (brand, description, differentiator)
+- **Per team** — a builder that lets the owner add one row per *specific* team (e.g. "15U Black", "U14 Girls"). Each team row gets 6 collapsible *subsections* of its own:
+  - identity (age, gender, head coach, coaches, roster cap, home location)
+  - schedule (consistent? + practice slot block-builder)
+  - competition (leagues, tournaments)
+  - sales (tryouts? + tryout details, reg form, lead notify, upsells)
+  - pricing (fee, structure, addons, discounts)
+  - onboarding (agreement file, intake form, notify-on-signup)
+  - + an Extra notes textarea per subsection
+
+Each subsection also has its open/closed state preserved across re-renders via `_bbTeamExpandedSubs`.
+
+## Schema
+
+```
+offers          One row per offer
+  id              uuid PK
+  client_id       uuid FK → clients
+  type            text (training/team/camp_clinic/league/tournament/gym_rental)
+  title           text
+  status          text (draft/published/archived)
+  data            jsonb { general_info: {...}, schedule: {...}, ... }
+  sort_order      int
+  created_at, updated_at, created_by
+
+offer_teams     One row per *specific team* under a Team offer
+  id              uuid PK
+  offer_id        uuid FK → offers (cascade delete)
+  title           text
+  data            jsonb (flat — every team subsection's fields at one level)
+  sort_order      int
+
+offer_files     Uploaded files for an offer (or per-team)
+  id              uuid PK
+  offer_id        uuid FK → offers
+  team_id         uuid FK → offer_teams (NULL for offer-scoped files)
+  section         text — disambiguator (see "File uploads" below)
+  filename        text
+  storage_path    text
+  mime_type       text
+  size_bytes      bigint
+  sort_order      int
+```
+
+RLS: scoped by `client_id` membership via `my_client_ids()`.
+
+Storage bucket: `offers` (public). Path layout:
+- offer-scoped: `<client_id>/<offer_id>/<sectionId>/<fieldKey>/<stamp>-<name>`
+- team-scoped: `<client_id>/<offer_id>/teams/<team_id>/<fieldKey>/<stamp>-<name>`
+
+`offer_files.section` holds the field identifier to keep multiple file fields in the same section separate:
+- offer scope: `'<sectionId>:<fieldKey>'`
+- team scope: `'<fieldKey>'` (team data is flat)
+
+## Field-renderer engine
+
+Two parallel renderers — same field types, different data scope.
+
+**Offer-scope** — `_bbRenderField(field, sectionId)`
+- Reads/writes `_bbState.offer.data[sectionId][field.key]`
+- Auto-saves to `offers.data` via debounced `_bbAutoSave()` (600ms)
+- Has the most field types
+
+**Team-scope** — `_bbRenderTeamSubField(teamId, f, val)`
+- Reads/writes `_bbTeamRows[i].data[field.key]` (flat — no per-subsection nesting)
+- Saves to `offer_teams.data` via `_bbSaveTeam(teamId)`
+- Brought to parity with offer-scope 2026-05-26 — supports every field type the offer renderer does
+
+Both support: `text`, `textarea`, `link`, `phone`, `email`, `currency`, `number`, `time`, `check_one`, `check_many`, `check_many_defaults` (offer-scope only), `block_builder` (with collapsible rows + summary), `location_picker`, `staff_select` (placeholder until real staff selector ships), `file` / `files`, `info`, plus `dep:{key,equals}` conditional visibility.
+
+## Important gotchas
+
+- **Team subsection state** — `<details>` elements re-emit without their `open` attribute on every re-render. Without the `_bbTeamExpandedSubs` Set + `ontoggle` handler, clicking a button inside an expanded subsection collapses it. Fixed 2026-05-26 — don't regress.
+
+- **Extra notes per team subsection** — must use prefixed keys (`identity_extra_notes`, `schedule_extra_notes`, etc) because all team data lives flat at `team.data.<key>`. Re-using `extra_notes` would collide across subsections. See `_bbTeamExtraNotes(subId)` helper.
+
+- **File uploads need a saved offer** — the widget short-circuits when `_bbState.offer.id` is null, since `offer_files` rows reference the offer. New offers must be saved before file fields work.
+
+- **Locations picker** — backed by the `locations` table, edited at BB > Locations. Files / inputs picking a location store just the UUID. If a location is later deleted, the offer falls back to "Pick a location…" on next render.
+
+- **Section key for file widget** — getting this wrong produces orphan uploads. Always use `<sectionId>:<fieldKey>` for offer-scope, just `<fieldKey>` for team-scope.
+
+## Known gaps (intentional, not bugs)
+
+- **Real staff selector** — `staff_select` fields currently render as text inputs with a placeholder. Will become a real picker once the BB Staff card is wired to populate the choice list. This applies to offer-scope AND team-scope; both will benefit at the same time.
+- **Brand-derived styling** — landing pages built from offer data don't yet pull colors / fonts from BB > Brand. Planned.
+- **Stripe wiring** — Pricing fields capture intent but don't create Stripe products / prices yet. Manual today.
+
+## When to update this note
+
+- New offer type added → update the 6-types table + section list
+- New field type added to the renderer → update the field-types list
+- Schema change to offers / offer_teams / offer_files → update the Schema block
+- New known gap or gotcha discovered → add to the gotchas or gaps list
+- Field-renderer refactor → update the engine section
