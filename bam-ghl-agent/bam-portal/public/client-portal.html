@@ -6501,9 +6501,93 @@ Then the call to action."]</div>
       }
 
       @media (max-width: 720px) {
-        #view-blueprint .bb-wizard-body { padding:18px 14px; }
+        /* ── Wizard rhythm + spacing ── */
+        #view-blueprint .bb-wizard-body { padding: 14px 14px 90px; }
         #view-blueprint .bb-step-dot { font-size:0; padding:0; min-width:34px; justify-content:center; }
         #view-blueprint .bb-step-dot .bb-step-num { margin:0; }
+        #view-blueprint .bb-wizard-steps { gap:6px; margin-bottom:18px; }
+        #view-blueprint .bb-field { margin-bottom:14px; }
+        #view-blueprint .bb-field-label { margin-bottom:8px; font-size:10.5px; }
+
+        /* Step head: tighten + add a divider so the section break is obvious. */
+        #view-blueprint .bb-wizard-step-head {
+          margin-bottom:16px;
+          padding-bottom:12px;
+          border-bottom:1px solid var(--line);
+        }
+        #view-blueprint .bb-wizard-step-name {
+          font-size:17px; line-height:1.25; margin-bottom:4px;
+        }
+        #view-blueprint .bb-wizard-step-sub {
+          font-family:'JetBrains Mono', monospace;
+          font-size:10px;
+          letter-spacing:0.1em;
+          text-transform:uppercase;
+          color:var(--text-mute);
+        }
+
+        /* ── Background hierarchy ──
+           Page (--ink) → Block cards (--surface-3, elevated) → Inputs inside
+           a block recess back to --ink. Top-level inputs sit at --surface-3
+           so they read as elevated above the page. */
+
+        /* Block cards (Group, Slot) — elevate clearly above the page. */
+        #view-blueprint .bb-block-row {
+          background: var(--surface-3);
+          border-color: var(--line-str);
+          border-radius: 10px;
+          padding: 14px 14px 16px;
+        }
+        #view-blueprint .bb-block-row-head { margin-bottom: 12px; }
+        #view-blueprint .bb-block-row-title { font-size:13.5px; }
+        #view-blueprint .bb-block-row-meta { font-size:10.5px; }
+
+        /* Top-level inputs (NOT inside a block) — slight elevation off page. */
+        #view-blueprint .bb-input,
+        #view-blueprint .bb-textarea,
+        #view-blueprint .bb-select,
+        #view-blueprint .bb-loc-pick {
+          background: var(--surface-3);
+          border-color: var(--line-str);
+        }
+        #view-blueprint .bb-choice {
+          background: var(--surface-3);
+          border-color: var(--line-str);
+          padding: 9px 14px;
+          min-height: 38px;
+          display: inline-flex;
+          align-items: center;
+        }
+
+        /* Inputs INSIDE a block card recess back to ink — visible "well". */
+        #view-blueprint .bb-block-row .bb-input,
+        #view-blueprint .bb-block-row .bb-textarea,
+        #view-blueprint .bb-block-row .bb-select,
+        #view-blueprint .bb-block-row .bb-loc-pick {
+          background: var(--ink);
+          border-color: var(--line);
+        }
+        #view-blueprint .bb-block-row .bb-choice {
+          background: var(--ink);
+          border-color: var(--line);
+        }
+        /* Selected state keeps its gold ghost regardless of nesting. */
+        #view-blueprint .bb-block-row .bb-choice.selected,
+        #view-blueprint .bb-choice.selected {
+          background: var(--accent-ghost);
+          border-color: var(--accent-border);
+          color: var(--accent);
+        }
+
+        /* Nested blocks (Slot inside Group) — drop back to surface-alt so the
+           outer Group card still reads as the higher level. */
+        #view-blueprint .bb-block-row .bb-block-row {
+          background: var(--surface-alt);
+          border-color: var(--line);
+        }
+
+        /* Tighter choice row gap so pills cluster as a group. */
+        #view-blueprint .bb-choice-row { gap: 6px; }
       }
     </style>
 
@@ -7713,14 +7797,6 @@ const _bbOfferConfigs = {
         hint:'e.g. "Middle School Skill Training"' },
       { key:'description', type:'textarea', label:'Short description',
         hint:'One-liner for the landing page' },
-      { key:'age_range', type:'text', label:'Age range', required:true,
-        hint:'e.g. "Grades 5-8", "U12-U14"' },
-      { key:'skill_level', type:'check_one', label:'Skill level', required:true,
-        options:['Beginner','Intermediate','Advanced','All'] },
-      { key:'gender', type:'check_many', label:'Gender', required:true,
-        options:['Boys','Girls'] },
-      { key:'location', type:'location_picker', label:'Primary location', required:true,
-        hint:'Pick from your saved locations or add a new one' },
       _bbCommonExtraNotes
     ]},
     { id:'schedule', label:'Schedule', fields:[
