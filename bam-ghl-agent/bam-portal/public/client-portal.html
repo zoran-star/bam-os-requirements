@@ -11186,23 +11186,45 @@ function _filterOversizeFiles(filesList) {
     const names = tooBig.map(f => `• ${f.name} (${_formatFileSize(f.size)})`).join('\n');
     alert(
       `These files are over 500MB and can't upload through the browser:\n\n${names}\n\n` +
-      `Please upload them to Google Drive, set the share link to "Anyone with the link", ` +
-      `and paste the Drive link in the "Google Drive link" field below.`
+      `Upload them to a cloud share (Google Drive, Dropbox, WeTransfer, OneDrive, iCloud — anything that gives you a public link) ` +
+      `and paste the link in the "Link to file" field below. Make sure sharing is set to "Anyone with the link".`
     );
   }
   return okay;
 }
 
-function _isValidDriveLink(raw) {
+// Accepts any http(s) URL — Google Drive, Dropbox, WeTransfer, OneDrive,
+// iCloud, Box, etc. Previously locked to drive.google.com only.
+function _isValidAssetLink(raw) {
   if (!raw) return false;
   const url = raw.trim();
-  if (!/^https?:\/\//i.test(url)) return false;
-  return /drive\.google\.com|docs\.google\.com/i.test(url);
+  if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(url)) return false;
+  try { new URL(url); return true; } catch (_) { return false; }
 }
 
-function _buildDriveLinkFileEntry(url) {
+const ASSET_LINK_HOST_LABELS = {
+  'drive.google.com':  'Google Drive',
+  'docs.google.com':   'Google Docs',
+  'dropbox.com':       'Dropbox',
+  'wetransfer.com':    'WeTransfer',
+  'we.tl':             'WeTransfer',
+  'onedrive.live.com': 'OneDrive',
+  '1drv.ms':           'OneDrive',
+  'icloud.com':        'iCloud',
+  'box.com':           'Box',
+  'youtube.com':       'YouTube',
+  'youtu.be':          'YouTube',
+  'vimeo.com':         'Vimeo',
+};
+function _assetLinkLabel(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return (ASSET_LINK_HOST_LABELS[host] || host) + ' link';
+  } catch (_) { return 'External link'; }
+}
+function _buildAssetLinkEntry(url) {
   return {
-    name: 'Google Drive link',
+    name: _assetLinkLabel(url),
     url: url.trim(),
     mime: 'text/uri-list',
     size: 0,
@@ -11254,12 +11276,12 @@ function _renderInputAssetsFilesList() {
 async function submitInputAssets() {
   const driveLinkRaw = document.getElementById('inputAssetsDriveLink')?.value?.trim() || '';
   const hasDriveLink = !!driveLinkRaw;
-  if (hasDriveLink && !_isValidDriveLink(driveLinkRaw)) {
-    alert('That doesn\'t look like a Google Drive link. Make sure it starts with https://drive.google.com or https://docs.google.com.');
+  if (hasDriveLink && !_isValidAssetLink(driveLinkRaw)) {
+    alert('That doesn\'t look like a valid URL. Paste a full link starting with https:// (Drive, Dropbox, WeTransfer, OneDrive — any host).');
     return;
   }
   if (!_inputAssetsState.files.length && !hasDriveLink) {
-    alert('Add at least one file or a Google Drive link to submit.');
+    alert('Add at least one file or a share link to submit.');
     return;
   }
   const notes = document.getElementById('inputAssetsNotes')?.value?.trim() || '';
@@ -11276,7 +11298,7 @@ async function submitInputAssets() {
   );
   try {
     const uploaded = await _mreqUploadFiles(filesToUpload);
-    if (hasDriveLink) uploaded.push(_buildDriveLinkFileEntry(driveLinkRaw));
+    if (hasDriveLink) uploaded.push(_buildAssetLinkEntry(driveLinkRaw));
     await _ctkCreateTicket({
       type: assetType,
       notes,
@@ -13514,8 +13536,8 @@ function _renderWizardCreatives() {
         }).join('')}
       </div>
 
-      <label class="modal-label" style="margin-top:12px">Google Drive link <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB)</span></label>
-      <input class="modal-input" type="url" placeholder="https://drive.google.com/..." value="${escapeHTML(c.driveLink || '')}" oninput="wizardSetCreativeDriveLink('${c.id}', this.value)" />
+      <label class="modal-label" style="margin-top:12px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB — Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
+      <input class="modal-input" type="url" placeholder="https://..." value="${escapeHTML(c.driveLink || '')}" oninput="wizardSetCreativeDriveLink('${c.id}', this.value)" />
       <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
       <label class="modal-label" style="margin-top:12px">Notes</label>
@@ -13530,7 +13552,7 @@ function _wizardCreativeHasContent(c) {
   // A creative block counts as "has content" if it has at least one
   // uploaded file OR a valid Google Drive link.
   if (c.files && c.files.length > 0) return true;
-  if (_isValidDriveLink(c.driveLink)) return true;
+  if (_isValidAssetLink(c.driveLink)) return true;
   return false;
 }
 
@@ -13582,10 +13604,10 @@ async function wizardSubmitFinal(skipped) {
     let totalFiles = 0;
     for (const c of _wizard.creatives) {
       const hasFiles = c.files.length > 0;
-      const validDrive = _isValidDriveLink(c.driveLink);
+      const validDrive = _isValidAssetLink(c.driveLink);
       if (!hasFiles && !validDrive) continue; // skip blocks with neither files nor a Drive link
       const uploaded = hasFiles ? await _mreqUploadFiles(c.files) : [];
-      if (validDrive) uploaded.push(_buildDriveLinkFileEntry(c.driveLink));
+      if (validDrive) uploaded.push(_buildAssetLinkEntry(c.driveLink));
       creativesPayload.push({
         local_id: c.id,
         type: c.type,
@@ -13595,7 +13617,7 @@ async function wizardSubmitFinal(skipped) {
       totalFiles += uploaded.length;
     }
     if (!creativesPayload.length) {
-      alert('Add at least one creative with a file or a Google Drive link.');
+      alert('Add at least one creative with a file or a share link.');
       submitBtns.forEach(b => b.disabled = false);
       return;
     }
@@ -16308,8 +16330,8 @@ function toggleTheme() {
     <input type="file" id="inputAssetsFileInput" accept="image/*,video/*,.psd,.ai,.zip" multiple style="display:none" onchange="_inputAssetsAddFiles(this.files)" />
     <div id="inputAssetsFilesList" class="wizard-files-list" style="margin-top:8px"></div>
 
-    <label class="modal-label" for="inputAssetsDriveLink" style="margin-top:18px">Google Drive link <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB)</span></label>
-    <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://drive.google.com/..." />
+    <label class="modal-label" for="inputAssetsDriveLink" style="margin-top:18px">Link to file <span style="color:var(--text-mute);font-weight:400">(use if your file is over 500MB — Drive, Dropbox, WeTransfer, OneDrive, etc.)</span></label>
+    <input id="inputAssetsDriveLink" class="modal-input" type="url" placeholder="https://..." />
     <div style="font-size:12px;color:var(--text-mute);margin-top:4px">Set sharing to "Anyone with the link" so we can open it.</div>
 
     <label class="modal-label" for="inputAssetsNotes" style="margin-top:18px">Notes for the content team</label>
