@@ -107,15 +107,17 @@ review notes, final checklist).
   Demo reviewer login email = `zoran+appreview@byanymeansbball.com` — a
   plus-alias to Zoran's inbox (decided 2026-05-21; the originally-spec'd
   `appreview@byanymeansbusiness.com` mailbox never existed).
-- **Members + Team hidden in the app** — Zoran chose to ship the app
-  WITHOUT the Members and Team tabs (Team confirmed web-only 2026-05-22).
-  `isNativeApp()` in `client-portal.html` (wraps
-  `Capacitor.isNativePlatform()`) makes `applyMemberMgmtNavState()` hide
-  the `[data-feature="members"]` and `[data-feature="team"]` nav inside
-  the native wrapper only — both stay live on the web. App v1 = 3 tabs
-  (Systems, Messages, Marketing) + push + tour. To bring Members into the
-  app later: remove its `!isNativeApp()` check in
-  `applyMemberMgmtNavState()` and resubmit.
+- **Members + Team + Business Blueprint hidden in the app** — Zoran chose
+  to ship the app WITHOUT those three tabs (Team confirmed web-only
+  2026-05-22; Business Blueprint added 2026-05-27 mid-submission when
+  Zoran spotted it in the screenshot prep — it's an owner-side desktop
+  setup surface, not a phone-flow). `isNativeApp()` in `client-portal.html`
+  (wraps `Capacitor.isNativePlatform()`) makes `applyMemberMgmtNavState()`
+  hide the `[data-feature="members"]`, `[data-feature="team"]`, and
+  `[data-feature="blueprint"]` nav inside the native wrapper only — all
+  stay live on the web. App v1 = 3 tabs (Systems, Messages, Marketing) +
+  push + tour. To bring any of them into the app later: remove the
+  `!isNativeApp()` check in `applyMemberMgmtNavState()` and resubmit.
 - **Approval-risk section** added to the guide — the WebView-wrapper
   rejection traps (Apple 4.2 "just a website", 2.1 demo login, 5.1.1(v)
   account deletion, 4.8 Sign in with Apple) each mapped to a mitigation.

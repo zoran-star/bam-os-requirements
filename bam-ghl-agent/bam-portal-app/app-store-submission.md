@@ -39,17 +39,18 @@ in and sees these tabs:
 | **Marketing** | Ad performance (Meta) + marketing/content requests | Live |
 | **Members** | Athlete roster — **hidden in the app for v1**, live on web | Web only |
 | **Team** | Invite teammates + revoke access — **hidden in the app for v1**, live on web | Web only |
+| **Business Blueprint** | Owner-side academy setup (general, brand, staff, locations) — **hidden in the app for v1**, live on web | Web only |
 | Push notifications | Native push prompt on login; tokens captured | Live (sending side is later) |
 | First-login tour | 8-step guided tour for new users | Live |
 
-**Decided (2026-05-20, updated 2026-05-22):**
-- **Members and Team are hidden in the app for v1.** The portal is one
-  codebase for web + app, so `isNativeApp()` in `client-portal.html`
-  hides the Members and Team tabs inside the native wrapper while they
-  stay live on the web. Members keeps developing on the web portal; when
-  its billing actions (Phase 3) are ready, remove its `isNativeApp()`
-  check and resubmit. Team is simply out of app v1 scope — no billing,
-  no App Store risk, just a scoping call.
+**Decided (2026-05-20, updated 2026-05-27):**
+- **Members, Team, and Business Blueprint are hidden in the app for v1.**
+  The portal is one codebase for web + app, so `isNativeApp()` in
+  `client-portal.html` hides those tabs inside the native wrapper while
+  they stay live on the web. Members keeps developing on the web portal;
+  when its billing actions (Phase 3) are ready, remove its `isNativeApp()`
+  check and resubmit. Team and Business Blueprint are out of app v1
+  scope — owner-side setup happens on desktop, not the phone.
 - **The app's v1 = 3 tabs** — Systems, Messages, Marketing — plus
   push notifications and the first-login tour.
 - Push **capture** works; staff **sending** notifications is a later

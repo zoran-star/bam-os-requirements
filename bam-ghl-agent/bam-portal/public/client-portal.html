@@ -4951,7 +4951,7 @@
         Resources
       </div>
 
-      <div class="nav-item" onclick="switchView('blueprint', this)">
+      <div class="nav-item" data-feature="blueprint" onclick="switchView('blueprint', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
@@ -6847,7 +6847,7 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Resources</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-view="blueprint" onclick="mobileSwitchView('blueprint')" aria-label="Business Blueprint">
+    <button type="button" class="mobile-nav-item" data-feature="blueprint" data-view="blueprint" onclick="mobileSwitchView('blueprint')" aria-label="Business Blueprint">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
       </svg>
@@ -7025,6 +7025,12 @@ function applyMemberMgmtNavState() {
   const showTeam = !isNativeApp();
   document.querySelectorAll('[data-feature="team"]').forEach(el => {
     el.style.display = showTeam ? '' : 'none';
+  });
+  // Business Blueprint is web-only — hidden inside the native app
+  // (not part of the App Store v1, same treatment as Members and Team).
+  const showBlueprint = !isNativeApp();
+  document.querySelectorAll('[data-feature="blueprint"]').forEach(el => {
+    el.style.display = showBlueprint ? '' : 'none';
   });
 }
 
