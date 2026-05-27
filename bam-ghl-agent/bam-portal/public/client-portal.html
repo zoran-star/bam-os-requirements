@@ -8529,6 +8529,13 @@ let _obtPanelOpen = false;
 
 function _obtRender() {
   let widget = document.getElementById('obt-widget');
+  // Onboarding tracker is a Business Blueprint feature, and BB is web-only
+  // in app v1. Hide the pill inside the native wrapper so it doesn't point
+  // at sections that aren't reachable in-app.
+  if (isNativeApp()) {
+    if (widget) widget.setAttribute('data-visible', 'false');
+    return;
+  }
   const p = _obtProgress;
   if (!p) {
     if (widget) widget.setAttribute('data-visible', 'false');
