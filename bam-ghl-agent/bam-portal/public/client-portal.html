@@ -5822,6 +5822,10 @@ Then the call to action."]</div>
       #view-calendar .cal-session-time {
         margin-top:2px; font-size:10px; color:var(--text-mute);
       }
+      #view-calendar .cal-session-venue {
+        margin-top:2px; font-size:10px; font-weight:600;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      }
       #view-calendar .cal-capacity-badge {
         position:absolute; bottom:6px; right:10px;
         font-size:10px; font-weight:700; padding:1px 6px; border-radius:3px;
@@ -7037,29 +7041,36 @@ function applyCalendarNavState() {
 // Mirrors the BAM GTA staff Classes page layout. Mock sessions live here
 // until backend wiring lands. Times are stored as fractional hours.
 // Sessions are date-keyed (YYYY-MM-DD) so non-recurring schedules work.
-const CAL_SESSION_COLOR = { bg:'rgba(232,197,71,0.14)', border:'rgba(232,197,71,0.5)', text:'#E8C547' };
+const CAL_VENUE_COLORS = {
+  'Lakeshore':     { bg:'rgba(232,197,71,0.14)',  border:'rgba(232,197,71,0.5)',  text:'#E8C547' },  // gold
+  'Tansley Woods': { bg:'rgba(122,169,214,0.14)', border:'rgba(122,169,214,0.5)', text:'#7AA9D6' },  // blue
+  'Alton':         { bg:'rgba(125,203,148,0.14)', border:'rgba(125,203,148,0.5)', text:'#7DCB94' },  // green
+  'Linbrook':      { bg:'rgba(199,135,255,0.14)', border:'rgba(199,135,255,0.5)', text:'#C787FF' },  // purple
+};
+const CAL_FALLBACK_COLOR = { bg:'rgba(180,180,180,0.10)', border:'rgba(180,180,180,0.4)', text:'#B5B5B5' };
+function calVenueColor(venue) { return CAL_VENUE_COLORS[venue] || CAL_FALLBACK_COLOR; }
 const CAL_SESSIONS = [
   // BAM GTA — Lakeshore Gym
-  { id:'s1',  date:'2026-05-24', name:'Sunday AM', startHour:8.5,  endHour:10,   location:'Lakeshore Gym', description:'Morning skills session.', booked:8,  capacity:12 },
-  { id:'s2',  date:'2026-05-24', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:11, capacity:14 },
-  { id:'s3',  date:'2026-05-25', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:9,  capacity:12 },
-  { id:'s4',  date:'2026-05-28', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:10, capacity:12 },
-  { id:'s5',  date:'2026-05-31', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:12, capacity:14 },
-  { id:'s6',  date:'2026-06-01', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:7,  capacity:12 },
-  { id:'s7',  date:'2026-06-04', name:'Thursday',  startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:5,  capacity:12 },
-  { id:'s8',  date:'2026-06-07', name:'Sunday PM', startHour:19,   endHour:21,   location:'Lakeshore Gym', description:'Evening live play.',      booked:9,  capacity:14 },
-  { id:'s9',  date:'2026-06-08', name:'Monday',    startHour:20,   endHour:21.5, location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:8,  capacity:12 },
+  { id:'s1',  date:'2026-05-24', name:'Sunday AM', startHour:8.5,  endHour:10,   venue:'Lakeshore',    location:'Lakeshore Gym', description:'Morning skills session.', booked:8,  capacity:12 },
+  { id:'s2',  date:'2026-05-24', name:'Sunday PM', startHour:19,   endHour:21,   venue:'Lakeshore',    location:'Lakeshore Gym', description:'Evening live play.',      booked:11, capacity:14 },
+  { id:'s3',  date:'2026-05-25', name:'Monday',    startHour:20,   endHour:21.5, venue:'Lakeshore',    location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:9,  capacity:12 },
+  { id:'s4',  date:'2026-05-28', name:'Thursday',  startHour:20,   endHour:21.5, venue:'Lakeshore',    location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:10, capacity:12 },
+  { id:'s5',  date:'2026-05-31', name:'Sunday PM', startHour:19,   endHour:21,   venue:'Lakeshore',    location:'Lakeshore Gym', description:'Evening live play.',      booked:12, capacity:14 },
+  { id:'s6',  date:'2026-06-01', name:'Monday',    startHour:20,   endHour:21.5, venue:'Lakeshore',    location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:7,  capacity:12 },
+  { id:'s7',  date:'2026-06-04', name:'Thursday',  startHour:20,   endHour:21.5, venue:'Lakeshore',    location:'Lakeshore Gym', description:'Weekly Thursday session.',booked:5,  capacity:12 },
+  { id:'s8',  date:'2026-06-07', name:'Sunday PM', startHour:19,   endHour:21,   venue:'Lakeshore',    location:'Lakeshore Gym', description:'Evening live play.',      booked:9,  capacity:14 },
+  { id:'s9',  date:'2026-06-08', name:'Monday',    startHour:20,   endHour:21.5, venue:'Lakeshore',    location:'Lakeshore Gym', description:'Weekly Monday session.',  booked:8,  capacity:12 },
 
   // Tansley Woods Community Centre (Burlington)
-  { id:'s10', date:'2026-06-02', name:'Single 1',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:6, capacity:12 },
-  { id:'s11', date:'2026-06-03', name:'Single 2',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:7, capacity:12 },
-  { id:'s12', date:'2026-06-09', name:'Single 1',   startHour:17,   endHour:19,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:8, capacity:12 },
-  { id:'s13', date:'2026-06-10', name:'Single 2',   startHour:19,   endHour:21,   location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:4, capacity:12 },
+  { id:'s10', date:'2026-06-02', name:'Single 1',   startHour:17,   endHour:19,   venue:'Tansley Woods', location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:6, capacity:12 },
+  { id:'s11', date:'2026-06-03', name:'Single 2',   startHour:17,   endHour:19,   venue:'Tansley Woods', location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:7, capacity:12 },
+  { id:'s12', date:'2026-06-09', name:'Single 1',   startHour:17,   endHour:19,   venue:'Tansley Woods', location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:8, capacity:12 },
+  { id:'s13', date:'2026-06-10', name:'Single 2',   startHour:19,   endHour:21,   venue:'Tansley Woods', location:'Tansley Woods Community Centre (Burlington)', description:'Burlington session.', booked:4, capacity:12 },
 
   // Alton Community Centre (Burlington)
-  { id:'s14', date:'2026-06-06', name:'Single 6',   startHour:11.5, endHour:13.5, location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:5,  capacity:12 },
-  { id:'s15', date:'2026-06-11', name:'Double 5/6', startHour:18,   endHour:20,   location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:10, capacity:14 },
-  { id:'s16', date:'2026-06-13', name:'Single 4',   startHour:12,   endHour:14,   location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:6,  capacity:12 },
+  { id:'s14', date:'2026-06-06', name:'Single 6',   startHour:11.5, endHour:13.5, venue:'Alton', location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:5,  capacity:12 },
+  { id:'s15', date:'2026-06-11', name:'Double 5/6', startHour:18,   endHour:20,   venue:'Alton', location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:10, capacity:14 },
+  { id:'s16', date:'2026-06-13', name:'Single 4',   startHour:12,   endHour:14,   venue:'Alton', location:'Alton Community Centre (Burlington)', description:'Burlington session.', booked:6,  capacity:12 },
 ];
 function calDateKey(d) {
   const y = d.getFullYear();
@@ -7111,8 +7122,15 @@ function renderCalendar() {
   const start = calStartOfWeek(CAL_WEEK_OFFSET);
   document.getElementById('cal-range-label').textContent = calFormatRange(start);
 
-  // Legend left empty (no categories yet for the real GTA schedule)
-  document.getElementById('cal-legend').innerHTML = '';
+  // Legend — one chip per venue currently scheduled
+  const venuesInUse = Array.from(new Set(CAL_SESSIONS.map(s => s.venue).filter(Boolean)));
+  document.getElementById('cal-legend').innerHTML = venuesInUse.map(v => {
+    const c = calVenueColor(v);
+    return `<div class="cal-legend-item">
+      <span class="cal-legend-dot" style="background:${c.text}"></span>
+      <span style="color:var(--text-mute);font-weight:500">${v}</span>
+    </div>`;
+  }).join('');
 
   // Day headers
   const headers = document.getElementById('cal-day-headers');
@@ -7129,12 +7147,12 @@ function renderCalendar() {
   const timeColInner = hours.map((h, i) => `
     <div class="cal-time-label" style="top:${i * CAL_HOUR_HEIGHT}px;height:${CAL_HOUR_HEIGHT}px">${calFormatHour(h)}</div>`).join('');
 
-  const c = CAL_SESSION_COLOR;
   const dayCols = CAL_DAYS.map((day, i) => {
     const dayDate = new Date(start); dayDate.setDate(dayDate.getDate() + i);
     const key = calDateKey(dayDate);
     const hourLines = hours.map((_, hi) => `<div class="cal-hour-line" style="top:${hi * CAL_HOUR_HEIGHT}px"></div>`).join('');
     const sessions = CAL_SESSIONS.filter(s => s.date === key).map(s => {
+      const c = calVenueColor(s.venue);
       const top = (s.startHour - CAL_HOUR_START) * CAL_HOUR_HEIGHT;
       const height = (s.endHour - s.startHour) * CAL_HOUR_HEIGHT - 2;
       return `<div class="cal-session"
@@ -7142,6 +7160,7 @@ function renderCalendar() {
                 onclick="openCalDrawer('${s.id}')">
         <div class="cal-session-name" style="color:${c.text}">${s.name}</div>
         <div class="cal-session-time">${calFormatTime(s.startHour)}</div>
+        <div class="cal-session-venue" style="color:${c.text};opacity:0.85">${s.venue || ''}</div>
         <span class="cal-capacity-badge" style="background:${c.border}">${s.booked}/${s.capacity}</span>
       </div>`;
     }).join('');
@@ -7158,9 +7177,11 @@ function openCalDrawer(id) {
   const dayDate = new Date(s.date + 'T00:00:00');
   const dateStr = dayDate.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' });
 
+  const vc = calVenueColor(s.venue);
   document.getElementById('cal-drawer').innerHTML = `
     <div class="cal-drawer-header">
       <div>
+        ${s.venue ? `<span style="display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:3px 9px;border-radius:999px;background:${vc.bg};color:${vc.text};margin-bottom:8px">${s.venue}</span>` : ''}
         <div class="cal-drawer-title">${s.name}</div>
       </div>
       <button class="cal-drawer-close" onclick="closeCalDrawer()" aria-label="Close">
