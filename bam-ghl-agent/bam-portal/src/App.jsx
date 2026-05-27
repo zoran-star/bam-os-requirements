@@ -158,7 +158,7 @@ export default function BAMPortal() {
   // test page). View + backend code preserved in repo; just removed from nav.
 
   useEffect(() => {
-    if (me && (me.role === "systems_manager" || me.role === "systems_executor") && nav !== "systems" && nav !== "training") {
+    if (me && (me.role === "systems_manager" || me.role === "systems_executor") && !["systems","clients","training"].includes(nav)) {
       setNav("systems");
     }
   }, [me, nav]);
@@ -428,6 +428,7 @@ export default function BAMPortal() {
   const navItems = isSystemsTeam
     ? [
         { label: "Systems", key: "systems" },
+        { label: "Clients", key: "clients", count: onboardingClients.length + activeClients.length },
       ]
     : [
         { label: "Inbox", key: "inbox" },
