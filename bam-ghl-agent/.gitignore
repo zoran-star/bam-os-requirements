@@ -2,4 +2,10 @@ CLAUDE.local.md
 builds/
 *.DS_Store
 .env
+.env.*
+!.env.example
+env/.env.*
+!env/.env.example
 node_modules/
+.claude/worktrees/
+*.pre-pull-backup

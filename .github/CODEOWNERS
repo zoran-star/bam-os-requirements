@@ -1,0 +1,11 @@
+# CODEOWNERS — auto-request review from owners when a PR touches their files
+# Format: <pattern> <github-username> [<github-username>...]
+# Docs: https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/customizing-your-repository/about-code-owners
+
+# Default — Zoran reviews everything unless overridden below
+*       @zoran-star
+
+# Optional: scope by area later, e.g.
+# bam-ghl-agent/bam-portal/   @zoran-star @cole-github-username
+# prototype/                  @zoran-star @cole-github-username
+# market-research/            @zoran-star
