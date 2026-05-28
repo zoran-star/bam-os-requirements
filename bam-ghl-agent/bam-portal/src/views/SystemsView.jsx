@@ -200,8 +200,14 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
           loading={loading}
           tokens={t}
           dark={dark}
+          isManager={isManager}
           onOpenTicket={(x) => setSelected(x)}
           onJumpToTab={(k) => setTab(k)}
+          onMarkComplete={async (id) => {
+            const res = await approveTicket(id);
+            if (res?.error) { alert(res.error); return; }
+            await load();
+          }}
         />
       ) : (
         <>
@@ -275,7 +281,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 // CLIENT ACTIONS (awaiting_client status, grouped by client, newest at
 // top), then TIMELINE SENSITIVE (urgent OR overdue OR due within 2
 // business days, sorted most overdue → nearest due).
-function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpToTab }) {
+function OverviewTab({ tickets, loading, tokens: t, dark, isManager, onOpenTicket, onJumpToTab, onMarkComplete }) {
   const tileData = [
     { key: "lobby",    label: "tickets in lobby",   count: tickets.filter(x => ["open","delegated"].includes(x.status)).length },
     { key: "ongoing",  label: "tickets ongoing",    count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status)).length },
@@ -367,7 +373,11 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {clientGroups[name].map(x => (
-                    <OverviewRow key={x.id} ticket={x} tokens={t} dark={dark} onClick={() => onOpenTicket(x)} variant="action" />
+                    <OverviewRow
+                      key={x.id} ticket={x} tokens={t} dark={dark} variant="action"
+                      onClick={() => onOpenTicket(x)}
+                      onMarkComplete={isManager ? onMarkComplete : null}
+                    />
                   ))}
                 </div>
               </div>
@@ -391,7 +401,11 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
         )}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {timelineTickets.map(x => (
-            <OverviewRow key={x.id} ticket={x} tokens={t} dark={dark} onClick={() => onOpenTicket(x)} variant="urgent" />
+            <OverviewRow
+              key={x.id} ticket={x} tokens={t} dark={dark} variant="urgent"
+              onClick={() => onOpenTicket(x)}
+              onMarkComplete={isManager ? onMarkComplete : null}
+            />
           ))}
         </div>
       </div>
@@ -401,7 +415,9 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
 
 // One row in the Overview lists. Variant 'action' is plain; 'urgent' is
 // red-tinted with a due-date column instead of submission date.
-function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
+// onMarkComplete is a fn(ticketId) — when passed (manager only), shows a
+// quick "✓ Complete" action on the right.
+function OverviewRow({ ticket, tokens: t, dark, onClick, variant, onMarkComplete }) {
   const title = ticket.menu_item
     || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
   const clientName = ticket.client?.business_name || "Unknown";
@@ -432,12 +448,15 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
     dateLabel = d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined }) : "";
   }
 
+  // Skip the complete action on already-complete statuses.
+  const canComplete = !!onMarkComplete && !["done","approved","cancelled"].includes(ticket.status);
+
   return (
-    <button
+    <div
       onClick={onClick}
       style={{
         display: "grid",
-        gridTemplateColumns: "180px 1fr 160px",
+        gridTemplateColumns: canComplete ? "180px 1fr 160px auto" : "180px 1fr 160px",
         gap: 16,
         alignItems: "center",
         padding: "14px 16px",
@@ -455,7 +474,34 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
       <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clientName}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
       <div style={{ fontSize: 13, fontWeight: 600, color: dateColor, textAlign: "right" }}>{dateLabel}</div>
-    </button>
+      {canComplete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (confirm(`Mark "${title}" complete?`)) onMarkComplete(ticket.id);
+          }}
+          style={{
+            background: "transparent",
+            border: `1px solid ${t.green || "#7DCB94"}55`,
+            color: t.green || "#7DCB94",
+            borderRadius: 999,
+            padding: "5px 10px",
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${t.green || "#7DCB94"}15`; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          title="Mark this ticket complete"
+        >
+          ✓ Complete
+        </button>
+      )}
+    </div>
   );
 }
 
