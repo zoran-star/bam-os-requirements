@@ -285,6 +285,19 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
     { key: "review",   label: "tickets in review",  count: tickets.filter(x => x.status === "in_review").length },
   ];
 
+  // Timeline-sensitive predicate — used both to filter the Timeline
+  // section AND to flag client-action rows that also qualify, so we can
+  // surface a "TIMELINE SENSITIVE" pill on them instead of duplicating.
+  const today = new Date(); today.setHours(0,0,0,0);
+  const twoBizDaysOut = addBusinessDays(today, 2);
+  const isTimelineSensitive = (x) => {
+    if (["done","approved","cancelled"].includes(x.status)) return false;
+    if (x.priority === "urgent") return true;
+    if (!x.due_date) return false;
+    const due = new Date(x.due_date + "T00:00:00");
+    return due.getTime() <= twoBizDaysOut.getTime();
+  };
+
   const clientActionTickets = tickets
     .filter(x => x.status === "awaiting_client")
     .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
@@ -297,18 +310,12 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   });
   const clientNames = Object.keys(clientGroups).sort();
 
-  // Timeline-sensitive: urgent OR (due_date set AND within 2 biz days
-  // or overdue) AND not in a terminal status.
-  const today = new Date(); today.setHours(0,0,0,0);
-  const twoBizDaysOut = addBusinessDays(today, 2);
+  // Tickets already shown under Client Actions are excluded here — we
+  // surface their urgency via a "TIMELINE SENSITIVE" pill on the client
+  // action row instead.
+  const clientActionIds = new Set(clientActionTickets.map(x => x.id));
   const timelineTickets = tickets
-    .filter(x => !["done","approved","cancelled"].includes(x.status))
-    .filter(x => {
-      if (x.priority === "urgent") return true;
-      if (!x.due_date) return false;
-      const due = new Date(x.due_date + "T00:00:00");
-      return due.getTime() <= twoBizDaysOut.getTime();
-    })
+    .filter(x => isTimelineSensitive(x) && !clientActionIds.has(x.id))
     .sort((a, b) => {
       // Most overdue first, then nearest due, urgent-no-date last.
       const ad = a.due_date ? new Date(a.due_date + "T00:00:00").getTime() : Infinity;
@@ -373,6 +380,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
                     <OverviewRow
                       key={x.id} ticket={x} tokens={t} dark={dark} variant="action"
                       onClick={() => onOpenTicket(x)}
+                      timelineSensitive={isTimelineSensitive(x)}
                     />
                   ))}
                 </div>
@@ -410,7 +418,10 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
 
 // One row in the Overview lists. Variant 'action' is plain; 'urgent' is
 // red-tinted with a due-date column instead of submission date.
-function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
+// timelineSensitive (only set on 'action' variant) renders a small red
+// "Timeline sensitive" pill next to the title so we can dedup the row
+// from the Timeline Sensitive section while keeping the urgency visible.
+function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensitive }) {
   const title = ticket.menu_item
     || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
   const clientName = ticket.client?.business_name || "Unknown";
@@ -462,7 +473,21 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
       onMouseLeave={e => { e.currentTarget.style.background = isUrgent ? redBg : t.surface; }}
     >
       <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clientName}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+        {timelineSensitive && (
+          <span style={{
+            flexShrink: 0,
+            fontSize: 10, fontWeight: 700,
+            color: t.red || "#ED7969",
+            textTransform: "uppercase", letterSpacing: 0.5,
+            padding: "2px 8px", borderRadius: 999,
+            background: `${t.red || "#ED7969"}15`,
+            border: `1px solid ${t.red || "#ED7969"}40`,
+            whiteSpace: "nowrap",
+          }}>Timeline sensitive</span>
+        )}
+      </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: dateColor, textAlign: "right" }}>{dateLabel}</div>
     </button>
   );
