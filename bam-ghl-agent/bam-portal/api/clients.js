@@ -1597,10 +1597,13 @@ export default async function handler(req, res) {
         if (prevStaff && prevStaff.email !== newEmail && prevStaff.user_id) {
           const sync = await adminUpdateAuthEmail(prevStaff.user_id, newEmail);
           if (!sync.ok) {
-            const friendly = /already|duplicate|409|422/i.test(sync.error || "")
-              ? "that email is already used by another account"
-              : `couldn't update login email: ${sync.error}`;
-            return res.status(400).json({ error: friendly });
+            if (/already|duplicate|409|422/i.test(sync.error || "")) {
+              return res.status(409).json({
+                error: "That email already belongs to another login account. If this is a different person taking over, archive this staff member and invite the new email as a fresh staff member instead.",
+                code: "email_belongs_to_other_user",
+              });
+            }
+            return res.status(400).json({ error: `couldn't update login email: ${sync.error}` });
           }
           authEmailSync = "updated";
         }
@@ -1842,10 +1845,18 @@ export default async function handler(req, res) {
           if (changing && prev.auth_user_id) {
             const sync = await adminUpdateAuthEmail(prev.auth_user_id, newEmail);
             if (!sync.ok) {
-              const friendly = /already|duplicate|409|422/i.test(sync.error || "")
-                ? "that email is already used by another account"
-                : `couldn't update login email: ${sync.error}`;
-              return res.status(400).json({ error: friendly });
+              if (/already|duplicate|409|422/i.test(sync.error || "")) {
+                // The new email is owned by a DIFFERENT auth user. Editing
+                // the email field here would silently leave the original
+                // owner with login access. The correct flow is Transfer
+                // ownership, which demotes the old user and links the new
+                // one — point staff there instead of just erroring.
+                return res.status(409).json({
+                  error: "That email already belongs to another login account. To put portal access on this email, use \"Transfer ownership\" in the Account management section below — it cleanly moves the client to the new person.",
+                  code: "email_belongs_to_other_user",
+                });
+              }
+              return res.status(400).json({ error: `couldn't update login email: ${sync.error}` });
             }
             authEmailSync = "updated";
             // Also keep the owner's client_users.email row in sync so the
