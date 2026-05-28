@@ -6875,7 +6875,15 @@ function switchView(name, el) {
 
   // Update nav
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-  el.classList.add('active');
+  // el is the clicked nav-item when called from sidebar onclick, but
+  // programmatic callers (the onboarding tracker, deep links, etc.)
+  // pass nothing. Resolve the matching nav-item by its onclick attr
+  // so we don't crash on `el.classList.add` when el is undefined.
+  if (!el) {
+    el = Array.from(document.querySelectorAll('.nav-item'))
+      .find(n => (n.getAttribute('onclick') || '').includes("'" + name + "'"));
+  }
+  if (el) el.classList.add('active');
 
   // Update views
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -8504,13 +8512,17 @@ async function _bbFinishOffer() {
 // All 6 tracker circles just navigate now. The done-state is flipped on
 // the destination card (Brand/Staff/Locations) or upstream (Meta Ads
 // from staff side).
+// Hash-then-view order so the BB panel is already rendered with the
+// right card by the time view-blueprint becomes active — avoids the
+// landing-flash-then-card flicker that the old `switchView ||
+// _bbNavigate` ordering produced.
 const _obtSections = [
-  { id:'general',   key:'general_done',   label:'General',   action:'nav', nav:() => switchView('blueprint') || _bbNavigate('general') },
-  { id:'staff',     key:'staff_done',     label:'Staff',     action:'nav', nav:() => switchView('blueprint') || _bbNavigate('staff') },
-  { id:'locations', key:'locations_done', label:'Locations', action:'nav', nav:() => switchView('blueprint') || _bbNavigate('locations') },
-  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav', nav:() => switchView('blueprint') || _bbNavigate('brand') },
-  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav', nav:() => switchView('blueprint') || _bbNavigate('offers') },
-  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav', nav:() => switchView('marketing') }
+  { id:'general',   key:'general_done',   label:'General',   action:'nav', nav:() => { _bbNavigate('general');   switchView('blueprint'); } },
+  { id:'staff',     key:'staff_done',     label:'Staff',     action:'nav', nav:() => { _bbNavigate('staff');     switchView('blueprint'); } },
+  { id:'locations', key:'locations_done', label:'Locations', action:'nav', nav:() => { _bbNavigate('locations'); switchView('blueprint'); } },
+  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav', nav:() => { _bbNavigate('brand');     switchView('blueprint'); } },
+  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav', nav:() => { _bbNavigate('offers');    switchView('blueprint'); } },
+  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav', nav:() => { switchView('marketing'); } }
 ];
 let _obtProgress = null;
 
