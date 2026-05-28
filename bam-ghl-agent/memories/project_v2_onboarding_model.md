@@ -6,7 +6,7 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 
 ## V1 vs V2 — what each client sees
 
-The staff "V2 access" toggle (per client) is the only switch. Today V2 = the Members tab only. Everything else is V1 and visible to every client.
+The staff "V2 access" toggle (per client) is the only switch. Today V2 adds **Members + Calendar** to the nav. Everything else is V1 and visible to every client.
 
 | Surface | V1 (default) | V2 (`clients.v2_access = true`) |
 |---|---|---|
@@ -17,6 +17,7 @@ The staff "V2 access" toggle (per client) is the only switch. Today V2 = the Mem
 | Business Blueprint | ✅ | ✅ |
 | Onboarding tracker pill | ✅ (if any section incomplete) | ✅ (same) |
 | Members | ❌ | ✅ |
+| Calendar | ❌ | ✅ |
 
 ## The staff toggle
 
