@@ -27,27 +27,27 @@ async function supabaseSelect(path) {
   return res.json();
 }
 
-// Look up an auth user by email. The /auth/v1/admin/users endpoint
-// doesn't support a `?filter=email.eq.X` query — that param is silently
-// ignored and the default first page is returned, so the lookup misses
-// any user past row ~50. This hits the auth schema directly via
-// PostgREST with the Accept-Profile header (service-role only), which
-// supports proper filtering.
+// Look up an auth user by email. The previous implementation hit the
+// auth schema via PostgREST with Accept-Profile: auth — that silently
+// fails on this project (auth schema isn't in PostgREST's exposed
+// schemas), so the "user already exists, link them" fallback path was
+// broken (404'd as "user exists in auth but couldn't be looked up").
+// Migration `auth_user_id_by_email_rpc` adds a SECURITY DEFINER RPC
+// gated to service_role that does the lookup inside Postgres.
 async function findAuthUserByEmail(email) {
   if (!email) return null;
-  const lowered = String(email).toLowerCase();
-  const url = `${SUPABASE_URL}/rest/v1/users?email=eq.${encodeURIComponent(lowered)}&select=id,email&limit=1`;
-  const res = await fetch(url, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/auth_user_id_by_email`, {
+    method: "POST",
     headers: {
       apikey: SUPABASE_SERVICE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      "Accept-Profile": "auth",
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({ p_email: String(email).toLowerCase() }),
   });
   if (!res.ok) return null;
-  const rows = await res.json().catch(() => []);
-  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  const id = await res.json().catch(() => null);
+  return id ? { id, email: String(email).toLowerCase() } : null;
 }
 
 // Lists candidates for the auto-resend-invite cron. A candidate is a
