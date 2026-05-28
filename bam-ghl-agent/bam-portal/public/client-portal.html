@@ -6678,7 +6678,7 @@ Then the call to action."]</div>
         position: absolute;
         top: calc(100% + 8px);
         right: 0;
-        width: 320px;
+        width: 380px;
         background: var(--surface);
         border: 1px solid var(--border-med);
         border-radius: 14px;
@@ -6709,8 +6709,8 @@ Then the call to action."]</div>
       }
       #obt-widget .obt-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 6px;
+        grid-template-columns: repeat(4, 1fr);    /* 8 circles → 4×2 grid */
+        gap: 4px;
       }
       #obt-widget .obt-circle {
         display: flex; flex-direction: column; align-items: center; gap: 5px;
@@ -6749,7 +6749,7 @@ Then the call to action."]</div>
           top: 14px; right: 12px;
         }
         #obt-widget .obt-panel {
-          width: min(320px, calc(100vw - 24px));
+          width: min(380px, calc(100vw - 24px));
           right: 0;
         }
       }
@@ -8512,17 +8512,28 @@ async function _bbFinishOffer() {
 // All 6 tracker circles just navigate now. The done-state is flipped on
 // the destination card (Brand/Staff/Locations) or upstream (Meta Ads
 // from staff side).
+// External onboarding URLs. Updating these (e.g. new Stripe price) is a
+// 1-line change here — both surfaces (tracker + any future "first
+// steps" surface) read from these constants.
+const ONB_GHL_SIGNUP_URL = 'https://buy.stripe.com/3cI5kF5LS94d1vb53jgnK0A';
+const ONB_SLACK_INVITE_URL = 'https://join.slack.com/t/byanymeansbusiness/shared_invite/zt-3z4aen1lz-u_v9B2QUUrhFz2f5PFmbBw';
+
 // Hash-then-view order so the BB panel is already rendered with the
 // right card by the time view-blueprint becomes active — avoids the
 // landing-flash-then-card flicker that the old `switchView ||
 // _bbNavigate` ordering produced.
+// `external` action opens a URL in a new tab AND marks the section
+// done in the same click (assume completion on link-out — user can
+// always click again to re-open the link, the done flag is sticky).
 const _obtSections = [
-  { id:'general',   key:'general_done',   label:'General',   action:'nav', nav:() => { _bbNavigate('general');   switchView('blueprint'); } },
-  { id:'staff',     key:'staff_done',     label:'Staff',     action:'nav', nav:() => { _bbNavigate('staff');     switchView('blueprint'); } },
-  { id:'locations', key:'locations_done', label:'Locations', action:'nav', nav:() => { _bbNavigate('locations'); switchView('blueprint'); } },
-  { id:'brand',     key:'brand_done',     label:'Brand',     action:'nav', nav:() => { _bbNavigate('brand');     switchView('blueprint'); } },
-  { id:'offers',    key:'offers_done',    label:'Offers',    action:'nav', nav:() => { _bbNavigate('offers');    switchView('blueprint'); } },
-  { id:'meta_ads',  key:'meta_ads_done',  label:'Meta Ads',  action:'nav', nav:() => { switchView('marketing'); } }
+  { id:'ghl_signup', key:'ghl_signup_done', label:'GoHighLevel', action:'external', url:ONB_GHL_SIGNUP_URL },
+  { id:'slack_join', key:'slack_join_done', label:'Join Slack',  action:'external', url:ONB_SLACK_INVITE_URL },
+  { id:'general',    key:'general_done',    label:'General',     action:'nav', nav:() => { _bbNavigate('general');   switchView('blueprint'); } },
+  { id:'staff',      key:'staff_done',      label:'Staff',       action:'nav', nav:() => { _bbNavigate('staff');     switchView('blueprint'); } },
+  { id:'locations',  key:'locations_done',  label:'Locations',   action:'nav', nav:() => { _bbNavigate('locations'); switchView('blueprint'); } },
+  { id:'brand',      key:'brand_done',      label:'Brand',       action:'nav', nav:() => { _bbNavigate('brand');     switchView('blueprint'); } },
+  { id:'offers',     key:'offers_done',     label:'Offers',      action:'nav', nav:() => { _bbNavigate('offers');    switchView('blueprint'); } },
+  { id:'meta_ads',   key:'meta_ads_done',   label:'Meta Ads',    action:'nav', nav:() => { switchView('marketing'); } }
 ];
 let _obtProgress = null;
 
@@ -8636,6 +8647,25 @@ function _obtClick(sectionId) {
   _obtPanelOpen = false;
   const w = document.getElementById('obt-widget');
   if (w) w.setAttribute('data-open', 'false');
+
+  // External step (GHL signup, Slack invite): open the URL in a new
+  // tab AND mark this section done so the circle flips immediately.
+  // Already-done circles still re-open the link on click.
+  if (s.action === 'external') {
+    window.open(s.url, '_blank', 'noopener,noreferrer');
+    if (!(_obtProgress && _obtProgress[s.key])) {
+      // Optimistic local flip — RPC will persist
+      if (_obtProgress) _obtProgress[s.key] = true;
+      _obtRender();
+      if (CLIENT_ID && _sb) {
+        _sb.rpc('mark_onboarding_section', {
+          p_client_id: CLIENT_ID, p_section: sectionId, p_done: true,
+        }).catch(() => {});
+      }
+    }
+    return;
+  }
+
   try { s.nav(); } catch (_) { /* nav helpers chain via OR */ }
 }
 

@@ -64,6 +64,8 @@ Six sections, three different completion mechanisms. **This table is the source 
 
 | Section | Trigger | Where it's set |
 |---|---|---|
+| GHL signup | external + click | Tracker circle opens the Stripe Buy link (`ONB_GHL_SIGNUP_URL`) in a new tab AND optimistically flips `clients.ghl_signup_done_at` to NOW() via `mark_onboarding_section('ghl_signup', true)` |
+| Join Slack | external + click | Same pattern with `ONB_SLACK_INVITE_URL` → flips `clients.slack_join_done_at` |
 | General | auto-derived | clients.business_name + owner_name + email all set |
 | Staff | manual mark-done | "I'm done with Staff" button on BB Staff card → `mark_onboarding_section('staff', true)` |
 | Locations | manual mark-done | "I'm done with Locations" button on BB Locations card → `mark_onboarding_section('locations', true)` |
@@ -71,12 +73,20 @@ Six sections, three different completion mechanisms. **This table is the source 
 | Offers | manual mark-done | "I'm done with Offers" button on BB Offers list → `mark_onboarding_section('offers', true)` |
 | Meta Ads | staff-controlled | BAM staff toggles "Meta Ads onboarding complete?" on the staff client overview tab → writes `clients.meta_ads_marked_done_at` |
 
+Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 external sections (GHL + Slack) don't gate the systems onboarding ticket — that trigger only fires on the 5 BB sections (General + Staff + Locations + Brand + Offers).
+
 Manual flags persist as timestamps on the clients row:
+- `ghl_signup_done_at`
+- `slack_join_done_at`
 - `staff_marked_done_at`
 - `brand_marked_done_at`
 - `locations_marked_done_at`
 - `offers_marked_done_at`
 - `meta_ads_marked_done_at`
+
+External URLs live in client-portal.html constants:
+- `ONB_GHL_SIGNUP_URL` — currently the Stripe Buy link for GoHighLevel
+- `ONB_SLACK_INVITE_URL` — BAM Business Slack invite (shared workspace)
 
 Un-mark button appears alongside each Mark-done CTA once flipped — sets the timestamp back to NULL.
 
