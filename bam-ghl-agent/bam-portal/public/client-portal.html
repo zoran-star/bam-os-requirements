@@ -8171,6 +8171,7 @@ async function _bbRenderOffersList(panel) {
       <button class="btn-primary-bb" onclick="_bbOpenTypePicker()">+ Add offer</button>
     </div>
     <div id="bb-offers-list"><div class="bb-empty">Loading offers…</div></div>
+    ${_bbMarkDoneCta('offers', 'Offers')}
   `;
 
   if (!CLIENT_ID || !_sb) {

@@ -68,13 +68,14 @@ Six sections, three different completion mechanisms. **This table is the source 
 | Staff | manual mark-done | "I'm done with Staff" button on BB Staff card → `mark_onboarding_section('staff', true)` |
 | Locations | manual mark-done | "I'm done with Locations" button on BB Locations card → `mark_onboarding_section('locations', true)` |
 | Brand | manual mark-done | "I'm done with Brand" button on BB Brand card → `mark_onboarding_section('brand', true)` |
-| Offers | auto-derived | ≥1 non-archived row in `offers` for this client |
+| Offers | manual mark-done | "I'm done with Offers" button on BB Offers list → `mark_onboarding_section('offers', true)` |
 | Meta Ads | staff-controlled | BAM staff toggles "Meta Ads onboarding complete?" on the staff client overview tab → writes `clients.meta_ads_marked_done_at` |
 
 Manual flags persist as timestamps on the clients row:
 - `staff_marked_done_at`
 - `brand_marked_done_at`
 - `locations_marked_done_at`
+- `offers_marked_done_at`
 - `meta_ads_marked_done_at`
 
 Un-mark button appears alongside each Mark-done CTA once flipped — sets the timestamp back to NULL.
