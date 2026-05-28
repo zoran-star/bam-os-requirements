@@ -57,7 +57,7 @@ function formatDate(s) {
 
 export default function SystemsView({ tokens: t, dark, me, session }) {
   const isManager = me?.role === "admin" || me?.role === "systems_manager";
-  const defaultTab = isManager ? "delegation" : "ongoing";
+  const defaultTab = "ongoing";
 
   const [tab, setTab] = useState(defaultTab);
   // Zoran-only sub-tab inside Review: 'tickets' | 'sessions'
@@ -67,7 +67,6 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const [pool, setPool] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [overviewClient, setOverviewClient] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,64 +94,33 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     return () => { supabase.removeChannel(channel); };
   }, [load]);
 
+  // One scoping rule for everyone: managers see all tickets in a tab,
+  // executors only see tickets assigned to them.
+  const inScope = (x) => isManager || x.assigned_to === me?.id;
+  // Managers also see open (un-delegated) tickets in Lobby so they can
+  // delegate from the row's modal; executors only see their own delegated
+  // tickets waiting to start.
+  const lobbyStatuses = isManager ? ["open","delegated"] : ["delegated"];
   const visibleTickets = tickets.filter(x => {
-    if (tab === "delegation") return x.status === "open";
-    if (tab === "review") {
-      if (x.status !== "in_review") return false;
-      if (isManager) return true;
-      return x.assigned_to === me?.id;
-    }
-    if (tab === "completed") {
-      if (!["done","approved","cancelled"].includes(x.status)) return false;
-      if (isManager) return true;
-      return x.assigned_to === me?.id;
-    }
-    if (tab === "execution") {
-      if (!["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)) return false;
-      if (isManager) return true;
-      return x.assigned_to === me?.id;
-    }
-    // Executor-only granular tabs
-    if (tab === "lobby") return x.status === "delegated" && x.assigned_to === me?.id;
-    if (tab === "ongoing") return ["in_progress","needs_rework"].includes(x.status) && x.assigned_to === me?.id;
-    if (tab === "awaiting") return x.status === "awaiting_client" && x.assigned_to === me?.id;
+    if (tab === "lobby")     return lobbyStatuses.includes(x.status) && inScope(x);
+    if (tab === "ongoing")   return ["in_progress","needs_rework"].includes(x.status) && inScope(x);
+    if (tab === "awaiting")  return x.status === "awaiting_client" && inScope(x);
+    if (tab === "review")    return x.status === "in_review" && inScope(x);
+    if (tab === "completed") return ["done","approved","cancelled"].includes(x.status) && inScope(x);
     return false;
   });
 
-  const overviewTickets = tickets
-    .filter(x => x.status !== "done" && x.status !== "approved")
-    .filter(x => overviewClient === "all" || x.client?.id === overviewClient)
-    .sort((a, b) => {
-      // Awaiting_client pinned to top
-      const aAwaiting = a.status === "awaiting_client" ? 0 : 1;
-      const bAwaiting = b.status === "awaiting_client" ? 0 : 1;
-      if (aAwaiting !== bAwaiting) return aAwaiting - bAwaiting;
-      const ad = a.due_date ? new Date(a.due_date).getTime() : Infinity;
-      const bd = b.due_date ? new Date(b.due_date).getTime() : Infinity;
-      return ad - bd;
-    });
-
-  const academyOptions = Array.from(
-    new Map(tickets.filter(x => x.client?.id).map(x => [x.client.id, x.client.business_name])).entries()
-  ).sort((a, b) => (a[1] || "").localeCompare(b[1] || ""));
-
-  const completedCount = tickets.filter(x => ["done","approved","cancelled"].includes(x.status)).length;
-  const tabs = isManager
-    ? [
-        { key: "overview",   label: "Overview",   count: tickets.filter(x => x.status !== "done" && x.status !== "approved").length },
-        { key: "delegation", label: "Delegation", count: tickets.filter(x => x.status === "open").length },
-        { key: "execution",  label: "Execution",  count: tickets.filter(x => ["delegated","in_progress","awaiting_client","needs_rework"].includes(x.status)).length },
-        { key: "review",     label: "Review",     count: tickets.filter(x => x.status === "in_review").length },
-        { key: "completed",  label: "Completed",  count: completedCount },
-        { key: "import",     label: "Asana Import" },
-      ]
-    : [
-        { key: "lobby",     label: "Lobby",           count: tickets.filter(x => x.assigned_to === me?.id && x.status === "delegated").length },
-        { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => x.assigned_to === me?.id && ["in_progress","needs_rework"].includes(x.status)).length },
-        { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.assigned_to === me?.id && x.status === "awaiting_client").length },
-        { key: "review",    label: "In review",       count: tickets.filter(x => x.assigned_to === me?.id && x.status === "in_review").length },
-        { key: "completed", label: "Completed",       count: tickets.filter(x => x.assigned_to === me?.id && ["done","approved","cancelled"].includes(x.status)).length },
-      ];
+  // Shared tab structure for managers + executors. Managers additionally
+  // get an Asana Import tab at the end. Counts reuse the same scope as
+  // visibleTickets above (managers see all, executors only their own).
+  const tabs = [
+    { key: "lobby",     label: "Lobby",           count: tickets.filter(x => lobbyStatuses.includes(x.status) && inScope(x)).length },
+    { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status) && inScope(x)).length },
+    { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.status === "awaiting_client" && inScope(x)).length },
+    { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length },
+    { key: "completed", label: "Completed",       count: tickets.filter(x => ["done","approved","cancelled"].includes(x.status) && inScope(x)).length },
+    ...(isManager ? [{ key: "import", label: "Asana Import" }] : []),
+  ];
 
   return (
     <div style={{ padding: "28px 32px" }}>
@@ -212,17 +180,6 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         <AgentSessionsPanel tokens={t} dark={dark} />
       ) : tab === "import" ? (
         <AsanaImportView tokens={t} dark={dark} />
-      ) : tab === "overview" ? (
-        <OverviewTab
-          tickets={overviewTickets}
-          loading={loading}
-          academyOptions={academyOptions}
-          overviewClient={overviewClient}
-          setOverviewClient={setOverviewClient}
-          onOpen={(x) => setSelected(x)}
-          onCancelClient={async (id) => { await cancelClientRequest(id); await load(); }}
-          tokens={t}
-        />
       ) : (
         <>
           {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
@@ -233,7 +190,9 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
             </div>
           )}
 
-          {tab === "execution" && visibleTickets.length > 0 ? (
+          {/* Managers get an assignee-grouped view on any multi-person tab.
+              Executors only see their own tickets, so grouping is redundant. */}
+          {isManager && ["lobby","ongoing","awaiting","review"].includes(tab) && visibleTickets.length > 0 ? (
             (() => {
               const groups = {};
               visibleTickets.forEach(x => {
@@ -286,91 +245,6 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         />
       )}
     </div>
-  );
-}
-
-function formatDueDate(s, t) {
-  if (!s) return { text: "No due date", color: t.textMute };
-  const d = new Date(s);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const due = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diff = Math.round((due - today) / 86400000);
-  const text = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: due.getFullYear() !== today.getFullYear() ? "numeric" : undefined });
-  let label = text;
-  if (diff < 0) label = `${text} · ${Math.abs(diff)}d overdue`;
-  else if (diff === 0) label = `${text} · today`;
-  else if (diff === 1) label = `${text} · tomorrow`;
-  else if (diff <= 7) label = `${text} · in ${diff}d`;
-  const color = diff < 0 ? t.red : diff <= 2 ? t.amber : t.text;
-  return { text: label, color };
-}
-
-const TYPE_LABEL = { error: "Error", change: "Change", build: "Build" };
-
-function OverviewTab({ tickets, loading, academyOptions, overviewClient, setOverviewClient, onOpen, onCancelClient, tokens: t }) {
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5 }}>Academy</span>
-        <select
-          value={overviewClient}
-          onChange={e => setOverviewClient(e.target.value)}
-          style={{ padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, minWidth: 200 }}
-        >
-          <option value="all">All academies ({academyOptions.length})</option>
-          {academyOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-        </select>
-        <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{tickets.length} open · sorted by due date</span>
-      </div>
-
-      {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
-
-      {!loading && tickets.length === 0 && (
-        <div style={{ color: t.textMute, fontSize: 14, padding: "40px 0", textAlign: "center" }}>No open tickets.</div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 1, background: t.border, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" }}>
-        {tickets.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 180px 200px", gap: 12, padding: "10px 16px", background: t.bg, fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            <div>Title</div><div>Type</div><div>Due</div><div>Academy</div>
-          </div>
-        )}
-        {tickets.map(x => {
-          const title = x.menu_item || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
-          const due = formatDueDate(x.due_date, t);
-          const awaiting = x.status === "awaiting_client";
-          return (
-            <div key={x.id} onClick={() => onOpen(x)} style={{
-              display: "grid", gridTemplateColumns: "1fr 110px 180px 200px", gap: 12,
-              padding: "14px 16px",
-              background: awaiting ? (t.bg === "#0E0E12" ? "rgba(232,191,96,0.06)" : "rgba(232,191,96,0.10)") : t.surface,
-              borderLeft: awaiting ? `3px solid ${t.accent}` : "3px solid transparent",
-              cursor: "pointer", alignItems: "center",
-            }}
-              onMouseEnter={e => e.currentTarget.style.background = t.bg}
-              onMouseLeave={e => e.currentTarget.style.background = awaiting ? (t.bg === "#0E0E12" ? "rgba(232,191,96,0.06)" : "rgba(232,191,96,0.10)") : t.surface}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
-                {awaiting && (
-                  <>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: t.accent, background: t.bg === "#0E0E12" ? "rgba(232,191,96,0.15)" : "rgba(232,191,96,0.20)", padding: "3px 8px", borderRadius: 6, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>⏳ Action Needed</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); if (confirm("Cancel the request to the client?")) onCancelClient?.(x.id); }}
-                      style={{ fontSize: 11, padding: "3px 8px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: 6, color: t.textSub, cursor: "pointer", whiteSpace: "nowrap" }}
-                    >Cancel request</button>
-                  </>
-                )}
-                <span style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: t.textSub }}>{TYPE_LABEL[x.type] || x.type}</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: due.color }}>{due.text}</div>
-              <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.client?.business_name || "—"}</div>
-            </div>
-          );
-        })}
-      </div>
-    </>
   );
 }
 
