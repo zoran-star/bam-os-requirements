@@ -14,8 +14,8 @@ import {
   denyTicket,
   cancelTicket,
   saveTicketFields,
+  setTicketDueDate,
 } from "../services/ticketsService";
-import AsanaImportView from "./AsanaImportView";
 import AgentSessionsPanel from "./AgentSessionsPanel";
 import { supabase } from "../lib/supabase";
 
@@ -55,9 +55,25 @@ function formatDate(s) {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+// Number of business days from a date (Mon=1..Fri=5 — skips Sat/Sun).
+function addBusinessDays(start, n) {
+  const d = new Date(start);
+  let added = 0;
+  while (added < n) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added += 1;
+  }
+  return d;
+}
+function biz(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function daysBetween(a, b) {
+  return Math.round((biz(b).getTime() - biz(a).getTime()) / 86400000);
+}
+
 export default function SystemsView({ tokens: t, dark, me, session }) {
   const isManager = me?.role === "admin" || me?.role === "systems_manager";
-  const defaultTab = "ongoing";
+  const defaultTab = isManager ? "overview" : "ongoing";
 
   const [tab, setTab] = useState(defaultTab);
   // Zoran-only sub-tab inside Review: 'tickets' | 'sessions'
@@ -110,16 +126,16 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     return false;
   });
 
-  // Shared tab structure for managers + executors. Managers additionally
-  // get an Asana Import tab at the end. Counts reuse the same scope as
-  // visibleTickets above (managers see all, executors only their own).
+  // Shared tab structure. Managers additionally get an Overview tab at
+  // the front. Counts reuse the same scope as visibleTickets above
+  // (managers see all, executors only their own).
   const tabs = [
+    ...(isManager ? [{ key: "overview", label: "Overview" }] : []),
     { key: "lobby",     label: "Lobby",           count: tickets.filter(x => lobbyStatuses.includes(x.status) && inScope(x)).length },
     { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status) && inScope(x)).length },
     { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.status === "awaiting_client" && inScope(x)).length },
     { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length },
     { key: "completed", label: "Completed",       count: tickets.filter(x => ["done","approved","cancelled"].includes(x.status) && inScope(x)).length },
-    ...(isManager ? [{ key: "import", label: "Asana Import" }] : []),
   ];
 
   return (
@@ -178,8 +194,15 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 
       {tab === "review" && canSeeAgentSessions && reviewSubTab === "sessions" ? (
         <AgentSessionsPanel tokens={t} dark={dark} />
-      ) : tab === "import" ? (
-        <AsanaImportView tokens={t} dark={dark} />
+      ) : tab === "overview" ? (
+        <OverviewTab
+          tickets={tickets}
+          loading={loading}
+          tokens={t}
+          dark={dark}
+          onOpenTicket={(x) => setSelected(x)}
+          onJumpToTab={(k) => setTab(k)}
+        />
       ) : (
         <>
           {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading tickets…</div>}
@@ -245,6 +268,194 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         />
       )}
     </div>
+  );
+}
+
+// Overview tab — managers/admins only. Three stat tiles at top, then
+// CLIENT ACTIONS (awaiting_client status, grouped by client, newest at
+// top), then TIMELINE SENSITIVE (urgent OR overdue OR due within 2
+// business days, sorted most overdue → nearest due).
+function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpToTab }) {
+  const tileData = [
+    { key: "lobby",    label: "tickets in lobby",   count: tickets.filter(x => ["open","delegated"].includes(x.status)).length },
+    { key: "ongoing",  label: "tickets ongoing",    count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status)).length },
+    { key: "review",   label: "tickets in review",  count: tickets.filter(x => x.status === "in_review").length },
+  ];
+
+  const clientActionTickets = tickets
+    .filter(x => x.status === "awaiting_client")
+    .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+
+  // Group client actions by client business_name
+  const clientGroups = {};
+  clientActionTickets.forEach(x => {
+    const name = x.client?.business_name || "Unknown client";
+    (clientGroups[name] = clientGroups[name] || []).push(x);
+  });
+  const clientNames = Object.keys(clientGroups).sort();
+
+  // Timeline-sensitive: urgent OR (due_date set AND within 2 biz days
+  // or overdue) AND not in a terminal status.
+  const today = new Date(); today.setHours(0,0,0,0);
+  const twoBizDaysOut = addBusinessDays(today, 2);
+  const timelineTickets = tickets
+    .filter(x => !["done","approved","cancelled"].includes(x.status))
+    .filter(x => {
+      if (x.priority === "urgent") return true;
+      if (!x.due_date) return false;
+      const due = new Date(x.due_date + "T00:00:00");
+      return due.getTime() <= twoBizDaysOut.getTime();
+    })
+    .sort((a, b) => {
+      // Most overdue first, then nearest due, urgent-no-date last.
+      const ad = a.due_date ? new Date(a.due_date + "T00:00:00").getTime() : Infinity;
+      const bd = b.due_date ? new Date(b.due_date + "T00:00:00").getTime() : Infinity;
+      return ad - bd;
+    });
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+      {/* Stat tiles */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {tileData.map(tile => (
+          <button
+            key={tile.key}
+            onClick={() => onJumpToTab(tile.key)}
+            style={{
+              padding: "28px 20px",
+              background: t.surface,
+              border: `1px solid ${t.border}`,
+              borderRadius: 12,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "center",
+              transition: "border-color 140ms, background 140ms",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = t.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; }}
+          >
+            <div style={{ fontSize: 38, fontWeight: 700, color: t.text, letterSpacing: "-0.02em" }}>
+              {tile.count}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 4 }}>
+              {tile.label}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* CLIENT ACTIONS */}
+      <div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16, paddingBottom: 8, borderBottom: `1px solid ${t.border}` }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: t.text, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            {clientActionTickets.length} Client Action{clientActionTickets.length === 1 ? "" : "s"}
+          </h2>
+          <span style={{ fontSize: 12, color: t.textMute }}>grouped by client · newest at top</span>
+        </div>
+        {loading && <div style={{ color: t.textMute, fontSize: 14 }}>Loading…</div>}
+        {!loading && clientActionTickets.length === 0 && (
+          <div style={{ color: t.textMute, fontSize: 13, padding: "20px 0", fontStyle: "italic" }}>
+            No tickets awaiting client action.
+          </div>
+        )}
+        {clientNames.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            {clientNames.map(name => (
+              <div key={name}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+                  {name}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {clientGroups[name].map(x => (
+                    <OverviewRow key={x.id} ticket={x} tokens={t} dark={dark} onClick={() => onOpenTicket(x)} variant="action" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* TIMELINE SENSITIVE */}
+      <div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16, paddingBottom: 8, borderBottom: `1px solid ${t.border}` }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: t.text, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
+            Timeline Sensitive
+          </h2>
+          <span style={{ fontSize: 12, color: t.textMute }}>urgent · overdue · due within 2 business days</span>
+        </div>
+        {!loading && timelineTickets.length === 0 && (
+          <div style={{ color: t.textMute, fontSize: 13, padding: "20px 0", fontStyle: "italic" }}>
+            Nothing urgent or due soon.
+          </div>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {timelineTickets.map(x => (
+            <OverviewRow key={x.id} ticket={x} tokens={t} dark={dark} onClick={() => onOpenTicket(x)} variant="urgent" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// One row in the Overview lists. Variant 'action' is plain; 'urgent' is
+// red-tinted with a due-date column instead of submission date.
+function OverviewRow({ ticket, tokens: t, dark, onClick, variant }) {
+  const title = ticket.menu_item
+    || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
+  const clientName = ticket.client?.business_name || "Unknown";
+  const isUrgent = variant === "urgent";
+  const redBg = dark ? "rgba(232,117,96,0.08)" : "rgba(232,117,96,0.10)";
+  const redBorder = `${t.red || "#ED7969"}55`;
+
+  // Date column: submission date for 'action', due_date label for 'urgent'.
+  let dateLabel = "";
+  let dateColor = t.textMute;
+  if (isUrgent) {
+    if (ticket.priority === "urgent" && !ticket.due_date) {
+      dateLabel = "🔴 Urgent";
+      dateColor = t.red || "#ED7969";
+    } else if (ticket.due_date) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const due = new Date(ticket.due_date + "T00:00:00");
+      const diff = daysBetween(today, due);
+      const datePart = due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      if (diff < 0)       dateLabel = `${datePart} · ${Math.abs(diff)}d overdue`;
+      else if (diff === 0) dateLabel = `${datePart} · today`;
+      else if (diff === 1) dateLabel = `${datePart} · tomorrow`;
+      else                 dateLabel = `${datePart} · in ${diff}d`;
+      dateColor = diff < 0 ? (t.red || "#ED7969") : t.text;
+    }
+  } else {
+    const d = ticket.submitted_at ? new Date(ticket.submitted_at) : null;
+    dateLabel = d ? d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined }) : "";
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "180px 1fr 160px",
+        gap: 16,
+        alignItems: "center",
+        padding: "14px 16px",
+        background: isUrgent ? redBg : t.surface,
+        border: `1px solid ${isUrgent ? redBorder : t.border}`,
+        borderRadius: 8,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        textAlign: "left",
+        transition: "background 140ms",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = isUrgent ? (dark ? "rgba(232,117,96,0.13)" : "rgba(232,117,96,0.16)") : t.bg; }}
+      onMouseLeave={e => { e.currentTarget.style.background = isUrgent ? redBg : t.surface; }}
+    >
+      <div style={{ fontSize: 13, color: t.textSub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{clientName}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: dateColor, textAlign: "right" }}>{dateLabel}</div>
+    </button>
   );
 }
 
@@ -397,10 +608,30 @@ function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, on
           <h2 style={{ fontSize: 20, fontWeight: 700, color: t.text, margin: 0 }}>
             {ticket.menu_item || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request")}
           </h2>
-          <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6 }}>
+          <div style={{ display: "flex", gap: 14, fontSize: 13, color: t.textMute, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span>{ticket.client?.business_name || "Unknown client"}</span>
             <span>Submitted {formatDate(ticket.submitted_at)}</span>
             {ticket.assignee && <span>Assigned to {ticket.assignee.name}</span>}
+            {/* Due date — admin can edit, everyone else sees the value. */}
+            {me?.role === "admin" ? (
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>Due</span>
+                <input
+                  type="date"
+                  value={ticket.due_date || ""}
+                  onMouseDown={e => e.stopPropagation()}
+                  onChange={e => wrap(() => setTicketDueDate(ticket.id, e.target.value))}
+                  disabled={busy}
+                  style={{
+                    background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6,
+                    padding: "3px 6px", fontSize: 12, color: t.text, fontFamily: "inherit",
+                    colorScheme: dark ? "dark" : "light",
+                  }}
+                />
+              </label>
+            ) : ticket.due_date && (
+              <span>Due {new Date(ticket.due_date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+            )}
           </div>
         </div>
 

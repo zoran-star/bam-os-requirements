@@ -353,6 +353,16 @@ export default async function handler(req, res) {
           update.fields = { ...(t.fields || {}), ...body.fields };
           break;
 
+        case "set_due_date":
+          // Admin-only override of the auto-calc'd due_date. Accepts ISO
+          // YYYY-MM-DD or empty string to clear back to NULL.
+          if (me.role !== "admin") return res.status(403).json({ error: "admin only" });
+          if (body.due_date && !/^\d{4}-\d{2}-\d{2}$/.test(body.due_date)) {
+            return res.status(400).json({ error: "due_date must be YYYY-MM-DD" });
+          }
+          update.due_date = body.due_date || null;
+          break;
+
         case "cancel_ticket":
           // Hard-cancel the whole ticket. Any authenticated systems staff
           // can do this, at any non-final status. Done/approved/cancelled

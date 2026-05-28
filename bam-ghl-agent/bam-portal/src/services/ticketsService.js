@@ -49,3 +49,4 @@ export const approveTicket        = (id)                       => patch(id, "app
 export const denyTicket           = (id, denial_notes)         => patch(id, "deny", { denial_notes });
 export const cancelTicket         = (id, reason)               => patch(id, "cancel_ticket", { reason: reason || "" });
 export const saveTicketFields     = (id, fields)               => patch(id, "update_fields", { fields });
+export const setTicketDueDate     = (id, due_date)             => patch(id, "set_due_date", { due_date: due_date || "" });
