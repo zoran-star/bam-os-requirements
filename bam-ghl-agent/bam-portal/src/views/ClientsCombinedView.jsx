@@ -820,6 +820,7 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
         <>
           <SectionTitle style={{ marginTop: 36 }}>Account management</SectionTitle>
           <AuthActions client={client} tokens={t} session={session} onChanged={onChanged} />
+          <TransferOwnerButton client={client} tokens={t} session={session} onChanged={onChanged} />
         </>
       )}
 
@@ -1956,6 +1957,105 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
 }
 
 // ─── Auth actions ───────────────────────────────────────────────────────────
+// Transfer ownership of a client to a different person. Opens a modal,
+// collects new owner name + email, calls action=transfer-owner which:
+//   - Revokes old owner's portal access (client_users.status='revoked')
+//   - Invites OR links the new owner's auth user
+//   - Updates clients.auth_user_id / email / owner_name
+//   - Sends invite email + Slack to the new owner
+function TransferOwnerButton({ client, tokens: t, session, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function go() {
+    if (!confirm(`Transfer ${client.business_name} from "${client.owner_name || client.email}" to ${name} (${email})?\n\nThe current owner will immediately lose portal access. The new owner gets an invite email.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      const tok = session?.access_token;
+      const res = await fetch("/api/clients?action=transfer-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, email: email.trim(), owner_name: name.trim() }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setMsg({ kind: "ok", text: j.mode === "link-existing"
+        ? "Transferred — new owner linked to their existing account."
+        : "Transferred — invite sent to new owner." });
+      setName(""); setEmail("");
+      onChanged?.();
+      setTimeout(() => setOpen(false), 1500);
+    } catch (e) {
+      setMsg({ kind: "err", text: e.message || "Transfer failed." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div style={{ padding: "14px 16px", border: `1px solid ${t.border}`, borderRadius: 6, marginTop: 10, display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ fontSize: 13, color: t.textSub, flex: 1 }}>
+          <div style={{ color: t.text, fontWeight: 600, marginBottom: 2 }}>Transfer ownership</div>
+          Move portal access to a different person. Current owner loses access immediately.
+        </div>
+        <button
+          onClick={() => { setOpen(true); setMsg(null); setName(""); setEmail(""); }}
+          style={{ padding: "8px 18px", background: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+        >Transfer…</button>
+      </div>
+
+      {open && (
+        <div onClick={() => !busy && setOpen(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 480, background: t.surface, border: `1px solid ${t.borderMed || t.border}`,
+            borderRadius: 14, padding: 28,
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: t.text, marginBottom: 4 }}>Transfer ownership</div>
+            <div style={{ fontSize: 13, color: t.textSub, marginBottom: 18 }}>
+              Current owner: <strong style={{ color: t.text }}>{client.owner_name || "—"}</strong> · <span style={{ color: t.textMute }}>{client.email || "no email"}</span>
+            </div>
+
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>New owner name</label>
+            <input
+              value={name} onChange={e => setName(e.target.value)} placeholder="Full name" disabled={busy}
+              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14 }}
+            />
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>New owner email</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="newowner@email.com" disabled={busy}
+              style={{ width: "100%", padding: "10px 12px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", marginBottom: 18 }}
+            />
+
+            {msg && (
+              <div style={{ fontSize: 13, color: msg.kind === "ok" ? (t.green || "#7DCB94") : (t.red || "#ED7969"), marginBottom: 14, fontWeight: 600 }}>
+                {msg.text}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setOpen(false)} disabled={busy}
+                style={{ padding: "9px 16px", background: "transparent", color: t.textSub, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={go} disabled={busy || !name.trim() || !email.trim()}
+                style={{ padding: "9px 22px", background: t.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                {busy ? "Transferring…" : "Transfer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function AuthActions({ client, tokens, session, onChanged }) {
   const t = tokens;
   const [msg, setMsg] = useState(null);

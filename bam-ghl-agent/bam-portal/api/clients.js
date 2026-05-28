@@ -1429,7 +1429,7 @@ export default async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally gated to ZORAN_EMAIL inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "archive", "list-feedback", "resolve-feedback"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -1968,6 +1968,184 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: "feedback id not found" });
         }
         return res.status(200).json({ ok: true, resolved: !undo, item: updated[0] });
+      }
+
+      // ── action=transfer-owner ──
+      // Admin/scaling-only. Atomically moves ownership of a client from
+      // the current owner to a new email + name. Steps:
+      //   1. Demote the old owner's client_users row (status='revoked')
+      //      so they lose portal access via my_client_ids(). Audit trail
+      //      preserved — we don't delete.
+      //   2. Resolve the new owner's auth user: invite if email is fresh,
+      //      link if the email already exists in auth (e.g. they own
+      //      another client too). Mirrors setup-account / invite-staff.
+      //   3. Patch clients: new auth_user_id + email + owner_name.
+      //   4. Insert/upsert client_users row for the new owner with
+      //      role='owner', status='active'.
+      //   5. Send the new owner an invite/magiclink email + Slack.
+      //
+      // Old owner's auth.users account is NOT deleted — they may still
+      // be staff somewhere, or own another client. Just lose access to
+      // THIS client.
+      if (action === "transfer-owner") {
+        const body = req.body || {};
+        const client_id = typeof body.client_id === "string" ? body.client_id : "";
+        const new_email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+        const new_owner_name = typeof body.owner_name === "string" ? body.owner_name.trim() : "";
+        if (!client_id) return res.status(400).json({ error: "client_id required" });
+        if (!new_owner_name) return res.status(400).json({ error: "new owner name required" });
+        if (!new_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(new_email)) {
+          return res.status(400).json({ error: "valid email required" });
+        }
+
+        // Fetch current state
+        const curRows = await supabaseSelect(
+          `clients?id=eq.${client_id}&select=id,business_name,auth_user_id,email,owner_name,slack_channel_id`
+        );
+        const cur = curRows?.[0];
+        if (!cur) return res.status(404).json({ error: "client not found" });
+        if (cur.email && cur.email.toLowerCase() === new_email && cur.owner_name === new_owner_name) {
+          return res.status(400).json({ error: "new owner matches current owner — nothing to transfer" });
+        }
+
+        // 1. Demote old owner (if any). Don't fail the transfer if the
+        // row doesn't exist — clients without a corresponding
+        // client_users row are valid (legacy data).
+        if (cur.auth_user_id) {
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/client_users?client_id=eq.${client_id}&user_id=eq.${cur.auth_user_id}`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal",
+              },
+              body: JSON.stringify({ status: "revoked", updated_at: new Date().toISOString() }),
+            }
+          ).catch(() => {});
+        }
+
+        // 2. Resolve new owner's auth user (invite OR link existing).
+        const { clientUrl } = portalUrls(req);
+        const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
+        let new_auth_user_id = null;
+        let inviteMode = "invite";
+        let actionLink = null;
+        const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "invite",
+            email: new_email,
+            options: { redirect_to: redirectTo, data: { needs_password: true } },
+          }),
+        });
+        if (inviteRes.ok) {
+          const j = await inviteRes.json();
+          new_auth_user_id = j?.id || j?.user?.id || null;
+          actionLink = j?.action_link || null;
+        } else {
+          const errText = await inviteRes.text();
+          if (inviteRes.status === 422 || /already/i.test(errText)) {
+            const existingAuth = await findAuthUserByEmail(new_email);
+            if (!existingAuth?.id) {
+              return res.status(500).json({ error: "new owner exists in auth but couldn't be looked up" });
+            }
+            new_auth_user_id = existingAuth.id;
+            inviteMode = "link-existing";
+            // Issue a magiclink so the new owner has a clickable login.
+            const ml = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+              method: "POST",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                type: "magiclink", email: new_email,
+                options: { redirect_to: redirectTo },
+              }),
+            });
+            if (ml.ok) {
+              const mj = await ml.json();
+              actionLink = mj?.action_link || null;
+            }
+          } else {
+            return res.status(400).json({ error: `invite: ${errText}` });
+          }
+        }
+        if (!new_auth_user_id) {
+          return res.status(500).json({ error: "couldn't resolve new owner auth user" });
+        }
+
+        // 3. Patch clients row (auth_user_id + email + owner_name).
+        const updateRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`,
+          {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({
+              auth_user_id: new_auth_user_id,
+              email: new_email,
+              owner_name: new_owner_name,
+              updated_at: new Date().toISOString(),
+            }),
+          }
+        );
+        if (!updateRes.ok) {
+          return res.status(500).json({ error: `clients update failed: ${await updateRes.text()}` });
+        }
+
+        // 4. Ensure client_users row exists for the new owner with role=owner.
+        await ensureOwnerMembership({
+          clientId: client_id, authUserId: new_auth_user_id,
+          name: new_owner_name, email: new_email,
+        });
+
+        // 5. Email + Slack (best-effort, parallel).
+        const [emailResult, slackResult] = actionLink
+          ? await Promise.all([
+              process.env.RESEND_API_KEY
+                ? (inviteMode === "invite"
+                    ? sendInviteEmail({
+                        to: new_email, actionLink,
+                        businessName: cur.business_name || "",
+                        resendApiKey: process.env.RESEND_API_KEY,
+                      })
+                    : sendResetPasswordEmail({
+                        to: new_email, actionLink,
+                        resendApiKey: process.env.RESEND_API_KEY,
+                      }))
+                : Promise.resolve({ ok: false, skipped: true }),
+              postInviteToSlack({
+                slackChannelId: cur.slack_channel_id || null,
+                businessName: cur.business_name || "",
+                ownerName: new_owner_name, email: new_email, actionLink,
+              }),
+            ])
+          : [{ ok: false, skipped: true }, { ok: false, skipped: true }];
+
+        return res.status(200).json({
+          ok: true,
+          mode: inviteMode,
+          old_owner: { email: cur.email, owner_name: cur.owner_name, auth_user_id: cur.auth_user_id },
+          new_owner: { email: new_email, owner_name: new_owner_name, auth_user_id: new_auth_user_id },
+          action_link: actionLink,
+          email_sent: !!emailResult?.ok,
+          slack_posted: !!slackResult?.ok,
+          slack_skipped: !!slackResult?.skipped,
+        });
       }
 
       if (action === "setup-account") {
