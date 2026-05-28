@@ -15145,10 +15145,20 @@ async function _sendFreshLink() {
   msgEl.style.color = 'var(--text-mute)';
   msgEl.textContent = '';
   try {
-    const { error } = await _sb.auth.resetPasswordForEmail(email, {
-      redirectTo: location.origin + '/client-portal.html?type=recovery'
+    // Use our smart server endpoint instead of Supabase's direct
+    // resetPasswordForEmail. The endpoint detects staff vs client by
+    // email lookup and routes the recovery link to the correct portal —
+    // critical because a staff user (Silva 2026-05-28) hitting this
+    // form was previously sent back to /client-portal.html every time
+    // even though they belong on the staff portal.
+    const res = await fetch('/api/clients?action=request-password-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     });
-    if (error) throw error;
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 429) throw new Error(data.error || 'Too many attempts. Try again later.');
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     msgEl.style.color = 'var(--green, #34d399)';
     msgEl.textContent = '✓ Fresh link sent. Check your inbox (and spam folder).';
     btn.textContent = 'Sent ✓';
