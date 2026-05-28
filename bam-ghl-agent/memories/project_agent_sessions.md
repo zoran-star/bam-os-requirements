@@ -1,6 +1,6 @@
 ---
 name: Agent Sessions — review Cam/Coleman/Mike/Rosano Claude Code transcripts
-description: 2026-05-28. New system that captures team members' Claude Code sessions, generates dual technical+visual summaries via Claude, and shows them in Zoran's Systems → Review → Agent sessions panel.
+description: 2026-05-28. New system that captures team members' Claude Code sessions, generates dual technical+visual summaries via Claude, and shows them in Zoran's Feedback tab as a "Feedback / Agent sessions" pill switcher.
 metadata:
   type: project
 ---
@@ -47,8 +47,8 @@ A system to let Zoran review what his team (Cam, Coleman, Mike, Rosano, anyone) 
          │
          ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│   Staff portal → Systems → Review tab → "Agent sessions" sub-tab     │
-│   (Only visible when me.email === zoran@byanymeansbball.com)         │
+│   Staff portal → Feedback tab → "Agent sessions" pill switcher       │
+│   (Feedback tab is already Zoran-only via App.jsx canSeeFeedback)    │
 │                                                                      │
 │   - User tabs: All / Cam / Coleman / Mike / Rosano (dynamic)         │
 │   - List of sessions with one-line tech summary preview              │

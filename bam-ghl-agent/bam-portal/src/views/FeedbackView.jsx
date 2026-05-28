@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
+import AgentSessionsPanel from "./AgentSessionsPanel";
 
 // ─── Feedback tab ────────────────────────────────────────────────────────────
 // ZORAN-ONLY view that lists all submissions from portal_feedback.
@@ -14,6 +15,8 @@ import { supabase } from "../lib/supabase";
 
 export default function FeedbackView({ tokens, dark, me, session }) {
   const t = tokens;
+  // Top-level switcher: 'feedback' (default) | 'sessions' (Claude Code transcripts)
+  const [section, setSection] = useState("feedback");
   const [feedback, setFeedback] = useState([]);
   const [staffMap, setStaffMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -108,6 +111,37 @@ export default function FeedbackView({ tokens, dark, me, session }) {
 
   return (
     <div>
+      {/* Section switcher: Feedback vs Agent Sessions */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+        {[
+          { key: "feedback", label: "Feedback" },
+          { key: "sessions", label: "Agent sessions" },
+        ].map(s => {
+          const active = section === s.key;
+          return (
+            <button
+              key={s.key}
+              onClick={() => setSection(s.key)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 999,
+                border: `1px solid ${active ? t.accent : t.border}`,
+                background: active ? t.accent : "transparent",
+                color: active ? "#000" : t.textMute,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {section === "sessions" ? (
+        <AgentSessionsPanel tokens={t} dark={dark} />
+      ) : (<>
       {/* Header counts */}
       <div style={{ display: "flex", gap: 32, marginBottom: 24, alignItems: "baseline", flexWrap: "wrap" }}>
         <Stat label="Open" value={counts.open} tokens={t} accent={counts.open > 0 ? t.amber : t.text} />
@@ -180,6 +214,7 @@ export default function FeedbackView({ tokens, dark, me, session }) {
           ))}
         </div>
       )}
+      </>)}
     </div>
   );
 }

@@ -17,11 +17,7 @@ import {
   setTicketDueDate,
   sendForFinalReview,
 } from "../services/ticketsService";
-import AgentSessionsPanel from "./AgentSessionsPanel";
 import { supabase } from "../lib/supabase";
-
-// Only Zoran sees the Agent Sessions sub-tab inside Review
-const ZORAN_EMAIL = "zoran@byanymeansbball.com";
 
 const STATUS_LABEL = {
   open:             "New",
@@ -79,9 +75,6 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const defaultTab = isManager ? "overview" : "ongoing";
 
   const [tab, setTab] = useState(defaultTab);
-  // Zoran-only sub-tab inside Review: 'tickets' | 'sessions'
-  const [reviewSubTab, setReviewSubTab] = useState("tickets");
-  const canSeeAgentSessions = me?.email === ZORAN_EMAIL;
   const [tickets, setTickets] = useState([]);
   const [pool, setPool] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -165,39 +158,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
         ))}
       </div>
 
-      {/* Review sub-tabs (Zoran only) — switches between in-review tickets and agent sessions */}
-      {tab === "review" && canSeeAgentSessions && (
-        <div style={{ display: "flex", gap: 6, marginBottom: 20 }}>
-          {[
-            { key: "tickets",  label: "Tickets in review" },
-            { key: "sessions", label: "Agent sessions" },
-          ].map(st => {
-            const active = reviewSubTab === st.key;
-            return (
-              <button
-                key={st.key}
-                onClick={() => setReviewSubTab(st.key)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 999,
-                  border: `1px solid ${active ? t.accent : t.border}`,
-                  background: active ? t.accent : "transparent",
-                  color: active ? "#000" : t.textMute,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {st.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === "review" && canSeeAgentSessions && reviewSubTab === "sessions" ? (
-        <AgentSessionsPanel tokens={t} dark={dark} />
-      ) : tab === "overview" ? (
+      {tab === "overview" ? (
         <OverviewTab
           tickets={tickets}
           loading={loading}
