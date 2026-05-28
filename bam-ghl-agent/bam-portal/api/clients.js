@@ -1427,16 +1427,25 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `invalid role (must be one of: ${[...VALID_STAFF_ROLES].join(", ")})` });
         }
 
-        // Refuse if a staff row with this email already exists
-        const dup = await supabaseSelect(`staff?email=eq.${encodeURIComponent(newEmail)}&select=id`);
-        if (dup?.length) {
+        // Existing staff with the same email — three sub-cases:
+        //   - row + user_id present → genuine duplicate, refuse
+        //   - row + user_id NULL    → repair by linking (Silva's case)
+        //   - no row                → continue to invite/link flow
+        const dup = await supabaseSelect(`staff?email=eq.${encodeURIComponent(newEmail)}&select=id,user_id`);
+        const existingStaff = dup?.[0];
+        if (existingStaff && existingStaff.user_id) {
           return res.status(409).json({ error: "a staff member with that email already exists" });
         }
 
-        // Send Supabase invite — creates auth user, emails the password-set link.
-        // Redirect goes to staff portal root so they land in the right app.
         const { staffUrl } = portalUrls(req);
         const redirectTo = `${staffUrl}/?type=invite`;
+
+        // Try to send a Supabase invite first. If the auth user already
+        // exists (e.g. they have a client account too), Supabase returns
+        // 422 — fall back to looking up that user via the RPC and just
+        // linking. Mirrors the existing client-portal access flow.
+        let auth_user_id = null;
+        let mode = "invite";
         const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
           method: "POST",
           headers: {
@@ -1446,16 +1455,49 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({ email: newEmail, redirect_to: redirectTo }),
         });
-        if (!inviteRes.ok) {
+
+        if (inviteRes.ok) {
+          const invited = await inviteRes.json();
+          auth_user_id = invited?.id || invited?.user?.id || null;
+          if (!auth_user_id) return res.status(500).json({ error: "invite sent but no auth user id returned" });
+        } else {
           const errText = await inviteRes.text();
-          const friendly = inviteRes.status === 422 || /already/i.test(errText)
-            ? "an account with that email already exists in auth"
-            : `invite: ${errText}`;
-          return res.status(400).json({ error: friendly });
+          if (inviteRes.status === 422 || /already/i.test(errText)) {
+            const existingAuth = await findAuthUserByEmail(newEmail);
+            if (!existingAuth?.id) {
+              return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
+            }
+            auth_user_id = existingAuth.id;
+            mode = "link-existing";
+          } else {
+            return res.status(400).json({ error: `invite: ${errText}` });
+          }
         }
-        const invited = await inviteRes.json();
-        const auth_user_id = invited?.id || invited?.user?.id;
-        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no auth user id returned" });
+
+        // Repair path: staff row exists with NULL user_id — just link.
+        if (existingStaff && !existingStaff.user_id) {
+          try {
+            const updRes = await fetch(`${SUPABASE_URL}/rest/v1/staff?id=eq.${existingStaff.id}`, {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({ name: newName, role: newRole, user_id: auth_user_id }),
+            });
+            if (!updRes.ok) throw new Error(`Supabase ${updRes.status}: ${await updRes.text()}`);
+            return res.status(200).json({
+              id: existingStaff.id, name: newName, email: newEmail, role: newRole,
+              invited: mode === "invite", linked: true,
+            });
+          } catch (updErr) {
+            // Don't roll back the auth user here — it may have existed before
+            // and belong to other resources. Just report the failure.
+            return res.status(500).json({ error: `staff link failed: ${updErr.message}` });
+          }
+        }
 
         // Insert the staff row
         try {
@@ -1466,13 +1508,19 @@ export default async function handler(req, res) {
             user_id: auth_user_id,
           });
           const row = Array.isArray(rows) ? rows[0] : rows;
-          return res.status(200).json({ id: row?.id, name: newName, email: newEmail, role: newRole, invited: true });
+          return res.status(200).json({
+            id: row?.id, name: newName, email: newEmail, role: newRole,
+            invited: mode === "invite", linked: mode === "link-existing",
+          });
         } catch (insertErr) {
-          // Roll back the auth user if the staff insert fails so we don't orphan
-          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
-            method: "DELETE",
-            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-          }).catch(() => {});
+          // Only roll back the auth user if WE created it (invite mode).
+          // For link-existing, the user belongs to other resources too.
+          if (mode === "invite") {
+            await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
+              method: "DELETE",
+              headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+            }).catch(() => {});
+          }
           return res.status(500).json({ error: `staff insert failed: ${insertErr.message}` });
         }
       }
