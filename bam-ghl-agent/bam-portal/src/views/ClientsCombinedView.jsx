@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import MessageThread from "../components/MessageThread";
+import { TicketModal } from "./SystemsView";
+import { fetchTickets, fetchDelegationPool } from "../services/ticketsService";
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -409,6 +411,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "setup",        label: "Setup" },
     { id: "team",         label: "Team" },
     { id: "marketing",    label: "Marketing" },
+    { id: "systems",      label: "Systems" },
     { id: "activity",     label: "Activity", hide: !ROLES.canViewFinancials(role) },
     { id: "notes",        label: "Notes" },
   ].filter(t => !t.hide);
@@ -459,6 +462,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
       {tab === "team" && <TeamTab client={client} tokens={t} session={session} />}
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
+      {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
       {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
     </div>
@@ -1453,6 +1457,133 @@ function CampaignPickerModal({ campaigns, selected, loading, error, onToggle, on
           <button onClick={onApply} style={btnStyle(t, "primary")}>Apply selection</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── SYSTEMS tab — every systems ticket for this client ─────────────────────
+// Visible to all staff roles (including systems_executors). Each ticket
+// renders as a clickable pill [date · title · status]. Click → full
+// TicketModal with all back-and-forth, assignee, updates, due/created
+// dates, and submitted fields (same component used in the Systems page).
+function SystemsTab({ client, tokens: t, dark, me }) {
+  const isManager = me?.role === "admin" || me?.role === "systems_manager";
+  const [allTickets, setAllTickets] = useState([]);
+  const [pool, setPool] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    const [ticketsRes, poolRes] = await Promise.all([
+      fetchTickets(),
+      fetchDelegationPool(),
+    ]);
+    if (ticketsRes.data) setAllTickets(ticketsRes.data);
+    if (poolRes.data) setPool(poolRes.data);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [client.id]);
+
+  // Filter to this client only, sort newest first by submitted_at.
+  const tickets = allTickets
+    .filter(x => x.client_id === client.id)
+    .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
+
+  const STATUS_LABELS = {
+    open:            { label: "New",            color: "#E8C547" },
+    delegated:       { label: "Delegated",      color: "#7AA9D6" },
+    in_progress:     { label: "In progress",    color: t.accent || "#E8C547" },
+    awaiting_client: { label: "Awaiting client",color: "#E8C547" },
+    in_review:       { label: "In review",      color: "#7AA9D6" },
+    needs_rework:    { label: "Needs rework",   color: "#ED7969" },
+    approved:        { label: "Approved",       color: "#7DCB94" },
+    done:            { label: "Done",           color: "#7DCB94" },
+    cancelled:       { label: "Cancelled",      color: t.textMute },
+  };
+
+  const fmtDate = (s) => {
+    if (!s) return "—";
+    const d = new Date(s);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined });
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: t.text, margin: 0, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {tickets.length} Ticket{tickets.length === 1 ? "" : "s"}
+        </h3>
+        <span style={{ fontSize: 12, color: t.textMute }}>newest first · click to open</span>
+      </div>
+
+      {loading && <div style={{ color: t.textMute, fontSize: 13 }}>Loading…</div>}
+
+      {!loading && tickets.length === 0 && (
+        <div style={{ color: t.textMute, fontSize: 13, padding: "24px 0", fontStyle: "italic" }}>
+          No systems tickets for this client yet.
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {tickets.map(x => {
+          const s = STATUS_LABELS[x.status] || { label: x.status, color: t.textMute };
+          const title = x.menu_item
+            || (x.type === "error" ? "Error report" : x.type === "change" ? "Change request" : "Build request");
+          return (
+            <button
+              key={x.id}
+              onClick={() => setSelected(x)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "100px 1fr auto",
+                gap: 16,
+                alignItems: "center",
+                padding: "12px 16px",
+                background: t.surface,
+                border: `1px solid ${t.border}`,
+                borderRadius: 999,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
+                transition: "border-color 140ms",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = t.accent || "#E8C547"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = t.border; }}
+            >
+              <span style={{ fontSize: 12, color: t.textMute, fontFamily: "monospace" }}>
+                {fmtDate(x.submitted_at)}
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {title}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 700, color: s.color,
+                textTransform: "uppercase", letterSpacing: 0.5,
+                padding: "3px 10px", borderRadius: 999,
+                background: `${s.color}15`, border: `1px solid ${s.color}40`,
+                whiteSpace: "nowrap",
+              }}>
+                {s.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selected && (
+        <TicketModal
+          ticket={selected}
+          me={me}
+          isManager={isManager}
+          pool={pool}
+          tokens={t}
+          dark={dark}
+          onClose={() => setSelected(null)}
+          onAction={async () => { await load(); setSelected(null); }}
+        />
+      )}
     </div>
   );
 }

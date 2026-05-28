@@ -485,7 +485,7 @@ function TicketCard({ ticket, tokens: t, onOpen }) {
   );
 }
 
-function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, onClose, onAction }) {
+export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, dark, onClose, onAction }) {
   const [ticket, setTicket] = useState(initial);
   const [notes, setNotes] = useState(initial.staff_notes || "");
   const [userGuide, setUserGuide] = useState(initial.user_guide || "");
