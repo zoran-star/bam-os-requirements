@@ -15,6 +15,7 @@ import {
   cancelTicket,
   saveTicketFields,
   setTicketDueDate,
+  sendForFinalReview,
 } from "../services/ticketsService";
 import AgentSessionsPanel from "./AgentSessionsPanel";
 import { supabase } from "../lib/supabase";
@@ -28,6 +29,7 @@ const STATUS_LABEL = {
   in_progress:      "In progress",
   awaiting_client:  "Awaiting client",
   in_review:        "In review",
+  final_review:     "Final review",
   needs_rework:     "Needs rework",
   approved:         "Approved",
   done:             "Done",
@@ -41,6 +43,7 @@ function statusColor(status, t) {
     case "in_progress":      return t.accent;
     case "awaiting_client":  return t.amber;
     case "in_review":        return t.blue;
+    case "final_review":     return t.amber;
     case "needs_rework":     return t.red;
     case "approved":
     case "done":             return t.green;
@@ -120,7 +123,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   const visibleTickets = tickets.filter(x => {
     if (tab === "lobby")     return lobbyStatuses.includes(x.status) && inScope(x);
     if (tab === "ongoing")   return ["in_progress","needs_rework"].includes(x.status) && inScope(x);
-    if (tab === "awaiting")  return x.status === "awaiting_client" && inScope(x);
+    if (tab === "awaiting")  return ["awaiting_client","final_review"].includes(x.status) && inScope(x);
     if (tab === "review")    return x.status === "in_review" && inScope(x);
     if (tab === "completed") return ["done","approved","cancelled"].includes(x.status) && inScope(x);
     return false;
@@ -133,7 +136,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
     ...(isManager ? [{ key: "overview", label: "Overview" }] : []),
     { key: "lobby",     label: "Lobby",           count: tickets.filter(x => lobbyStatuses.includes(x.status) && inScope(x)).length },
     { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status) && inScope(x)).length },
-    { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => x.status === "awaiting_client" && inScope(x)).length },
+    { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => ["awaiting_client","final_review"].includes(x.status) && inScope(x)).length },
     { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length },
     { key: "completed", label: "Completed",       count: tickets.filter(x => ["done","approved","cancelled"].includes(x.status) && inScope(x)).length },
   ];
@@ -894,10 +897,11 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             >Submit for review</button>
           )}
 
-          {/* Manager: approve / deny on in_review */}
+          {/* Manager: approve / deny / send-for-final-review on in_review */}
           {isManager && ticket.status === "in_review" && (
             <>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
+              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title="Send to client for final sign-off">Mark complete for review</button>
               {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
           )}

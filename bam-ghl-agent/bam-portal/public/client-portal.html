@@ -2246,6 +2246,7 @@
   .status-pill.action-required { color: var(--pace-stop); }
   .status-pill.in-progress     { color: var(--gold); }
   .status-pill.needs-review    { color: var(--pace-flow); }
+  .status-pill.final-review    { color: var(--pace-go); }
   .status-pill.approved        { color: var(--pace-go); }
 
   .load-more {
@@ -13708,6 +13709,7 @@ const STATUS_LABEL = {
   'action-required': 'Action Required',
   'in-progress':     'In Progress',
   'needs-review':    'Completed — Needs Review',
+  'final-review':    'Final Review',
   'approved':        'Approved',
 };
 
@@ -13715,6 +13717,7 @@ const STATUS_LABEL_SHORT = {
   'action-required': 'Action Required',
   'in-progress':     'In Progress',
   'needs-review':    'In-Review',
+  'final-review':    'Final Review',
   'approved':        'Approved',
 };
 
@@ -13768,6 +13771,7 @@ function mapTicket(r) {
     in_progress:      'in-progress',
     awaiting_client:  'action-required',
     in_review:        'in-progress',
+    final_review:     'final-review',
     needs_rework:     'in-progress',
     approved:         'approved',
     done:             'approved',
@@ -13814,8 +13818,10 @@ async function loadTickets() {
     .order('updated_at', { ascending: false });
   if (error) { console.error('loadTickets:', error.message); return; }
   tickets = (data || []).map(mapTicket);
-  // Awaiting-client first
-  tickets.sort((a, b) => (a.rawStatus === 'awaiting_client' ? -1 : 0) - (b.rawStatus === 'awaiting_client' ? -1 : 0));
+  // Awaiting-client + final-review pinned to the top (anything that
+  // needs the client's attention).
+  const needsClient = (s) => s === 'awaiting_client' || s === 'final_review';
+  tickets.sort((a, b) => (needsClient(a.rawStatus) ? -1 : 0) - (needsClient(b.rawStatus) ? -1 : 0));
   renderTicketLists();
 }
 
@@ -13967,10 +13973,41 @@ function renderDetail() {
       }).join('')}
     </div>` : '';
 
-  const guideHTML = (t.status === 'approved' && t.userGuide) ? `
+  // Show the user guide whenever it's present and meaningful — both on
+  // final-review (so the client can review what's been built) and on
+  // approved (the after-state). For in_progress / awaiting-client
+  // tickets there usually isn't one yet.
+  const guideHTML = ((t.status === 'approved' || t.status === 'final-review') && t.userGuide) ? `
     <div class="user-guide">
       <div class="user-guide-label">📘 User guide</div>
       <div class="user-guide-body">${escapeHTML(t.userGuide)}</div>
+    </div>` : '';
+
+  // Final-review block — pinned at the top under the title, side-by-side
+  // "Looks good — complete" and "Send feedback" actions. Feedback opens
+  // a text+files form inline.
+  const finalReviewHTML = t.status === 'final-review' ? `
+    <div class="final-review-block" style="background:rgba(125,203,148,0.10);border:1px solid rgba(125,203,148,0.35);border-radius:10px;padding:16px;margin:16px 0">
+      <div style="font-size:11px;font-weight:700;color:#7DCB94;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🟢 Final Review</div>
+      <div style="font-size:14px;color:var(--text);margin-bottom:12px">
+        Our team finished the work and is ready for your sign-off. Review the user guide above, then approve or send feedback.
+      </div>
+      <div id="final-feedback-form" style="display:none;margin-top:12px">
+        <textarea id="final-feedback-text" placeholder="What needs to change?" rows="3" style="width:100%;padding:10px;background:var(--surface);border:1px solid var(--line-str);border-radius:8px;color:var(--text);font:inherit;resize:vertical;margin-bottom:8px"></textarea>
+        <div id="final-feedback-files" class="file-list" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="mini-btn" style="cursor:pointer">
+            Attach files
+            <input type="file" multiple onchange="handleFile(this, 'final-feedback-files')">
+          </label>
+          <button class="btn" onclick="document.getElementById('final-feedback-form').style.display='none'">Cancel</button>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="submitFinalFeedback()">Send feedback →</button>
+        </div>
+      </div>
+      <div id="final-review-actions" style="display:flex;gap:8px;align-items:center">
+        <button class="btn" onclick="document.getElementById('final-feedback-form').style.display='block';document.getElementById('final-review-actions').style.display='none'">Send feedback</button>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="submitFinalApprove()">✓ Looks good — mark complete</button>
+      </div>
     </div>` : '';
 
   const dateBit = t.target ? `<div class="detail-date">target completion: ${t.target}</div>` : '';
@@ -13983,10 +14020,53 @@ function renderDetail() {
       ${dateBit}
     </div>
     ${actionFormHTML}
-    ${fieldsHTML}
     ${guideHTML}
+    ${finalReviewHTML}
+    ${fieldsHTML}
     ${threadHTML}
   `;
+}
+
+// ── Final-review actions (client-side approval workflow) ──────────
+async function submitFinalApprove() {
+  const t = getTicket(_currentTicketId);
+  if (!t) return;
+  if (!confirm("Mark this ticket as complete? This closes it out.")) return;
+  const res = await fetch(`/api/tickets?id=${t.id}&action=final_approve&public=1`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert('Approve failed: ' + (err.error || res.status));
+    return;
+  }
+  await loadTickets();
+  const refreshed = getTicket(_currentTicketId);
+  if (refreshed) renderDetail(); else closeDetail();
+}
+
+async function submitFinalFeedback() {
+  const t = getTicket(_currentTicketId);
+  if (!t) return;
+  const feedback = (document.getElementById('final-feedback-text')?.value || '').trim();
+  if (!feedback) { alert('Please write what needs to change.'); return; }
+  const files = await _uploadFiles('final-feedback-files', t.id);
+  const res = await fetch(`/api/tickets?id=${t.id}&action=final_feedback&public=1`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
+    body: JSON.stringify({ feedback, files }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert('Send feedback failed: ' + (err.error || res.status));
+    return;
+  }
+  _pendingFiles['final-feedback-files'] = [];
+  await loadTickets();
+  const refreshed = getTicket(_currentTicketId);
+  if (refreshed) renderDetail(); else closeDetail();
 }
 
 async function submitClientResponse() {

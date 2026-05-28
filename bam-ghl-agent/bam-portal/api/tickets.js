@@ -97,6 +97,27 @@ function isManager(me) {
   return me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager");
 }
 
+// Mirrors my_client_ids() RLS function for the public ticket API. Returns
+// every client UUID the authed user can act on — covers direct owners
+// (clients.auth_user_id), invited teammates (client_users), AND BAM
+// staff who are set as the client's scaling_manager. Without this, the
+// public API would fall back to single-client lookup via auth_user_id
+// and lock scaling managers + invited members out of write actions.
+async function userClientIds(userId) {
+  const ids = new Set();
+  const direct = await sb(`clients?auth_user_id=eq.${userId}&select=id`);
+  (direct || []).forEach(r => ids.add(r.id));
+  const members = await sb(`client_users?user_id=eq.${userId}&status=eq.active&select=client_id`);
+  (members || []).forEach(r => ids.add(r.client_id));
+  const staffRows = await sb(`staff?user_id=eq.${userId}&select=id`);
+  const staffIds = (staffRows || []).map(r => r.id);
+  if (staffIds.length) {
+    const sm = await sb(`clients?scaling_manager_id=in.(${staffIds.join(",")})&select=id`);
+    (sm || []).forEach(r => ids.add(r.id));
+  }
+  return Array.from(ids);
+}
+
 async function enrichTickets(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
@@ -130,7 +151,6 @@ export default async function handler(req, res) {
 
     // ─── PUBLIC (client portal) — session-based auth ────────────────
     if (isPublic) {
-      // Resolve client_id from the authed Supabase user
       const auth = req.headers.authorization || "";
       const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
       if (!token) return res.status(401).json({ error: "auth required" });
@@ -140,11 +160,15 @@ export default async function handler(req, res) {
       if (!userRes.ok) return res.status(401).json({ error: "invalid token" });
       const user = await userRes.json();
       if (!user?.id) return res.status(401).json({ error: "invalid token" });
-      const clientRows = await sb(`clients?auth_user_id=eq.${user.id}&select=id`);
-      const clientId = clientRows?.[0]?.id;
-      if (!clientId) return res.status(403).json({ error: "no linked client" });
+      // All clients this user can act on — covers owners, invited
+      // teammates (client_users), and scaling managers (staff link).
+      const accessibleIds = await userClientIds(user.id);
+      if (!accessibleIds.length) return res.status(403).json({ error: "no linked client" });
 
       if (req.method === "GET") {
+        // Optional ?client_id= for multi-client users; defaults to first.
+        const requested = req.query.client_id;
+        const clientId = requested && accessibleIds.includes(requested) ? requested : accessibleIds[0];
         const data = await sb(
           `tickets?client_id=eq.${clientId}&select=id,type,menu_item,fields,files,status,priority,client_action_request,user_guide,submitted_at,updated_at,resolved_at,messages&order=updated_at.desc`
         );
@@ -154,34 +178,73 @@ export default async function handler(req, res) {
       if (req.method === "PATCH") {
         const { id, action } = req.query;
         const body = req.body || {};
-        if (action !== "client_respond") return res.status(400).json({ error: "invalid action" });
         if (!id) return res.status(400).json({ error: "id required" });
+        const validActions = ["client_respond", "final_approve", "final_feedback"];
+        if (!validActions.includes(action)) return res.status(400).json({ error: "invalid action" });
 
-        const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status,messages`);
-        if (!existing?.length || existing[0].client_id !== clientId) {
+        const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status,messages,user_guide`);
+        if (!existing?.length || !accessibleIds.includes(existing[0].client_id)) {
           return res.status(403).json({ error: "not your ticket" });
         }
-        if (existing[0].status !== "awaiting_client") {
-          return res.status(400).json({ error: "ticket not awaiting client" });
+        const t = existing[0];
+        const now = new Date().toISOString();
+
+        if (action === "client_respond") {
+          if (t.status !== "awaiting_client") return res.status(400).json({ error: "ticket not awaiting client" });
+          const newMsg = {
+            direction: "client_to_staff",
+            body: body.client_action_response || "",
+            files: body.client_action_files || [],
+            author_id: null, created_at: now,
+          };
+          const updated = await sbPatch(`tickets?id=eq.${id}`, {
+            client_action_response: body.client_action_response || "",
+            client_action_files: body.client_action_files || [],
+            messages: [...(t.messages || []), newMsg],
+            status: "in_progress",
+            updated_at: now,
+          });
+          return res.status(200).json({ data: updated?.[0] });
         }
 
-        const newMsg = {
-          direction: "client_to_staff",
-          body: body.client_action_response || "",
-          files: body.client_action_files || [],
-          author_id: null,
-          created_at: new Date().toISOString(),
-        };
-        const messages = [...(existing[0].messages || []), newMsg];
+        if (action === "final_approve") {
+          if (t.status !== "final_review") return res.status(400).json({ error: "ticket not in final review" });
+          const newMsg = {
+            direction: "client_to_staff",
+            body: "(client approved final review)",
+            files: [], author_id: null, system: true, created_at: now,
+          };
+          const updated = await sbPatch(`tickets?id=eq.${id}`, {
+            messages: [...(t.messages || []), newMsg],
+            status: "done",
+            resolved_at: now,
+            updated_at: now,
+          });
+          // Slack notify on the client channel — closes the loop.
+          postClientSlackNotification(t.client_id,
+            `✅ Client approved final review — Systems [${String(id).slice(0, 8).toUpperCase()}]`, req);
+          return res.status(200).json({ data: updated?.[0] });
+        }
 
-        const updated = await sbPatch(`tickets?id=eq.${id}`, {
-          client_action_response: body.client_action_response || "",
-          client_action_files: body.client_action_files || [],
-          messages,
-          status: "in_progress",
-          updated_at: new Date().toISOString(),
-        });
-        return res.status(200).json({ data: updated?.[0] });
+        if (action === "final_feedback") {
+          if (t.status !== "final_review") return res.status(400).json({ error: "ticket not in final review" });
+          const feedback = (body.feedback || "").trim();
+          if (!feedback) return res.status(400).json({ error: "feedback text required" });
+          const newMsg = {
+            direction: "client_to_staff",
+            body: feedback,
+            files: body.files || [],
+            author_id: null, created_at: now,
+          };
+          const updated = await sbPatch(`tickets?id=eq.${id}`, {
+            messages: [...(t.messages || []), newMsg],
+            status: "in_progress",
+            updated_at: now,
+          });
+          postClientSlackNotification(t.client_id,
+            `🔄 Client sent feedback on final review — Systems [${String(id).slice(0, 8).toUpperCase()}]`, req);
+          return res.status(200).json({ data: updated?.[0] });
+        }
       }
 
       return res.status(405).json({ error: "method not allowed" });
@@ -353,6 +416,23 @@ export default async function handler(req, res) {
           update.fields = { ...(t.fields || {}), ...body.fields };
           break;
 
+        case "send_for_final_review":
+          // Manager forwards an in_review ticket to the client for their
+          // sign-off. Status goes to final_review (a special variant of
+          // awaiting_client — same UX bucket, dedicated UI on both ends).
+          if (!isManager(me)) return res.status(403).json({ error: "manager only" });
+          if (t.status !== "in_review") return res.status(400).json({ error: "ticket must be in_review" });
+          update.status = "final_review";
+          update.messages = [
+            ...(t.messages || []),
+            {
+              direction: "staff_to_client",
+              body: "(sent to client for final review)",
+              files: [], author_id: me.id, system: true, created_at: now,
+            },
+          ];
+          break;
+
         case "set_due_date":
           // Admin-only override of the auto-calc'd due_date. Accepts ISO
           // YYYY-MM-DD or empty string to clear back to NULL.
@@ -409,6 +489,9 @@ export default async function handler(req, res) {
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);
+      } else if (action === "send_for_final_review") {
+        postClientSlackNotification(t.client_id,
+          `🟢 Final review ready — Systems [${code}]\n_Open the portal to approve or send feedback._`, req);
       }
 
       return res.status(200).json({ data: enriched[0] });
