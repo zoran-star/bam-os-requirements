@@ -27,6 +27,34 @@ async function supabaseSelect(path) {
   return res.json();
 }
 
+// Update an auth user's email via the admin API. Without this, edits
+// to clients.email or staff.email leave the auth login email stale —
+// the user keeps logging in with the old address. Uses email_confirm:
+// true so the change is immediate (staff is doing this on the user's
+// behalf, no point bouncing through a confirmation email).
+//
+// Returns { ok: true } on success, { ok: false, error, status } on
+// failure. Callers should treat the auth update as best-effort: if it
+// fails (e.g. email already taken by a different auth user), surface
+// the error so the caller knows the local row + auth drifted.
+async function adminUpdateAuthEmail(authUserId, newEmail) {
+  if (!authUserId || !newEmail) return { ok: false, error: "missing args" };
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${authUserId}`, {
+    method: "PUT",
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ email: newEmail, email_confirm: true }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    return { ok: false, status: res.status, error: text };
+  }
+  return { ok: true };
+}
+
 // Look up an auth user by email. The previous implementation hit the
 // auth schema via PostgREST with Accept-Profile: auth — that silently
 // fails on this project (auth schema isn't in PostgREST's exposed
@@ -1068,14 +1096,26 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({ email, redirect_to: redirectTo, data: { needs_password: true } }),
         });
-        if (!inviteRes.ok) {
-          // 422 = already exists in auth (no clients row though — orphan auth user).
-          // Either way: log + return generic success. Never echo Supabase error text.
-          await logAttempt(false);
-          return res.status(200).json(GENERIC_RESPONSE);
+        let auth_user_id = null;
+        if (inviteRes.ok) {
+          const invited = await inviteRes.json();
+          auth_user_id = invited?.id || invited?.user?.id || null;
+        } else {
+          // 422 = the email already has an auth account (likely staff at
+          // another academy, or a prior client). Fall back to linking the
+          // existing user instead of silently dropping the signup.
+          const errText = await inviteRes.text();
+          if (inviteRes.status === 422 || /already/i.test(errText)) {
+            const existingAuth = await findAuthUserByEmail(email);
+            if (existingAuth?.id) auth_user_id = existingAuth.id;
+          }
+          if (!auth_user_id) {
+            // Genuine failure (network / other Supabase error). Generic success
+            // to avoid leaking; logged as failure for our metrics.
+            await logAttempt(false);
+            return res.status(200).json(GENERIC_RESPONSE);
+          }
         }
-        const invited = await inviteRes.json();
-        const auth_user_id = invited?.id || invited?.user?.id;
         if (!auth_user_id) {
           await logAttempt(false);
           return res.status(200).json(GENERIC_RESPONSE);
@@ -1547,6 +1587,24 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `invalid role (must be one of: ${[...VALID_STAFF_ROLES].join(", ")})` });
         }
 
+        // If email is changing AND the staff member has a linked auth user,
+        // sync the auth login email FIRST. If it 422s (e.g. that email is
+        // already taken by another auth user), bail before drifting the
+        // staff row away from the actual auth email.
+        const existingStaff = await supabaseSelect(`staff?id=eq.${encodeURIComponent(staffId)}&select=email,user_id`);
+        const prevStaff = existingStaff?.[0];
+        let authEmailSync = null;
+        if (prevStaff && prevStaff.email !== newEmail && prevStaff.user_id) {
+          const sync = await adminUpdateAuthEmail(prevStaff.user_id, newEmail);
+          if (!sync.ok) {
+            const friendly = /already|duplicate|409|422/i.test(sync.error || "")
+              ? "that email is already used by another account"
+              : `couldn't update login email: ${sync.error}`;
+            return res.status(400).json({ error: friendly });
+          }
+          authEmailSync = "updated";
+        }
+
         const updRes = await fetch(
           `${SUPABASE_URL}/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`,
           {
@@ -1569,7 +1627,7 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: "staff member not found" });
         }
         const row = rows[0];
-        return res.status(200).json({ id: row.id, name: row.name, email: row.email, role: row.role });
+        return res.status(200).json({ id: row.id, name: row.name, email: row.email, role: row.role, auth_email_sync: authEmailSync });
       }
 
       // ── action=reset-staff-password ──
@@ -1770,6 +1828,41 @@ export default async function handler(req, res) {
         if (!Object.keys(patch).length) return res.status(400).json({ error: "nothing to update" });
         patch.updated_at = new Date().toISOString();
 
+        // If email is changing AND the client has a linked auth user, also
+        // update auth.users.email so the owner can log in with the new
+        // address. We do this BEFORE the clients PATCH so a 422 (e.g. email
+        // already taken by another auth user) blocks the update — otherwise
+        // we'd silently drift the auth login from the displayed email.
+        let authEmailSync = null;
+        if (patch.email !== undefined) {
+          const existing = await supabaseSelect(`clients?id=eq.${client_id}&select=email,auth_user_id`);
+          const prev = existing?.[0];
+          const newEmail = patch.email;
+          const changing = prev && newEmail && prev.email !== newEmail;
+          if (changing && prev.auth_user_id) {
+            const sync = await adminUpdateAuthEmail(prev.auth_user_id, newEmail);
+            if (!sync.ok) {
+              const friendly = /already|duplicate|409|422/i.test(sync.error || "")
+                ? "that email is already used by another account"
+                : `couldn't update login email: ${sync.error}`;
+              return res.status(400).json({ error: friendly });
+            }
+            authEmailSync = "updated";
+            // Also keep the owner's client_users.email row in sync so the
+            // teammate list shows the right address.
+            await fetch(`${SUPABASE_URL}/rest/v1/client_users?user_id=eq.${prev.auth_user_id}&client_id=eq.${client_id}`, {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal",
+              },
+              body: JSON.stringify({ email: newEmail }),
+            }).catch(() => {});
+          }
+        }
+
         const res2 = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client_id}`, {
           method: "PATCH",
           headers: {
@@ -1784,7 +1877,7 @@ export default async function handler(req, res) {
           const errText = await res2.text();
           return res.status(500).json({ error: `update failed: ${errText}` });
         }
-        return res.status(200).json({ ok: true, ...patch });
+        return res.status(200).json({ ok: true, auth_email_sync: authEmailSync, ...patch });
       }
 
       // ── action=archive ──
@@ -2161,7 +2254,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "valid email required" });
       }
 
-      // ── Send invite (creates auth user with no password + emails the link) ──
+      // ── Send invite, fall back to link-existing on 422 ──
       const { clientUrl } = portalUrls(req);
       const redirectTo = `${clientUrl}/client-portal.html?type=invite`;
       const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/invite`, {
@@ -2173,18 +2266,27 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({ email, redirect_to: redirectTo }),
       });
-      if (!inviteRes.ok) {
+      let auth_user_id = null;
+      let mode = "invite";
+      if (inviteRes.ok) {
+        const invited = await inviteRes.json();
+        auth_user_id = invited?.id || invited?.user?.id || null;
+        if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
+      } else {
         const errText = await inviteRes.text();
-        const friendly = inviteRes.status === 422 || /already/i.test(errText)
-          ? "an account with that email already exists"
-          : `invite: ${errText}`;
-        return res.status(400).json({ error: friendly });
+        if (inviteRes.status === 422 || /already/i.test(errText)) {
+          const existingAuth = await findAuthUserByEmail(email);
+          if (!existingAuth?.id) {
+            return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
+          }
+          auth_user_id = existingAuth.id;
+          mode = "link-existing";
+        } else {
+          return res.status(400).json({ error: `invite: ${errText}` });
+        }
       }
-      const invited = await inviteRes.json();
-      const auth_user_id = invited?.id || invited?.user?.id;
-      if (!auth_user_id) return res.status(500).json({ error: "invite sent but no user id returned" });
 
-      // ── Insert the clients row, linked to the new auth user ──
+      // ── Insert the clients row, linked to the auth user ──
       try {
         const rows = await supabaseInsert("clients", {
           business_name, owner_name, email, status, auth_user_id,
@@ -2195,13 +2297,19 @@ export default async function handler(req, res) {
         await ensureOwnerMembership({
           clientId: row?.id, authUserId: auth_user_id, name: owner_name, email,
         });
-        return res.status(200).json({ id: row?.id, business_name: row?.business_name, email, invited: true });
+        return res.status(200).json({
+          id: row?.id, business_name: row?.business_name, email,
+          invited: mode === "invite", linked: mode === "link-existing",
+        });
       } catch (insertErr) {
-        // Roll back the auth user if the clients insert fails so they don't get orphaned
-        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
-          method: "DELETE",
-          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
-        }).catch(() => {});
+        // Only roll back the auth user if WE created it (invite mode).
+        // For link-existing, the user belongs to other resources too.
+        if (mode === "invite") {
+          await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${auth_user_id}`, {
+            method: "DELETE",
+            headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+          }).catch(() => {});
+        }
         return res.status(500).json({ error: `clients insert failed: ${insertErr.message}` });
       }
     } catch (err) {
