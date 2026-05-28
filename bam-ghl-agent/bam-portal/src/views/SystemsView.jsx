@@ -267,7 +267,11 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
           tokens={t}
           dark={dark}
           onClose={() => setSelected(null)}
-          onAction={async () => { await load(); setSelected(null); }}
+          // Don't auto-close on action. The modal updates in-place
+          // (status pill, action bar swap) so the user can see their
+          // click took effect. They close manually with the Close
+          // button when they're done.
+          onAction={async () => { await load(); }}
         />
       )}
     </div>

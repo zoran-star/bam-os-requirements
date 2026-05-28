@@ -1581,7 +1581,10 @@ function SystemsTab({ client, tokens: t, dark, me }) {
           tokens={t}
           dark={dark}
           onClose={() => setSelected(null)}
-          onAction={async () => { await load(); setSelected(null); }}
+          // Stay open after an action so the modal updates in place
+          // (status pill, action bar swap) — matches SystemsView's
+          // behavior. User closes explicitly.
+          onAction={async () => { await load(); }}
         />
       )}
     </div>
