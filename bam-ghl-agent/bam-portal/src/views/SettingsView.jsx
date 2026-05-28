@@ -484,13 +484,16 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
 
       <div style={{ marginTop: 36, paddingTop: 24, borderTop: `1px solid ${tokens.border}` }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: tokens.textMute, marginBottom: 12 }}>Account</div>
-        <button onClick={onLogout} style={{
-          background: "none", border: `1px solid ${tokens.red}`, borderRadius: 8,
-          padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 600,
-          color: tokens.red, fontFamily: "inherit",
-        }}>
-          Sign Out
-        </button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <ChangePasswordButton tokens={tokens} />
+          <button onClick={onLogout} style={{
+            background: "none", border: `1px solid ${tokens.red}`, borderRadius: 8,
+            padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+            color: tokens.red, fontFamily: "inherit",
+          }}>
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {showNewStaff && (
@@ -501,6 +504,67 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
         />
       )}
     </div>
+  );
+}
+
+// In-portal password change — avoids the forgot-password email loop.
+// Uses supabase.auth.updateUser({ password }) on the active session.
+function ChangePasswordButton({ tokens }) {
+  const [open, setOpen] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function save() {
+    if (newPw.length < 8) { setMsg({ kind: "err", text: "Password must be at least 8 characters." }); return; }
+    if (newPw !== confirm) { setMsg({ kind: "err", text: "Passwords don't match." }); return; }
+    setBusy(true); setMsg(null);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setBusy(false);
+    if (error) { setMsg({ kind: "err", text: error.message }); return; }
+    setMsg({ kind: "ok", text: "✓ Password updated." });
+    setNewPw(""); setConfirm("");
+    setTimeout(() => setOpen(false), 1200);
+  }
+
+  return (
+    <>
+      <button onClick={() => { setOpen(true); setMsg(null); setNewPw(""); setConfirm(""); }} style={{
+        background: "none", border: `1px solid ${tokens.border}`, borderRadius: 8,
+        padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 600,
+        color: tokens.text, fontFamily: "inherit",
+      }}>Change password</button>
+      {open && (
+        <div onClick={() => !busy && setOpen(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            width: "100%", maxWidth: 420, background: tokens.surface, border: `1px solid ${tokens.borderMed || tokens.border}`,
+            borderRadius: 14, padding: 26,
+          }}>
+            <div style={{ fontSize: 18, fontWeight: 700, color: tokens.text, marginBottom: 6 }}>Change password</div>
+            <div style={{ fontSize: 13, color: tokens.textMute, marginBottom: 18 }}>You'll stay signed in.</div>
+            <input type="password" placeholder="New password (min 8)" autoComplete="new-password"
+              value={newPw} onChange={e => setNewPw(e.target.value)} disabled={busy}
+              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 10, boxSizing: "border-box" }} />
+            <input type="password" placeholder="Confirm new password" autoComplete="new-password"
+              value={confirm} onChange={e => setConfirm(e.target.value)} disabled={busy}
+              style={{ width: "100%", padding: "10px 12px", background: tokens.bg, border: `1px solid ${tokens.border}`, borderRadius: 6, color: tokens.text, fontSize: 13, fontFamily: "inherit", marginBottom: 14, boxSizing: "border-box" }} />
+            {msg && (
+              <div style={{ fontSize: 13, fontWeight: 600, color: msg.kind === "ok" ? (tokens.green || "#7DCB94") : (tokens.red || "#ED7969"), marginBottom: 14 }}>
+                {msg.text}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button onClick={() => setOpen(false)} disabled={busy} style={{ padding: "9px 16px", background: "transparent", color: tokens.textSub, border: `1px solid ${tokens.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={save} disabled={busy || !newPw || !confirm} style={{ padding: "9px 22px", background: tokens.accent || "#E8C547", color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>{busy ? "Saving…" : "Save password"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

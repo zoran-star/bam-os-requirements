@@ -5022,6 +5022,7 @@
         <button class="user-signout" onclick="signOut()">Sign out →</button>
       </div>
 
+      <button class="user-tour-link" onclick="openChangePassword()" style="margin-bottom:6px">Change password</button>
       <button class="user-tour-link" onclick="startOnboardingTour()">↻ Take the tour</button>
 
       <!-- Hidden compat — the userAvatar id is referenced by JS, keep it for now -->
@@ -15029,6 +15030,57 @@ async function signOut() {
   await _sb.auth.signOut();
   CLIENT_ID = null;
   location.reload();
+}
+
+// ── In-portal "Change my password" — for authed users ──
+// Avoids the forgot-password email round-trip. Calls Supabase's
+// updateUser({ password }) directly using the active session.
+function openChangePassword() {
+  let modal = document.getElementById('change-pw-modal');
+  if (modal) { modal.style.display = 'flex'; return; }
+  modal = document.createElement('div');
+  modal.id = 'change-pw-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px';
+  modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--line-str,var(--line));border-radius:14px;padding:26px" onclick="event.stopPropagation()">
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px">Change password</div>
+      <div style="font-size:13px;color:var(--text-mute);margin-bottom:18px">Pick a new password. You'll stay signed in.</div>
+      <input id="change-pw-new" type="password" placeholder="New password (min 8)" autocomplete="new-password"
+        style="width:100%;padding:10px 12px;background:var(--surface-alt,var(--bg,#000));border:1px solid var(--line-str,var(--line));border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;margin-bottom:10px;box-sizing:border-box" />
+      <input id="change-pw-confirm" type="password" placeholder="Confirm new password" autocomplete="new-password"
+        style="width:100%;padding:10px 12px;background:var(--surface-alt,var(--bg,#000));border:1px solid var(--line-str,var(--line));border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;margin-bottom:14px;box-sizing:border-box" />
+      <div id="change-pw-msg" style="font-size:13px;font-weight:600;margin-bottom:14px;min-height:18px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('change-pw-modal').style.display='none'" style="padding:9px 16px;background:transparent;color:var(--text-sub);border:1px solid var(--line);border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="change-pw-go" onclick="submitChangePassword()" style="padding:9px 22px;background:var(--gold,var(--accent));color:#0B0B0D;border:0;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Save password</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('change-pw-new')?.focus(), 0);
+}
+
+async function submitChangePassword() {
+  const newPw = document.getElementById('change-pw-new')?.value || '';
+  const conf  = document.getElementById('change-pw-confirm')?.value || '';
+  const msgEl = document.getElementById('change-pw-msg');
+  const btn   = document.getElementById('change-pw-go');
+  if (newPw.length < 8) { msgEl.style.color = 'var(--red,#fb7185)'; msgEl.textContent = 'Password must be at least 8 characters.'; return; }
+  if (newPw !== conf)  { msgEl.style.color = 'var(--red,#fb7185)'; msgEl.textContent = 'Passwords don\'t match.'; return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  msgEl.style.color = 'var(--text-mute)'; msgEl.textContent = '';
+  try {
+    const { error } = await _sb.auth.updateUser({ password: newPw });
+    if (error) throw error;
+    msgEl.style.color = 'var(--green,#34d399)';
+    msgEl.textContent = '✓ Password updated.';
+    btn.textContent = 'Saved ✓'; btn.style.opacity = '0.6';
+    setTimeout(() => { document.getElementById('change-pw-modal').style.display = 'none'; }, 1200);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Save password';
+    msgEl.style.color = 'var(--red,#fb7185)';
+    msgEl.textContent = e?.message || 'Failed to update. Try again.';
+  }
 }
 
 function showRecoveryForm(flowType) {
