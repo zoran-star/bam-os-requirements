@@ -5150,7 +5150,7 @@
                   </button>
                 </div>
 
-                <button class="intake-primary" onclick="submitTicket('error')">Submit error report →</button>
+                <button class="intake-primary" onclick="submitTicket('error', event)">Submit error report →</button>
               </div>
             </div>
 
@@ -5193,7 +5193,7 @@
                   </div>
                 </div>
 
-                <button class="intake-primary" onclick="submitTicket('change')">Submit change request →</button>
+                <button class="intake-primary" onclick="submitTicket('change', event)">Submit change request →</button>
               </div>
             </div>
 
@@ -5302,7 +5302,7 @@
                   </div>
                 </div>
 
-                <button class="intake-primary" onclick="submitTicket('custom')">Submit custom request →</button>
+                <button class="intake-primary" onclick="submitTicket('custom', event)">Submit custom request →</button>
               </div>
             </div>
 
@@ -14369,7 +14369,7 @@ function _dformRenderPage() {
     html += `<button class="dform-back" onclick="_dformBack()">← Back</button>`;
   }
   if (isLast) {
-    html += `<button class="intake-primary" onclick="_dformSubmit()">Submit request →</button>`;
+    html += `<button class="intake-primary" onclick="_dformSubmit(event)">Submit request →</button>`;
   } else {
     html += `<button class="intake-primary" onclick="_dformNext()">Continue →</button>`;
   }
@@ -14722,8 +14722,8 @@ function _dformBack() {
   }
 }
 
-function _dformSubmit() {
-  submitTicket('menu');
+function _dformSubmit(evt) {
+  submitTicket('menu', evt);
 }
 
 // _pendingFiles: { 'error-files': [File, ...], ... }
@@ -14861,68 +14861,90 @@ function toggleRedAlert() {
   btn.classList.toggle('active', isRedAlert);
 }
 
-async function submitTicket(type) {
-  // Collect fields based on ticket type
-  let fields = {};
-  let menuItem = null;
-  let priority = 'standard';
+// In-flight guard. BTG hit a 10x duplicate bug on 2026-05-27 when the
+// client tapped Submit repeatedly while a file upload was in progress —
+// each tap fired a fresh insert because there was no debounce. This
+// flag drops repeat invocations until the first one finishes (success
+// OR failure), and the trigger button is visually disabled too.
+let _submitTicketInFlight = false;
+async function submitTicket(type, evt) {
+  if (_submitTicketInFlight) return;
+  _submitTicketInFlight = true;
 
-  if (type === 'error') {
-    fields = {
-      title:  (document.getElementById('error-title')?.value  || '').trim(),
-      where:  (document.getElementById('error-where')?.value  || '').trim(),
-      should: (document.getElementById('error-should')?.value || '').trim(),
-    };
-    priority = isRedAlert ? 'urgent' : 'standard';
+  // Disable the originating button so it's visually obvious the submit
+  // is in progress. evt is undefined on programmatic calls (defensive).
+  const btn = (evt && evt.currentTarget)
+    || (typeof event !== "undefined" && event && event.target?.closest?.("button"))
+    || null;
+  const originalText = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.textContent = "Submitting…"; }
 
-  } else if (type === 'change') {
-    fields = {
-      title: (document.getElementById('change-title')?.value || '').trim(),
-      what: (document.getElementById('change-what')?.value || '').trim(),
-      how:  (document.getElementById('change-how')?.value  || '').trim(),
-    };
+  try {
+    // Collect fields based on ticket type
+    let fields = {};
+    let menuItem = null;
+    let priority = 'standard';
 
-  } else if (type === 'menu') {
-    menuItem = selectedMenuItem;
-    // Dynamic form answers keyed by question text
-    fields = { ..._dformAnswers };
+    if (type === 'error') {
+      fields = {
+        title:  (document.getElementById('error-title')?.value  || '').trim(),
+        where:  (document.getElementById('error-where')?.value  || '').trim(),
+        should: (document.getElementById('error-should')?.value || '').trim(),
+      };
+      priority = isRedAlert ? 'urgent' : 'standard';
 
-  } else if (type === 'custom') {
-    menuItem = 'Build something else';
-    fields = {
-      title:    (document.getElementById('custom-title')?.value || '').trim(),
-      describe: (document.getElementById('custom-desc')?.value || '').trim(),
-      info:     (document.getElementById('custom-info')?.value || '').trim(),
-    };
+    } else if (type === 'change') {
+      fields = {
+        title: (document.getElementById('change-title')?.value || '').trim(),
+        what: (document.getElementById('change-what')?.value || '').trim(),
+        how:  (document.getElementById('change-how')?.value  || '').trim(),
+      };
+
+    } else if (type === 'menu') {
+      menuItem = selectedMenuItem;
+      // Dynamic form answers keyed by question text
+      fields = { ..._dformAnswers };
+
+    } else if (type === 'custom') {
+      menuItem = 'Build something else';
+      fields = {
+        title:    (document.getElementById('custom-title')?.value || '').trim(),
+        describe: (document.getElementById('custom-desc')?.value || '').trim(),
+        info:     (document.getElementById('custom-info')?.value || '').trim(),
+      };
+    }
+
+    // Generate a temp ID for file path grouping, then insert
+    const tempId = crypto.randomUUID();
+    const fileListId = type === 'error' ? 'error-files' : type === 'change' ? 'change-files' : type === 'menu' ? 'menu-files' : 'custom-files';
+    const uploadedFiles = await _uploadFiles(fileListId, tempId);
+
+    const { error } = await _sb.from('tickets').insert({
+      id:        tempId,
+      client_id: CLIENT_ID,
+      type:      type === 'menu' ? 'build' : type === 'custom' ? 'build' : type,
+      status:    'open',
+      priority,
+      fields,
+      menu_item: menuItem,
+      files:     uploadedFiles,
+    });
+
+    if (error) {
+      console.error('Ticket submit error:', error.message);
+      alert('Something went wrong — please try again.');
+      return;
+    }
+
+    // Refresh the live tickets list so the new ticket appears immediately
+    // when the client clicks "Back to systems". Awaited so the list isn't
+    // mid-fetch when the user navigates back.
+    await loadTickets();
+    showScreen('screen-confirm');
+  } finally {
+    _submitTicketInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
-
-  // Generate a temp ID for file path grouping, then insert
-  const tempId = crypto.randomUUID();
-  const fileListId = type === 'error' ? 'error-files' : type === 'change' ? 'change-files' : type === 'menu' ? 'menu-files' : 'custom-files';
-  const uploadedFiles = await _uploadFiles(fileListId, tempId);
-
-  const { error } = await _sb.from('tickets').insert({
-    id:        tempId,
-    client_id: CLIENT_ID,
-    type:      type === 'menu' ? 'build' : type === 'custom' ? 'build' : type,
-    status:    'open',
-    priority,
-    fields,
-    menu_item: menuItem,
-    files:     uploadedFiles,
-  });
-
-  if (error) {
-    console.error('Ticket submit error:', error.message);
-    alert('Something went wrong — please try again.');
-    return;
-  }
-
-  // Refresh the live tickets list so the new ticket appears immediately
-  // when the client clicks "Back to systems". Awaited so the list isn't
-  // mid-fetch when the user navigates back.
-  await loadTickets();
-  showScreen('screen-confirm');
 }
 
 // ── Auth boot ─────────────────────────────────────────────────────
