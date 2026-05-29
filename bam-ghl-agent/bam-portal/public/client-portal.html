@@ -12070,6 +12070,40 @@ function _membersSetSort(value) {
   fetchAndRenderMembers(); // sort happens server-side
 }
 
+// One-click smoke test for the GHL SMS integration. Hardcoded to Zoran's
+// number for now. Logs the API response in an alert + console so the
+// outcome is obvious without needing DevTools.
+async function _membersTestGhlSms() {
+  const btn = document.getElementById('members-test-ghl-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope.');
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id:     CLIENT_ID,
+        contact_phone: '+14165733718',
+        type:          'SMS',
+        message:       'Test from BAM portal — GHL SMS integration. If you got this, payment-link sends will work too.',
+      }),
+    });
+    const json = await _safeJson(res);
+    console.log('[test-ghl-sms] response:', json);
+    if (res.ok) {
+      alert(`✓ Sent.\n\nReply from GHL:\n${JSON.stringify(json, null, 2)}\n\nCheck your phone in a few seconds.`);
+    } else {
+      alert(`✗ Failed (HTTP ${res.status}).\n\n${JSON.stringify(json, null, 2)}\n\nCopy this and paste it in the chat.`);
+    }
+  } catch (e) {
+    console.error('[test-ghl-sms]', e);
+    alert(`✗ ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📱  Test GHL SMS to me'; }
+  }
+}
+
 // Pretty short date — "Mar 14, 2026" / "Mar 14" if same year.
 function _memberJoinedShort(m) {
   const iso = m.stripe_joined_at || m.joined_date || null;
@@ -12209,7 +12243,10 @@ function _renderMembersView() {
         ${popover}
       </div>
     </div>
-    <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">${filtered.length} shown${(f.q || activeFilterCount) ? ` of ${all.length}` : ''}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--text-mute)">${filtered.length} shown${(f.q || activeFilterCount) ? ` of ${all.length}` : ''}</div>
+      <button onclick="_membersTestGhlSms()" id="members-test-ghl-btn" title="Sends a test SMS via GHL to verify the integration is wired up" style="background:transparent;color:var(--text-mute);border:1px dashed var(--border);padding:5px 10px;font-size:11px;font-weight:600;border-radius:4px;cursor:pointer;font-family:inherit">📱  Test GHL SMS to me</button>
+    </div>
   `;
 
   if (!all.length) {

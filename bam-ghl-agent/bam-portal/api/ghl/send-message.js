@@ -66,12 +66,35 @@ async function resolveUser(req) {
   return { user, isStaff, clientIds };
 }
 
-// Pick the agency API token. We prefer a sub-account-scoped key when the
-// academy has one stashed (clients.ghl_api_key — future), and fall back to
-// the platform-wide GHL_API_KEY env var.
+// Pick the GHL token for this academy. Order of preference:
+//
+//   1. Per-academy entry in GHL_LOCATIONS_JSON, matched by locationId or
+//      by business_name (this matches the existing api/ghl.js setup so
+//      no new env vars are needed).
+//   2. Plain GHL_API_KEY env var as a last-resort fallback.
+//
+// Returns { token, locationId } or null if nothing usable is found.
 function pickGhlToken(client) {
-  // future: client.ghl_api_key if per-academy OAuth ships
-  return process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
+  // Try GHL_LOCATIONS_JSON first — same env var the existing api/ghl.js uses.
+  if (process.env.GHL_LOCATIONS_JSON) {
+    let locs;
+    try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
+    if (Array.isArray(locs)) {
+      // Match by locationId first (most reliable), then by business_name.
+      const entry =
+        locs.find(l => l.locationId && l.locationId === client.ghl_location_id) ||
+        locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
+      if (entry) {
+        const token = entry.apiKeyV2 || entry.apiKey || null;
+        const locationId = entry.locationId || client.ghl_location_id || null;
+        if (token) return { token, locationId };
+      }
+    }
+  }
+  // Fallback to a plain env var.
+  const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
+  if (token) return { token, locationId: client.ghl_location_id };
+  return null;
 }
 
 async function ghl(method, path, { token, locationId, body } = {}) {
@@ -150,13 +173,14 @@ export default async function handler(req, res) {
     });
   }
 
-  const token = pickGhlToken(client);
-  if (!token) {
+  const creds = pickGhlToken(client);
+  if (!creds) {
     return res.status(500).json({
-      error: "GHL not configured.",
-      hint:  "Set GHL_API_KEY (or GHL_AGENCY_TOKEN) in Vercel env.",
+      error: "GHL not configured for this academy.",
+      hint:  "Either add this academy to GHL_LOCATIONS_JSON (matched by locationId or name) or set a fallback GHL_API_KEY env var.",
     });
   }
+  const { token, locationId } = creds;
 
   const type = (body.type || "SMS").toUpperCase() === "EMAIL" ? "Email" : "SMS";
   const message = (body.message || "").trim();
@@ -169,7 +193,7 @@ export default async function handler(req, res) {
   // Find the contact
   const contactId = await lookupContact({
     token,
-    locationId: client.ghl_location_id,
+    locationId,
     phone:      body.contact_phone,
     email:      body.contact_email,
   });
