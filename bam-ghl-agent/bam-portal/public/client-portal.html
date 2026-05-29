@@ -4993,6 +4993,17 @@
         Inbox
       </div>
 
+      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('pipelines', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="4" height="16" rx="1"/>
+            <rect x="10" y="4" width="4" height="10" rx="1"/>
+            <rect x="17" y="4" width="4" height="6" rx="1"/>
+          </svg>
+        </span>
+        Pipelines
+      </div>
+
       <div class="nav-item" data-feature="calendar" style="display:none" onclick="switchView('calendar', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5961,6 +5972,103 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-reply-send { background:var(--accent); color:#0B0B0D; border:none; padding:9px 18px; border-radius:6px; font-weight:700; font-size:13px; cursor:pointer; }
       #ib-drawer .ib-d-reply-send:disabled { background:var(--border); color:var(--text-mute); cursor:not-allowed; }
     </style>
+    <!-- ══════════════════════════════
+         PIPELINES VIEW (per-academy GHL kanban + drag-drop + Convert)
+    ══════════════════════════════ -->
+    <style>
+      #view-pipelines .pl-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+      #view-pipelines .pl-tab {
+        font-size:12px; padding:6px 14px; border-radius:999px; cursor:pointer;
+        border:1px solid var(--border); background:transparent; color:var(--text);
+        font-weight:500; font-family:inherit;
+      }
+      #view-pipelines .pl-tab.on {
+        border-color:var(--accent); background:rgba(232,197,71,0.12);
+        color:var(--accent); font-weight:700;
+      }
+      #view-pipelines .pl-board {
+        display:flex; gap:12px; overflow-x:auto; padding-bottom:14px;
+        scroll-snap-type:x proximity;
+      }
+      #view-pipelines .pl-col {
+        flex:0 0 280px; max-width:280px; background:rgba(255,255,255,0.02);
+        border:1px solid var(--border); border-radius:8px; padding:10px;
+        scroll-snap-align:start;
+        display:flex; flex-direction:column; max-height:calc(100vh - 240px);
+      }
+      #view-pipelines .pl-col.drag-over { background:rgba(232,197,71,0.10); border-color:var(--accent); }
+      #view-pipelines .pl-col-header {
+        font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+        color:var(--text-mute); padding:4px 6px 10px; display:flex;
+        justify-content:space-between; align-items:center; gap:6px;
+      }
+      #view-pipelines .pl-col-count {
+        font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;
+        background:rgba(232,197,71,0.12); color:var(--accent);
+      }
+      #view-pipelines .pl-cards { display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; }
+      #view-pipelines .pl-card {
+        background:var(--surface); border:1px solid var(--border); border-radius:6px;
+        padding:10px 12px; cursor:grab; transition:transform 100ms, border-color 100ms;
+      }
+      #view-pipelines .pl-card:hover { border-color:rgba(232,197,71,0.45); }
+      #view-pipelines .pl-card.dragging { opacity:0.4; cursor:grabbing; }
+      #view-pipelines .pl-card-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-card-contact { font-size:11px; color:var(--text-mute); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-card-row { display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:6px; }
+      #view-pipelines .pl-tag {
+        display:inline-block; font-size:10px; font-weight:700; padding:2px 7px;
+        border-radius:999px;
+      }
+      #view-pipelines .pl-tag-member { background:#1f7a3d; color:#fff; }
+      #view-pipelines .pl-tag-lead   { background:transparent; border:1px solid var(--border); color:var(--text-mute); }
+      #view-pipelines .pl-card-age { font-size:10px; color:var(--text-mute); }
+      #view-pipelines .pl-card-stale .pl-card-age { color:#c47424; font-weight:600; }
+      #view-pipelines .pl-empty { font-size:12px; color:var(--text-mute); text-align:center; padding:14px 8px; }
+
+      /* Drawer */
+      #pl-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity 250ms; z-index:60; }
+      #pl-drawer-overlay.open { opacity:1; pointer-events:auto; }
+      #pl-drawer {
+        position:fixed; top:0; right:0; bottom:0; width:460px; max-width:100%;
+        background:var(--surface); border-left:1px solid var(--border);
+        transform:translateX(100%); transition:transform 250ms; z-index:61;
+        overflow-y:auto;
+      }
+      #pl-drawer.open { transform:translateX(0); }
+      #pl-drawer .pl-d-header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:14px; }
+      #pl-drawer .pl-d-title { font-size:18px; font-weight:700; }
+      #pl-drawer .pl-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
+      #pl-drawer .pl-d-section { padding:14px 20px; border-bottom:1px solid var(--border); }
+      #pl-drawer .pl-d-section .lbl { color:var(--text-mute); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+      #pl-drawer .pl-d-row { display:grid; grid-template-columns:120px 1fr; gap:10px; font-size:13px; padding:4px 0; }
+      #pl-drawer .pl-d-row .lbl2 { color:var(--text-mute); }
+      #pl-drawer .pl-d-actions { padding:16px 20px; display:flex; flex-direction:column; gap:8px; }
+      #pl-drawer .pl-d-btn {
+        background:transparent; color:var(--text); border:1px solid var(--border);
+        padding:10px 14px; font-size:13px; font-weight:600; border-radius:4px;
+        cursor:pointer; font-family:inherit; width:100%;
+      }
+      #pl-drawer .pl-d-btn.primary { background:var(--accent); color:#0B0B0D; border-color:var(--accent); }
+      #pl-drawer .pl-d-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    </style>
+    <div class="view" id="view-pipelines">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 03 · Pipelines</span>
+          <div class="topbar-title">Pipelines</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="pl-pipeline-tabs" class="pl-tabs"></div>
+        <div id="pl-board-container">
+          <div class="req-empty" style="padding:20px 0">Loading pipelines…</div>
+        </div>
+      </div>
+    </div>
+    <div id="pl-drawer-overlay" onclick="closePipelineDrawer()"></div>
+    <div id="pl-drawer" role="dialog" aria-modal="true"></div>
+
     <div class="view" id="view-inbox">
       <div class="topbar">
         <div>
@@ -7151,6 +7259,7 @@ function switchView(name, el) {
   if (name === 'members') fetchAndRenderMembers();
   if (name === 'pricing') fetchAndRenderPricing();
   if (name === 'inbox')   fetchAndRenderInbox();
+  if (name === 'pipelines') fetchAndRenderPipelines();
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') renderCalendar();
@@ -12391,6 +12500,254 @@ function _renderMembersView() {
 
 let _PRICING_DATA = null;
 let _PRICING_FILTER = 'all';
+
+// ══════════════════════════════════════════════════════════════
+// PIPELINES VIEW — per-academy GHL kanban + drag-drop + Convert
+// ══════════════════════════════════════════════════════════════
+
+let _PL_DATA       = null;   // { pipelines:[{id,name,stages,opportunities}], totals:{...} }
+let _PL_PIPELINE   = null;   // currently-selected pipeline id
+let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
+
+async function fetchAndRenderPipelines() {
+  const container = document.getElementById('pl-board-container');
+  if (!container) return;
+  container.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading pipelines…</div>';
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _PL_DATA = json;
+    if (!_PL_PIPELINE && json.pipelines && json.pipelines.length) {
+      _PL_PIPELINE = json.pipelines[0].id;
+    }
+    _renderPipelineTabs();
+    _renderPipelineBoard();
+  } catch (e) {
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _renderPipelineTabs() {
+  const host = document.getElementById('pl-pipeline-tabs');
+  if (!host || !_PL_DATA) return;
+  if (!_PL_DATA.pipelines.length) { host.innerHTML = ''; return; }
+  host.innerHTML = _PL_DATA.pipelines.map(p => {
+    const on = p.id === _PL_PIPELINE;
+    return `<button class="pl-tab ${on ? 'on' : ''}" onclick="_plSelectPipeline('${escapeHTML(p.id)}')">${escapeHTML(p.name)} <span style="opacity:0.7">${p.opportunities.length}</span></button>`;
+  }).join('');
+}
+
+function _plSelectPipeline(pipelineId) {
+  _PL_PIPELINE = pipelineId;
+  _renderPipelineTabs();
+  _renderPipelineBoard();
+}
+
+function _plAgeShort(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso); if (isNaN(d.getTime())) return '—';
+  const diffH = Math.floor((Date.now() - d.getTime()) / 3600000);
+  if (diffH < 1)   return 'just now';
+  if (diffH < 24)  return diffH + 'h';
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7)   return diffD + 'd';
+  if (diffD < 30)  return Math.floor(diffD / 7) + 'w';
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
+function _renderPipelineBoard() {
+  const container = document.getElementById('pl-board-container');
+  if (!container || !_PL_DATA) return;
+  if (!_PL_DATA.pipelines.length) {
+    container.innerHTML = '<div class="req-empty" style="padding:20px 0">No pipelines in GHL yet.</div>';
+    return;
+  }
+  const p = _PL_DATA.pipelines.find(x => x.id === _PL_PIPELINE) || _PL_DATA.pipelines[0];
+  if (!p) { container.innerHTML = ''; return; }
+
+  // Group opportunities by stage
+  const byStage = new Map();
+  for (const s of p.stages) byStage.set(s.id, []);
+  for (const o of p.opportunities) {
+    if (!byStage.has(o.stageId)) byStage.set(o.stageId, []);
+    byStage.get(o.stageId).push(o);
+  }
+
+  const cardHtml = (o) => {
+    const tag = o.member
+      ? `<span class="pl-tag pl-tag-member" title="${escapeHTML(o.member.athlete_name)} (${escapeHTML(o.member.status || '')})">member</span>`
+      : `<span class="pl-tag pl-tag-lead">lead</span>`;
+    const age = _plAgeShort(o.lastStageChangeAt || o.updatedAt);
+    const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
+    const stale = ageMs > 7 * 86400 * 1000;
+    return `
+      <div class="pl-card ${stale ? 'pl-card-stale' : ''}"
+           draggable="true"
+           ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
+           ondragend="_plDragEnd(event)"
+           onclick="_plOpenCard('${escapeHTML(o.id)}')">
+        <div class="pl-card-name">${escapeHTML(o.name || o.contact.name || 'Untitled')}</div>
+        <div class="pl-card-contact">${escapeHTML(o.contact.name || '')} ${o.contact.phone ? '· ' + escapeHTML(o.contact.phone) : ''}</div>
+        <div class="pl-card-row">
+          ${tag}
+          <span class="pl-card-age">${escapeHTML(age)}</span>
+        </div>
+      </div>`;
+  };
+
+  const colHtml = p.stages.map(s => {
+    const opps = byStage.get(s.id) || [];
+    return `
+      <div class="pl-col"
+           ondragover="_plDragOver(event,'${escapeHTML(s.id)}')"
+           ondragleave="_plDragLeave(event)"
+           ondrop="_plDrop(event,'${escapeHTML(s.id)}','${escapeHTML(p.id)}')">
+        <div class="pl-col-header">
+          <span>${escapeHTML(s.name)}</span>
+          <span class="pl-col-count">${opps.length}</span>
+        </div>
+        <div class="pl-cards">
+          ${opps.length ? opps.map(cardHtml).join('') : '<div class="pl-empty">No cards here yet.</div>'}
+        </div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="pl-board">${colHtml}</div>`;
+}
+
+// ── Drag & drop ───────────────────────────────────────────
+function _plDragStart(e, oppId, fromStageId, pipelineId) {
+  _PL_DRAG_OPP = { oppId, fromStageId, pipelineId };
+  e.currentTarget.classList.add('dragging');
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', oppId); } catch (_) {}
+}
+function _plDragEnd(e) {
+  document.querySelectorAll('#view-pipelines .pl-card.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('#view-pipelines .pl-col.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+function _plDragOver(e, stageId) {
+  if (!_PL_DRAG_OPP) return;
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function _plDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+}
+async function _plDrop(e, toStageId, pipelineId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!_PL_DRAG_OPP) return;
+  const { oppId, fromStageId } = _PL_DRAG_OPP;
+  _PL_DRAG_OPP = null;
+  if (toStageId === fromStageId) return;
+
+  // Optimistic update — move the card locally first
+  const p = _PL_DATA.pipelines.find(x => x.id === pipelineId);
+  if (p) {
+    const o = p.opportunities.find(x => x.id === oppId);
+    if (o) {
+      o.stageId = toStageId;
+      o.lastStageChangeAt = new Date().toISOString();
+      _renderPipelineBoard();
+    }
+  }
+
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipeline_id: pipelineId, stage_id: toStageId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+  } catch (err) {
+    alert('Move failed: ' + err.message);
+    // Roll back
+    if (p) {
+      const o = p.opportunities.find(x => x.id === oppId);
+      if (o) o.stageId = fromStageId;
+      _renderPipelineBoard();
+    }
+  }
+}
+
+// ── Card drawer ───────────────────────────────────────────
+function _plOpenCard(oppId) {
+  const drawer  = document.getElementById('pl-drawer');
+  const overlay = document.getElementById('pl-drawer-overlay');
+  if (!drawer || !overlay || !_PL_DATA) return;
+  // Find the opp + pipeline + stage
+  let p, o, s;
+  for (const pl of _PL_DATA.pipelines) {
+    const found = pl.opportunities.find(x => x.id === oppId);
+    if (found) { p = pl; o = found; s = pl.stages.find(st => st.id === found.stageId); break; }
+  }
+  if (!o) return;
+
+  const memberBadge = o.member
+    ? `<span class="pl-tag pl-tag-member">member · ${escapeHTML(o.member.athlete_name || '')}</span>`
+    : `<span class="pl-tag pl-tag-lead">lead</span>`;
+
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  drawer.innerHTML = `
+    <div class="pl-d-header">
+      <div>
+        <div class="pl-d-title">${escapeHTML(o.name || o.contact.name || 'Untitled')}</div>
+        <div class="pl-d-sub">${escapeHTML(p.name)} · ${escapeHTML(s?.name || '—')} · ${memberBadge}</div>
+      </div>
+      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+    </div>
+    <div class="pl-d-section">
+      <div class="pl-d-row"><div class="lbl2">Contact</div><div>${escapeHTML(o.contact.name || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Phone</div><div>${escapeHTML(o.contact.phone || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Email</div><div>${escapeHTML(o.contact.email || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Value</div><div>${o.monetaryValue ? '$' + Number(o.monetaryValue).toLocaleString() : '—'}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Status</div><div>${escapeHTML(o.status || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Stage age</div><div>${escapeHTML(_plAgeShort(o.lastStageChangeAt))}</div></div>
+    </div>
+    <div class="pl-d-actions">
+      ${o.member
+        ? `<button class="pl-d-btn primary" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
+        : `<button class="pl-d-btn primary" onclick="_plConvert('${escapeHTML(o.id)}')">Convert to member</button>`}
+      ${o.contactId
+        ? `<a class="pl-d-btn" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center" href="https://app.gohighlevel.com/v2/location/${escapeHTML((_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '')}/contacts/detail/${escapeHTML(o.contactId)}">Open in GHL ↗</a>`
+        : ''}
+    </div>`;
+}
+
+function closePipelineDrawer() {
+  document.getElementById('pl-drawer-overlay')?.classList.remove('open');
+  document.getElementById('pl-drawer')?.classList.remove('open');
+}
+
+async function _plConvert(oppId) {
+  if (!confirm('Convert this lead to a member?\n\nCreates a member row in payment_method_required state with the contact info from GHL.')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?action=convert&client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: oppId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const m = json.member || {};
+    closePipelineDrawer();
+    alert(`✓ ${json.duplicate ? 'Already existed' : 'Created'}: ${m.athlete_name || 'member'}.`);
+    fetchAndRenderPipelines();   // refresh so the card now shows 'member' badge
+  } catch (e) {
+    alert('Convert failed: ' + e.message);
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // INBOX VIEW — GHL conversations + reply (per-academy)
