@@ -4973,6 +4973,16 @@
         Members
       </div>
 
+      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('pricing', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </span>
+        Pricing
+      </div>
+
       <div class="nav-item" data-feature="calendar" style="display:none" onclick="switchView('calendar', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5751,6 +5761,138 @@ Then the call to action."]</div>
         <div id="stripe-modal-host"></div>
       </div>
     </div>
+
+    <!-- ══════════════════════════════
+         PRICING VIEW (catalog of Stripe prices per academy)
+         Source of truth for every price an academy has — canonical /
+         lil_sale / legacy / deprecated. Click a row → drawer with full
+         details + the members tied to that price.
+    ══════════════════════════════ -->
+    <style>
+      #view-pricing .pc-section-header {
+        font-size:12px; font-weight:700; letter-spacing:0.08em; color:var(--text-mute);
+        text-transform:uppercase; margin:18px 0 8px;
+        display:flex; align-items:center; gap:8px;
+      }
+      #view-pricing .pc-section-header::after {
+        content:''; flex:1; height:1px; background:var(--border);
+      }
+      #view-pricing .pc-row {
+        display:grid;
+        grid-template-columns: 1fr 90px 120px 100px 24px;
+        gap:14px; align-items:center;
+        padding:12px 16px; margin-bottom:8px;
+        border:1px solid var(--border); border-radius:8px;
+        background:transparent; cursor:pointer;
+        transition:background 150ms ease, border-color 150ms ease;
+      }
+      #view-pricing .pc-row:hover {
+        background:rgba(232,197,71,0.06); border-color:rgba(232,197,71,0.45);
+      }
+      #view-pricing .pc-name { font-weight:700; font-size:14px; }
+      #view-pricing .pc-name-sub { font-size:11px; color:var(--text-mute); margin-top:2px; font-family:monospace; }
+      #view-pricing .pc-plan { font-size:12px; color:var(--text-mute); }
+      #view-pricing .pc-price { font-size:13px; font-weight:600; }
+      #view-pricing .pc-count {
+        font-size:12px; font-weight:700; padding:3px 10px; border-radius:999px;
+        background:rgba(232,197,71,0.12); color:var(--accent);
+        text-align:center; white-space:nowrap;
+      }
+      #view-pricing .pc-count.pc-count-zero {
+        background:transparent; color:var(--text-mute); border:1px dashed var(--border);
+      }
+      #view-pricing .pc-chevron { color:var(--text-mute); font-size:16px; text-align:right; }
+      #view-pricing .pc-totals {
+        display:flex; gap:14px; flex-wrap:wrap; padding:14px 0;
+        font-size:12px; color:var(--text-mute);
+      }
+      #view-pricing .pc-totals strong { color:var(--text); font-weight:700; }
+      #view-pricing .pc-uncatalogued {
+        background:rgba(154,59,47,0.08); border:1px solid rgba(154,59,47,0.4);
+        border-radius:8px; padding:12px 14px; margin-top:18px;
+      }
+      #view-pricing .pc-uncatalogued .pc-row {
+        background:transparent; border-color:rgba(154,59,47,0.3); margin-bottom:6px;
+      }
+      @media (max-width:640px) {
+        #view-pricing .pc-row { grid-template-columns: 1fr 90px 18px; }
+        #view-pricing .pc-row .pc-plan,
+        #view-pricing .pc-row .pc-price { display:none; }
+      }
+
+      /* Drawer — slides in from right on click */
+      #pc-drawer-overlay {
+        position:fixed; inset:0; background:rgba(0,0,0,0.45);
+        opacity:0; pointer-events:none; transition:opacity 250ms ease;
+        z-index:60;
+      }
+      #pc-drawer-overlay.open { opacity:1; pointer-events:auto; }
+      #pc-drawer {
+        position:fixed; top:0; right:0; bottom:0; width:480px; max-width:100%;
+        background:var(--surface); border-left:1px solid var(--border);
+        transform:translateX(100%); transition:transform 250ms ease;
+        z-index:61; overflow-y:auto;
+      }
+      #pc-drawer.open { transform:translateX(0); }
+      #pc-drawer .pc-d-header {
+        padding:18px 20px; border-bottom:1px solid var(--border);
+        display:flex; justify-content:space-between; align-items:flex-start; gap:14px;
+      }
+      #pc-drawer .pc-d-title { font-size:18px; font-weight:700; line-height:1.2; }
+      #pc-drawer .pc-d-sub { font-size:11px; color:var(--text-mute); font-family:monospace; margin-top:4px; }
+      #pc-drawer .pc-d-close {
+        background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px;
+        padding:4px 10px; border-radius:6px;
+      }
+      #pc-drawer .pc-d-close:hover { background:var(--border); color:var(--text); }
+      #pc-drawer .pc-d-section { padding:16px 20px; border-bottom:1px solid var(--border); }
+      #pc-drawer .pc-d-row {
+        display:grid; grid-template-columns: 120px 1fr; gap:10px;
+        font-size:13px; padding:5px 0;
+      }
+      #pc-drawer .pc-d-row .lbl { color:var(--text-mute); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; }
+      #pc-drawer .pc-d-row .val { font-weight:600; }
+      #pc-drawer .pc-d-members .pc-d-mem-row {
+        display:flex; justify-content:space-between; align-items:center; gap:10px;
+        padding:8px 0; border-bottom:1px solid var(--border);
+      }
+      #pc-drawer .pc-d-members .pc-d-mem-row:last-child { border-bottom:none; }
+      #pc-drawer .pc-d-mem-name { font-size:14px; font-weight:600; }
+      #pc-drawer .pc-d-mem-parent { font-size:12px; color:var(--text-mute); margin-top:1px; }
+      #pc-drawer .pc-d-mem-action {
+        background:none; border:1px solid var(--border); color:var(--text);
+        font-size:11px; padding:4px 10px; border-radius:6px; cursor:pointer;
+      }
+      #pc-drawer .pc-d-mem-action:hover { background:var(--border); }
+
+      /* Tier badge — shared with Members pill */
+      .pc-tier-badge {
+        display:inline-block; font-size:10px; font-weight:700; padding:2px 8px;
+        border-radius:999px; letter-spacing:0.04em; text-transform:uppercase;
+      }
+      .pc-tier-canonical     { background:#1f7a3d; color:#fff; }
+      .pc-tier-lil_sale      { background:var(--accent); color:#000; }
+      .pc-tier-legacy_match  { background:transparent; border:1px solid #7a5a2f; color:#7a5a2f; }
+      .pc-tier-legacy_unknown{ background:transparent; border:1px solid #7a5a2f; color:#7a5a2f; }
+      .pc-tier-deprecated    { background:#9a3b2f; color:#fff; }
+      .pc-tier-uncatalogued  { background:transparent; border:1px solid #555; color:#555; }
+    </style>
+    <div class="view" id="view-pricing">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 03 · Pricing</span>
+          <div class="topbar-title">Pricing Catalog</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="pricing-totals-host" class="pc-totals"></div>
+        <div id="pricing-list-container">
+          <div class="req-empty" style="padding:20px 0">Loading prices…</div>
+        </div>
+      </div>
+    </div>
+    <div id="pc-drawer-overlay" onclick="closePricingDrawer()"></div>
+    <div id="pc-drawer" role="dialog" aria-modal="true"></div>
 
     <!-- ══════════════════════════════
          CALENDAR VIEW (weekly schedule, V2-gated)
@@ -6900,6 +7042,7 @@ function switchView(name, el) {
 
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
+  if (name === 'pricing') fetchAndRenderPricing();
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') renderCalendar();
@@ -12063,6 +12206,239 @@ function _renderMembersView() {
 
   container.innerHTML = toolbar + cards;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
+}
+
+// ══════════════════════════════════════════════════════════════
+// PRICING CATALOG VIEW
+// ══════════════════════════════════════════════════════════════
+
+let _PRICING_DATA = null;
+let _PRICING_FILTER = 'all';
+
+async function fetchAndRenderPricing() {
+  const container = document.getElementById('pricing-list-container');
+  if (!container) return;
+  try {
+    const token = await _mreqAuthToken();
+    const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _PRICING_DATA = json;
+    _renderPricingView();
+  } catch (e) {
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pricing — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _pricingTierLabel(tier) {
+  return ({
+    canonical:       'Canonical',
+    lil_sale:        'Lil sale',
+    legacy_match:    'Legacy',
+    legacy_unknown:  'Legacy',
+    deprecated:      'Deprecated',
+    uncatalogued:    'Unknown $',
+  })[tier] || tier;
+}
+
+function _pricingTierBadge(tier) {
+  const label = _pricingTierLabel(tier);
+  return `<span class="pc-tier-badge pc-tier-${escapeHTML(tier)}">${escapeHTML(label)}</span>`;
+}
+
+function _pricingAmount(row) {
+  if (row.amount_cents == null) return '—';
+  const amt = (row.amount_cents / 100).toFixed(2).replace(/\.00$/, '');
+  const ival = row.interval ? row.interval.replace(/_/g, ' ') : '';
+  return `$${amt}${ival ? ' / ' + ival : ''}`;
+}
+
+function _renderPricingView() {
+  const container = document.getElementById('pricing-list-container');
+  const totalsHost = document.getElementById('pricing-totals-host');
+  if (!container || !_PRICING_DATA) return;
+
+  const catalog = _PRICING_DATA.catalog || [];
+  const uncatalogued = _PRICING_DATA.uncatalogued || [];
+  const totalMembers = (_PRICING_DATA.totals && _PRICING_DATA.totals.members_with_price) || 0;
+
+  // Filter chips
+  const tiers = ['all', 'canonical', 'lil_sale', 'legacy_match', 'legacy_unknown', 'deprecated'];
+  const filterChips = tiers.map(t => {
+    const sel = _PRICING_FILTER === t;
+    const label = t === 'all' ? 'All' : _pricingTierLabel(t);
+    const count = t === 'all' ? catalog.length : catalog.filter(r => r.tier === t).length;
+    return `<button onclick="_pricingSetFilter('${t}')" style="
+      font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer;
+      border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
+      background:${sel ? 'rgba(232,197,71,0.12)' : 'transparent'};
+      color:${sel ? 'var(--accent)' : 'var(--text)'};
+      font-weight:${sel ? '700' : '500'};">${escapeHTML(label)} <span style="opacity:0.6">${count}</span></button>`;
+  }).join(' ');
+
+  totalsHost.innerHTML = `
+    <span><strong>${catalog.length}</strong> prices</span>
+    <span>·</span>
+    <span><strong>${totalMembers}</strong> members tied to a catalog price</span>
+    ${uncatalogued.length ? `<span>·</span><span style="color:#9a3b2f"><strong>${uncatalogued.length}</strong> uncatalogued price(s)</span>` : ''}
+  `;
+
+  // Filter
+  const filtered = _PRICING_FILTER === 'all'
+    ? catalog
+    : catalog.filter(r => r.tier === _PRICING_FILTER);
+
+  // Group by tier (skip grouping if filtered to one tier)
+  const order = ['canonical', 'lil_sale', 'legacy_match', 'legacy_unknown', 'deprecated'];
+  const groups = new Map();
+  for (const t of order) groups.set(t, []);
+  for (const row of filtered) {
+    if (!groups.has(row.tier)) groups.set(row.tier, []);
+    groups.get(row.tier).push(row);
+  }
+
+  const renderRow = (row) => `
+    <div class="pc-row" onclick="openPricingDrawer('${escapeHTML(row.stripe_price_id)}')">
+      <div>
+        <div class="pc-name">${escapeHTML(row.display_name || row.stripe_price_id)}</div>
+        <div class="pc-name-sub">${escapeHTML(row.stripe_price_id)}</div>
+      </div>
+      <div class="pc-plan">${escapeHTML(row.canonical_plan || '—')}</div>
+      <div class="pc-price">${_pricingAmount(row)}</div>
+      <div class="pc-count ${row.member_count === 0 ? 'pc-count-zero' : ''}">${row.member_count} member${row.member_count === 1 ? '' : 's'}</div>
+      <div class="pc-chevron">›</div>
+    </div>`;
+
+  const sections = [];
+  for (const [tier, rows] of groups.entries()) {
+    if (!rows.length) continue;
+    sections.push(`
+      <div class="pc-section-header">${_pricingTierLabel(tier)} <span style="font-weight:500;font-size:11px;color:var(--text-mute)">${rows.length}</span></div>
+      ${rows.map(renderRow).join('')}
+    `);
+  }
+
+  let uncatHtml = '';
+  if (uncatalogued.length && (_PRICING_FILTER === 'all' || _PRICING_FILTER === 'legacy_unknown')) {
+    uncatHtml = `
+      <div class="pc-uncatalogued">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px">⚠ Uncatalogued prices in use</div>
+        <div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">
+          These Stripe prices have active members but aren't in the catalog yet.
+          Fixed automatically once the price.created/updated webhook is enabled in Stripe.
+        </div>
+        ${uncatalogued.map(u => `
+          <div class="pc-row" style="cursor:default">
+            <div>
+              <div class="pc-name" style="color:#9a3b2f">${escapeHTML(u.stripe_price_id)}</div>
+              <div class="pc-name-sub">not in catalog</div>
+            </div>
+            <div class="pc-plan">—</div>
+            <div class="pc-price">—</div>
+            <div class="pc-count">${u.member_count} member${u.member_count === 1 ? '' : 's'}</div>
+            <div class="pc-chevron"></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML = `
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px">${filterChips}</div>
+    ${sections.length ? sections.join('') : '<div class="req-empty" style="padding:20px 0">No prices match this filter.</div>'}
+    ${uncatHtml}
+  `;
+}
+
+function _pricingSetFilter(t) {
+  _PRICING_FILTER = t;
+  _renderPricingView();
+}
+
+// ── Drawer (detail on click) ─────────────────────────────────
+async function openPricingDrawer(priceId) {
+  const drawer  = document.getElementById('pc-drawer');
+  const overlay = document.getElementById('pc-drawer-overlay');
+  if (!drawer || !overlay) return;
+  drawer.innerHTML = `<div style="padding:20px;color:var(--text-mute)">Loading…</div>`;
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+
+  try {
+    const token = await _mreqAuthToken();
+    const qs = '?price_id=' + encodeURIComponent(priceId) +
+               (CLIENT_ID ? '&client_id=' + encodeURIComponent(CLIENT_ID) : '');
+    const r = await fetch('/api/pricing' + qs, { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _renderPricingDrawer(json);
+  } catch (e) {
+    drawer.innerHTML = `<div style="padding:20px;color:#9a3b2f">Couldn't load price — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function closePricingDrawer() {
+  const drawer  = document.getElementById('pc-drawer');
+  const overlay = document.getElementById('pc-drawer-overlay');
+  if (drawer)  drawer.classList.remove('open');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function _renderPricingDrawer({ price, members, member_count }) {
+  const drawer = document.getElementById('pc-drawer');
+  if (!drawer || !price) return;
+
+  const memberRows = (members || []).map(m => `
+    <div class="pc-d-mem-row">
+      <div>
+        <div class="pc-d-mem-name">${escapeHTML(m.athlete_name || '—')}</div>
+        <div class="pc-d-mem-parent">Parent: ${escapeHTML(m.parent_name || '—')} · ${escapeHTML(m.status || '—')}</div>
+      </div>
+      <button class="pc-d-mem-action" onclick="closePricingDrawer(); openMemberPopup('${escapeHTML(m.id)}')">View</button>
+    </div>
+  `).join('') || '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No members on this price.</div>';
+
+  drawer.innerHTML = `
+    <div class="pc-d-header">
+      <div>
+        <div class="pc-d-title">${escapeHTML(price.display_name || price.stripe_price_id)}</div>
+        <div class="pc-d-sub">${escapeHTML(price.stripe_price_id)}</div>
+      </div>
+      <button class="pc-d-close" onclick="closePricingDrawer()" aria-label="Close">×</button>
+    </div>
+
+    <div class="pc-d-section">
+      <div class="pc-d-row"><div class="lbl">Tier</div><div class="val">${_pricingTierBadge(price.tier)}</div></div>
+      <div class="pc-d-row"><div class="lbl">Routable</div><div class="val">${price.is_routable ? 'Yes — /change can sell this' : 'No — held by existing members only'}</div></div>
+      <div class="pc-d-row"><div class="lbl">Canonical plan</div><div class="val">${escapeHTML(price.canonical_plan || '—')}</div></div>
+      <div class="pc-d-row"><div class="lbl">Amount</div><div class="val">${_pricingAmount(price)}</div></div>
+      <div class="pc-d-row"><div class="lbl">HST mode</div><div class="val">${escapeHTML(price.hst_mode || '—')}</div></div>
+      <div class="pc-d-row"><div class="lbl">Currency</div><div class="val">${escapeHTML((price.currency || '').toUpperCase())}</div></div>
+    </div>
+
+    <div class="pc-d-section">
+      <div class="pc-d-row"><div class="lbl">Stripe product</div><div class="val" style="font-family:monospace;font-size:12px">${escapeHTML(price.stripe_product_id || '—')}</div></div>
+      <div class="pc-d-row"><div class="lbl">Connect acct</div><div class="val" style="font-family:monospace;font-size:12px">${escapeHTML(price.stripe_account_id || '—')}</div></div>
+      <div class="pc-d-row"><div class="lbl">Tied to offer</div><div class="val">Training offer (canonical roster — explicit FK pending)</div></div>
+      <div class="pc-d-row"><div class="lbl">Last synced</div><div class="val">${price.last_synced_at ? new Date(price.last_synced_at).toLocaleString() : '—'}</div></div>
+    </div>
+
+    ${price.notes ? `
+      <div class="pc-d-section">
+        <div class="lbl" style="color:var(--text-mute);font-size:11px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">Notes</div>
+        <div style="font-size:13px;line-height:1.5">${escapeHTML(price.notes)}</div>
+      </div>
+    ` : ''}
+
+    <div class="pc-d-section pc-d-members">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="lbl" style="color:var(--text-mute);font-size:11px;text-transform:uppercase;letter-spacing:0.06em">Members on this price</div>
+        <div style="font-size:13px;font-weight:700">${member_count}</div>
+      </div>
+      ${memberRows}
+    </div>
+  `;
 }
 
 function _membersRestoreSearchFocus(cursorPos) {
