@@ -8635,6 +8635,39 @@ function _obtTogglePanel(ev) {
   if (w) w.setAttribute('data-open', _obtPanelOpen ? 'true' : 'false');
 }
 
+// Non-blocking toast shown when the client clicks an external onboarding
+// circle (GHL / Slack). The circle itself is staff-checked, so we use
+// this to explain that just visiting the link doesn't flip the dot.
+function _obtShowToast(message) {
+  let toast = document.getElementById('obt-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'obt-toast';
+    toast.style.cssText = `
+      position: fixed; top: 76px; right: 24px; z-index: 1400;
+      background: var(--surface); border: 1px solid var(--accent-border);
+      color: var(--text); padding: 10px 16px; border-radius: 999px;
+      font-family: inherit; font-size: 12px; font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      opacity: 0; transform: translateY(-6px);
+      transition: opacity 0.18s, transform 0.18s;
+      max-width: calc(100vw - 48px);
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  // Trigger transition next frame
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+  if (toast._timer) clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+  }, 3200);
+}
+
 function _obtClick(sectionId) {
   const s = _obtSections.find(x => x.id === sectionId);
   if (!s) return;
@@ -8649,20 +8682,13 @@ function _obtClick(sectionId) {
   if (w) w.setAttribute('data-open', 'false');
 
   // External step (GHL signup, Slack invite): open the URL in a new
-  // tab AND mark this section done so the circle flips immediately.
-  // Already-done circles still re-open the link on click.
+  // tab and show a non-blocking toast — the circle is staff-checked
+  // only (BAM verifies completion before flipping it). Clients can
+  // visit the link as many times as they want; doing so doesn't flip
+  // anything in the DB.
   if (s.action === 'external') {
     window.open(s.url, '_blank', 'noopener,noreferrer');
-    if (!(_obtProgress && _obtProgress[s.key])) {
-      // Optimistic local flip — RPC will persist
-      if (_obtProgress) _obtProgress[s.key] = true;
-      _obtRender();
-      if (CLIENT_ID && _sb) {
-        _sb.rpc('mark_onboarding_section', {
-          p_client_id: CLIENT_ID, p_section: sectionId, p_done: true,
-        }).catch(() => {});
-      }
-    }
+    _obtShowToast('BAM marks this complete when verified.');
     return;
   }
 

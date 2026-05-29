@@ -496,12 +496,12 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   // tab. Everything else (BB nav, tracker, etc.) is V1 = visible to all.
   const v2Access = !!client.v2_access;
 
-  // Meta Ads onboarding-tracker flag. Staff flips this to fill the
-  // "Meta Ads" circle on the client's onboarding tracker — clients can't
-  // self-check it because BAM verifies the Meta connection from the staff
-  // side. Stored as timestamptz on clients (non-null = done).
-  const metaAdsDone = !!client.meta_ads_marked_done_at;
-  const [savingMetaAds, setSavingMetaAds] = useState(false);
+  // Onboarding-tracker staff-checks. Live in the Setup section below.
+  // Meta Ads got moved out of this tab and into MarketingTab 2026-05-27.
+  const ghlSignupDone = !!client.ghl_signup_done_at;
+  const slackJoinDone = !!client.slack_join_done_at;
+  const [savingGhl, setSavingGhl] = useState(false);
+  const [savingSlack, setSavingSlack] = useState(false);
 
   async function toggleV2Access(next) {
     setSavingOnb(true);
@@ -525,14 +525,14 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
     }
   }
 
-  async function toggleMetaAdsDone(next) {
-    setSavingMetaAds(true);
+  async function toggleSetupFlag(field, next, setSaving) {
+    setSaving(true);
     const tok = session?.access_token;
     try {
       const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, meta_ads_marked_done: next }),
+        body: JSON.stringify({ client_id: client.id, [field]: next }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -543,7 +543,7 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
     } catch (e) {
       alert("Couldn't save: " + (e?.message || e));
     } finally {
-      setSavingMetaAds(false);
+      setSaving(false);
     }
   }
 
@@ -610,28 +610,53 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
           </div>
         </div>
 
+        {/* Setup — staff-checks that fill onboarding-tracker circles
+            for things the CLIENT can't self-verify (BAM purchases GHL,
+            client joins the BAM Slack workspace). Meta Ads check
+            lives over on the Marketing tab now. */}
+        <SectionTitle style={{ marginTop: 22 }}>Setup</SectionTitle>
+
         <div style={{
-          marginTop: 10, padding: "12px 14px",
-          background: metaAdsDone ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${metaAdsDone ? t.accentBorder : t.border}`,
+          marginTop: 6, padding: "12px 14px",
+          background: ghlSignupDone ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${ghlSignupDone ? t.accentBorder : t.border}`,
           borderRadius: 8,
         }}>
-          <label style={{
-            display: "flex", alignItems: "center", gap: 10,
-            cursor: "pointer", fontSize: 13, color: t.text,
-          }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
             <input
               type="checkbox"
-              checked={metaAdsDone}
-              disabled={savingMetaAds}
-              onChange={(e) => toggleMetaAdsDone(e.target.checked)}
+              checked={ghlSignupDone}
+              disabled={savingGhl}
+              onChange={(e) => toggleSetupFlag("ghl_signup_done", e.target.checked, setSavingGhl)}
               style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
             />
-            <span style={{ fontWeight: 600 }}>Meta Ads onboarding complete?</span>
-            {savingMetaAds && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
+            <span style={{ fontWeight: 600 }}>GoHighLevel signup complete?</span>
+            {savingGhl && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
           </label>
           <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            Fills the "Meta Ads" circle on the client's onboarding tracker. Check when Meta is wired + the ad account is producing data on the client's Marketing tab.
+            Check after the client has paid via the GHL Stripe link AND the sub-account is provisioned. Fills the "GoHighLevel" circle on the client's onboarding tracker.
+          </div>
+        </div>
+
+        <div style={{
+          marginTop: 10, padding: "12px 14px",
+          background: slackJoinDone ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${slackJoinDone ? t.accentBorder : t.border}`,
+          borderRadius: 8,
+        }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
+            <input
+              type="checkbox"
+              checked={slackJoinDone}
+              disabled={savingSlack}
+              onChange={(e) => toggleSetupFlag("slack_join_done", e.target.checked, setSavingSlack)}
+              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
+            />
+            <span style={{ fontWeight: 600 }}>Joined BAM Slack workspace?</span>
+            {savingSlack && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
+          </label>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
+            Check once the client has accepted the Slack invite + you can see them in the shared workspace. Fills the "Join Slack" circle on their tracker.
           </div>
         </div>
 
@@ -878,6 +903,32 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
   const [savingFlag, setSavingFlag] = useState(false);
   const [flagErr, setFlagErr] = useState(null);
 
+  // Meta Ads onboarding-tracker flag. Moved here from OverviewTab
+  // (2026-05-27) so the marketing surface owns the marketing check.
+  // Staff flips this to fill the "Meta Ads" circle on the client's
+  // onboarding tracker.
+  const metaAdsDone = !!client.meta_ads_marked_done_at;
+  const [savingMetaAds, setSavingMetaAds] = useState(false);
+  async function toggleMetaAdsDone(next) {
+    setSavingMetaAds(true);
+    const tok = session?.access_token;
+    try {
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, meta_ads_marked_done: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert("Couldn't save: " + (j.error || res.statusText));
+      } else if (onChanged) onChanged();
+    } catch (e) {
+      alert("Couldn't save: " + (e?.message || e));
+    } finally {
+      setSavingMetaAds(false);
+    }
+  }
+
   // Sub-tab within the Marketing tab: "campaigns" (setup + active campaigns)
   // or "kpis" (yesterday + week-over-week lead KPIs).
   const [marketingSubTab, setMarketingSubTab] = useState("campaigns");
@@ -1099,6 +1150,33 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
             }} />
           </button>
         )}
+      </div>
+
+      {/* Meta Ads onboarding-tracker check (moved here from OverviewTab
+          2026-05-27 — staff owns the flip, lives next to the marketing
+          data so it's reviewed in context). Shows regardless of
+          marketing_included so it's discoverable even for clients
+          without marketing on. */}
+      <div style={{
+        marginBottom: 18, padding: "12px 14px",
+        background: metaAdsDone ? `${t.accent}10` : t.surfaceEl,
+        border: `1px solid ${metaAdsDone ? t.accentBorder : t.border}`,
+        borderRadius: 8,
+      }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
+          <input
+            type="checkbox"
+            checked={metaAdsDone}
+            disabled={savingMetaAds}
+            onChange={(e) => toggleMetaAdsDone(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
+          />
+          <span style={{ fontWeight: 600 }}>Meta Ads onboarding complete?</span>
+          {savingMetaAds && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
+        </label>
+        <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
+          Fills the "Meta Ads" circle on the client's onboarding tracker. Check when Meta is wired + the ad account is producing data on this tab.
+        </div>
       </div>
 
       {/* Everything below is hidden when marketing is not included */}

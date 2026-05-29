@@ -1786,6 +1786,24 @@ export default async function handler(req, res) {
           patch.meta_ads_marked_done_at = v ? new Date().toISOString() : null;
         }
 
+        // GHL signup + Slack join onboarding flags — staff-only checks
+        // (clients SEE them in their tracker but only BAM marks done).
+        // Same boolean → timestamp pattern as meta_ads_marked_done.
+        if (wasSet("ghl_signup_done")) {
+          const v = body.ghl_signup_done;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "ghl_signup_done must be a boolean" });
+          }
+          patch.ghl_signup_done_at = v ? new Date().toISOString() : null;
+        }
+        if (wasSet("slack_join_done")) {
+          const v = body.slack_join_done;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "slack_join_done must be a boolean" });
+          }
+          patch.slack_join_done_at = v ? new Date().toISOString() : null;
+        }
+
         if (wasSet("onboarding_method")) {
           const m = body.onboarding_method;
           if (m !== null && !["call", "send_link"].includes(m)) {

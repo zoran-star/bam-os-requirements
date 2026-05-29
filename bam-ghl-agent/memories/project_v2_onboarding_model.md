@@ -64,14 +64,14 @@ Six sections, three different completion mechanisms. **This table is the source 
 
 | Section | Trigger | Where it's set |
 |---|---|---|
-| GHL signup | external + click | Tracker circle opens the Stripe Buy link (`ONB_GHL_SIGNUP_URL`) in a new tab AND optimistically flips `clients.ghl_signup_done_at` to NOW() via `mark_onboarding_section('ghl_signup', true)` |
-| Join Slack | external + click | Same pattern with `ONB_SLACK_INVITE_URL` → flips `clients.slack_join_done_at` |
+| GHL signup | staff-controlled | Client click opens `ONB_GHL_SIGNUP_URL` in a new tab + shows a "BAM marks this when verified" toast — **client cannot flip the circle**. Staff flips it via the "GoHighLevel signup complete?" checkbox in the **Setup** section of the staff client Overview tab → writes `clients.ghl_signup_done_at` |
+| Join Slack | staff-controlled | Same pattern with `ONB_SLACK_INVITE_URL`. Staff flips "Joined BAM Slack workspace?" in **Setup** → writes `clients.slack_join_done_at` |
 | General | auto-derived | clients.business_name + owner_name + email all set |
 | Staff | manual mark-done | "I'm done with Staff" button on BB Staff card → `mark_onboarding_section('staff', true)` |
 | Locations | manual mark-done | "I'm done with Locations" button on BB Locations card → `mark_onboarding_section('locations', true)` |
 | Brand | manual mark-done | "I'm done with Brand" button on BB Brand card → `mark_onboarding_section('brand', true)` |
 | Offers | manual mark-done | "I'm done with Offers" button on BB Offers list → `mark_onboarding_section('offers', true)` |
-| Meta Ads | staff-controlled | BAM staff toggles "Meta Ads onboarding complete?" on the staff client overview tab → writes `clients.meta_ads_marked_done_at` |
+| Meta Ads | staff-controlled | BAM staff toggles "Meta Ads onboarding complete?" on the staff client **Marketing** tab (moved here from Overview 2026-05-27 so the marketing surface owns the marketing check) → writes `clients.meta_ads_marked_done_at` |
 
 Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 external sections (GHL + Slack) don't gate the systems onboarding ticket — that trigger only fires on the 5 BB sections (General + Staff + Locations + Brand + Offers).
 
