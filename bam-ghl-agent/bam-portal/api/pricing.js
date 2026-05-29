@@ -37,7 +37,10 @@ async function resolveUser(req) {
   if (!userRes.ok) throw Object.assign(new Error("invalid token"), { status: 401 });
   const user = await userRes.json();
 
-  const staff = await sb(`staff?auth_user_id=eq.${user.id}&select=id,role&limit=1`);
+  let staff = await sb(`staff?user_id=eq.${user.id}&select=id,role&limit=1`);
+  if ((!staff || !staff[0]) && user.email) {
+    staff = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,role&limit=1`);
+  }
   const isStaff = Array.isArray(staff) && staff[0];
 
   const memberships = await sb(
