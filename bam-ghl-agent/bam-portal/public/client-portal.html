@@ -12228,7 +12228,7 @@ function _renderMembersView() {
       ${_memberAvatar(m, 38)}
       <div class="member-card-main">
         <div class="member-card-name">${escapeHTML(m.athlete_name || 'Unnamed')}</div>
-        <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}${_memberJoinedShort(m) ? ` · Joined ${escapeHTML(_memberJoinedShort(m))}` : ''}</div>
+        <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
       <div class="member-card-pills">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
@@ -12419,17 +12419,15 @@ function _renderPricingDrawer({ price, members, member_count }) {
   const drawer = document.getElementById('pc-drawer');
   if (!drawer || !price) return;
 
-  const memberRows = (members || []).map(m => {
-    const joined = _memberJoinedShort(m);
-    return `
+  const memberRows = (members || []).map(m => `
     <div class="pc-d-mem-row">
       <div>
         <div class="pc-d-mem-name">${escapeHTML(m.athlete_name || '—')}</div>
-        <div class="pc-d-mem-parent">Parent: ${escapeHTML(m.parent_name || '—')} · ${escapeHTML(m.status || '—')}${joined ? ` · Joined ${escapeHTML(joined)}` : ''}</div>
+        <div class="pc-d-mem-parent">Parent: ${escapeHTML(m.parent_name || '—')} · ${escapeHTML(m.status || '—')}</div>
       </div>
       <button class="pc-d-mem-action" onclick="closePricingDrawer(); openMemberPopup('${escapeHTML(m.id)}')">View</button>
-    </div>`;
-  }).join('') || '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No members on this price.</div>';
+    </div>
+  `).join('') || '<div style="color:var(--text-mute);font-size:13px;padding:8px 0">No members on this price.</div>';
 
   drawer.innerHTML = `
     <div class="pc-d-header">
