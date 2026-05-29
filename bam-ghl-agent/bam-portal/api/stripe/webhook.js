@@ -12,6 +12,9 @@
 //   customer.subscription.updated   →  sync members.plan if price changed
 //                                       in Stripe (canonical prices only)
 //   invoice.payment_failed          →  auto-flag status='payment_failed'
+//   price.created / price.updated   →  upsert into pricing_catalog
+//                                       (auto-classify legacy_match if amount
+//                                        equals a canonical, else legacy_unknown)
 //
 // Connect: each event payload has `account` set to the connected account
 // id when it originated there. We use the platform key + Stripe-Account
@@ -146,6 +149,8 @@ export default async function handler(req, res) {
       case "customer.subscription.deleted": return await handleSubDeleted(event, connectedAccount, res);
       case "customer.subscription.updated": return await handleSubUpdated(event, connectedAccount, res);
       case "invoice.payment_failed":        return await handleInvoiceFailed(event, connectedAccount, res);
+      case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
+      case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
     }
   } catch (e) {
@@ -345,4 +350,109 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
   });
 
   return res.status(200).json({ ok: true, action: "flagged-payment-failed", member_id: member.id });
+}
+
+// ─────────────────────────────────────────────────────────
+// price.created / price.updated
+// ─────────────────────────────────────────────────────────
+// Mirror every Stripe price for a connected academy into pricing_catalog
+// so /change, mismatch detector, and Offers UI all stay in sync.
+//
+// Auto-classification rule:
+//   - new row + amount matches an existing canonical for the same client
+//     → tier='legacy_match', canonical_plan inherited, is_routable=false
+//   - new row + no canonical match
+//     → tier='legacy_unknown', is_routable=false
+//   - existing row: tier/canonical_plan/is_routable are PRESERVED
+//     (owner classifications never silently overwritten by Stripe edits)
+async function handlePriceUpserted(event, connectedAccount, res) {
+  const price = event.data && event.data.object;
+  if (!price) return res.status(200).json({ skipped: "no price object" });
+  if (!connectedAccount) return res.status(200).json({ skipped: "no connected account on event" });
+
+  // Resolve client_id from the connected account
+  const clientRows = await sb(
+    `clients?stripe_connect_account_id=eq.${encodeURIComponent(connectedAccount)}&select=id&limit=1`
+  );
+  const client = Array.isArray(clientRows) && clientRows[0];
+  if (!client) {
+    await writeAudit({
+      action_type: "stripe-price-upsert-orphan",
+      args:        { event_id: event.id, connected_account: connectedAccount, price_id: price.id },
+    });
+    return res.status(200).json({ skipped: "no client for connected account" });
+  }
+
+  // Existing row? Preserve owner-set classification.
+  const existingRows = await sb(
+    `pricing_catalog?client_id=eq.${client.id}` +
+    `&stripe_price_id=eq.${encodeURIComponent(price.id)}` +
+    `&select=tier,canonical_plan,is_routable&limit=1`
+  );
+  const existing = Array.isArray(existingRows) && existingRows[0];
+
+  let tier, canonical_plan, is_routable;
+  if (existing) {
+    tier           = existing.tier;
+    canonical_plan = existing.canonical_plan;
+    is_routable    = existing.is_routable;
+  } else {
+    // Auto-classify: amount match against this academy's canonical rows
+    const canonicalRows = await sb(
+      `pricing_catalog?client_id=eq.${client.id}` +
+      `&tier=eq.canonical&amount_cents=eq.${price.unit_amount || 0}` +
+      `&select=canonical_plan&limit=1`
+    );
+    const matchingCanonical = Array.isArray(canonicalRows) && canonicalRows[0];
+    tier           = matchingCanonical ? "legacy_match" : "legacy_unknown";
+    canonical_plan = matchingCanonical ? matchingCanonical.canonical_plan : null;
+    is_routable    = false;
+  }
+
+  // Derive interval label from price.recurring
+  let interval = null;
+  if (price.recurring && price.recurring.interval && price.recurring.interval_count != null) {
+    const c = price.recurring.interval_count, u = price.recurring.interval;
+    if (u === "week" && c === 4)  interval = "4_weeks";
+    else if (u === "week" && c === 12) interval = "3_months";
+    else if (u === "week" && c === 24) interval = "6_months";
+    else if (u === "month" && c === 1) interval = "4_weeks";
+    else if (u === "month" && c === 3) interval = "3_months";
+    else if (u === "month" && c === 6) interval = "6_months";
+    else interval = `${c}_${u}`;
+  } else if (price.type === "one_time") {
+    interval = "one_time";
+  }
+
+  const hst_mode = price.tax_behavior === "inclusive" ? "all_in" : null;
+
+  const row = {
+    client_id:         client.id,
+    stripe_price_id:   price.id,
+    stripe_product_id: price.product,
+    stripe_account_id: connectedAccount,
+    display_name:      price.nickname || null,
+    canonical_plan,
+    tier,
+    is_routable,
+    amount_cents:      price.unit_amount || 0,
+    currency:          price.currency || "cad",
+    interval,
+    hst_mode,
+    last_synced_at:    nowIso(),
+  };
+
+  await sb(`pricing_catalog?on_conflict=client_id,stripe_price_id`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([row]),
+  });
+
+  await writeAudit({
+    client_id:   client.id,
+    action_type: existing ? "stripe-price-updated" : "stripe-price-created",
+    args:        { event_id: event.id, price_id: price.id, product_id: price.product, amount_cents: price.unit_amount, auto_tier: tier, canonical_plan },
+  });
+
+  return res.status(200).json({ ok: true, action: event.type, price_id: price.id, tier });
 }

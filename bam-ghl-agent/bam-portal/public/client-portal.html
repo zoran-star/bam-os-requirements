@@ -11864,6 +11864,24 @@ function _memberEngagementChip(eng) {
   return `<span style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid ${color};color:${color}">${escapeHTML(label)}</span>`;
 }
 
+// Pricing-tier badge — surfaces members whose Stripe price is NOT a
+// current canonical / sellable price. Hidden for canonical/lil_sale (the
+// "normal" case) so the roster stays clean.
+function _memberPricingPill(pricing) {
+  if (!pricing || !pricing.tier) return '';
+  const map = {
+    legacy_match:   ['legacy',     '#7a5a2f'],   // amber-brown
+    legacy_unknown: ['legacy',     '#7a5a2f'],
+    deprecated:     ['deprecated', '#9a3b2f'],   // red
+    uncatalogued:   ['unknown $',  '#555'],      // grey — sub price not in catalog yet
+  };
+  const entry = map[pricing.tier];
+  if (!entry) return '';
+  const [label, color] = entry;
+  const title = pricing.display_name ? `${pricing.display_name} · ${pricing.tier}` : pricing.tier;
+  return `<span title="${escapeHTML(title)}" style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:transparent;border:1px solid ${color};color:${color}">${escapeHTML(label)}</span>`;
+}
+
 // Circular avatar — uses uploaded image if present, otherwise initials on
 // a deterministic colored circle.
 function _memberAvatar(m, size) {
@@ -12040,7 +12058,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
+      <div class="member-card-pills">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = toolbar + cards;

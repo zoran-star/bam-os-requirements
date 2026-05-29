@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-25 (Session 3) — Sync audit done (50/50 in sync, Vedant cleaned from roster, Aarav re-flagged as payment_failed). Roster cards mobile-responsive (3-col grid <=640px), plan column removed, popup Group now editable as number input. Subscription ID shown instead of customer ID. Production-readiness checklist documented below.
+description: 2026-05-28 (Session 4) — Pricing catalog shipped. New pricing_catalog table per-academy with 31 BAM GTA prices seeded from plans-and-pricing.md. Stripe webhook auto-syncs price.created/updated. members.stripe_price_id column + backfill. GET /api/members enriches with .pricing. Legacy / deprecated pill on roster cards. Reverse sync surfaced 2 pre-2026-05-24 orphan Stripe subs (Kun Liu/Ryan, John Fu).
 type: project
 ---
 
@@ -626,6 +626,176 @@ Path from "code shipped" to "Filip/Adrian/Sergio can rely on the portal":
   Krishay/Skylar) — Stripe will show 'trialing' but DB shows
   'live'. This is correct — trial_end is being used for /refer
   credit or package rollover, not a pause.
+
+## Session 4 — 2026-05-28 — Pricing catalog (per-academy Stripe price source of truth)
+
+The bigger build: a portal-side `pricing_catalog` table that is the source
+of truth for every Stripe price an academy has, classified by tier
+(canonical / lil_sale / legacy_match / legacy_unknown / deprecated). Replaces
+the hardcoded PRICE_TO_PLAN map in api/members.js (Phase 11 — still pending)
+and generalizes everything to every academy, not just BAM GTA.
+
+### Why this shipped
+
+`/Users/zoransavic/BAM GTA/memories/plans-and-pricing.md` was BAM GTA's
+manual source of truth — 170 lines of canonical vs legacy classification.
+The portal couldn't read it. Now it lives in `pricing_catalog`, queryable
+by any code path (/change, webhooks, UI, future cron audits) and auto-keeps
+fresh via Stripe webhooks.
+
+### Schema — `pricing_catalog`
+
+`bam-portal/supabase/pricing-catalog-schema.sql` (idempotent migration).
+
+```
+pricing_catalog
+  id                uuid PK
+  client_id         uuid → clients (CASCADE)
+  stripe_price_id   text       UNIQUE per client_id
+  stripe_product_id text
+  stripe_account_id text       denorm for fast filter
+  display_name      text       "Steady", "Dominate lil sale", etc
+  canonical_plan    text       1/wk · 2/wk · 3/wk · unlmtd · NULL
+  tier              text       canonical · lil_sale · legacy_match · legacy_unknown · deprecated
+  is_routable       bool       /change can route NEW subs onto this?
+  amount_cents      int
+  currency          text       default 'cad'
+  interval          text       4_weeks · 3_months · 6_months · one_time
+  hst_mode          text       all_in · pre_tax · NULL
+  notes             text
+  metadata          jsonb
+  last_synced_at    timestamptz
+```
+
+Indexes: `(client_id, canonical_plan) WHERE is_routable`, `(client_id, tier)`,
+`(stripe_price_id)`. RLS SELECT via `my_client_ids()`; writes service-role only.
+
+### BAM GTA seed — 31 rows
+
+`bam-portal/supabase/pricing-catalog-gta-seed.sql` (re-runnable).
+
+```
+canonical       12  Steady · Accelerated · Elevate · Dominate (monthly)
+                    + 8 prepay (3mo/6mo × 4 tiers)
+lil_sale         2  Dominate $395.50 (preferred + variant)
+legacy_match     2  amount = canonical → auto-classified
+legacy_unknown  13  GHL Dynamic / "Starter" / "Girls" / Carson $356 etc
+deprecated       2  Parker 50%-off, Qundi old plan
+```
+
+Source: extracted manually from plans-and-pricing.md PLUS a Stripe sweep
+of every distinct price ID in use on active/trialing/paused/payment_failed
+member subs (so the catalog covers 100% of current members).
+
+### Auto-classification rule (used by webhook + on backfill)
+
+```
+new price arrives → match its amount against this client's tier='canonical'
+  ├─ MATCH    → tier='legacy_match', canonical_plan inherited, is_routable=false
+  └─ NO MATCH → tier='legacy_unknown', canonical_plan=NULL,    is_routable=false
+```
+
+Owner-set classifications (`canonical` / `lil_sale` / `deprecated`) are
+NEVER overwritten by Stripe events — once classified, the row's
+tier/canonical_plan/is_routable are preserved on upsert.
+
+### Stripe webhook — `price.created` + `price.updated` shipped
+
+`bam-portal/api/stripe/webhook.js` got 2 new event cases routed to
+`handlePriceUpserted()`:
+
+1. Resolve `client_id` from `event.account` (the connected Stripe acct) via
+   `clients.stripe_connect_account_id` lookup.
+2. If price exists in catalog → preserve owner classification.
+3. If new → auto-classify per rule above.
+4. PostgREST upsert via `Prefer: resolution=merge-duplicates`.
+5. Write audit row (`stripe-price-created` / `stripe-price-updated`).
+6. Returns 200 even on error so Stripe doesn't retry-storm.
+
+**Stripe dashboard action needed (manual):** add `price.created` +
+`price.updated` events to the Connect webhook endpoint
+`https://portal.byanymeansbusiness.com/api/stripe/webhook`. Until then,
+the catalog is static.
+
+### `members.stripe_price_id` column + backfill
+
+```sql
+ALTER TABLE members ADD COLUMN stripe_price_id text;
+CREATE INDEX members_stripe_price_idx ON members (client_id, stripe_price_id);
+```
+
+Backfilled 46 of 50 GTA members from the Stripe sub→price mapping pulled
+during the reverse sync audit. The 4 NULLs are by-design (Stefan Djeric,
+Samuel, Santiago, Tony Li — none have an active sub).
+
+Going forward, the Stripe webhook keeps it in sync. Out-of-band Stripe
+edits (price change in dashboard, sub item swap) will flow through
+`customer.subscription.updated` and should update `members.stripe_price_id`
+too — Phase 11 will add that handler tweak.
+
+### GET /api/members — pricing enrichment
+
+The list endpoint now batch-queries `pricing_catalog` once per request and
+attaches a `.pricing` object to each member row:
+
+```js
+m.pricing = { tier, canonical_plan, display_name, amount_cents, interval }
+   // OR { tier: "uncatalogued" } if sub uses a price not in catalog at all
+```
+
+Single batched query (uses the indexes) — no N+1 per member. Tier=null
+when member has no `stripe_subscription_id` (Stefan + Samuel + Santiago
++ Tony Li).
+
+### Roster pill — legacy / deprecated visible at a glance
+
+`_memberPricingPill(pricing)` in `client-portal.html` renders one of:
+
+```
+🟫 "legacy"      legacy_match OR legacy_unknown    amber-brown outline
+🟥 "deprecated"  deprecated                         red outline
+⬜ "unknown $"   uncatalogued (sub price not in     grey outline
+                catalog at all — gap to investigate)
+(no pill)        canonical OR lil_sale (the normal sellable case)
+```
+
+Hover title shows the catalog `display_name` + tier. Slotted into
+`.member-card-pills` after engagement chip.
+
+### Reverse sync audit — 2 pre-automation orphans surfaced
+
+Ran members ↔ Stripe diff in BOTH directions for the first time. Found:
+
+```
+Kun Liu (Ryan)   cus_UVq5pKmKTHcKHg   sub_1TWoQ0Rx…   active   signed 2026-05-14
+John Fu          cus_UWo0Cw0OB5BiZ3   sub_1TXkQORx…   active   signed 2026-05-16
+```
+
+Both signed up BEFORE the 2026-05-24 intake automation went live. NOT a
+bug — they predate the wire-up. Anyone signing up after 2026-05-24 via
+the GHL form auto-populates correctly. These 2 still need manual backfill
+into `members` (athlete name + plan from GHL form). Kun Liu/Ryan also has
+a pending Cancel ticket from Sergio.
+
+**New playbook addition:** the 2026-05-25 sync audit only checked
+DB → Stripe. The reverse check (Stripe → DB) is the one that catches
+orphans. Run BOTH directions periodically.
+
+### What's still pending after this session
+
+```
+#10  UI    Extend Offers system (Training offer Pricing section) to surface
+            catalog rows grouped by tier. Owner can re-tag canonical → lil_sale
+            or promote legacy_unknown → canonical. Inside the offer per Zoran's
+            UI surface call (2026-05-28).
+#11  API   Refactor api/members.js actionChange to read pricing_catalog
+            instead of the hardcoded PLAN_TO_PRICE map. Same swap in the
+            webhook handleSubCreated/Updated PRICE_TO_PLAN. Generalize to
+            non-GTA academies.
+#4 #6     Backfill Kun Liu/Ryan + John Fu in members + cancel Ryan.
+#1 #2 #3  Pause Tristan/Nathan/Christ (3 real Sergio tickets).
+#13      Re-verify all 8 PATCH actions still work after the catalog refactor.
+```
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works

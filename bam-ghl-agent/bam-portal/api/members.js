@@ -283,10 +283,40 @@ export default async function handler(req, res) {
         query = `members?client_id=eq.${targetClientId}&select=*&order=athlete_name.asc`;
       }
       const members = await sb(query);
+      const memberList = Array.isArray(members) ? members : [];
+
+      // Enrich each member with their pricing_catalog row (for tier badge
+      // + display_name on the roster card). Single batched query.
+      if (memberList.length) {
+        const clientIds = [...new Set(memberList.map(m => m.client_id).filter(Boolean))];
+        const priceIds  = [...new Set(memberList.map(m => m.stripe_price_id).filter(Boolean))];
+        if (clientIds.length && priceIds.length) {
+          const catalogRows = await sb(
+            `pricing_catalog?client_id=in.(${clientIds.join(",")})` +
+            `&stripe_price_id=in.(${priceIds.map(encodeURIComponent).join(",")})` +
+            `&select=client_id,stripe_price_id,tier,canonical_plan,display_name,amount_cents,interval`
+          ).catch(() => []);
+          const catalog = new Map(
+            (Array.isArray(catalogRows) ? catalogRows : []).map(r => [`${r.client_id}|${r.stripe_price_id}`, r])
+          );
+          for (const m of memberList) {
+            if (m.stripe_price_id) {
+              const row = catalog.get(`${m.client_id}|${m.stripe_price_id}`);
+              m.pricing = row ? {
+                tier: row.tier,
+                canonical_plan: row.canonical_plan,
+                display_name: row.display_name,
+                amount_cents: row.amount_cents,
+                interval: row.interval,
+              } : { tier: "uncatalogued" };
+            }
+          }
+        }
+      }
 
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;
       return res.status(200).json({
-        members: Array.isArray(members) ? members : [],
+        members: memberList,
         stripe: {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",
