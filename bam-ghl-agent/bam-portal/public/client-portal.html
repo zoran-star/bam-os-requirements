@@ -12773,6 +12773,18 @@ function _renderMemberModalBody(m, stripe, history) {
     ? btn('Unpause', `mUnpause('${m.id}')`)
     : btn('Pause',   `mPause('${m.id}')`);
 
+  // "View in Stripe" — opens the customer page on the academy's connected
+  // Stripe account in a new tab. Requires both a connected account id
+  // (from the academy's clients row) and a stripe_customer_id on the
+  // member. Hidden if either is missing.
+  const acctId = (_STRIPE_CONNECT_STATE && _STRIPE_CONNECT_STATE.account_id) || null;
+  const stripeBtn = (acctId && m.stripe_customer_id)
+    ? `<a href="https://dashboard.stripe.com/${encodeURIComponent(acctId)}/customers/${encodeURIComponent(m.stripe_customer_id)}" target="_blank" rel="noopener noreferrer" style="grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit;text-decoration:none">
+        View in Stripe
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+      </a>`
+    : '';
+
   body.innerHTML = `
     <!-- Header — avatar (click to upload) + name + status + close -->
     <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:6px">
@@ -12830,6 +12842,7 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('Referred',    `mReferred('${m.id}')`)}
+      ${stripeBtn}
     </div>
   `;
 }
