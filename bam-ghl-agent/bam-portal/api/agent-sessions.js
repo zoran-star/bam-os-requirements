@@ -62,8 +62,12 @@ async function getStaffFromBearer(req) {
 }
 
 function checkIngestSecret(req) {
-  const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  return INGEST_SECRET && bearer === INGEST_SECRET;
+  // Vercel CLI can store env values with a trailing literal \n when piped
+  // in via `cat | vercel env add` — strip whitespace on both sides before
+  // comparing so the secret matches whether or not it has a stray newline.
+  const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  const stored = (INGEST_SECRET || "").trim();
+  return stored && bearer === stored;
 }
 
 // ── AI summaries ────────────────────────────────────────────────────
