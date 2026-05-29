@@ -109,7 +109,7 @@ async function resolveUser(req) {
   let clients = [];
   if (clientIds.length) {
     clients = await sb(
-      `clients?id=in.(${clientIds.join(",")})&select=id,business_name,stripe_connect_account_id,stripe_connect_status`
+      `clients?id=in.(${clientIds.join(",")})&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id`
     ) || [];
   }
 
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
     let row = clients.find(c => c.id === targetClientId);
     if (row) return row;
     if (!isStaff) return null;
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status`);
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id`);
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
   }
 
@@ -391,6 +391,9 @@ export default async function handler(req, res) {
       });
     }
     const stripeAccount = client.stripe_connect_account_id;
+    // Stash the academy's client row on ctx so actions can read academy-level
+    // config (ghl_location_id, business_name, etc) without re-querying.
+    ctx.client = client;
 
     // Dispatch
     try {
@@ -784,6 +787,10 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
   const base = isLocal ? origin : "https://portal.byanymeansbusiness.com";
   const returnUrl = body.return_url || `${base}/client-portal.html#members`;
 
+  // Academy-level GHL config — needed by the modal so the UI can show
+  // whether SMS / Email send-via-GHL is wired up for this academy.
+  const academyGhl = ctx.client?.ghl_location_id || null;
+
   const session = await stripeFetch(`/billing_portal/sessions`, {
     method: "POST",
     stripeAccount,
@@ -804,10 +811,37 @@ async function actionPaymentLink(res, member, stripeAccount, ctx, body, req) {
     db_changes: null,
   });
 
+  // Default text for the SMS/Email modal — staff can edit before sending.
+  const academyName = ctx.client?.business_name || "your academy";
+  const suggestedSms = `Hi, here's the link to update your card with ${academyName}: ${session.url}`;
+  const suggestedEmailSubject = `Update your card on file — ${academyName}`;
+  const suggestedEmailHtml =
+    `<p>Hi${member.parent_name ? ` ${member.parent_name.split(/\s+/)[0]}` : ""},</p>` +
+    `<p>Here's the link to update your card with ${academyName}:</p>` +
+    `<p><a href="${session.url}">${session.url}</a></p>` +
+    `<p>Thanks!<br>${academyName}</p>`;
+
   return res.status(200).json({
     ok: true,
     url: session.url,
     expires_at: session.expires_at || null,
+    parent: {
+      name:  member.parent_name  || null,
+      phone: member.parent_phone || null,
+      email: member.parent_email || null,
+    },
+    ghl: {
+      // location_id present → academy is wired to GHL → SMS/Email send is possible.
+      // Front-end still has to call /api/ghl/send-message which does the contact
+      // lookup + actual send.
+      ready:       Boolean(academyGhl),
+      location_id: academyGhl,
+    },
+    suggested: {
+      sms_text:     suggestedSms,
+      email_subject: suggestedEmailSubject,
+      email_html:   suggestedEmailHtml,
+    },
   });
 }
 

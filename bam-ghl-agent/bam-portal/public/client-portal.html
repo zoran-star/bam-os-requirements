@@ -12953,10 +12953,138 @@ async function mChange(memberId, currentPlan) {
 async function mPaymentLink(memberId) {
   try {
     const r = await _memberAction(memberId, 'payment-link', {});
-    if (navigator.clipboard) navigator.clipboard.writeText(r.url).catch(() => {});
-    alert(`Payment link created (copied to clipboard):\n\n${r.url}`);
-    window.open(r.url, '_blank');
+    _openPaymentLinkModal(memberId, r);
   } catch (e) { alert('Payment link failed: ' + e.message); }
+}
+
+// Right-side modal: shows the Stripe portal URL + pre-formatted SMS/email
+// the staff can edit, then sends via GHL (or copies the link if GHL isn't
+// available for this parent).
+function _openPaymentLinkModal(memberId, data) {
+  const host = document.getElementById('member-modal-host') || document.body;
+  const url       = data.url || '';
+  const parent    = data.parent || {};
+  const ghl       = data.ghl    || { ready: false };
+  const suggested = data.suggested || {};
+  const sms       = suggested.sms_text       || `Update your card: ${url}`;
+  const emailSub  = suggested.email_subject  || 'Update your card on file';
+  const emailHtml = suggested.email_html     || `<p>Update your card: <a href="${url}">${url}</a></p>`;
+
+  // Precondition logic — drives which buttons are enabled
+  const hasPhone = !!parent.phone;
+  const hasEmail = !!parent.email;
+  const ghlReady = !!ghl.ready;
+
+  // Status pills (small reasons line so staff sees WHY a button might be off)
+  const reasons = [];
+  if (!ghlReady) reasons.push('Academy not connected to GHL.');
+  if (!hasPhone) reasons.push('No parent phone on file.');
+  if (!hasEmail) reasons.push('No parent email on file.');
+
+  const wrap = document.createElement('div');
+  wrap.id = 'pl-modal';
+  wrap.innerHTML = `
+    <div id="pl-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:80" onclick="_closePaymentLinkModal()"></div>
+    <div id="pl-modal-card" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:540px;max-width:calc(100vw - 28px);max-height:calc(100vh - 28px);overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:81;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:700">Payment link</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">${escapeHTML(parent.name || 'Parent')} · ${escapeHTML(parent.phone || '—')} · ${escapeHTML(parent.email || '—')}</div>
+        </div>
+        <button onclick="_closePaymentLinkModal()" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
+      </div>
+
+      <!-- URL row + copy button -->
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Stripe portal URL</div>
+      <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:18px">
+        <input id="pl-url" readonly value="${escapeHTML(url)}" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;outline:none">
+        <button onclick="_plCopyUrl()" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px">Copy</button>
+        <a href="${escapeHTML(url)}" target="_blank" rel="noopener noreferrer" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:4px;cursor:pointer;font-weight:600;font-size:13px;text-decoration:none;display:inline-flex;align-items:center">Open ↗</a>
+      </div>
+
+      <!-- SMS panel -->
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">SMS preview</div>
+      <textarea id="pl-sms" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
+      <button id="pl-sms-btn" onclick="_plSend('SMS','${memberId}')" ${(!ghlReady || !hasPhone) ? 'disabled' : ''} style="width:100%;background:${(ghlReady && hasPhone) ? 'var(--gold,#E8C547)' : 'var(--border)'};color:${(ghlReady && hasPhone) ? '#0B0B0D' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(ghlReady && hasPhone) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:18px">📱  Send SMS via GHL</button>
+
+      <!-- Email panel -->
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);letter-spacing:0.6px;text-transform:uppercase;margin-bottom:6px">Email preview</div>
+      <input id="pl-email-subject" value="${escapeHTML(emailSub)}" placeholder="Subject" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;margin-bottom:6px">
+      <textarea id="pl-email-body" rows="3" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:8px 10px;color:var(--text);font:inherit;font-size:13px;outline:none;resize:vertical;margin-bottom:8px">${escapeHTML(sms)}</textarea>
+      <button id="pl-email-btn" onclick="_plSend('Email','${memberId}')" ${(!ghlReady || !hasEmail) ? 'disabled' : ''} style="width:100%;background:transparent;color:${(ghlReady && hasEmail) ? 'var(--text)' : 'var(--text-mute)'};border:1px solid var(--border);padding:10px 12px;font-weight:700;border-radius:4px;cursor:${(ghlReady && hasEmail) ? 'pointer' : 'not-allowed'};font-size:13px;font-family:inherit;margin-bottom:14px">✉  Send Email via GHL</button>
+
+      ${reasons.length ? `<div style="background:rgba(154,59,47,0.08);border:1px solid rgba(154,59,47,0.4);border-radius:6px;padding:10px 12px;margin-bottom:14px"><div style="font-size:12px;color:#c47a6a;font-weight:600;margin-bottom:4px">Why some buttons are off</div><div style="font-size:12px;color:var(--text-mute);line-height:1.5">${reasons.map(r => '• ' + escapeHTML(r)).join('<br>')}</div></div>` : ''}
+
+      <div id="pl-status" style="font-size:13px;min-height:18px"></div>
+    </div>
+  `;
+  host.appendChild(wrap);
+}
+
+function _closePaymentLinkModal() {
+  const m = document.getElementById('pl-modal');
+  if (m) m.remove();
+}
+
+function _plCopyUrl() {
+  const input = document.getElementById('pl-url');
+  if (!input) return;
+  input.select();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(input.value).then(() => _plStatus('Copied to clipboard.', 'ok'));
+  } else {
+    document.execCommand('copy');
+    _plStatus('Copied.', 'ok');
+  }
+}
+
+function _plStatus(msg, kind) {
+  const el = document.getElementById('pl-status');
+  if (!el) return;
+  const color = kind === 'err' ? '#c47a6a' : (kind === 'ok' ? '#7eb98c' : 'var(--text-mute)');
+  el.style.color = color;
+  el.textContent = msg;
+}
+
+async function _plSend(type, memberId) {
+  if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) {
+    _plStatus('No client_id in scope — refresh and try again.', 'err'); return;
+  }
+  const parentRow = _MEMBERS_ALL.find(m => m.id === memberId) || {};
+  const isSms = type === 'SMS';
+  const message = (isSms
+    ? document.getElementById('pl-sms')
+    : document.getElementById('pl-email-body')).value.trim();
+  const subject = isSms ? null : document.getElementById('pl-email-subject').value.trim();
+  if (!message) { _plStatus('Message body is empty.', 'err'); return; }
+  if (!isSms && !subject) { _plStatus('Email needs a subject.', 'err'); return; }
+
+  _plStatus(`Sending ${type} via GHL…`);
+  const btn = document.getElementById(isSms ? 'pl-sms-btn' : 'pl-email-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id:     CLIENT_ID,
+        contact_phone: parentRow.parent_phone || null,
+        contact_email: parentRow.parent_email || null,
+        contact_name:  parentRow.parent_name  || null,
+        type,
+        message,
+        subject: subject || undefined,
+      }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status) + (json.hint ? ' — ' + json.hint : ''));
+    _plStatus(`✓ ${type} sent to ${parentRow.parent_name || 'parent'}.`, 'ok');
+  } catch (e) {
+    _plStatus('Failed: ' + e.message, 'err');
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function mReferred(memberId) {
