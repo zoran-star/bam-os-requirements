@@ -33,16 +33,93 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const GHL_AUTHORIZE_URL = "https://marketplace.gohighlevel.com/oauth/chooselocation";
 const GHL_TOKEN_URL     = "https://services.leadconnectorhq.com/oauth/token";
 
-// Scopes the portal needs end-to-end. Conservative — covers SMS, email,
-// contact lookup, location read. Extend later when new GHL features ship.
+// Scopes the portal can use end-to-end. Comprehensive set so future BAM
+// portal features (pipelines, calendars, invoices, social, etc) don't
+// require each academy to re-OAuth. Only sub-account-level scopes — no
+// agency-level. If you don't tick a matching scope in the GHL Marketplace
+// app config, GHL ignores it on consent. Safe to request more than the
+// app has enabled.
 const SCOPES = [
+  // Core CRM
+  "locations.readonly",
+  "users.readonly",
+  "businesses.readonly",
   "contacts.readonly",
   "contacts.write",
+
+  // Conversations + messaging (SMS / email / etc)
   "conversations.readonly",
   "conversations.write",
   "conversations/message.readonly",
   "conversations/message.write",
-  "locations.readonly",
+
+  // Pipelines / opportunities
+  "opportunities.readonly",
+  "opportunities.write",
+
+  // Calendars + appointments
+  "calendars.readonly",
+  "calendars.write",
+  "calendars/events.readonly",
+  "calendars/events.write",
+  "calendars/groups.readonly",
+  "calendars/groups.write",
+
+  // Forms, workflows, campaigns, surveys
+  "forms.readonly",
+  "workflows.readonly",
+  "campaigns.readonly",
+  "surveys.readonly",
+
+  // Custom fields / values / tags / tasks / templates
+  "locations/customFields.readonly",
+  "locations/customFields.write",
+  "locations/customValues.readonly",
+  "locations/customValues.write",
+  "locations/tags.readonly",
+  "locations/tags.write",
+  "locations/tasks.readonly",
+  "locations/tasks.write",
+  "locations/templates.readonly",
+
+  // Products + invoices + payments (read-most, write where useful)
+  "products.readonly",
+  "products.write",
+  "products/prices.readonly",
+  "products/prices.write",
+  "products/collection.readonly",
+  "invoices.readonly",
+  "invoices.write",
+  "invoices/schedule.readonly",
+  "invoices/schedule.write",
+  "invoices/template.readonly",
+  "payments/orders.readonly",
+  "payments/orders.write",
+  "payments/transactions.readonly",
+  "payments/subscriptions.readonly",
+  "payments/integration.readonly",
+  "payments/coupons.readonly",
+  "payments/coupons.write",
+
+  // Snapshots
+  "snapshots.readonly",
+
+  // Social planner
+  "socialplanner/post.readonly",
+  "socialplanner/post.write",
+  "socialplanner/account.readonly",
+  "socialplanner/oauth.readonly",
+  "socialplanner/medialibrary.readonly",
+
+  // Courses + email builder
+  "courses.readonly",
+  "courses.write",
+  "emails/builder.readonly",
+  "emails/builder.write",
+
+  // Blogs (rarely used but cheap to include)
+  "blogs.readonly",
+  "blogs.write",
 ].join(" ");
 
 function nowIso() { return new Date().toISOString(); }
