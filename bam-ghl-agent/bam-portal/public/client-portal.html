@@ -4983,6 +4983,16 @@
         Pricing
       </div>
 
+      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('inbox', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-6l-2 3h-4l-2-3H2"/>
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+          </svg>
+        </span>
+        Inbox
+      </div>
+
       <div class="nav-item" data-feature="calendar" style="display:none" onclick="switchView('calendar', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5880,6 +5890,100 @@ Then the call to action."]</div>
       .pc-tier-deprecated    { background:#9a3b2f; color:#fff; }
       .pc-tier-uncatalogued  { background:transparent; border:1px solid #555; color:#555; }
     </style>
+    <!-- ══════════════════════════════
+         INBOX VIEW (per-academy GHL conversations + reply)
+         All conversations from the academy's connected GHL sub-account,
+         tagged member/lead, with a thread drawer + reply box.
+    ══════════════════════════════ -->
+    <style>
+      #view-inbox .ib-toolbar { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+      #view-inbox .ib-tab {
+        font-size:12px; padding:6px 14px; border-radius:999px; cursor:pointer;
+        border:1px solid var(--border); background:transparent; color:var(--text);
+        font-weight:500; font-family:inherit;
+      }
+      #view-inbox .ib-tab.on {
+        border-color:var(--accent); background:rgba(232,197,71,0.12);
+        color:var(--accent); font-weight:700;
+      }
+      #view-inbox .ib-search {
+        flex:1; min-width:220px; padding:8px 12px; background:var(--surface);
+        border:1px solid var(--border); border-radius:4px; color:var(--text);
+        font:inherit; font-size:13px; outline:none;
+      }
+      #view-inbox .ib-row {
+        display:grid; grid-template-columns: 1fr 80px 100px; gap:12px; align-items:center;
+        padding:12px 14px; border:1px solid var(--border); border-radius:8px;
+        margin-bottom:8px; cursor:pointer; transition:background 150ms, border-color 150ms;
+      }
+      #view-inbox .ib-row:hover { background:rgba(232,197,71,0.06); border-color:rgba(232,197,71,0.45); }
+      #view-inbox .ib-row-name { font-weight:700; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-inbox .ib-row-preview { font-size:12px; color:var(--text-mute); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-inbox .ib-row-type { font-size:11px; color:var(--text-mute); text-align:center; text-transform:uppercase; letter-spacing:0.04em; }
+      #view-inbox .ib-row-date { font-size:12px; color:var(--text-mute); text-align:right; }
+      #view-inbox .ib-tag {
+        display:inline-block; font-size:10px; font-weight:700; padding:2px 7px;
+        border-radius:999px; margin-left:8px; vertical-align:middle;
+      }
+      #view-inbox .ib-tag-member { background:#1f7a3d; color:#fff; }
+      #view-inbox .ib-tag-lead   { background:transparent; border:1px solid var(--border); color:var(--text-mute); }
+      #view-inbox .ib-unread {
+        display:inline-block; width:8px; height:8px; border-radius:50%;
+        background:var(--accent); margin-right:6px; vertical-align:middle;
+      }
+
+      /* Thread drawer */
+      #ib-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity 250ms; z-index:60; }
+      #ib-drawer-overlay.open { opacity:1; pointer-events:auto; }
+      #ib-drawer {
+        position:fixed; top:0; right:0; bottom:0; width:520px; max-width:100%;
+        background:var(--surface); border-left:1px solid var(--border);
+        transform:translateX(100%); transition:transform 250ms; z-index:61;
+        display:flex; flex-direction:column;
+      }
+      #ib-drawer.open { transform:translateX(0); }
+      #ib-drawer .ib-d-header { padding:18px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-shrink:0; }
+      #ib-drawer .ib-d-title { font-size:17px; font-weight:700; }
+      #ib-drawer .ib-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
+      #ib-drawer .ib-d-close { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px; padding:4px 10px; }
+      #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
+      #ib-drawer .ib-msg {
+        max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
+        word-wrap:break-word;
+      }
+      #ib-drawer .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
+      #ib-drawer .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
+      #ib-drawer .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #ib-drawer .ib-d-reply { border-top:1px solid var(--border); padding:14px 20px; flex-shrink:0; }
+      #ib-drawer .ib-d-reply textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:13px; color:var(--text); resize:vertical; min-height:60px; outline:none; }
+      #ib-drawer .ib-d-reply-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
+      #ib-drawer .ib-d-reply-type { font-size:12px; color:var(--text-mute); }
+      #ib-drawer .ib-d-reply-send { background:var(--accent); color:#0B0B0D; border:none; padding:9px 18px; border-radius:6px; font-weight:700; font-size:13px; cursor:pointer; }
+      #ib-drawer .ib-d-reply-send:disabled { background:var(--border); color:var(--text-mute); cursor:not-allowed; }
+    </style>
+    <div class="view" id="view-inbox">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ 03 · Inbox</span>
+          <div class="topbar-title">Inbox</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="ib-toolbar">
+          <button class="ib-tab on" data-tab="all"     onclick="_ibSetTab('all')">All <span id="ib-count-all"></span></button>
+          <button class="ib-tab"    data-tab="members" onclick="_ibSetTab('members')">Members <span id="ib-count-members"></span></button>
+          <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
+          <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
+          <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
+        </div>
+        <div id="inbox-list-container">
+          <div class="req-empty" style="padding:20px 0">Loading conversations…</div>
+        </div>
+      </div>
+    </div>
+    <div id="ib-drawer-overlay" onclick="closeInboxDrawer()"></div>
+    <div id="ib-drawer" role="dialog" aria-modal="true"></div>
+
     <div class="view" id="view-pricing">
       <div class="topbar">
         <div>
@@ -7046,6 +7150,7 @@ function switchView(name, el) {
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
   if (name === 'pricing') fetchAndRenderPricing();
+  if (name === 'inbox')   fetchAndRenderInbox();
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') renderCalendar();
@@ -12286,6 +12391,236 @@ function _renderMembersView() {
 
 let _PRICING_DATA = null;
 let _PRICING_FILTER = 'all';
+
+// ══════════════════════════════════════════════════════════════
+// INBOX VIEW — GHL conversations + reply (per-academy)
+// ══════════════════════════════════════════════════════════════
+
+let _INBOX_DATA   = null;
+let _INBOX_TAB    = 'all';
+let _INBOX_SEARCH = '';
+let _INBOX_THREAD = null;  // { convo: {...}, messages: [...] }
+
+async function fetchAndRenderInbox() {
+  const container = document.getElementById('inbox-list-container');
+  if (!container) return;
+  container.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading conversations…</div>';
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/inbox?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _INBOX_DATA = json;
+    _renderInboxList();
+  } catch (e) {
+    container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load inbox — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _ibSetTab(tab) {
+  _INBOX_TAB = tab;
+  document.querySelectorAll('#view-inbox .ib-tab').forEach(b => {
+    b.classList.toggle('on', b.getAttribute('data-tab') === tab);
+  });
+  _renderInboxList();
+}
+
+function _ibSetSearch(v) {
+  _INBOX_SEARCH = v.toLowerCase();
+  _renderInboxList();
+}
+
+function _ibFormatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const diffMs  = Date.now() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1)    return 'just now';
+  if (diffMin < 60)   return diffMin + 'm';
+  if (diffMin < 1440) return Math.floor(diffMin / 60) + 'h';
+  if (diffMin < 10080) return Math.floor(diffMin / 1440) + 'd';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function _renderInboxList() {
+  const container = document.getElementById('inbox-list-container');
+  if (!container || !_INBOX_DATA) return;
+
+  const counts = _INBOX_DATA.counts || {};
+  const setCount = (id, n) => { const e = document.getElementById(id); if (e) e.textContent = n != null ? `(${n})` : ''; };
+  setCount('ib-count-all',     counts.all);
+  setCount('ib-count-members', counts.members);
+  setCount('ib-count-leads',   counts.leads);
+
+  let rows = _INBOX_DATA.conversations || [];
+  if (_INBOX_TAB === 'members') rows = rows.filter(c => c.classification === 'member');
+  if (_INBOX_TAB === 'leads')   rows = rows.filter(c => c.classification === 'lead');
+  if (_INBOX_SEARCH) {
+    rows = rows.filter(c => {
+      const hay = ((c.contactName || '') + ' ' + (c.lastMessageBody || '')).toLowerCase();
+      return hay.includes(_INBOX_SEARCH);
+    });
+  }
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="req-empty" style="padding:20px 0">No conversations match.</div>';
+    return;
+  }
+
+  const html = rows.map(c => {
+    const unread = (c.unreadCount || 0) > 0;
+    const tag = c.classification === 'member'
+      ? `<span class="ib-tag ib-tag-member">${escapeHTML((c.member && c.member.athlete_name) ? c.member.athlete_name : 'Member')}</span>`
+      : `<span class="ib-tag ib-tag-lead">Lead</span>`;
+    return `
+      <div class="ib-row" onclick="openInboxThread('${escapeHTML(c.id)}','${escapeHTML(c.contactId || '')}')">
+        <div style="min-width:0">
+          <div class="ib-row-name">
+            ${unread ? '<span class="ib-unread"></span>' : ''}${escapeHTML(c.contactName)}
+            ${tag}
+          </div>
+          <div class="ib-row-preview">${escapeHTML(c.lastMessageBody || '(no message)')}</div>
+        </div>
+        <div class="ib-row-type">${escapeHTML((c.lastMessageType || '').replace(/^TYPE_/, ''))}</div>
+        <div class="ib-row-date">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = html;
+}
+
+async function openInboxThread(conversationId, contactId) {
+  const overlay = document.getElementById('ib-drawer-overlay');
+  const drawer  = document.getElementById('ib-drawer');
+  if (!overlay || !drawer) return;
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  drawer.innerHTML = `<div style="padding:24px;color:var(--text-mute)">Loading thread…</div>`;
+
+  // Pull convo metadata from list so we can show contact name immediately
+  const convo = (_INBOX_DATA && _INBOX_DATA.conversations || []).find(c => c.id === conversationId);
+
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&conversation_id=${encodeURIComponent(conversationId)}`, {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _INBOX_THREAD = { convo, messages: json.messages || [], conversationId, contactId };
+    _renderInboxDrawer();
+  } catch (e) {
+    drawer.innerHTML = `<div style="padding:24px;color:#9a3b2f">Couldn't load thread — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function closeInboxDrawer() {
+  document.getElementById('ib-drawer-overlay')?.classList.remove('open');
+  document.getElementById('ib-drawer')?.classList.remove('open');
+  _INBOX_THREAD = null;
+}
+
+function _renderInboxDrawer() {
+  const drawer = document.getElementById('ib-drawer');
+  if (!drawer || !_INBOX_THREAD) return;
+  const { convo, messages, contactId } = _INBOX_THREAD;
+  const name    = convo?.contactName || 'Conversation';
+  const phone   = convo?.phone       || '';
+  const email   = convo?.email       || '';
+  const memberLine = convo?.member
+    ? `${escapeHTML(convo.member.athlete_name || '')} · ${escapeHTML(convo.member.status || '')}`
+    : 'Lead (no member match)';
+
+  // Sort messages oldest → newest (GHL sometimes returns newest first)
+  const sorted = [...messages].sort((a, b) => {
+    const ta = a.date ? new Date(a.date).getTime() : 0;
+    const tb = b.date ? new Date(b.date).getTime() : 0;
+    return ta - tb;
+  });
+
+  const bubbles = sorted.length
+    ? sorted.map(m => {
+        const out = (m.direction || '').toLowerCase() === 'outbound';
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
+          ${escapeHTML(m.body || '(no body)')}
+          <div class="ib-msg-meta">${escapeHTML((m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+        </div>`;
+      }).join('')
+    : '<div style="color:var(--text-mute);font-size:13px">No messages in this thread yet.</div>';
+
+  drawer.innerHTML = `
+    <div class="ib-d-header">
+      <div>
+        <div class="ib-d-title">${escapeHTML(name)}</div>
+        <div class="ib-d-sub">${escapeHTML(phone || email || '—')} · ${memberLine}</div>
+      </div>
+      <button class="ib-d-close" onclick="closeInboxDrawer()" aria-label="Close">×</button>
+    </div>
+    <div class="ib-d-thread" id="ib-thread-scroll">${bubbles}</div>
+    <div class="ib-d-reply">
+      <textarea id="ib-reply-input" placeholder="Type your reply…"></textarea>
+      <div class="ib-d-reply-actions">
+        <select id="ib-reply-type" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px">
+          <option value="SMS">SMS</option>
+          <option value="Email">Email</option>
+        </select>
+        <button class="ib-d-reply-send" onclick="_ibSendReply()">Send</button>
+      </div>
+    </div>`;
+
+  // Scroll to newest message
+  const scrollEl = document.getElementById('ib-thread-scroll');
+  if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+}
+
+async function _ibSendReply() {
+  const t = _INBOX_THREAD;
+  if (!t) return;
+  const textEl = document.getElementById('ib-reply-input');
+  const typeEl = document.getElementById('ib-reply-type');
+  const btn    = document.querySelector('#ib-drawer .ib-d-reply-send');
+  const message = (textEl?.value || '').trim();
+  const type    = typeEl?.value || 'SMS';
+  if (!message) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Reply from ${t.convo?.contactName || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id:  CLIENT_ID,
+        contact_id: t.contactId || (t.convo && t.convo.contactId),
+        type,
+        message,
+        subject,
+      }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    // Optimistic append so the staff sees their reply immediately
+    t.messages.push({
+      id:        json.ghl_message_id || ('local-' + Date.now()),
+      body:      message,
+      type,
+      direction: 'outbound',
+      date:      new Date().toISOString(),
+    });
+    if (textEl) textEl.value = '';
+    _renderInboxDrawer();
+    // Refresh list in the background so the latest preview catches up
+    fetchAndRenderInbox();
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
 
 async function fetchAndRenderPricing() {
   const container = document.getElementById('pricing-list-container');

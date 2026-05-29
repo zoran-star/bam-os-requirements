@@ -252,8 +252,9 @@ export default async function handler(req, res) {
   if (!message && !html) return res.status(400).json({ error: "message (or html for Email) required" });
   if (type === "Email" && !subject) return res.status(400).json({ error: "subject required for Email" });
 
-  // Find the contact
-  const contactId = await lookupContact({
+  // Find the contact. Callers can pass contact_id directly (Inbox reply
+  // case — we already know who we're replying to) to skip the lookup.
+  const contactId = body.contact_id || await lookupContact({
     token,
     locationId,
     phone:      body.contact_phone,
