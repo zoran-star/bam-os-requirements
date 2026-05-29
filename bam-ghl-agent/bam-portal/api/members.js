@@ -252,6 +252,7 @@ export default async function handler(req, res) {
               trial_end: sub.trial_end,
               current_period_end: sub.current_period_end,
               cancel_at_period_end: sub.cancel_at_period_end,
+              created: sub.created || null,
               price_id: item?.price?.id || null,
               amount_cents: item?.price?.unit_amount || null,
               currency: (item?.price?.currency || "cad").toLowerCase(),
@@ -259,6 +260,22 @@ export default async function handler(req, res) {
               interval_count: item?.price?.recurring?.interval_count || null,
               latest_invoice_url: sub.latest_invoice?.hosted_invoice_url || null,
             };
+
+            // Lazy backfill: if we just learned the sub's created date and
+            // the column is empty, persist it. New signups via webhook get
+            // populated up front; this fills in the legacy rows the first
+            // time anyone opens their popup. Non-fatal on error.
+            if (sub.created && !member.stripe_joined_at) {
+              try {
+                const iso = new Date(sub.created * 1000).toISOString();
+                await sb(`members?id=eq.${id}`, {
+                  method: "PATCH",
+                  headers: { Prefer: "return=minimal" },
+                  body: JSON.stringify({ stripe_joined_at: iso }),
+                });
+                member.stripe_joined_at = iso;
+              } catch (_) { /* non-fatal */ }
+            }
           } catch (e) {
             stripe = { error: e.message };
           }
@@ -273,14 +290,23 @@ export default async function handler(req, res) {
       }
 
       // ─── List ────────────────────────────────────────────────────
+      // Sort options:
+      //   ?sort=name              alphabetical by athlete_name (default)
+      //   ?sort=joined_newest     newest joiners first (stripe date, fallback joined_date)
+      //   ?sort=joined_oldest     oldest joiners first
+      const sort = (req.query && req.query.sort) || "name";
+      const orderBy = sort === "joined_newest" ? "stripe_joined_at.desc.nullslast"
+                    : sort === "joined_oldest" ? "stripe_joined_at.asc.nullslast"
+                    : "athlete_name.asc";
+
       let query;
       let targetClientId = null;
       if (isStaff && !req.query.client_id) {
-        query = `members?select=*&order=athlete_name.asc`;
+        query = `members?select=*&order=${orderBy}`;
       } else {
         targetClientId = resolveTargetClient();
         if (!targetClientId) return res.status(403).json({ error: "no academy in scope" });
-        query = `members?client_id=eq.${targetClientId}&select=*&order=athlete_name.asc`;
+        query = `members?client_id=eq.${targetClientId}&select=*&order=${orderBy}`;
       }
       const members = await sb(query);
       const memberList = Array.isArray(members) ? members : [];

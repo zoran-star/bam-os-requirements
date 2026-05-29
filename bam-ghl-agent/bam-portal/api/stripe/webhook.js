@@ -207,6 +207,15 @@ async function handleSubCreated(event, connectedAccount, res) {
   };
   if (planFromPrice) patch.plan = planFromPrice;
 
+  // Stripe sub.created → stripe_joined_at (this is the actual paying-member
+  // start date, more accurate than the GHL form's joined_date which captures
+  // intake-form submit time).
+  if (sub.created) patch.stripe_joined_at = new Date(sub.created * 1000).toISOString();
+
+  // Persist current price id (members.stripe_price_id powers the legacy pill
+  // + Pricing view counts).
+  if (priceId) patch.stripe_price_id = priceId;
+
   await sb(`members?id=eq.${target.id}`, {
     method: "PATCH",
     headers: { Prefer: "return=minimal" },

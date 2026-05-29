@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       const members = await sb(
         `members?client_id=eq.${targetClientId}` +
         `&stripe_price_id=eq.${encodeURIComponent(singlePriceId)}` +
-        `&select=id,athlete_name,parent_name,status,trainer,avatar_url` +
+        `&select=id,athlete_name,parent_name,status,trainer,avatar_url,stripe_joined_at,joined_date` +
         `&order=athlete_name.asc`
       );
 
