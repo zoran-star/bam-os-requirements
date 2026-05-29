@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-28 (Session 4) — Pricing catalog shipped. New pricing_catalog table per-academy with 31 BAM GTA prices seeded from plans-and-pricing.md. Stripe webhook auto-syncs price.created/updated. members.stripe_price_id column + backfill. GET /api/members enriches with .pricing. Legacy / deprecated pill on roster cards. Reverse sync surfaced 2 pre-2026-05-24 orphan Stripe subs (Kun Liu/Ryan, John Fu).
+description: 2026-05-29 (Session 5) — GHL OAuth Connect flow + Inbox view shipped. Per-academy ghl_access_token storage with auto-refresh; Connect GHL button in Members topbar mirrors Stripe Connect pattern. New /api/ghl/connect (prepare + callback), /api/ghl/send-message (OAuth path + GHL_LOCATIONS_JSON fallback), /api/ghl/inbox (conversations list + thread + reply). Payment-link UX upgraded — modal preview instead of alert(), sends via GHL on click. New "Inbox" sidebar nav with All / Members / Leads tabs + thread drawer + inline reply. stripe_joined_at column + backfill (46/50 done via Stripe MCP) + Newest/Oldest sort + popup-only display. "View in Stripe" deep-link button on member popup. Pricing view with catalog list + drawer (commit 3129388). Onboarding wizard PARKED per Zoran 2026-05-29 — see [[project_onboarding_wizard_parked]].
 type: project
 ---
 
@@ -797,7 +797,149 @@ orphans. Run BOTH directions periodically.
 #13      Re-verify all 8 PATCH actions still work after the catalog refactor.
 ```
 
+## Session 5 — 2026-05-29 — GHL OAuth + Inbox + Payment-link modal
+
+### GHL OAuth Connect flow
+
+Per-academy OAuth into each academy's GHL sub-account. Mirrors the existing
+Stripe Connect pattern. White-label vision: BAM Business owns one master
+Marketplace app; each academy clicks "Connect GHL" once and is set forever.
+
+**Schema added to `clients`:**
+```
+ghl_access_token         text   — bearer used on every GHL call
+ghl_refresh_token        text   — refresh path; ~24h expiry on access
+ghl_token_expires_at     ts     — when to refresh (60s skew)
+ghl_connect_status       text   — not_connected | onboarding | connected | disabled
+ghl_connected_at         ts
+ghl_company_id           text   — agency id (informational)
+```
+
+**Endpoints:**
+- `api/ghl/connect.js`  POST = prepare (signed-state authorize URL pointed
+  at `marketplace.gohighlevel.com/oauth/chooselocation`); GET = callback
+  (verifies state, POSTs to `services.leadconnectorhq.com/oauth/token`
+  with `user_type=Location`, writes access + refresh + expiry +
+  locationId + companyId + status='connected').
+- `api/ghl/send-message.js`  Token resolution order:
+  1. Per-academy OAuth (with auto-refresh if expiring within 60s)
+  2. GHL_LOCATIONS_JSON entry (interim — same env var existing api/ghl.js uses)
+  3. Plain GHL_API_KEY env var (last-resort fallback)
+  Also: accepts `contact_id` directly (Inbox reply path) to skip the
+  phone/email lookup.
+- `api/ghl/inbox.js`  GET = list conversations + classification
+  (member if contactId/email/phone matches a member row, else lead),
+  counts (all/members/leads/unread). Or `?conversation_id=` = full
+  thread (sorted oldest→newest).
+
+**Scopes requested (comprehensive set so adding pipelines/calendars/invoices
+later doesn't require re-OAuth):**
+contacts.{readonly,write} · conversations.{readonly,write} ·
+conversations/message.{readonly,write} · locations.readonly ·
+opportunities.{readonly,write} · calendars.{readonly,write} ·
+calendars/events.{readonly,write} · calendars/groups.{readonly,write} ·
+forms.readonly · workflows.readonly · campaigns.readonly ·
+locations/customFields.{readonly,write} ·
+locations/customValues.{readonly,write} ·
+locations/tags.{readonly,write} · locations/tasks.{readonly,write} ·
+locations/templates.readonly · products.{readonly,write} ·
+products/prices.{readonly,write} · products/collection.readonly ·
+invoices.{readonly,write} · invoices/schedule.{readonly,write} ·
+invoices/template.readonly · payments/orders.{readonly,write} ·
+payments/transactions.readonly · payments/subscriptions.readonly ·
+payments/integration.readonly · payments/coupons.{readonly,write} ·
+snapshots.readonly · socialplanner/post.{readonly,write} ·
+socialplanner/account.readonly · socialplanner/oauth.readonly ·
+socialplanner/medialibrary.readonly · courses.{readonly,write} ·
+emails/builder.{readonly,write} · blogs.{readonly,write} ·
+businesses.readonly · users.readonly · surveys.readonly
+
+**Env vars (Zoran adds in Vercel after creating the Marketplace App):**
+- `GHL_OAUTH_CLIENT_ID` — Marketplace App client id
+- `GHL_OAUTH_CLIENT_SECRET` — same, secret
+- `GHL_OAUTH_STATE_SECRET` — random hex for HMAC (falls back to
+  service-role key if unset)
+
+**Redirect URI to register in the GHL Marketplace app:**
+`https://portal.byanymeansbusiness.com/api/ghl/connect`
+
+**App Type:** Sub-Account (NOT Agency — we want location-scoped tokens).
+**Distribution:** Private is fine for the BAM-only phase; switch to Public
+when onboarding non-BAM academies.
+
+### Payment-link modal
+
+`mPaymentLink` no longer alerts — opens a right-half modal:
+- Stripe portal URL + Copy + Open buttons
+- Editable SMS preview (default per Zoran:
+  `Hi, here's the link to update your card with <Academy>: <URL>`)
+- Editable email subject + body
+- Send SMS / Send Email buttons (POST to `/api/ghl/send-message`)
+- Reasons panel listing why a button is greyed (no phone / no email /
+  GHL not connected)
+- Copy-link fallback always available
+
+`actionPaymentLink` now returns `{ url, parent: {name,phone,email},
+ghl: {ready, location_id}, suggested: {sms_text, email_subject, email_html} }`.
+
+### Inbox view (new sidebar nav)
+
+`Messages` (BAM team chat) is kept — `Inbox` is a separate sibling. Three
+tabs (All / Members / Leads), search, refresh, classification logic in the
+API, right-side drawer with sorted bubbles (gold-right outbound, outlined
+left inbound) + inline reply box with SMS/Email type picker.
+
+Reply path: drawer → `/api/ghl/send-message` with `contact_id` (skip
+lookup) → optimistic append + background list refresh.
+
+### Member popup extras
+
+- `View in Stripe ↗` button — opens
+  `https://dashboard.stripe.com/{acct_id}/customers/{cus_id}` in a new tab.
+  Hidden when either ID is missing (Stefan Djeric).
+- `Joined` row in BILLING section — pulls from
+  `stripe.created` (live) or `members.stripe_joined_at` (persisted)
+  or `members.joined_date` (fallback).
+- Sort dropdown on Members toolbar: Name (A–Z) · Newest joiners ·
+  Oldest joiners. Sort happens server-side via
+  `?sort=joined_newest|joined_oldest`.
+- Backfill: ran `mcp__stripe__fetch_stripe_resources` 46x via this
+  Claude session, then a single bulk UPDATE FROM (VALUES …). 46/50
+  members populated; 4 NULLs are by-design (Stefan, Samuel, Santiago,
+  Tony Li — no sub).
+- `/api/admin/backfill-stripe-joined-at.js` also added for re-running
+  this per-academy (chunked 8-wide).
+
+### Pricing view (sidebar nav 'Pricing')
+
+Standalone view that shows every catalog row grouped by tier with member
+count. Click row → drawer with full detail + members list. Includes an
+"Uncatalogued" surface for any sub price not yet in the catalog (steady
+state should be empty since the webhook now syncs `price.created` /
+`price.updated`).
+
+### Test SMS button
+
+Small dashed "📱 Test GHL SMS to me" button at the top of the Members tab,
+hardcoded to `+14165733718` (Zoran). One click verifies the entire
+OAuth → send-message → GHL → Twilio chain works. Result alerted, no
+DevTools needed.
+
+### What still needs to happen on Zoran's side
+
+1. Create the BAM Business Portal Marketplace App in GHL
+2. Tick all scopes listed above
+3. Set the 3 env vars in Vercel
+4. Click "Connect GHL" on the Members tab for BAM GTA
+5. Click "Test GHL SMS to me" — phone buzzes
+6. Click any Inbox conversation → reply box works
+
+Once those work for BAM GTA, the same code handles every future academy
+with zero changes — just OAuth in.
+
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
 - [[project_marketing_content_flow]] — the api/ + view pattern to model
 - [[project_app_store_launch]] — the other active client-portal thread
+- [[project_onboarding_wizard_parked]] — the 3-step wizard plan, parked
+  until GHL is verified end-to-end for BAM GTA
