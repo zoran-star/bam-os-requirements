@@ -109,7 +109,7 @@ async function resolveUser(req) {
   let clients = [];
   if (clientIds.length) {
     clients = await sb(
-      `clients?id=in.(${clientIds.join(",")})&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id`
+      `clients?id=in.(${clientIds.join(",")})&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id,ghl_connect_status`
     ) || [];
   }
 
@@ -220,7 +220,7 @@ export default async function handler(req, res) {
     let row = clients.find(c => c.id === targetClientId);
     if (row) return row;
     if (!isStaff) return null;
-    const rows = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id`);
+    const rows = await sb(`clients?id=eq.${encodeURIComponent(targetClientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status,ghl_location_id,ghl_connect_status`);
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
   }
 
@@ -347,6 +347,11 @@ export default async function handler(req, res) {
           client_id: targetClientId,
           status: targetClient?.stripe_connect_status || "not_connected",
           account_id: targetClient?.stripe_connect_account_id || null,
+        },
+        ghl: {
+          client_id:   targetClientId,
+          status:      targetClient?.ghl_connect_status || (targetClient?.ghl_location_id ? "connected" : "not_connected"),
+          location_id: targetClient?.ghl_location_id || null,
         },
       });
     } catch (e) {

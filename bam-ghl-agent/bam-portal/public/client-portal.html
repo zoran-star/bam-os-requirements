@@ -5750,7 +5750,10 @@ Then the call to action."]</div>
           <span class="topbar-kicker">§ 03 · Members</span>
           <div class="topbar-title">Member Management</div>
         </div>
-        <div id="stripe-connect-button-host" style="margin-top:6px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          <div id="stripe-connect-button-host"></div>
+          <div id="ghl-connect-button-host"></div>
+        </div>
       </div>
       <div class="content">
         <div class="readout">Your Roster</div>
@@ -11965,6 +11968,7 @@ let _MEMBERS_FILTER_OPEN = false;
 async function fetchAndRenderMembers() {
   // Handle return redirect from Stripe Connect OAuth (?stripe_connect=...)
   _stripeConnectReturnCheck();
+  _ghlConnectReturnCheck();
 
   const container = document.getElementById('members-list-container');
   if (!container) return;
@@ -11982,6 +11986,7 @@ async function fetchAndRenderMembers() {
     const json = await _safeJson(res);
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
+    renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
     _renderMembersView();
   } catch (e) {
@@ -12693,6 +12698,115 @@ function _stripeConnectMaybeSwitch() {
   const sc = new URLSearchParams(window.location.search).get('stripe_connect')
           || sessionStorage.getItem('stripe_connect_return');
   if (sc && typeof switchView === 'function') switchView('members');
+}
+
+// ─────────────────────────────────────────────────────────
+// GHL Connect — per-academy OAuth (mirror of Stripe Connect UX)
+// ─────────────────────────────────────────────────────────
+
+let _GHL_CONNECT_STATE = null;
+
+function renderGhlConnectButton(ghl) {
+  _GHL_CONNECT_STATE = ghl || { status: 'not_connected' };
+  const host = document.getElementById('ghl-connect-button-host');
+  if (!host) return;
+  const status = (ghl && ghl.status) || 'not_connected';
+
+  const colorMap = {
+    not_connected: ['Connect GHL',       'var(--gold,#E8C547)', '#0B0B0D'],
+    onboarding:    ['GHL: onboarding…',  'transparent',         '#a17a2f'],
+    connected:     ['GHL connected ✓',   'transparent',         '#1f7a3d'],
+    disabled:      ['GHL disabled',      'transparent',         '#9a3b2f'],
+  };
+  const [label, bg, color] = colorMap[status] || colorMap.not_connected;
+  const border = status === 'not_connected' ? 'var(--gold,#E8C547)' : color;
+
+  host.innerHTML = `<button onclick="openGhlConnectModal()" style="background:${bg};color:${color};border:1px solid ${border};padding:7px 14px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit">${escapeHTML(label)}</button>`;
+}
+
+function openGhlConnectModal() {
+  const ghl = _GHL_CONNECT_STATE || { status: 'not_connected' };
+  const status = ghl.status;
+  const host   = document.getElementById('stripe-modal-host') || document.body;
+
+  let inner;
+  if (status === 'connected') {
+    inner = `
+      <div style="font-size:13px;line-height:1.5;color:var(--text-mute);margin-bottom:14px">
+        GHL is connected for this academy. Payment-link SMS + email send through your GHL sub-account.
+      </div>
+      <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--text-mute);margin-bottom:14px;word-break:break-all">
+        Location: ${escapeHTML(ghl.location_id || '—')}
+      </div>
+      <button onclick="_startGhlConnect()" style="background:transparent;color:var(--text);border:1px solid var(--border);padding:10px 14px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer;font-family:inherit;width:100%">Reconnect GHL</button>`;
+  } else if (status === 'onboarding') {
+    inner = `
+      <div style="font-size:13px;line-height:1.5;color:var(--text-mute);margin-bottom:14px">
+        Onboarding to GHL was started but didn't finish. Click below to resume — you'll bounce to GHL's "Choose location" page.
+      </div>
+      <button onclick="_startGhlConnect()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:10px 14px;font-size:13px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;width:100%">Resume GHL connect ↗</button>`;
+  } else {
+    inner = `
+      <div style="font-size:13px;line-height:1.5;color:var(--text-mute);margin-bottom:14px">
+        Connecting GHL lets us send SMS + email through your GHL sub-account — used by payment-link, welcome messages, and dunning. You'll bounce to GHL, pick your location, approve scopes, and come back. ~30 seconds.
+      </div>
+      <button onclick="_startGhlConnect()" style="background:var(--gold,#E8C547);color:#0B0B0D;border:none;padding:10px 14px;font-size:13px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit;width:100%">Connect GHL ↗</button>`;
+  }
+
+  host.innerHTML = `
+    <div id="ghl-connect-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:80" onclick="closeGhlConnectModal()"></div>
+    <div id="ghl-connect-modal-card" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:440px;max-width:calc(100vw - 28px);background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:81;padding:22px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div>
+          <div style="font-size:16px;font-weight:700">GHL Connection</div>
+          <div style="font-size:12px;color:var(--text-mute);margin-top:3px">Status: ${escapeHTML(status)}</div>
+        </div>
+        <button onclick="closeGhlConnectModal()" style="background:none;border:none;color:var(--text-mute);font-size:22px;cursor:pointer;line-height:1;padding:0 6px">×</button>
+      </div>
+      ${inner}
+    </div>`;
+}
+
+function closeGhlConnectModal() {
+  const host = document.getElementById('stripe-modal-host');
+  if (host) host.innerHTML = '';
+}
+
+async function _startGhlConnect() {
+  try {
+    if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
+    const token = await _mreqAuthToken();
+    // Stash status flag so post-login bounce still surfaces the result.
+    sessionStorage.setItem('ghl_connect_pending', '1');
+    const res = await fetch('/api/ghl/connect', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID }),
+    });
+    const json = await _safeJson(res);
+    if (!res.ok || !json.redirect_url) throw new Error(json.error || ('HTTP ' + res.status));
+    window.location.href = json.redirect_url;  // bounce to GHL
+  } catch (e) {
+    alert('Couldn\'t start GHL connect: ' + e.message);
+  }
+}
+
+function _ghlConnectReturnCheck() {
+  const params = new URLSearchParams(window.location.search);
+  let sc  = params.get('ghl_connect') || sessionStorage.getItem('ghl_connect_return');
+  let msg = params.get('msg')         || sessionStorage.getItem('ghl_connect_msg');
+  if (!sc) return;
+  sessionStorage.removeItem('ghl_connect_return');
+  sessionStorage.removeItem('ghl_connect_msg');
+  sessionStorage.removeItem('ghl_connect_pending');
+  if (params.get('ghl_connect')) {
+    history.replaceState(null, '', window.location.pathname + window.location.hash);
+  }
+  if (sc === 'connected') {
+    setTimeout(() => alert('✅ GHL connected.'), 100);
+  } else {
+    alert('GHL connection failed' + (msg ? ' — ' + msg : ''));
+  }
 }
 
 // ── Member detail popup ──────────────────────────────────────

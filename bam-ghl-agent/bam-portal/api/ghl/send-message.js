@@ -66,21 +66,73 @@ async function resolveUser(req) {
   return { user, isStaff, clientIds };
 }
 
+const GHL_TOKEN_URL = "https://services.leadconnectorhq.com/oauth/token";
+
+// Refresh the academy's GHL OAuth token using its refresh_token. Persists
+// the new access_token + expiry on the clients row. Returns the new access
+// token (or throws). Mirrors the GHL OAuth refresh spec.
+async function refreshGhlToken(client) {
+  const clientId     = process.env.GHL_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GHL_OAUTH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error("GHL_OAUTH_CLIENT_ID/SECRET not configured");
+  if (!client.ghl_refresh_token)  throw new Error("academy has no GHL refresh_token");
+
+  const tokenRes = await fetch(GHL_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id:     clientId,
+      client_secret: clientSecret,
+      grant_type:    "refresh_token",
+      refresh_token: client.ghl_refresh_token,
+      user_type:     "Location",
+    }),
+  });
+  const tok = await tokenRes.json();
+  if (!tokenRes.ok || !tok?.access_token) {
+    throw new Error(tok?.error_description || tok?.error || "GHL token refresh failed");
+  }
+  const expiresAt = new Date(Date.now() + (Number(tok.expires_in) || 86400) * 1000).toISOString();
+
+  await sb(`clients?id=eq.${client.id}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      ghl_access_token:     tok.access_token,
+      ghl_refresh_token:    tok.refresh_token || client.ghl_refresh_token,
+      ghl_token_expires_at: expiresAt,
+    }),
+  });
+
+  return { token: tok.access_token, locationId: tok.locationId || client.ghl_location_id };
+}
+
 // Pick the GHL token for this academy. Order of preference:
 //
-//   1. Per-academy entry in GHL_LOCATIONS_JSON, matched by locationId or
-//      by business_name (this matches the existing api/ghl.js setup so
-//      no new env vars are needed).
-//   2. Plain GHL_API_KEY env var as a last-resort fallback.
+//   1. Per-academy OAuth token (clients.ghl_access_token) — Pattern A,
+//      the white-label vision. Auto-refreshes if near expiry.
+//   2. Per-academy entry in GHL_LOCATIONS_JSON — legacy / interim,
+//      matches the existing api/ghl.js setup.
+//   3. Plain GHL_API_KEY env var — last-resort fallback.
 //
 // Returns { token, locationId } or null if nothing usable is found.
-function pickGhlToken(client) {
-  // Try GHL_LOCATIONS_JSON first — same env var the existing api/ghl.js uses.
+async function pickGhlToken(client) {
+  // 1. Per-academy OAuth
+  if (client.ghl_access_token) {
+    const expiresAt = client.ghl_token_expires_at ? new Date(client.ghl_token_expires_at).getTime() : 0;
+    const skewMs    = 60 * 1000; // refresh if expiring within 60s
+    if (expiresAt - Date.now() <= skewMs && client.ghl_refresh_token) {
+      try { return await refreshGhlToken(client); }
+      catch (_) { /* fall through to existing token; GHL may still accept */ }
+    }
+    return { token: client.ghl_access_token, locationId: client.ghl_location_id };
+  }
+
+  // 2. GHL_LOCATIONS_JSON
   if (process.env.GHL_LOCATIONS_JSON) {
     let locs;
     try { locs = JSON.parse(process.env.GHL_LOCATIONS_JSON); } catch (_) { locs = []; }
     if (Array.isArray(locs)) {
-      // Match by locationId first (most reliable), then by business_name.
       const entry =
         locs.find(l => l.locationId && l.locationId === client.ghl_location_id) ||
         locs.find(l => l.name && client.business_name && l.name.toLowerCase() === client.business_name.toLowerCase());
@@ -91,7 +143,8 @@ function pickGhlToken(client) {
       }
     }
   }
-  // Fallback to a plain env var.
+
+  // 3. Fallback
   const token = process.env.GHL_API_KEY || process.env.GHL_AGENCY_TOKEN || null;
   if (token) return { token, locationId: client.ghl_location_id };
   return null;
@@ -163,21 +216,30 @@ export default async function handler(req, res) {
   }
 
   // Load academy GHL config
-  const clientRows = await sb(`clients?id=eq.${clientId}&select=id,business_name,ghl_location_id&limit=1`);
+  const clientRows = await sb(
+    `clients?id=eq.${clientId}` +
+    `&select=id,business_name,ghl_location_id,ghl_access_token,ghl_refresh_token,ghl_token_expires_at,ghl_connect_status` +
+    `&limit=1`
+  );
   const client = Array.isArray(clientRows) && clientRows[0];
   if (!client) return res.status(404).json({ error: "academy not found" });
-  if (!client.ghl_location_id) {
+  if (!client.ghl_location_id && !client.ghl_access_token) {
     return res.status(400).json({
       error: "Academy not connected to GHL.",
-      hint:  "Set clients.ghl_location_id (Settings → GHL connection) before sending.",
+      hint:  "Click 'Connect GHL' on the Members tab to start the OAuth flow.",
     });
   }
 
-  const creds = pickGhlToken(client);
+  let creds;
+  try {
+    creds = await pickGhlToken(client);
+  } catch (e) {
+    return res.status(500).json({ error: `GHL token refresh failed: ${e.message}` });
+  }
   if (!creds) {
     return res.status(500).json({
       error: "GHL not configured for this academy.",
-      hint:  "Either add this academy to GHL_LOCATIONS_JSON (matched by locationId or name) or set a fallback GHL_API_KEY env var.",
+      hint:  "Click 'Connect GHL' to authorize, or add this academy to GHL_LOCATIONS_JSON as an interim.",
     });
   }
   const { token, locationId } = creds;
