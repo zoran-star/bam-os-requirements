@@ -435,22 +435,36 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     return res.status(400).json({ error: "member has no Stripe subscription to pause" });
   }
 
-  let trialEndUnix;
-  let resumeDate = null;
+  let intendedTrialEnd;
+  let intendedResumeDate = null;
   if (body.until) {
-    trialEndUnix = isoToUnix(body.until);
-    resumeDate = String(body.until).slice(0, 10);
+    intendedTrialEnd = isoToUnix(body.until);
+    intendedResumeDate = String(body.until).slice(0, 10);
   } else if (body.weeks) {
     const weeks = Number(body.weeks);
     if (!Number.isFinite(weeks) || weeks < 1) {
       return res.status(400).json({ error: "weeks must be a positive number" });
     }
-    trialEndUnix = nowUnix() + weeks * 7 * 86400;
-    resumeDate = unixToDateStr(trialEndUnix);
+    intendedTrialEnd = nowUnix() + weeks * 7 * 86400;
+    intendedResumeDate = unixToDateStr(intendedTrialEnd);
   } else {
     // indefinite (default)
-    trialEndUnix = nowUnix() + PAUSE_INDEFINITE_DAYS * 86400;
+    intendedTrialEnd = nowUnix() + PAUSE_INDEFINITE_DAYS * 86400;
   }
+
+  // Guard against short pauses that would otherwise pull the next charge IN.
+  // If the parent's current paid period ends LATER than the requested pause
+  // end, extend the pause so trial_end is no earlier than current_period_end.
+  // This guarantees pausing never moves the next charge earlier than it would
+  // have naturally been.
+  const currentSub = await stripeFetch(
+    `/subscriptions/${member.stripe_subscription_id}`,
+    { stripeAccount }
+  );
+  const currentPeriodEnd = currentSub.current_period_end || 0;
+  const trialEndUnix = Math.max(intendedTrialEnd, currentPeriodEnd);
+  const adjustedToPeriodEnd = trialEndUnix !== intendedTrialEnd;
+  const resumeDate = intendedResumeDate ? unixToDateStr(trialEndUnix) : null;
 
   // Stripe: set trial_end + clear pause_collection if it was set
   const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
@@ -498,14 +512,14 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end },
+    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end, adjusted_to_period_end: adjustedToPeriodEnd },
     db_changes: dbChanges,
   });
 
   return res.status(200).json({
     ok: true,
     member: { id: member.id, status: "paused" },
-    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate },
+    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate, adjusted_to_period_end: adjustedToPeriodEnd },
   });
 }
 

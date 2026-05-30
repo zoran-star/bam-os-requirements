@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Member Buttons — Plain-English Guide</title>
+<style>
+  :root {
+    --ink:        #0E0E10;
+    --ink-2:      #15151A;
+    --surface:    #1A1A1F;
+    --hairline:   #2A2A30;
+    --hairline-2: #34343C;
+    --text:       #F2F2F5;
+    --mute:       #8A8A93;
+    --gold:       #E8C547;
+    --green:      #5DBA7E;
+    --amber:      #E4A24A;
+    --red:        #E25F5F;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--ink); color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  .display, h1, h2, h3 { font-family: 'Space Grotesk', 'Inter', sans-serif;
+    font-weight: 600; letter-spacing: -0.01em; line-height: 1.15; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    font-size: 0.9em; letter-spacing: 0; }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  /* HEADER */
+  header.top {
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 32px; margin-bottom: 48px;
+  }
+  header.top .eyebrow {
+    color: var(--gold); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  header.top h1 { font-size: 44px; margin: 0 0 12px; }
+  header.top p { color: var(--mute); font-size: 16px; max-width: 640px; margin: 0; }
+
+  /* TOC */
+  nav.toc {
+    background: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 48px;
+  }
+  nav.toc h2 {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--mute); margin: 0 0 14px; font-weight: 500;
+  }
+  nav.toc ol { list-style: none; padding: 0; margin: 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+  nav.toc a {
+    color: var(--text); text-decoration: none;
+    padding: 10px 14px; border-radius: 4px; display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--hairline);
+    transition: border-color 0.15s, background 0.15s;
+  }
+  nav.toc a:hover { border-color: var(--gold); background: var(--surface); }
+  nav.toc a .num { font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--gold); min-width: 18px; }
+  nav.toc a .name { font-weight: 500; }
+
+  /* BUTTON CARDS */
+  .button-card {
+    background: var(--ink-2);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 32px;
+    margin-bottom: 28px;
+    scroll-margin-top: 24px;
+  }
+  .button-card .header-row {
+    display: flex; align-items: baseline; gap: 14px;
+    padding-bottom: 18px; margin-bottom: 22px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .button-card .emoji {
+    font-size: 28px; line-height: 1;
+  }
+  .button-card h2 {
+    font-size: 26px; margin: 0; flex: 1;
+  }
+  .button-card .one-liner {
+    color: var(--mute); font-size: 14px; margin: 0;
+  }
+  .button-card .num-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--gold); letter-spacing: 0.18em;
+  }
+
+  /* WHEN TO USE */
+  .when {
+    background: var(--surface);
+    border-left: 2px solid var(--gold);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    border-radius: 0 4px 4px 0;
+  }
+  .when .label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .when .text { color: var(--text); font-size: 15px; }
+
+  /* FLOW DIAGRAM */
+  .flow {
+    display: flex; align-items: stretch; gap: 0;
+    margin-bottom: 24px;
+    background: var(--surface);
+    border-radius: 4px;
+    border: 1px solid var(--hairline);
+    overflow: hidden;
+  }
+  .flow .step {
+    flex: 1; padding: 18px;
+    display: flex; flex-direction: column; gap: 8px;
+    position: relative;
+  }
+  .flow .step + .step { border-left: 1px solid var(--hairline); }
+  .flow .step .stage {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--mute); letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .flow .step .what { font-size: 13px; line-height: 1.5; color: var(--text); }
+  .flow .arrow {
+    color: var(--gold); align-self: center; font-size: 14px; padding: 0 4px;
+  }
+
+  /* TWO-COLUMN: parent vs portal */
+  .split {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    margin-bottom: 18px;
+  }
+  .side {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 18px;
+  }
+  .side .head {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--mute); letter-spacing: 0.16em; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .side .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--mute);
+  }
+  .side.parent .dot { background: var(--green); }
+  .side.portal .dot { background: var(--gold); }
+  .side ul { margin: 0; padding-left: 18px; }
+  .side li { margin-bottom: 6px; font-size: 14px; }
+  .side li:last-child { margin-bottom: 0; }
+
+  /* WATCH OUT */
+  .watch {
+    background: rgba(228, 162, 74, 0.07);
+    border: 1px solid rgba(228, 162, 74, 0.25);
+    border-left: 2px solid var(--amber);
+    padding: 14px 18px;
+    border-radius: 0 4px 4px 0;
+    margin-top: 14px;
+  }
+  .watch .label {
+    color: var(--amber); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .watch .text { font-size: 14px; }
+
+  /* AUTO MAGIC */
+  .auto {
+    background: rgba(93, 186, 126, 0.05);
+    border: 1px solid rgba(93, 186, 126, 0.2);
+    border-left: 2px solid var(--green);
+    padding: 14px 18px;
+    border-radius: 0 4px 4px 0;
+    margin-top: 14px;
+  }
+  .auto .label {
+    color: var(--green); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .auto .text { font-size: 14px; }
+
+  /* PILL */
+  .pill {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 9px; border-radius: 999px;
+    color: #000; vertical-align: middle;
+  }
+  .pill.live { background: var(--green); color: #000; }
+  .pill.paused { background: var(--amber); color: #000; }
+  .pill.cancelling { background: #C97A3A; color: #000; }
+  .pill.failed { background: var(--red); color: #fff; }
+
+  /* SECTION DIVIDER */
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--mute); margin: 48px 0 18px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  /* FOOTER */
+  footer {
+    margin-top: 64px; padding-top: 32px;
+    border-top: 1px solid var(--hairline);
+    color: var(--mute); font-size: 13px; text-align: center;
+  }
+
+  /* TIMELINE */
+  .timeline {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 24px 24px 18px;
+    margin-bottom: 18px;
+  }
+  .timeline-track {
+    position: relative;
+    height: 4px;
+    background: var(--hairline-2);
+    margin: 40px 16px 60px;
+    border-radius: 2px;
+  }
+  .timeline-track::before {
+    content: ""; position: absolute; left: 0; top: 0; height: 100%;
+    width: 33%; background: var(--green); border-radius: 2px;
+  }
+  .timeline-track::after {
+    content: ""; position: absolute; left: 33%; top: 0; height: 100%;
+    width: 34%; background: var(--amber); border-radius: 2px;
+  }
+  .tl-marker {
+    position: absolute; top: -8px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--ink-2); border: 3px solid var(--gold);
+    transform: translateX(-50%);
+  }
+  .tl-marker .tl-label {
+    position: absolute; top: -38px; left: 50%; transform: translateX(-50%);
+    text-align: center; white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  .tl-marker .tl-sublabel {
+    position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+    text-align: center; white-space: nowrap;
+    font-size: 12px; color: var(--text);
+  }
+  .tl-marker .tl-dollar {
+    position: absolute; top: 50px; left: 50%; transform: translateX(-50%);
+    text-align: center; white-space: nowrap;
+    font-size: 11px; color: var(--mute);
+  }
+  .tl-marker.pos-0  { left: 0%; }
+  .tl-marker.pos-33 { left: 33%; border-color: var(--amber); }
+  .tl-marker.pos-100 { left: 100%; border-color: var(--green); }
+
+  /* MATH BOXES */
+  .math-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-bottom: 18px;
+  }
+  .math-box {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .math-box .mode {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--gold); letter-spacing: 0.18em; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .math-box .formula {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    color: var(--text); margin-bottom: 4px;
+  }
+  .math-box .example {
+    font-size: 12px; color: var(--mute);
+  }
+
+  /* EDGE CASES LIST */
+  .edges {
+    display: grid; gap: 10px;
+    margin-top: 14px;
+  }
+  .edge {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-left: 2px solid var(--mute);
+    padding: 14px 18px;
+    border-radius: 0 4px 4px 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  .edge .edge-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--mute); letter-spacing: 0.1em; padding-top: 2px;
+    min-width: 28px;
+  }
+  .edge .edge-body { font-size: 14px; }
+  .edge .edge-body strong { color: var(--gold); font-weight: 600; }
+  .edge.warning { border-left-color: var(--amber); }
+  .edge.danger  { border-left-color: var(--red); }
+
+  /* SUB SECTION TITLE INSIDE CARD */
+  .sub-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--mute); margin: 24px 0 14px;
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 720px) {
+    .wrap { padding: 32px 16px 64px; }
+    header.top h1 { font-size: 32px; }
+    .button-card { padding: 20px; }
+    .button-card h2 { font-size: 22px; }
+    .split { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow .step + .step { border-left: none; border-top: 1px solid var(--hairline); }
+    .math-grid { grid-template-columns: 1fr; }
+    .timeline-track { margin: 30px 12px 50px; }
+    .tl-marker .tl-label { font-size: 9px; }
+    .tl-marker .tl-sublabel { font-size: 11px; }
+    .tl-marker .tl-dollar { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Member Management</div>
+  <h1>The 7 buttons, in plain English.</h1>
+  <p>What each one does. What happens to the parent. What happens to your roster. Read top-to-bottom or jump to the one you need.</p>
+</header>
+
+<nav class="toc">
+  <h2>Quick jump</h2>
+  <ol>
+    <li><a href="#pause"><span class="num">01</span><span class="name">⏸ Pause</span></a></li>
+    <li><a href="#unpause"><span class="num">02</span><span class="name">▶ Unpause</span></a></li>
+    <li><a href="#cancel"><span class="num">03</span><span class="name">✕ Cancel</span></a></li>
+    <li><a href="#refund"><span class="num">04</span><span class="name">↺ Refund</span></a></li>
+    <li><a href="#change"><span class="num">05</span><span class="name">⇄ Change Plan</span></a></li>
+    <li><a href="#payment-link"><span class="num">06</span><span class="name">🔗 Payment Link</span></a></li>
+    <li><a href="#referred"><span class="num">07</span><span class="name">🎁 Referred</span></a></li>
+  </ol>
+</nav>
+
+<div class="section-title">The buttons</div>
+
+<!-- ─────────────── 01 · PAUSE ─────────────── -->
+<section class="button-card" id="pause">
+  <div class="header-row">
+    <div class="emoji">⏸</div>
+    <div style="flex:1">
+      <h2>Pause</h2>
+      <p class="one-liner">Freeze billing for a set time. They come back when you say.</p>
+    </div>
+    <div class="num-tag">01</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">A family says "we're going on vacation for 3 weeks" or "we need a break for the holidays."</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Pick how long: <strong>weeks</strong>, a <strong>date</strong>, or <strong>indefinite</strong></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Stops charging until the resume date</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what">Status flips to <span class="pill paused">PAUSED</span></div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li>Stops getting charged immediately</li>
+        <li>Card stays on file</li>
+        <li>Next charge happens on the resume date</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>Member moves to the <strong>Paused</strong> tab</li>
+        <li>A "pause" row gets logged with start + end dates</li>
+        <li>Resume date is visible on their card</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auto">
+    <div class="label">🟢 Auto-magic</div>
+    <div class="text">When the resume date hits and Stripe successfully charges them, the portal automatically flips status back to <span class="pill live">LIVE</span>. You don't have to do anything.</div>
+  </div>
+
+  <!-- ─── NEXT PAYMENT MATH ─── -->
+  <div class="sub-title">When is their next payment?</div>
+
+  <div class="timeline">
+    <div class="timeline-track">
+      <div class="tl-marker pos-0">
+        <div class="tl-label">Last charge</div>
+        <div class="tl-sublabel">e.g. Jan 5</div>
+        <div class="tl-dollar">— $59 paid</div>
+      </div>
+      <div class="tl-marker pos-33">
+        <div class="tl-label">You pause</div>
+        <div class="tl-sublabel">e.g. Jan 15</div>
+        <div class="tl-dollar">no charge</div>
+      </div>
+      <div class="tl-marker pos-100">
+        <div class="tl-label">Resume date</div>
+        <div class="tl-sublabel">e.g. Feb 12</div>
+        <div class="tl-dollar">— $59 charged</div>
+      </div>
+    </div>
+    <div style="font-size: 13px; color: var(--mute); text-align: center; margin-top: 8px;">
+      Stripe charges them <strong style="color: var(--text)">the full regular amount</strong>
+      on the resume date — and a brand-new billing cycle starts from that day.
+    </div>
+  </div>
+
+  <div class="sub-title">How the resume date is calculated</div>
+
+  <div class="math-grid">
+    <div class="math-box">
+      <div class="mode">Weeks mode</div>
+      <div class="formula">today + (N × 7 days)</div>
+      <div class="example">Pause 3 weeks today (Jan 15) → resume Feb 5</div>
+    </div>
+    <div class="math-box">
+      <div class="mode">Until-date mode</div>
+      <div class="formula">that exact date</div>
+      <div class="example">Pause until Mar 1 → resume Mar 1</div>
+    </div>
+    <div class="math-box">
+      <div class="mode">Indefinite</div>
+      <div class="formula">today + 720 days</div>
+      <div class="example">Stripe's hard limit. ~2 years.</div>
+    </div>
+  </div>
+
+  <!-- ─── EDGE CASES ─── -->
+  <div class="sub-title">Edge cases — the stuff to know</div>
+
+  <div class="edges">
+
+    <div class="edge">
+      <div class="edge-num">01</div>
+      <div class="edge-body">
+        <strong>Pause never moves the next charge earlier than it would naturally be.</strong>
+        If the requested pause is shorter than the days remaining in their current paid period, the system automatically extends the pause to the end of the current period — so the next charge never comes in early. The pause length you enter is treated as a minimum.
+        <br><br>
+
+        <div style="background: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: 4px; padding: 14px 16px; margin-top: 10px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px;">
+            Example
+          </div>
+          <div style="font-size: 13px; line-height: 1.7;">
+            Parent paid $59 on <strong>Jan 5</strong> (cycle Jan 5 → Feb 5).<br>
+            You pause them on <strong>Jan 15</strong> for 1 week.<br>
+            Pause end would be Jan 22 — but their cycle was paid through Feb 5.<br>
+            The system auto-extends the pause to <strong>Feb 5</strong> (no early charge).<br>
+            On Feb 5, Stripe charges them <strong>$59</strong> for the next month.<br>
+            <span style="color: var(--green);">Net: pause respects what they already paid for.</span>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline-2); font-size: 13px;">
+          For longer pauses (longer than days remaining in cycle), the next charge moves forward by however much the pause exceeds the cycle end. Pause 4 weeks on Jan 15 → next charge Feb 12 (7 days later than original Feb 5).
+        </div>
+      </div>
+    </div>
+
+    <div class="edge warning">
+      <div class="edge-num">02</div>
+      <div class="edge-body">
+        <strong>Indefinite isn't truly indefinite.</strong>
+        It's capped at 720 days because Stripe won't allow longer. If they're still paused after ~2 years, Stripe will auto-charge them on day 720. If you want them paused forever, use <strong>Cancel</strong> instead.
+      </div>
+    </div>
+
+    <div class="edge warning">
+      <div class="edge-num">03</div>
+      <div class="edge-body">
+        <strong>Their card has to still work on resume day.</strong>
+        If their card expires during the pause and you don't get it updated, the resume-day charge will fail → status flips to <span class="pill failed">PAYMENT FAILED</span>. Solution: send them the <strong>Payment Link</strong> a few days before the resume date if you're worried.
+      </div>
+    </div>
+
+    <div class="edge">
+      <div class="edge-num">04</div>
+      <div class="edge-body">
+        <strong>You can shift the pause without unpausing.</strong>
+        Pause too short? Click <strong>Unpause</strong> and pick a "new resume date" — Stripe just shifts the resume date out. The pause row in your roster updates to the new end date. No extra charges either way.
+      </div>
+    </div>
+
+    <div class="edge">
+      <div class="edge-num">05</div>
+      <div class="edge-body">
+        <strong>Plan changes during pause work fine.</strong>
+        You can use <strong>Change Plan</strong> on a paused member. The new price just kicks in when they resume — no immediate charge, no proration.
+      </div>
+    </div>
+
+    <div class="edge">
+      <div class="edge-num">06</div>
+      <div class="edge-body">
+        <strong>Pause amount = whatever their plan currently is.</strong>
+        The resume-day charge is whatever the member's <em>current</em> plan costs. If you changed their plan during the pause, the new amount applies. If you didn't, it's the same amount they were paying before.
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ─────────────── 02 · UNPAUSE ─────────────── -->
+<section class="button-card" id="unpause">
+  <div class="header-row">
+    <div class="emoji">▶</div>
+    <div style="flex:1">
+      <h2>Unpause</h2>
+      <p class="one-liner">Resume billing — either now, or push the pause to a new date.</p>
+    </div>
+    <div class="num-tag">02</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">They came back early <strong>OR</strong> they want to extend the pause to a different date.</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Pick <strong>resume now</strong> or set a <strong>new resume date</strong></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Charges immediately (resume now) <em>or</em> shifts the future charge date</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what">Flips to <span class="pill live">LIVE</span> or stays <span class="pill paused">PAUSED</span> with new date</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li>Resume now → next charge is <em>today</em></li>
+        <li>New date → next charge moves to that date</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>The open pause row gets closed (or shifted)</li>
+        <li>Member returns to your <strong>Live</strong> tab</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────── 03 · CANCEL ─────────────── -->
+<section class="button-card" id="cancel">
+  <div class="header-row">
+    <div class="emoji">✕</div>
+    <div style="flex:1">
+      <h2>Cancel</h2>
+      <p class="one-liner">End the membership. Two flavors: at end of period, or right now.</p>
+    </div>
+    <div class="num-tag">03</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">The family is quitting the academy. Default = let them finish what they already paid for.</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Pick <strong>at end of period</strong> (default) or <strong>cancel now</strong></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Sub flagged to end at period close <em>or</em> killed immediately</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what"><span class="pill cancelling">CANCELLING</span> (stays on roster) <em>or</em> removed instantly</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li><strong>End of period:</strong> they finish their paid month, no more charges after</li>
+        <li><strong>Immediate:</strong> billing stops today (no refund of the partial month)</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li><strong>End of period:</strong> stays on roster with amber <span class="pill cancelling">CANCELLING</span> pill, auto-removed when their month ends</li>
+        <li><strong>Immediate:</strong> gone from the roster right away</li>
+        <li>A "cancel" row is logged either way</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auto">
+    <div class="label">🟢 Auto-magic</div>
+    <div class="text">If a member is "Cancelling," the system waits for Stripe to officially end the sub at period close, then removes them. You'll never see a "ghost" charge against a cancelled member.</div>
+  </div>
+</section>
+
+<!-- ─────────────── 04 · REFUND ─────────────── -->
+<section class="button-card" id="refund">
+  <div class="header-row">
+    <div class="emoji">↺</div>
+    <div style="flex:1">
+      <h2>Refund</h2>
+      <p class="one-liner">Give money back for a specific charge. Full or partial.</p>
+    </div>
+    <div class="num-tag">04</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">They paid for something they shouldn't have — duplicate charge, billed in error, agreed-on goodwill refund.</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Pick the charge + amount (default: full)</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Sends the money back to their original card</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what">Refund row logged. Membership <em>not</em> affected.</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li>Money lands back on their card in <strong>3–5 business days</strong></li>
+        <li>Membership keeps going as normal</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>A refund row is logged with the amount, date, and reason</li>
+        <li>Member status doesn't change</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auto">
+    <div class="label">🟢 Auto-magic</div>
+    <div class="text">Even if a refund happens directly in the Stripe Dashboard (not through this button), the portal still catches it and adds it to the refund log. Your records stay complete.</div>
+  </div>
+</section>
+
+<!-- ─────────────── 05 · CHANGE PLAN ─────────────── -->
+<section class="button-card" id="change">
+  <div class="header-row">
+    <div class="emoji">⇄</div>
+    <div style="flex:1">
+      <h2>Change Plan</h2>
+      <p class="one-liner">Move them between plans: 1/wk, 2/wk, 3/wk, or unlimited.</p>
+    </div>
+    <div class="num-tag">05</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">A family wants to come more often (upgrade) or scale back (downgrade).</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Pick the new plan + (upgrade only) yes/no on <strong>prorating</strong></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Updates the sub price. <em>Optional:</em> charge the prorated difference now.</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what">Plan label updates instantly</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li><strong>Upgrade + prorate:</strong> charged the price difference now, new amount from next cycle</li>
+        <li><strong>Upgrade no prorate:</strong> new amount starts next cycle only</li>
+        <li><strong>Downgrade:</strong> no refund — new lower amount starts next cycle</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>Plan pill updates (e.g. <span class="mono">1/wk</span> → <span class="mono">2/wk</span>)</li>
+        <li>Audit log records the old and new plan</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="watch">
+    <div class="label">⚠ Watch out for</div>
+    <div class="text">"Prorate now" only works on upgrades. Downgrades never charge or refund a partial amount — Stripe just bills the new lower price next cycle.</div>
+  </div>
+</section>
+
+<!-- ─────────────── 06 · PAYMENT LINK ─────────────── -->
+<section class="button-card" id="payment-link">
+  <div class="header-row">
+    <div class="emoji">🔗</div>
+    <div style="flex:1">
+      <h2>Payment Link</h2>
+      <p class="one-liner">A self-service link so the parent can update their card.</p>
+    </div>
+    <div class="num-tag">06</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">Their card got declined, expired, or they want to switch to a new card. Saves you the back-and-forth.</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Button creates a personalized link</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Auto</div>
+      <div class="what">Link is <strong>copied to your clipboard</strong> + opens in a new tab to preview</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">You</div>
+      <div class="what">Paste it into text/email to the parent</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li>Lands on Stripe's hosted page (looks branded, safe)</li>
+        <li>Can update card, view invoices, change billing email</li>
+        <li>Can self-cancel (if you've enabled that in Stripe)</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>Card update gets logged ("card updated · Visa ····1234")</li>
+        <li>If they were <span class="pill failed">PAYMENT FAILED</span>, next successful charge auto-flips them back to <span class="pill live">LIVE</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="auto">
+    <div class="label">🟢 Auto-magic</div>
+    <div class="text">You don't have to manually clear the "Payment Failed" flag. Once the parent fixes their card and Stripe retries successfully, the portal handles the rest.</div>
+  </div>
+
+  <div class="watch">
+    <div class="label">⚠ Watch out for</div>
+    <div class="text">This button only works if the member has at least one previous successful charge in Stripe (i.e. they've been billed before). Brand-new members who haven't paid yet need a different intake link.</div>
+  </div>
+</section>
+
+<!-- ─────────────── 07 · REFERRED ─────────────── -->
+<section class="button-card" id="referred">
+  <div class="header-row">
+    <div class="emoji">🎁</div>
+    <div style="flex:1">
+      <h2>Referred</h2>
+      <p class="one-liner">Credit them with free weeks for sending you new families.</p>
+    </div>
+    <div class="num-tag">07</div>
+  </div>
+
+  <div class="when">
+    <div class="label">Use when</div>
+    <div class="text">A current family brought in 1+ new paying families. Each referral = <strong>+4 weeks</strong> of free time.</div>
+  </div>
+
+  <div class="flow">
+    <div class="step">
+      <div class="stage">You click</div>
+      <div class="what">Enter how many people they referred (1–10)</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Stripe</div>
+      <div class="what">Pushes their next charge date out by <strong>4 weeks × count</strong></div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="step">
+      <div class="stage">Roster</div>
+      <div class="what">Referral row logged with new charge date</div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="side parent">
+      <div class="head"><span class="dot"></span> For the parent</div>
+      <ul>
+        <li>Next charge moves out by 4 weeks per referral</li>
+        <li>2 referrals = 8 free weeks, 10 referrals = 40 free weeks</li>
+        <li>Effectively free training during that window</li>
+      </ul>
+    </div>
+    <div class="side portal">
+      <div class="head"><span class="dot"></span> In your roster</div>
+      <ul>
+        <li>A referral row is logged (count, weeks added, new date)</li>
+        <li>Member status stays <span class="pill live">LIVE</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="watch">
+    <div class="label">⚠ Watch out for</div>
+    <div class="text">Stripe has a hard 730-day max on free-time extensions. If a single referral burst would push them past 2 years, the portal caps it at 730 days and tells you.</div>
+  </div>
+</section>
+
+<footer>
+  Member Management · Plain-English Guide · BAM Business
+</footer>
+
+</div>
+</body>
+</html>
