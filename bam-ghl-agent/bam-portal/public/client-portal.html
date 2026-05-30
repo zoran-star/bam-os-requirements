@@ -344,8 +344,24 @@
     margin-bottom: 14px;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--line);
+    /* Cap height so power users (BAM staff with 18+ clients) get a scrollable
+       list instead of buttons pushed off-screen + unclickable. */
+    max-height: 280px;
+    overflow-y: auto;
   }
   .client-switcher.visible { display: flex; }
+  .client-switcher-search {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 6px;
+    width: 100%;
+  }
   .client-switcher-label {
     font-family: var(--mono);
     font-size: 9px;
@@ -7615,9 +7631,13 @@ function closeCalDrawer() {
   document.getElementById('cal-drawer-overlay').classList.remove('open');
 }
 
-// Bottom-left account switcher. Only renders when this auth user is
-// the Point of Contact for more than one client. Each row in CLIENT_ROWS
-// becomes a button; clicking switches the active client.
+// Bottom-left account switcher. Only renders when this auth user belongs
+// to more than one client. Each row in CLIENT_ROWS becomes a button;
+// clicking switches the active client. When the user has >5 clients
+// (BAM staff added to many academies) a search input appears so they
+// can filter the list instead of scrolling.
+let _CLIENT_SWITCHER_FILTER = '';
+
 function renderClientSwitcher() {
   const root = document.getElementById('clientSwitcher');
   if (!root) return;
@@ -7626,8 +7646,13 @@ function renderClientSwitcher() {
     return;
   }
   root.classList.add('visible');
-  // Preserve the label, replace the buttons below it
-  const buttons = CLIENT_ROWS.map(c => {
+
+  const filterLower = (_CLIENT_SWITCHER_FILTER || '').toLowerCase().trim();
+  const rows = filterLower
+    ? CLIENT_ROWS.filter(c => (c.business_name || '').toLowerCase().includes(filterLower))
+    : CLIENT_ROWS;
+
+  const buttons = rows.map(c => {
     const active = c.id === CLIENT_ID;
     const safeName = (c.business_name || '(unnamed)')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -7639,6 +7664,7 @@ function renderClientSwitcher() {
       ${active ? '<span class="checkmark">✓</span>' : ''}
     </button>`;
   }).join('');
+
   // Replace everything after the label
   const label = root.querySelector('.client-switcher-label');
   root.innerHTML = '';
@@ -7649,7 +7675,33 @@ function renderClientSwitcher() {
     l.textContent = 'Your accounts';
     root.appendChild(l);
   }
-  root.insertAdjacentHTML('beforeend', buttons);
+
+  // Search input when the user has lots of clients (e.g. BAM staff).
+  if (CLIENT_ROWS.length > 5) {
+    root.insertAdjacentHTML('beforeend',
+      `<input type="text" class="client-switcher-search"
+              placeholder="Search…  (${CLIENT_ROWS.length})"
+              value="${(_CLIENT_SWITCHER_FILTER || '').replace(/"/g, '&quot;')}"
+              oninput="_clientSwitcherSetFilter(this.value)">`);
+  }
+
+  root.insertAdjacentHTML('beforeend',
+    rows.length ? buttons : `<div style="font-size:12px;color:var(--text-mute);padding:8px 4px;text-align:center">No matches</div>`);
+}
+
+function _clientSwitcherSetFilter(v) {
+  _CLIENT_SWITCHER_FILTER = v;
+  const root = document.getElementById('clientSwitcher');
+  const focusedCursor = root?.querySelector('.client-switcher-search')?.selectionStart || null;
+  renderClientSwitcher();
+  // Restore focus + cursor on the rebuilt input
+  setTimeout(() => {
+    const input = document.querySelector('#clientSwitcher .client-switcher-search');
+    if (input) {
+      input.focus();
+      if (focusedCursor != null) { try { input.setSelectionRange(focusedCursor, focusedCursor); } catch (_) {} }
+    }
+  }, 0);
 }
 
 // ── Team (multi-user portal access) ──
