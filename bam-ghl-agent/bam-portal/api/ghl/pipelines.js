@@ -89,8 +89,8 @@ async function ghl(method, path, { token, body } = {}) {
 }
 
 async function refreshGhlToken(client) {
-  const cid = process.env.GHL_OAUTH_CLIENT_ID;
-  const sec = process.env.GHL_OAUTH_CLIENT_SECRET;
+  const cid = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
+  const sec = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
   if (!cid || !sec) throw new Error("GHL_OAUTH_CLIENT_ID/SECRET not configured");
   if (!client.ghl_refresh_token) throw new Error("academy has no GHL refresh_token");
   const tokenRes = await fetch(GHL_TOKEN_URL, {

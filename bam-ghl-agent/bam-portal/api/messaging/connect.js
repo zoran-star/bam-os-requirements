@@ -223,7 +223,7 @@ async function handlePrepare(req, res) {
   const owns = (ctx.clientIds || []).includes(clientId);
   if (!isStaff && !owns) return res.status(403).json({ error: "not your academy" });
 
-  const ghlClientId = process.env.GHL_OAUTH_CLIENT_ID;
+  const ghlClientId = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
   if (!ghlClientId) return res.status(500).json({ error: "GHL_OAUTH_CLIENT_ID not configured" });
 
   const state = signState({
@@ -263,8 +263,8 @@ async function handleCallback(req, res) {
   catch (e) { return redirectBack(res, "error", `state: ${e.message}`); }
   if (!payload.client_id) return redirectBack(res, "error", "state missing client_id");
 
-  const clientId     = process.env.GHL_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GHL_OAUTH_CLIENT_SECRET;
+  const clientId     = (process.env.GHL_OAUTH_CLIENT_ID || "").trim();
+  const clientSecret = (process.env.GHL_OAUTH_CLIENT_SECRET || "").trim();
   if (!clientId || !clientSecret) {
     return redirectBack(res, "error", "GHL OAuth env vars missing");
   }
