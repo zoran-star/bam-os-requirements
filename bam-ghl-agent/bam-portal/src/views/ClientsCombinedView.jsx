@@ -543,15 +543,21 @@ function OnboardingTab({ client, tokens, role, session, onChanged, setTab }) {
   }
 
   // Derived done-flags pulled straight from the client row.
-  const ghlDone     = !!client.ghl_signup_done_at;
-  const slackDone   = !!client.slack_join_done_at;
-  const generalDone = !!(client.business_name && client.owner_name && client.email);
-  const staffDone   = !!client.staff_marked_done_at;
-  const locsDone    = !!client.locations_marked_done_at;
-  const brandDone   = !!client.brand_marked_done_at;
-  const offersDone  = !!client.offers_marked_done_at;
-  const metaDone    = !!client.meta_ads_marked_done_at;
+  const ghlDone        = !!client.ghl_signup_done_at;
+  const slackDone      = !!client.slack_join_done_at;
+  const generalAutoOk  = !!(client.business_name && client.owner_name && client.email);
+  const generalOverride = !!client.general_marked_done_at;
+  const generalDone    = generalAutoOk || generalOverride;
+  const staffDone      = !!client.staff_marked_done_at;
+  const locsDone       = !!client.locations_marked_done_at;
+  const brandDone      = !!client.brand_marked_done_at;
+  const offersDone     = !!client.offers_marked_done_at;
+  const metaDone       = !!client.meta_ads_marked_done_at;
 
+  // Every section now has an inline staff toggle (Zoran 2026-05-30).
+  // Owner pill stays as "BAM check" / "Client" / "Auto" so the SM knows
+  // who normally owns each one, but staff can flip ANY of them to
+  // unblock a stuck client or mark out-of-band completion.
   const sections = [
     { id: "ghl",       label: "GoHighLevel signup",        owner: "staff",  done: ghlDone,
       meta: ghlDone ? `Checked ${fmtDate(client.ghl_signup_done_at)}` : "Waiting on BAM to verify payment + provisioning",
@@ -561,24 +567,31 @@ function OnboardingTab({ client, tokens, role, session, onChanged, setTab }) {
       toggle: { field: "slack_join_done", checked: slackDone } },
     { id: "general",   label: "General — business basics", owner: "auto",   done: generalDone,
       meta: generalDone
-        ? `Auto-derived from business_name + owner_name + email`
-        : `Missing: ${[!client.business_name && "business_name", !client.owner_name && "owner_name", !client.email && "email"].filter(Boolean).join(", ")}` },
+        ? (generalOverride
+            ? `Staff override ${fmtDate(client.general_marked_done_at)}`
+            : `Auto-derived from business_name + owner_name + email`)
+        : `Missing: ${[!client.business_name && "business_name", !client.owner_name && "owner_name", !client.email && "email"].filter(Boolean).join(", ")}`,
+      toggle: { field: "general_marked_done", checked: generalOverride } },
     { id: "staff",     label: "Staff — academy teammates", owner: "client", done: staffDone,
       meta: staffDone
-        ? `Client marked done ${fmtDate(client.staff_marked_done_at)}${counts.teammates != null ? ` · ${counts.teammates} teammate${counts.teammates === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Staff card" },
+        ? `Marked done ${fmtDate(client.staff_marked_done_at)}${counts.teammates != null ? ` · ${counts.teammates} teammate${counts.teammates === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Staff card",
+      toggle: { field: "staff_marked_done", checked: staffDone } },
     { id: "locations", label: "Locations",                 owner: "client", done: locsDone,
       meta: locsDone
-        ? `Client marked done ${fmtDate(client.locations_marked_done_at)}${counts.locations != null ? ` · ${counts.locations} location${counts.locations === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Locations card" },
+        ? `Marked done ${fmtDate(client.locations_marked_done_at)}${counts.locations != null ? ` · ${counts.locations} location${counts.locations === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Locations card",
+      toggle: { field: "locations_marked_done", checked: locsDone } },
     { id: "brand",     label: "Brand",                     owner: "client", done: brandDone,
       meta: brandDone
-        ? `Client marked done ${fmtDate(client.brand_marked_done_at)}`
-        : "Waiting on client to mark done on BB Brand card" },
+        ? `Marked done ${fmtDate(client.brand_marked_done_at)}`
+        : "Waiting on client to mark done on BB Brand card",
+      toggle: { field: "brand_marked_done", checked: brandDone } },
     { id: "offers",    label: "Offers",                    owner: "client", done: offersDone,
       meta: offersDone
-        ? `Client marked done ${fmtDate(client.offers_marked_done_at)}${counts.offers != null ? ` · ${counts.offers} offer${counts.offers === 1 ? '' : 's'}` : ''}`
-        : "Waiting on client to mark done on BB Offers list" },
+        ? `Marked done ${fmtDate(client.offers_marked_done_at)}${counts.offers != null ? ` · ${counts.offers} offer${counts.offers === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Offers list",
+      toggle: { field: "offers_marked_done", checked: offersDone } },
     { id: "meta",      label: "Meta Ads onboarding",       owner: "staff",  done: metaDone,
       meta: metaDone
         ? `Checked ${fmtDate(client.meta_ads_marked_done_at)}`

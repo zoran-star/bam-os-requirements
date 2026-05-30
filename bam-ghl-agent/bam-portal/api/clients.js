@@ -1804,6 +1804,28 @@ export default async function handler(req, res) {
           patch.slack_join_done_at = v ? new Date().toISOString() : null;
         }
 
+        // Staff override flags for sections normally driven by the
+        // client (Staff/Brand/Locations/Offers BB cards) or auto-derived
+        // (General). Lets SMs unblock a client or mark sections done
+        // out-of-band from the staff Onboarding tab. Each maps to its
+        // *_marked_done_at column — null = unmark, NOW() = done.
+        const overrideMap = {
+          general_marked_done:   "general_marked_done_at",
+          staff_marked_done:     "staff_marked_done_at",
+          locations_marked_done: "locations_marked_done_at",
+          brand_marked_done:     "brand_marked_done_at",
+          offers_marked_done:    "offers_marked_done_at",
+        };
+        for (const [bodyField, col] of Object.entries(overrideMap)) {
+          if (wasSet(bodyField)) {
+            const v = body[bodyField];
+            if (typeof v !== "boolean") {
+              return res.status(400).json({ error: bodyField + " must be a boolean" });
+            }
+            patch[col] = v ? new Date().toISOString() : null;
+          }
+        }
+
         if (wasSet("onboarding_method")) {
           const m = body.onboarding_method;
           if (m !== null && !["call", "send_link"].includes(m)) {
