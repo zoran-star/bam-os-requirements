@@ -12,6 +12,12 @@
 //   customer.subscription.updated   →  sync members.plan if price changed
 //                                       in Stripe (canonical prices only)
 //   invoice.payment_failed          →  auto-flag status='payment_failed'
+//   invoice.payment_succeeded       →  if member was 'payment_failed',
+//                                       recover to 'live' (Stripe retry hit
+//                                       after the parent updated their card
+//                                       via the Billing Portal)
+//   payment_method.attached         →  audit-log a "card updated" entry so
+//                                       staff sees it in member history
 //   price.created / price.updated   →  upsert into pricing_catalog
 //                                       (auto-classify legacy_match if amount
 //                                        equals a canonical, else legacy_unknown)
@@ -149,6 +155,9 @@ export default async function handler(req, res) {
       case "customer.subscription.deleted": return await handleSubDeleted(event, connectedAccount, res);
       case "customer.subscription.updated": return await handleSubUpdated(event, connectedAccount, res);
       case "invoice.payment_failed":        return await handleInvoiceFailed(event, connectedAccount, res);
+      case "invoice.payment_succeeded":     return await handleInvoiceSucceeded(event, connectedAccount, res);
+      case "invoice.paid":                  return await handleInvoiceSucceeded(event, connectedAccount, res);
+      case "payment_method.attached":       return await handlePaymentMethodAttached(event, connectedAccount, res);
       case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
@@ -359,6 +368,90 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
   });
 
   return res.status(200).json({ ok: true, action: "flagged-payment-failed", member_id: member.id });
+}
+
+// ─────────────────────────────────────────────────────────
+// invoice.payment_succeeded / invoice.paid
+// ─────────────────────────────────────────────────────────
+// Parent paid successfully — most commonly after they updated their card
+// via the Billing Portal and Stripe re-tried the failed invoice. If the
+// member was sitting in 'payment_failed', flip them back to 'live'.
+// Members already in 'live' get a no-op (every successful invoice fires
+// this event — we only act on a recovery).
+async function handleInvoiceSucceeded(event, connectedAccount, res) {
+  const inv = event.data && event.data.object;
+  if (!inv) return res.status(200).json({ skipped: "no invoice" });
+  const subId  = inv.subscription;
+  const custId = inv.customer;
+
+  let member = null;
+  if (subId) {
+    const r = await sb(`members?stripe_subscription_id=eq.${encodeURIComponent(subId)}&select=*&limit=1`);
+    if (Array.isArray(r) && r[0]) member = r[0];
+  }
+  if (!member && custId) {
+    const r = await sb(`members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=*&limit=1`);
+    if (Array.isArray(r) && r[0]) member = r[0];
+  }
+  if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
+  if (member.status !== "payment_failed") {
+    return res.status(200).json({ skipped: "member not in payment_failed state", current_status: member.status });
+  }
+
+  await sb(`members?id=eq.${member.id}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+  });
+
+  await writeAudit({
+    client_id:       member.client_id,
+    member_id:       member.id,
+    action_type:     "stripe-auto-payment-recovered",
+    args:            { event_id: event.id, event_type: event.type, invoice_id: inv.id, sub_id: subId, customer_id: custId, amount_paid: inv.amount_paid },
+    db_changes:      { members: { status: { from: "payment_failed", to: "live" } } },
+  });
+
+  return res.status(200).json({ ok: true, action: "recovered-to-live", member_id: member.id });
+}
+
+// ─────────────────────────────────────────────────────────
+// payment_method.attached
+// ─────────────────────────────────────────────────────────
+// Parent attached a new card (almost always via the Billing Portal).
+// Audit-only — no status change here; the recovery flips at the next
+// successful invoice (handleInvoiceSucceeded). Lets staff see "card
+// updated at 10:23am" when scrolling a member's history without
+// digging into Stripe.
+async function handlePaymentMethodAttached(event, connectedAccount, res) {
+  const pm = event.data && event.data.object;
+  if (!pm) return res.status(200).json({ skipped: "no payment_method" });
+  const custId = pm.customer;
+  if (!custId) return res.status(200).json({ skipped: "no customer on payment_method" });
+
+  const rows = await sb(
+    `members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=id,client_id&limit=1`
+  );
+  const member = Array.isArray(rows) && rows[0];
+  if (!member) return res.status(200).json({ skipped: "no member with that customer_id" });
+
+  await writeAudit({
+    client_id:   member.client_id,
+    member_id:   member.id,
+    action_type: "stripe-auto-card-updated",
+    args:        {
+      event_id:        event.id,
+      payment_method:  pm.id,
+      type:            pm.type,                  // 'card' | 'us_bank_account' | etc.
+      card_brand:      pm.card?.brand || null,   // 'visa' / 'mastercard' / ...
+      card_last4:      pm.card?.last4 || null,
+      card_exp_month:  pm.card?.exp_month || null,
+      card_exp_year:   pm.card?.exp_year || null,
+    },
+    db_changes:  null,
+  });
+
+  return res.status(200).json({ ok: true, action: "audit-logged", member_id: member.id });
 }
 
 // ─────────────────────────────────────────────────────────
