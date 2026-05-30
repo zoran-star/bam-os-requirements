@@ -5080,6 +5080,21 @@
   <!-- ── Main ── -->
   <div class="main">
 
+    <!-- Persistent GHL-not-connected banner. Hidden by default; the
+         members loader (fetchAndRenderMembers) flips it visible when
+         the academy hasn't OAuth'd into GHL yet. Lives above every view
+         so it's impossible to miss. -->
+    <div id="ghl-banner" style="display:none; background:rgba(232,197,71,0.12); border-bottom:1px solid rgba(232,197,71,0.4); padding:12px 22px; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap; font-size:13px;">
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:16px;">⚡</span>
+        <span><strong>GHL not connected.</strong> Inbox, Pipelines, and Payment-Link SMS are inactive until you connect.</span>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button onclick="openGhlConnectModal()" style="background:var(--gold,#E8C547); color:#0B0B0D; border:none; padding:8px 16px; font-size:13px; font-weight:700; border-radius:4px; cursor:pointer; font-family:inherit;">Connect GHL ↗</button>
+        <button onclick="_dismissGhlBanner()" title="Hide for this session" style="background:transparent; color:var(--text-mute); border:1px solid var(--border); padding:8px 12px; font-size:12px; border-radius:4px; cursor:pointer; font-family:inherit;">Hide</button>
+      </div>
+    </div>
+
     <!-- ══════════════════════════════
          SYSTEMS VIEW
     ══════════════════════════════ -->
@@ -13457,8 +13472,17 @@ let _GHL_CONNECT_STATE = null;
 function renderGhlConnectButton(ghl) {
   _GHL_CONNECT_STATE = ghl || { status: 'not_connected' };
   const host = document.getElementById('ghl-connect-button-host');
-  if (!host) return;
   const status = (ghl && ghl.status) || 'not_connected';
+
+  // Persistent banner across every view — unmissable until connected.
+  const banner = document.getElementById('ghl-banner');
+  if (banner) {
+    const dismissed = sessionStorage.getItem('ghl_banner_dismissed') === '1';
+    const shouldShow = status === 'not_connected' && !dismissed;
+    banner.style.display = shouldShow ? 'flex' : 'none';
+  }
+
+  if (!host) return;
 
   const colorMap = {
     not_connected: ['Connect GHL',       'var(--gold,#E8C547)', '#0B0B0D'],
@@ -13470,6 +13494,12 @@ function renderGhlConnectButton(ghl) {
   const border = status === 'not_connected' ? 'var(--gold,#E8C547)' : color;
 
   host.innerHTML = `<button onclick="openGhlConnectModal()" style="background:${bg};color:${color};border:1px solid ${border};padding:7px 14px;font-size:12px;font-weight:700;border-radius:4px;cursor:pointer;font-family:inherit">${escapeHTML(label)}</button>`;
+}
+
+function _dismissGhlBanner() {
+  sessionStorage.setItem('ghl_banner_dismissed', '1');
+  const banner = document.getElementById('ghl-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 function openGhlConnectModal() {
@@ -17788,6 +17818,26 @@ async function boot() {
   _stripeConnectMaybeSwitch();
   renderClientSwitcher();
   document.getElementById('login-overlay').style.display = 'none';
+
+  // Boot-time GHL status ping so the persistent banner can render
+  // immediately, before the user clicks Members. Falls back silently
+  // if the call errors (banner stays hidden — never a blocker).
+  if (V2_ACCESS && !_isNativeApp() && typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+    (async () => {
+      try {
+        const token = (await _sb.auth.getSession()).data?.session?.access_token;
+        if (!token) return;
+        const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!r.ok) return;
+        const json = await r.json();
+        if (typeof renderGhlConnectButton === 'function') {
+          renderGhlConnectButton(json.ghl || { status: 'not_connected' });
+        }
+      } catch (_) { /* non-fatal */ }
+    })();
+  }
 
   // Populate user-row from authed email + clients.owner_name
   const email = session.user.email || '';
