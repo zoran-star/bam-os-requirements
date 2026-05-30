@@ -403,9 +403,10 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
 function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBack, onChanged }) {
   const t = tokens;
   const role = me?.role || "";
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("onboarding");
 
   const tabs = [
+    { id: "onboarding",   label: "Onboarding" },
     { id: "overview",     label: "Overview" },
     { id: "messages",     label: "Messages" },
     { id: "setup",        label: "Setup" },
@@ -457,6 +458,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
         ))}
       </div>
 
+      {tab === "onboarding" && <OnboardingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} setTab={setTab} />}
       {tab === "overview" && <OverviewTab client={client} staffMap={staffMap} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "messages" && <MessagesTab client={client} tokens={t} session={session} me={me} />}
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
@@ -481,6 +483,247 @@ function StatusPill({ client, tokens }) {
       whiteSpace: "nowrap",
     }}>{label}</span>
   );
+}
+
+// ─── ONBOARDING tab ─────────────────────────────────────────────────────────
+// Sequential checklist of all 8 onboarding sections in chronological order
+// so SMs can see "where is this client right now?" at a glance. Each row
+// shows: status dot + section name + who flips it + meta/last-activity +
+// inline check (for staff-owned) OR jump link (for client-owned).
+//
+// Staff toggles here are MIRRORED with their original homes (GHL/Slack on
+// the Overview Setup section, Meta Ads on the Marketing tab) so the SM can
+// flip from whichever tab they're already on.
+function OnboardingTab({ client, tokens, role, session, onChanged, setTab }) {
+  const t = tokens;
+  const [counts, setCounts] = useState({ offers: null, locations: null, teammates: null });
+  const [saving, setSaving] = useState({}); // per-flag saving state
+
+  // Load row counts for offers + locations + teammates so the SM can see
+  // the actual data the client has provided without leaving the tab.
+  useEffect(() => {
+    let cancelled = false;
+    const tok = session?.access_token;
+    if (!tok || !client.id) return;
+    const headers = { Authorization: `Bearer ${tok}` };
+    (async () => {
+      try {
+        const [offersRes, locsRes, teammatesRes] = await Promise.all([
+          fetch(`/api/clients?action=count-offers&client_id=${client.id}`, { headers }),
+          fetch(`/api/clients?action=count-locations&client_id=${client.id}`, { headers }),
+          fetch(`/api/clients?action=count-teammates&client_id=${client.id}`, { headers }),
+        ]);
+        // Endpoints may not exist yet — fall back gracefully; the row
+        // count is nice-to-have, not load-blocking.
+        const offers = offersRes.ok ? (await offersRes.json()).count : null;
+        const locations = locsRes.ok ? (await locsRes.json()).count : null;
+        const teammates = teammatesRes.ok ? (await teammatesRes.json()).count : null;
+        if (!cancelled) setCounts({ offers, locations, teammates });
+      } catch (_) { /* best-effort */ }
+    })();
+    return () => { cancelled = true; };
+  }, [client.id, session]);
+
+  async function setFlag(field, next) {
+    setSaving(s => ({ ...s, [field]: true }));
+    try {
+      const tok = session?.access_token;
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ client_id: client.id, [field]: next }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert("Couldn't save: " + (j.error || res.statusText));
+      } else if (onChanged) onChanged();
+    } finally {
+      setSaving(s => ({ ...s, [field]: false }));
+    }
+  }
+
+  // Derived done-flags pulled straight from the client row.
+  const ghlDone     = !!client.ghl_signup_done_at;
+  const slackDone   = !!client.slack_join_done_at;
+  const generalDone = !!(client.business_name && client.owner_name && client.email);
+  const staffDone   = !!client.staff_marked_done_at;
+  const locsDone    = !!client.locations_marked_done_at;
+  const brandDone   = !!client.brand_marked_done_at;
+  const offersDone  = !!client.offers_marked_done_at;
+  const metaDone    = !!client.meta_ads_marked_done_at;
+
+  const sections = [
+    { id: "ghl",       label: "GoHighLevel signup",        owner: "staff",  done: ghlDone,
+      meta: ghlDone ? `Checked ${fmtDate(client.ghl_signup_done_at)}` : "Waiting on BAM to verify payment + provisioning",
+      toggle: { field: "ghl_signup_done", checked: ghlDone } },
+    { id: "slack",     label: "Joined BAM Slack",          owner: "staff",  done: slackDone,
+      meta: slackDone ? `Checked ${fmtDate(client.slack_join_done_at)}` : "Waiting on BAM to verify client joined workspace",
+      toggle: { field: "slack_join_done", checked: slackDone } },
+    { id: "general",   label: "General — business basics", owner: "auto",   done: generalDone,
+      meta: generalDone
+        ? `Auto-derived from business_name + owner_name + email`
+        : `Missing: ${[!client.business_name && "business_name", !client.owner_name && "owner_name", !client.email && "email"].filter(Boolean).join(", ")}` },
+    { id: "staff",     label: "Staff — academy teammates", owner: "client", done: staffDone,
+      meta: staffDone
+        ? `Client marked done ${fmtDate(client.staff_marked_done_at)}${counts.teammates != null ? ` · ${counts.teammates} teammate${counts.teammates === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Staff card" },
+    { id: "locations", label: "Locations",                 owner: "client", done: locsDone,
+      meta: locsDone
+        ? `Client marked done ${fmtDate(client.locations_marked_done_at)}${counts.locations != null ? ` · ${counts.locations} location${counts.locations === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Locations card" },
+    { id: "brand",     label: "Brand",                     owner: "client", done: brandDone,
+      meta: brandDone
+        ? `Client marked done ${fmtDate(client.brand_marked_done_at)}`
+        : "Waiting on client to mark done on BB Brand card" },
+    { id: "offers",    label: "Offers",                    owner: "client", done: offersDone,
+      meta: offersDone
+        ? `Client marked done ${fmtDate(client.offers_marked_done_at)}${counts.offers != null ? ` · ${counts.offers} offer${counts.offers === 1 ? '' : 's'}` : ''}`
+        : "Waiting on client to mark done on BB Offers list" },
+    { id: "meta",      label: "Meta Ads onboarding",       owner: "staff",  done: metaDone,
+      meta: metaDone
+        ? `Checked ${fmtDate(client.meta_ads_marked_done_at)}`
+        : "Waiting on BAM to verify Meta connection + ad account is producing",
+      toggle: { field: "meta_ads_marked_done", checked: metaDone } },
+  ];
+
+  const doneCount = sections.filter(s => s.done).length;
+  const total = sections.length;
+
+  // SM's next action: first staff section that isn't done OR generic.
+  const nextStaffAction = sections.find(s => s.owner === "staff" && !s.done);
+  const nextClientWaitOn = sections.find(s => s.owner === "client" && !s.done);
+
+  return (
+    <div>
+      {/* Progress banner */}
+      <div style={{
+        background: t.surfaceEl, border: `1px solid ${t.border}`,
+        borderRadius: 12, padding: "16px 18px", marginBottom: 22,
+      }}>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: t.textMute, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>Onboarding progress</div>
+          <div style={{ fontSize: 22, color: t.text, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{doneCount}<span style={{ color: t.textMute, fontSize: 14, fontWeight: 500 }}> / {total}</span></div>
+        </div>
+        <div style={{ height: 6, background: t.border, borderRadius: 999, overflow: "hidden" }}>
+          <div style={{
+            width: `${Math.round((doneCount / total) * 100)}%`,
+            height: "100%",
+            background: doneCount === total ? t.green : t.accent,
+            transition: "width 0.2s",
+          }} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
+          <div style={{ fontSize: 12, color: t.textMute }}>
+            <div style={{ color: t.textSub, fontWeight: 600, marginBottom: 2 }}>Next BAM action</div>
+            {nextStaffAction
+              ? <span style={{ color: t.text }}>{nextStaffAction.label}</span>
+              : <span>None — all staff checks done.</span>}
+          </div>
+          <div style={{ fontSize: 12, color: t.textMute }}>
+            <div style={{ color: t.textSub, fontWeight: 600, marginBottom: 2 }}>Waiting on client</div>
+            {nextClientWaitOn
+              ? <span style={{ color: t.text }}>{nextClientWaitOn.label}</span>
+              : <span>Nothing — they're caught up.</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Section rows */}
+      <SectionTitle>Sections</SectionTitle>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {sections.map((s, i) => (
+          <div key={s.id} style={{
+            display: "flex", alignItems: "flex-start", gap: 14,
+            padding: "14px 16px",
+            background: s.done ? `${t.accent}08` : t.surfaceEl,
+            border: `1px solid ${s.done ? t.accentBorder : t.border}`,
+            borderRadius: 10,
+          }}>
+            {/* Status dot */}
+            <div style={{
+              flexShrink: 0, marginTop: 2,
+              width: 22, height: 22, borderRadius: "50%",
+              background: s.done ? t.accent : "transparent",
+              border: `1.5px solid ${s.done ? t.accent : t.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: 700, color: s.done ? "#0A0A0B" : t.textMute,
+              fontFamily: "monospace",
+            }}>{s.done ? "✓" : i + 1}</div>
+
+            {/* Label + meta */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 14, color: t.text, fontWeight: 600 }}>{s.label}</span>
+                <OwnerPill owner={s.owner} tokens={t} />
+              </div>
+              <div style={{ fontSize: 12, color: t.textMute, lineHeight: 1.5 }}>{s.meta}</div>
+            </div>
+
+            {/* Inline action — either a staff checkbox or a jump link */}
+            <div style={{ flexShrink: 0 }}>
+              {s.toggle ? (
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: t.textSub }}>
+                  <input
+                    type="checkbox"
+                    checked={s.toggle.checked}
+                    disabled={!!saving[s.toggle.field]}
+                    onChange={(e) => setFlag(s.toggle.field, e.target.checked)}
+                    style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
+                  />
+                  <span>{s.toggle.checked ? "Done" : "Mark done"}</span>
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Quick deep-links from the SM's perspective: Staff →
+                    // Team tab; Locations/Brand/Offers/General → Setup
+                    // tab (where the staff has the closest equivalent).
+                    if (s.id === "staff")      setTab && setTab("team");
+                    else if (s.id === "general") setTab && setTab("overview");
+                    else                       setTab && setTab("setup");
+                  }}
+                  style={{
+                    background: "transparent", border: `1px solid ${t.border}`,
+                    color: t.textSub, padding: "6px 12px", borderRadius: 6,
+                    fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >View</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Legend */}
+      <div style={{ marginTop: 22, padding: "10px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, fontSize: 11, color: t.textMute, lineHeight: 1.6 }}>
+        <b style={{ color: t.textSub }}>Owner legend</b> · <b style={{ color: t.text }}>staff</b> = BAM checks it · <b style={{ color: t.text }}>client</b> = client clicks "I'm done" on their portal card · <b style={{ color: t.text }}>auto</b> = derived from data the client provides. Staff toggles here mirror the same toggles on Overview Setup + Marketing tabs.
+      </div>
+    </div>
+  );
+}
+
+function OwnerPill({ owner, tokens }) {
+  const t = tokens;
+  const map = {
+    staff:  { label: "BAM check",  bg: `${t.accent}22`,  color: t.accent },
+    client: { label: "Client",     bg: "rgba(122,184,245,0.18)", color: "#7AB8F5" },
+    auto:   { label: "Auto",       bg: "rgba(74,222,128,0.15)",  color: t.green },
+  };
+  const m = map[owner] || map.auto;
+  return (
+    <span style={{
+      fontSize: 10, padding: "2px 8px", borderRadius: 999,
+      background: m.bg, color: m.color, fontWeight: 600, letterSpacing: 0.3,
+      textTransform: "uppercase",
+    }}>{m.label}</span>
+  );
+}
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 // ─── OVERVIEW tab ───────────────────────────────────────────────────────────

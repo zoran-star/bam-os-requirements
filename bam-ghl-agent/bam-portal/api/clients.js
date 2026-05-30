@@ -2527,6 +2527,44 @@ export default async function handler(req, res) {
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
+  // Lightweight counts used by the staff per-client Onboarding tab so SMs
+  // see "3 offers", "2 locations", "1 teammate" inline next to each
+  // section status. Returns { count }. No deep client_id auth check
+  // because the values are non-sensitive aggregate counts — service-role
+  // can fetch them; staff Bearer is the gate at the network layer.
+  if (req.method === "GET" && req.query.action) {
+    const cnt = async (table, filters) => {
+      const url = `${SUPABASE_URL}/rest/v1/${table}?${filters}&select=id`;
+      const r = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+          Prefer: "count=exact",
+          "Range-Unit": "items",
+          Range: "0-0",
+        },
+      });
+      const cr = r.headers.get("content-range") || "";
+      const m = cr.match(/\/(\d+)$/);
+      return m ? Number(m[1]) : 0;
+    };
+    const clientId = req.query.client_id;
+    if (!clientId) return res.status(400).json({ error: "client_id required" });
+    try {
+      if (req.query.action === "count-offers") {
+        return res.status(200).json({ count: await cnt("offers", `client_id=eq.${clientId}&status=neq.archived`) });
+      }
+      if (req.query.action === "count-locations") {
+        return res.status(200).json({ count: await cnt("locations", `client_id=eq.${clientId}`) });
+      }
+      if (req.query.action === "count-teammates") {
+        return res.status(200).json({ count: await cnt("client_users", `client_id=eq.${clientId}&status=eq.active&role=neq.owner`) });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   try {
     const id = req.query.id;
     const path = id
