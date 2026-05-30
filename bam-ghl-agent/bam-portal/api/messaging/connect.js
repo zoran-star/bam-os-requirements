@@ -101,15 +101,11 @@ const SCOPES = [
   "payments/coupons.readonly",
   "payments/coupons.write",
 
-  // Snapshots
-  "snapshots.readonly",
-
-  // Social planner
+  // Social planner (subset — medialibrary not available for sub-account apps)
   "socialplanner/post.readonly",
   "socialplanner/post.write",
   "socialplanner/account.readonly",
   "socialplanner/oauth.readonly",
-  "socialplanner/medialibrary.readonly",
 
   // Courses + email builder
   "courses.readonly",
@@ -117,9 +113,12 @@ const SCOPES = [
   "emails/builder.readonly",
   "emails/builder.write",
 
-  // Blogs (rarely used but cheap to include)
-  "blogs.readonly",
-  "blogs.write",
+  // Notes on dropped scopes (2026-05-30):
+  //   snapshots.readonly                — not available for Sub-Account apps
+  //   socialplanner/medialibrary.readonly — same
+  //   blogs.readonly / blogs.write       — same
+  // If GHL later exposes these to Sub-Account apps, add back here AND tick
+  // the matching scope in the Marketplace app config.
 ].join(" ");
 
 function nowIso() { return new Date().toISOString(); }
