@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-29 (Session 5) — GHL OAuth Connect flow + Inbox view shipped. Per-academy ghl_access_token storage with auto-refresh; Connect GHL button in Members topbar mirrors Stripe Connect pattern. New /api/ghl/connect (prepare + callback), /api/ghl/send-message (OAuth path + GHL_LOCATIONS_JSON fallback), /api/ghl/inbox (conversations list + thread + reply). Payment-link UX upgraded — modal preview instead of alert(), sends via GHL on click. New "Inbox" sidebar nav with All / Members / Leads tabs + thread drawer + inline reply. stripe_joined_at column + backfill (46/50 done via Stripe MCP) + Newest/Oldest sort + popup-only display. "View in Stripe" deep-link button on member popup. Pricing view with catalog list + drawer (commit 3129388). Onboarding wizard PARKED per Zoran 2026-05-29 — see [[project_onboarding_wizard_parked]].
+description: 2026-05-30 (Session 6) — Pipelines view shipped (per-academy GHL kanban, drag-drop stage moves, Convert-to-member button, member/lead classification). Mike's stuck client switcher fixed (max-height + search filter when >5 clients). GHL OAuth flow code COMPLETE but BAM GTA not yet OAuth'd — Zoran in middle of creating GHL Marketplace App. Kun Liu/Ryan + John Fu still NOT in roster — pending GHL access so we can pull form data and backfill. Onboarding wizard parked. Original 3 pause tickets (Lucrecia/Amy/Christ) still pending.
 type: project
 ---
 
@@ -936,6 +936,119 @@ DevTools needed.
 
 Once those work for BAM GTA, the same code handles every future academy
 with zero changes — just OAuth in.
+
+## Session 6 — 2026-05-30 — Pipelines view + Mike fix + GHL setup-in-progress
+
+### Pipelines view (commit `fc59b0a`)
+
+New "Pipelines" sidebar nav in client portal (V2-gated, web-only, same
+firewall as Members/Pricing/Inbox). Per-academy GHL kanban with all
+pipelines the academy has.
+
+- **`api/ghl/pipelines.js`** (new):
+  - `GET ?client_id=<uuid>` — all pipelines + stages + opportunities,
+    each opportunity classified `member` (if contactId/email/phone
+    matches a member row) or `lead`. Returns totals.
+  - `PATCH ?client_id=<uuid>&opportunity_id=<id>` body
+    `{ pipeline_id, stage_id }` — moves the opp to a new stage via
+    GHL `PUT /opportunities/{id}`.
+  - `POST ?action=convert&client_id=<uuid>` body
+    `{ opportunity_id }` — creates a member row from the opp's contact
+    info (status='payment_method_required'). Idempotent on
+    (athlete_name, parent_email). Writes a `convert-from-pipeline`
+    audit row.
+
+- **UI (`client-portal.html`)**:
+  - New sidebar nav `Pipelines` next to `Inbox`.
+  - Pipeline tabs at top; horizontal kanban below.
+  - Cards are draggable (HTML5 native). Drop → optimistic UI +
+    PATCH to GHL → roll back on failure.
+  - Card shows: name, contact name + phone, member/lead tag, age in
+    stage (amber tint when >7 days = stale).
+  - Click card → right drawer: full contact info, value, status,
+    stage age. Drawer actions:
+    - `Open member popup` if matched to a member.
+    - `Convert to member` if it's a lead.
+    - `Open in GHL ↗` deep link to `app.gohighlevel.com`.
+
+- **Scopes**: `opportunities.readonly` + `opportunities.write`
+  already in the OAuth scope set we shipped Session 5.
+
+- **Mobile note**: drag-drop is desktop-only practical. A button-based
+  "advance one stage" fallback for mobile is parked.
+
+### Client switcher fix — Mike (commit `b84ec6e`)
+
+`mike@byanymeansbusiness.com` (BAM staff, member of 18 academies) was
+stuck on the bottom-left account switcher. Buttons rendered but had no
+max-height + no overflow scroll, so the lower 13 academies were pushed
+off-screen and unreachable.
+
+- `.client-switcher` CSS got `max-height: 280px` + `overflow-y: auto`.
+- `renderClientSwitcher()` adds a search input when `CLIENT_ROWS.length > 5`
+  — case-insensitive substring filter on business_name. Persists cursor
+  position between keystrokes via `_clientSwitcherSetFilter()`.
+
+No regression for users with 2-5 clients — input only renders past that
+threshold; max-height is harmless when the list fits.
+
+### GHL setup — IN PROGRESS
+
+Zoran is in the middle of (as of session end 2026-05-30):
+1. Creating BAM Business Portal Marketplace App at
+   `marketplace.gohighlevel.com` (or via `app.gohighlevel.com` →
+   sidebar → Marketplace if no separate login)
+2. App config: Sub-Account type (NOT Agency), Private distribution,
+   Redirect URI = `https://portal.byanymeansbusiness.com/api/ghl/connect`,
+   tick every scope box visible.
+3. Copy Client ID + Client Secret → paste into Vercel env vars
+   `GHL_OAUTH_CLIENT_ID` + `GHL_OAUTH_CLIENT_SECRET` +
+   `GHL_OAUTH_STATE_SECRET` (any 60+ char hex).
+4. Wait for Vercel redeploy (~60s).
+5. Click `Connect GHL` button on Members tab → OAuth → pick BAM GTA
+   location → approve.
+6. Click `📱 Test GHL SMS to me` button → expect phone to buzz.
+
+**When he confirms "connected" + test SMS arrived** → that's the
+trigger to:
+1. Auto-backfill Kun Liu/Ryan + John Fu from GHL contact form data
+   (search GHL by name → pull contact + form fields → INSERT member row).
+2. Cancel Kun Liu's sub via portal Cancel action (sub_1TWoQ0Rx…) —
+   Sergio's ticket #4.
+3. Unpark the onboarding wizard (see [[project_onboarding_wizard_parked]]).
+
+### Open items at session end (for next session pickup)
+
+```
+ORIGINAL MISSION (still open)
+  #1 Pause Lucrecia → Tristan Pierre        sub_1TR9KkRx…
+  #2 Pause Amy / Nathan                       sub_1SQKAmRx…
+  #3 Pause Christ's mom / Christ              sub_1THXifRx…
+  #4 Cancel Kun Liu / Ryan ticket             sub_1TWoQ0Rx… (cancel via portal once backfilled)
+  #6 Backfill John Fu in members              sub_1TXkQORx…
+
+GHL-DEPENDENT (waits on Zoran finishing Marketplace setup)
+  - Verify Connect GHL flow works for BAM GTA
+  - Verify Test SMS button delivers SMS to 4165733718
+  - Verify Inbox shows real conversations
+  - Verify Pipelines shows real boards
+  - Backfill Kun Liu + John Fu using GHL access
+  - Cancel Kun Liu's sub via portal Cancel action
+
+CATALOG-DEPENDENT
+  #10 UI extend Offers system to surface catalog
+  #11 /change route via catalog lookup (replace hardcoded PLAN_TO_PRICE)
+  #13 Re-verify all 8 PATCH actions still work with catalog
+
+PARKED
+  #21 Onboarding wizard (3-step, ~1.5 days)
+       see [[project_onboarding_wizard_parked]]
+       trigger to unpark: "GHL verified end-to-end for BAM GTA"
+```
+
+### Commits this session
+- `fc59b0a` — Pipelines view + Convert to member
+- `b84ec6e` — Mike's client switcher fix (max-height + filter)
 
 ## Related notes
 - [[project_client_auth]] — how client login + client_id scoping works
