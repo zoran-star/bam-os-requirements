@@ -17822,7 +17822,7 @@ async function boot() {
   // Boot-time GHL status ping so the persistent banner can render
   // immediately, before the user clicks Members. Falls back silently
   // if the call errors (banner stays hidden — never a blocker).
-  if (V2_ACCESS && !_isNativeApp() && typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+  if (V2_ACCESS && typeof isNativeApp === 'function' && !isNativeApp() && typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
     (async () => {
       try {
         const token = (await _sb.auth.getSession()).data?.session?.access_token;
