@@ -609,7 +609,7 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
     }
   }
 
-  // Insert cancellations row
+  // Insert cancellations row (always — captures intent + audit trail)
   await sb(`cancellations`, {
     method: "POST",
     headers: { Prefer: "return=minimal" },
@@ -627,11 +627,25 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
     }]),
   });
 
-  // Delete the members row (cancellations holds the historical record).
-  await sb(`members?id=eq.${member.id}`, {
-    method: "DELETE",
-    headers: { Prefer: "return=minimal" },
-  });
+  // For immediate cancels (or members with no Stripe sub), the subscription is
+  // already terminated → safe to delete the members row now.
+  // For period-end cancels, the parent is still billing through end of period —
+  // leave the row in 'cancelling' so they remain on the roster and don't see
+  // ghost charges. The members row will be DELETED later by handleSubDeleted
+  // when Stripe fires customer.subscription.deleted at period end.
+  const willDeleteNow = body.immediate || !member.stripe_subscription_id;
+  if (willDeleteNow) {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  } else {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "cancelling", updated_at: nowIso() }),
+    });
+  }
 
   await writeAudit({
     client_id: member.client_id,
@@ -641,12 +655,12 @@ async function actionCancel(res, member, stripeAccount, ctx, body) {
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
     stripe_response: sub ? { id: sub.id, status: sub.status, cancel_at_period_end: sub.cancel_at_period_end } : null,
-    db_changes: { cancellations: "inserted", members: "deleted" },
+    db_changes: { cancellations: "inserted", members: willDeleteNow ? "deleted" : "status → cancelling" },
   });
 
   return res.status(200).json({
     ok: true,
-    member: { id: member.id, deleted: true },
+    member: { id: member.id, deleted: willDeleteNow, status: willDeleteNow ? null : "cancelling" },
     sub: sub ? { id: sub.id, status: sub.status, cancel_at_period_end: sub.cancel_at_period_end } : null,
   });
 }

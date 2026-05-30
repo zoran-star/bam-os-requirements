@@ -18,6 +18,10 @@
 //                                       via the Billing Portal)
 //   payment_method.attached         →  audit-log a "card updated" entry so
 //                                       staff sees it in member history
+//   charge.refunded                 →  mirror Stripe-Dashboard refunds into
+//                                       the `refunds` table (idempotent on
+//                                       stripe_refund_id — so portal-initiated
+//                                       refunds don't get duplicated)
 //   price.created / price.updated   →  upsert into pricing_catalog
 //                                       (auto-classify legacy_match if amount
 //                                        equals a canonical, else legacy_unknown)
@@ -158,6 +162,7 @@ export default async function handler(req, res) {
       case "invoice.payment_succeeded":     return await handleInvoiceSucceeded(event, connectedAccount, res);
       case "invoice.paid":                  return await handleInvoiceSucceeded(event, connectedAccount, res);
       case "payment_method.attached":       return await handlePaymentMethodAttached(event, connectedAccount, res);
+      case "charge.refunded":               return await handleChargeRefunded(event, connectedAccount, res);
       case "price.created":                 return await handlePriceUpserted(event, connectedAccount, res);
       case "price.updated":                 return await handlePriceUpserted(event, connectedAccount, res);
       default:                              return res.status(200).json({ skipped: event.type });
@@ -258,22 +263,32 @@ async function handleSubDeleted(event, connectedAccount, res) {
   const member = Array.isArray(rows) && rows[0];
   if (!member) return res.status(200).json({ skipped: "no member with that sub_id" });
 
-  await sb(`cancellations`, {
-    method: "POST",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify([{
-      client_id:              member.client_id,
-      member_id:              member.id,
-      athlete_name:           member.athlete_name,
-      archetype:              member.archetype,
-      parent_name:            member.parent_name,
-      type:                   "cancel",
-      cancel_date:            new Date().toISOString().slice(0, 10),
-      reason:                 "cancelled in Stripe (outside portal)",
-      stripe_subscription_id: member.stripe_subscription_id,
-      stripe_customer_id:     member.stripe_customer_id,
-    }]),
-  });
+  // If a cancellations row was already created by the portal (e.g. period-end
+  // cancel from actionCancel — member is currently 'cancelling'), don't insert
+  // a duplicate. Otherwise insert one now (covers cancellations done directly
+  // in the Stripe Dashboard, outside the portal).
+  const existingCancel = await sb(
+    `cancellations?member_id=eq.${member.id}&type=eq.cancel&select=id&limit=1`
+  );
+  const cancellationAlreadyLogged = Array.isArray(existingCancel) && existingCancel.length > 0;
+  if (!cancellationAlreadyLogged) {
+    await sb(`cancellations`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{
+        client_id:              member.client_id,
+        member_id:              member.id,
+        athlete_name:           member.athlete_name,
+        archetype:              member.archetype,
+        parent_name:            member.parent_name,
+        type:                   "cancel",
+        cancel_date:            new Date().toISOString().slice(0, 10),
+        reason:                 "cancelled in Stripe (outside portal)",
+        stripe_subscription_id: member.stripe_subscription_id,
+        stripe_customer_id:     member.stripe_customer_id,
+      }]),
+    });
+  }
 
   await sb(`members?id=eq.${member.id}`, {
     method: "DELETE",
@@ -283,10 +298,10 @@ async function handleSubDeleted(event, connectedAccount, res) {
   await writeAudit({
     client_id:       member.client_id,
     member_id:       member.id,
-    action_type:     "stripe-auto-cancel",
-    args:            { event_id: event.id, sub_id: sub.id },
+    action_type:     cancellationAlreadyLogged ? "stripe-period-end-cancel-finalized" : "stripe-auto-cancel",
+    args:            { event_id: event.id, sub_id: sub.id, prior_status: member.status },
     stripe_response: { id: sub.id, status: sub.status },
-    db_changes:      { cancellations: "inserted", members: "deleted" },
+    db_changes:      { cancellations: cancellationAlreadyLogged ? "(already present)" : "inserted", members: "deleted" },
   });
 
   return res.status(200).json({ ok: true, action: "auto-cancelled", member_id: member.id });
@@ -373,11 +388,13 @@ async function handleInvoiceFailed(event, connectedAccount, res) {
 // ─────────────────────────────────────────────────────────
 // invoice.payment_succeeded / invoice.paid
 // ─────────────────────────────────────────────────────────
-// Parent paid successfully — most commonly after they updated their card
-// via the Billing Portal and Stripe re-tried the failed invoice. If the
-// member was sitting in 'payment_failed', flip them back to 'live'.
-// Members already in 'live' get a no-op (every successful invoice fires
-// this event — we only act on a recovery).
+// Parent paid successfully. Three recoverable cases:
+//   - 'payment_failed' → 'live'  (parent updated card via Billing Portal,
+//                                  Stripe retry succeeded)
+//   - 'paused'         → 'live'  (pause trial_end elapsed naturally and
+//                                  Stripe auto-resumed billing)
+//   - anything else    → no-op   (every successful invoice fires this
+//                                  event — only act on a real recovery)
 async function handleInvoiceSucceeded(event, connectedAccount, res) {
   const inv = event.data && event.data.object;
   if (!inv) return res.status(200).json({ skipped: "no invoice" });
@@ -394,9 +411,11 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     if (Array.isArray(r) && r[0]) member = r[0];
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
-  if (member.status !== "payment_failed") {
-    return res.status(200).json({ skipped: "member not in payment_failed state", current_status: member.status });
+  const RECOVERABLE = new Set(["payment_failed", "paused"]);
+  if (!RECOVERABLE.has(member.status)) {
+    return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
   }
+  const prevStatus = member.status;
 
   await sb(`members?id=eq.${member.id}`, {
     method: "PATCH",
@@ -404,15 +423,27 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     body: JSON.stringify({ status: "live", updated_at: nowIso() }),
   });
 
+  // If recovering from pause, close the open pause row in cancellations.
+  if (prevStatus === "paused") {
+    await sb(
+      `cancellations?member_id=eq.${member.id}&type=eq.pause&pause_end=is.null`,
+      {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ pause_end: nowIso().slice(0, 10) }),
+      }
+    ).catch(() => {});
+  }
+
   await writeAudit({
     client_id:       member.client_id,
     member_id:       member.id,
-    action_type:     "stripe-auto-payment-recovered",
+    action_type:     prevStatus === "paused" ? "stripe-auto-pause-resumed" : "stripe-auto-payment-recovered",
     args:            { event_id: event.id, event_type: event.type, invoice_id: inv.id, sub_id: subId, customer_id: custId, amount_paid: inv.amount_paid },
-    db_changes:      { members: { status: { from: "payment_failed", to: "live" } } },
+    db_changes:      { members: { status: { from: prevStatus, to: "live" } } },
   });
 
-  return res.status(200).json({ ok: true, action: "recovered-to-live", member_id: member.id });
+  return res.status(200).json({ ok: true, action: "recovered-to-live", from: prevStatus, member_id: member.id });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -452,6 +483,91 @@ async function handlePaymentMethodAttached(event, connectedAccount, res) {
   });
 
   return res.status(200).json({ ok: true, action: "audit-logged", member_id: member.id });
+}
+
+// ─────────────────────────────────────────────────────────
+// charge.refunded
+// ─────────────────────────────────────────────────────────
+// Stripe fires this when a charge is fully or partially refunded — including
+// when the refund was created in the Stripe Dashboard (outside our portal).
+// Mirror any refund rows that aren't already in `refunds` (idempotent on
+// stripe_refund_id) so the portal's refund history stays complete.
+async function handleChargeRefunded(event, connectedAccount, res) {
+  const charge = event.data && event.data.object;
+  if (!charge) return res.status(200).json({ skipped: "no charge object" });
+  const custId = charge.customer;
+  if (!custId) return res.status(200).json({ skipped: "no customer on charge" });
+
+  const memberRows = await sb(
+    `members?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=*&limit=1`
+  );
+  let member = Array.isArray(memberRows) && memberRows[0];
+
+  // Member may have been cancelled/deleted already. Try cancellations as
+  // fallback so we still log a refund row for the historical relationship.
+  if (!member) {
+    const cancelRows = await sb(
+      `cancellations?stripe_customer_id=eq.${encodeURIComponent(custId)}&select=client_id,member_id,athlete_name,parent_name,stripe_subscription_id&order=created_at.desc&limit=1`
+    );
+    const c = Array.isArray(cancelRows) && cancelRows[0];
+    if (c) {
+      member = {
+        id:                     c.member_id,
+        client_id:              c.client_id,
+        athlete_name:           c.athlete_name,
+        parent_name:            c.parent_name,
+        stripe_subscription_id: c.stripe_subscription_id,
+        stripe_customer_id:     custId,
+      };
+    }
+  }
+  if (!member) return res.status(200).json({ skipped: "no member or cancellation record for customer" });
+
+  const refundsOnCharge = (charge.refunds && charge.refunds.data) || [];
+  if (refundsOnCharge.length === 0) return res.status(200).json({ skipped: "no refunds in payload" });
+
+  let inserted = 0;
+  let skipped = 0;
+  for (const refund of refundsOnCharge) {
+    // Idempotency: if a row with this stripe_refund_id already exists, skip.
+    const existing = await sb(
+      `refunds?stripe_refund_id=eq.${encodeURIComponent(refund.id)}&select=id&limit=1`
+    );
+    if (Array.isArray(existing) && existing.length > 0) {
+      skipped++;
+      continue;
+    }
+    await sb(`refunds`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{
+        client_id:              member.client_id,
+        member_id:              member.id,
+        athlete_name:           member.athlete_name,
+        parent_name:            member.parent_name,
+        stripe_charge_id:       charge.id,
+        stripe_refund_id:       refund.id,
+        amount_cents:           refund.amount,
+        currency:               refund.currency || "cad",
+        reason:                 refund.reason || "refunded in Stripe (outside portal)",
+        refund_date:            new Date((refund.created || Math.floor(Date.now() / 1000)) * 1000).toISOString().slice(0, 10),
+        stripe_customer_id:     member.stripe_customer_id,
+        stripe_subscription_id: member.stripe_subscription_id,
+      }]),
+    });
+    inserted++;
+  }
+
+  await writeAudit({
+    client_id:       member.client_id,
+    member_id:       member.id,
+    action_type:     "stripe-auto-refund-mirrored",
+    args:            { event_id: event.id, charge_id: charge.id, refunds_inserted: inserted, refunds_skipped_idempotent: skipped },
+    stripe_response: { charge_id: charge.id, amount_refunded: charge.amount_refunded },
+    db_changes:      { refunds: `${inserted} inserted, ${skipped} already present` },
+  });
+
+  return res.status(200).json({ ok: true, action: "refunds-mirrored", inserted, skipped, member_id: member.id });
 }
 
 // ─────────────────────────────────────────────────────────

@@ -12212,6 +12212,7 @@ function _memberStatusPill(status) {
   const map = {
     live:                    ['Live', '#1f7a3d'],
     paused:                  ['Paused', '#8a6d1f'],
+    cancelling:              ['Cancelling', '#8a4d1f'],
     payment_method_required: ['Needs card', '#9a3b2f'],
     payment_failed:          ['Payment failed', '#9a3b2f'],
   };
@@ -12264,8 +12265,11 @@ function _memberAvatar(m, size) {
 function _filterMembers(all) {
   const f = _MEMBERS_FILTER;
   const isIssue = (s) => s === 'payment_failed' || s === 'payment_method_required';
+  // 'cancelling' members are still billing through the end of their period —
+  // surface them under "Live" so they don't disappear from the roster.
+  const isLiveLike = (s) => s === 'live' || s === 'cancelling';
   return all.filter(m => {
-    if (f.status === 'live'   && m.status !== 'live')   return false;
+    if (f.status === 'live'   && !isLiveLike(m.status)) return false;
     if (f.status === 'paused' && m.status !== 'paused') return false;
     if (f.status === 'issues' && !isIssue(m.status))    return false;
     if (f.trainer    !== 'all' && (m.trainer    || '') !== f.trainer)    return false;
@@ -12365,7 +12369,7 @@ function _renderMembersView() {
   const cursorPos = wasFocused ? oldInput.selectionStart : null;
 
   const all = _MEMBERS_ALL;
-  const liveCount   = all.filter(m => m.status === 'live').length;
+  const liveCount   = all.filter(m => m.status === 'live' || m.status === 'cancelling').length;
   const pausedCount = all.filter(m => m.status === 'paused').length;
   const issuesCount = all.filter(m => m.status === 'payment_failed' || m.status === 'payment_method_required').length;
   const filtered = _filterMembers(all);
