@@ -450,6 +450,38 @@ async function sendInviteEmail({ to, actionLink, businessName, resendApiKey }) {
 
 // Post an invite link to the client's Slack channel. Fire-and-forget,
 // silently no-ops if SLACK_BOT_TOKEN unset or channel not mapped.
+// Lighter Slack notification for the "teammate added" case. The original
+// postInviteToSlack message (Hi team! / portal is ready / link below) was
+// too noisy when a teammate was added — clients only need to know that
+// a teammate was added, not get the full re-onboarding-style message.
+// Used by invite-team-member only; the first-owner / setup-account /
+// reset-password flows still get the full postInviteToSlack message.
+async function postTeammateAddedToSlack({ slackChannelId, name, email }) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !slackChannelId) return { ok: false, skipped: true };
+    const who = name ? `*${name}*` : "A new teammate";
+    const text = `👥 ${who}${email ? ` (${email})` : ""} was added as a portal teammate. They'll get the setup link by email.`;
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({
+        channel: slackChannelId,
+        text,
+        unfurl_links: false,
+      }),
+    });
+    const j = await res.json().catch(() => ({}));
+    return { ok: !!j.ok, error: j.error };
+  } catch (err) {
+    console.error("Slack teammate-added post failed:", err?.message || err);
+    return { ok: false, error: err?.message };
+  }
+}
+
 async function postInviteToSlack({ slackChannelId, businessName, ownerName, email, actionLink }) {
   try {
     const token = process.env.SLACK_BOT_TOKEN;
@@ -1321,8 +1353,12 @@ export default async function handler(req, res) {
             }
           }
 
-          // Notify: email to the new teammate + Slack to the client channel
-          // (so BAM staff watching that channel see the new portal user).
+          // Notify: email to the new teammate (with the setup link) +
+          // a LIGHT "teammate added" message to the client's Slack
+          // channel — no link blob, just an FYI that someone's coming
+          // online. Owners still get the full invite-style Slack post
+          // via postInviteToSlack from setup-account / reset-password;
+          // this branch is for adding teammates to an existing client.
           const [emailRes, slackRes] = actionLink
             ? await Promise.all([
                 sendInviteEmail({
@@ -1330,10 +1366,9 @@ export default async function handler(req, res) {
                   businessName: teamClient.business_name || "",
                   resendApiKey: process.env.RESEND_API_KEY,
                 }),
-                postInviteToSlack({
+                postTeammateAddedToSlack({
                   slackChannelId: teamClient.slack_channel_id || null,
-                  businessName: teamClient.business_name || "",
-                  ownerName: name, email, actionLink,
+                  name, email,
                 }),
               ])
             : [{ ok: false, error: "no link generated" }, { ok: false, skipped: true }];
