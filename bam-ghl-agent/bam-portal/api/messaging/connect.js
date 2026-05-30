@@ -4,10 +4,10 @@
 // Modeled on api/stripe/connect.js (Standard Connect OAuth pattern).
 //
 // Flow:
-//   1. POST /api/ghl/connect   body: { client_id }
+//   1. POST /api/messaging/connect   body: { client_id }
 //      → returns { redirect_url } pointing at GHL's chooselocation page
 //   2. Academy owner picks their location in GHL, approves scopes
-//   3. GHL redirects back to GET /api/ghl/connect?code=...&state=...
+//   3. GHL redirects back to GET /api/messaging/connect?code=...&state=...
 //   4. We exchange code for an access_token + refresh_token at GHL's
 //      token endpoint, store both (+ locationId + expiry) on the
 //      academy's clients row
@@ -23,7 +23,7 @@
 //   SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY
 //
 // Redirect URI to register in the GHL Marketplace app config:
-//   https://portal.byanymeansbusiness.com/api/ghl/connect
+//   https://portal.byanymeansbusiness.com/api/messaging/connect
 
 import crypto from "node:crypto";
 
@@ -133,7 +133,7 @@ function getOrigin(req) {
 
 // The redirect URI registered in the GHL Marketplace app must match this.
 function redirectUri(req) {
-  return `${getOrigin(req)}/api/ghl/connect`;
+  return `${getOrigin(req)}/api/messaging/connect`;
 }
 
 function signState(payload) {

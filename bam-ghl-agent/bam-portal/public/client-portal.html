@@ -13526,7 +13526,7 @@ async function _startGhlConnect() {
     const token = await _mreqAuthToken();
     // Stash status flag so post-login bounce still surfaces the result.
     sessionStorage.setItem('ghl_connect_pending', '1');
-    const res = await fetch('/api/ghl/connect', {
+    const res = await fetch('/api/messaging/connect', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ client_id: CLIENT_ID }),
