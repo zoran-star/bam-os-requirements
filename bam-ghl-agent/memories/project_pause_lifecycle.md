@@ -51,9 +51,10 @@ marked completed (with reason "superseded by pause update"), then a fresh
 cancellations row is inserted. Frontend shows an "Update pause" confirm
 dialog when the member is already paused.
 
-## Schema additions to `cancellations`
+## Schema additions
 
 ```sql
+-- cancellations: lifecycle timestamps
 ALTER TABLE public.cancellations
   ADD COLUMN activated_at timestamptz,
   ADD COLUMN completed_at timestamptz;
@@ -65,7 +66,20 @@ CREATE INDEX idx_cancellations_pending_pause
 CREATE INDEX idx_cancellations_active_pause
   ON public.cancellations (pause_end)
   WHERE type = 'pause' AND activated_at IS NOT NULL AND completed_at IS NULL;
+
+-- members: denormalized "future pause queued" date for cheap pill render
+ALTER TABLE public.members
+  ADD COLUMN pause_scheduled_for date;
+
+CREATE INDEX idx_members_pause_scheduled_for
+  ON public.members (pause_scheduled_for)
+  WHERE pause_scheduled_for IS NOT NULL;
 ```
+
+`members.pause_scheduled_for` is set by `actionPause` when a future-dated
+pause is queued, cleared by cron Phase A (activation), `actionUnpause`,
+and `actionCancel`. Frontend uses it to render a "🕐 Pause queued · DATE"
+secondary pill without joining `cancellations` on every list render.
 
 Pause row lifecycle states (derived):
 
@@ -80,7 +94,22 @@ Pause row lifecycle states (derived):
 **Schedule:** every hour at :15 (`15 * * * *`)
 **Path:** `/api/members?action=cron-process-scheduled-pauses`
 **Auth:** `Authorization: Bearer ${CRON_SECRET}` (same shared secret as the
-invite-resend cron — already set in Vercel env)
+invite-resend cron — already set in Vercel env). Comparison uses
+`timingSafeEqual` to avoid timing leaks.
+
+### Concurrency safety
+
+Both phases use a **claim-first conditional PATCH** pattern: each row's
+update is gated by a filter on the lifecycle column being `IS NULL`. If
+two cron invocations race, only one PATCH returns a row — the other gets
+an empty result and skips its post-claim work (member status flip, audit).
+
+Every Stripe call uses an `Idempotency-Key` derived from `cancellations.id`
+(`pause-activate-<row.id>`), so even if both runs reach the Stripe call,
+Stripe collapses them into a single effect.
+
+The endpoint returns **HTTP 500** when any row fails (so Vercel cron logs
+surface the failure). On success, returns 200 with counters.
 
 ### Phase A — Activate
 

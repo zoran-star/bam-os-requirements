@@ -423,14 +423,16 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     body: JSON.stringify({ status: "live", updated_at: nowIso() }),
   });
 
-  // If recovering from pause, close the open pause row in cancellations.
+  // If recovering from pause, mark any active cancellations row completed
+  // (idempotent via conditional filter — completed_at IS NULL). The cron also
+  // runs this same logic in Phase B; whichever fires first wins.
   if (prevStatus === "paused") {
     await sb(
-      `cancellations?member_id=eq.${member.id}&type=eq.pause&pause_end=is.null`,
+      `cancellations?member_id=eq.${member.id}&type=eq.pause&completed_at=is.null`,
       {
         method: "PATCH",
         headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ pause_end: nowIso().slice(0, 10) }),
+        body: JSON.stringify({ completed_at: nowIso(), activated_at: nowIso() }),
       }
     ).catch(() => {});
   }

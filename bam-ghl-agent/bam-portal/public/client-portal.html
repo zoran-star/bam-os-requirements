@@ -12275,7 +12275,10 @@ async function fetchAndRenderMembers() {
   }
 }
 
-function _memberStatusPill(status) {
+function _memberStatusPill(status, opts) {
+  // opts is the member object — if it carries pause_scheduled_for, render
+  // a secondary "Pause queued" pill alongside the main status. Useful for
+  // surfacing a future-dated pause to staff before the cron activates it.
   const map = {
     live:                    ['Live', '#1f7a3d'],
     paused:                  ['Paused', '#8a6d1f'],
@@ -12284,7 +12287,12 @@ function _memberStatusPill(status) {
     payment_failed:          ['Payment failed', '#9a3b2f'],
   };
   const [label, color] = map[status] || [status || '—', '#555'];
-  return `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
+  const main = `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;background:${color};color:#fff">${escapeHTML(label)}</span>`;
+  if (opts && opts.pause_scheduled_for && status !== 'paused' && status !== 'cancelling') {
+    const queued = `<span title="Pause queued — auto-activates ${escapeHTML(opts.pause_scheduled_for)}" style="display:inline-block;margin-left:5px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:transparent;border:1px solid #8a6d1f;color:#cfa647">🕐 Pause queued · ${escapeHTML(opts.pause_scheduled_for)}</span>`;
+    return main + queued;
+  }
+  return main;
 }
 
 function _memberEngagementChip(eng) {
@@ -12558,7 +12566,7 @@ function _renderMembersView() {
         <div class="member-card-parent">Parent: ${escapeHTML(m.parent_name || '—')}</div>
       </div>
       <div class="member-card-trainer">${escapeHTML(m.trainer || '—')}</div>
-      <div class="member-card-pills">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
+      <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
   container.innerHTML = toolbar + cards;
@@ -13698,9 +13706,14 @@ function _renderMemberModalBody(m, stripe, history) {
 
   const btn = (label, onclick, primary) =>
     `<button onclick="${onclick}" style="background:${primary ? 'var(--gold,#E8C547)' : 'transparent'};color:${primary ? '#0B0B0D' : 'var(--text)'};border:1px solid var(--border);padding:10px 12px;font-weight:600;border-radius:4px;cursor:pointer;font-size:13px;font-family:inherit">${label}</button>`;
-  const toggleBtn = m.status === 'paused'
-    ? btn('Unpause', `mUnpause('${m.id}')`)
-    : btn('Pause',   `mPause('${m.id}')`);
+  // Pause/Unpause button — hidden on cancelling members (backend rejects).
+  // 'paused' → Unpause; otherwise Pause (with 'Update pause' inference in mPause).
+  let toggleBtn = '';
+  if (m.status === 'paused') {
+    toggleBtn = btn('Unpause', `mUnpause('${m.id}')`);
+  } else if (m.status !== 'cancelling') {
+    toggleBtn = btn('Pause', `mPause('${m.id}')`);
+  }
 
   // "View in Stripe" — opens the customer page on the academy's connected
   // Stripe account in a new tab. Requires both a connected account id
@@ -13725,7 +13738,7 @@ function _renderMemberModalBody(m, stripe, history) {
       <div style="flex:1;min-width:0">
         <div style="font-weight:700;font-size:22px;line-height:1.15">${escapeHTML(m.athlete_name)}</div>
         <div style="font-size:13px;color:var(--text-mute);margin-top:6px">Parent: ${escapeHTML(m.parent_name || '—')}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">${_memberStatusPill(m.status)}${_memberEngagementChip(m.engagement)}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px">${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}</div>
       </div>
       <button onclick="closeMemberPopup()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);font-size:26px;cursor:pointer;line-height:1;padding:0 4px;margin-top:-4px">×</button>
     </div>
@@ -13801,43 +13814,94 @@ async function _memberAction(memberId, action, body) {
   return json;
 }
 
+// Strict YYYY-MM-DD validation: must match the format AND round-trip via
+// Date so that '2026-13-45' / '2026-02-30' get rejected.
+function _isValidYMD(s) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + 'T00:00:00Z');
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toISOString().slice(0, 10) === s;
+}
+
+// Local-tz "today" in YYYY-MM-DD (handles staff working past UTC midnight).
+function _localTodayYMD() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 async function mPause(memberId) {
-  // Re-pause detection: lookup the in-memory member to see current status.
-  const m = (typeof _MEMBERS_ALL !== 'undefined' ? _MEMBERS_ALL : []).find(x => x.id === memberId);
+  // Re-pause detection. Pull the freshest known state — if we have a list
+  // cache, use it; otherwise fall back to a fresh single-member fetch so a
+  // stale list doesn't mis-classify the action.
+  let m = (typeof _MEMBERS_ALL !== 'undefined' ? _MEMBERS_ALL : []).find(x => x.id === memberId);
+  if (!m) {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/members?id=${encodeURIComponent(memberId)}`, {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      const j = await _safeJson(r);
+      if (r.ok && j && j.member) m = j.member;
+    } catch (_) { /* fall through — best-effort */ }
+  }
   const isUpdatingExistingPause = m && m.status === 'paused';
-  const labelHead = isUpdatingExistingPause ? 'Update pause' : 'Pause';
+  const hasQueuedPause = m && m.pause_scheduled_for && m.status !== 'paused';
+  const labelHead = (isUpdatingExistingPause || hasQueuedPause) ? 'Update pause' : 'Pause';
 
   if (isUpdatingExistingPause) {
     if (!confirm('This member is already paused. Update the pause window?')) return;
+  } else if (hasQueuedPause) {
+    if (!confirm(`A pause is queued to start ${m.pause_scheduled_for}. Replace it?`)) return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = _localTodayYMD();
   const start = prompt(`${labelHead} — START date (YYYY-MM-DD):`, today);
   if (start === null) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start.trim())) { alert('Start date must be YYYY-MM-DD.'); return; }
+  const startTrim = start.trim();
+  if (!_isValidYMD(startTrim)) { alert(`Start date "${startTrim}" is not a valid YYYY-MM-DD.`); return; }
 
   const end = prompt(`${labelHead} — END date (YYYY-MM-DD):`, '');
   if (end === null) return;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(end.trim())) { alert('End date must be YYYY-MM-DD.'); return; }
+  const endTrim = end.trim();
+  if (!_isValidYMD(endTrim)) { alert(`End date "${endTrim}" is not a valid YYYY-MM-DD.`); return; }
+  if (endTrim <= startTrim) { alert('End date must be after start date.'); return; }
+  if (endTrim < today) { alert('End date is in the past — pick a future date.'); return; }
 
   const reason = prompt(`${labelHead} — reason (optional)`, '');
-  const body = { start_date: start.trim(), end_date: end.trim() };
+  const body = { start_date: startTrim, end_date: endTrim };
   if (reason && reason.trim()) body.reason = reason.trim();
 
   try {
     const r = await _memberAction(memberId, 'pause', body);
     let msg = isUpdatingExistingPause ? 'Pause updated.' : 'Paused.';
     if (r.sub?.scheduled) {
-      msg = `Pause scheduled to start ${start.trim()}. Billing will pause automatically on that date.`;
+      msg = `🕐 Pause queued for ${startTrim}. The system will auto-activate it that morning.`;
     }
     if (r.sub?.capped_to_stripe_max) {
-      msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max — the resume date is sooner than what you entered.';
+      msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max — the next-charge date is sooner than what you entered.';
     }
     if (r.sub?.resume_date) msg += `\n\nNext charge: ${r.sub.resume_date}`;
     alert(msg);
     closeMemberPopup();
-    fetchAndRenderMembers();
-  } catch (e) { alert(`${labelHead} failed: ` + e.message); }
+    await fetchAndRenderMembers();
+  } catch (e) {
+    // Translate known backend errors into targeted CTAs.
+    const em = (e && e.message) || '';
+    if (/payment[_ ]failed|past[_ ]due|payment link/i.test(em)) {
+      if (confirm(`${em}\n\nSend the parent a payment link now?`)) {
+        try { await mPaymentLink(memberId); } catch (_) { /* user already got the alert */ }
+      }
+      return;
+    }
+    if (/cancelling/i.test(em)) {
+      alert(`Pause can't be set on a cancelling member.\nUn-cancel them first (no API for that yet — Stripe Dashboard).`);
+      return;
+    }
+    alert(`${labelHead} failed: ${em}`);
+  }
 }
 
 async function mUnpause(memberId) {
