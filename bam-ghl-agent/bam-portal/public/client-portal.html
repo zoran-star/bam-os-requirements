@@ -8711,6 +8711,8 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbTeamRows = [];
   _bbExpandedTeams = new Set();
   _bbLoadLocations();             // warm the locations cache for pickers
+  _bbLoadStaff();                  // warm staff_select dropdowns
+  _bbLoadOffersList();             // warm offer_select (upsells targets)
   await _bbLoadOfferFiles(offer.id);
   _bbRenderWizardBody();
 }
@@ -9468,12 +9470,12 @@ const _bbOfferConfigs = {
           { key:'name', type:'text', label:'Field name', required:true,
             hint:'e.g. "Where did you hear about us?", "Sibling discount eligible?", "Current team"' }
         ] },
-      { key:'lead_notify', type:'staff_select', label:'Lead notify',
+      { key:'lead_notify', type:'staff_select', label:'Staff in charge',
         hint:'Who gets pinged on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
         hint:'Target offer + description ("After 6 months, pitch private lessons")',
         subFields:[
-          { key:'target', type:'text', label:'Target offer' },
+          { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
       _bbCommonExtraNotes
@@ -9546,7 +9548,7 @@ const _bbOfferConfigs = {
       { key:'upsells', type:'block_builder', label:'Upsells',
         hint:'Target offer + description ("After this clinic, pitch the academy")',
         subFields:[
-          { key:'target', type:'text', label:'Target offer' },
+          { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
       _bbCommonExtraNotes
@@ -9622,7 +9624,7 @@ const _bbOfferConfigs = {
       { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
         subFields:[
-          { key:'target', type:'text', label:'Target offer' },
+          { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
       _bbCommonExtraNotes
@@ -9716,7 +9718,7 @@ const _bbOfferConfigs = {
       { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
         subFields:[
-          { key:'target', type:'text', label:'Target offer' },
+          { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
       _bbCommonExtraNotes
@@ -9824,7 +9826,7 @@ const _bbOfferConfigs = {
       { key:'lead_notify', type:'staff_select', label:'Notify on new lead' },
       { key:'upsells', type:'block_builder', label:'Upsells',
         subFields:[
-          { key:'target', type:'text', label:'Target offer' },
+          { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
       _bbCommonExtraNotes
@@ -10012,9 +10014,37 @@ function _bbRenderField(field, sectionId) {
       }
       break;
     }
-    case 'staff_select':
-      body = `<input type="text" class="bb-input" placeholder="Staff selector coming once Staff card ships (Stage 2)" value="${_bbEscapeHtml(val)}" oninput="${onInputHandler}" onblur="_bbAutoSave()" />`;
+    case 'staff_select': {
+      // Real picker — dropdown of academy teammates from client_users,
+      // warmed at wizard open via _bbLoadStaff. Value stored = client_users.id.
+      if (_bbStaffList.length === 0) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No teammates yet — invite one in <b>BB &gt; Staff</b> first, then come back.</div>`;
+      } else {
+        const opts = _bbStaffList.map(s =>
+          `<option value="${_bbEscapeAttr(s.id)}" ${val === s.id ? 'selected' : ''}>${_bbEscapeHtml(s.name || s.email || '(unnamed)')}</option>`
+        ).join('');
+        body = `<select class="bb-input" onchange="_bbUpdateField('${sectionId}','${field.key}',this.value); _bbAutoSave()">
+          <option value="">Pick a teammate…</option>${opts}
+        </select>`;
+      }
       break;
+    }
+    case 'offer_select': {
+      // Dropdown of existing non-archived offers for this client
+      // (excluding the offer being edited so it can't upsell to itself).
+      const others = _bbOffersList.filter(o => o.id !== (_bbState.offer && _bbState.offer.id));
+      if (others.length === 0) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No other offers yet — create at least one more offer to pick from.</div>`;
+      } else {
+        const opts = others.map(o =>
+          `<option value="${_bbEscapeAttr(o.id)}" ${val === o.id ? 'selected' : ''}>${_bbEscapeHtml(o.title || '(untitled)')}</option>`
+        ).join('');
+        body = `<select class="bb-input" onchange="${onInputHandler}; _bbAutoSave()">
+          <option value="">Pick an offer…</option>${opts}
+        </select>`;
+      }
+      break;
+    }
     case 'location_picker': {
       const loc = val ? _bbLocationById(val) : null;
       body = `<button type="button" class="bb-loc-pick ${loc ? '' : 'empty'}" onclick="_bbOpenLocationPickerFor('${sectionId}','${field.key}')">
@@ -10082,6 +10112,59 @@ function _bbRenderSubField(sectionId, parentKey, rowIdx, sf, subVal, row) {
         <div class="bb-choice-row">${(sf.options || []).map(opt => `
           <button type="button" class="bb-choice ${arr.includes(opt) ? 'selected' : ''}" onclick="_bbBlockToggleMany('${sectionId}','${parentKey}',${rowIdx},'${sf.key}','${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
         `).join('')}</div>
+        ${hint}
+      </div>
+    `;
+  }
+
+  // Staff selector inside a block_builder row — dropdown of teammates.
+  if (sf.type === 'staff_select') {
+    if (_bbStaffList.length === 0) {
+      return `
+        <div class="bb-field" style="margin-bottom:10px">
+          <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+          <div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No teammates yet — invite one in BB &gt; Staff first.</div>
+          ${hint}
+        </div>
+      `;
+    }
+    const opts = _bbStaffList.map(s =>
+      `<option value="${_bbEscapeAttr(s.id)}" ${v === s.id ? 'selected' : ''}>${_bbEscapeHtml(s.name || s.email || '(unnamed)')}</option>`
+    ).join('');
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+        <select class="bb-input" onchange="${handler}; _bbAutoSave()">
+          <option value="">Pick a teammate…</option>${opts}
+        </select>
+        ${hint}
+      </div>
+    `;
+  }
+
+  // Offer selector inside a block_builder row — dropdown of existing
+  // non-archived offers. Used by upsells.target. Filters out the offer
+  // currently being edited so it can't upsell to itself.
+  if (sf.type === 'offer_select') {
+    const others = _bbOffersList.filter(o => o.id !== (_bbState.offer && _bbState.offer.id));
+    if (others.length === 0) {
+      return `
+        <div class="bb-field" style="margin-bottom:10px">
+          <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+          <div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No other offers yet — create at least one more offer to pick from.</div>
+          ${hint}
+        </div>
+      `;
+    }
+    const opts = others.map(o =>
+      `<option value="${_bbEscapeAttr(o.id)}" ${v === o.id ? 'selected' : ''}>${_bbEscapeHtml(o.title || '(untitled)')}</option>`
+    ).join('');
+    return `
+      <div class="bb-field" style="margin-bottom:10px">
+        <div class="bb-field-label">${depBadge}${_bbEscapeHtml(sf.label)} ${reqMark}</div>
+        <select class="bb-input" onchange="${handler}; _bbAutoSave()">
+          <option value="">Pick an offer…</option>${opts}
+        </select>
         ${hint}
       </div>
     `;
@@ -10934,6 +11017,46 @@ let _bbTeamLoadedFor = null;
 let _bbLocations = [];
 let _bbLocationsLoadedFor = null;
 let _bbLocPickerCtx = null; // { onSelect(locationId, location), multi: bool }
+
+// Staff picker — pulls the academy's teammates (client_users rows) and
+// caches them per CLIENT_ID. Drives the `staff_select` field type.
+let _bbStaffList = [];
+let _bbStaffLoadedFor = null;
+async function _bbLoadStaff() {
+  if (!_sb || !CLIENT_ID) return [];
+  if (_bbStaffLoadedFor === CLIENT_ID) return _bbStaffList;
+  const { data } = await _sb.from('client_users')
+    .select('id, name, email, role')
+    .eq('client_id', CLIENT_ID)
+    .eq('status', 'active');
+  _bbStaffList = (data || []).sort(
+    (a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')
+  );
+  _bbStaffLoadedFor = CLIENT_ID;
+  return _bbStaffList;
+}
+function _bbStaffById(id) {
+  return _bbStaffList.find(s => s.id === id) || null;
+}
+
+// Offers picker — pulls the academy's existing offers (excluding the
+// offer being edited) to power the upsells `target` dropdown.
+let _bbOffersList = [];
+let _bbOffersListLoadedFor = null;
+async function _bbLoadOffersList() {
+  if (!_sb || !CLIENT_ID) return [];
+  if (_bbOffersListLoadedFor === CLIENT_ID) return _bbOffersList;
+  const { data } = await _sb.from('offers')
+    .select('id, type, title, status')
+    .eq('client_id', CLIENT_ID)
+    .neq('status', 'archived');
+  _bbOffersList = (data || []).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  _bbOffersListLoadedFor = CLIENT_ID;
+  return _bbOffersList;
+}
+function _bbOfferById(id) {
+  return _bbOffersList.find(o => o.id === id) || null;
+}
 
 async function _bbLoadLocations() {
   if (!_sb || !CLIENT_ID) return [];
