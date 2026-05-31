@@ -9291,6 +9291,8 @@ const _bbStdPricing = [
         hint:'e.g. "Unlimited Monthly" or "10-session Pack"' },
       { key:'type', type:'check_one', label:'Pricing type', required:true,
         options:['Membership','Package','Single Session','Other'] },
+      { key:'whats_included', type:'textarea', label:'What do clients get?',
+        hint:'What\'s included at this price — sessions per week, access to facilities, gear, perks, etc. Sales / landing page copy will pull from this.' },
       { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
         hint:'Headline number before added fees — monthly fee, package total, or per-session cost' },
       { key:'added_fees', type:'text', label:'Added fees',
@@ -9306,6 +9308,8 @@ const _bbStdPricing = [
         subFields:[
           { key:'length', type:'text', label:'Commitment length', required:true,
             hint:'e.g. "3 months", "6 months", "1 year"' },
+          { key:'whats_included', type:'textarea', label:'What do clients get?',
+            hint:'What\'s included for this commitment — same as the base price unless it changes (extra sessions, bonus gear, locked-in rate, etc.).' },
           { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
             hint:'Headline number before added fees' },
           { key:'added_fees', type:'text', label:'Added fees',
