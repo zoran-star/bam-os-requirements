@@ -380,23 +380,23 @@
 
   <div class="when">
     <div class="label">Use when</div>
-    <div class="text">A family says "we're going on vacation for 3 weeks" or "we need a break for the holidays."</div>
+    <div class="text">A family says "we're going on vacation Jan 20 → Feb 3" or "we need a break starting next week."</div>
   </div>
 
   <div class="flow">
     <div class="step">
       <div class="stage">You click</div>
-      <div class="what">Pick a <strong>start date</strong> and <strong>end date</strong></div>
+      <div class="what">Pick a <strong>start date</strong> + <strong>end date</strong></div>
     </div>
     <div class="arrow">→</div>
     <div class="step">
-      <div class="stage">Stripe</div>
-      <div class="what">Next charge moves out by the pause length</div>
+      <div class="stage">System</div>
+      <div class="what">Pauses billing + blocks training during the window</div>
     </div>
     <div class="arrow">→</div>
     <div class="step">
-      <div class="stage">Roster</div>
-      <div class="what">Status flips to <span class="pill paused">PAUSED</span></div>
+      <div class="stage">End date hits</div>
+      <div class="what">Status auto-flips back to <span class="pill live">LIVE</span></div>
     </div>
   </div>
 
@@ -404,24 +404,26 @@
     <div class="side parent">
       <div class="head"><span class="dot"></span> For the parent</div>
       <ul>
-        <li>Stops getting charged immediately</li>
+        <li>No charges during the pause window</li>
         <li>Card stays on file</li>
-        <li>Next charge happens on the resume date</li>
+        <li>Next charge moves out by exactly the pause length</li>
+        <li>Resumes training automatically on end date</li>
       </ul>
     </div>
     <div class="side portal">
       <div class="head"><span class="dot"></span> In your roster</div>
       <ul>
-        <li>Member moves to the <strong>Paused</strong> tab</li>
-        <li>A "pause" row gets logged with start + end dates</li>
-        <li>Resume date is visible on their card</li>
+        <li><span class="pill paused">PAUSED</span> pill while pause is active</li>
+        <li>Pause row logged with start + end dates</li>
+        <li>End date hits → auto-recovers to <span class="pill live">LIVE</span></li>
+        <li>No manual unpause needed</li>
       </ul>
     </div>
   </div>
 
   <div class="auto">
     <div class="label">🟢 Auto-magic</div>
-    <div class="text">When the resume date hits and Stripe successfully charges them, the portal automatically flips status back to <span class="pill live">LIVE</span>. You don't have to do anything.</div>
+    <div class="text">A background job runs every hour. It (a) <strong>starts</strong> scheduled pauses when their start date arrives, and (b) <strong>recovers</strong> paused members back to <span class="pill live">LIVE</span> when their end date passes. You set the dates once — the system does the rest.</div>
   </div>
 
   <!-- ─── NEXT PAYMENT MATH ─── -->
@@ -471,70 +473,117 @@
     </div>
   </div>
 
+  <!-- ─── SCHEDULED PAUSES ─── -->
+  <div class="sub-title">Schedule a pause for later 📅</div>
+
+  <div class="timeline">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <div style="padding: 14px 16px; background: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: 4px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px;">
+          Start = today
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: var(--text);">
+          Pause goes into effect <strong>immediately</strong>. Status flips to <span class="pill paused">PAUSED</span> right now. Stripe billing is paused right now.
+        </div>
+      </div>
+      <div style="padding: 14px 16px; background: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: 4px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px;">
+          Start = future date
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: var(--text);">
+          Pause is <strong>queued</strong>. Member stays <span class="pill live">LIVE</span> for now. The system auto-activates on your start date — within an hour.
+        </div>
+      </div>
+    </div>
+    <div style="font-size: 13px; color: var(--mute); text-align: center; margin-top: 14px;">
+      You can set up a pause weeks in advance. They train normally until then.
+    </div>
+  </div>
+
+  <!-- ─── UPDATE A PAUSE ─── -->
+  <div class="sub-title">Updating an existing pause ✏️</div>
+
+  <div class="timeline" style="padding: 18px 24px;">
+    <div style="font-size: 14px; line-height: 1.7; color: var(--text);">
+      Click <strong>Pause</strong> on a member who's already paused → confirm dialog:
+      <strong style="color: var(--gold);">"Update the pause window?"</strong>
+      Then pick new start + end dates. The old pause row is marked superseded;
+      a new one takes its place. Stripe billing adjusts automatically.
+    </div>
+  </div>
+
   <!-- ─── EDGE CASES ─── -->
-  <div class="sub-title">Edge cases — the stuff to know</div>
+  <div class="sub-title">Things the system blocks (and why)</div>
 
   <div class="edges">
 
-    <div class="edge">
+    <div class="edge warning">
       <div class="edge-num">01</div>
       <div class="edge-body">
-        <strong>Pause always extends the next charge by exactly the pause length.</strong>
-        Whether the pause is 1 day or 4 weeks, the next charge date moves out by exactly that much. No surprises. The parent's unused paid time isn't lost — it gets folded into the extension.
-        <br><br>
-
-        <div style="background: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: 4px; padding: 14px 16px; margin-top: 10px;">
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--gold); letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 8px;">
-            Example
-          </div>
-          <div style="font-size: 13px; line-height: 1.7;">
-            Parent paid $59 on <strong>Jan 5</strong> (cycle Jan 5 → Feb 5).<br>
-            Today is Jan 15. You pause: start <strong>Jan 15</strong>, end <strong>Jan 22</strong> (7 days).<br>
-            Next charge moves: <strong>Feb 5 + 7 days = Feb 12</strong>.<br>
-            On Feb 12, Stripe charges them <strong>$59</strong> for the next cycle.<br>
-            <span style="color: var(--green);">Net: pause length is preserved as a billing extension.</span>
-          </div>
-        </div>
+        <strong>Member has <span class="pill failed">PAYMENT FAILED</span></strong> →
+        Pause is rejected. Fix the card first with the <strong>Payment Link</strong>.
+        Why: pausing a broken billing state masks the real problem.
       </div>
     </div>
 
     <div class="edge warning">
       <div class="edge-num">02</div>
       <div class="edge-body">
-        <strong>End date is capped at ~730 days from today.</strong>
-        Stripe's hard limit. If you pick an end date further out, the system clamps it and the response tells you. For permanent pauses, use <strong>Cancel</strong> instead.
+        <strong>Member is <span class="pill cancelling">CANCELLING</span></strong> →
+        Pause is rejected. They've already decided to leave.
+        Why: pausing a cancellation creates conflicting intent.
       </div>
     </div>
 
     <div class="edge warning">
       <div class="edge-num">03</div>
       <div class="edge-body">
-        <strong>Their card has to still work on resume day.</strong>
-        If their card expires during the pause and you don't get it updated, the resume-day charge will fail → status flips to <span class="pill failed">PAYMENT FAILED</span>. Solution: send them the <strong>Payment Link</strong> a few days before the resume date if you're worried.
+        <strong>End date is in the past</strong> → Pause is rejected.
+        The end has to be in the future.
       </div>
     </div>
 
-    <div class="edge">
+    <div class="edge warning">
       <div class="edge-num">04</div>
       <div class="edge-body">
-        <strong>You can shift the pause without unpausing.</strong>
-        Pause too short? Click <strong>Unpause</strong> and pick a "new resume date" — Stripe just shifts the resume date out. The pause row in your roster updates to the new end date. No extra charges either way.
+        <strong>End is on or before start</strong> → Pause is rejected.
+        The pause has to last at least one day.
       </div>
     </div>
 
-    <div class="edge">
+    <div class="edge warning">
       <div class="edge-num">05</div>
       <div class="edge-body">
-        <strong>Plan changes during pause work fine.</strong>
-        You can use <strong>Change Plan</strong> on a paused member. The new price just kicks in when they resume — no immediate charge, no proration.
+        <strong>End date is more than ~730 days away</strong> → Capped to Stripe's
+        max. You'll see "End date was capped" in the success message. For permanent
+        pauses, use <strong>Cancel</strong> instead.
       </div>
     </div>
 
     <div class="edge">
       <div class="edge-num">06</div>
       <div class="edge-body">
-        <strong>Pause amount = whatever their plan currently is.</strong>
-        The resume-day charge is whatever the member's <em>current</em> plan costs. If you changed their plan during the pause, the new amount applies. If you didn't, it's the same amount they were paying before.
+        <strong>Their card expires during the pause</strong> → On end date, Stripe
+        will try to charge and fail. Member flips to <span class="pill failed">PAYMENT FAILED</span>.
+        Send them the <strong>Payment Link</strong> a few days before end date if you're worried.
+      </div>
+    </div>
+
+    <div class="edge">
+      <div class="edge-num">07</div>
+      <div class="edge-body">
+        <strong>Plan changes during pause work fine.</strong>
+        Use <strong>Change Plan</strong> on a paused member. New price kicks in when they resume.
+        No early charge, no proration.
+      </div>
+    </div>
+
+    <div class="edge">
+      <div class="edge-num">08</div>
+      <div class="edge-body">
+        <strong>Resume-day charge = current plan price.</strong>
+        Whatever the member's plan is at the end of the pause is what gets billed.
+        If you changed it during the pause, the new price applies.
       </div>
     </div>
 
