@@ -6836,9 +6836,12 @@ Then the call to action."]</div>
         padding:14px;
       }
       #view-blueprint .bb-block-row-head {
-        display:flex; align-items:center; justify-content:space-between;
+        display:flex; align-items:center; justify-content:space-between; gap:12px;
         margin-bottom:10px;
       }
+      /* No content below when collapsed → drop the margin so we don't
+         leave 10px of dead space under the title in a collapsed row. */
+      #view-blueprint .bb-block-row-head:last-child { margin-bottom:0; }
       #view-blueprint .bb-block-remove {
         padding:4px 10px; border-radius:5px;
         background:transparent; border:1px solid var(--border-med);
