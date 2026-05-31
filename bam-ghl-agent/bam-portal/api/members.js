@@ -48,6 +48,17 @@ const VALID_PLANS = Object.keys(PLAN_TO_PRICE);
 // (not inline) so the cap is consistent across the system.
 const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
 
+// Stripe API 2025-03-31 moved `current_period_end` from the subscription
+// object to the subscription_item. Older API versions kept it at the
+// subscription level. We read from both so the code works regardless of
+// which API version the platform account is on.
+function subCurrentPeriodEnd(sub) {
+  if (!sub) return null;
+  if (sub.current_period_end) return sub.current_period_end;
+  const item = sub.items?.data?.[0];
+  return item?.current_period_end || null;
+}
+
 // ─────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────
@@ -265,7 +276,7 @@ export default async function handler(req, res) {
             stripe = {
               status: sub.status,
               trial_end: sub.trial_end,
-              current_period_end: sub.current_period_end,
+              current_period_end: subCurrentPeriodEnd(sub),
               cancel_at_period_end: sub.cancel_at_period_end,
               created: sub.created || null,
               price_id: item?.price?.id || null,
@@ -516,7 +527,7 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     // cancellations insert below so a row exists even if the Stripe call
     // throws (the row can be cleaned up; we never end up with a paused
     // Stripe sub and no corresponding DB record).
-    const currentPeriodEnd = currentSub.current_period_end || 0;
+    const currentPeriodEnd = subCurrentPeriodEnd(currentSub) || 0;
     const anchor = Math.max(nowUnix(), currentPeriodEnd);
     trialEndUnix = anchor + pauseLengthSeconds;
 
@@ -1027,7 +1038,7 @@ async function actionReferred(res, member, stripeAccount, ctx, body) {
   const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
     stripeAccount,
   });
-  const anchor = currentSub.trial_end || currentSub.current_period_end || nowUnix();
+  const anchor = currentSub.trial_end || subCurrentPeriodEnd(currentSub) || nowUnix();
   const newTrialEnd = anchor + weeksAdded * 7 * 86400;
 
   // Stripe cap: 730 days from now
@@ -1182,7 +1193,7 @@ async function cronProcessScheduledPauses(res) {
       // Compute trial_end using the standard rule. Use nowUnix() (not todayUnix)
       // so we don't shrink the pause length by up to 24h when running mid-day.
       const pauseLengthSeconds = isoToUnix(row.pause_end) - isoToUnix(row.pause_start);
-      const anchor = Math.max(nowUnix(), currentSub.current_period_end || 0);
+      const anchor = Math.max(nowUnix(), subCurrentPeriodEnd(currentSub) || 0);
       let trialEndUnix = anchor + pauseLengthSeconds;
       const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
       const capped = trialEndUnix > stripeCap;

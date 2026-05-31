@@ -3,6 +3,15 @@
 
 const STRIPE_API = "https://api.stripe.com/v1";
 
+// Stripe API 2025-03-31 moved `current_period_end` onto the subscription_item.
+// Read both locations defensively so we work across versions.
+function subCurrentPeriodEnd(sub) {
+  if (!sub) return null;
+  if (sub.current_period_end) return sub.current_period_end;
+  const item = sub.items?.data?.[0];
+  return item?.current_period_end || null;
+}
+
 async function stripeFetch(path) {
   const res = await fetch(`${STRIPE_API}${path}`, {
     headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
@@ -118,7 +127,7 @@ export default async function handler(req, res) {
           planName: s.plan?.nickname || s.items?.data?.[0]?.price?.nickname || "Plan",
           amount: (s.plan?.amount || s.items?.data?.[0]?.price?.unit_amount || 0) / 100,
           interval: s.plan?.interval || s.items?.data?.[0]?.price?.recurring?.interval || "month",
-          currentPeriodEnd: s.current_period_end,
+          currentPeriodEnd: subCurrentPeriodEnd(s),
         })),
       }));
       return res.status(200).json({ data: mapped });
@@ -175,13 +184,14 @@ export default async function handler(req, res) {
       }));
 
       const upcomingRenewals = (activeSubs.data || [])
-        .filter(s => s.current_period_end && s.current_period_end <= fourteenDaysFromNow)
-        .map(s => ({
+        .map(s => ({ s, periodEnd: subCurrentPeriodEnd(s) }))
+        .filter(x => x.periodEnd && x.periodEnd <= fourteenDaysFromNow)
+        .map(({ s, periodEnd }) => ({
           id: s.id,
           customerName: s.customer?.name || s.customer?.email || "Unknown",
           customerEmail: s.customer?.email || "",
           amount: (s.plan?.amount || s.items?.data?.[0]?.price?.unit_amount || 0) / 100,
-          renewalDate: s.current_period_end,
+          renewalDate: periodEnd,
           planName: s.plan?.nickname || s.items?.data?.[0]?.price?.nickname || "Plan",
         }));
 
