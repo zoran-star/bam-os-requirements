@@ -1,94 +1,170 @@
 ---
-name: Next Session Pickup — 2026-05-30
-description: Hand-off note. Zoran is mid-setup on the GHL Marketplace App. When he comes back, do these in order. Delete this file once the work below is done.
+name: Next Session Pickup — 2026-05-30 (after GHL connected)
+description: Hand-off note. GHL OAuth is LIVE end-to-end for BAM GTA. Kun Liu/Ryan + John Fu are backfilled. Next: test the 6 PATCH actions end-to-end starting with clicking Cancel on Ryan. Delete this file once Sergio's 4 tickets are cleared.
 type: project
 ---
 
-## What Zoran is doing right now
-
-Creating BAM Business Portal as a **Sub-Account-type Marketplace App**
-inside `app.gohighlevel.com` (his agency dashboard sidebar → Marketplace).
-
-He'll come back with one of:
-- A) `"connected"` / `"test SMS arrived"` → GHL is wired, do step 1 below
-- B) `"stuck on step X"` → walk him through that step (full walkthrough is
-     in the description line of [[project_member_management_portal]] Session 6)
-- C) `"error message Y"` → diagnose from Y
-
-## When GHL is verified (step A)
+## TL;DR — state at end of session
 
 ```
-1. Backfill Kun Liu/Ryan + John Fu from GHL contact form data.
-   They're orphan Stripe subs (cus_UVq5pKmKTHcKHg + cus_UWo0Cw0OB5BiZ3)
-   that filled out the GHL form pre-2026-05-24 (before intake webhook
-   was wired). Form data lives in GHL custom fields.
+✅  GHL Marketplace App created · BAM GTA OAuth'd · token in DB
+✅  Kun Liu/Ryan + John Fu inserted into members (via GHL contacts API)
+⏳  6 PATCH actions (pause/unpause/change/refund/cancel/referred + payment-link) NOT yet tested in production
+⏳  Sergio has 6 pending tickets — 1 of them (Cancel Ryan) is what tests Cancel
+```
 
-   Approach:
-   - Use the now-active OAuth token (clients.ghl_access_token) for BAM GTA
-   - GET /contacts/?locationId=Le9phlhqKyjLyd0JTECv&query=Kun+Liu
-   - Pull contactId → GET /contacts/{contactId} → grab custom fields
-     (athlete_name, plan, parent_email, parent_phone, etc.)
-   - INSERT row into members scoped to BAM GTA client_id
-   - Repeat for John Fu (query=John+Fu)
+## What to do FIRST in the new session
 
-2. Cancel Kun Liu's sub via portal Cancel action.
-   - Sub: sub_1TWoQ0RxInSEtAh8Mt8zPgC9
-   - The portal Cancel action will:
-     - DELETE the Stripe sub
-     - INSERT a cancellations row (denormalized)
-     - DELETE the members row
-   - This clears Sergio's pending Cancel ticket.
+```
+1. Pull latest:  cd /Users/zoransavic/bam-os-requirements && git pull
+2. Ask Zoran which button he wants to test first.
+3. The order he picked: Cancel Ryan FIRST (clears Sergio's ticket #4).
+4. Walk him through:
+     Members tab → search "Ryan" → click card → Cancel button → confirm
+5. Verify:
+     - Stripe sub_1TWoQ0RxInSEtAh8Mt8zPgC9 deleted in Stripe
+     - cancellations row inserted (SELECT * FROM cancellations WHERE athlete_name='Ryan Liu')
+     - members row 9ab25134-3f08-4353-a3ba-27d270b50d97 deleted
+     - member_audit_log entry with action_type='cancel'
+6. Then Pause Lucrecia → Tristan Pierre (#1), Amy → Nathan (#2), Christ (#3)
+7. Then update each task status as you go.
+```
 
-3. John Fu stays as live member (no cancel needed).
+## Sergio's pending tickets (as of 2026-05-30)
 
-4. Update [[project_member_management_portal]] Session 6 section:
-   - mark Kun Liu + John Fu as backfilled
-   - mark Sergio's Cancel ticket as resolved
-   - mark task #4 + #6 complete
+```
+1.  emily pelleja — Pause                         (newest)
+2.  Jamie — Other                                 (??? unclear, ask Zoran)
+3.  Christ's mom — Pause                          ← task #3
+4.  Kun Liu — Ryan's dad — Cancel                 ← task #4 (Ryan now in roster)
+5.  Amy (Nathan's mom) — Pause                    ← task #2
+6.  Lucrecia — Pause                              ← task #1
+```
 
-5. Unpark the onboarding wizard:
-   - update [[project_onboarding_wizard_parked]] from PARKED → ACTIVE
-   - kick off Phase 1 of the wizard build (see that note for details)
+## Key state pointers
 
-## The 3 original pause tickets (still open)
+```
+BAM GTA client_id        39875f07-0a4b-4429-a201-2249bc1f24df
+BAM GTA Stripe acct      acct_1P7kUCRxInSEtAh8
+BAM GTA GHL locationId   Le9phlhqKyjLyd0JTECv
+GHL Marketplace App      "FC"  (Zoran renamed from "BAM Business Portal")
+GHL OAuth client_id      6a1b6d4148da57158ac6a510-mpsz61td
 
-Lucrecia / Amy / Christ's mom — Sergio's pause tickets from session 1.
-After backfilling Ryan + John Fu, ask Zoran if he wants to run the
-3 pauses now (drive him through the portal Pause action on each)
-or save for later.
+Kun Liu / Ryan
+  members.id             9ab25134-3f08-4353-a3ba-27d270b50d97
+  Stripe sub             sub_1TWoQ0RxInSEtAh8Mt8zPgC9 (active, Accelerated $316)
+  GHL contact id         U8DTfeKzDBLuQicSGSv0
+  Parent: Kun Liu, lkun121@yahoo.com, +16475272083
+  Athlete: Ryan Liu (from GHL custom field RqNojS2YaVGQNjMAo4HB)
 
-Subs:
-- Tristan Pierre  (Lucrecia)   sub_1TR9KkRxInSEtAh8cGQPHc7O
-- Nathan          (Amy)        sub_1SQKAmRxInSEtAh80faMUh1C
-- Christ          (Christ's mom) sub_1THXifRxInSEtAh8nEMFdMD8
+John Fu
+  members.id             ae431da8-9cb7-442f-99c6-3fd578e3268e
+  Stripe sub             sub_1TXkQORxInSEtAh8QtnpZKpq (active, Accelerated $316)
+  GHL contact id         vtaIgKM5Rs9K445VihDV
+  Parent: John Fu, johnfu041810121021@gmail.com, (no phone)
+  Athlete: John Fu (NO separate athlete field in his GHL — flag for follow-up)
 
-## What NOT to do
+Buttons guide doc (Zoran's reference)
+  /Users/zoransavic/bam-os-requirements/bam-ghl-agent/docs/member-buttons-guide.html
+```
 
-- Don't re-explain the GHL OAuth setup — he's been through the walkthrough
-  multiple times this session. Reference Session 6 of
-  [[project_member_management_portal]] if he asks again.
-- Don't rebuild any of the views (Pipelines/Inbox/Pricing/Members/Payment-
-  link modal) — they're shipped. If he reports a bug, fix the specific bug.
-- Don't touch the Stripe Connect flow (it's already wired and working).
-- Don't ask him to look at GHL_LOCATIONS_JSON — that's the legacy fallback.
-  The OAuth path is the new path and what we want him on.
+## Things that were tricky — DO NOT redo
 
-## Quick state lookups
+```
+1. The OAuth redirect URI path can't contain "ghl"
+   → We moved api/ghl/connect.js → api/messaging/connect.js
+   → If future-you sees /api/ghl/connect referenced anywhere, that's stale.
+
+2. Bash `echo "..." | vercel env add` adds trailing \n
+   → All GHL OAuth code paths read env vars via (process.env.X || "").trim()
+   → Don't remove that pattern.
+
+3. 4 scopes are Agency-only (not Sub-Account):
+     snapshots.readonly
+     socialplanner/medialibrary.readonly
+     blogs.readonly · blogs.write
+   → These are commented out in api/messaging/connect.js SCOPES list.
+   → If GHL ever exposes them to Sub-Account apps, uncomment + tick in
+     the Marketplace app config.
+
+4. GHL "Submit for review" ≠ "Publish version"
+   → Private apps only need Publish (skip Submit for Review).
+   → Even Private apps need at least 1 published version for OAuth to work.
+
+5. GHL has THREE different "secrets" with similar names:
+     - Client Secret              ← OAuth (GHL_OAUTH_CLIENT_SECRET)
+     - Webhook Shared Secret      ← for future webhook signature verify
+     - App Shared Secret          ← yet another thing, not used yet
+   Zoran pasted the "shared secret key" first by mistake — it's the
+   webhook one. Make sure you're getting the OAuth Client Secret.
+
+6. App type MUST be "Sub-Account" (not "Agency")
+   → location-scoped tokens; tokens for one location work for that location only
+
+7. The persistent GHL banner uses isNativeApp() (NOT _isNativeApp)
+   → typeof guarded; if you add another boot ping, use the same guard.
+
+8. URL structure:
+   /                        → React app's index.html (SPA fallback rewrite)
+   /client-portal.html      → standalone HTML file (the client portal)
+   /api/*                   → serverless functions
+   staff.byanymeansbusiness.com   → React staff portal
+   portal.byanymeansbusiness.com  → /client-portal.html is the canonical client URL
+```
+
+## Files Zoran touched but YOU may not know about
+
+```
+docs/member-buttons-guide.html         Zoran's explainer of the 8 PATCH actions.
+                                       If he asks to "see the doc" — that's the one.
+                                       Open with: open <path>
+```
+
+## Env vars currently set in Vercel for this work
+
+```
+GHL_OAUTH_CLIENT_ID         …61td
+GHL_OAUTH_CLIENT_SECRET     …e5a6
+GHL_OAUTH_STATE_SECRET      …b3fb  (auto-generated this session)
+GHL_LOCATIONS_JSON          (legacy — still set, used as fallback)
+GHL_INTAKE_WEBHOOK_SECRET   (older — used by intake form webhook)
+STRIPE_CONNECT_SECRET_KEY   (the platform key for Connect)
+STRIPE_WEBHOOK_SECRET       (Stripe webhook signature)
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+## After the 6 PATCH actions are verified
+
+```
+1. Mark Sergio's tickets cleared in his queue.
+2. UNPARK the onboarding wizard:
+     - Update [[project_onboarding_wizard_parked]]
+     - Kick off Phase 1 build (~half day for wizard component +
+       Stripe-to-members auto-import).
+3. Refactor task #10 + #11 + #13 (catalog refactor — separate thread,
+   independent of GHL).
+4. Delete this file.
+```
+
+## Quick health checks if anything looks wrong
 
 ```sql
--- BAM GTA's GHL connection state
+-- BAM GTA's GHL OAuth state
 SELECT business_name, ghl_connect_status, ghl_location_id,
        (ghl_access_token IS NOT NULL) AS has_token,
        ghl_token_expires_at
-FROM clients
-WHERE id = '39875f07-0a4b-4429-a201-2249bc1f24df';
+FROM clients WHERE id = '39875f07-0a4b-4429-a201-2249bc1f24df';
 
--- Members with orphan Stripe (Kun Liu + John Fu before backfill)
-SELECT stripe_customer_id, stripe_subscription_id
-FROM stripe_orphan_check  -- not a real table; do reverse sync if needed
+-- Ryan + John Fu rows
+SELECT id, athlete_name, parent_name, status::text, stripe_subscription_id
+FROM members
+WHERE id IN ('9ab25134-3f08-4353-a3ba-27d270b50d97',
+             'ae431da8-9cb7-442f-99c6-3fd578e3268e');
+
+-- Recent audit trail
+SELECT created_at, athlete_name, action_type, performed_by_name
+FROM member_audit_log mal
+LEFT JOIN members m ON m.id = mal.member_id
+WHERE mal.client_id = '39875f07-0a4b-4429-a201-2249bc1f24df'
+ORDER BY mal.created_at DESC LIMIT 20;
 ```
-
-## Context budget at session end
-
-~69% (692k of 1M). Next session can start fresh and pull this note in
-plus [[project_member_management_portal]] Session 6 to get oriented.

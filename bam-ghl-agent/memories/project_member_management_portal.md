@@ -1,6 +1,6 @@
 ---
 name: Member Management → Client Portal
-description: 2026-05-30 (Session 6) — Pipelines view shipped (per-academy GHL kanban, drag-drop stage moves, Convert-to-member button, member/lead classification). Mike's stuck client switcher fixed (max-height + search filter when >5 clients). GHL OAuth flow code COMPLETE but BAM GTA not yet OAuth'd — Zoran in middle of creating GHL Marketplace App. Kun Liu/Ryan + John Fu still NOT in roster — pending GHL access so we can pull form data and backfill. Onboarding wizard parked. Original 3 pause tickets (Lucrecia/Amy/Christ) still pending.
+description: 2026-05-30 (Session 6 final) — GHL OAuth flow LIVE end-to-end for BAM GTA. Marketplace App created (Sub-Account type, white-label), redirect URI moved to /api/messaging/connect (GHL rejects "ghl" in path). clients.ghl_access_token populated. Kun Liu/Ryan + John Fu BACKFILLED into members (athlete name pulled from GHL custom fields). Pipelines view shipped. Mike's stuck client switcher fixed. Persistent GHL-not-connected banner across all views. NEXT: test the 6 PATCH actions (pause/unpause/change/refund/cancel/referred + payment-link) end-to-end — start by clicking Cancel on Ryan to clear Sergio's ticket. Onboarding wizard still parked (now ready to unpark).
 type: project
 ---
 
