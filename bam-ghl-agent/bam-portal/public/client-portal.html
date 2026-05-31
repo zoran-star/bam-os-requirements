@@ -9300,12 +9300,19 @@ const _bbStdPricing = [
         subFields:[
           { key:'length', type:'text', label:'Commitment length', required:true,
             hint:'e.g. "3 months", "6 months", "1 year"' },
-          { key:'price', type:'currency', label:'Price', required:true,
-            hint:'Total or per-cycle — note which in the discount field below' },
+          { key:'price', type:'currency', label:'Price (pre-tax)', required:true,
+            hint:'Headline number before taxes / extra fees' },
+          { key:'extra_fee_value', type:'text', label:'Extra fees',
+            hint:'e.g. "+13% HST" or "$25 admin fee" — leave blank if none' },
+          { key:'extra_fee_description', type:'textarea', label:'Extra fees — description',
+            hint:'What the extra fees cover (taxes, admin, processing, etc.)' },
           { key:'discount_notes', type:'textarea', label:'Notes on the discount',
             hint:'Optional. e.g. "$20/mo off the regular monthly rate" or "Total of $750 vs $900 paid monthly"' },
           { key:'after', type:'check_one', label:'What happens after the commitment?', required:true,
-            options:['Goes back to monthly','Renews same length','Ends'] }
+            options:['Goes back to monthly','Renews same length','Ends','Other'] },
+          { key:'after_other', type:'textarea', label:'Explain what happens', required:true,
+            dep:{ key:'after', equals:'Other' },
+            hint:'Describe the post-commitment behavior' }
         ] },
       { key:'sessions_included', type:'number', label:'Sessions included',
         dep:{ key:'type', equals:'Package' } },
