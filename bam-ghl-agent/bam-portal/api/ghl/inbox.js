@@ -211,17 +211,17 @@ export default async function handler(req, res) {
   }
 
   // Annotate each conversation: member / lead / unknown.
-  // We tag a contact as 'member' if their email or phone matches a member
-  // row for this client. The members table is the source of truth.
-  const contactIds = [...new Set(convos.map(c => c.contactId).filter(Boolean))];
-  const emails     = [...new Set(convos.map(c => c.email).filter(Boolean).map(e => e.toLowerCase()))];
-  const phones     = [...new Set(convos.map(c => c.phone).filter(Boolean))];
-
+  // Primary key is ghl_contact_id (now backfilled across the roster — see
+  // /api/ghl/backfill-contacts). Email + normalized-phone are fallbacks for
+  // the rare case of a new member whose contact_id hasn't synced yet.
   const memberLookups = await sb(
     `members?client_id=eq.${clientId}` +
     `&select=id,athlete_name,parent_name,parent_email,parent_phone,ghl_contact_id,status`
   ).catch(() => []);
   const members = Array.isArray(memberLookups) ? memberLookups : [];
+
+  // Strip everything that isn't a digit so "(416) 555-1234" matches "+14165551234".
+  const normPhone = (p) => (p ? String(p).replace(/\D+/g, "") : "");
 
   const memberByContactId = new Map();
   const memberByEmail     = new Map();
@@ -229,14 +229,15 @@ export default async function handler(req, res) {
   for (const m of members) {
     if (m.ghl_contact_id) memberByContactId.set(m.ghl_contact_id, m);
     if (m.parent_email)   memberByEmail.set(m.parent_email.toLowerCase(), m);
-    if (m.parent_phone)   memberByPhone.set(m.parent_phone, m);
+    const p = normPhone(m.parent_phone);
+    if (p) memberByPhone.set(p, m);
   }
 
   const annotated = convos.map(c => {
     const m =
       (c.contactId && memberByContactId.get(c.contactId)) ||
       (c.email     && memberByEmail.get((c.email || "").toLowerCase())) ||
-      (c.phone     && memberByPhone.get(c.phone)) ||
+      (c.phone     && memberByPhone.get(normPhone(c.phone))) ||
       null;
     return {
       id:                c.id,
