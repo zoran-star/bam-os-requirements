@@ -3,6 +3,10 @@
     {
       "path": "/api/clients?action=cron-resend-invites",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/members?action=cron-process-scheduled-pauses",
+      "schedule": "15 * * * *"
     }
   ],
   "headers": [

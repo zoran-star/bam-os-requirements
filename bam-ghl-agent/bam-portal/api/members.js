@@ -181,6 +181,16 @@ async function writeAudit({ client_id, member_id, action_type, args, performed_b
 // ─────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
+  // ── Cron: scheduled-pause lifecycle (run hourly via vercel.json) ──
+  // Uses bearer CRON_SECRET, runs BEFORE the user-auth resolver.
+  if (req.query.action === "cron-process-scheduled-pauses") {
+    const auth = req.headers.authorization || "";
+    const expected = process.env.CRON_SECRET;
+    if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    if (auth !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
+    return await cronProcessScheduledPauses(res);
+  }
+
   let ctx;
   try {
     ctx = await resolveUser(req);
@@ -429,9 +439,12 @@ export default async function handler(req, res) {
 // out by exactly the pause length beyond the natural next-charge date:
 //   trial_end = max(now, current_period_end) + pause_length_seconds
 //
+// Future-scheduled pauses (start_date > tomorrow) are queued in the
+// `cancellations` table with activated_at=null and picked up by the
+// hourly cron (cronProcessScheduledPauses) when start_date hits.
+//
 // Capped at Stripe's 730-day trial max. Rejects past-due / payment_failed /
-// cancelling members. Rejects past end_date. Does not accept future
-// start_date for now (would need scheduling cron).
+// cancelling members. Rejects past end_date.
 async function actionPause(res, member, stripeAccount, ctx, body) {
   if (!member.stripe_subscription_id) {
     return res.status(400).json({ error: "member has no Stripe subscription to pause" });
@@ -465,14 +478,12 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
   if (endUnix <= nowUnix()) {
     return res.status(400).json({ error: "end_date is in the past — pick a future date" });
   }
-  // V1: only immediate-start pauses (future-scheduled would need a cron)
-  if (startUnix > nowUnix() + 86400) {
-    return res.status(400).json({
-      error: "future-scheduled pauses not supported yet — click Pause on the day it should start",
-    });
-  }
 
-  // Fetch current sub — need state + period_end
+  // Future-scheduled vs immediate. Future = the pause starts more than ~1 day
+  // out; we defer the Stripe trial_end + status flip to the cron at that time.
+  const isFutureScheduled = startUnix > nowUnix() + 86400;
+
+  // Fetch current sub — need state + period_end (only relevant for immediate)
   const currentSub = await stripeFetch(
     `/subscriptions/${member.stripe_subscription_id}`,
     { stripeAccount }
@@ -485,43 +496,70 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     });
   }
 
-  const currentPeriodEnd = currentSub.current_period_end || 0;
   const pauseLengthSeconds = endUnix - startUnix;
-  const anchor = Math.max(nowUnix(), currentPeriodEnd);
-
-  // New rule: pause length is added to the next-payment date, never moves charge in.
-  let trialEndUnix = anchor + pauseLengthSeconds;
-
-  // Cap at Stripe's 730-day trial max (1-day buffer for safety)
-  const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
-  const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
+  let trialEndUnix = null;
   let cappedToStripeMax = false;
-  if (trialEndUnix > stripeCap) {
-    trialEndUnix = stripeCap;
-    cappedToStripeMax = true;
+  let resumeDate = null;
+
+  if (!isFutureScheduled) {
+    // Immediate pause — compute trial_end + apply to Stripe right now
+    const currentPeriodEnd = currentSub.current_period_end || 0;
+    const anchor = Math.max(nowUnix(), currentPeriodEnd);
+    trialEndUnix = anchor + pauseLengthSeconds;
+
+    // Cap at Stripe's 730-day trial max (1-day buffer)
+    const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+    const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
+    if (trialEndUnix > stripeCap) {
+      trialEndUnix = stripeCap;
+      cappedToStripeMax = true;
+    }
+    resumeDate = unixToDateStr(trialEndUnix);
+
+    // Stripe: set trial_end + clear pause_collection if it was set
+    await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+      method: "POST",
+      stripeAccount,
+      body: {
+        trial_end: String(trialEndUnix),
+        proration_behavior: "none",
+        "pause_collection": "",
+      },
+    });
   }
 
-  const resumeDate = unixToDateStr(trialEndUnix);
+  // If re-pausing (already paused or pending future pause), expire prior pause row(s)
+  // so we don't have two active pauses on the same member.
+  const priorRows = await sb(
+    `cancellations?member_id=eq.${member.id}&type=eq.pause&completed_at=is.null&select=id&limit=10`
+  );
+  if (Array.isArray(priorRows) && priorRows.length > 0) {
+    for (const r of priorRows) {
+      await sb(`cancellations?id=eq.${r.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ completed_at: nowIso(), reason: (body.reason || "") + " [superseded by pause update]" }),
+      }).catch(() => {});
+    }
+  }
 
-  // Stripe: set trial_end + clear pause_collection if it was set
-  const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
-    method: "POST",
-    stripeAccount,
-    body: {
-      trial_end: String(trialEndUnix),
-      proration_behavior: "none",
-      "pause_collection": "",
-    },
-  });
+  // Build sub object for return / audit (Stripe doesn't always return on PATCH read)
+  const sub = isFutureScheduled
+    ? { id: currentSub.id, status: currentSub.status, trial_end: currentSub.trial_end }
+    : { ...currentSub, trial_end: trialEndUnix };
 
   // DB writes
   const dbChanges = {};
-  await sb(`members?id=eq.${member.id}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "paused", updated_at: nowIso() }),
-  });
-  dbChanges.members = { id: member.id, status: "paused" };
+  if (!isFutureScheduled) {
+    await sb(`members?id=eq.${member.id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "paused", updated_at: nowIso() }),
+    });
+    dbChanges.members = { id: member.id, status: "paused" };
+  } else {
+    dbChanges.members = { id: member.id, status: "live (pause scheduled)" };
+  }
 
   await sb(`cancellations`, {
     method: "POST",
@@ -538,25 +576,26 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
       reason: body.reason || null,
       stripe_subscription_id: member.stripe_subscription_id,
       stripe_customer_id: member.stripe_customer_id,
+      activated_at: isFutureScheduled ? null : nowIso(),
     }]),
   });
-  dbChanges.cancellations = "inserted";
+  dbChanges.cancellations = isFutureScheduled ? "inserted (pending)" : "inserted (active)";
 
   await writeAudit({
     client_id: member.client_id,
     member_id: member.id,
-    action_type: "pause",
+    action_type: isFutureScheduled ? "pause-scheduled" : "pause",
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end, capped_to_stripe_max: cappedToStripeMax, pause_length_days: Math.round(pauseLengthSeconds / 86400) },
+    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end, capped_to_stripe_max: cappedToStripeMax, pause_length_days: Math.round(pauseLengthSeconds / 86400), scheduled: isFutureScheduled },
     db_changes: dbChanges,
   });
 
   return res.status(200).json({
     ok: true,
-    member: { id: member.id, status: "paused" },
-    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate, capped_to_stripe_max: cappedToStripeMax },
+    member: { id: member.id, status: isFutureScheduled ? "live" : "paused", pause_scheduled_for: isFutureScheduled ? start_date : null },
+    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate, capped_to_stripe_max: cappedToStripeMax, scheduled: isFutureScheduled },
   });
 }
 
@@ -1032,4 +1071,150 @@ async function actionUpdateProfile(res, member, ctx, body) {
   });
 
   return res.status(200).json({ ok: true, member: updated });
+}
+
+// ─────────────────────────────────────────────────────────
+// Cron: process scheduled pauses (runs hourly via vercel.json)
+// ─────────────────────────────────────────────────────────
+// Two phases:
+//   Phase A — Activate: cancellations rows with type='pause' AND
+//             activated_at IS NULL AND pause_start <= today.
+//             → fetch the sub, compute trial_end per the standard rule,
+//               PATCH Stripe, flip members.status='paused', set activated_at.
+//   Phase B — Complete: cancellations rows with type='pause' AND
+//             activated_at IS NOT NULL AND completed_at IS NULL AND
+//             pause_end <= today, AND linked member is currently 'paused'.
+//             → flip members.status='live', set completed_at.
+//
+// Phase B catches ALL pauses (immediate and future-scheduled) that should
+// auto-recover when the user's chosen end_date passes — closing the gap
+// where members.status='paused' lingered until Stripe's invoice fired.
+async function cronProcessScheduledPauses(res) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayUnix = isoToUnix(today);
+  let activated = 0, completed = 0, activationErrors = 0, completionErrors = 0;
+  const errors = [];
+
+  // ── Phase A: activate due pauses ──
+  const pendingPauses = await sb(
+    `cancellations?type=eq.pause&activated_at=is.null&pause_start=lte.${today}&select=id,client_id,member_id,pause_start,pause_end,stripe_subscription_id&limit=100`
+  );
+  for (const row of (pendingPauses || [])) {
+    try {
+      // Load member + figure out which connected account
+      const memberRows = await sb(`members?id=eq.${row.member_id}&select=*`);
+      const member = Array.isArray(memberRows) && memberRows[0];
+      if (!member || !member.stripe_subscription_id) {
+        await sb(`cancellations?id=eq.${row.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ activated_at: nowIso(), completed_at: nowIso(), reason: "skipped — no member or sub" }),
+        });
+        continue;
+      }
+      const clientRows = await sb(`clients?id=eq.${member.client_id}&select=stripe_connect_account_id`);
+      const stripeAccount = clientRows?.[0]?.stripe_connect_account_id || null;
+      if (!stripeAccount) {
+        errors.push({ row_id: row.id, reason: "no stripe_connect_account_id on client" });
+        activationErrors++;
+        continue;
+      }
+
+      const currentSub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, { stripeAccount });
+
+      // Compute trial_end using the standard rule against the pause length.
+      const pauseLengthSeconds = isoToUnix(row.pause_end) - isoToUnix(row.pause_start);
+      const anchor = Math.max(todayUnix, currentSub.current_period_end || 0);
+      let trialEndUnix = anchor + pauseLengthSeconds;
+      const stripeCap = todayUnix + 729 * 86400;
+      const capped = trialEndUnix > stripeCap;
+      if (capped) trialEndUnix = stripeCap;
+
+      await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
+        method: "POST",
+        stripeAccount,
+        body: { trial_end: String(trialEndUnix), proration_behavior: "none", "pause_collection": "" },
+      });
+
+      await sb(`members?id=eq.${member.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "paused", updated_at: nowIso() }),
+      });
+
+      await sb(`cancellations?id=eq.${row.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ activated_at: nowIso() }),
+      });
+
+      await writeAudit({
+        client_id: member.client_id,
+        member_id: member.id,
+        action_type: "cron-pause-activated",
+        args: { cancellations_id: row.id, pause_start: row.pause_start, pause_end: row.pause_end },
+        stripe_response: { id: currentSub.id, trial_end: trialEndUnix, capped_to_stripe_max: capped },
+        db_changes: { members: { status: "live → paused" } },
+      });
+
+      activated++;
+    } catch (e) {
+      activationErrors++;
+      errors.push({ row_id: row.id, phase: "activate", message: e.message });
+    }
+  }
+
+  // ── Phase B: complete ended pauses ──
+  const dueToComplete = await sb(
+    `cancellations?type=eq.pause&activated_at=not.is.null&completed_at=is.null&pause_end=lte.${today}&select=id,client_id,member_id,pause_end&limit=200`
+  );
+  for (const row of (dueToComplete || [])) {
+    try {
+      const memberRows = await sb(`members?id=eq.${row.member_id}&select=id,client_id,status`);
+      const member = Array.isArray(memberRows) && memberRows[0];
+
+      // If the member row is gone (cancelled), just mark the pause completed.
+      if (!member) {
+        await sb(`cancellations?id=eq.${row.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ completed_at: nowIso() }),
+        });
+        continue;
+      }
+
+      // Only flip to 'live' if still 'paused'. Other statuses (cancelling,
+      // payment_failed) shouldn't be overridden by the cron.
+      if (member.status === "paused") {
+        await sb(`members?id=eq.${member.id}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+        });
+      }
+
+      await sb(`cancellations?id=eq.${row.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ completed_at: nowIso() }),
+      });
+
+      await writeAudit({
+        client_id: member.client_id,
+        member_id: member.id,
+        action_type: "cron-pause-completed",
+        args: { cancellations_id: row.id, pause_end: row.pause_end },
+        stripe_response: null,
+        db_changes: { members: member.status === "paused" ? { status: "paused → live" } : { status: `unchanged (${member.status})` } },
+      });
+
+      completed++;
+    } catch (e) {
+      completionErrors++;
+      errors.push({ row_id: row.id, phase: "complete", message: e.message });
+    }
+  }
+
+  console.log(`[cron-process-scheduled-pauses] activated=${activated} completed=${completed} errors=${activationErrors + completionErrors}`);
+  return res.status(200).json({ ok: true, activated, completed, activationErrors, completionErrors, errors });
 }

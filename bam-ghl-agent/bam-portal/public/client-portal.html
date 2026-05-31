@@ -13802,22 +13802,34 @@ async function _memberAction(memberId, action, body) {
 }
 
 async function mPause(memberId) {
+  // Re-pause detection: lookup the in-memory member to see current status.
+  const m = (typeof _MEMBERS_ALL !== 'undefined' ? _MEMBERS_ALL : []).find(x => x.id === memberId);
+  const isUpdatingExistingPause = m && m.status === 'paused';
+  const labelHead = isUpdatingExistingPause ? 'Update pause' : 'Pause';
+
+  if (isUpdatingExistingPause) {
+    if (!confirm('This member is already paused. Update the pause window?')) return;
+  }
+
   const today = new Date().toISOString().slice(0, 10);
-  const start = prompt('Pause START date (YYYY-MM-DD):', today);
+  const start = prompt(`${labelHead} — START date (YYYY-MM-DD):`, today);
   if (start === null) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start.trim())) { alert('Start date must be YYYY-MM-DD.'); return; }
 
-  const end = prompt('Pause END date (YYYY-MM-DD):', '');
+  const end = prompt(`${labelHead} — END date (YYYY-MM-DD):`, '');
   if (end === null) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(end.trim())) { alert('End date must be YYYY-MM-DD.'); return; }
 
-  const reason = prompt('Pause reason (optional)', '');
+  const reason = prompt(`${labelHead} — reason (optional)`, '');
   const body = { start_date: start.trim(), end_date: end.trim() };
   if (reason && reason.trim()) body.reason = reason.trim();
 
   try {
     const r = await _memberAction(memberId, 'pause', body);
-    let msg = 'Paused.';
+    let msg = isUpdatingExistingPause ? 'Pause updated.' : 'Paused.';
+    if (r.sub?.scheduled) {
+      msg = `Pause scheduled to start ${start.trim()}. Billing will pause automatically on that date.`;
+    }
     if (r.sub?.capped_to_stripe_max) {
       msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max — the resume date is sooner than what you entered.';
     }
@@ -13825,7 +13837,7 @@ async function mPause(memberId) {
     alert(msg);
     closeMemberPopup();
     fetchAndRenderMembers();
-  } catch (e) { alert('Pause failed: ' + e.message); }
+  } catch (e) { alert(`${labelHead} failed: ` + e.message); }
 }
 
 async function mUnpause(memberId) {
