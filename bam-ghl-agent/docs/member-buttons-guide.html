@@ -386,12 +386,12 @@
   <div class="flow">
     <div class="step">
       <div class="stage">You click</div>
-      <div class="what">Pick how long: <strong>weeks</strong>, a <strong>date</strong>, or <strong>indefinite</strong></div>
+      <div class="what">Pick a <strong>start date</strong> and <strong>end date</strong></div>
     </div>
     <div class="arrow">→</div>
     <div class="step">
       <div class="stage">Stripe</div>
-      <div class="what">Stops charging until the resume date</div>
+      <div class="what">Next charge moves out by the pause length</div>
     </div>
     <div class="arrow">→</div>
     <div class="step">
@@ -455,19 +455,19 @@
 
   <div class="math-grid">
     <div class="math-box">
-      <div class="mode">Weeks mode</div>
-      <div class="formula">today + (N × 7 days)</div>
-      <div class="example">Pause 3 weeks today (Jan 15) → resume Feb 5</div>
+      <div class="mode">The formula</div>
+      <div class="formula">next_charge + pause_length</div>
+      <div class="example">Pause length = end_date − start_date</div>
     </div>
     <div class="math-box">
-      <div class="mode">Until-date mode</div>
-      <div class="formula">that exact date</div>
-      <div class="example">Pause until Mar 1 → resume Mar 1</div>
+      <div class="mode">Example</div>
+      <div class="formula">Feb 5 + 7d = Feb 12</div>
+      <div class="example">Cycle to Feb 5, pause Jan 15 → Jan 22 (7d), next charge Feb 12</div>
     </div>
     <div class="math-box">
-      <div class="mode">Indefinite</div>
-      <div class="formula">today + 720 days</div>
-      <div class="example">Stripe's hard limit. ~2 years.</div>
+      <div class="mode">Stripe cap</div>
+      <div class="formula">max 730 days</div>
+      <div class="example">Resume date is capped if you pick further out.</div>
     </div>
   </div>
 
@@ -479,8 +479,8 @@
     <div class="edge">
       <div class="edge-num">01</div>
       <div class="edge-body">
-        <strong>Pause never moves the next charge earlier than it would naturally be.</strong>
-        If the requested pause is shorter than the days remaining in their current paid period, the system automatically extends the pause to the end of the current period — so the next charge never comes in early. The pause length you enter is treated as a minimum.
+        <strong>Pause always extends the next charge by exactly the pause length.</strong>
+        Whether the pause is 1 day or 4 weeks, the next charge date moves out by exactly that much. No surprises. The parent's unused paid time isn't lost — it gets folded into the extension.
         <br><br>
 
         <div style="background: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: 4px; padding: 14px 16px; margin-top: 10px;">
@@ -489,16 +489,11 @@
           </div>
           <div style="font-size: 13px; line-height: 1.7;">
             Parent paid $59 on <strong>Jan 5</strong> (cycle Jan 5 → Feb 5).<br>
-            You pause them on <strong>Jan 15</strong> for 1 week.<br>
-            Pause end would be Jan 22 — but their cycle was paid through Feb 5.<br>
-            The system auto-extends the pause to <strong>Feb 5</strong> (no early charge).<br>
-            On Feb 5, Stripe charges them <strong>$59</strong> for the next month.<br>
-            <span style="color: var(--green);">Net: pause respects what they already paid for.</span>
+            Today is Jan 15. You pause: start <strong>Jan 15</strong>, end <strong>Jan 22</strong> (7 days).<br>
+            Next charge moves: <strong>Feb 5 + 7 days = Feb 12</strong>.<br>
+            On Feb 12, Stripe charges them <strong>$59</strong> for the next cycle.<br>
+            <span style="color: var(--green);">Net: pause length is preserved as a billing extension.</span>
           </div>
-        </div>
-
-        <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--hairline-2); font-size: 13px;">
-          For longer pauses (longer than days remaining in cycle), the next charge moves forward by however much the pause exceeds the cycle end. Pause 4 weeks on Jan 15 → next charge Feb 12 (7 days later than original Feb 5).
         </div>
       </div>
     </div>
@@ -506,8 +501,8 @@
     <div class="edge warning">
       <div class="edge-num">02</div>
       <div class="edge-body">
-        <strong>Indefinite isn't truly indefinite.</strong>
-        It's capped at 720 days because Stripe won't allow longer. If they're still paused after ~2 years, Stripe will auto-charge them on day 720. If you want them paused forever, use <strong>Cancel</strong> instead.
+        <strong>End date is capped at ~730 days from today.</strong>
+        Stripe's hard limit. If you pick an end date further out, the system clamps it and the response tells you. For permanent pauses, use <strong>Cancel</strong> instead.
       </div>
     </div>
 

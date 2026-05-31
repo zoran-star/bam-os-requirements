@@ -42,11 +42,6 @@ const PLAN_TO_PRICE = {
 const PLAN_TIER = { "1/wk": 1, "2/wk": 2, "3/wk": 3, "unlmtd": 4 };
 const VALID_PLANS = Object.keys(PLAN_TO_PRICE);
 
-// 720 days = "essentially forever, but recoverable". Just under Stripe's
-// 730-day (2yr) cap — gives a buffer + Stripe pings via
-// customer.subscription.trial_will_end 3 days before expiry.
-const PAUSE_INDEFINITE_DAYS = 720;
-
 // ─────────────────────────────────────────────────────────
 // Shared helpers
 // ─────────────────────────────────────────────────────────
@@ -427,44 +422,86 @@ export default async function handler(req, res) {
 // ─────────────────────────────────────────────────────────
 // Action: PAUSE
 // ─────────────────────────────────────────────────────────
-// body: { duration: "indefinite" } | { until: "YYYY-MM-DD" } | { weeks: N } | reason?
-// Sets Stripe sub trial_end (never pause_collection). Indefinite = 720 days.
-// Writes a cancellations row (type='pause'), flips members.status='paused'.
+// body: { start_date: "YYYY-MM-DD", end_date: "YYYY-MM-DD", reason? }
+//
+// One mode: explicit start + end date. Pause length = end - start (days).
+// Billing pause via Stripe trial_end, computed so the next charge is shifted
+// out by exactly the pause length beyond the natural next-charge date:
+//   trial_end = max(now, current_period_end) + pause_length_seconds
+//
+// Capped at Stripe's 730-day trial max. Rejects past-due / payment_failed /
+// cancelling members. Rejects past end_date. Does not accept future
+// start_date for now (would need scheduling cron).
 async function actionPause(res, member, stripeAccount, ctx, body) {
   if (!member.stripe_subscription_id) {
     return res.status(400).json({ error: "member has no Stripe subscription to pause" });
   }
 
-  let intendedTrialEnd;
-  let intendedResumeDate = null;
-  if (body.until) {
-    intendedTrialEnd = isoToUnix(body.until);
-    intendedResumeDate = String(body.until).slice(0, 10);
-  } else if (body.weeks) {
-    const weeks = Number(body.weeks);
-    if (!Number.isFinite(weeks) || weeks < 1) {
-      return res.status(400).json({ error: "weeks must be a positive number" });
-    }
-    intendedTrialEnd = nowUnix() + weeks * 7 * 86400;
-    intendedResumeDate = unixToDateStr(intendedTrialEnd);
-  } else {
-    // indefinite (default)
-    intendedTrialEnd = nowUnix() + PAUSE_INDEFINITE_DAYS * 86400;
+  // Block pauses on members already in a problem state
+  if (member.status === "payment_failed") {
+    return res.status(400).json({
+      error: "Member has a failed payment. Send the Payment Link to fix their card before pausing.",
+    });
+  }
+  if (member.status === "cancelling") {
+    return res.status(400).json({
+      error: "Member is being cancelled. Pause is not allowed — un-cancel first.",
+    });
   }
 
-  // Guard against short pauses that would otherwise pull the next charge IN.
-  // If the parent's current paid period ends LATER than the requested pause
-  // end, extend the pause so trial_end is no earlier than current_period_end.
-  // This guarantees pausing never moves the next charge earlier than it would
-  // have naturally been.
+  // Validate dates
+  const { start_date, end_date } = body;
+  if (!start_date || !end_date) {
+    return res.status(400).json({ error: "start_date and end_date required (YYYY-MM-DD)" });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start_date) || !/^\d{4}-\d{2}-\d{2}$/.test(end_date)) {
+    return res.status(400).json({ error: "dates must be YYYY-MM-DD" });
+  }
+  const startUnix = isoToUnix(start_date);
+  const endUnix   = isoToUnix(end_date);
+  if (endUnix <= startUnix) {
+    return res.status(400).json({ error: "end_date must be after start_date" });
+  }
+  if (endUnix <= nowUnix()) {
+    return res.status(400).json({ error: "end_date is in the past — pick a future date" });
+  }
+  // V1: only immediate-start pauses (future-scheduled would need a cron)
+  if (startUnix > nowUnix() + 86400) {
+    return res.status(400).json({
+      error: "future-scheduled pauses not supported yet — click Pause on the day it should start",
+    });
+  }
+
+  // Fetch current sub — need state + period_end
   const currentSub = await stripeFetch(
     `/subscriptions/${member.stripe_subscription_id}`,
     { stripeAccount }
   );
+
+  // Block pauses on past-due / unpaid subs (parent needs to fix card first)
+  if (currentSub.status === "past_due" || currentSub.status === "unpaid") {
+    return res.status(400).json({
+      error: `Stripe sub is ${currentSub.status} — fix the card via the Payment Link before pausing.`,
+    });
+  }
+
   const currentPeriodEnd = currentSub.current_period_end || 0;
-  const trialEndUnix = Math.max(intendedTrialEnd, currentPeriodEnd);
-  const adjustedToPeriodEnd = trialEndUnix !== intendedTrialEnd;
-  const resumeDate = intendedResumeDate ? unixToDateStr(trialEndUnix) : null;
+  const pauseLengthSeconds = endUnix - startUnix;
+  const anchor = Math.max(nowUnix(), currentPeriodEnd);
+
+  // New rule: pause length is added to the next-payment date, never moves charge in.
+  let trialEndUnix = anchor + pauseLengthSeconds;
+
+  // Cap at Stripe's 730-day trial max (1-day buffer for safety)
+  const STRIPE_TRIAL_MAX_SECS = 729 * 86400;
+  const stripeCap = nowUnix() + STRIPE_TRIAL_MAX_SECS;
+  let cappedToStripeMax = false;
+  if (trialEndUnix > stripeCap) {
+    trialEndUnix = stripeCap;
+    cappedToStripeMax = true;
+  }
+
+  const resumeDate = unixToDateStr(trialEndUnix);
 
   // Stripe: set trial_end + clear pause_collection if it was set
   const sub = await stripeFetch(`/subscriptions/${member.stripe_subscription_id}`, {
@@ -496,8 +533,8 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
       archetype: member.archetype,
       parent_name: member.parent_name,
       type: "pause",
-      pause_start: unixToDateStr(nowUnix()),
-      pause_end: resumeDate,
+      pause_start: start_date,
+      pause_end: end_date,
       reason: body.reason || null,
       stripe_subscription_id: member.stripe_subscription_id,
       stripe_customer_id: member.stripe_customer_id,
@@ -512,14 +549,14 @@ async function actionPause(res, member, stripeAccount, ctx, body) {
     args: body,
     performed_by: ctx.user.id,
     performed_by_name: ctx.staff?.name || null,
-    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end, adjusted_to_period_end: adjustedToPeriodEnd },
+    stripe_response: { id: sub.id, status: sub.status, trial_end: sub.trial_end, capped_to_stripe_max: cappedToStripeMax, pause_length_days: Math.round(pauseLengthSeconds / 86400) },
     db_changes: dbChanges,
   });
 
   return res.status(200).json({
     ok: true,
     member: { id: member.id, status: "paused" },
-    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate, adjusted_to_period_end: adjustedToPeriodEnd },
+    sub: { id: sub.id, status: sub.status, trial_end: sub.trial_end, resume_date: resumeDate, capped_to_stripe_max: cappedToStripeMax },
   });
 }
 

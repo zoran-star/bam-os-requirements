@@ -13802,19 +13802,27 @@ async function _memberAction(memberId, action, body) {
 }
 
 async function mPause(memberId) {
-  const dur = prompt('Pause for how long?\n  • leave blank → INDEFINITE (720 days)\n  • or N weeks (just a number, e.g. "4")\n  • or until date (e.g. "2026-09-15")', '');
-  if (dur === null) return;
-  const body = {};
-  const t = dur.trim();
-  if (!t) { /* indefinite */ }
-  else if (/^\d{4}-\d{2}-\d{2}$/.test(t)) body.until = t;
-  else if (/^\d+$/.test(t)) body.weeks = parseInt(t, 10);
-  else { alert('Not a recognized format.'); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const start = prompt('Pause START date (YYYY-MM-DD):', today);
+  if (start === null) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start.trim())) { alert('Start date must be YYYY-MM-DD.'); return; }
+
+  const end = prompt('Pause END date (YYYY-MM-DD):', '');
+  if (end === null) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(end.trim())) { alert('End date must be YYYY-MM-DD.'); return; }
+
   const reason = prompt('Pause reason (optional)', '');
+  const body = { start_date: start.trim(), end_date: end.trim() };
   if (reason && reason.trim()) body.reason = reason.trim();
+
   try {
-    await _memberAction(memberId, 'pause', body);
-    alert('Paused.');
+    const r = await _memberAction(memberId, 'pause', body);
+    let msg = 'Paused.';
+    if (r.sub?.capped_to_stripe_max) {
+      msg += '\n\n⚠ End date was capped to Stripe\'s 730-day max — the resume date is sooner than what you entered.';
+    }
+    if (r.sub?.resume_date) msg += `\n\nNext charge: ${r.sub.resume_date}`;
+    alert(msg);
     closeMemberPopup();
     fetchAndRenderMembers();
   } catch (e) { alert('Pause failed: ' + e.message); }
