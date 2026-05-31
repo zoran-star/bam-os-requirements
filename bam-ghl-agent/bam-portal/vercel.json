@@ -7,6 +7,10 @@
     {
       "path": "/api/members?action=cron-process-scheduled-pauses",
       "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/ghl/cron-sync-contacts",
+      "schedule": "*/10 * * * *"
     }
   ],
   "headers": [
