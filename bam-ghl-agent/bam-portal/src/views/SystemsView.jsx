@@ -212,7 +212,7 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {visibleTickets.map(x => (
-                <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} />
+                <TicketCard key={x.id} ticket={x} tokens={t} onOpen={() => setSelected(x)} completed={tab === "completed"} />
               ))}
             </div>
           )}
@@ -244,10 +244,20 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 // top), then TIMELINE SENSITIVE (urgent OR overdue OR due within 2
 // business days, sorted most overdue → nearest due).
 function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpToTab }) {
+  // "Completed in the last 5 days" — done/approved/cancelled tickets whose
+  // resolved_at lands within the trailing 5-day window. Clicking jumps to
+  // the Completed tab (which shows the full archive).
+  const fiveDaysAgo = new Date(); fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+  const completedLast5 = tickets.filter(x =>
+    ["done","approved","cancelled"].includes(x.status) &&
+    x.resolved_at && new Date(x.resolved_at).getTime() >= fiveDaysAgo.getTime()
+  ).length;
+
   const tileData = [
     { key: "lobby",    label: "tickets in lobby",   count: tickets.filter(x => ["open","delegated"].includes(x.status)).length },
     { key: "ongoing",  label: "tickets ongoing",    count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status)).length },
     { key: "review",   label: "tickets in review",  count: tickets.filter(x => x.status === "in_review").length },
+    { key: "completed", label: "completed last 5 days", count: completedLast5 },
   ];
 
   // Timeline-sensitive predicate — used both to filter the Timeline
@@ -291,7 +301,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       {/* Stat tiles */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
         {tileData.map(tile => (
           <button
             key={tile.key}
@@ -458,28 +468,44 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
   );
 }
 
-function TicketCard({ ticket, tokens: t, onOpen }) {
+function TicketCard({ ticket, tokens: t, onOpen, completed }) {
   const title = ticket.menu_item
     || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
   const preview = Object.values(ticket.fields || {}).filter(Boolean).join(" · ").slice(0, 120);
+  // On the Completed tab, surface the completion date (resolved_at) large
+  // on the right so staff can scan "what got finished and when" at a glance.
+  const showCompletedDate = completed && ticket.resolved_at;
   return (
     <div onClick={onOpen} style={{
       background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12,
       padding: "16px 20px", cursor: "pointer", transition: "border-color 0.2s",
+      display: "flex", alignItems: "center", gap: 20,
     }}
       onMouseEnter={e => e.currentTarget.style.borderColor = t.borderMed}
       onMouseLeave={e => e.currentTarget.style.borderColor = t.border}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-        {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
-        <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{formatDate(ticket.submitted_at)}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+          {ticket.priority === "urgent" && <span style={{ fontSize: 11, fontWeight: 700, color: t.red }}>🔴 URGENT</span>}
+          {!showCompletedDate && <span style={{ fontSize: 12, color: t.textMute, marginLeft: "auto" }}>{formatDate(ticket.submitted_at)}</span>}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
+        <div style={{ fontSize: 13, color: t.textMute, marginBottom: 8 }}>
+          {ticket.client?.business_name || "Unknown client"}
+          {ticket.assignee && <> · assigned to <b style={{ color: t.textSub }}>{ticket.assignee.name}</b></>}
+        </div>
+        {preview && <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.4 }}>{preview}</div>}
       </div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 4 }}>{title}</div>
-      <div style={{ fontSize: 13, color: t.textMute, marginBottom: 8 }}>
-        {ticket.client?.business_name || "Unknown client"}
-        {ticket.assignee && <> · assigned to <b style={{ color: t.textSub }}>{ticket.assignee.name}</b></>}
-      </div>
-      {preview && <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.4 }}>{preview}</div>}
+      {showCompletedDate && (
+        <div style={{ flexShrink: 0, textAlign: "right" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: t.textMute, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+            Completed
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: t.text, letterSpacing: "-0.01em" }}>
+            {formatDate(ticket.resolved_at)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
