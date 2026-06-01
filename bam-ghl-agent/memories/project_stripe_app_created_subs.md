@@ -51,8 +51,34 @@ The failed portal attempt leaves a `cancellations` row with
 that, the sub is not app-created — fall back to the manual-billing + DB-pause
 pattern above.
 
-## Open question / future fix
+## Root cause (confirmed 2026-06-01) — it's the account TYPE, not the key
 
-To let the portal manage these subs, the connected account would need to grant
-the platform broader access, or the subs would need to be recreated through the
-app. Not solved yet — flag to Zoran if it recurs at scale.
+Retrieved the connected account `acct_1P7kUCRxInSEtAh8`:
+
+```
+type       : standard
+controller : { "type": "account" }   (the academy controls its own Stripe)
+business   : By Any Means Toronto
+```
+
+For **Standard** connected accounts, Stripe gives the platform READ access to
+everything but WRITE access **only to objects the platform itself created**.
+This is a hard, by-design limit — **no API key (restricted or full secret)
+lifts it.** We confirmed empirically: the platform secret key + `Stripe-Account`
+header READS Knowl's sub fine but the portal's PATCH is rejected.
+
+The only way to get full write access to dashboard/imported subs would be if the
+account were **Express or Custom** (controller = the platform/application), i.e.
+BAM controls the academy's Stripe instead of the academy owning its own
+dashboard. Not worth it — would mean re-onboarding their entire Stripe under BAM.
+
+## The accepted model (no fix needed)
+
+```
+Sub created BY the portal      → all 6 buttons work ✅
+Sub created in dashboard/import → edit by hand in Stripe 🖐
+```
+
+Affected = the migrated/backfilled BAM GTA roster (joined before the portal
+created subs). Every NEW signup through the portal is fully managed. Self-heals
+over time. Keep manual-for-legacy; do NOT pursue "broaden Connect access."
