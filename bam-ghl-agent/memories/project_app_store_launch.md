@@ -131,18 +131,26 @@ review notes, final checklist).
   reloads this work, prints a 9-step status board, and continues the
   walkthrough.
 
-## Step 4 — Demo account (in progress, 2026-05-21)
+## Step 4 — Demo account ✅ DONE (2026-06-01)
 
 Demo reviewer account `zoran+appreview@byanymeansbball.com` / "Demo
-Academy" client created in the staff portal — auth user + clients row
-exist and are linked. Blocker hit: clicking the invite email landed on
-the **staff** portal HQ login, not the client portal.
+Academy" — fully set up and verified:
+- auth user + clients row + `client_users` owner row all linked
+- password set; `email_confirmed_at` 2026-05-21, `last_sign_in_at`
+  2026-05-22, `onboarding_completed_at` 2026-05-22 (tour done)
+- **1 sample Change ticket seeded** (id
+  `03acda4e-ed3b-4f37-812d-32f07b1815ce`) with a 2-message client↔staff
+  thread, so the reviewer doesn't see an empty Messages tab.
 
-Root cause = the Supabase redirect_to → Site URL fallback bug; fixed in
-commit `d35d124` (see [[Client Portal Auth]] gotcha). Once that deploy
-lands, re-send the invite/reset for Demo Academy → it lands on the
-client portal → set the password → submit one sample ticket → Step 4
-done. The stale `CLIENT_PORTAL_URL` env var can be deleted from Vercel.
+The earlier blocker (invite email landed on the **staff** HQ login) was
+the Supabase redirect_to → Site URL fallback bug, fixed in `d35d124`
+(see [[Client Portal Auth]] gotcha) and since deployed. **Action left for
+Zoran:** put the password he set into the App Store / Play review forms.
+The stale `CLIENT_PORTAL_URL` env var can still be deleted from Vercel.
+
+**Remaining [Zoran] gates before submit:** Part 1 feature approval, Part 2
+phone testing, screenshots + Play feature graphic, the Mac/Xcode compile
+(iOS archive) + Android `.aab`, then the two store submissions.
 
 ## Related notes
 - [[project_client_portal_mobile]] — the mobile/phone layout pass that made

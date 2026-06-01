@@ -232,7 +232,13 @@ tracking or advertising.** Declare exactly this:
 
 ---
 
-## Part 6 — Demo reviewer account  **[Zoran]**
+## Part 6 — Demo reviewer account  ✅ DONE
+
+> **Status (2026-06-01):** Demo Academy created, `zoran+appreview@byanymeansbball.com`
+> invited, password set, login + tour completed, and **1 sample Change ticket
+> with a 2-message client↔staff thread** seeded so the Messages tab isn't empty
+> for the reviewer. Ticket id `03acda4e-ed3b-4f37-812d-32f07b1815ce`. **Put the
+> password Zoran set into the review forms.** Steps below kept for reference.
 
 Apple and Google **require working credentials** to review a login-gated
 app — no login, instant rejection. Don't hand-write SQL for this: use the
@@ -361,11 +367,11 @@ Contact: zoran@byanymeansbball.com
 
 - [ ] Part 1 feature list approved
 - [ ] Part 2 testing checklist fully passed on a phone
-- [ ] `privacy.html` + `support.html` live (pushed to `main`, deployed)
-- [ ] Demo reviewer account created, seeded, and login tested
+- [x] `privacy.html` + `support.html` live (pushed to `main`, deployed)
+- [x] Demo reviewer account created, seeded, and login tested *(Demo Academy + `zoran+appreview@…`; password set, login + tour done, 1 sample Change ticket w/ thread seeded 2026-06-01)*
 - [ ] Screenshots captured at the required sizes
 - [ ] Feature graphic made (Play)
-- [ ] `appId` / `server.url` confirmed in `capacitor.config.json`
+- [x] `appId` / `server.url` confirmed in `capacitor.config.json` *(verified 2026-05-20)*
 - [ ] APNs `.p8` key created (needed before push *sending* — not blocking
       this submission)
 - [ ] iOS build archived + uploaded
