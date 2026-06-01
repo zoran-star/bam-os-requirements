@@ -2389,9 +2389,12 @@ function ActionItemsTab({ client, tokens, session }) {
     } catch (e) { alert(e.message); }
   }
 
-  const open = items.filter(i => !i.completed_at);
-  const done = items.filter(i => i.completed_at);
+  const onb = items.filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const rest = items.filter(i => !i.onboarding_key);
+  const open = rest.filter(i => !i.completed_at);
+  const done = rest.filter(i => i.completed_at);
   const today = new Date().toISOString().slice(0, 10);
+  const groupLabel = { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: t.textMute, margin: "18px 0 10px" };
   const inputStyle = {
     width: "100%", padding: "9px 11px", background: t.surface,
     border: `1px solid ${t.border}`, borderRadius: 6, color: t.text,
@@ -2439,6 +2442,23 @@ function ActionItemsTab({ client, tokens, session }) {
     );
   }
 
+  // Onboarding step row — AUTO steps (Stripe/GHL connect) are locked; MANUAL
+  // steps (Slack / Create GHL) are checkable by staff or academy.
+  function onbRow(it) {
+    const auto = _AI_ONB_AUTO.has(it.onboarding_key);
+    const isDone = !!it.completed_at;
+    return (
+      <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: isDone ? 0.6 : 1 }}>
+        <input type="checkbox" checked={isDone} disabled={auto}
+          onChange={() => { if (!auto) toggle(it); }}
+          title={auto ? "Completes automatically when connected" : ""}
+          style={{ width: 18, height: 18, cursor: auto ? "default" : "pointer", accentColor: t.accent }} />
+        <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</div>
+        <span style={_aiChipStyle(t)}>{isDone ? "✓ Done" : (auto ? "Auto · waiting" : "To do")}</span>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 720 }}>
       <SectionTitle>Action items</SectionTitle>
@@ -2464,12 +2484,21 @@ function ActionItemsTab({ client, tokens, session }) {
       {err && <div style={{ color: "#e08b7e", marginBottom: 12 }}>{err}</div>}
       {loading && <div style={{ color: t.textMute }}>Loading…</div>}
       {!loading && items.length === 0 && <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>No action items yet.</div>}
+
+      {onb.length > 0 && <div style={groupLabel}>Onboarding · {onb.filter(i => i.completed_at).length}/{onb.length}</div>}
+      {onb.map(onbRow)}
+
+      {onb.length > 0 && (open.length > 0 || done.length > 0) && <div style={groupLabel}>Tasks</div>}
       {open.map(row)}
-      {done.length > 0 && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: t.textMute, margin: "18px 0 10px" }}>Done · {done.length}</div>}
+      {done.length > 0 && <div style={groupLabel}>Done · {done.length}</div>}
       {done.map(row)}
     </div>
   );
 }
+
+// Onboarding steps that complete automatically from a connection signal —
+// their checkbox is locked in both portals (mirrors the API guard).
+const _AI_ONB_AUTO = new Set(["connect_stripe", "connect_ghl"]);
 
 // ─── Auth actions ───────────────────────────────────────────────────────────
 // Transfer ownership of a client to a different person. Opens a modal,

@@ -122,6 +122,67 @@ function dueLabel(d) {
   return ` · due ${d}`;
 }
 
+// ── Onboarding steps (system-seeded action items) ─────────────────────────
+// A row's onboarding_key marks it as a fixed onboarding step.
+//   AUTO   steps complete from a live signal on the clients row (read-only).
+//   MANUAL steps are checkboxes that ALSO write the canonical clients flag,
+//          so the legacy onboarding tracker pill stays in sync.
+const ONBOARDING_STEPS = [
+  { key: "slack",          title: "Join the BAM Slack workspace",        sort: 1, mode: "manual", flagCol: "slack_join_done_at" },
+  { key: "connect_stripe", title: "Connect your Stripe account",         sort: 2, mode: "auto",   signalCol: "stripe_connect_connected_at" },
+  { key: "create_ghl",     title: "Create your GoHighLevel sub-account", sort: 3, mode: "manual", flagCol: "ghl_signup_done_at" },
+  { key: "connect_ghl",    title: "Connect your GoHighLevel account",    sort: 4, mode: "auto",   signalCol: "ghl_connected_at" },
+];
+const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
+const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.signalCol || s.flagCol))].join(",");
+
+async function loadClientSignals(clientId) {
+  const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS}`);
+  return (Array.isArray(rows) && rows[0]) || {};
+}
+
+// Idempotently ensure all onboarding steps exist for this client, then
+// reconcile AUTO steps against the live client signals. Safe to call on every
+// GET — steady state is 2 selects + 0 writes.
+async function syncOnboardingItems(clientId) {
+  const signals = await loadClientSignals(clientId);
+  const existing = await sb(
+    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at`
+  );
+  const byKey = {};
+  (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
+
+  for (const step of ONBOARDING_STEPS) {
+    const signalVal = signals[step.signalCol || step.flagCol] || null; // timestamp or null
+    const row = byKey[step.key];
+
+    if (!row) {
+      // Seed missing step (idempotent via on_conflict). completed_at derived
+      // from the current signal so already-connected clients show done.
+      await sb(`action_items?on_conflict=client_id,onboarding_key`, {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+        body: JSON.stringify({
+          client_id: clientId, title: step.title, onboarding_key: step.key,
+          sort_order: step.sort, created_by_name: "Onboarding", created_by_role: "staff",
+          completed_at: signalVal,
+        }),
+      });
+      continue;
+    }
+    // AUTO steps mirror the live signal — never manually toggled.
+    if (step.mode === "auto") {
+      const shouldBeDone = !!signalVal;
+      if (!!row.completed_at !== shouldBeDone) {
+        await sb(`action_items?id=eq.${row.id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ completed_at: shouldBeDone ? signalVal : null }),
+        });
+      }
+    }
+  }
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   const action = req.query && req.query.action;
@@ -171,6 +232,9 @@ export default async function handler(req, res) {
       const clientId = (req.query && req.query.client_id) || ctx.clientIds[0] || null;
       if (!clientId) return res.status(400).json({ error: "client_id required" });
       if (!canAccess(ctx, clientId)) return res.status(403).json({ error: "not your academy" });
+
+      // Seed missing onboarding steps + reconcile auto ones before listing.
+      await syncOnboardingItems(clientId);
 
       const items = await sb(
         `action_items?client_id=eq.${clientId}&select=*` +
@@ -234,6 +298,12 @@ export default async function handler(req, res) {
       if (!existing) return res.status(404).json({ error: "not found" });
       if (!canAccess(ctx, existing.client_id)) return res.status(403).json({ error: "not your academy" });
 
+      // Onboarding AUTO steps can't be ticked by hand — they mirror a signal.
+      const obStep = existing.onboarding_key ? ONBOARDING_BY_KEY[existing.onboarding_key] : null;
+      if (obStep && obStep.mode === "auto" && "completed" in b) {
+        return res.status(400).json({ error: "This step completes automatically when the connection is made." });
+      }
+
       const patch = {};
       if (typeof b.title === "string") {
         if (!b.title.trim()) return res.status(400).json({ error: "title cannot be empty" });
@@ -282,6 +352,15 @@ export default async function handler(req, res) {
       });
       const item = Array.isArray(rows) ? rows[0] : rows;
 
+      // Manual onboarding step → write the canonical clients flag too, so the
+      // legacy onboarding tracker pill reflects the same done state.
+      if (obStep && obStep.mode === "manual" && "completed" in b) {
+        await sb(`clients?id=eq.${existing.client_id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ [obStep.flagCol]: b.completed ? patch.completed_at : null }),
+        });
+      }
+
       // Slack ping only on a genuine reassignment to a person.
       if (reassignedTo) {
         await postClientSlackNotification(
@@ -297,10 +376,11 @@ export default async function handler(req, res) {
     if (req.method === "DELETE") {
       const id = req.query && req.query.id;
       if (!id) return res.status(400).json({ error: "id required" });
-      const existingRows = await sb(`action_items?id=eq.${id}&select=client_id&limit=1`);
+      const existingRows = await sb(`action_items?id=eq.${id}&select=client_id,onboarding_key&limit=1`);
       const existing = Array.isArray(existingRows) && existingRows[0];
       if (!existing) return res.status(200).json({ ok: true }); // already gone
       if (!canAccess(ctx, existing.client_id)) return res.status(403).json({ error: "not your academy" });
+      if (existing.onboarding_key) return res.status(400).json({ error: "onboarding steps can't be deleted" });
       await sb(`action_items?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return res.status(200).json({ ok: true });
     }
