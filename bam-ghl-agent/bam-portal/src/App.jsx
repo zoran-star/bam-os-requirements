@@ -863,7 +863,7 @@ function NewTicketModal({ tokens, clients, onClose }) {
         <label style={labelStyle}>Priority</label>
         <select style={inputStyle} value={priority} onChange={e => setPriority(e.target.value)}>
           <option value="standard">Standard</option>
-          <option value="red_alert">🚨 Red alert (blocking)</option>
+          <option value="urgent">🚨 Red alert (blocking)</option>
         </select>
 
         {error && <div style={{ color: "#ED7969", fontSize: 13, marginBottom: 12 }}>⚠ {error}</div>}
