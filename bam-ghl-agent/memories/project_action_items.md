@@ -58,12 +58,14 @@ steps keyed by `action_items.onboarding_key`:
 | `create_ghl` | Create your GoHighLevel sub-account | **manual** | writes `clients.ghl_signup_done_at` |
 | `connect_ghl` | Connect your GoHighLevel account | **auto** | `clients.ghl_connected_at` |
 
-- **AUTO** steps mirror the live clients-row signal — checkbox is **locked** in both
-  portals; the API rejects manual `completed` changes. Reconciled on every GET via
-  `syncOnboardingItems()`.
-- **MANUAL** steps are checkboxes (either side can tick — fully shared). Ticking ALSO
+- **AUTO** steps self-complete from the live clients-row signal via `syncOnboardingItems()`
+  (reconciled on every GET) — BUT every step is also **check/uncheck-able by hand** (client
+  OR staff). The moment a human toggles a step, `action_items.onboarding_overridden` is set
+  true and the auto-reconcile leaves it alone from then on (human wins). Migration
+  `action_items_onboarding_overridden` (2026-06-01).
+- **MANUAL** steps are checkboxes (either side can tick/untick — fully shared). Ticking ALSO
   writes the canonical `clients` flag, so the **legacy onboarding tracker pill stays in
-  sync** (see [[project_v2_onboarding_model]]).
+  sync** (see [[project_v2_onboarding_model]]); unticking clears it.
 - Onboarding rows **can't be deleted** (API guard) and have `sort_order` 1–4.
 - Schema: `action_items.onboarding_key` (text, null = ad-hoc) + `sort_order` (int) +
   unique `(client_id, onboarding_key)`. Migration `action_items_onboarding_key`.
