@@ -40,8 +40,8 @@ in and sees these tabs:
 | **Members** | Athlete roster — **hidden in the app for v1**, live on web | Web only |
 | **Team** | Invite teammates + revoke access — **hidden in the app for v1**, live on web | Web only |
 | **Business Blueprint** | Owner-side academy setup (general, brand, staff, locations) — **hidden in the app for v1**, live on web | Web only |
-| Push notifications | Native push prompt on login; tokens captured | Live (sending side is later) |
-| First-login tour | 8-step guided tour for new users | Live |
+| Push notifications | Native prompt on login; tokens captured; **staff→client sending being built before submit** | Live |
+| First-login tour | 8-step guided tour — **hidden in the app for v1**, live on web | Web only |
 
 **Decided (2026-05-20, updated 2026-05-27):**
 - **Members, Team, and Business Blueprint are hidden in the app for v1.**
@@ -52,9 +52,13 @@ in and sees these tabs:
   check and resubmit. Team and Business Blueprint are out of app v1
   scope — owner-side setup happens on desktop, not the phone.
 - **The app's v1 = 3 tabs** — Systems, Messages, Marketing — plus
-  push notifications and the first-login tour.
-- Push **capture** works; staff **sending** notifications is a later
-  build. The app still ships — it just won't send anything yet.
+  **working native push** (capture + send). The first-login tour is
+  **hidden in the app** for v1 (kept on web) to keep the reviewer flow
+  dead-simple — gated on `!isNativeApp()` in `boot()`.
+- **Push sending is being built before submit** (decided 2026-06-01):
+  real staff→client push is our strongest Guideline 4.2 defense, so it
+  must actually fire for the reviewer — not just capture tokens. Build
+  plan + credential dependencies in `project_app_store_launch`.
 
 ---
 
