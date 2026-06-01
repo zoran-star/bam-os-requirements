@@ -1,13 +1,27 @@
 ---
 name: CoachIQ integration — billing ownership + credits webhook bridge
-description: How BAM GTA's billing is split across CoachIQ/GHL/manual, why the portal can't write to those Stripe subs, and the CONFIRMED webhook bridge (api-v3.coachiq.io Incoming Webhook automation trigger) that lets the portal own billing while CoachIQ keeps granting credits. Investigated 2026-06-01.
+description: Strategic — connect CoachIQ to the FullControl portal so BAM can SELL FullControl to academies already on CoachIQ. Covers how BAM GTA billing splits across CoachIQ/GHL/manual, why the portal can't write to those Stripe subs, the CONFIRMED webhook bridge (api-v3.coachiq.io Incoming Webhook → Add Credits), the new-user onboarding flow, and the open questions left. Investigated 2026-06-01.
 metadata:
   type: project
 ---
 
 # CoachIQ integration
 
-## What CoachIQ is to BAM GTA
+## Why this matters (the strategic goal)
+
+**The point of all this: figure out how to connect CoachIQ to the FullControl
+portal so BAM can sell FullControl to academies that are ALREADY on CoachIQ.**
+
+CoachIQ has a large base of sports academies. If FullControl can sit on top of a
+CoachIQ account — portal owns billing/CRM/marketing, CoachIQ keeps doing
+credits/scheduling — then every CoachIQ academy is a sellable FullControl lead
+without forcing them to rip out the tool they already use. The Incoming Webhook
+bridge (below) is the technical wedge that makes this possible.
+
+This started from a concrete case (pausing Knowl Beharie on BAM GTA) and grew
+into the general integration model.
+
+## What CoachIQ is to academies
 
 CoachIQ is the **credits + scheduling engine** BAM GTA uses. Athletes get
 training "credits"; CoachIQ grants them when a CoachIQ product is purchased and
@@ -94,15 +108,70 @@ This decouples credits from CoachIQ's sub_id, so #3 (portal-created new subs) an
 credits. Migration card-reuse check: 26/33 have a reusable default PM, 7 need a
 re-collect (payment link).
 
+## Creating new users + the onboarding flow
+
+`api-v3.coachiq.io` is **webhook-only** — it exposes just
+`/hook/automation/trigger/{automationId}`. Every other path (users, products,
+etc.) returns 404. **There is no REST endpoint to create a CoachIQ user.**
+
+So a CoachIQ user must exist BEFORE the portal can grant them credits/products.
+Two ways to create one:
+- **A. Parent self-signs-up in CoachIQ** (build it into the onboarding funnel)
+- **B. Zapier "Create User" action** (portal → Zapier → CoachIQ) — the only
+  programmatic path. (An automation itself has no "Create User" action.)
+
+Automation **actions** seen in the UI: Send Announcement/In-App/SMS, Add/Remove
+Product Purchase, Add/Remove Tag, Update Custom Field, Add/Redeem Credits. Each
+action has a **Target User** = "User from trigger" with a **Change** option.
+
+Proposed new-member flow:
+```
+1. Onboarding funnel → parent gets a CoachIQ account (A or B)
+2. Parent pays → PORTAL creates the Stripe sub (portal-owned)
+3. Payment succeeds → portal POSTs the webhook:
+     Automation A: "Add a Product Purchase to a User"
+       → grants product + program access + initial credits
+       (grants access WITHOUT payment — perfect since they paid in the portal)
+4. Each renewal → portal POSTs the webhook:
+     Automation B: "Add Credits → Specific Product Bank"  → monthly top-up
+5. Pause/cancel → portal stops POSTing
+     (optional Automation C: Redeem Credits / Revoke Program Access)
+```
+
+## OPEN QUESTIONS — what's left to figure out
+
+1. **User matching from the webhook payload.** The action's Target User
+   ("User from trigger" → Change) — can it resolve a user by **email**
+   (`{{payload.email}}`)? If yes, email is the join key and the portal never
+   needs to store `coachiq_member_id`. If id-only, the portal must capture each
+   athlete's CoachIQ id during signup (e.g. a "New User → Send to External
+   Webhook" automation posting the id back). **Need a screenshot of the Change
+   options to decide.**
+2. **How parents get a CoachIQ account in onboarding** — self-signup (UX detour)
+   vs Zapier Create User (seamless, needs a Zap). Pick one.
+3. **Live end-to-end test** — create one "Incoming Webhook → Add Credits"
+   automation, grab its automationId, fire a real test credit at a test athlete.
+4. **Product/credit modeling** — confirm one product-bank per plan and the
+   per-cycle credit counts (e.g. 2/wk → 8/mo) so Automation B tops up correctly.
+5. **Scope decision** — bridge for NEW members only (#3) vs also migrate the 33
+   live BAM GTA subs to portal-owned (#4: 26 auto, 7 re-collect).
+6. **Sales motion** — once proven on BAM GTA, package this as the "keep CoachIQ,
+   add FullControl" offer for other CoachIQ academies (the strategic goal).
+
 ## Secrets
 
 The API key, org id, and group id are NOT stored in this repo. They belong in
 Vercel env when the bridge is built. The key Zoran pasted in chat on 2026-06-01
 should be rotated.
 
-## Status / next steps (not built yet)
+## Status (as of 2026-06-01)
 
-1. Zoran creates ONE CoachIQ automation: Incoming Webhook → Add Credits.
-2. Sends the automationId → fire a real test credit at a test athlete.
-3. Build: Stripe webhook handler → POST to CoachIQ + pause/cancel logic.
-4. Decide scope: bridge for new subs only (#3) vs migrate the 33 live (#4).
+```
+✅ Bridge endpoint + auth CONFIRMED LIVE (api-v3 webhook, Bearer + x-group-id)
+✅ Architecture proven: portal owns billing, CoachIQ does credits via webhook
+✅ New-member flow drafted (create user → pay → Add Product Purchase → top-ups)
+⏳ NOT built. Blocked on the 6 open questions above (esp. #1 user matching + #3 test)
+```
+
+Immediate next step: get the **Target User → Change** screenshot (open question #1),
+then create the test automation and fire a live credit (#3).
