@@ -518,6 +518,54 @@
   .view { display: none; }
   .view.active { display: block; animation: fadeIn 0.25s ease both; }
 
+  /* ── Action Items ── */
+  .ai-fab {
+    position: fixed; right: 28px; bottom: 28px; z-index: 9000;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--accent); color: #0B0B0D; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4); transition: transform .15s ease, filter .15s ease;
+  }
+  .ai-fab:hover { transform: translateY(-2px); filter: brightness(1.06); }
+  .ai-item {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface-el); margin-bottom: 10px;
+  }
+  .ai-item.done { opacity: 0.55; }
+  .ai-item.done .ai-item-title { text-decoration: line-through; }
+  .ai-check {
+    flex-shrink: 0; width: 22px; height: 22px; margin-top: 1px;
+    border: 2px solid var(--text-mute); border-radius: 6px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; background: transparent;
+    color: #0B0B0D; transition: background .12s ease, border-color .12s ease;
+  }
+  .ai-check.on { background: var(--accent); border-color: var(--accent); }
+  .ai-item-body { flex: 1; min-width: 0; }
+  .ai-item-title { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
+  .ai-item-desc { font-size: 13px; color: var(--text-mute); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+  .ai-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+  .ai-chip {
+    font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
+    background: var(--surface-hov); color: var(--text-mute); display: inline-flex; align-items: center; gap: 4px;
+  }
+  .ai-chip.overdue { background: rgba(154,59,47,0.22); color: #e08b7e; }
+  .ai-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .ai-icon-btn {
+    background: transparent; border: 1px solid var(--line); border-radius: 7px;
+    width: 30px; height: 30px; cursor: pointer; color: var(--text-mute);
+    display: flex; align-items: center; justify-content: center; transition: color .12s, border-color .12s;
+  }
+  .ai-icon-btn:hover { color: var(--text); border-color: var(--text-mute); }
+  .ai-group-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-mute); margin: 22px 0 10px;
+  }
+  .ai-select, .modal-input.ai-date {
+    width: 100%; background: var(--surface-el); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px;
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -4968,6 +5016,17 @@
         Resources
       </div>
 
+      <div class="nav-item" onclick="switchView('action-items', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"/>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+        </span>
+        Action Items
+        <span class="nav-badge" id="action-items-badge" style="display:none;background:var(--accent);color:#0B0B0D;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:auto"></span>
+      </div>
+
       <div class="nav-item" data-feature="blueprint" onclick="switchView('blueprint', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -7192,6 +7251,30 @@ Then the call to action."]</div>
       }
     </style>
 
+    <div class="view" id="view-action-items">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Action Items</span>
+          <div class="topbar-title">Action Items</div>
+        </div>
+      </div>
+      <div class="content">
+        <p style="color:var(--text-mute);font-size:13px;margin:0 0 18px;max-width:560px;line-height:1.5">
+          Everything your team needs to do. Anyone on your account — or your BAM team — can add, edit, assign, and check off items.
+        </p>
+        <div id="action-items-list">
+          <div class="req-empty" style="padding:20px 0">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Bottom-right create button -->
+      <button type="button" class="ai-fab" id="action-items-fab" onclick="openActionItemModal()" aria-label="New action item" title="New action item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
+    </div>
+
     <div class="view" id="view-blueprint">
       <div class="topbar">
         <div>
@@ -7239,6 +7322,13 @@ Then the call to action."]</div>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
       </svg>
       <span class="mobile-nav-label">Resources</span>
+    </button>
+    <button type="button" class="mobile-nav-item" data-view="action-items" onclick="mobileSwitchView('action-items')" aria-label="Action Items">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      <span class="mobile-nav-label">Actions</span>
     </button>
     <button type="button" class="mobile-nav-item" data-feature="blueprint" data-view="blueprint" onclick="mobileSwitchView('blueprint')" aria-label="Business Blueprint">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -7303,6 +7393,9 @@ function switchView(name, el) {
 
   // When entering Resources, load + render the library
   if (name === 'resources') openResourcesView();
+
+  // When entering Action Items, load the list
+  if (name === 'action-items') fetchAndRenderActionItems();
 
   // When entering Business Blueprint, render based on hash route
   if (name === 'blueprint') openBlueprintView();
@@ -18464,6 +18557,33 @@ function toggleTheme() {
     <div class="modal-footer">
       <button class="btn-modal-secondary" onclick="closeRevokeTeamModal()">Keep access</button>
       <button class="btn-modal-danger" id="revokeTeamConfirmBtn" onclick="confirmRevokeTeam()">Yes, revoke</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Action item create / edit modal ── -->
+<div id="actionItemModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeActionItemModal()">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-kicker">§ Action Items</div>
+    <div class="modal-title" id="actionItemModalTitle">New action item</div>
+
+    <label class="modal-label" for="aiTitle">Title</label>
+    <input type="text" id="aiTitle" class="modal-input" placeholder="e.g. Send updated waiver PDF" />
+
+    <label class="modal-label" for="aiDesc" style="margin-top:14px">Description <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
+    <textarea id="aiDesc" class="modal-input" rows="3" placeholder="Any detail or context"></textarea>
+
+    <label class="modal-label" for="aiAssignee" style="margin-top:14px">Assign to</label>
+    <select id="aiAssignee" class="ai-select"><option value="">Unassigned</option></select>
+
+    <label class="modal-label" for="aiDue" style="margin-top:14px">Due date <span style="color:var(--text-mute);font-weight:400">(optional)</span></label>
+    <input type="date" id="aiDue" class="modal-input ai-date" />
+
+    <div class="team-msg" id="actionItemMsg"></div>
+
+    <div class="modal-footer">
+      <button class="btn-modal-secondary" onclick="closeActionItemModal()">Cancel</button>
+      <button class="btn-modal-primary" id="actionItemSubmitBtn" onclick="submitActionItem()">Add item</button>
     </div>
   </div>
 </div>
