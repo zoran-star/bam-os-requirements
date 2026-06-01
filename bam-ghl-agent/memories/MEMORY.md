@@ -5,6 +5,7 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [BAM GHL North Star](project_bam_ghl_north_star.md) — dual client+staff portal (chat, ad spend, tickets), not just an autonomous agent
 - [BAM GHL Agent Files](project_bam_ghl_agent_files.md) — local + git + Vercel file locations and workflow
 - [Client Portal Flow](project_client_portal_flow.md) — onboarding.html → client row, client-portal.html shows tickets, live on Vercel
+- [Action Items](project_action_items.md) — 2026-06-01: shared per-client to-do list. V1 client-portal tab + staff `ActionItemsTab`, `action_items` table, `/api/action-items`, Slack on create/reassign/due-soon. Done=checkbox, academy-team assignees only (staff later).
 - [Support Ticket System](project_support_ticket_system.md) — full ticket pipeline + Systems portal status
 - [BAM Onboarding Checkpoints](project_bam_onboarding_checkpoints.md) — current 14-step sheet checklist, baseline for Supabase redesign
 - [Slack Onboarding Automation](project_slack_onboarding_automation.md) — auto-create Slack channels for new clients
