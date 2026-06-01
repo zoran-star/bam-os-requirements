@@ -147,7 +147,7 @@ async function loadClientSignals(clientId) {
 async function syncOnboardingItems(clientId) {
   const signals = await loadClientSignals(clientId);
   const existing = await sb(
-    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at`
+    `action_items?client_id=eq.${clientId}&onboarding_key=not.is.null&select=id,onboarding_key,completed_at,onboarding_overridden`
   );
   const byKey = {};
   (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
@@ -170,8 +170,9 @@ async function syncOnboardingItems(clientId) {
       });
       continue;
     }
-    // AUTO steps mirror the live signal — never manually toggled.
-    if (step.mode === "auto") {
+    // AUTO steps mirror the live signal — UNLESS a human has overridden them
+    // (checked/unchecked by hand), in which case the human's choice stands.
+    if (step.mode === "auto" && !row.onboarding_overridden) {
       const shouldBeDone = !!signalVal;
       if (!!row.completed_at !== shouldBeDone) {
         await sb(`action_items?id=eq.${row.id}`, {
@@ -298,13 +299,12 @@ export default async function handler(req, res) {
       if (!existing) return res.status(404).json({ error: "not found" });
       if (!canAccess(ctx, existing.client_id)) return res.status(403).json({ error: "not your academy" });
 
-      // Onboarding AUTO steps can't be ticked by hand — they mirror a signal.
       const obStep = existing.onboarding_key ? ONBOARDING_BY_KEY[existing.onboarding_key] : null;
-      if (obStep && obStep.mode === "auto" && "completed" in b) {
-        return res.status(400).json({ error: "This step completes automatically when the connection is made." });
-      }
 
       const patch = {};
+      // Any hand toggle of an onboarding step marks it overridden, so the
+      // auto-reconcile stops forcing AUTO steps back to the signal value.
+      if (obStep && "completed" in b) patch.onboarding_overridden = true;
       if (typeof b.title === "string") {
         if (!b.title.trim()) return res.status(400).json({ error: "title cannot be empty" });
         patch.title = b.title.trim();

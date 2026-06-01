@@ -12598,10 +12598,9 @@ const _AI_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 function _aiOnbHTML(it) {
   const cfg = ONB_UI[it.onboarding_key] || {};
   const isDone = !!it.completed_at;
-  // Auto steps: locked indicator. Manual steps: real toggle.
-  const check = cfg.auto
-    ? `<span class="ai-check${isDone ? ' on' : ''}" title="Completes automatically" style="cursor:default">${isDone ? _AI_CHECK_ICON : ''}</span>`
-    : `<button class="ai-check${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  // Every step is check/uncheck-able by hand. Auto steps also self-complete
+  // from the connection signal until someone overrides them by hand.
+  const check = `<button class="ai-check${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   const status = isDone
     ? `<span class="ai-chip" style="color:#7BC47F">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
