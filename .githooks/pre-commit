@@ -1,0 +1,17 @@
+#!/bin/sh
+# Guardrail: never commit directly to the live branch.
+# `main` is the version clients actually run. All work goes on a branch,
+# then through a PR. This stops accidental commits straight onto main.
+branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
+if [ "$branch" = "main" ]; then
+  echo ""
+  echo "  ✋ You're on 'main' — the live branch. Commits here are blocked."
+  echo ""
+  echo "     Make a branch first, then commit:"
+  echo "       git checkout -b my-change"
+  echo ""
+  echo "  (This is intentional. main only changes via a reviewed PR.)"
+  echo ""
+  exit 1
+fi
+exit 0
