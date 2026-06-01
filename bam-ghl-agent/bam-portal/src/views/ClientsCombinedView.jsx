@@ -413,6 +413,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "team",         label: "Team" },
     { id: "marketing",    label: "Marketing" },
     { id: "systems",      label: "Systems" },
+    { id: "actionItems",  label: "Action Items" },
     { id: "activity",     label: "Activity", hide: !ROLES.canViewFinancials(role) },
     { id: "notes",        label: "Notes" },
   ].filter(t => !t.hide);
@@ -465,6 +466,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "team" && <TeamTab client={client} tokens={t} session={session} />}
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
+      {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
       {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
     </div>
@@ -2286,6 +2288,185 @@ function NotesTab({ client, tokens, me, session, staffMap }) {
           <div style={{ fontSize: 14, color: t.text, whiteSpace: "pre-wrap" }}>{n.body}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ─── Action Items tab (v1) ───────────────────────────────────────────────────
+// Shared per-client to-do list — the same rows the academy team sees in their
+// client portal. Goes through /api/action-items so Slack pings + assignee
+// validation run server-side. Any field is editable by anyone who can see it.
+function _aiChipStyle(t, overdue) {
+  return {
+    fontWeight: 600, padding: "3px 9px", borderRadius: 999,
+    background: overdue ? "rgba(154,59,47,0.22)" : (t.surfaceHov || t.surface),
+    color: overdue ? "#e08b7e" : t.textMute,
+    display: "inline-flex", alignItems: "center", gap: 4,
+  };
+}
+function _aiIconBtn(t) {
+  return {
+    background: "transparent", border: `1px solid ${t.border}`, borderRadius: 7,
+    width: 30, height: 30, cursor: "pointer", color: t.textMute, fontSize: 13,
+  };
+}
+
+function ActionItemsTab({ client, tokens, session }) {
+  const t = tokens;
+  const [items, setItems] = useState([]);
+  const [team, setTeam] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  const [title, setTitle] = useState("");
+  const [desc, setDesc] = useState("");
+  const [assignee, setAssignee] = useState("");
+  const [due, setDue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [edit, setEdit] = useState({ title: "", description: "", assignee_id: "", due_date: "" });
+
+  const tok = session?.access_token;
+
+  async function api(method, body, qs) {
+    const res = await fetch("/api/action-items" + (qs || ""), {
+      method,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    return j;
+  }
+
+  async function load() {
+    setLoading(true); setErr(null);
+    try {
+      const j = await api("GET", null, "?client_id=" + encodeURIComponent(client.id));
+      setItems(j.items || []);
+      setTeam(j.team || []);
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [client.id]);
+
+  async function addItem() {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await api("POST", {
+        client_id: client.id, title: title.trim(),
+        description: desc.trim() || null, assignee_id: assignee || null, due_date: due || null,
+      });
+      setTitle(""); setDesc(""); setAssignee(""); setDue("");
+      load();
+    } catch (e) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function toggle(it) {
+    try { await api("PATCH", { id: it.id, completed: !it.completed_at }); load(); }
+    catch (e) { alert(e.message); }
+  }
+  async function remove(it) {
+    if (!confirm("Delete this action item?")) return;
+    try { await api("DELETE", null, "?id=" + encodeURIComponent(it.id)); load(); }
+    catch (e) { alert(e.message); }
+  }
+  function startEdit(it) {
+    setEditId(it.id);
+    setEdit({ title: it.title || "", description: it.description || "", assignee_id: it.assignee_id || "", due_date: it.due_date || "" });
+  }
+  async function saveEdit() {
+    if (!edit.title.trim()) return;
+    try {
+      await api("PATCH", {
+        id: editId, title: edit.title.trim(),
+        description: edit.description.trim() || null,
+        assignee_id: edit.assignee_id || null, due_date: edit.due_date || null,
+      });
+      setEditId(null); load();
+    } catch (e) { alert(e.message); }
+  }
+
+  const open = items.filter(i => !i.completed_at);
+  const done = items.filter(i => i.completed_at);
+  const today = new Date().toISOString().slice(0, 10);
+  const inputStyle = {
+    width: "100%", padding: "9px 11px", background: t.surface,
+    border: `1px solid ${t.border}`, borderRadius: 6, color: t.text,
+    fontSize: 13, fontFamily: "inherit",
+  };
+
+  function row(it) {
+    if (editId === it.id) {
+      return (
+        <div key={it.id} style={{ padding: 14, background: t.surfaceEl, border: `1px solid ${t.accent}`, borderRadius: 8, marginBottom: 8 }}>
+          <input value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} style={{ ...inputStyle, marginBottom: 8 }} placeholder="Title" />
+          <textarea value={edit.description} onChange={e => setEdit({ ...edit, description: e.target.value })} rows={2} style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }} placeholder="Description" />
+          <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+            <select value={edit.assignee_id} onChange={e => setEdit({ ...edit, assignee_id: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
+              <option value="">Unassigned</option>
+              {team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+            <input type="date" value={edit.due_date} onChange={e => setEdit({ ...edit, due_date: e.target.value })} style={{ ...inputStyle, flex: 1 }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button onClick={() => setEditId(null)} style={{ padding: "7px 14px", background: "transparent", color: t.textMute, border: `1px solid ${t.border}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            <button onClick={saveEdit} style={{ padding: "7px 14px", background: t.accent, color: "#0B0B0D", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Save</button>
+          </div>
+        </div>
+      );
+    }
+    const overdue = !it.completed_at && it.due_date && it.due_date < today;
+    return (
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: it.completed_at ? 0.55 : 1 }}>
+        <input type="checkbox" checked={!!it.completed_at} onChange={() => toggle(it)} style={{ marginTop: 3, width: 18, height: 18, cursor: "pointer", accentColor: t.accent }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textDecoration: it.completed_at ? "line-through" : "none", wordBreak: "break-word" }}>{it.title}</div>
+          {it.description && <div style={{ fontSize: 13, color: t.textMute, marginTop: 3, whiteSpace: "pre-wrap" }}>{it.description}</div>}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8, fontSize: 11 }}>
+            <span style={_aiChipStyle(t)}>{it.assignee_name ? `👤 ${it.assignee_name}` : "Unassigned"}</span>
+            {it.due_date && <span style={_aiChipStyle(t, overdue)}>📅 {it.due_date}{overdue ? " · overdue" : ""}</span>}
+            {it.created_by_name && <span style={{ ..._aiChipStyle(t), opacity: 0.7 }}>by {it.created_by_name}</span>}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => startEdit(it)} style={_aiIconBtn(t)} title="Edit">✎</button>
+          <button onClick={() => remove(it)} style={_aiIconBtn(t)} title="Delete">🗑</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 720 }}>
+      <SectionTitle>Action items</SectionTitle>
+      <div style={{ fontSize: 12, color: t.textMute, marginBottom: 14 }}>
+        Shared with the academy team — they see and edit the same list in their portal.
+      </div>
+
+      <div style={{ padding: 14, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 18 }}>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="New action item…" style={{ ...inputStyle, marginBottom: 8 }} />
+        <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} placeholder="Description (optional)" style={{ ...inputStyle, marginBottom: 8, resize: "vertical" }} />
+        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+          <select value={assignee} onChange={e => setAssignee(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+            <option value="">Unassigned</option>
+            {team.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+          <input type="date" value={due} onChange={e => setDue(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={addItem} disabled={saving || !title.trim()} style={{ padding: "8px 18px", background: title.trim() ? t.accent : t.surfaceEl, color: title.trim() ? "#0B0B0D" : t.textMute, border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: title.trim() ? "pointer" : "not-allowed" }}>{saving ? "Adding…" : "Add item"}</button>
+        </div>
+      </div>
+
+      {err && <div style={{ color: "#e08b7e", marginBottom: 12 }}>{err}</div>}
+      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
+      {!loading && items.length === 0 && <div style={{ color: t.textMute, padding: 24, fontStyle: "italic", textAlign: "center" }}>No action items yet.</div>}
+      {open.map(row)}
+      {done.length > 0 && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: t.textMute, margin: "18px 0 10px" }}>Done · {done.length}</div>}
+      {done.map(row)}
     </div>
   );
 }

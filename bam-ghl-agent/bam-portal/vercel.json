@@ -11,6 +11,10 @@
     {
       "path": "/api/ghl/cron-sync-contacts",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/action-items?action=cron-due-soon",
+      "schedule": "0 13 * * *"
     }
   ],
   "headers": [
