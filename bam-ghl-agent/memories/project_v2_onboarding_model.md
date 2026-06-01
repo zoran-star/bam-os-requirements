@@ -80,6 +80,8 @@ Six sections, three different completion mechanisms. **This table is the source 
 
 Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 external sections (GHL + Slack) don't gate the systems onboarding ticket — that trigger only fires on the 5 BB sections (General + Staff + Locations + Brand + Offers).
 
+> ⚠ **Second writer (2026-06-01):** `slack_join_done_at` and `ghl_signup_done_at` are now ALSO written by the **Action Items onboarding steps** (`slack` → slack_join_done_at, `create_ghl` → ghl_signup_done_at). Ticking the step in the Action Items tab writes the same column this tracker reads, so the two stay in sync. `stripe_connect_connected_at` + `ghl_connected_at` drive AUTO Action Items steps (Connect Stripe / Connect GHL) but are NOT tracker sections. See [[project_action_items]].
+
 Manual flags persist as timestamps on the clients row:
 - `ghl_signup_done_at`
 - `slack_join_done_at`

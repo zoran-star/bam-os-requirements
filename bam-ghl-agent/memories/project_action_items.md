@@ -45,8 +45,39 @@ Reuses the per-client channel pattern (`clients.slack_channel_id`, `SLACK_BOT_TO
 
 Done = checkbox · assignee = academy team only (staff later) · fully shared list · Slack on create+reassign+due-soon · due date optional · single assignee, can be unassigned · sorted soonest-due-first.
 
+## Onboarding steps (added 2026-06-01)
+
+Action Items doubles as the **client onboarding checklist**. A pinned "Onboarding"
+group renders at the top of the list (client + staff), seeded from a fixed set of
+steps keyed by `action_items.onboarding_key`:
+
+| key | title | mode | signal / flag column |
+|---|---|---|---|
+| `slack` | Join the BAM Slack workspace | **manual** | writes `clients.slack_join_done_at` |
+| `connect_stripe` | Connect your Stripe account | **auto** | `clients.stripe_connect_connected_at` |
+| `create_ghl` | Create your GoHighLevel sub-account | **manual** | writes `clients.ghl_signup_done_at` |
+| `connect_ghl` | Connect your GoHighLevel account | **auto** | `clients.ghl_connected_at` |
+
+- **AUTO** steps mirror the live clients-row signal — checkbox is **locked** in both
+  portals; the API rejects manual `completed` changes. Reconciled on every GET via
+  `syncOnboardingItems()`.
+- **MANUAL** steps are checkboxes (either side can tick — fully shared). Ticking ALSO
+  writes the canonical `clients` flag, so the **legacy onboarding tracker pill stays in
+  sync** (see [[project_v2_onboarding_model]]).
+- Onboarding rows **can't be deleted** (API guard) and have `sort_order` 1–4.
+- Schema: `action_items.onboarding_key` (text, null = ad-hoc) + `sort_order` (int) +
+  unique `(client_id, onboarding_key)`. Migration `action_items_onboarding_key`.
+- Seeded for **all clients** (backfill 2026-06-01) + lazily on every GET (idempotent via
+  `on_conflict`), so new clients auto-get them.
+- Client-portal CTAs reuse existing flows: Slack invite (`ONB_SLACK_INVITE_URL`),
+  `openStripeConnectModal()`, `openGhlConnectModal()`. UI config = `ONB_UI` (client-portal.html);
+  staff auto-set = `_AI_ONB_AUTO` (ClientsCombinedView.jsx).
+- To add a step: extend `ONBOARDING_STEPS` in `api/action-items.js`, add to `ONB_UI` (client)
+  + `_AI_ONB_AUTO` (staff) if auto, and backfill existing clients.
+
 ## Gotchas / future
 
 - Client portal calls go through `/api/action-items` with the Supabase JWT (`_mreqAuthToken()`), NOT direct `_sb` table reads — so RLS isn't exercised from the browser today.
 - Mobile bottom-nav got a 6th item ("Actions"). Watch for crowding on very small screens.
 - Staff assignees + notifications-to-staff are the obvious v2.
+- Onboarding **manual** flags now have TWO writers: the BB onboarding tracker AND the Action Items step — both write the same `clients.*_done_at` columns, so they stay consistent. Keep it that way.

@@ -565,6 +565,12 @@
     width: 100%; background: var(--surface-el); border: 1px solid var(--line);
     color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px;
   }
+  .ai-onb-cta {
+    background: var(--accent); color: #0B0B0D; border: none; border-radius: 7px;
+    padding: 7px 13px; font-size: 12px; font-weight: 700; cursor: pointer;
+    white-space: nowrap; transition: filter .12s ease;
+  }
+  .ai-onb-cta:hover { filter: brightness(1.07); }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -12550,6 +12556,15 @@ function _aiFmtDate(d) {
   } catch (e) { return d; }
 }
 
+// Onboarding step UI config — keyed by action_items.onboarding_key.
+// auto = system-completed (locked checkbox); cta = the button that does the thing.
+const ONB_UI = {
+  slack:          { auto: false, cta: { label: 'Open invite ↗', fn: "window.open(ONB_SLACK_INVITE_URL,'_blank')" } },
+  connect_stripe: { auto: true,  cta: { label: 'Connect Stripe', fn: 'openStripeConnectModal()' } },
+  create_ghl:     { auto: false, cta: null },
+  connect_ghl:    { auto: true,  cta: { label: 'Connect GHL', fn: 'openGhlConnectModal()' } },
+};
+
 function _renderActionItems() {
   const container = document.getElementById('action-items-list');
   if (!container) return;
@@ -12557,14 +12572,49 @@ function _renderActionItems() {
     container.innerHTML = '<div class="req-empty" style="padding:28px 0;text-align:center;color:var(--text-mute)">No action items yet.<br/>Tap the + button to add one.</div>';
     return;
   }
-  const open = _AI_ITEMS.filter(i => !i.completed_at);
-  const done = _AI_ITEMS.filter(i => i.completed_at);
-  let html = open.map(_aiItemHTML).join('');
+  const onb = _AI_ITEMS.filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+  const rest = _AI_ITEMS.filter(i => !i.onboarding_key);
+  let html = '';
+
+  if (onb.length) {
+    const doneCount = onb.filter(i => i.completed_at).length;
+    html += `<div class="ai-group-label">Onboarding · ${doneCount}/${onb.length}</div>`;
+    html += onb.map(_aiOnbHTML).join('');
+  }
+
+  const open = rest.filter(i => !i.completed_at);
+  const done = rest.filter(i => i.completed_at);
+  if (onb.length && (open.length || done.length)) html += `<div class="ai-group-label">Tasks</div>`;
+  html += open.map(_aiItemHTML).join('');
   if (done.length) {
     html += `<div class="ai-group-label">Done · ${done.length}</div>`;
     html += done.map(_aiItemHTML).join('');
   }
   container.innerHTML = html;
+}
+
+const _AI_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M20 6L9 17l-5-5"/></svg>';
+
+function _aiOnbHTML(it) {
+  const cfg = ONB_UI[it.onboarding_key] || {};
+  const isDone = !!it.completed_at;
+  // Auto steps: locked indicator. Manual steps: real toggle.
+  const check = cfg.auto
+    ? `<span class="ai-check${isDone ? ' on' : ''}" title="Completes automatically" style="cursor:default">${isDone ? _AI_CHECK_ICON : ''}</span>`
+    : `<button class="ai-check${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  const status = isDone
+    ? `<span class="ai-chip" style="color:#7BC47F">✓ Done</span>`
+    : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
+  const cta = (!isDone && cfg.cta)
+    ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
+  return `<div class="ai-item${isDone ? ' done' : ''}">
+    ${check}
+    <div class="ai-item-body">
+      <div class="ai-item-title">${escapeHTML(it.title)}</div>
+      <div class="ai-meta">${status}</div>
+    </div>
+    <div class="ai-item-actions">${cta}</div>
+  </div>`;
 }
 
 function _aiItemHTML(it) {
