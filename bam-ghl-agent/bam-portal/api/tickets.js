@@ -2,6 +2,8 @@
 // Staff (authenticated): GET/PATCH via Bearer token (Supabase access token)
 // Client portal (public): GET/PATCH with ?public=1 and client_id
 
+import { sendPush } from "./_lib/push.js";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -479,19 +481,28 @@ export default async function handler(req, res) {
       // Slack notify (fire-and-forget) on client-facing actions only.
       // Uniform template: {emoji} {Action} — {Type} [{CODE}] + optional body.
       const code = String(t.id || "").slice(0, 3).toUpperCase();
+      // Native push mirrors the Slack notify, but only for the actions a
+      // client actually needs to act on (skip the withdrawn-request notice).
+      // Fire-and-forget; sendPush no-ops safely if no devices / keys unset.
+      const pushClient = (title, pbody) =>
+        sendPush({ client_id: t.client_id, title, body: pbody, data: { ticket_id: String(t.id), type: t.type || "" } })
+          .catch((e) => console.warn("push failed:", e?.message));
       if (action === "request_client") {
         const ask = (body.client_action_request || "").trim();
         postClientSlackNotification(t.client_id,
           `🔔 Action requested — Systems [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+        pushClient("BAM needs your input", ask || "Open the portal to respond to a request.");
       } else if (action === "cancel_client_request") {
         postClientSlackNotification(t.client_id,
           `↩️ Request withdrawn — Systems [${code}]`, req);
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);
+        pushClient("Your request is complete ✅", "BAM finished work on your ticket.");
       } else if (action === "send_for_final_review") {
         postClientSlackNotification(t.client_id,
           `🟢 Final review ready — Systems [${code}]\n_Open the portal to approve or send feedback._`, req);
+        pushClient("Ready for your review", "A ticket is ready for your approval in the portal.");
       }
 
       return res.status(200).json({ data: enriched[0] });
