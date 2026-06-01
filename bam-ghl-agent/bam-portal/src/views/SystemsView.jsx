@@ -54,6 +54,19 @@ function formatDate(s) {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+// Relative day count for completed tickets: "Today", "Yesterday",
+// "N days ago". Compares calendar days, not 24h windows, so a ticket
+// finished late last night reads "Yesterday" not "Today".
+function relativeDays(s) {
+  if (!s) return "";
+  const then = new Date(s); then.setHours(0, 0, 0, 0);
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const days = Math.round((now.getTime() - then.getTime()) / 86400000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return `${days} days ago`;
+}
+
 // Number of business days from a date (Mon=1..Fri=5 — skips Sat/Sun).
 function addBusinessDays(start, n) {
   const d = new Date(start);
@@ -502,7 +515,7 @@ function TicketCard({ ticket, tokens: t, onOpen, completed }) {
             Completed
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: t.text, letterSpacing: "-0.01em" }}>
-            {formatDate(ticket.resolved_at)}
+            {relativeDays(ticket.resolved_at)}
           </div>
         </div>
       )}
