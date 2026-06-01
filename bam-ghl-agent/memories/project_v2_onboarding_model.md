@@ -6,7 +6,7 @@ The canonical doc for how onboarding, V2 access, the Business Blueprint, the tra
 
 ## V1 vs V2 — what each client sees
 
-The staff "V2 access" toggle (per client) is the only switch. Today V2 adds **Members + Calendar** to the nav. Everything else is V1 and visible to every client.
+The staff "V2 access" toggle (per client) is the only switch. Today V2 unlocks **5 nav items**: Members, Pricing, Inbox, Pipelines, Calendar. Everything else is V1 and visible to every client.
 
 | Surface | V1 (default) | V2 (`clients.v2_access = true`) |
 |---|---|---|
@@ -17,7 +17,12 @@ The staff "V2 access" toggle (per client) is the only switch. Today V2 adds **Me
 | Business Blueprint | ✅ | ✅ |
 | Onboarding tracker pill | ✅ (if any section incomplete) | ✅ (same) |
 | Members | ❌ | ✅ |
+| Pricing | ❌ | ✅ |
+| Inbox | ❌ | ✅ |
+| Pipelines | ❌ | ✅ |
 | Calendar | ❌ | ✅ |
+
+**Gating mechanism (client-portal.html):** Members, Pricing, Inbox, Pipelines all carry `data-feature="members"` and are toggled together by `applyMemberMgmtNavState()` (`MEMBER_MGMT_ENABLED && V2_ACCESS && !isNativeApp()`). Calendar carries `data-feature="calendar"` and is toggled by `applyCalendarNavState()` (`CALENDAR_ENABLED && V2_ACCESS && !isNativeApp()`). All 5 are **web-only** — hidden in the native iOS/Android wrapper. (Business Blueprint + Team are also web-only via `!isNativeApp()` but are NOT V2-gated — every web client sees them.)
 
 ## The staff toggle
 
@@ -66,7 +71,7 @@ Six sections, three different completion mechanisms. **This table is the source 
 |---|---|---|
 | GHL signup | staff-controlled | Client click opens `ONB_GHL_SIGNUP_URL` in a new tab + shows a "BAM marks this when verified" toast — **client cannot flip the circle**. Staff flips it via the "GoHighLevel signup complete?" checkbox in the **Setup** section of the staff client Overview tab → writes `clients.ghl_signup_done_at` |
 | Join Slack | staff-controlled | Same pattern with `ONB_SLACK_INVITE_URL`. Staff flips "Joined BAM Slack workspace?" in **Setup** → writes `clients.slack_join_done_at` |
-| General | auto-derived | clients.business_name + owner_name + email all set |
+| General | auto-derived (+ manual override) | clients.business_name + owner_name + email all set, OR staff sets `general_marked_done_at` |
 | Staff | manual mark-done | "I'm done with Staff" button on BB Staff card → `mark_onboarding_section('staff', true)` |
 | Locations | manual mark-done | "I'm done with Locations" button on BB Locations card → `mark_onboarding_section('locations', true)` |
 | Brand | manual mark-done | "I'm done with Brand" button on BB Brand card → `mark_onboarding_section('brand', true)` |
@@ -78,6 +83,7 @@ Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 externa
 Manual flags persist as timestamps on the clients row:
 - `ghl_signup_done_at`
 - `slack_join_done_at`
+- `general_marked_done_at` — General is auto-derived (business_name + owner_name + email all set) but staff can also manually override via this timestamp; done-state = `auto OR override`
 - `staff_marked_done_at`
 - `brand_marked_done_at`
 - `locations_marked_done_at`
