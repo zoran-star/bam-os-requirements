@@ -99,6 +99,28 @@ Path A (Settings → New client) still uses staff-typed password for now — the
 
 **Fallback (Supabase dashboard):** see `bam-ghl-agent/docs/client-account-setup.md`. Used for resets, deactivation, and one-off troubleshooting.
 
+### "Already has a login" → account-added email (added 2026-06-01)
+
+When you set someone up whose **email already exists as a confirmed auth user** (e.g. an owner taking on a 2nd academy, a teammate who's also staff, a staffer who already had a client login), Supabase `generate_link(invite)` returns **422 already-registered** and the code falls into a **link-existing** branch. These people don't need to set a password — they already have one.
+
+Previously the link-existing branches sent the generic "set your password" invite email built around a **magic link**, and the whole email send was **gated on `actionLink`** — so if `generate_link(magiclink)` failed, the user got wired up but **received nothing**, and staff saw a 200 (silent failure). `invite-staff` link-existing sent **nothing at all**, ever.
+
+**Fix (commit on `fix/new-client-email-not-sending`):** new `buildAccountAddedEmail` / `sendAccountAddedEmail` in `api/clients.js`. It points at the **plain login page** (not a magic link), so it can never silently no-op; the magic link is now only an optional one-tap convenience line. Copy: *"You've been added to X — you already have a BAM login, just sign in."* `kind` ∈ `owner | teammate | staff` only changes wording. From domain is the same verified `portal@byanymeansbball.com`.
+
+**Wired into all four link-existing spots:**
+| Action | kind | login URL |
+|---|---|---|
+| `setup-account` | owner | `<clientUrl>/client-portal.html` |
+| `invite-team-member` | teammate | `<clientUrl>/client-portal.html` |
+| `invite-staff` (was silent) | staff | `<staffUrl>/` |
+| `transfer-owner` (was reset email) | owner | `<clientUrl>/client-portal.html` |
+
+Fresh-invite / resend modes are unchanged — they still send the "set your password" invite (`sendInviteEmail`) since those users genuinely have no password yet.
+
+**How this surfaced:** Zoran created client "By Any Means Basketball" (owner `coleman@byanymeansbball.com`) on 2026-06-01. Coleman's email had been a confirmed, already-signed-in auth user since 2026-03-27, so setup-account took link-existing → magic-link invite. He already had a working password (didn't need any email). The real gap was that anyone in that situation gets confusing/spam-prone mail or nothing.
+
+**Slack note (minor follow-up):** link-existing still posts the invite-flavored `postInviteToSlack` ("set your password") rather than an "added — just log in" variant. Email is fixed; Slack copy not yet specialized.
+
 ## Password reset (and invite — same machinery)
 
 **Staff-triggered** (only path for now — self-serve "Forgot password?" is a deferred TODO):

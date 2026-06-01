@@ -448,6 +448,169 @@ async function sendInviteEmail({ to, actionLink, businessName, resendApiKey }) {
   return { ok: true };
 }
 
+// ─── Account-added email ────────────────────────────────────────────────────
+// For someone whose email ALREADY has a BAM login (owner taking over a 2nd
+// academy, a teammate who's also a staff member, a staff member who already
+// had a client account, etc). They don't need to set a password — there's
+// nothing to set up — so the invite/"set your password" copy is wrong and the
+// magic-link CTA is both confusing and spam-prone.
+//
+// Crucially this email points at the plain LOGIN PAGE and therefore does NOT
+// depend on a generated magic link. That fixes the silent-failure bug: the
+// link-existing branches used to gate the whole email on `actionLink`, so if
+// generate_link(magiclink) failed the user was wired up but got nothing and
+// staff saw a 200. Now the login URL always exists, so the email always sends;
+// the magic link is only ever an optional one-tap convenience.
+//
+// `kind`: 'owner' | 'teammate' | 'staff' — only changes copy.
+function buildAccountAddedEmail({ loginUrl, businessName, kind, actionLink }) {
+  const biz = (businessName || "").trim();
+  const bizPossessive = biz ? `${biz}'s` : "your";
+  const headline =
+    kind === "staff"
+      ? "You've been added to the BAM team"
+      : biz
+        ? `You've been added to ${biz}`
+        : "You've been added to your BAM portal";
+  const lead =
+    kind === "staff"
+      ? "You've been added to the BAM Business staff dashboard."
+      : kind === "owner"
+        ? `You've been set up as the owner of ${bizPossessive} BAM Business portal.`
+        : `You've been added to ${bizPossessive} BAM Business portal.`;
+  const surface = kind === "staff" ? "staff dashboard" : "portal";
+  const oneTap = actionLink
+    ? `
+          <tr>
+            <td style="padding:8px 32px 0 32px;">
+              <p style="margin:0;font-size:13px;line-height:1.55;color:#666;">
+                Want to skip typing your password? Use this one-tap sign-in link (expires in 24 hours):<br/>
+                <a href="${actionLink}" style="color:#0B0B0D;text-decoration:underline;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;word-break:break-all;">${actionLink}</a>
+              </p>
+            </td>
+          </tr>`
+    : "";
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${headline}</title>
+</head>
+<body style="margin:0;padding:0;background:#F5F1E8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1A1A1F;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F5F1E8;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <tr>
+            <td style="background:#0B0B0D;padding:24px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                <td style="font-family:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;font-size:20px;font-weight:700;color:#FFFFFF;letter-spacing:-0.01em;">
+                  <span style="color:#E8C547;">BAM</span> Business
+                </td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:36px 32px 8px 32px;">
+              <p style="margin:0 0 6px;font-family:'JetBrains Mono',Menlo,monospace;font-size:11px;font-weight:600;color:#8B6914;letter-spacing:0.14em;text-transform:uppercase;">${kind === "staff" ? "Staff Dashboard" : "Client Portal"}</p>
+              <h1 style="margin:0 0 18px;font-family:'Space Grotesk',-apple-system,sans-serif;font-size:28px;font-weight:700;letter-spacing:-0.025em;color:#0B0B0D;line-height:1.15;">
+                ${headline}
+              </h1>
+              <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#3A3A45;">
+                ${lead} <strong>Good news — you already have a BAM login</strong>, so there's nothing to set up.
+                Just sign in with the email and password you already use, and you'll see it in your ${surface}.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+                <td bgcolor="#E8C547" style="border-radius:6px;">
+                  <a href="${loginUrl}"
+                     style="display:inline-block;padding:14px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;font-weight:700;color:#0B0B0D;text-decoration:none;letter-spacing:-0.01em;border-radius:6px;">
+                    Log in →
+                  </a>
+                </td>
+              </tr></table>
+            </td>
+          </tr>${oneTap}
+          <tr>
+            <td style="padding:24px 32px 12px 32px;">
+              <p style="margin:0 0 8px;font-size:13px;color:#666;">
+                Button not working? Copy and paste this link into your browser:
+              </p>
+              <p style="margin:0;font-family:'JetBrains Mono',Menlo,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;">
+                <a href="${loginUrl}" style="color:#0B0B0D;text-decoration:underline;">${loginUrl}</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 36px 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="border-top:1px solid #E8E8E8;height:1px;line-height:1px;">&nbsp;</td></tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:12px;line-height:1.55;color:#888;">
+                Forgot your password? Use "Forgot password?" on the login screen to reset it.
+                If you weren't expecting this, you can ignore the email.
+              </p>
+              <p style="margin:14px 0 0;font-size:11px;color:#AAA;">
+                BAM Business
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+  const text = [
+    headline,
+    "",
+    `${lead} Good news — you already have a BAM login, so there's nothing to set up. Just sign in with the email and password you already use:`,
+    loginUrl,
+    ...(actionLink ? ["", `Or use this one-tap sign-in link (expires in 24 hours): ${actionLink}`] : []),
+    "",
+    'Forgot your password? Use "Forgot password?" on the login screen.',
+    "",
+    "— BAM Business",
+  ].join("\n");
+  return { html, text };
+}
+
+async function sendAccountAddedEmail({ to, loginUrl, businessName, kind, actionLink, resendApiKey }) {
+  const { html, text } = buildAccountAddedEmail({ loginUrl, businessName, kind, actionLink });
+  const biz = (businessName || "").trim();
+  const subject =
+    kind === "staff"
+      ? "You've been added to the BAM staff dashboard"
+      : biz
+        ? `${biz}: you've been added to the BAM portal`
+        : "You've been added to your BAM portal";
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      // Same verified FROM domain as sendInviteEmail (byanymeansbball.com).
+      from: "BAM Business <portal@byanymeansbball.com>",
+      to: [to],
+      subject,
+      html,
+      text,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Resend account-added send failed:", errText.slice(0, 200));
+    return { ok: false, error: errText };
+  }
+  return { ok: true };
+}
+
 // Post an invite link to the client's Slack channel. Fire-and-forget,
 // silently no-ops if SLACK_BOT_TOKEN unset or channel not mapped.
 // Lighter Slack notification for the "teammate added" case. The original
@@ -1298,7 +1461,7 @@ export default async function handler(req, res) {
 
           // Try invite (creates a fresh auth user). If the email already has
           // an auth user, look them up and issue a magiclink instead.
-          let actionLink = null, memberUserId = null;
+          let actionLink = null, memberUserId = null, memberMode = "invite";
           const inviteRes = await genTeamLink("invite", { data: { needs_password: true } });
           if (inviteRes.ok) {
             actionLink = inviteRes.actionLink;
@@ -1308,6 +1471,7 @@ export default async function handler(req, res) {
             if (!existingUser?.id) {
               return res.status(500).json({ error: "user exists in auth but couldn't be looked up" });
             }
+            memberMode = "link-existing";
             memberUserId = existingUser.id;
             const ml = await genTeamLink("magiclink");
             if (ml.ok) actionLink = ml.actionLink;
@@ -1359,19 +1523,30 @@ export default async function handler(req, res) {
           // online. Owners still get the full invite-style Slack post
           // via postInviteToSlack from setup-account / reset-password;
           // this branch is for adding teammates to an existing client.
-          const [emailRes, slackRes] = actionLink
-            ? await Promise.all([
-                sendInviteEmail({
-                  to: email, actionLink,
+          // link-existing teammate already has a login → "you've been added,
+          // just sign in" email (login-page based, never silently no-ops).
+          // Fresh invite → "set your password" email.
+          const teamLoginUrl = `${clientUrl}/client-portal.html`;
+          const [emailRes, slackRes] = await Promise.all([
+            memberMode === "link-existing"
+              ? sendAccountAddedEmail({
+                  to: email, loginUrl: teamLoginUrl,
                   businessName: teamClient.business_name || "",
+                  kind: "teammate", actionLink,
                   resendApiKey: process.env.RESEND_API_KEY,
-                }),
-                postTeammateAddedToSlack({
-                  slackChannelId: teamClient.slack_channel_id || null,
-                  name, email,
-                }),
-              ])
-            : [{ ok: false, error: "no link generated" }, { ok: false, skipped: true }];
+                })
+              : actionLink
+                ? sendInviteEmail({
+                    to: email, actionLink,
+                    businessName: teamClient.business_name || "",
+                    resendApiKey: process.env.RESEND_API_KEY,
+                  })
+                : Promise.resolve({ ok: false, error: "no link generated" }),
+            postTeammateAddedToSlack({
+              slackChannelId: teamClient.slack_channel_id || null,
+              name, email,
+            }),
+          ]);
 
           return res.status(200).json({
             ok: true,
@@ -1563,6 +1738,15 @@ export default async function handler(req, res) {
               body: JSON.stringify({ name: newName, role: newRole, user_id: auth_user_id }),
             });
             if (!updRes.ok) throw new Error(`Supabase ${updRes.status}: ${await updRes.text()}`);
+            // Fresh invites get Supabase's built-in invite email via
+            // /auth/v1/invite above. A link-existing staffer already has a
+            // login and otherwise got NOTHING — tell them they've been added.
+            if (mode === "link-existing" && process.env.RESEND_API_KEY) {
+              await sendAccountAddedEmail({
+                to: newEmail, loginUrl: `${staffUrl}/`,
+                kind: "staff", resendApiKey: process.env.RESEND_API_KEY,
+              }).catch(() => {});
+            }
             return res.status(200).json({
               id: existingStaff.id, name: newName, email: newEmail, role: newRole,
               invited: mode === "invite", linked: true,
@@ -1583,6 +1767,14 @@ export default async function handler(req, res) {
             user_id: auth_user_id,
           });
           const row = Array.isArray(rows) ? rows[0] : rows;
+          // Same as the repair path: link-existing staffers get no Supabase
+          // invite email, so send the "you've been added" notice ourselves.
+          if (mode === "link-existing" && process.env.RESEND_API_KEY) {
+            await sendAccountAddedEmail({
+              to: newEmail, loginUrl: `${staffUrl}/`,
+              kind: "staff", resendApiKey: process.env.RESEND_API_KEY,
+            }).catch(() => {});
+          }
           return res.status(200).json({
             id: row?.id, name: newName, email: newEmail, role: newRole,
             invited: mode === "invite", linked: mode === "link-existing",
@@ -2199,28 +2391,36 @@ export default async function handler(req, res) {
           name: new_owner_name, email: new_email,
         });
 
-        // 5. Email + Slack (best-effort, parallel).
-        const [emailResult, slackResult] = actionLink
-          ? await Promise.all([
-              process.env.RESEND_API_KEY
-                ? (inviteMode === "invite"
-                    ? sendInviteEmail({
-                        to: new_email, actionLink,
-                        businessName: cur.business_name || "",
-                        resendApiKey: process.env.RESEND_API_KEY,
-                      })
-                    : sendResetPasswordEmail({
-                        to: new_email, actionLink,
-                        resendApiKey: process.env.RESEND_API_KEY,
-                      }))
+        // 5. Email + Slack (best-effort, parallel). A link-existing new owner
+        // already has a login → "you've been added — just log in" email
+        // (login-page based, doesn't depend on the magic link). A fresh
+        // invite → "set your password". Email is no longer gated on
+        // actionLink so the link-existing case can't silently send nothing.
+        const transferLoginUrl = `${clientUrl}/client-portal.html`;
+        const [emailResult, slackResult] = await Promise.all([
+          !process.env.RESEND_API_KEY
+            ? Promise.resolve({ ok: false, skipped: true })
+            : inviteMode === "link-existing"
+              ? sendAccountAddedEmail({
+                  to: new_email, loginUrl: transferLoginUrl,
+                  businessName: cur.business_name || "", kind: "owner",
+                  actionLink, resendApiKey: process.env.RESEND_API_KEY,
+                })
+              : actionLink
+                ? sendInviteEmail({
+                    to: new_email, actionLink,
+                    businessName: cur.business_name || "",
+                    resendApiKey: process.env.RESEND_API_KEY,
+                  })
                 : Promise.resolve({ ok: false, skipped: true }),
-              postInviteToSlack({
+          actionLink
+            ? postInviteToSlack({
                 slackChannelId: cur.slack_channel_id || null,
                 businessName: cur.business_name || "",
                 ownerName: new_owner_name, email: new_email, actionLink,
-              }),
-            ])
-          : [{ ok: false, skipped: true }, { ok: false, skipped: true }];
+              })
+            : Promise.resolve({ ok: false, skipped: true }),
+        ]);
 
         return res.status(200).json({
           ok: true,
@@ -2388,25 +2588,39 @@ export default async function handler(req, res) {
         });
 
         // Notify via Resend + Slack in parallel. For 'link-existing' the
-        // copy is more about "you now have access" than "set your password",
-        // but the invite email template is generic enough either way.
-        const [emailRes, slackRes] = actionLink
-          ? await Promise.all([
-              sendInviteEmail({
+        // owner already has a login, so send the "you've been added — just
+        // log in" email (points at the login page, never depends on the
+        // magic link, so it can't silently no-op). 'invite'/'resend' still
+        // get the "set your password" invite email.
+        const clientLoginUrl = `${clientUrl}/client-portal.html`;
+        const [emailRes, slackRes] = await Promise.all([
+          mode === "link-existing"
+            ? sendAccountAddedEmail({
                 to: newEmail,
-                actionLink,
+                loginUrl: clientLoginUrl,
                 businessName,
+                kind: "owner",
+                actionLink,
                 resendApiKey: process.env.RESEND_API_KEY,
-              }),
-              postInviteToSlack({
+              })
+            : actionLink
+              ? sendInviteEmail({
+                  to: newEmail,
+                  actionLink,
+                  businessName,
+                  resendApiKey: process.env.RESEND_API_KEY,
+                })
+              : Promise.resolve({ ok: false, error: "no link generated" }),
+          actionLink
+            ? postInviteToSlack({
                 slackChannelId,
                 businessName,
                 ownerName: owner_name,
                 email: newEmail,
                 actionLink,
-              }),
-            ])
-          : [{ ok: false, error: "no link generated" }, { ok: false, skipped: true }];
+              })
+            : Promise.resolve({ ok: false, skipped: true }),
+        ]);
 
         return res.status(200).json({
           id: client_id,
