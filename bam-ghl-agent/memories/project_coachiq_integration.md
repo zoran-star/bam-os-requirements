@@ -98,8 +98,10 @@ Portal owns Stripe sub (all buttons work)
   → Stripe payment webhook → portal handler
   → POST api-v3.coachiq.io/hook/automation/trigger/<creditAutomationId>
      Bearer <key> · x-group-id <group>
-     { "userId": <members.coachiq_member_id>, "credits": N, "plan": "2/wk" }
-  → CoachIQ automation: Incoming Webhook → "Add Credits to {{payload.userId}}"
+     { "user": { "id": "<members.coachiq_member_id>" }, "credits": N }
+     ↑ user.id = the CoachIQ USER id (NOT email, NOT profile id) — see #1
+  → CoachIQ automation: Incoming Webhook, action "Add Credits"
+     with Target User = "User from trigger" (resolves from payload user.id)
 Pause/cancel → portal simply stops POSTing (or fires a redeem/revoke automation).
 ```
 
@@ -139,6 +141,8 @@ DECIDED new-member funnel (Zoran's vision, 2026-06-01):
 ```
 1. FC/GHL-branded FORM → contact into GHL + Supabase
      → Zapier "Create User" in CoachIQ  (parent never sees a CoachIQ form)
+     → CAPTURE the new CoachIQ user id → store in members.coachiq_member_id
+       (required — the credit webhook targets by user.id, see #1)
 2. Funnel → PORTAL payment page → portal creates the Stripe sub (portal-owned)
 3. Payment succeeds → portal POSTs the webhook:
      Automation A: "Add a Product Purchase to a User"
@@ -157,13 +161,27 @@ billing ownership is lost.
 
 ## OPEN QUESTIONS — what's left to figure out
 
-1. **User matching from the webhook payload.** The action's Target User
-   ("User from trigger" → Change) — can it resolve a user by **email**
-   (`{{payload.email}}`)? If yes, email is the join key and the portal never
-   needs to store `coachiq_member_id`. If id-only, the portal must capture each
-   athlete's CoachIQ id during signup (e.g. a "New User → Send to External
-   Webhook" automation posting the id back). **Need a screenshot of the Change
-   options to decide.**
+1. ~~User matching from the webhook payload~~ **RESOLVED 2026-06-02 (live-tested).**
+   The join key is **`{ "user": { "id": "<CoachIQ user id>" } }`** — nested, key
+   literally `id`, value = the CoachIQ **user id** (e.g. Knowl = `0227cc1d-1c0b-
+   403f-bda7-aea877fbd5cf`). Verified: that payload → action `success:true`,
+   "Tag added to user", and CoachIQ enriched the full user (email/phone/name).
+   What does NOT work (all tested live):
+   - `{"user":{"email":…}}` — email does NOT resolve, even for a real athlete
+   - `{"user":{"userId":…}}` — key must be `id`, not `userId`
+   - top-level `userId`/`email` — ignored
+   - **profile id ≠ user id** — the `?profile=` id (e.g. `d8016b4e…`/`32d290cf…`)
+     is the PROFILE id and does NOT resolve; you need the USER id (`0227cc1d…`).
+   "User from trigger" stays EMPTY for an incoming webhook ("user is required");
+   "Specific user" is a fixed dropdown (no variables). So the ONLY way to target
+   dynamically is sending the real CoachIQ user id as `user.id`.
+
+   **Consequence — the portal must STORE each member's CoachIQ user id**
+   (`members.coachiq_member_id`, currently EMPTY):
+   - NEW members → Zapier "Create User" returns the id → save it on creation.
+   - EXISTING members → BACKFILL from Stripe: CoachIQ stamps `userId` into each
+     sub's metadata (confirmed on Knowl's sub: `userId=0227cc1d…`, plus
+     `profileId`, `userEmail`, `productId`). Read it off the 68 CoachIQ subs.
 2. ~~How parents get a CoachIQ account~~ **RESOLVED 2026-06-01:** FC/GHL form →
    Zapier "Create User" (no CoachIQ form). Parent uses CoachIQ (white-labeled) to
    book; login is self-serve on first app open (set password, matched by email).
@@ -192,9 +210,13 @@ should be rotated.
 ✅ New-member funnel DECIDED (FC/GHL form → Zapier Create User → portal payment →
    webhook adds product/credits → download white-labeled app → first-open login)
 ✅ #2 RESOLVED (user creation + login self-serve on first app open)
-⏳ NOT built. Open: #1 user-matching (email vs id), #3 live test, #4 product
-   modeling, #5 scope, #6 sales packaging.
+✅ #1 RESOLVED (live-tested): join key = { "user": { "id": "<CoachIQ user id>" } }.
+   Email/profile-id do NOT work — must send the real user id. Portal must store
+   coachiq_member_id (new = Zapier returns it; existing = backfill from Stripe meta).
+⏳ NOT built. Open: #3 full live test (add CREDITS not just tag), #4 product
+   modeling, #5 scope, #6 sales packaging, + the coachiq_member_id backfill job.
 ```
 
-Immediate next step: close **#1** — confirm the webhook can match the CoachIQ user
-by email (Target User → Change), so the portal just sends the parent's email.
+Immediate next step: **#4 product/credit modeling** + decide #5 scope, then build.
+Quick win available: backfill members.coachiq_member_id from the 68 CoachIQ subs'
+Stripe metadata (`userId`).
