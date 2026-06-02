@@ -191,8 +191,31 @@ billing ownership is lost.
    automation, grab its automationId, fire a real test credit at a test athlete.
 4. **Product/credit modeling** — confirm one product-bank per plan and the
    per-cycle credit counts (e.g. 2/wk → 8/mo) so Automation B tops up correctly.
-5. **Scope decision** — bridge for NEW members only (#3) vs also migrate the 33
-   live BAM GTA subs to portal-owned (#4: 26 auto, 7 re-collect).
+5. ~~Scope decision~~ **DECIDED 2026-06-02: MIGRATE ALL to portal-owned** — Zoran
+   wants the billing buttons (pause/cancel/change/refund) to work for EVERY member,
+   and buttons only work on portal-created subs. So the back-book must be migrated.
+   **Migration is a risky live cutover — do it LAST, after the bridge is proven.**
+
+   Per-member mechanic: portal creates a NEW sub on the existing customer (reuse
+   card), trial_end = OLD sub's next-charge date (no double-charge/gap) → cancel
+   the OLD CoachIQ sub → portal now webhooks credits on each new-sub payment
+   (existing credits stay; only future top-ups switch to the bridge).
+
+   The 4 "don't mess it up" risks:
+   - Timing → anchor new sub trial_end to old current_period_end.
+   - Cards → 26/33 reuse silently, 7 need a payment-link re-collect.
+   - 🔴 CoachIQ "Subscription Cancelled" trigger may fire on cancel and revoke
+     the member's access/credits → CHECK + disable/handle the academy's automations
+     before cutover.
+   - Credit continuity → the "Add Credits on payment" webhook automation must be
+     LIVE + tested BEFORE canceling any CoachIQ sub.
+
+   Build order: (1) backfill coachiq_member_id → (2) #4 product/credit modeling →
+   (3) build+test the credit webhook automation (#3) → (4) portal create-sub +
+   Stripe-webhook→CoachIQ credit POST → (5) neutralize CoachIQ Subscription-
+   Cancelled automations → (6) THEN migrate the 33 live subs per-member.
+   Fallback if cutover too risky: keep back-book on CoachIQ, manage those billing
+   changes manually in Stripe (the Knowl in-place pattern); new members portal-native.
 6. **Sales motion** — once proven on BAM GTA, package this as the "keep CoachIQ,
    add FullControl" offer for other CoachIQ academies (the strategic goal).
 
@@ -213,10 +236,13 @@ should be rotated.
 ✅ #1 RESOLVED (live-tested): join key = { "user": { "id": "<CoachIQ user id>" } }.
    Email/profile-id do NOT work — must send the real user id. Portal must store
    coachiq_member_id (new = Zapier returns it; existing = backfill from Stripe meta).
-⏳ NOT built. Open: #3 full live test (add CREDITS not just tag), #4 product
-   modeling, #5 scope, #6 sales packaging, + the coachiq_member_id backfill job.
+✅ #5 scope DECIDED: MIGRATE ALL to portal-owned (buttons must work for everyone);
+   cutover done LAST, after the bridge is proven.
+⏳ NOT built. Build order: (1) backfill coachiq_member_id from Stripe metadata →
+   (2) #4 product/credit modeling → (3) build+test credit webhook automation →
+   (4) portal create-sub + Stripe-webhook→credit POST → (5) handle CoachIQ
+   Subscription-Cancelled automations → (6) migrate the 33 live subs.
 ```
 
-Immediate next step: **#4 product/credit modeling** + decide #5 scope, then build.
-Quick win available: backfill members.coachiq_member_id from the 68 CoachIQ subs'
-Stripe metadata (`userId`).
+Immediate next step: backfill `members.coachiq_member_id` from the 68 CoachIQ subs'
+Stripe metadata (`userId`), then #4 product/credit modeling.
