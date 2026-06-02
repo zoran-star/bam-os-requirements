@@ -19,6 +19,12 @@ import {
 } from "../services/ticketsService";
 import { supabase } from "../lib/supabase";
 
+// Lobby = unassigned working tickets (triage queue); Ongoing = the same working
+// statuses once someone is assigned. Assignment is the dividing line.
+const WORKING_STATUSES = ["open", "delegated", "in_progress", "needs_rework"];
+const isLobbyTicket   = (x) => WORKING_STATUSES.includes(x.status) && !x.assigned_to;
+const isOngoingTicket = (x) => WORKING_STATUSES.includes(x.status) && !!x.assigned_to;
+
 const STATUS_LABEL = {
   open:             "New",
   delegated:        "Delegated",
@@ -122,13 +128,11 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   // One scoping rule for everyone: managers see all tickets in a tab,
   // executors only see tickets assigned to them.
   const inScope = (x) => isManager || x.assigned_to === me?.id;
-  // Managers also see open (un-delegated) tickets in Lobby so they can
-  // delegate from the row's modal; executors only see their own delegated
-  // tickets waiting to start.
-  const lobbyStatuses = isManager ? ["open","delegated"] : ["delegated"];
+  // Lobby = UNASSIGNED working tickets (the triage queue). The moment a ticket
+  // is assigned to anyone it moves to Ongoing — regardless of open/in_progress.
   const visibleTickets = tickets.filter(x => {
-    if (tab === "lobby")     return lobbyStatuses.includes(x.status) && inScope(x);
-    if (tab === "ongoing")   return ["in_progress","needs_rework"].includes(x.status) && inScope(x);
+    if (tab === "lobby")     return isLobbyTicket(x) && inScope(x);
+    if (tab === "ongoing")   return isOngoingTicket(x) && inScope(x);
     if (tab === "awaiting")  return ["awaiting_client","final_review"].includes(x.status) && inScope(x);
     if (tab === "review")    return x.status === "in_review" && inScope(x);
     if (tab === "completed") return ["done","approved","cancelled"].includes(x.status) && inScope(x);
@@ -140,8 +144,8 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
   // (managers see all, executors only their own).
   const tabs = [
     ...(isManager ? [{ key: "overview", label: "Overview" }] : []),
-    { key: "lobby",     label: "Lobby",           count: tickets.filter(x => lobbyStatuses.includes(x.status) && inScope(x)).length },
-    { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status) && inScope(x)).length },
+    { key: "lobby",     label: "Lobby",           count: tickets.filter(x => isLobbyTicket(x) && inScope(x)).length },
+    { key: "ongoing",   label: "Ongoing",         count: tickets.filter(x => isOngoingTicket(x) && inScope(x)).length },
     { key: "awaiting",  label: "Awaiting client", count: tickets.filter(x => ["awaiting_client","final_review"].includes(x.status) && inScope(x)).length },
     { key: "review",    label: "In review",       count: tickets.filter(x => x.status === "in_review" && inScope(x)).length },
     { key: "completed", label: "Completed",       count: tickets.filter(x => ["done","approved","cancelled"].includes(x.status) && inScope(x)).length },
@@ -267,8 +271,8 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   ).length;
 
   const tileData = [
-    { key: "lobby",    label: "tickets in lobby",   count: tickets.filter(x => ["open","delegated"].includes(x.status)).length },
-    { key: "ongoing",  label: "tickets ongoing",    count: tickets.filter(x => ["in_progress","needs_rework"].includes(x.status)).length },
+    { key: "lobby",    label: "tickets in lobby",   count: tickets.filter(isLobbyTicket).length },
+    { key: "ongoing",  label: "tickets ongoing",    count: tickets.filter(isOngoingTicket).length },
     { key: "review",   label: "tickets in review",  count: tickets.filter(x => x.status === "in_review").length },
     { key: "completed", label: "completed last 5 days", count: completedLast5 },
   ];
@@ -286,8 +290,11 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
     return due.getTime() <= twoBizDaysOut.getTime();
   };
 
+  // Both states mean the ball is in the client's court: awaiting_client (we
+  // asked them something) and final_review (build done → sent for their final
+  // sign-off). Matches the "Awaiting client" tab grouping.
   const clientActionTickets = tickets
-    .filter(x => x.status === "awaiting_client")
+    .filter(x => ["awaiting_client", "final_review"].includes(x.status))
     .sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
 
   // Group client actions by client business_name
@@ -1069,6 +1076,51 @@ function Row({ label, value, tokens: t }) {
 // content (any newline or > 60 chars → textarea). Complex values
 // (objects/arrays that aren't simple lists) fall back to read-only —
 // editing those structurally would need a richer UI.
+// Read-only structured renderer for complex submission values (brand object,
+// staff/offers/locations arrays, etc.) so the systems team can actually read
+// them in the ticket instead of "(edit via direct DB)".
+function _fmtScalar(v) {
+  if (v == null || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  return String(v);
+}
+function ComplexValue({ value, tokens: t, depth = 0 }) {
+  if (value == null || value === "") return <span style={{ color: t.textMute }}>—</span>;
+  if (typeof value !== "object") return <span>{_fmtScalar(value)}</span>;
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span style={{ color: t.textMute }}>None</span>;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {value.map((item, i) => (
+          <div key={i} style={{ border: `1px solid ${t.border}`, borderRadius: 6, padding: "8px 10px", background: t.bg }}>
+            <ComplexValue value={item} tokens={t} depth={depth + 1} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const entries = Object.entries(value).filter(([, v]) =>
+    v != null && v !== "" &&
+    !(Array.isArray(v) && v.length === 0) &&
+    !(typeof v === "object" && !Array.isArray(v) && Object.keys(v || {}).length === 0)
+  );
+  if (entries.length === 0) return <span style={{ color: t.textMute }}>—</span>;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {entries.map(([k, v]) => (
+        <div key={k} style={{ display: "flex", gap: 8, fontSize: 12.5, alignItems: "flex-start" }}>
+          <span style={{ minWidth: 120, color: t.textMute, textTransform: "capitalize", flexShrink: 0 }}>{k.replace(/_/g, " ")}</span>
+          <span style={{ flex: 1, color: t.text, wordBreak: "break-word" }}>
+            {typeof v === "object" ? <ComplexValue value={v} tokens={t} depth={depth + 1} /> : _fmtScalar(v)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EditableRow({ label, value, originalValue, onChange, disabled, tokens: t }) {
   const isEdited = value !== originalValue;
   const isPlainString = value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
@@ -1105,8 +1157,8 @@ function EditableRow({ label, value, originalValue, onChange, disabled, tokens: 
       <div style={{ minWidth: 220, fontSize: 13, fontWeight: 500, color: t.textSub, paddingTop: 8 }}>{label}</div>
       <div style={{ flex: 1 }}>
         {isComplex ? (
-          <div style={{ fontSize: 13, color: t.text, fontStyle: "italic", paddingTop: 8 }}>
-            (complex value — edit via direct DB)
+          <div style={{ paddingTop: 6 }}>
+            <ComplexValue value={value} tokens={t} />
           </div>
         ) : useTextarea ? (
           <textarea
