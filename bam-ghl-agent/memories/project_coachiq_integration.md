@@ -81,8 +81,24 @@ mutation { signUp_V2(input:{
   password, tags, avatar }` (used by admin mutations); `SignUp_V2_Input` uses
   `first`/`last` not `firstName`/`lastName`.
 
-So new-member creation can be a **direct portal→GraphQL call** (signUp_V2), dropping
-the Zapier dependency. Admin ops (update/delete) still need a staff session.
+⚠️ **CORRECTION (2026-06-02): signUp_V2 alone is NOT enough.** The user it creates
+is a **bare CoachIQ login account that is NOT enrolled in the academy's group/
+roster** — they don't show in Clients/People, and firing the credit/tag webhook at
+their id runs **0 actions** (vs a real member = 1 success). The token DOES decode to
+the new userId (`{id, iat}` JWT — userId extraction solved), but the account is
+floating/unusable until enrolled.
+
+**To ENROLL a user in the academy group** (so they're creditable/bookable) needs
+elevated auth the API key lacks:
+- `adminAddUser` → "must be logged in" → needs a STAFF session token.
+- Zapier "Create User" → may handle group enrollment (the integration's blessed
+  path — possibly why CoachIQ exposes it).
+- A CoachIQ product/checkout → but that's CoachIQ taking payment (we don't want).
+
+**NEXT LEAD:** find a `login`/`signIn` mutation → portal logs in as a BAM staff
+CoachIQ account → gets a staff session token → then `adminAddUser` (proper group
+enrollment) + `updateUser`/`deleteUser` all work → full lifecycle, still no Zapier.
+Until that's confirmed, the fallback create+enroll path is Zapier "Create User".
 
 ⚠️ Test cleanup: signUp_V2 created ~2 "FCTEST DELETEME" users in BAM GTA — delete
 them in CoachIQ People (can't via API; deleteUser needs staff login).
