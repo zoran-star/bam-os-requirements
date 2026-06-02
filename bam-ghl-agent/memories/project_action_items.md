@@ -51,22 +51,37 @@ Action Items doubles as the **client onboarding checklist**. A pinned "Onboardin
 group renders at the top of the list (client + staff), seeded from a fixed set of
 steps keyed by `action_items.onboarding_key`:
 
-| key | title | mode | signal / flag column |
-|---|---|---|---|
-| `slack` | Join the BAM Slack workspace | **manual** | writes `clients.slack_join_done_at` |
-| `connect_stripe` | Connect your Stripe account | **auto** | `clients.stripe_connect_connected_at` |
-| `create_ghl` | Create your GoHighLevel sub-account | **manual** | writes `clients.ghl_signup_done_at` |
-| `connect_ghl` | Connect your GoHighLevel account | **auto** | `clients.ghl_connected_at` |
+9 steps total (2026-06-02). Each maps to a clients timestamp column (`col`) and
+is either **writable** (toggling writes col — two-way sync) or **signal** (col is
+an external connection signal):
 
-- **AUTO** steps self-complete from the live clients-row signal via `syncOnboardingItems()`
-  (reconciled on every GET) — BUT every step is also **check/uncheck-able by hand** (client
-  OR staff). The moment a human toggles a step, `action_items.onboarding_overridden` is set
-  true and the auto-reconcile leaves it alone from then on (human wins). Migration
-  `action_items_onboarding_overridden` (2026-06-01).
-- **MANUAL** steps are checkboxes (either side can tick/untick — fully shared). Ticking ALSO
-  writes the canonical `clients` flag, so the **legacy onboarding tracker pill stays in
-  sync** (see [[project_v2_onboarding_model]]); unticking clears it.
-- Onboarding rows **can't be deleted** (API guard) and have `sort_order` 1–4.
+| # | key | title | col | writable |
+|---|---|---|---|---|
+| 1 | `slack` | Join the BAM Slack workspace | `slack_join_done_at` | ✅ |
+| 2 | `connect_stripe` | Connect your Stripe account | `stripe_connect_connected_at` | signal |
+| 3 | `create_ghl` | Create your GoHighLevel sub-account | `ghl_signup_done_at` | ✅ |
+| 4 | `connect_ghl` | Connect your GoHighLevel account | `ghl_connected_at` | signal |
+| 5 | `general_info` | Fill out General Info | `general_marked_done_at` | ✅ → BB #bb=general |
+| 6 | `staff` | Add your Staff | `staff_marked_done_at` | ✅ → BB #bb=staff |
+| 7 | `locations` | Add your Locations | `locations_marked_done_at` | ✅ → BB #bb=locations |
+| 8 | `brand` | Set up Brand & Website | `brand_marked_done_at` | ✅ → BB #bb=brand |
+| 9 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+
+- `syncOnboardingItems()` reconciles every step from its `col` on each GET.
+  **Writable** steps always mirror col (toggling writes col, so consistent) — this is
+  the two-way sync with the BB "I'm done with X" buttons. **Signal** steps mirror col
+  UNLESS `action_items.onboarding_overridden` is set (human toggled by hand → human wins).
+- Every step is **check/uncheck-able by hand** (client OR staff). Toggling a writable step
+  writes its `col`; toggling a signal step sets `onboarding_overridden`.
+- Steps 5–9 are the **off-call form steps** — their client-portal CTA (`_aiOpenBB`) jumps to
+  the matching Business Blueprint section; completion = that section's mark-done.
+  Note: `general_info` keys ONLY off `general_marked_done_at` (the explicit "I'm done with
+  General" click), NOT the tracker's auto-derive (name+owner+email) — so it can read
+  not-done even when the BB tracker shows general_done.
+- Onboarding rows **can't be deleted** (API guard); `sort_order` 1–9.
+- Migrations: `action_items_onboarding_key`, `action_items_onboarding_overridden`,
+  `clients_timezone_kpis` (+ time_zone, kpi_data, kpi_marked_done_at; extended
+  update_client_basics + mark_onboarding_section), `onboarding_progress_kpis`.
 - Schema: `action_items.onboarding_key` (text, null = ad-hoc) + `sort_order` (int) +
   unique `(client_id, onboarding_key)`. Migration `action_items_onboarding_key`.
 - Seeded for **all clients** (backfill 2026-06-01) + lazily on every GET (idempotent via

@@ -123,18 +123,26 @@ function dueLabel(d) {
 }
 
 // ── Onboarding steps (system-seeded action items) ─────────────────────────
-// A row's onboarding_key marks it as a fixed onboarding step.
-//   AUTO   steps complete from a live signal on the clients row (read-only).
-//   MANUAL steps are checkboxes that ALSO write the canonical clients flag,
-//          so the legacy onboarding tracker pill stays in sync.
+// A row's onboarding_key marks it as a fixed onboarding step. Each step maps to
+// a timestamp column on the clients row (`col`):
+//   writable=true  → toggling the step writes col (two-way sync with the BB
+//                    "mark done" buttons / Setup tracker); reconcile always
+//                    mirrors col.
+//   writable=false → col is an external signal (Stripe/GHL connect). Reconcile
+//                    mirrors col UNLESS a human overrode the step by hand.
 const ONBOARDING_STEPS = [
-  { key: "slack",          title: "Join the BAM Slack workspace",        sort: 1, mode: "manual", flagCol: "slack_join_done_at" },
-  { key: "connect_stripe", title: "Connect your Stripe account",         sort: 2, mode: "auto",   signalCol: "stripe_connect_connected_at" },
-  { key: "create_ghl",     title: "Create your GoHighLevel sub-account", sort: 3, mode: "manual", flagCol: "ghl_signup_done_at" },
-  { key: "connect_ghl",    title: "Connect your GoHighLevel account",    sort: 4, mode: "auto",   signalCol: "ghl_connected_at" },
+  { key: "slack",          title: "Join the BAM Slack workspace",        sort: 1, col: "slack_join_done_at",          writable: true },
+  { key: "connect_stripe", title: "Connect your Stripe account",         sort: 2, col: "stripe_connect_connected_at", writable: false },
+  { key: "create_ghl",     title: "Create your GoHighLevel sub-account", sort: 3, col: "ghl_signup_done_at",           writable: true },
+  { key: "connect_ghl",    title: "Connect your GoHighLevel account",    sort: 4, col: "ghl_connected_at",             writable: false },
+  { key: "general_info",   title: "Fill out General Info",               sort: 5, col: "general_marked_done_at",       writable: true },
+  { key: "staff",          title: "Add your Staff",                      sort: 6, col: "staff_marked_done_at",         writable: true },
+  { key: "locations",      title: "Add your Locations",                  sort: 7, col: "locations_marked_done_at",     writable: true },
+  { key: "brand",          title: "Set up Brand & Website",              sort: 8, col: "brand_marked_done_at",         writable: true },
+  { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
-const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.signalCol || s.flagCol))].join(",");
+const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
 
 async function loadClientSignals(clientId) {
   const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS}`);
@@ -142,8 +150,7 @@ async function loadClientSignals(clientId) {
 }
 
 // Idempotently ensure all onboarding steps exist for this client, then
-// reconcile AUTO steps against the live client signals. Safe to call on every
-// GET — steady state is 2 selects + 0 writes.
+// reconcile each against its clients-row column. Safe to call on every GET.
 async function syncOnboardingItems(clientId) {
   const signals = await loadClientSignals(clientId);
   const existing = await sb(
@@ -153,31 +160,33 @@ async function syncOnboardingItems(clientId) {
   (existing || []).forEach(r => { byKey[r.onboarding_key] = r; });
 
   for (const step of ONBOARDING_STEPS) {
-    const signalVal = signals[step.signalCol || step.flagCol] || null; // timestamp or null
+    const colVal = signals[step.col] || null; // timestamp or null
     const row = byKey[step.key];
 
     if (!row) {
       // Seed missing step (idempotent via on_conflict). completed_at derived
-      // from the current signal so already-connected clients show done.
+      // from the current column so already-done clients show done.
       await sb(`action_items?on_conflict=client_id,onboarding_key`, {
         method: "POST",
         headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
         body: JSON.stringify({
           client_id: clientId, title: step.title, onboarding_key: step.key,
           sort_order: step.sort, created_by_name: "Onboarding", created_by_role: "staff",
-          completed_at: signalVal,
+          completed_at: colVal,
         }),
       });
       continue;
     }
-    // AUTO steps mirror the live signal — UNLESS a human has overridden them
-    // (checked/unchecked by hand), in which case the human's choice stands.
-    if (step.mode === "auto" && !row.onboarding_overridden) {
-      const shouldBeDone = !!signalVal;
+    // Writable steps always mirror col (toggling writes col, so they're already
+    // consistent; this picks up changes made via the BB "mark done" buttons).
+    // Signal steps mirror col UNLESS a human overrode the step by hand.
+    const respectOverride = !step.writable && row.onboarding_overridden;
+    if (!respectOverride) {
+      const shouldBeDone = !!colVal;
       if (!!row.completed_at !== shouldBeDone) {
         await sb(`action_items?id=eq.${row.id}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ completed_at: shouldBeDone ? signalVal : null }),
+          body: JSON.stringify({ completed_at: shouldBeDone ? colVal : null }),
         });
       }
     }
@@ -302,9 +311,10 @@ export default async function handler(req, res) {
       const obStep = existing.onboarding_key ? ONBOARDING_BY_KEY[existing.onboarding_key] : null;
 
       const patch = {};
-      // Any hand toggle of an onboarding step marks it overridden, so the
-      // auto-reconcile stops forcing AUTO steps back to the signal value.
-      if (obStep && "completed" in b) patch.onboarding_overridden = true;
+      // Hand-toggling a SIGNAL step (Stripe/GHL connect) marks it overridden so
+      // the reconcile stops forcing it back to the signal. Writable steps don't
+      // need this — toggling writes their col, so they stay consistent.
+      if (obStep && !obStep.writable && "completed" in b) patch.onboarding_overridden = true;
       if (typeof b.title === "string") {
         if (!b.title.trim()) return res.status(400).json({ error: "title cannot be empty" });
         patch.title = b.title.trim();
@@ -352,12 +362,12 @@ export default async function handler(req, res) {
       });
       const item = Array.isArray(rows) ? rows[0] : rows;
 
-      // Manual onboarding step → write the canonical clients flag too, so the
-      // legacy onboarding tracker pill reflects the same done state.
-      if (obStep && obStep.mode === "manual" && "completed" in b) {
+      // Writable onboarding step → write its canonical clients column too, so
+      // the BB "mark done" buttons + onboarding tracker reflect the same state.
+      if (obStep && obStep.writable && "completed" in b) {
         await sb(`clients?id=eq.${existing.client_id}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ [obStep.flagCol]: b.completed ? patch.completed_at : null }),
+          body: JSON.stringify({ [obStep.col]: b.completed ? patch.completed_at : null }),
         });
       }
 

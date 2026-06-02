@@ -8107,6 +8107,7 @@ const _bbCards = [
   { id:'staff',     label:'Staff',     desc:'People who work at the academy (also portal teammates)' },
   { id:'locations', label:'Locations', desc:'Every place you operate from' },
   { id:'brand',     label:'Brand',     desc:'Logos, colors, fonts, website spec, photos' },
+  { id:'kpis',      label:'KPIs',      desc:'Your baseline numbers — revenue, clients, sales, expenses' },
   { id:'offers',    label:'Offers',    desc:'Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals' }
 ];
 
@@ -8180,6 +8181,7 @@ const _bbCardIcons = {
   staff:     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   locations: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
   brand:     '<circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.97-4.48-9-10-9z"/>',
+  kpis:      '<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="12" y="7" width="3" height="10"/><rect x="17" y="13" width="3" height="4"/>',
 };
 function _bbCardIconSvg(cardId) {
   const inner = _bbCardIcons[cardId] || '<rect x="3" y="3" width="18" height="18" rx="2"/>';
@@ -8191,7 +8193,7 @@ function _bbRenderLanding(panel) {
   const others = _bbCards.filter(c => c.id !== 'offers');
   panel.innerHTML = `
     <p style="font-size:14px;color:var(--text-sub);margin:0 0 22px;line-height:1.55;max-width:680px">
-      Your academy at a glance. Five cards cover everything from your offers to business basics. Start with Offers — it's where most of the work lives.
+      Your academy at a glance. These cards cover everything from your offers to business basics. Start with Offers — it's where most of the work lives.
     </p>
 
     <div class="bb-hero" onclick="_bbNavigate('${offers.id}')">
@@ -8222,6 +8224,7 @@ function _bbRenderCardPlaceholder(panel, card) {
   if (card === 'locations') return _bbRenderLocationsCard(panel, meta);
   if (card === 'general')   return _bbRenderGeneralCard(panel, meta);
   if (card === 'brand')     return _bbRenderBrandCard(panel, meta);
+  if (card === 'kpis')      return _bbRenderKpisCard(panel, meta);
 
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
@@ -8377,9 +8380,31 @@ function _bbRenderGeneralCard(panel, meta) {
       <div class="bb-field-hint">Federal tax ID. Required if you want us to set up Stripe Connect under your business.</div>
     </div>
 
+    <div class="bb-field">
+      <div class="bb-field-label">Time zone</div>
+      <select id="bb-gen-time_zone" class="bb-input" onchange="_bbGenChanged()">
+        ${_BB_TZ_OPTS.map(([val, label]) => `<option value="${val}" ${(c.time_zone || '') === val ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <div class="bb-field-hint">Used to time automations, reminders, and reports correctly.</div>
+    </div>
+
     <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
   `;
 }
+
+// Common time zones (IANA value · friendly label). "" = not set.
+const _BB_TZ_OPTS = [
+  ['', '— Select —'],
+  ['America/New_York', 'Eastern (New York / Toronto)'],
+  ['America/Chicago', 'Central (Chicago)'],
+  ['America/Denver', 'Mountain (Denver)'],
+  ['America/Phoenix', 'Arizona (no DST)'],
+  ['America/Los_Angeles', 'Pacific (LA / Vancouver)'],
+  ['America/Anchorage', 'Alaska'],
+  ['Pacific/Honolulu', 'Hawaii'],
+  ['America/Halifax', 'Atlantic (Halifax)'],
+  ['Europe/London', 'UK (London)'],
+];
 
 function _bbGenChanged() {
   _bbBasicsScheduleSave(() => ({
@@ -8390,6 +8415,7 @@ function _bbGenChanged() {
     phone:         document.getElementById('bb-gen-phone')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
+    time_zone:     document.getElementById('bb-gen-time_zone')?.value || '',
   }));
 }
 
@@ -8551,6 +8577,93 @@ async function _bbBrandSetWebsiteStatus(opt) {
   const next = (cur.website_status === opt) ? '' : opt;
   await _bbSaveClientBasics({ brand_data: { ...cur, website_status: next } });
   _bbRenderFromHash();
+}
+
+// ─── BB KPIs CARD ───────────────────────────────────────────────────────
+// Baseline business metrics. All optional. Stored in clients.kpi_data jsonb,
+// same auto-save + mark-done pattern as Brand.
+const _BB_KPI_GROUPS = [
+  ['💰 Revenue', [
+    ['rev_30d', 'Total Revenue — last 30 days', '$'],
+    ['rev_avg_3mo', 'Avg Monthly Revenue — last 3 mo', '$'],
+    ['rev_highest_month', 'Highest Revenue Month — all-time', '$'],
+    ['rev_goal_6mo', 'Revenue Goal — next 6 mo', '$'],
+  ]],
+  ['👥 Clients', [
+    ['clients_active', 'Total Active Clients', ''],
+    ['clients_new_30d', 'New Clients — last 30 days', ''],
+    ['clients_lost_30d', 'Lost Clients — last 30 days', ''],
+    ['churn_pct', 'Avg Monthly Churn', '%'],
+    ['avg_stay_months', 'Avg Length of Stay', 'months'],
+    ['avg_spend_client', 'Avg Monthly Spend / Client', '$'],
+    ['est_ltv', 'Estimated Client LTV', '$'],
+    ['peak_active', 'Peak Active Clients — all-time', ''],
+  ]],
+  ['📈 Sales', [
+    ['leads_30d', 'Total Leads — last 30 days', ''],
+    ['cpl', 'Cost Per Lead (CPL)', '$'],
+    ['trials_30d', 'Trials Booked — last 30 days', ''],
+    ['showup_pct', 'Show-Up Rate', '%'],
+    ['close_pct', 'Close Rate', '%'],
+    ['cac', 'Cost to Acquire a Client (CAC)', '$'],
+    ['monthly_ad_spend', 'Current Monthly Ad Spend', '$'],
+  ]],
+];
+const _BB_KPI_IDS = [..._BB_KPI_GROUPS.flatMap(([, fs]) => fs.map(f => f[0])), 'avg_monthly_expenses', 'expenses_breakdown'];
+
+function _bbRenderKpisCard(panel, meta) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const kd = c.kpi_data || {};
+  const vk = (k) => _bbEscapeHtml(kd[k] == null ? '' : kd[k]);
+  const grpTitle = (t) => `<div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--text);margin:24px 0 10px">${t}</div>`;
+  const numField = (id, label, unit) => `
+    <div class="bb-field">
+      <div class="bb-field-label">${_bbEscapeHtml(label)}${unit ? ` <span style="color:var(--text-mute);font-weight:400">(${unit})</span>` : ''}</div>
+      <input id="bb-kpi-${id}" type="number" inputmode="decimal" class="bb-input" value="${vk(id)}" oninput="_bbKpisChanged()" />
+    </div>`;
+  const groupsHtml = _BB_KPI_GROUPS.map(([title, fields]) =>
+    grpTitle(title) + fields.map(([id, label, unit]) => numField(id, label, unit)).join('')
+  ).join('');
+
+  panel.innerHTML = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">${_bbEscapeHtml(meta.label)}</div>
+        <div class="bb-page-sub">${_bbEscapeHtml(meta.desc)}</div>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--text-mute);margin:0 0 18px;max-width:620px;line-height:1.5">
+      All optional — fill in whatever you know. Estimates are fine; these give us your baseline to measure growth against.
+    </p>
+    ${groupsHtml}
+    ${grpTitle('💸 Expenses')}
+    <div class="bb-field">
+      <div class="bb-field-label">Avg Monthly Expenses <span style="color:var(--text-mute);font-weight:400">($)</span></div>
+      <input id="bb-kpi-avg_monthly_expenses" type="number" inputmode="decimal" class="bb-input" value="${vk('avg_monthly_expenses')}" oninput="_bbKpisChanged()" />
+    </div>
+    <div class="bb-field">
+      <div class="bb-field-label">Expenses breakdown</div>
+      <textarea id="bb-kpi-expenses_breakdown" class="bb-textarea" oninput="_bbKpisChanged()" placeholder="List your main monthly expenses — rent, coaches, software, ads, etc.">${vk('expenses_breakdown')}</textarea>
+    </div>
+
+    <div style="font-size:11px;color:var(--text-mute);margin-top:6px;text-align:right">Auto-saves as you type.</div>
+
+    ${_bbMarkDoneCta('kpis', 'KPIs')}
+  `;
+}
+
+function _bbKpisChanged() {
+  _bbBasicsScheduleSave(() => {
+    const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    const cur = (c && c.kpi_data) || {};
+    const next = { ...cur };
+    _BB_KPI_IDS.forEach(id => { next[id] = document.getElementById('bb-kpi-' + id)?.value || ''; });
+    return { kpi_data: next };
+  });
 }
 
 // ─── BB STAFF CARD ──────────────────────────────────────────────────────
@@ -12563,7 +12676,19 @@ const ONB_UI = {
   connect_stripe: { auto: true,  cta: { label: 'Connect Stripe', fn: 'openStripeConnectModal()' } },
   create_ghl:     { auto: false, cta: null },
   connect_ghl:    { auto: true,  cta: { label: 'Connect GHL', fn: 'openGhlConnectModal()' } },
+  // Off-call form steps — CTA jumps to the matching Business Blueprint section.
+  general_info:   { auto: false, cta: { label: 'Open form ↗', fn: "_aiOpenBB('general')" } },
+  staff:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('staff')" } },
+  locations:      { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('locations')" } },
+  brand:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('brand')" } },
+  kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
 };
+
+// Jump from an Action Items onboarding step to its Business Blueprint section.
+function _aiOpenBB(card) {
+  switchView('blueprint');
+  _bbNavigate(card);
+}
 
 function _renderActionItems() {
   const container = document.getElementById('action-items-list');
