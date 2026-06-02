@@ -51,6 +51,42 @@ not created by your application."* See [[project_stripe_app_created_subs]] for
 the full Stripe-side detail. In-place manual edits in Stripe keep the same
 sub_id, so CoachIQ stays synced (that's why the Knowl manual pause was correct).
 
+## CoachIQ GraphQL API (api-v3) — DIRECT user create, no Zapier (2026-06-02)
+
+`api-v3.coachiq.io/graphql` is a GraphQL API authed by the **same API key**
+(`Authorization: Bearer <key>` + `x-group-id`). Introspection is disabled, but
+field names were mapped via error "did you mean" suggestions. Query root = `Root`,
+mutation root = `Mutation`.
+
+**Auth scope of the API key is LIMITED:**
+- ✅ `signUp_V2` works with the key (it's a public self-signup; key not even required)
+- ❌ `adminAddUser`, `updateUser`, `deleteUser`, `user` query → "You must be logged
+  in to do this" (need a real STAFF session token, not the API key)
+
+**The create-user path = `signUp_V2` (no Zapier needed):**
+```
+mutation { signUp_V2(input:{
+   email:String!  first:String!  last:String!  phone:String!  password:String!
+}) { token status } }
+```
+- Self-signup style → **requires a password** → collect it on the FC onboarding
+  form (parent picks it, then logs into the white-labeled app with it).
+- Returns `{ token, status }` — **NOT the userId.** Get the userId by: (1) decoding
+  the token (likely a JWT w/ the id), (2) calling `user` query with that token, or
+  (3) a CoachIQ "New User → Send to External Webhook" automation that posts the id
+  to the portal (most robust). ← TODO confirm which.
+- **Rate-limited** ("Auth rate limit exceeded", retryAfter ~450s) — fine at normal
+  signup volume; only trips under rapid testing.
+- Other input shapes seen: `UpdateUserInput{ firstName!, lastName!, email, phone,
+  password, tags, avatar }` (used by admin mutations); `SignUp_V2_Input` uses
+  `first`/`last` not `firstName`/`lastName`.
+
+So new-member creation can be a **direct portal→GraphQL call** (signUp_V2), dropping
+the Zapier dependency. Admin ops (update/delete) still need a staff session.
+
+⚠️ Test cleanup: signUp_V2 created ~2 "FCTEST DELETEME" users in BAM GTA — delete
+them in CoachIQ People (can't via API; deleteUser needs staff login).
+
 ## The CoachIQ API — what the key can do
 
 There are no public API docs. The main app (`admin.coachiq.io`, Apollo GraphQL)
@@ -139,9 +175,11 @@ action has a **Target User** = "User from trigger" with a **Change** option.
 
 DECIDED new-member funnel (Zoran's vision, 2026-06-01):
 ```
-1. FC/GHL-branded FORM → contact into GHL + Supabase
-     → Zapier "Create User" in CoachIQ  (parent never sees a CoachIQ form)
-     → CAPTURE the new CoachIQ user id → store in members.coachiq_member_id
+1. FC/GHL-branded FORM (incl. a password field) → contact into GHL + Supabase
+     → portal backend calls signUp_V2 DIRECTLY (api-v3 GraphQL, no Zapier)
+       to create the CoachIQ user (parent never sees a CoachIQ form)
+     → CAPTURE the new CoachIQ user id (decode token / user query / New-User
+       outbound-webhook automation) → store in members.coachiq_member_id
        (required — the credit webhook targets by user.id, see #1)
 2. Funnel → PORTAL payment page → portal creates the Stripe sub (portal-owned)
 3. Payment succeeds → portal POSTs the webhook:
