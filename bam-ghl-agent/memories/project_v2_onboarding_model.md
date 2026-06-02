@@ -82,6 +82,12 @@ Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 externa
 
 > ⚠ **Second writer (2026-06-01):** `slack_join_done_at` and `ghl_signup_done_at` are now ALSO written by the **Action Items onboarding steps** (`slack` → slack_join_done_at, `create_ghl` → ghl_signup_done_at). Ticking the step in the Action Items tab writes the same column this tracker reads, so the two stay in sync. `stripe_connect_connected_at` + `ghl_connected_at` drive AUTO Action Items steps (Connect Stripe / Connect GHL) but are NOT tracker sections. See [[project_action_items]].
 
+> ⚠ **More second-writers (2026-06-02):** the BB form steps now also exist as Action Items onboarding steps that write the same `*_marked_done_at` columns this tracker uses — `general_marked_done_at` · `staff_marked_done_at` · `locations_marked_done_at` · `brand_marked_done_at`. Two-way synced with the BB "I'm done with X" buttons. See [[project_action_items]].
+
+## New "KPIs" BB card (2026-06-02)
+
+Sixth BB card: **KPIs** (`#bb=kpis`). Baseline metrics (revenue / clients / sales / expenses), all optional. Stored in **`clients.kpi_data` jsonb** (same auto-save pattern as `brand_data`); mark-done flag **`clients.kpi_marked_done_at`** via `mark_onboarding_section('kpis')`; `get_onboarding_progress()` now returns `kpis_done`. Renderer `_bbRenderKpisCard`/`_bbKpisChanged`; field list = `_BB_KPI_GROUPS` + `_BB_KPI_IDS`. Also a `kpis` Action Items onboarding step (#9). **General card** gained **Time Zone** (`clients.time_zone`, `_BB_TZ_OPTS`). Website NOT added to General — already in `brand_data.website_url`/`domain`.
+
 Manual flags persist as timestamps on the clients row:
 - `ghl_signup_done_at`
 - `slack_join_done_at`
