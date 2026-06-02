@@ -115,28 +115,45 @@ re-collect (payment link).
 etc.) returns 404. **There is no REST endpoint to create a CoachIQ user.**
 
 So a CoachIQ user must exist BEFORE the portal can grant them credits/products.
-Two ways to create one:
-- **A. Parent self-signs-up in CoachIQ** (build it into the onboarding funnel)
-- **B. Zapier "Create User" action** (portal → Zapier → CoachIQ) — the only
-  programmatic path. (An automation itself has no "Create User" action.)
+Ways to create one:
+- **Zapier "Create User" action** (FC/GHL form → Zapier → CoachIQ) — **the chosen
+  path.** No CoachIQ-hosted form is shown to the parent.
+- CoachIQ signup form (Login/Signup connection) — works + is no-Zapier, but it's
+  CoachIQ-hosted; rejected because Zoran wants signup to live in the FC/GHL funnel.
+- Manual create in the CoachIQ UI — Zoran has done this before; same result.
+
+**Login is self-serve (confirmed by Zoran):** a created user has NO password;
+on first app open they set a password and log in (matched by email). So a
+Zapier/manually-created user works seamlessly — no welcome-email needed.
+
+**Parent USES CoachIQ to book** (decided) → they need a real login, which the
+first-open flow gives them. CoachIQ can be **white-labeled** (branded app, custom
+domain, themed athlete portal — "your app, not CoachIQ's"), so the parent only
+ever sees the academy/FullControl brand, never "CoachIQ".
 
 Automation **actions** seen in the UI: Send Announcement/In-App/SMS, Add/Remove
 Product Purchase, Add/Remove Tag, Update Custom Field, Add/Redeem Credits. Each
 action has a **Target User** = "User from trigger" with a **Change** option.
 
-Proposed new-member flow:
+DECIDED new-member funnel (Zoran's vision, 2026-06-01):
 ```
-1. Onboarding funnel → parent gets a CoachIQ account (A or B)
-2. Parent pays → PORTAL creates the Stripe sub (portal-owned)
+1. FC/GHL-branded FORM → contact into GHL + Supabase
+     → Zapier "Create User" in CoachIQ  (parent never sees a CoachIQ form)
+2. Funnel → PORTAL payment page → portal creates the Stripe sub (portal-owned)
 3. Payment succeeds → portal POSTs the webhook:
      Automation A: "Add a Product Purchase to a User"
        → grants product + program access + initial credits
        (grants access WITHOUT payment — perfect since they paid in the portal)
 4. Each renewal → portal POSTs the webhook:
      Automation B: "Add Credits → Specific Product Bank"  → monthly top-up
-5. Pause/cancel → portal stops POSTing
+5. Post-payment page: "download your app" → white-labeled CoachIQ app;
+     parent first-opens it → sets password → books with the pushed credits
+6. Pause/cancel → portal stops POSTing
      (optional Automation C: Redeem Credits / Revoke Program Access)
 ```
+Sacred rule: the signup form and payment page are FC/portal — **never put the
+payment (Products connection) on a CoachIQ form**, or CoachIQ creates the sub and
+billing ownership is lost.
 
 ## OPEN QUESTIONS — what's left to figure out
 
@@ -147,8 +164,11 @@ Proposed new-member flow:
    athlete's CoachIQ id during signup (e.g. a "New User → Send to External
    Webhook" automation posting the id back). **Need a screenshot of the Change
    options to decide.**
-2. **How parents get a CoachIQ account in onboarding** — self-signup (UX detour)
-   vs Zapier Create User (seamless, needs a Zap). Pick one.
+2. ~~How parents get a CoachIQ account~~ **RESOLVED 2026-06-01:** FC/GHL form →
+   Zapier "Create User" (no CoachIQ form). Parent uses CoachIQ (white-labeled) to
+   book; login is self-serve on first app open (set password, matched by email).
+   Remaining build: wire GHL→Zapier→Create User + confirm a Zapier-made user can
+   first-open-set-password the same as a manually-made one.
 3. **Live end-to-end test** — create one "Incoming Webhook → Add Credits"
    automation, grab its automationId, fire a real test credit at a test athlete.
 4. **Product/credit modeling** — confirm one product-bank per plan and the
@@ -169,9 +189,12 @@ should be rotated.
 ```
 ✅ Bridge endpoint + auth CONFIRMED LIVE (api-v3 webhook, Bearer + x-group-id)
 ✅ Architecture proven: portal owns billing, CoachIQ does credits via webhook
-✅ New-member flow drafted (create user → pay → Add Product Purchase → top-ups)
-⏳ NOT built. Blocked on the 6 open questions above (esp. #1 user matching + #3 test)
+✅ New-member funnel DECIDED (FC/GHL form → Zapier Create User → portal payment →
+   webhook adds product/credits → download white-labeled app → first-open login)
+✅ #2 RESOLVED (user creation + login self-serve on first app open)
+⏳ NOT built. Open: #1 user-matching (email vs id), #3 live test, #4 product
+   modeling, #5 scope, #6 sales packaging.
 ```
 
-Immediate next step: get the **Target User → Change** screenshot (open question #1),
-then create the test automation and fire a live credit (#3).
+Immediate next step: close **#1** — confirm the webhook can match the CoachIQ user
+by email (Target User → Change), so the portal just sends the parent's email.
