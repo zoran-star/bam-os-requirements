@@ -942,10 +942,10 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             </>
           )}
 
-          {/* Manager: mark complete on any non-terminal, non-in_review
-              status. Same underlying action as Approve, different label
-              since there's nothing to approve here. */}
-          {isManager && !["done","approved","cancelled","in_review"].includes(ticket.status) && (
+          {/* Mark complete on any non-terminal, non-in_review status. Managers
+              on any ticket; the assigned executor on their own. Same underlying
+              action as Approve, different label (nothing to approve here). */}
+          {canExec && !["done","approved","cancelled","in_review"].includes(ticket.status) && (
             <button
               disabled={busy}
               onMouseDown={e => e.preventDefault()}
