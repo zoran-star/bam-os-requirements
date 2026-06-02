@@ -8314,7 +8314,9 @@ function _bbRenderGeneralCard(panel, meta) {
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
   const v = (k) => _bbEscapeHtml(c[k] || '');
   const entityType = c.entity_type || '';
-  const entityOpts = ['LLC','Corp','Sole prop','Partnership','Non-profit','Other'];
+  const entityPresets = ['LLC','Corp','Sole prop','Partnership','Non-profit'];
+  const isOtherEntity = !!entityType && !entityPresets.includes(entityType);
+  const entityOpts = [...entityPresets, 'Other'];
 
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
@@ -8343,24 +8345,6 @@ function _bbRenderGeneralCard(panel, meta) {
     </div>
 
     <div class="bb-field">
-      <div class="bb-field-label">Owner / point of contact <span class="bb-field-req">*</span></div>
-      <input id="bb-gen-owner_name" type="text" class="bb-input" value="${v('owner_name')}"
-        oninput="_bbGenChanged()" />
-    </div>
-
-    <div class="bb-field">
-      <div class="bb-field-label">Owner email <span class="bb-field-req">*</span></div>
-      <input id="bb-gen-email" type="email" class="bb-input" value="${v('email')}"
-        oninput="_bbGenChanged()" />
-    </div>
-
-    <div class="bb-field">
-      <div class="bb-field-label">Phone</div>
-      <input id="bb-gen-phone" type="tel" class="bb-input" value="${v('phone')}"
-        oninput="_bbGenChanged()" />
-    </div>
-
-    <div class="bb-field">
       <div class="bb-field-label">Address</div>
       <textarea id="bb-gen-address" class="bb-textarea" oninput="_bbGenChanged()">${v('address')}</textarea>
       <div class="bb-field-hint">Mailing address for the business. Locations you operate from live under BB &gt; Locations.</div>
@@ -8368,9 +8352,14 @@ function _bbRenderGeneralCard(panel, meta) {
 
     <div class="bb-field">
       <div class="bb-field-label">Entity type</div>
-      <div class="bb-choice-row">${entityOpts.map(opt => `
-        <button type="button" class="bb-choice ${entityType === opt ? 'selected' : ''}" onclick="_bbGenSetEntity('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>
-      `).join('')}</div>
+      <div class="bb-choice-row">${entityOpts.map(opt => {
+        const sel = opt === 'Other' ? isOtherEntity : entityType === opt;
+        return `<button type="button" class="bb-choice ${sel ? 'selected' : ''}" onclick="_bbGenSetEntity('${_bbEscapeAttr(opt)}')">${_bbEscapeHtml(opt)}</button>`;
+      }).join('')}</div>
+      ${isOtherEntity ? `
+      <input id="bb-gen-entity_other" type="text" class="bb-input" style="margin-top:8px"
+        value="${entityType === 'Other' ? '' : _bbEscapeHtml(entityType)}"
+        oninput="_bbGenOtherChanged()" placeholder="Specify entity type (e.g. Co-op, S-Corp)" />` : ''}
     </div>
 
     <div class="bb-field">
@@ -8410,21 +8399,34 @@ function _bbGenChanged() {
   _bbBasicsScheduleSave(() => ({
     business_name: document.getElementById('bb-gen-business_name')?.value || '',
     legal_name:    document.getElementById('bb-gen-legal_name')?.value || '',
-    owner_name:    document.getElementById('bb-gen-owner_name')?.value || '',
-    email:         document.getElementById('bb-gen-email')?.value || '',
-    phone:         document.getElementById('bb-gen-phone')?.value || '',
     address:       document.getElementById('bb-gen-address')?.value || '',
     ein:           document.getElementById('bb-gen-ein')?.value || '',
     time_zone:     document.getElementById('bb-gen-time_zone')?.value || '',
   }));
 }
 
+const _ENTITY_PRESETS = ['LLC','Corp','Sole prop','Partnership','Non-profit'];
 async function _bbGenSetEntity(opt) {
   const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
-  const next = (c?.entity_type === opt) ? '' : opt;   // click again to unselect
+  const cur = c?.entity_type || '';
+  const curIsOther = !!cur && !_ENTITY_PRESETS.includes(cur);
+  let next;
+  if (opt === 'Other') next = curIsOther ? '' : 'Other';   // toggle Other mode
+  else                 next = (cur === opt) ? '' : opt;     // toggle a preset
   if (c) c.entity_type = next;
   await _bbSaveClientBasics({ entity_type: next });
   _bbRenderFromHash();
+}
+
+// The "Other" free-text — debounced save, no re-render (keeps input focus).
+function _bbGenOtherChanged() {
+  _bbBasicsScheduleSave(() => {
+    const val = (document.getElementById('bb-gen-entity_other')?.value || '').trim();
+    const next = val || 'Other';   // keep the 'Other' sentinel if cleared
+    const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    if (c) c.entity_type = next;
+    return { entity_type: next };
+  });
 }
 
 // ─── BB BRAND CARD ──────────────────────────────────────────────────────
@@ -8673,6 +8675,8 @@ function _bbKpisChanged() {
 // Staff tracker circle is the manual click-to-toggle on the circle
 // itself, so this card doesn't need a Mark-done button.
 async function _bbRenderStaffCard(panel, meta) {
+  const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID) || {};
+  const ov = (k) => _bbEscapeHtml(c[k] || '');
   panel.innerHTML = `
     <button class="bb-back" onclick="_bbNavigate(null)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
@@ -8685,6 +8689,25 @@ async function _bbRenderStaffCard(panel, meta) {
       </div>
       <button class="btn-primary-bb" onclick="openInviteTeamModal()">+ Invite teammate</button>
     </div>
+
+    <div style="background:var(--surface-el);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:0 0 20px">
+      <div style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--text)">👑 Owner / primary contact</div>
+      <div style="font-size:12px;color:var(--text-mute);margin:4px 0 12px">The main person we deal with — used across the portal, emails, and billing.</div>
+      <div class="bb-field">
+        <div class="bb-field-label">Owner name <span class="bb-field-req">*</span></div>
+        <input id="bb-owner-name" type="text" class="bb-input" value="${ov('owner_name')}" oninput="_bbStaffOwnerChanged()" />
+      </div>
+      <div class="bb-field">
+        <div class="bb-field-label">Owner email <span class="bb-field-req">*</span></div>
+        <input id="bb-owner-email" type="email" class="bb-input" value="${ov('email')}" oninput="_bbStaffOwnerChanged()" />
+      </div>
+      <div class="bb-field" style="margin-bottom:0">
+        <div class="bb-field-label">Owner phone</div>
+        <input id="bb-owner-phone" type="tel" class="bb-input" value="${ov('phone')}" oninput="_bbStaffOwnerChanged()" />
+      </div>
+      <div style="font-size:11px;color:var(--text-mute);margin-top:8px;text-align:right">Auto-saves as you type.</div>
+    </div>
+
     <p style="font-size:13px;color:var(--text-sub);line-height:1.55;margin:0 0 16px;max-width:680px">
       Everyone listed here can log in to this portal with full access. Anyone on the team can invite more people; only the account owner can revoke access.
     </p>
@@ -8739,6 +8762,20 @@ async function _bbRenderStaffCard(panel, meta) {
       ${canRevoke ? `<button class="team-revoke-btn" onclick="openRevokeTeamModal('${r.id}')">Revoke</button>` : ''}
     </div>`;
   }).join('');
+}
+
+// Owner / primary contact block on the Staff card → clients.owner_name/email/phone.
+function _bbStaffOwnerChanged() {
+  _bbBasicsScheduleSave(() => {
+    const patch = {
+      owner_name: document.getElementById('bb-owner-name')?.value || '',
+      email:      document.getElementById('bb-owner-email')?.value || '',
+      phone:      document.getElementById('bb-owner-phone')?.value || '',
+    };
+    const c = (CLIENT_ROWS || []).find(r => r.id === CLIENT_ID);
+    if (c) { c.owner_name = patch.owner_name; c.email = patch.email; c.phone = patch.phone; }
+    return patch;
+  });
 }
 
 // ─── BB LOCATIONS CARD ──────────────────────────────────────────────────
