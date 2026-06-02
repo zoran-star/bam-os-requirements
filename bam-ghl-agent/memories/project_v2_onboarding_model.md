@@ -46,10 +46,13 @@ Each card is a real CRUD surface (no more "Coming soon"):
 | Card | Backing | Persistence |
 |---|---|---|
 | Offers | `offers` + `offer_teams` + `offer_files` tables | auto-save via `_bbAutoSave()` (debounced 600ms) |
-| General | clients row (business_name, owner_name, email, phone, address, legal_name, entity_type, ein) | `update_client_basics` RPC, debounced 600ms |
-| Staff | `client_users` (academy teammates) | invite / revoke modals shared with the merged Team page |
+| General | clients row (business_name, address, legal_name, entity_type, ein, time_zone) | `update_client_basics` RPC, debounced 600ms |
+| Staff | `client_users` (academy teammates) + **Owner block** (owner_name/email/phone on clients row, `_bbStaffOwnerChanged`) | invite / revoke modals shared with the merged Team page |
 | Locations | `locations` table | `_bbOpenAddLocationModal` + inline delete |
 | Brand | `clients.brand_data` jsonb (colors / fonts / logo URLs / website spec) | `update_client_basics` RPC, debounced 600ms |
+| KPIs | `clients.kpi_data` jsonb (revenue/clients/sales/expenses) | `update_client_basics` RPC, debounced 600ms |
+
+> **2026-06-02:** Owner contact (owner_name/email/phone) moved OUT of the General card into an **Owner block at the top of the Staff card** — still the same clients-row columns, just edited there. Entity type "Other" now reveals a free-text box; the custom value is stored directly in `entity_type` (so it's "Other" when the value isn't one of the 5 presets — `_ENTITY_PRESETS`).
 
 ## Onboarding tracker pill (V1)
 
