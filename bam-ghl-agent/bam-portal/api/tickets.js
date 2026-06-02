@@ -389,7 +389,11 @@ export default async function handler(req, res) {
           break;
 
         case "approve":
-          if (!isManager(me)) return res.status(403).json({ error: "manager only" });
+          // Managers can complete any ticket; the assigned executor can also
+          // mark their own ticket complete at any point.
+          if (!isManager(me) && t.assigned_to !== me.id) {
+            return res.status(403).json({ error: "not your ticket" });
+          }
           update.status = "done";
           update.resolved_at = now;
           break;
