@@ -7,10 +7,6 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_API = "https://api.stripe.com/v1";
 
-// Identity gate for feedback-management actions (list-feedback,
-// resolve-feedback). Only this email can see / check off feedback.
-const ZORAN_EMAIL = "zoran@byanymeansbball.com";
-
 // In-memory cache for Stripe revenue (keyed by stripe_customer_id, 60s TTL)
 const revenueCache = new Map();
 const REVENUE_TTL_MS = 60 * 1000;
@@ -1463,7 +1459,7 @@ export default async function handler(req, res) {
       //   (default insert)         admin+scaling
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
-      // additionally gated to ZORAN_EMAIL inside their handlers.
+      // additionally narrowed to the `admin` role inside their handlers.
       const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 

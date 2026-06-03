@@ -162,9 +162,13 @@ Client submits form
 
 These tables exist in Supabase but no code in `bam-portal/api/` or `bam-portal/src/` reads or writes them. They have data; the source/owner is unclear. **Do not drop without confirming with the likely owner.**
 
+> **Correction (2026-06-03):** `client_users` is NOT dead — it shipped 2026-05-20 as the
+> many-users-per-academy join table (owner + invited teammates) and is actively read by both
+> portals' Team tabs. See [[memories/project_multi_user_portal.md]]. Removed from the table below.
+> The `content_*` and `board_items` rows below are still genuinely unconfirmed.
+
 | Table | Rows | Last touched | Likely owner |
 |---|---|---|---|
-| `client_users` | 0 | never | Cole's older auth model? (separate from `clients` + Supabase Auth) |
 | `board_items` | 20 | 2026-04-09 | Unknown — possibly old Notion sync or planning artifact |
 | `content_themes` | 20 | 2026-04-05 | Coleman's content production workflow? |
 | `content_creatives` | 9 | 2026-03-28 | Same |
