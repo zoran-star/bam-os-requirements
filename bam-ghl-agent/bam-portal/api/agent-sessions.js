@@ -102,20 +102,32 @@ Produce TWO summaries of what happened in this session:
 
 The user (${userDisplayName || "unknown"}) was working in: ${projectPath || "unknown"}
 
-Return ONLY valid JSON in this exact shape:
-{"technical_summary": "...", "visual_summary": "..."}`;
+Call the submit_summaries tool with both summaries.`;
 
+  // Use a forced tool call to guarantee structured JSON. (Assistant-prefill
+  // is NOT supported by this model — it 400s with "conversation must end with
+  // a user message" — and free-text "return ONLY JSON" prompting was
+  // unreliable: the model sometimes led with prose and broke JSON.parse.)
   const body = {
     model: ANTHROPIC_MODEL,
     max_tokens: 4096,
     system: systemPrompt,
-    messages: [
-      { role: "user", content: `Transcript:\n\n${text}` },
-      // Prefill the assistant turn with "{" so the model is forced to emit
-      // JSON from the first token (it used to sometimes lead with prose /
-      // transcript text, which broke JSON.parse).
-      { role: "assistant", content: "{" },
+    tools: [
+      {
+        name: "submit_summaries",
+        description: "Record the technical and visual summaries of the session.",
+        input_schema: {
+          type: "object",
+          properties: {
+            technical_summary: { type: "string", description: "Developer-level recap (files, decisions, what's broken/blocked, infra changes, risks)." },
+            visual_summary: { type: "string", description: "Extremely short, visual, ADHD-friendly: tl;dr line with emoji, optional ASCII diagram, 3-5 bullets, one ⚠ line if risky." },
+          },
+          required: ["technical_summary", "visual_summary"],
+        },
+      },
     ],
+    tool_choice: { type: "tool", name: "submit_summaries" },
+    messages: [{ role: "user", content: `Transcript:\n\n${text}` }],
   };
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -134,14 +146,22 @@ Return ONLY valid JSON in this exact shape:
     };
   }
   const data = await r.json();
+  // Primary path: read the forced tool_use block's structured input.
+  const toolBlock = (data.content || []).find(
+    (b) => b.type === "tool_use" && b.name === "submit_summaries"
+  );
+  if (toolBlock?.input) {
+    return {
+      technical_summary: toolBlock.input.technical_summary || "(no technical_summary in response)",
+      visual_summary: toolBlock.input.visual_summary || "(no visual_summary in response)",
+    };
+  }
+  // Defensive fallback: if a future model returns text instead, parse it.
   const out = (data.content || [])
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
-  // We prefilled the assistant turn with "{", so the response continues the
-  // object — prepend it back before parsing. Fall back to the raw output in
-  // case a future model returns the "{" itself.
-  const parsed = parseJsonLoose("{" + out) || parseJsonLoose(out);
+  const parsed = parseJsonLoose(out);
   if (parsed) {
     return {
       technical_summary: parsed.technical_summary || "(no technical_summary in response)",
