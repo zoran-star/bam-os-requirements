@@ -48,7 +48,25 @@ org would need ABM).
   installed; `capacitor.config.json` configured; `client-portal.html`
   registers on login, captures the device token, and upserts it to a new
   Supabase `device_tokens` table (RLS-scoped per user). No-op outside the
-  native app. Staff send-side is the follow-up below.
+  native app.
+- **Push SEND backend (built 2026-06-01)** — Zoran decided to ship real
+  push before submit (it's the key Apple 4.2 defense; capture-only was too
+  weak). Built dependency-free (Node crypto + http2 + fetch):
+  - `bam-portal/api/_lib/push.js` — `sendPush({client_id|auth_user_id,
+    title, body, data})`. iOS via APNs HTTP/2 (ES256 JWT, cached ~50 min),
+    Android via FCM HTTP v1 (service-account RS256 → OAuth token). Prunes
+    dead tokens (APNs 410 / FCM UNREGISTERED). **Skips a platform silently
+    if its env vars are missing** — safe to call before keys land.
+  - `bam-portal/api/push/send.js` — staff-only HTTP route for manual/test
+    sends (future "send notification" UI).
+  - **Trigger:** `api/tickets.js` PATCH now fires a push to the client
+    alongside the existing Slack notify, for `request_client`,
+    `send_for_final_review`, and `approve`. This is the genuine native
+    feature that defends 4.2 — and during review, a staff reply to the
+    demo ticket makes the reviewer's phone buzz.
+  - ES256 + RS256 signing verified locally (64-byte raw sig, round-trips).
+  - **Untestable end-to-end until the credentials below exist + the app is
+    on a real device.** Env vars documented in `env/.env.example`.
 - **`device_tokens` migration applied** — 2026-05-20: ran
   `bam-portal/scripts/migration/device-tokens.sql` against live Supabase
   (`jnojmfmpnsfmtqmwhopz`) via the Supabase MCP `apply_migration`. Verified
@@ -60,9 +78,15 @@ org would need ABM).
    `npm install` → `npx cap sync ios` → `npx cap open ios` → set signing
    Team → add the **Push Notifications** capability → Archive → upload to
    App Store Connect. Full steps in `bam-portal-app/README.md`.
-2. **APNs Auth Key** — in the Apple Developer portal create a `.p8` APNs
-   key; save the key file + Key ID + Team ID (the staff send-backend needs
-   them later).
+2. **APNs Auth Key** ([Zoran], NOW unblocks push) — Apple Developer →
+   Keys → ➕ → enable APNs → download the `.p8` once. Set Vercel env
+   `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`
+   (`com.byanymeansbusiness.portal`), `APNS_P8` (full key contents). The
+   send backend is already built and waiting on these.
+2b. **Firebase / FCM** ([Zoran], for Android push) — create a Firebase
+   project, add `google-services.json` to the Android project, generate a
+   service-account key, and set Vercel env `FCM_PROJECT_ID`,
+   `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY`.
 3. **Phase 3 — App Store Connect**: screenshots, 1024 icon, description,
    a hosted **privacy policy URL**, App Privacy data declaration, and a
    **demo login account** for the reviewer (portal is behind a login —
@@ -71,9 +95,12 @@ org would need ABM).
    request Unlisted distribution → release.
 
 ### 🔜 Follow-up (after approval)
-- Staff-side "send a notification" UI in `bam-portal/` + an APNs send
-  backend (service-role API route reading `device_tokens`). The app
-  collects tokens now; sending is a separate build.
+- Staff-side "send a notification" UI in `bam-portal/` (the send backend +
+  `api/push/send.js` route already exist — this is just the button).
+- Push on the in-portal conversations system (`api/messages.js`) too — v1
+  only pushes on ticket actions (`api/tickets.js`), which is what the
+  Messages tab surfaces. Add a conversations trigger if that becomes the
+  primary client↔staff channel.
 
 ## Key facts
 - Capacitor project lives at `bam-ghl-agent/bam-portal-app/`.
