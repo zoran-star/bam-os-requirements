@@ -4,6 +4,8 @@ description: 8-step guided spotlight tour that fires on first login to teach new
 type: project
 ---
 
+> ⚠ **2026-06-03 — cut to 2 steps.** The 8-step Systems/Marketing spotlight tour was replaced with a minimal welcome that points new clients at the **Action Items onboarding checklist** to get started: step 1 = welcome modal, step 2 = spotlight `#action-items-list` on the `action-items` view. `getEffectiveTourSteps()` now just returns `TOUR_STEPS` (no marketing branching). The verifier (`verify-client-portal-ui.mjs`) was updated to check the action-items targets instead of the old 6 buttons. Everything below describes the ORIGINAL 8-step design (kept for history).
+
 8-step product tour shipped to `bam-portal/public/client-portal.html`. Fires automatically the first time a client logs in (when `clients.onboarding_completed_at IS NULL`). Skippable + restartable via "Take the tour" sidebar link.
 
 ## Why this exists

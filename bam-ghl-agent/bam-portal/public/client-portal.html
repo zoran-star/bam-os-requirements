@@ -12718,6 +12718,7 @@ const ONB_UI = {
   staff:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('staff')" } },
   locations:      { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('locations')" } },
   brand:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('brand')" } },
+  offers:         { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('offers')" } },
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
 };
 
@@ -17690,89 +17691,22 @@ async function loadAcademyName() {
 //  Restartable any time via the sidebar "Take the tour" link.
 // ─────────────────────────────────────────────────────────
 const TOUR_STEPS = [
-  // Step 1: Welcome (centered modal)
-  // Welcome copy adapts to whether marketing is included — see
-  // getEffectiveTourSteps() below.
+  // Step 1: Welcome (centered modal) — point them at the onboarding checklist.
   {
     type: 'modal',
     id: 'welcome',
     title: 'Welcome to your BAM portal{NAME}',
-    body: 'Two areas to know:',
-    vis: [
-      ['a', '<strong>Systems</strong> for tickets (fixes, changes, builds)'],
-      ['a', '<strong>Marketing</strong> for your live ads'],
-    ],
+    body: "Let's get you set up. Your onboarding checklist lives in <strong>Action Items</strong> — work through it and we'll build out your systems.",
     nextLabel: 'Show me →',
   },
-  // Step 2: Systems ticket type buttons
+  // Step 2: Spotlight the Action Items onboarding checklist.
   {
     type: 'spot',
-    view: 'systems',
-    selector: '.ticket-types',
-    place: 'bottom',
-    title: 'Submit tickets from Systems',
-    body: 'Pick a type. <strong>Error</strong> fixes something broken. <strong>Change</strong> adjusts what exists. <strong>Build</strong> creates something new.',
-    nextLabel: 'Next →',
-  },
-  // Step 3: Systems live tickets + action required example
-  {
-    type: 'spot',
-    view: 'systems',
-    selector: '#ticket-list-live',
+    view: 'action-items',
+    selector: '#action-items-list',
     place: 'top',
-    title: "Track what's in flight",
-    body: 'Submitted tickets land here. When we need a reply from you, the row shows <strong>⏳ Action Needed</strong> (like the example). Tap it to respond.',
-    nextLabel: 'Next →',
-  },
-  // Step 4 (NEW): view-switch transition. Spotlight the Marketing nav item while still on Systems.
-  {
-    type: 'spot',
-    marketingOnly: true,
-    view: 'systems',
-    selector: '.nav-item[onclick*="marketing"]',
-    place: 'right',
-    title: "Now let's see your ads",
-    body: 'Open <strong>Marketing</strong> to see your ads (we\'ll switch you).',
-    nextLabel: 'Switch →',
-  },
-  // Step 5: Marketing new campaign button
-  {
-    type: 'spot',
-    marketingOnly: true,
-    view: 'marketing',
-    selector: '.btn-add-campaign',
-    place: 'top',
-    title: 'Request a new ad',
-    body: 'Tap <strong>+ Add New Campaign</strong>. Tell us your goal and budget, we handle the rest.',
-    nextLabel: 'Next →',
-  },
-  // Step 6: Marketing change campaign button
-  {
-    type: 'spot',
-    marketingOnly: true,
-    view: 'marketing',
-    selector: '.btn-change-campaign',
-    place: 'left',
-    title: 'Edit a live campaign',
-    body: 'Every live campaign has <strong>Change Campaign</strong>. Adjust budget, audience, creative, or pause it. We review every change.',
-    nextLabel: 'Next →',
-  },
-  // Step 7: Marketing pending requests + action required example
-  {
-    type: 'spot',
-    marketingOnly: true,
-    view: 'marketing',
-    selector: '#marketing-request-list-pending',
-    place: 'top',
-    title: 'Your campaign requests',
-    body: 'Campaigns you\'ve requested show here. <strong>⏳ Action Needed</strong> means we\'re waiting on you. Tap to reply.',
-    nextLabel: 'Next →',
-  },
-  // Step 8: Done (centered modal)
-  {
-    type: 'modal',
-    title: "You're set",
-    body: "Submit a ticket whenever you need something. Your account manager replies inside the same ticket.<br><br>Replay this tour anytime from the sidebar.",
+    title: 'Start here',
+    body: "Knock these out: connect <strong>Slack</strong>, <strong>Stripe</strong> & <strong>GoHighLevel</strong>, then fill in your business info, offers, and KPIs. Tick each one off as you go — we take it from there.",
     nextLabel: 'Got it →',
   },
 ];
@@ -17847,19 +17781,9 @@ let _tourStep = 1;
 // at tour start (and at every step lookup, since it's cheap) so the same
 // session can toggle marketing on/off without a reload.
 function getEffectiveTourSteps() {
-  if (MARKETING_INCLUDED) return TOUR_STEPS;
-  return TOUR_STEPS
-    .filter(s => !s.marketingOnly)
-    .map(s => {
-      if (s.id !== 'welcome') return s;
-      return {
-        ...s,
-        body: 'One area to know:',
-        vis: [
-          ['a', '<strong>Systems</strong> for tickets (fixes, changes, builds)'],
-        ],
-      };
-    });
+  // The tour now just points to the Action Items checklist — no marketing/
+  // systems branching needed.
+  return TOUR_STEPS;
 }
 
 function startOnboardingTour() {
