@@ -24,13 +24,11 @@ const html = readFileSync(PORTAL_PATH, 'utf8');
 
 // Each spotlight step in the tour needs at least one matching element.
 // Patterns intentionally permissive (whitespace, attr-order tolerant).
+// The first-login tour now just points to the Action Items onboarding
+// checklist (welcome modal → spotlight the list). Verify those targets exist.
 const TOUR_TARGETS = [
-  { step: 2, name: 'Ticket types (Error/Change/Build)',     css: '.ticket-types',                  pattern: /class="ticket-types"/ },
-  { step: 3, name: 'Live tickets list',                     css: '#ticket-list-live',              pattern: /id="ticket-list-live"/ },
-  { step: 4, name: 'Marketing nav item (sidebar)',          css: '.nav-item[onclick*="marketing"]', pattern: /class="nav-item"\s+onclick="switchView\('marketing'/ },
-  { step: 5, name: 'New campaign button',                   css: '.btn-add-campaign',              pattern: /class="btn-add-campaign"/ },
-  { step: 6, name: 'Change campaign button',                css: '.btn-change-campaign',           pattern: /btn-change-campaign/ },
-  { step: 7, name: 'Pending requests list',                 css: '#marketing-request-list-pending', pattern: /id="marketing-request-list-pending"/ },
+  { step: 2, name: 'Action Items nav item',  css: ".nav-item[onclick*=\"action-items\"]", pattern: /onclick="switchView\('action-items'/ },
+  { step: 2, name: 'Action Items list',      css: '#action-items-list',                   pattern: /id="action-items-list"/ },
 ];
 
 // Other invariants worth catching cheaply.

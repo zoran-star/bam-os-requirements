@@ -65,7 +65,10 @@ an external connection signal):
 | 6 | `staff` | Add your Staff | `staff_marked_done_at` | ✅ → BB #bb=staff |
 | 7 | `locations` | Add your Locations | `locations_marked_done_at` | ✅ → BB #bb=locations |
 | 8 | `brand` | Set up Brand & Website | `brand_marked_done_at` | ✅ → BB #bb=brand |
-| 9 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+| 9 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
+| 10 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+
+(2026-06-03: `offers` added as step 9; the first-login product tour was cut from 8 steps to a 2-step welcome that just points the client at this Action Items checklist — see [[project_client_portal_tour]].)
 
 - `syncOnboardingItems()` reconciles every step from its `col` on each GET.
   **Writable** steps always mirror col (toggling writes col, so consistent) — this is

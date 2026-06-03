@@ -139,7 +139,8 @@ const ONBOARDING_STEPS = [
   { key: "staff",          title: "Add your Staff",                      sort: 6, col: "staff_marked_done_at",         writable: true },
   { key: "locations",      title: "Add your Locations",                  sort: 7, col: "locations_marked_done_at",     writable: true },
   { key: "brand",          title: "Set up Brand & Website",              sort: 8, col: "brand_marked_done_at",         writable: true },
-  { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
+  { key: "offers",         title: "Set up your Offers",                  sort: 9, col: "offers_marked_done_at",        writable: true },
+  { key: "kpis",           title: "Fill out your KPIs",                  sort: 10, col: "kpi_marked_done_at",           writable: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
