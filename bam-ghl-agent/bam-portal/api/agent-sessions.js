@@ -17,8 +17,6 @@ const INGEST_SECRET = process.env.AGENT_SESSION_INGEST_SECRET;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
-const ZORAN_EMAIL = "zoran@byanymeansbball.com";
-
 const SB = {
   apikey: SUPABASE_SERVICE_KEY,
   Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
@@ -245,11 +243,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "unknown action" });
     }
 
-    // ── GET (Zoran-only) ──
+    // ── GET (admin-only) ──
     if (req.method === "GET") {
       const user = await getStaffFromBearer(req);
-      if (!user || user.email !== ZORAN_EMAIL) {
-        return res.status(403).json({ error: "zoran only" });
+      if (!user) return res.status(401).json({ error: "unauthorized" });
+      const staffRows = await sbSelect(
+        `staff?email=eq.${encodeURIComponent(user.email)}&select=role`
+      );
+      if (staffRows?.[0]?.role !== "admin") {
+        return res.status(403).json({ error: "admin only" });
       }
 
       // Distinct users (for the tabs)

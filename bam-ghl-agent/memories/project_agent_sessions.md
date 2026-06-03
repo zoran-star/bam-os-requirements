@@ -37,18 +37,18 @@ A system to let Zoran review what his team (Cam, Coleman, Mike, Rosano, anyone) 
 │         {technical_summary, visual_summary}                          │
 │      → marks status=completed                                        │
 │                                                                      │
-│   /api/agent-sessions (GET, zoran-only)                              │
+│   /api/agent-sessions (GET, admin-only)                              │
 │      → list                                                          │
-│   /api/agent-sessions?id=<uuid> (GET, zoran-only)                    │
+│   /api/agent-sessions?id=<uuid> (GET, admin-only)                    │
 │      → single session with full transcript                           │
-│   /api/agent-sessions?users=true (GET, zoran-only)                   │
+│   /api/agent-sessions?users=true (GET, admin-only)                   │
 │      → distinct user list for the tab strip                          │
 └────────┬─────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │   Staff portal → Feedback tab → "Agent sessions" pill switcher       │
-│   (Feedback tab is already Zoran-only via App.jsx canSeeFeedback)    │
+│   (Feedback tab is admin-only via App.jsx canSeeFeedback)        │
 │                                                                      │
 │   - User tabs: All / Cam / Coleman / Mike / Rosano (dynamic)         │
 │   - List of sessions with one-line tech summary preview              │
@@ -63,7 +63,7 @@ A system to let Zoran review what his team (Cam, Coleman, Mike, Rosano, anyone) 
 |---|---|
 | `bam-ghl-agent/bam-portal/api/agent-sessions.js` | Vercel function — start/finish/list/get |
 | `bam-ghl-agent/bam-portal/src/views/AgentSessionsPanel.jsx` | The whole UI panel |
-| `bam-ghl-agent/bam-portal/src/views/SystemsView.jsx` | Wires the panel into Review sub-tab (only if `me.email === ZORAN_EMAIL`) |
+| `bam-ghl-agent/bam-portal/src/views/FeedbackView.jsx` | Hosts the panel behind a "Feedback / Agent sessions" pill switcher (tab gated to `admin` via `canSeeFeedback` in App.jsx) |
 | `.claude/commands/showtime.md` | `/showtime` skill — marks session start |
 | `.claude/commands/byebye.md` | `/byebye` skill — sends transcript + cleanup |
 | `~/.claude/showtime-config.json` | LOCAL (not committed). Per-user. Has `{url, secret}`. |
@@ -114,7 +114,7 @@ Then `/showtime` to start, `/byebye` to stop. That's it.
 - **Marker requires same-machine usage.** /showtime writes to local disk; /byebye reads it. If you run /showtime on one machine and /byebye on another, it won't work.
 - **Transcript file discovery** depends on Claude Code's path conventions — `~/.claude/projects/<cwd-with-slashes-as-dashes>/<session-uuid>.jsonl`. If Anthropic changes this, /byebye needs an update.
 - **Summary generation is server-side and synchronous** on /finish — adds ~10-15s to the /byebye call. If Claude API is slow or down, transcript is still saved and `status=completed`, summaries just say "(error)".
-- **Visibility is hardcoded** to `zoran@byanymeansbball.com` both in the API (`GET` returns 403 to anyone else) AND in the frontend (the sub-tab only renders for Zoran's email). Changing visibility requires both.
+- **Visibility = `admin` role** (changed 2026-06-03 from Zoran-only). Gated in TWO places: the API (`GET` looks up the caller's `staff.role` and returns 403 unless `admin`) AND the frontend (`canSeeFeedback = me?.role === "admin"` in App.jsx decides whether the whole Feedback tab renders). Changing visibility requires both. The same change also widened the `portal_feedback` list/resolve endpoints in `api/clients.js` (list-feedback / resolve-feedback) to `admin` — they were Zoran-only too. Reads use the service-role key so RLS is bypassed; no DB migration was needed.
 
 ## When to update this note
 
