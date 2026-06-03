@@ -17,8 +17,6 @@ const INGEST_SECRET = process.env.AGENT_SESSION_INGEST_SECRET;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
-const ZORAN_EMAIL = "zoran@byanymeansbball.com";
-
 const SB = {
   apikey: SUPABASE_SERVICE_KEY,
   Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
@@ -109,9 +107,15 @@ Return ONLY valid JSON in this exact shape:
 
   const body = {
     model: ANTHROPIC_MODEL,
-    max_tokens: 2048,
+    max_tokens: 4096,
     system: systemPrompt,
-    messages: [{ role: "user", content: `Transcript:\n\n${text}` }],
+    messages: [
+      { role: "user", content: `Transcript:\n\n${text}` },
+      // Prefill the assistant turn with "{" so the model is forced to emit
+      // JSON from the first token (it used to sometimes lead with prose /
+      // transcript text, which broke JSON.parse).
+      { role: "assistant", content: "{" },
+    ],
   };
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -134,19 +138,40 @@ Return ONLY valid JSON in this exact shape:
     .filter((b) => b.type === "text")
     .map((b) => b.text)
     .join("");
-  // Strip code fences if present, then JSON.parse.
-  const cleaned = out.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
-  try {
-    const parsed = JSON.parse(cleaned);
+  // We prefilled the assistant turn with "{", so the response continues the
+  // object — prepend it back before parsing. Fall back to the raw output in
+  // case a future model returns the "{" itself.
+  const parsed = parseJsonLoose("{" + out) || parseJsonLoose(out);
+  if (parsed) {
     return {
       technical_summary: parsed.technical_summary || "(no technical_summary in response)",
       visual_summary: parsed.visual_summary || "(no visual_summary in response)",
     };
-  } catch (e) {
-    return {
-      technical_summary: `(failed to parse Claude response: ${e.message})\n\nraw:\n${out.slice(0, 4000)}`,
-      visual_summary: "⚠ summary parse failed",
-    };
+  }
+  return {
+    technical_summary: `(failed to parse Claude response)\n\nraw:\n${out.slice(0, 4000)}`,
+    visual_summary: "⚠ summary parse failed",
+  };
+}
+
+// Best-effort JSON parse: strips ``` fences, tries a direct parse, then falls
+// back to the widest {...} slice. Returns null if nothing parses.
+function parseJsonLoose(s) {
+  if (!s) return null;
+  const cleaned = s.replace(/```(?:json)?/gi, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 }
 
@@ -245,11 +270,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "unknown action" });
     }
 
-    // ── GET (Zoran-only) ──
+    // ── GET (admin-only) ──
     if (req.method === "GET") {
       const user = await getStaffFromBearer(req);
-      if (!user || user.email !== ZORAN_EMAIL) {
-        return res.status(403).json({ error: "zoran only" });
+      if (!user) return res.status(401).json({ error: "unauthorized" });
+      const staffRows = await sbSelect(
+        `staff?email=eq.${encodeURIComponent(user.email)}&select=role`
+      );
+      if (staffRows?.[0]?.role !== "admin") {
+        return res.status(403).json({ error: "admin only" });
       }
 
       // Distinct users (for the tabs)

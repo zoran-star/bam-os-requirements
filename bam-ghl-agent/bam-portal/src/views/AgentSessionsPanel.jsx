@@ -1,4 +1,4 @@
-// Agent Sessions Panel — shown inside Systems > Review when viewer is Zoran.
+// Agent Sessions Panel — shown inside the Feedback tab for admins.
 // Lists Claude Code sessions captured via /showtime → /byebye skills, grouped
 // by user. Click a row to see the side-by-side technical + visual summary.
 

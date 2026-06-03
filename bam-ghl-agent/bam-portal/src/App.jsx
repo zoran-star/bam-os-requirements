@@ -151,9 +151,9 @@ export default function BAMPortal() {
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeResources = me?.role === "admin";
   // Feedback tab: ZORAN-ONLY (email-gated, not role-gated). The widget that
-  // submits feedback is universal (any user, any page), but only Zoran can
+  // submits feedback is universal (any user, any page), but only admins can
   // see the list + check items off as resolved.
-  const canSeeFeedback = me?.email === "zoran@byanymeansbball.com";
+  const canSeeFeedback = me?.role === "admin";
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 

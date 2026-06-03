@@ -1993,11 +1993,12 @@ export default async function handler(req, res) {
       //  + staff can all use the universal widget. See above.)
 
       // ── action=list-feedback ──
-      // ZORAN-ONLY (email-gated, not role-gated). Returns the most recent
-      // portal_feedback rows for the staff portal's Feedback tab.
+      // ADMIN-ONLY (role-gated). Returns the most recent portal_feedback rows
+      // for the staff portal's Feedback tab. (Outer ADMIN_ONLY_ACTIONS gate
+      // allows admin+scaling_manager; this narrows it to the admin role.)
       if (action === "list-feedback") {
-        if (user.email !== ZORAN_EMAIL) {
-          return res.status(403).json({ error: "feedback view is Zoran-only" });
+        if (role !== "admin") {
+          return res.status(403).json({ error: "feedback view is admin-only" });
         }
         const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
         const portalFilter = (req.query.portal === "client" || req.query.portal === "staff" || req.query.portal === "signup")
@@ -2013,25 +2014,25 @@ export default async function handler(req, res) {
       }
 
       // ── action=resolve-feedback ──
-      // ZORAN-ONLY. Checks off a feedback item as resolved (or un-resolves
+      // ADMIN-ONLY. Checks off a feedback item as resolved (or un-resolves
       // it with ?undo=1).
       if (action === "resolve-feedback") {
-        if (user.email !== ZORAN_EMAIL) {
-          return res.status(403).json({ error: "feedback resolve is Zoran-only" });
+        if (role !== "admin") {
+          return res.status(403).json({ error: "feedback resolve is admin-only" });
         }
         const fbId = typeof req.query.id === "string" ? req.query.id : "";
         if (!fbId) return res.status(400).json({ error: "id required" });
         const undo = req.query.undo === "1" || req.body?.undo === true;
 
-        // Resolve the staff id for Zoran (for the resolved_by FK)
+        // Resolve the staff id for the acting admin (for the resolved_by FK)
         const sRows = await supabaseSelect(
-          `staff?email=eq.${encodeURIComponent(ZORAN_EMAIL)}&select=id`
+          `staff?email=eq.${encodeURIComponent(user.email)}&select=id`
         );
-        const zoranStaffId = sRows?.[0]?.id || null;
+        const actingStaffId = sRows?.[0]?.id || null;
 
         const updateBody = undo
           ? { resolved_at: null, resolved_by: null }
-          : { resolved_at: new Date().toISOString(), resolved_by: zoranStaffId };
+          : { resolved_at: new Date().toISOString(), resolved_by: actingStaffId };
         const updRes = await fetch(
           `${SUPABASE_URL}/rest/v1/portal_feedback?id=eq.${encodeURIComponent(fbId)}`,
           {

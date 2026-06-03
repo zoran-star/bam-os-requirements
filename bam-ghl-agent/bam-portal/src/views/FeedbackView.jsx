@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import AgentSessionsPanel from "./AgentSessionsPanel";
 
 // ─── Feedback tab ────────────────────────────────────────────────────────────
-// ZORAN-ONLY view that lists all submissions from portal_feedback.
+// ADMIN-ONLY view that lists all submissions from portal_feedback.
 // Sources of submissions: universal floating Bug/Feature widget on
 //   - client portal (client-portal.html)
 //   - signup page  (onboarding.html)
