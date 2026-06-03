@@ -414,7 +414,6 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "marketing",    label: "Marketing" },
     { id: "systems",      label: "Systems" },
     { id: "actionItems",  label: "Action Items" },
-    { id: "activity",     label: "Activity", hide: !ROLES.canViewFinancials(role) },
     { id: "notes",        label: "Notes" },
   ].filter(t => !t.hide);
 
@@ -467,7 +466,6 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
       {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
-      {tab === "activity" && ROLES.canViewFinancials(role) && <ActivityTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}
     </div>
   );
@@ -955,14 +953,8 @@ function SetupTab({ client, staff, tokens, role, session, onChanged, onBack }) {
         tokens={t}
       />
 
-      <SectionTitle style={{ marginTop: 28 }}>Onboarding</SectionTitle>
-      <OnboardingMethodPicker
-        method={currentValue("onboarding_method") || ""}
-        callDone={!!currentValue("call_completed_at")}
-        onMethodChange={v => set("onboarding_method", v || null)}
-        onCallDoneChange={v => set("call_completed_at", v)}
-        tokens={t}
-      />
+      {/* Onboarding Method (Call / Send link / Call done) removed 2026-06-03 —
+          onboarding is driven by the Action Items checklist now. */}
 
       <SectionTitle style={{ marginTop: 28 }}>Integrations</SectionTitle>
       <EditField
@@ -1853,45 +1845,6 @@ function SystemsTab({ client, tokens: t, dark, me }) {
   );
 }
 
-// ─── ACTIVITY tab (tickets + Stripe failed payments) ─────────────────────────
-function ActivityTab({ client, tokens, session }) {
-  const t = tokens;
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      supabase.from("tickets").select("id,type,menu_item,status,submitted_at").eq("client_id", client.id).order("submitted_at", { ascending: false }).limit(10),
-    ]).then(([tk]) => {
-      if (cancelled) return;
-      setTickets(tk.data || []);
-      setLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [client.id]);
-
-  return (
-    <div>
-      <SectionTitle>Recent tickets</SectionTitle>
-      {loading && <div style={{ color: t.textMute }}>Loading…</div>}
-      {!loading && tickets.length === 0 && <div style={{ color: t.textMute, fontStyle: "italic", padding: 12 }}>No tickets yet.</div>}
-      {!loading && tickets.length > 0 && (
-        <div style={{ background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 6, overflow: "hidden" }}>
-          {tickets.map(tk => (
-            <div key={tk.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", padding: "12px 18px", borderBottom: `1px solid ${t.border}`, fontSize: 13 }}>
-              <div style={{ fontWeight: 600 }}>{tk.menu_item || tk.type}</div>
-              <div style={{ color: t.textSub, textTransform: "capitalize" }}>{tk.type}</div>
-              <div style={{ color: t.textSub, textTransform: "capitalize" }}>{tk.status}</div>
-              <div style={{ color: t.textMute }}>{tk.submitted_at ? new Date(tk.submitted_at).toLocaleDateString() : "—"}</div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── MESSAGES tab ───────────────────────────────────────────────────────────
 // Per-client view of the general conversation thread. Wraps the same
 // MessageThread component the Inbox uses, scoped to this client's
@@ -2773,56 +2726,6 @@ function EditField({ label, value, onChange, tokens, type = "text", hint }) {
         }}
       />
       {hint && <div style={{ fontSize: 11, color: tokens.textMute, marginTop: 4 }}>{hint}</div>}
-    </div>
-  );
-}
-
-function OnboardingMethodPicker({ method, callDone, onMethodChange, onCallDoneChange, tokens }) {
-  const t = tokens;
-  const labelStyle = { display: "block", fontSize: 11, color: t.textMute, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 };
-
-  const Pill = ({ value, label }) => {
-    const active = method === value;
-    return (
-      <button
-        type="button"
-        onClick={() => onMethodChange(value)}
-        style={{
-          padding: "8px 16px", borderRadius: 999,
-          background: active ? `${t.accent}22` : "transparent",
-          border: `1px solid ${active ? t.accent : t.border}`,
-          color: active ? t.accent : t.textSub,
-          fontSize: 13, fontWeight: 600, cursor: "pointer",
-          fontFamily: "inherit",
-        }}
-      >{label}</button>
-    );
-  };
-
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <label style={labelStyle}>Method</label>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <Pill value="call" label="Call" />
-        <Pill value="send_link" label="Send link" />
-      </div>
-      {method === "call" && (
-        <label style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "10px 14px", border: `1px solid ${t.border}`, borderRadius: 8,
-          cursor: "pointer", fontSize: 13, color: t.text,
-          background: callDone ? `${t.green}10` : "transparent",
-        }}>
-          <input
-            type="checkbox"
-            checked={callDone}
-            onChange={e => onCallDoneChange(e.target.checked)}
-            style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.green }}
-          />
-          <span>Call done?</span>
-          {callDone && <span style={{ marginLeft: "auto", fontSize: 11, color: t.green, fontWeight: 600 }}>✓ marks client live</span>}
-        </label>
-      )}
     </div>
   );
 }
