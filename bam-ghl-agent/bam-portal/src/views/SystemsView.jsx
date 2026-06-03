@@ -1107,16 +1107,21 @@ function ComplexValue({ value, tokens: t, depth = 0 }) {
     !(typeof v === "object" && !Array.isArray(v) && Object.keys(v || {}).length === 0)
   );
   if (entries.length === 0) return <span style={{ color: t.textMute }}>—</span>;
+  // Stacked (label ABOVE value) so the value always gets full width — side-by-side
+  // collapses to one-char-per-line on narrow/mobile widths.
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {entries.map(([k, v]) => (
-        <div key={k} style={{ display: "flex", gap: 8, fontSize: 12.5, alignItems: "flex-start" }}>
-          <span style={{ minWidth: 120, color: t.textMute, textTransform: "capitalize", flexShrink: 0 }}>{k.replace(/_/g, " ")}</span>
-          <span style={{ flex: 1, color: t.text, wordBreak: "break-word" }}>
-            {typeof v === "object" ? <ComplexValue value={v} tokens={t} depth={depth + 1} /> : _fmtScalar(v)}
-          </span>
-        </div>
-      ))}
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {entries.map(([k, v]) => {
+        const nested = v && typeof v === "object";
+        return (
+          <div key={k}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: t.textMute, textTransform: "capitalize", marginBottom: 3 }}>{k.replace(/_/g, " ")}</div>
+            <div style={{ fontSize: 13, color: t.text, overflowWrap: "anywhere", lineHeight: 1.45 }}>
+              {nested ? <ComplexValue value={v} tokens={t} depth={depth + 1} /> : _fmtScalar(v)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1152,15 +1157,22 @@ function EditableRow({ label, value, originalValue, onChange, disabled, tokens: 
     transition: "border-color 0.15s",
   };
 
+  // Complex values render full-width (label on top) so nested data isn't
+  // squeezed into a narrow column — critical on mobile.
+  if (isComplex) {
+    return (
+      <div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: t.textSub, marginBottom: 8, textTransform: "capitalize" }}>{label}</div>
+        <ComplexValue value={value} tokens={t} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
       <div style={{ minWidth: 220, fontSize: 13, fontWeight: 500, color: t.textSub, paddingTop: 8 }}>{label}</div>
       <div style={{ flex: 1 }}>
-        {isComplex ? (
-          <div style={{ paddingTop: 6 }}>
-            <ComplexValue value={value} tokens={t} />
-          </div>
-        ) : useTextarea ? (
+        {useTextarea ? (
           <textarea
             value={stringValue}
             onChange={e => emit(e.target.value)}
