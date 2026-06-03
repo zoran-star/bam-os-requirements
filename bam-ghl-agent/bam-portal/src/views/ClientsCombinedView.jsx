@@ -754,13 +754,6 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   // tab. Everything else (BB nav, tracker, etc.) is V1 = visible to all.
   const v2Access = !!client.v2_access;
 
-  // Onboarding-tracker staff-checks. Live in the Setup section below.
-  // Meta Ads got moved out of this tab and into MarketingTab 2026-05-27.
-  const ghlSignupDone = !!client.ghl_signup_done_at;
-  const slackJoinDone = !!client.slack_join_done_at;
-  const [savingGhl, setSavingGhl] = useState(false);
-  const [savingSlack, setSavingSlack] = useState(false);
-
   async function toggleV2Access(next) {
     setSavingOnb(true);
     const tok = session?.access_token;
@@ -780,28 +773,6 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
       alert("Couldn't save: " + (e?.message || e));
     } finally {
       setSavingOnb(false);
-    }
-  }
-
-  async function toggleSetupFlag(field, next, setSaving) {
-    setSaving(true);
-    const tok = session?.access_token;
-    try {
-      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, [field]: next }),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        alert("Couldn't save: " + (j.error || res.statusText));
-      } else if (onChanged) {
-        onChanged();
-      }
-    } catch (e) {
-      alert("Couldn't save: " + (e?.message || e));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -868,55 +839,9 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
           </div>
         </div>
 
-        {/* Setup — staff-checks that fill onboarding-tracker circles
-            for things the CLIENT can't self-verify (BAM purchases GHL,
-            client joins the BAM Slack workspace). Meta Ads check
-            lives over on the Marketing tab now. */}
-        <SectionTitle style={{ marginTop: 22 }}>Setup</SectionTitle>
-
-        <div style={{
-          marginTop: 6, padding: "12px 14px",
-          background: ghlSignupDone ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${ghlSignupDone ? t.accentBorder : t.border}`,
-          borderRadius: 8,
-        }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
-            <input
-              type="checkbox"
-              checked={ghlSignupDone}
-              disabled={savingGhl}
-              onChange={(e) => toggleSetupFlag("ghl_signup_done", e.target.checked, setSavingGhl)}
-              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-            />
-            <span style={{ fontWeight: 600 }}>GoHighLevel signup complete?</span>
-            {savingGhl && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
-          </label>
-          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            Check after the client has paid via the GHL Stripe link AND the sub-account is provisioned. Fills the "GoHighLevel" circle on the client's onboarding tracker.
-          </div>
-        </div>
-
-        <div style={{
-          marginTop: 10, padding: "12px 14px",
-          background: slackJoinDone ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${slackJoinDone ? t.accentBorder : t.border}`,
-          borderRadius: 8,
-        }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 13, color: t.text }}>
-            <input
-              type="checkbox"
-              checked={slackJoinDone}
-              disabled={savingSlack}
-              onChange={(e) => toggleSetupFlag("slack_join_done", e.target.checked, setSavingSlack)}
-              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-            />
-            <span style={{ fontWeight: 600 }}>Joined BAM Slack workspace?</span>
-            {savingSlack && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
-          </label>
-          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            Check once the client has accepted the Slack invite + you can see them in the shared workspace. Fills the "Join Slack" circle on their tracker.
-          </div>
-        </div>
+        {/* Setup checks (GHL signup / Slack join) removed 2026-06-03 — those
+            flags are now managed via the Action Items onboarding steps
+            (Create GHL / Join Slack), two-way synced. */}
 
         {canViewFinancials && (
           <>

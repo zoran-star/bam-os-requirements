@@ -72,8 +72,8 @@ Six sections, three different completion mechanisms. **This table is the source 
 
 | Section | Trigger | Where it's set |
 |---|---|---|
-| GHL signup | staff-controlled | Client click opens `ONB_GHL_SIGNUP_URL` in a new tab + shows a "BAM marks this when verified" toast — **client cannot flip the circle**. Staff flips it via the "GoHighLevel signup complete?" checkbox in the **Setup** section of the staff client Overview tab → writes `clients.ghl_signup_done_at` |
-| Join Slack | staff-controlled | Same pattern with `ONB_SLACK_INVITE_URL`. Staff flips "Joined BAM Slack workspace?" in **Setup** → writes `clients.slack_join_done_at` |
+| GHL signup | staff/client | Client click opens `ONB_GHL_SIGNUP_URL`. `ghl_signup_done_at` is now toggled via the **Create GHL** Action Items onboarding step (either side). *(The old "GoHighLevel signup complete?" checkbox in the staff Overview Setup section was removed 2026-06-03 — Action Items replaced it.)* |
+| Join Slack | staff/client | `ONB_SLACK_INVITE_URL`. `slack_join_done_at` now toggled via the **Join Slack** Action Items step. *(Old "Joined BAM Slack workspace?" Setup checkbox removed 2026-06-03.)* |
 | General | auto-derived (+ manual override) | clients.business_name + owner_name + email all set, OR staff sets `general_marked_done_at` |
 | Staff | manual mark-done | "I'm done with Staff" button on BB Staff card → `mark_onboarding_section('staff', true)` |
 | Locations | manual mark-done | "I'm done with Locations" button on BB Locations card → `mark_onboarding_section('locations', true)` |
