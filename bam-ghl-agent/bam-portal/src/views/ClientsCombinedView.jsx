@@ -309,6 +309,7 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
         <NewClientModal
           tokens={t}
           session={session}
+          staff={staff}
           onClose={() => setSelectedId(null)}
           onCreated={(id) => { refresh(); setSelectedId(id); }}
         />
@@ -2610,11 +2611,12 @@ function AuthActions({ client, tokens, session, onChanged }) {
 }
 
 // ─── New client modal ───────────────────────────────────────────────────────
-function NewClientModal({ tokens, session, onClose, onCreated }) {
+function NewClientModal({ tokens, session, staff = [], onClose, onCreated }) {
   const t = tokens;
   const [biz, setBiz] = useState("");
   const [owner, setOwner] = useState("");
   const [email, setEmail] = useState("");
+  const [sm, setSm] = useState("");
   const [sendInvite, setSendInvite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -2622,6 +2624,7 @@ function NewClientModal({ tokens, session, onClose, onCreated }) {
   async function create() {
     setErr(null);
     if (!biz.trim()) { setErr("Business name required"); return; }
+    if (!sm) { setErr("Assign a Scaling Manager"); return; }
     if (sendInvite && (!email.trim() || !owner.trim())) {
       setErr("Email + point of contact required to send invite");
       return;
@@ -2642,6 +2645,19 @@ function NewClientModal({ tokens, session, onClose, onCreated }) {
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+
+      // Assign the Scaling Manager (works for both create paths via update-fields).
+      if (j.id && sm) {
+        const smRes = await fetch(`/api/clients?action=update-fields&id=${j.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
+          body: JSON.stringify({ client_id: j.id, scaling_manager_id: sm }),
+        });
+        if (!smRes.ok) {
+          const sj = await smRes.json().catch(() => ({}));
+          throw new Error("Client created, but assigning SM failed: " + (sj.error || smRes.statusText));
+        }
+      }
       onCreated(j.id);
     } catch (e) {
       setErr(e.message);
@@ -2657,6 +2673,13 @@ function NewClientModal({ tokens, session, onClose, onCreated }) {
         <EditField label="Business name" value={biz} onChange={setBiz} tokens={t} />
         <EditField label="Point of contact" value={owner} onChange={setOwner} tokens={t} />
         <EditField label="Email" value={email} onChange={setEmail} tokens={t} type="email" />
+        <EditSelect
+          label="Scaling Manager"
+          value={sm}
+          onChange={setSm}
+          options={[{ value: "", label: "Select a Scaling Manager…" }, ...staff.map(s => ({ value: s.id, label: `${s.name} · ${s.role}` }))]}
+          tokens={t}
+        />
         <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 14, cursor: "pointer", fontSize: 13, color: t.textSub }}>
           <input type="checkbox" checked={sendInvite} onChange={e => setSendInvite(e.target.checked)} />
           Send portal invite immediately *(requires email + point of contact)*
