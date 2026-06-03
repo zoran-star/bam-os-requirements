@@ -50,12 +50,14 @@ If a slide reads like a generic SaaS pitch (Stripe/Linear/pastel gradients) — 
 
 | Token | Hex | Role |
 |---|---|---|
-| **Signal Gold** | `#E8C547` | Primary accent on dark — the one stat, the CTA, the live dot, the active item |
-| Champagne | `#C9A55C` | Gradients on avatar/orb placeholders, counterweights |
-| Deep Gold | `#8B6F2A` | Gold text **on paper** (passes AA on light bg) |
-| Gold highlight | `#F4D788` | Hover/focus lift only |
+| **Gold** | `#C8A84E` | Primary accent — the one stat, the CTA, the live dot, the active item. **Matches the live site/app exactly.** |
+| Gold light | `#D4B65C` | Hover/focus lift, gradients on avatar/orb placeholders, lighter counterweight |
+| Gold deep | `#A08030` | Darker gold for gradients and depth |
+| Gold text | `#9E8535` | Gold **text on paper** (higher contrast, passes AA on light bg) |
 
 **Gold discipline:** one gold moment per slide. If three things are gold, two are wrong.
+
+> This is the same gold (`#C8A84E`) used across the live site and prototype — decks and product stay in lockstep. (Historical note: the early brand guide used a brighter "Signal Gold" `#E8C547`; that has been retired in favor of the app gold.)
 
 ### Pace (status — muted on purpose, used rarely in decks)
 
@@ -65,7 +67,7 @@ If a slide reads like a generic SaaS pitch (Stripe/Linear/pastel gradients) — 
 | Stop | `#E87560` | Risk / problem / churn |
 | Flow | `#5A8FB8` | Neutral info, secondary data series |
 
-> **In-app note:** the live product runs a warmer, rounder variant (gold `#C8A84E`, cream `#F8F7F5`, Plus Jakarta Sans, 8–20px radius, soft shadows). Use that only when a slide shows a literal product screenshot. For everything else, the editorial palette above is the deck standard.
+> **In-app note:** the gold is shared with the product, but the live app runs a warmer, rounder *surface* treatment (cream `#F8F7F5` backgrounds, Plus Jakarta Sans, 8–20px radius, soft shadows). Use that surface styling only when a slide shows a literal product screenshot. For deck chrome, keep the editorial ink/paper/hairline palette above — just with the `#C8A84E` gold.
 
 ---
 
@@ -221,7 +223,7 @@ Nautical / flight-deck. Plain, precise, confident. Strip adjectives, prefer verb
 /* Color */
 --ink:#0A0A0B  --ink-2:#131316  --ink-3:#1C1C21  --line:#2A2A31  --line-2:#383842
 --paper:#F5F1E8  --paper-2:#EBE4D3  --paper-3:#E0D7C1  --line-light:#D4C9AD
---gold:#E8C547  --gold-2:#C9A55C  --gold-3:#8B6F2A  --gold-hi:#F4D788
+--gold:#C8A84E  --gold-light:#D4B65C  --gold-deep:#A08030  --gold-text:#9E8535
 --go:#9FD88A  --stop:#E87560  --flow:#5A8FB8
 
 /* Type */
