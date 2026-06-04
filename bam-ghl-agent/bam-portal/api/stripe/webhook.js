@@ -34,6 +34,7 @@
 // request body with the webhook signing secret.
 
 import crypto from "node:crypto";
+import { addCoachiqCredits, coachiqEnabled } from "../coachiq.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -411,6 +412,33 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     if (Array.isArray(r) && r[0]) member = r[0];
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
+
+  // ── CoachIQ credit bridge (GATED — inert until COACHIQ_* env vars are set) ──
+  // For PORTAL-OWNED subs only (we created them → metadata.origin === "fullcontrol-
+  // portal"), push the cycle's credits to CoachIQ. Never fires for CoachIQ-native
+  // subs (they credit themselves) so there's no double-credit. Runs for ANY paid
+  // invoice (incl. normal 'live' renewals), independent of the recovery logic
+  // below. Non-fatal: a credit failure must never break Stripe webhook handling.
+  if (subId && member.coachiq_member_id && coachiqEnabled()) {
+    try {
+      const sub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount);
+      if (sub && sub.metadata && sub.metadata.origin === "fullcontrol-portal") {
+        await addCoachiqCredits(member.coachiq_member_id, { plan: member.plan || null, invoice_id: inv.id });
+        await writeAudit({
+          client_id: member.client_id, member_id: member.id,
+          action_type: "coachiq-credits-added",
+          args: { invoice_id: inv.id, sub_id: subId, coachiq_user_id: member.coachiq_member_id },
+        }).catch(() => {});
+      }
+    } catch (e) {
+      await writeAudit({
+        client_id: member.client_id, member_id: member.id,
+        action_type: "coachiq-credits-error",
+        args: { invoice_id: inv.id, sub_id: subId, error: String((e && e.message) || e) },
+      }).catch(() => {});
+    }
+  }
+
   const RECOVERABLE = new Set(["payment_failed", "paused"]);
   if (!RECOVERABLE.has(member.status)) {
     return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
