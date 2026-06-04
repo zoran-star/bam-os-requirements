@@ -1,40 +1,29 @@
 # Core Service Reference Setup
 
-Set this up once so the `align-core-data-model` skill can review the latest core-service architecture before prototype data-model work.
-
-The two repositories must be sibling folders:
+Set up `fc-core-srvc` as a read-only sibling of `bam-os-requirements`:
 
 ```text
-some-parent-folder/
+parent/
 ├── bam-os-requirements/
 └── fc-core-srvc/
 ```
 
-The `fc-core-srvc` checkout is a read-only architecture reference for prototype work. Do not make backend changes there unless someone explicitly asks.
+## Tell The Agent
 
-## Easiest Setup: Tell The Agent
-
-Open the `bam-os-requirements` repository in Claude Code and paste:
+Paste this in Claude Code while `bam-os-requirements` is open:
 
 ```text
-Set up the FullControl core service as a read-only sibling reference for this repository.
+Set up https://github.com/Full-Control/fc-core-srvc.git as a read-only sibling folder named fc-core-srvc.
 
-1. Find the parent folder that contains bam-os-requirements.
-2. Clone https://github.com/Full-Control/fc-core-srvc.git into that parent folder as fc-core-srvc. Do not clone it inside bam-os-requirements.
-3. If fc-core-srvc already exists, do not overwrite, delete, reset, stash, or clean it. Verify it is a clean checkout whose origin is https://github.com/Full-Control/fc-core-srvc.git.
-4. Switch the reference checkout to main and run git pull --ff-only origin main.
-5. Confirm the final folder layout, remote URL, branch, clean status, and current commit.
-6. Do not install dependencies or run the backend. This checkout is only for reading architecture and data models.
-7. Confirm bam-os-requirements/.claude/skills/align-core-data-model/SKILL.md exists. If this setup happened during an active Claude Code session, tell me to restart Claude Code so it loads the project skill.
+If it already exists, verify its origin and clean status. Do not overwrite, reset, stash, or clean it.
+Switch it to main, run git pull --ff-only origin main, and report its path, origin, status, and commit.
+Do not install dependencies or run the backend.
+Confirm .claude/skills/align-core-data-model/SKILL.md exists, then tell me to restart Claude Code.
 ```
-
-The agent may ask for permission to access GitHub. Approve the clone or pull only when the repository URL is exactly:
-
-`https://github.com/Full-Control/fc-core-srvc.git`
 
 ## Manual Setup
 
-Run these commands from the folder that contains `bam-os-requirements`:
+Run from the folder containing `bam-os-requirements`:
 
 ```bash
 git clone https://github.com/Full-Control/fc-core-srvc.git fc-core-srvc
@@ -43,36 +32,6 @@ git -C fc-core-srvc pull --ff-only origin main
 git -C fc-core-srvc status --short
 ```
 
-Success means the final `status --short` command prints nothing.
+The final command should print nothing. Then restart Claude Code from `bam-os-requirements`.
 
-Verify the remote:
-
-```bash
-git -C fc-core-srvc remote get-url origin
-```
-
-It must print:
-
-```text
-https://github.com/Full-Control/fc-core-srvc.git
-```
-
-## If A Legacy `bam-os-srvc` Folder Exists
-
-Do not rename, delete, reset, or clean it because it may contain someone else's backend work.
-
-Create the fresh `fc-core-srvc` sibling reference using the setup instructions above. The skill prefers that canonical folder and pulls its latest `main` before every review.
-
-## After Setup
-
-Start or restart Claude Code from the `bam-os-requirements` repository root. Project skills are loaded from `.claude/skills/` when Claude Code starts.
-
-The PM does not need to remember to invoke this skill. The root `CLAUDE.md` tells the agent to use it automatically whenever work changes persistent data.
-
-No manual core-service update is normally required. Whenever work changes persistent data, the skill automatically:
-
-1. Finds the sibling `fc-core-srvc` checkout.
-2. Confirms it is clean and points to the canonical GitHub repository.
-3. Pulls the latest `main` with `--ff-only`.
-4. Reviews the relevant core-service models and architecture.
-5. Implements the prototype change and reports alignment or deliberate deviations.
+Do not rename or modify an existing legacy `bam-os-srvc` folder. Create the clean `fc-core-srvc` reference instead.

@@ -45,15 +45,11 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
 
-### Mandatory data-model alignment
+### Core alignment
 
-Before creating or changing persistent data or backend architecture, including tables, Supabase SQL or migrations, stored entities, relationships, identifiers, statuses, important backend workflows, integration boundaries, API data shapes, RLS, tenant rules, or domain ownership, automatically use the [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md) skill.
+For persistent-data or backend-architecture changes, automatically use [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md). It pulls and reviews [`fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc), then updates the relevant concise [`core handoff`](docs/core-handoff/README.md).
 
-The skill reviews the canonical [`Full-Control/fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc) model and architecture before implementation. Treat the core service as the future direction, not a backward-compatibility constraint. New prototype tables and deliberate forward-looking improvements are allowed.
-
-One-time setup for a collaborator or their agent: [`core-service-reference-setup.md`](core-service-reference-setup.md).
-
-Developer architecture handoffs and future parity tracking: [`docs/core-handoff/README.md`](docs/core-handoff/README.md). Update the relevant domain handoff in the same commit as any persistent-data or architecture change.
+Setup: [`core-service-reference-setup.md`](core-service-reference-setup.md).
 
 ## Project router — which folder for which work
 
