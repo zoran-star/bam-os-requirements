@@ -333,6 +333,10 @@ ENGINE (remaining):
    default payment method; set `trial_end = <next charge>`; stamp
    `metadata: { member_id, coachiq_user_id }`. New members: fresh customer+sub.
    Migration: anchor `trial_end` to the OLD sub's `current_period_end`.
+   PRICE SOURCE READY: `pricing_catalog` (client 39875f07…) has the full plan→price
+   map; pick the `tier='canonical'` row per `canonical_plan` (1/wk→plan_ToNwa96lQ5I1Bs,
+   2/wk→plan_ThYK86w2Zd8fp3, 3/wk→plan_U3CUUJkzgyTjel, unlmtd→plan_U3CFSoR1LdyGlb,
+   + 3mo/6mo canonical variants). So create-sub doesn't need new price config.
 2. **Wire credits**: in `api/stripe/webhook.js` `handleInvoiceSucceeded`, for
    PORTAL-OWNED subs only (e.g. `metadata.coachiq_user_id` present), call
    `addCoachiqCredits(metadata.coachiq_user_id, { plan, amount })`. Never fire for
