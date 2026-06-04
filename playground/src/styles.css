@@ -19,11 +19,110 @@ body {
 }
 
 .app {
-  min-height: 100%;
-  padding: max(env(safe-area-inset-top), 20px) 22px calc(env(safe-area-inset-bottom) + 40px);
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ---------- Whiteboard ---------- */
+.wb-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  background:
+    radial-gradient(circle at 1px 1px, #232329 1px, transparent 0) 0 0 / 26px 26px,
+    var(--bg);
+  cursor: grab;
+}
+.wb-viewport:active { cursor: grabbing; }
+.wb-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.wb-card {
+  position: absolute;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+}
+.wb-card-title { padding: 16px; font-weight: 700; }
+.wb-hint {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* ---------- Todo card preview ---------- */
+.todo-preview { padding: 16px 18px; height: 100%; }
+.tp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+.tp-title { font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
+.tp-count { font-size: 12px; color: var(--muted); }
+.todo-preview ul { list-style: none; margin: 0; padding: 0; }
+.todo-preview li { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
+.tp-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid #4a4a52;
+  flex: 0 0 auto;
+}
+.todo-preview li.done .tp-dot { background: var(--accent); border-color: var(--accent); }
+.tp-label {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-preview li.done .tp-label { color: var(--muted); text-decoration: line-through; }
+.tp-more { font-size: 12px; color: var(--muted); padding-top: 4px; }
+
+/* ---------- Zoom-in layer (open widget) ---------- */
+.zoom-layer {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  animation: zoomIn 0.22s ease-out;
+}
+@keyframes zoomIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.board {
+  padding: max(env(safe-area-inset-top), 20px) 22px calc(env(safe-area-inset-bottom) + 60px);
   max-width: 640px;
   margin: 0 auto;
 }
+.board-head { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; }
+.back {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+  padding: 0 8px 4px 0;
+  cursor: pointer;
+}
+.slide-hint { color: var(--muted); font-size: 12px; margin: 0 0 22px; }
 
 /* ---------- Gate ---------- */
 .gate {
@@ -79,7 +178,7 @@ body {
   font-size: 34px;
   font-weight: 800;
   letter-spacing: 1px;
-  margin: 8px 0 28px;
+  margin: 0;
 }
 .loading { padding: 40px; color: var(--muted); }
 
@@ -96,6 +195,12 @@ body {
   align-items: center;
   gap: 12px;
   padding: 9px 0;
+  touch-action: pan-y; /* vertical scroll stays native; we handle horizontal slide */
+  transition: transform 0.12s ease;
+}
+.todo-section li.child {
+  border-left: 2px solid var(--line);
+  padding-left: 12px;
 }
 .circle {
   flex: 0 0 auto;
