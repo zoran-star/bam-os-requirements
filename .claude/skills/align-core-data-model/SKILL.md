@@ -14,7 +14,7 @@ Keep prototype work fast while shaping its data so it can move into the core ser
 - Never modify the core service unless the user explicitly asks.
 - Do not block a non-technical user with implementation questions that the agent can answer from the repositories.
 
-## Resolve The Core Service
+## Resolve And Refresh The Core Service
 
 Use the current canonical repository:
 
@@ -22,9 +22,22 @@ Use the current canonical repository:
 
 1. From the `bam-os-requirements` repository root, prefer a sibling checkout at `../fc-core-srvc`.
 2. Accept sibling `../bam-os-srvc` as the legacy local folder name after confirming it represents the canonical repository.
-3. Verify the checkout is current when practical. Do not pull, overwrite, or clean a dirty core-service checkout.
-4. If no checkout is available, inspect the GitHub repository read-only. State clearly if access is unavailable.
-5. Never clone the core service inside `bam-os-requirements`.
+3. If no checkout is available, follow [`core-service-reference-setup.md`](../../../core-service-reference-setup.md) to create one before continuing.
+4. Never clone the core service inside `bam-os-requirements`.
+
+Before reading any core-service architecture, model, or migration files:
+
+1. Confirm the checkout remote points to `https://github.com/Full-Control/fc-core-srvc.git`.
+2. Confirm the worktree is clean with `git -C <core-path> status --short`.
+3. Switch to `main` and update it:
+
+```bash
+git -C <core-path> switch main
+git -C <core-path> pull --ff-only origin main
+git -C <core-path> rev-parse --short HEAD
+```
+
+Do not begin the alignment review until the pull succeeds. If the checkout is dirty, the remote is wrong, or the pull fails, do not stash, reset, merge, overwrite, or clean it. Report the problem and use the setup guide to repair or create a clean reference checkout.
 
 ## Review Before Designing
 
@@ -71,7 +84,7 @@ For a new marketing campaign feature, first inspect `Academy`, `Location`, and t
 2. Review the final schema and code against the rules above.
 3. Update affected memory notes and schema documentation.
 4. Finish with a short **Core alignment** report containing:
-   - Core-service files inspected
+   - Core-service commit and files inspected
    - Decisions aligned with the core
    - New concepts the core will eventually need
    - Deliberate deviations or migration debt

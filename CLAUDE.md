@@ -51,6 +51,8 @@ Before creating or changing persistent data — including tables, Supabase SQL o
 
 The skill reviews the canonical [`Full-Control/fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc) model and architecture before implementation. Treat the core service as the future direction, not a backward-compatibility constraint. New prototype tables and deliberate forward-looking improvements are allowed.
 
+One-time setup for a collaborator or their agent: [`core-service-reference-setup.md`](core-service-reference-setup.md).
+
 ## Project router — which folder for which work
 
 When the user asks for something, route to the right folder. Each subfolder has its own CLAUDE.md + memories/ that loads when you `cd` into it. **If the user is working in the wrong folder for the task, tell them to switch.**
