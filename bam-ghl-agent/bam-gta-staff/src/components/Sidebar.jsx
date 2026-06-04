@@ -6,11 +6,17 @@ const NAV = [
   { to: '/home', name: 'Home', icon: 'home' },
   { to: '/inbox', name: 'Inbox', icon: 'inbox', badge: 5 },
   { to: '/pipeline', name: 'Leads', icon: 'pipeline' },
+  { to: '/trials', name: 'Trials', icon: 'trials' },
+  { to: '/post-trial', name: 'Post-Trial', icon: 'posttrial' },
   { to: '/members', name: 'Members', icon: 'members' },
+  { to: '/member-actions', name: 'Member Actions', icon: 'actions' },
   { to: '/sessions', name: 'Classes', icon: 'sessions' },
+  { to: '/automations', name: 'Automations', icon: 'automations' },
   { name: 'Admin', icon: 'admin', children: [
     { to: '/admin', name: 'Approvals' },
     { to: '/analysis', name: 'Analysis' },
+    { to: '/failed-payments', name: 'Failed Payments' },
+    { to: '/onboarding', name: 'Onboarding' },
   ]},
 ];
 

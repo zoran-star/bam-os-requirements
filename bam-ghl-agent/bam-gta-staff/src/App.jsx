@@ -8,6 +8,12 @@ import Sessions from './pages/Sessions';
 import MemberProfiles from './pages/MemberProfiles';
 import Admin from './pages/Admin';
 import Inbox from './pages/Inbox';
+import Trials from './pages/Trials';
+import PostTrial from './pages/PostTrial';
+import MemberActions from './pages/MemberActions';
+import Automations from './pages/Automations';
+import FailedPayments from './pages/FailedPayments';
+import Onboarding from './pages/Onboarding';
 
 export default function App() {
   useEffect(() => {
@@ -26,8 +32,14 @@ export default function App() {
         <Route path="/analysis" element={<Layout><Analysis /></Layout>} />
         <Route path="/sessions" element={<Layout><Sessions /></Layout>} />
         <Route path="/members" element={<Layout><MemberProfiles /></Layout>} />
+        <Route path="/member-actions" element={<Layout><MemberActions /></Layout>} />
         <Route path="/admin" element={<Layout><Admin /></Layout>} />
         <Route path="/inbox" element={<Layout><Inbox /></Layout>} />
+        <Route path="/trials" element={<Layout><Trials /></Layout>} />
+        <Route path="/post-trial" element={<Layout><PostTrial /></Layout>} />
+        <Route path="/automations" element={<Layout><Automations /></Layout>} />
+        <Route path="/failed-payments" element={<Layout><FailedPayments /></Layout>} />
+        <Route path="/onboarding" element={<Layout><Onboarding /></Layout>} />
       </Routes>
     </HashRouter>
   );
