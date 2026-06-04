@@ -365,3 +365,45 @@ EXTERNAL INPUTS STILL NEEDED FROM ZORAN:
    • admin-scoped CoachIQ token (or Zapier) → unblock create+enroll + the 32 ids
    • credits-per-plan numbers → product/credit model
    • go-ahead to wire + deploy portal code (PR #49 onward)
+
+## TRACK A — new-customer onboarding funnel (build-ready design, 2026-06-04)
+
+Goal: a new athlete signs up entirely in FullControl-branded surfaces; CoachIQ is
+invisible until the (white-labeled) app download. Portal owns billing day one.
+
+```
+STEP            SURFACE              MECHANICS
+─────────────────────────────────────────────────────────────────────
+1 Capture       GHL/FC form          Fields: parent first/last/email/phone,
+                (FC-branded)         athlete first/last, plan (1/wk·2/wk·3/wk·
+                                     unlmtd), term (4wk·3mo·6mo). On submit →
+                                     GHL contact + Supabase members row
+                                     (status='payment_method_required').
+2 Create CoachIQ  portal backend     Create the CoachIQ user + ENROLL in group →
+  user            (server)           capture CoachIQ userId → members.coachiq_member_id.
+                                     PATH PENDING #3: admin-token adminAddUser OR
+                                     Zapier "Create User". (signUp_V2 alone = bare,
+                                     not enrolled — do NOT use.)
+3 Pay           PORTAL payment page  Stripe Checkout/Elements on the academy's
+                (NOT CoachIQ/GHL)    CONNECTED account via platform key →
+                                     createPortalSub(price from pricing_catalog
+                                     canonical row for the chosen plan+term).
+                                     → sub is PORTAL-OWNED → buttons work.
+4 Credit        Stripe webhook       invoice.paid on a portal-owned sub →
+                → CoachIQ            addCoachiqCredits(coachiq_member_id, {plan})
+                                     → CoachIQ adds the cycle's credits.
+5 Activate      FC "you're in" page  Instructions to download the white-labeled
+                                     CoachIQ app; first open → set password
+                                     (matched by email) → book with credits.
+─────────────────────────────────────────────────────────────────────
+```
+
+Edge cases: returning parent (email already a CoachIQ user → find-or-create, reuse
+id); multiple athletes per parent (one CoachIQ user/customer can hold both — see
+Joey+Penelope); card declined at step 3 → member stays
+payment_method_required, no CoachIQ credit fired. SACRED: payment only on the
+portal; never add a Products/payment connection to a CoachIQ form or use GHL checkout.
+
+Blockers to ship Track A: #3 (create+enroll) + the credit automation/numbers +
+deploy sign-off. Everything else (form, payment page, webhook wiring) is specced
+and the helper code exists (api/coachiq.js, api/coachiq-billing.js).
