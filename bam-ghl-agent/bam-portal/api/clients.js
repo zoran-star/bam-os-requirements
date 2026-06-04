@@ -2,6 +2,8 @@
 // GET /api/clients               → list all clients
 // GET /api/clients?id=<uuid>     → single client
 
+import { ADMIN_LIKE_ROLES, ANY_STAFF_ROLES, ASSIGNABLE_STAFF_ROLES } from "./_roles.js";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
@@ -1443,9 +1445,7 @@ export default async function handler(req, res) {
       //   ADMIN_LIKE = admin OR scaling_manager   — full power
       //   MARKETING  = ADMIN_LIKE + marketing roles
       //   ANY_STAFF  = anyone with a row in `staff` (defensive: must be authenticated)
-      const ADMIN_LIKE_ROLES = new Set(["admin", "scaling_manager"]);
-      const MARKETING_ROLES  = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor"]);
-      const ANY_STAFF_ROLES  = new Set(["admin", "scaling_manager", "marketing_manager", "marketing_executor", "systems_manager", "systems_executor", "systems"]);
+      // ADMIN_LIKE_ROLES / ANY_STAFF_ROLES imported from ./_roles.js (canonical).
 
       // Action gating:
       //   invite-staff             admin+scaling
@@ -1477,14 +1477,7 @@ export default async function handler(req, res) {
       // Supabase invite email so the new staff can set their password.
       // Redirect goes to the staff portal root (NOT /client-portal.html).
       if (action === "invite-staff") {
-        const VALID_STAFF_ROLES = new Set([
-          "admin",
-          "systems_manager",
-          "systems_executor",
-          "marketing_manager",
-          "marketing_executor",
-          "scaling_manager",
-        ]);
+        const VALID_STAFF_ROLES = ASSIGNABLE_STAFF_ROLES;
         const body = req.body || {};
         const newName = typeof body.name === "string" ? body.name.trim() : "";
         const newEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -1599,10 +1592,7 @@ export default async function handler(req, res) {
       // ── action=update-staff ──
       // Admin-only. Update a staff row's name/email/role.
       if (action === "update-staff") {
-        const VALID_STAFF_ROLES = new Set([
-          "admin", "systems_manager", "systems_executor",
-          "marketing_manager", "marketing_executor", "scaling_manager",
-        ]);
+        const VALID_STAFF_ROLES = ASSIGNABLE_STAFF_ROLES;
         const body = req.body || {};
         const staffId = typeof body.id === "string" ? body.id.trim() : "";
         const newName = typeof body.name === "string" ? body.name.trim() : "";

@@ -2,6 +2,8 @@
 // Staff (authenticated): GET/PATCH via Bearer token (Supabase access token)
 // Client portal (public): GET/PATCH with ?public=1 and client_id
 
+import { SYSTEMS_ROLES, SYSTEMS_MANAGER_ROLES } from "./_roles.js";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -88,13 +90,12 @@ async function verifyStaff(req) {
   const rows = await sb(`staff?email=eq.${encodeURIComponent(user.email)}&select=id,name,role,email,user_id`);
   const me = Array.isArray(rows) && rows[0];
   if (!me) return null;
-  const systemsRoles = ["admin", "scaling_manager", "systems_manager", "systems_executor", "systems"];
-  if (!systemsRoles.includes(me.role)) return null;
+  if (!SYSTEMS_ROLES.has(me.role)) return null;
   return me;
 }
 
 function isManager(me) {
-  return me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager");
+  return me && SYSTEMS_MANAGER_ROLES.has(me.role);
 }
 
 // Mirrors my_client_ids() RLS function for the public ticket API. Returns
