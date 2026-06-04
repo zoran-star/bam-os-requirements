@@ -47,11 +47,13 @@ Slash commands available in this repo (in `.claude/commands/`, shared via git):
 
 ### Mandatory data-model alignment
 
-Before creating or changing persistent data — including tables, Supabase SQL or migrations, stored entities, relationships, identifiers, statuses, API data shapes, RLS, or tenant rules — automatically use the [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md) skill.
+Before creating or changing persistent data or backend architecture, including tables, Supabase SQL or migrations, stored entities, relationships, identifiers, statuses, important backend workflows, integration boundaries, API data shapes, RLS, tenant rules, or domain ownership, automatically use the [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md) skill.
 
 The skill reviews the canonical [`Full-Control/fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc) model and architecture before implementation. Treat the core service as the future direction, not a backward-compatibility constraint. New prototype tables and deliberate forward-looking improvements are allowed.
 
 One-time setup for a collaborator or their agent: [`core-service-reference-setup.md`](core-service-reference-setup.md).
+
+Developer architecture handoffs and future parity tracking: [`docs/core-handoff/README.md`](docs/core-handoff/README.md). Update the relevant domain handoff in the same commit as any persistent-data or architecture change.
 
 ## Project router — which folder for which work
 
