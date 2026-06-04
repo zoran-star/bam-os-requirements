@@ -320,3 +320,44 @@ share one CoachIQ user/customer (e.g. Joey + Penelope → same userId).
 
 Immediate next step: #4 product/credit modeling + the emailLogin→staff-token path
 (unblocks both user create+enroll AND the 32 missing coachiq ids).
+
+## BUILD PLAN — execution-ready (2026-06-03)
+
+Code so far: **`bam-portal/api/coachiq.js`** (PR #49) — proven `addCoachiqCredits()`
++ `triggerCoachiqAutomation()` helper; `createCoachiqUser()` is a stub (blocked).
+
+ENGINE (remaining):
+1. **Portal create-sub** (`api/members.js` new action `create-sub` or a dedicated
+   fn): platform key + `Stripe-Account: <connected acct>` → create subscription on
+   the academy's connected account so the PORTAL owns it. Reuse the customer's
+   default payment method; set `trial_end = <next charge>`; stamp
+   `metadata: { member_id, coachiq_user_id }`. New members: fresh customer+sub.
+   Migration: anchor `trial_end` to the OLD sub's `current_period_end`.
+2. **Wire credits**: in `api/stripe/webhook.js` `handleInvoiceSucceeded`, for
+   PORTAL-OWNED subs only (e.g. `metadata.coachiq_user_id` present), call
+   `addCoachiqCredits(metadata.coachiq_user_id, { plan, amount })`. Never fire for
+   CoachIQ-owned subs (they credit natively) → no double-credit.
+3. **Per-academy config**: add `clients.coachiq_group_id`,
+   `clients.coachiq_credit_automation_id` (+ key ref). Env fallback for BAM GTA.
+4. **Create+enroll user** (BLOCKED): finish via admin token (api-v3/graphql
+   `adminAddUser`) or Zapier "Create User"; capture id → `coachiq_member_id`.
+
+PRODUCT/CREDIT MODEL (#4) — fill the numbers with Zoran:
+   plan → credits per cycle:  1/wk → ? · 2/wk → ? · unlmtd → ? (per month)
+   Decide: one CoachIQ "Incoming Webhook → Add Credits" automation reading
+   `{{payload.credits}}`, OR one automation per plan. Recommend: single automation,
+   portal sends the credit count in the payload.
+
+TRACK A (new customers): GHL/FC form → createCoachiqUser (capture id) → PORTAL
+   Stripe Checkout (portal-owned sub) → webhook → addCoachiqCredits → app-download
+   page. Payment NEVER on CoachIQ/GHL.
+
+TRACK B (migrate 68): prereqs first — backfill ids ✅(22/54; 32 need admin lookup),
+   credit automation LIVE + tested, DISABLE CoachIQ "Subscription Cancelled"
+   automation. Then per member: create portal sub (anchored) → cancel CoachIQ sub →
+   credits now via webhook. 26/33 silent, 7 need card re-collect.
+
+EXTERNAL INPUTS STILL NEEDED FROM ZORAN:
+   • admin-scoped CoachIQ token (or Zapier) → unblock create+enroll + the 32 ids
+   • credits-per-plan numbers → product/credit model
+   • go-ahead to wire + deploy portal code (PR #49 onward)
