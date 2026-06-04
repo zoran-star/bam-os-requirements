@@ -298,5 +298,14 @@ should be rotated.
    Subscription-Cancelled automations → (6) migrate the 33 live subs.
 ```
 
-Immediate next step: backfill `members.coachiq_member_id` from the 68 CoachIQ subs'
-Stripe metadata (`userId`), then #4 product/credit modeling.
+**Backfill DONE 2026-06-03:** populated `members.coachiq_member_id` for **22 of 54**
+BAM GTA members by matching Stripe `customer`→`metadata.userId` (CoachIQ stamps
+userId on every sub it creates; 73 CoachIQ subs / 33 distinct customers / 22 matched
+a member row). The other **32 members are missing** because their subs were created
+by **GHL or manually, not CoachIQ** — so there's no userId in Stripe metadata for
+them. Those 32 need a CoachIQ-side lookup (the `user`/list query, which needs a
+STAFF session token) OR confirmation they're even CoachIQ users. Note: siblings can
+share one CoachIQ user/customer (e.g. Joey + Penelope → same userId).
+
+Immediate next step: #4 product/credit modeling + the emailLogin→staff-token path
+(unblocks both user create+enroll AND the 32 missing coachiq ids).
