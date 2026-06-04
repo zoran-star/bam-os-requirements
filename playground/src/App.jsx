@@ -2,6 +2,7 @@ import { useState } from 'react'
 import Gate, { isUnlocked } from './Gate.jsx'
 import Whiteboard from './Whiteboard.jsx'
 import Todos from './Todos.jsx'
+import SlackDigest from './SlackDigest.jsx'
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(isUnlocked())
@@ -17,6 +18,9 @@ export default function App() {
         <div className="zoom-layer">
           {openWidget.type === 'todo' && (
             <Todos title={openWidget.title} onClose={() => setOpenWidget(null)} />
+          )}
+          {openWidget.type === 'slack' && (
+            <SlackDigest title={openWidget.title} onClose={() => setOpenWidget(null)} />
           )}
         </div>
       )}

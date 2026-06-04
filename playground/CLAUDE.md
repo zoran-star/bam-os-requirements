@@ -31,6 +31,19 @@ Supabase project `jnojmfmpnsfmtqmwhopz`. Two tables (RLS open to publishable key
 - `playground_todos` — `id, section, section_position, label, position, done, depth, …`
   `depth` = nesting level (slide a row right to indent under the one above; left to outdent).
 
+## Slack Digest widget (`type: 'slack'`)
+Tap the Slack card → pick a date/time → **Summarize**. Calls the `slack-digest`
+edge function, which:
+1. Reads Zoran's Slack user token from `user_slack_tokens` (slack_user_id `U09A66CU5N2`).
+2. Lists every channel/DM he's in, pulls messages + thread replies since the chosen time.
+3. Summarizes each conversation + an overview with Claude (`claude-haiku-4-5`).
+
+- Edge function source: `supabase/functions/slack-digest/index.ts`.
+- Secrets it reads (both in the `app_secrets` table, via service role):
+  `user_slack_tokens.access_token` and `app_secrets.key = 'anthropic_api_key'`.
+- Limitation: catches threads whose **parent** is in the window; replies to older
+  threads aren't surfaced. Caps at 60 channels.
+
 ## Add a new widget type
 1. Insert a row in `playground_widgets` with a new `type`.
 2. Render its card preview in `Whiteboard.jsx` (the `w.type === 'todo' ? … : …` branch).

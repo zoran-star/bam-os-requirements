@@ -94,6 +94,83 @@ body {
 .todo-preview li.done .tp-label { color: var(--muted); text-decoration: line-through; }
 .tp-more { font-size: 12px; color: var(--muted); padding-top: 4px; }
 
+/* ---------- Slack card (whiteboard) ---------- */
+.slack-preview {
+  height: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  background: linear-gradient(150deg, #2a1430, #151518);
+}
+.sp-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: #4a154b;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+.sp-title { font-size: 20px; font-weight: 800; }
+.sp-sub { font-size: 13px; color: var(--muted); }
+
+/* ---------- Slack digest (full screen) ---------- */
+.sd-controls { display: flex; gap: 8px; margin-bottom: 20px; }
+.sd-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 15px;
+  padding: 12px 14px;
+  color-scheme: dark;
+}
+.sd-go {
+  background: #4a154b;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sd-go:disabled { opacity: 0.6; }
+.sd-error {
+  background: #2a1414;
+  border: 1px solid #5a2a2a;
+  color: #ff9b9b;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+.sd-overview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+.sd-overview h2 { font-size: 14px; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.sd-overview p { margin: 0 0 8px; font-size: 16px; line-height: 1.5; }
+.sd-meta { font-size: 12px; color: var(--muted); }
+.sd-card {
+  border-bottom: 1px solid var(--line);
+  padding: 14px 2px;
+}
+.sd-card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.sd-label { font-weight: 700; font-size: 15px; }
+.sd-count { font-size: 12px; color: var(--muted); }
+.sd-summary { margin: 0; font-size: 15px; line-height: 1.5; color: #d6d6d9; }
+.sd-action { margin: 6px 0 0; font-size: 14px; color: var(--accent); }
+
 /* ---------- Zoom-in layer (open widget) ---------- */
 .zoom-layer {
   position: absolute;
