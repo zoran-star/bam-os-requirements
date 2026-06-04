@@ -95,10 +95,21 @@ elevated auth the API key lacks:
   path — possibly why CoachIQ exposes it).
 - A CoachIQ product/checkout → but that's CoachIQ taking payment (we don't want).
 
-**NEXT LEAD:** find a `login`/`signIn` mutation → portal logs in as a BAM staff
-CoachIQ account → gets a staff session token → then `adminAddUser` (proper group
-enrollment) + `updateUser`/`deleteUser` all work → full lifecycle, still no Zapier.
-Until that's confirmed, the fallback create+enroll path is Zapier "Create User".
+**LOGIN PATH (tested 2026-06-03):** `emailLogin(input:{ email, password, groupId?,
+code? }): { token, success }` works → returns a staff session JWT. The JWT is
+`{id, iat}` with **NO exp claim → likely long-lived** ("login once, store token"
+is viable). BUT: logging in as `zoran@byanymeansbball.com` and calling
+`adminAddUser` returns **"You are not allowed to do this"** — that account is
+authenticated but is NOT an admin/owner of the BAM GTA group (719bb0cf). Its
+`user`/`profile` queries are self-scoped (return only the active user, null here)
+— so it also can't look up the 32 missing members.
+
+**→ Need the actual BAM GTA CoachIQ OWNER/ADMIN account** (likely a "By Any Means
+Toronto" login, not the bball.com one), OR grant that account admin on group
+719bb0cf in CoachIQ settings. Once an admin token is used: adminAddUser should
+create+enroll, and admin read queries should resolve the 32 missing coachiq ids.
+Fallback if admin access can't be arranged: Zapier "Create User" (integration
+scope may enroll). signUp_V2 alone only makes bare, unenrolled accounts.
 
 ⚠️ Test cleanup: signUp_V2 created ~2 "FCTEST DELETEME" users in BAM GTA — delete
 them in CoachIQ People (can't via API; deleteUser needs staff login).
