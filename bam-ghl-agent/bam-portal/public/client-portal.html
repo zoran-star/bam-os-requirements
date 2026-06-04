@@ -11703,6 +11703,7 @@ async function switchClient(newId) {
   closeCampaignDetail && closeCampaignDetail();
   // Reapply per-client UI state
   applyMarketingNavState();
+  applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
   renderClientSwitcher();
   await loadAcademyName();
   await loadTickets();
