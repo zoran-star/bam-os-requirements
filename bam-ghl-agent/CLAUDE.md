@@ -158,24 +158,32 @@ Client submits form
 
 ---
 
-## Supabase tables with unknown status (audit 2026-05-17)
+## Supabase tables — deprecated / cleanup (audit 2026-05-17, updated 2026-06-03)
 
-These tables exist in Supabase but no code in `bam-portal/api/` or `bam-portal/src/` reads or writes them. They have data; the source/owner is unclear. **Do not drop without confirming with the likely owner.**
+> **`client_users` is NOT dead** — it shipped 2026-05-20 as the many-users-per-academy join table
+> (owner + invited teammates) and is actively read by both portals' Team tabs. See
+> [[memories/project_multi_user_portal.md]].
 
-> **Correction (2026-06-03):** `client_users` is NOT dead — it shipped 2026-05-20 as the
-> many-users-per-academy join table (owner + invited teammates) and is actively read by both
-> portals' Team tabs. See [[memories/project_multi_user_portal.md]]. Removed from the table below.
-> The `content_*` and `board_items` rows below are still genuinely unconfirmed.
+**DEPRECATED — slated to drop (Zoran's call 2026-06-03).** No code in `bam-portal/` reads or writes
+these; they are stale data. **Do not build on them.** Drop after a backup, on/after **2026-07-01**
+(retention window). Take a `pg_dump`/CSV export first.
 
-| Table | Rows | Last touched | Likely owner |
+| Table | Rows | Last touched | Note |
 |---|---|---|---|
-| `board_items` | 20 | 2026-04-09 | Unknown — possibly old Notion sync or planning artifact |
-| `content_themes` | 20 | 2026-04-05 | Coleman's content production workflow? |
+| `board_items` | 20 | 2026-04-09 | Old Notion sync / planning artifact — unused |
+| `content_themes` | 20 | 2026-04-05 | Predates `content_tickets`; superseded |
 | `content_creatives` | 9 | 2026-03-28 | Same |
 | `content_scripts` | 1 | 2026-03-28 | Same |
 | `content_feedback` | 15 | 2026-03-28 | Same |
 
-Note: these are SEPARATE from `content_tickets` (which IS the active staff-portal content workflow — used by MarketingView + ContentView). The `content_*` tables above predate that system.
+These are SEPARATE from `content_tickets` (the LIVE staff-portal content workflow — used by
+MarketingView + ContentView). The `content_*` tables above predate that system.
+
+**`client_meta_tokens` (legacy, KEPT on purpose):** `api/marketing.js` still reads it as a fallback
+before `staff_meta_tokens`. The live model is the **staff-side** Meta token powering all clients;
+client-side OAuth is untested/deferred. The fallback is harmless (read-only) and removing it would
+break any client who self-connected, so **leave it until client-side Meta OAuth actually launches** —
+then migrate to `staff_meta_tokens` only and delete the fallback paths.
 
 ## Knowledge storage — what lives where
 

@@ -7,9 +7,11 @@
 // Endpoints:
 //   POST /api/agent-sessions?action=start    (bearer: AGENT_SESSION_INGEST_SECRET)
 //   POST /api/agent-sessions?action=finish   (bearer: AGENT_SESSION_INGEST_SECRET)
-//   GET  /api/agent-sessions                 (zoran-only)
-//   GET  /api/agent-sessions?id=<uuid>       (zoran-only)
-//   GET  /api/agent-sessions?users=true      (zoran-only, returns list of distinct user_email + display)
+//   GET  /api/agent-sessions                 (admin-only)
+//   GET  /api/agent-sessions?id=<uuid>       (admin-only)
+//   GET  /api/agent-sessions?users=true      (admin-only, returns list of distinct user_email + display)
+
+import { requireEnv } from "./_env.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -225,6 +227,10 @@ function compactTranscript(transcript) {
 // ── handler ─────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   try {
+    // Fail loudly if core config is missing, instead of failing deep in a request.
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY");
+    requireEnv("VITE_SUPABASE_URL", "SUPABASE_URL");
+
     const action = req.query.action;
 
     // ── POST start / finish (ingest) — bearer = INGEST_SECRET ──

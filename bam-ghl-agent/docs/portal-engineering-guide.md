@@ -97,9 +97,15 @@ const role = staffRows?.[0]?.role;
 if (role !== "admin") return res.status(403).json({ error: "admin only" });
 ```
 
+**Role sets are canonical in `api/_roles.js` — import them, never re-type a `new Set([...])`.**
+It exports `ADMIN_ROLES`, `ADMIN_LIKE_ROLES` (admin + scaling_manager), `MARKETING_ROLES`,
+`MARKETING_OPS_ROLES` (marketing without scaling_manager — Meta/guide ops), `SYSTEMS_ROLES`,
+`SYSTEMS_MANAGER_ROLES`, `ANY_STAFF_ROLES`, `ASSIGNABLE_STAFF_ROLES` (excludes the legacy
+`systems` role), plus `hasRole(role, set)`. When you add or change a role, update `_roles.js`
+**and** the `canSee*` flags in `App.jsx` in the same commit.
+
 Known roles: `admin`, `scaling_manager`, `marketing_manager`, `marketing_executor`,
-`systems_manager`, `systems_executor`, `systems`. Common groupings used in code:
-`ADMIN_LIKE = {admin, scaling_manager}`.
+`systems_manager`, `systems_executor`, `systems` (legacy — gateable, not assignable).
 
 ### Frontend tab/feature visibility
 Gated in `App.jsx` via `canSee*` booleans off `me.role` (e.g.
@@ -171,6 +177,12 @@ this was skipped. Run it.**
 - **Env vars fail silently.** A missing/stale key (e.g. `ANTHROPIC_API_KEY`, ingest secret) won't
   crash — it returns an error string or 401 deep in a response. If something "works locally but not
   in prod" or vice-versa, suspect Vercel env first. Local `.env.local` keys can be stale.
+  - **Check what's wired:** `GET /api/health?secret=<CRON_SECRET>` reports every integration's
+    configured/live status (booleans only, no secret values). Add `?strict=1` for a 503 when a
+    required integration is down — wire it to an uptime monitor.
+  - **In new code, fail loudly:** use `requireEnv("X","Y")` from `api/_env.js` at the top of a
+    handler instead of `process.env.X || ""`. It throws a clear "Missing required env var" the
+    function's try/catch turns into a real 500 — not a silent empty string.
 - **Hardcoded identities** still exist in spots (emails, IDs). If you're widening access, grep for
   the old hardcode in **both** the API and the frontend — gates are often duplicated.
 

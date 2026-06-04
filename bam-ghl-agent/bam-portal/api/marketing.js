@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { MARKETING_OPS_ROLES } from "./_roles.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
 //
@@ -28,7 +29,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.en
 const CONTENT_TYPES = new Set(["replace", "add", "campaign-create"]);
 // Who can create/edit/delete guide cards. Keep in sync with the canonical
 // STAFF_ROLES list (no bare "marketing" — it's not a real role).
-const GUIDE_WRITE_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
+const GUIDE_WRITE_ROLES = MARKETING_OPS_ROLES;
 
 // ─────────────────────────────────────────────────────────
 // Shared helpers
@@ -967,7 +968,7 @@ function metaVerifyState(state) {
 // without that client ever logging into Facebook.
 //
 // Restricted to admin + marketing roles (the people who actually wire up ads).
-const META_OPS_ROLES = new Set(["admin", "marketing_manager", "marketing_executor"]);
+const META_OPS_ROLES = MARKETING_OPS_ROLES;
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
