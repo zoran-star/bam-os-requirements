@@ -39,11 +39,17 @@ Update memory **the moment** something changes, not at commit time.
 Run `/memory-audit` periodically. Memory drift wastes context.
 
 
-## Repo slash commands
-Skills available in this repo (in `.claude/commands/`, shared via git):
+## Repo slash commands and skills
+Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/start` — session entry sequence: pull, show recent activity, project menu, route to a project, tell user what's next
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+
+### Mandatory data-model alignment
+
+Before creating or changing persistent data — including tables, Supabase SQL or migrations, stored entities, relationships, identifiers, statuses, API data shapes, RLS, or tenant rules — automatically use the [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md) skill.
+
+The skill reviews the canonical [`Full-Control/fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc) model and architecture before implementation. Treat the core service as the future direction, not a backward-compatibility constraint. New prototype tables and deliberate forward-looking improvements are allowed.
 
 ## Project router — which folder for which work
 
