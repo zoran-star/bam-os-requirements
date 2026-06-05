@@ -379,11 +379,16 @@ ENGINE (remaining):
 4. **Create+enroll user** (BLOCKED): finish via admin token (api-v3/graphql
    `adminAddUser`) or Zapier "Create User"; capture id → `coachiq_member_id`.
 
-PRODUCT/CREDIT MODEL (#4) — fill the numbers with Zoran:
-   plan → credits per cycle:  1/wk → ? · 2/wk → ? · unlmtd → ? (per month)
-   Decide: one CoachIQ "Incoming Webhook → Add Credits" automation reading
-   `{{payload.credits}}`, OR one automation per plan. Recommend: single automation,
-   portal sends the credit count in the payload.
+PRODUCT/CREDIT MODEL (#4) — DECIDED 2026-06-05: **MASTER CREDITS, single automation.**
+   Zoran's call: skip per-product/per-sub credit banks (too much CoachIQ setup) — use
+   the universal Master Credits pool. ONE CoachIQ automation:
+     "Incoming Webhook → Add Credits → Master Credits, amount = {{payload.credits}}"
+   The PORTAL computes credits-per-cycle from the plan and sends it in the webhook
+   payload ({user:{id}, credits:N}). No per-plan automations, no CoachIQ products.
+   Trade-off accepted: parents don't see their plan in CoachIQ (it's in the FC portal
+   / ask a coach).
+   STILL NEED from Zoran: credits-per-cycle per plan (1/wk, 2/wk, 3/wk, unlmtd) and
+   how to handle "unlmtd" (large fixed grant? or unlimited handled outside credits?).
 
 TRACK A (new customers): GHL/FC form → createCoachiqUser (capture id) → PORTAL
    Stripe Checkout (portal-owned sub) → webhook → addCoachiqCredits → app-download
