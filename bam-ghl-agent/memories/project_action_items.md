@@ -65,9 +65,9 @@ an external connection signal):
 | 6 | `staff` | Add your Staff | `staff_marked_done_at` | ✅ → BB #bb=staff |
 | 7 | `locations` | Add your Locations | `locations_marked_done_at` | ✅ → BB #bb=locations |
 | 8 | `brand` | Set up Brand & Website | `brand_marked_done_at` | ✅ → BB #bb=brand |
-| 9 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
-| 10 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
-| 11 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+| 9 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+| 10 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
+| 11 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
 | 12 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
 
 (2026-06-03: `offers` added as step 9; the first-login product tour was cut from 8 steps to a 2-step welcome that just points the client at this Action Items checklist — see [[project_client_portal_tour]].)

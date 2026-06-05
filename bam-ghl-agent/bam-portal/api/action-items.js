@@ -211,9 +211,9 @@ const ONBOARDING_STEPS = [
   { key: "staff",          title: "Add your Staff",                      sort: 6, col: "staff_marked_done_at",         writable: true },
   { key: "locations",      title: "Add your Locations",                  sort: 7, col: "locations_marked_done_at",     writable: true },
   { key: "brand",          title: "Set up Brand & Website",              sort: 8, col: "brand_marked_done_at",         writable: true },
-  { key: "offers",         title: "Set up your Offers",                  sort: 9, col: "offers_marked_done_at",        writable: true },
-  { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 10, col: "call_booked_at",            writable: true },
-  { key: "kpis",           title: "Fill out your KPIs",                  sort: 11, col: "kpi_marked_done_at",           writable: true },
+  { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
+  { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
+  { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
 ];
