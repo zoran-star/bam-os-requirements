@@ -43,6 +43,7 @@ export default function ResourcesView({ tokens, dark, me }) {
   const [filterCat, setFilterCat] = useState("all");
   const [editing, setEditing] = useState(null);       // resource being edited (or {} for new)
   const [showCats, setShowCats] = useState(false);
+  const [converting, setConverting] = useState(null); // resource id being converted, or 'all'
 
   const isAdmin = me?.role === "admin";
 
@@ -101,6 +102,53 @@ export default function ResourcesView({ tokens, dark, me }) {
     }
   };
 
+  // ─── Convert legacy PDF(s) → content blocks (AI) ───
+  const isLegacyPdf = (r) =>
+    (!Array.isArray(r.content_blocks) || r.content_blocks.length === 0) &&
+    (r.resource_files || []).some((f) => (f.mime_type || "").includes("pdf"));
+
+  const convertCall = async (action, body) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`/api/resources/convert?action=${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify(body || {}),
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || `${action} failed`);
+    return j;
+  };
+
+  const handleConvert = async (r) => {
+    setConverting(r.id); setError(null);
+    try { await convertCall("convert", { resourceId: r.id }); await load(); }
+    catch (e) { setError(`Convert failed: ${e.message}`); }
+    finally { setConverting(null); }
+  };
+
+  const handleConvertAll = async () => {
+    if (!window.confirm("Convert all legacy PDF resources into interactive pages? This uses AI and may take a minute.")) return;
+    setConverting("all"); setError(null);
+    let total = 0;
+    try {
+      let remaining = Infinity;
+      while (remaining > 0) {
+        const j = await convertCall("convert-all");
+        total += j.converted || 0;
+        remaining = j.remaining || 0;
+        if ((j.converted || 0) === 0 && remaining > 0) {           // a batch all-failed → stop
+          const f = (j.failed || [])[0];
+          throw new Error(f ? `${f.title}: ${f.error}` : "some resources could not be converted");
+        }
+      }
+      await load();
+      if (total) setError(null);
+    } catch (e) {
+      setError(`Converted ${total}. Stopped: ${e.message}`);
+      await load();
+    } finally { setConverting(null); }
+  };
+
   if (!isAdmin) {
     return (
       <div style={{ padding: 40, color: tk.textSub }}>
@@ -145,6 +193,14 @@ export default function ResourcesView({ tokens, dark, me }) {
         </div>
 
         <div style={{ display: "flex", gap: 8 }}>
+          {resources.filter(isLegacyPdf).length > 0 && (
+            <button onClick={handleConvertAll} disabled={!!converting} style={btnSecondary(tk)}
+              title="Use AI to turn legacy PDF resources into interactive pages">
+              {converting === "all"
+                ? "Converting…"
+                : `Convert ${resources.filter(isLegacyPdf).length} PDF${resources.filter(isLegacyPdf).length > 1 ? "s" : ""}`}
+            </button>
+          )}
           <button
             onClick={() => setShowCats(true)}
             style={btnSecondary(tk)}
@@ -183,7 +239,7 @@ export default function ResourcesView({ tokens, dark, me }) {
         }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "1fr 130px 80px 130px 120px",
+            gridTemplateColumns: "1fr 120px 70px 110px 185px",
             gap: 0, padding: "12px 16px",
             borderBottom: `1px solid ${tk.borderMed}`,
             fontSize: 11, fontWeight: 600, color: tk.textMute, letterSpacing: "0.06em", textTransform: "uppercase",
@@ -201,7 +257,7 @@ export default function ResourcesView({ tokens, dark, me }) {
             return (
               <div key={r.id} style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 130px 80px 130px 120px",
+                gridTemplateColumns: "1fr 120px 70px 110px 185px",
                 gap: 0, padding: "14px 16px",
                 borderBottom: `1px solid ${tk.border}`,
                 alignItems: "center",
@@ -229,6 +285,12 @@ export default function ResourcesView({ tokens, dark, me }) {
                 <div style={{ fontSize: 13, color: tk.textSub }}>{fileCount}</div>
                 <div style={{ fontSize: 12, color: tk.textSub }}>{formatRelative(r.created_at)}</div>
                 <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  {isLegacyPdf(r) && (
+                    <button onClick={() => handleConvert(r)} disabled={!!converting} style={btnIcon(tk)}
+                      title="Convert this PDF into an interactive page with AI">
+                      {converting === r.id ? "…" : "Convert"}
+                    </button>
+                  )}
                   <button onClick={() => setEditing(r)} style={btnIcon(tk)} title="Edit">Edit</button>
                   <button onClick={() => handleDelete(r)} style={btnIconDanger(tk)} title="Delete">Delete</button>
                 </div>
