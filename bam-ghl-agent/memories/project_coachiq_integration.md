@@ -379,12 +379,19 @@ ENGINE (remaining):
 4. **Create+enroll user** (BLOCKED): finish via admin token (api-v3/graphql
    `adminAddUser`) or Zapier "Create User"; capture id → `coachiq_member_id`.
 
-PRODUCT/CREDIT MODEL (#4) — DECIDED 2026-06-05: **MASTER CREDITS, single automation.**
-   Zoran's call: skip per-product/per-sub credit banks (too much CoachIQ setup) — use
-   the universal Master Credits pool. ONE CoachIQ automation:
-     "Incoming Webhook → Add Credits → Master Credits, amount = {{payload.credits}}"
-   The PORTAL computes credits-per-cycle from the plan and sends it in the webhook
-   payload ({user:{id}, credits:N}). No per-plan automations, no CoachIQ products.
+PRODUCT/CREDIT MODEL (#4) — Master Credits. **CORRECTION 2026-06-05: the
+   "Add Credits"/"Redeem" "Number of Credits" field is a FIXED number stepper — it
+   does NOT accept {{payload.credits}} (variables/Insert Field don't work there).**
+   So we can't send a dynamic amount. Instead: **one automation PER credit amount**,
+   and the PORTAL calls the matching automationId for the member's plan.
+     - v1 (4-week billing): build 4 automations → Add 4 / Add 8 / Add 12 / Add 48
+       (each: Incoming Webhook → Add Credits → Master → fixed N).
+     - term plans add more amounts later (24/36/48/72/144/288) — or only support
+       monthly billing in v1.
+   Portal stores an amount→automationId map (env or clients row) and POSTs
+   {user:{id}} to the right one. No per-product banks, no CoachIQ products.
+   Expiry (reset-then-add) ALSO blocked by the same fixed-number limit on Redeem →
+   ship v1 WITHOUT expiry (credits roll over; revisit later).
    Trade-off accepted: parents don't see their plan in CoachIQ (it's in the FC portal
    / ask a coach).
    FINAL NUMBERS (Zoran, 2026-06-05): monthly credits per plan = 1/wk:4, 2/wk:8,
