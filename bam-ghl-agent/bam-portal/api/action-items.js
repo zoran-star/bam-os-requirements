@@ -140,6 +140,15 @@ async function loadMarketingMgr() {
   return { name: s.name || "Cam", booking_url: s.booking_url || null };
 }
 
+// The ads specialist (Ximena) — first marketing_executor — for the
+// "Book a call with Ximena" step.
+async function loadAdsSpecialist() {
+  const rows = await sb(`staff?role=eq.marketing_executor&select=name,booking_url&order=created_at.asc&limit=1`);
+  const s = rows && rows[0];
+  if (!s) return null;
+  return { name: s.name || "Ximena", booking_url: s.booking_url || null };
+}
+
 // Build the systems onboarding ticket from the client's data (replaces the old
 // auto DB trigger — now fired manually by staff via the trigger_buildout step).
 // Idempotent: bails if the client already has a systems_onboarding_ticket_id.
@@ -233,6 +242,7 @@ const ONBOARDING_STEPS = [
   { key: "ready_for_review", title: "Ready for review call?",           sort: 15, col: "ready_for_review_at",         writable: true, staff_only: true },
   // Client step — locked (greyed) until ready_for_review is done.
   { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 16, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
+  { key: "book_call_ximena", title: "Book a call with Ximena (ads)",        sort: 17, col: "ximena_call_booked_at",      writable: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
@@ -357,10 +367,11 @@ export default async function handler(req, res) {
       const team = await loadTeam(clientId);
       const sm = await loadClientSM(clientId);
       const mktg = await loadMarketingMgr();
+      const ads = await loadAdsSpecialist();
       // Whether the staff "Ready for review call?" gate is flipped — unlocks
       // the client's book_review_call step.
       const review_ready = (items || []).some(i => i.onboarding_key === "ready_for_review" && i.completed_at);
-      return res.status(200).json({ items: visibleItems, team, sm, mktg, review_ready });
+      return res.status(200).json({ items: visibleItems, team, sm, mktg, ads, review_ready });
     }
 
     // ── POST: create ──────────────────────────────────────────────────────
