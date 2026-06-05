@@ -387,8 +387,12 @@ PRODUCT/CREDIT MODEL (#4) — DECIDED 2026-06-05: **MASTER CREDITS, single autom
    payload ({user:{id}, credits:N}). No per-plan automations, no CoachIQ products.
    Trade-off accepted: parents don't see their plan in CoachIQ (it's in the FC portal
    / ask a coach).
-   STILL NEED from Zoran: credits-per-cycle per plan (1/wk, 2/wk, 3/wk, unlmtd) and
-   how to handle "unlmtd" (large fixed grant? or unlimited handled outside credits?).
+   FINAL NUMBERS (Zoran, 2026-06-05): monthly credits per plan = 1/wk:4, 2/wk:8,
+   3/wk:12, unlmtd:48 (48 = "effectively unlimited", big-grant approach). Per
+   payment grant = monthly × months-in-cycle (4-wk→×1, 3mo→×3, 6mo→×6), e.g.
+   2/wk 3-month = 24, unlmtd 6-month = 288. **Credits EXPIRE at end of each billing
+   cycle** (set expiry on the Add Credits action / send expiry in payload). Plan
+   tiers ARE enforced by credit count; unlmtd is just a high number.
 
 TRACK A (new customers): GHL/FC form → createCoachiqUser (capture id) → PORTAL
    Stripe Checkout (portal-owned sub) → webhook → addCoachiqCredits → app-download
