@@ -39,11 +39,17 @@ Update memory **the moment** something changes, not at commit time.
 Run `/memory-audit` periodically. Memory drift wastes context.
 
 
-## Repo slash commands
-Skills available in this repo (in `.claude/commands/`, shared via git):
+## Repo slash commands and skills
+Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/start` — session entry sequence: pull, show recent activity, project menu, route to a project, tell user what's next
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+
+### Core alignment
+
+For persistent-data or backend-architecture changes, automatically use [`align-core-data-model`](.claude/skills/align-core-data-model/SKILL.md). It pulls and reviews [`fc-core-srvc`](https://github.com/Full-Control/fc-core-srvc), then updates the relevant concise [`core handoff`](docs/core-handoff/README.md).
+
+Setup: [`core-service-reference-setup.md`](core-service-reference-setup.md).
 
 ## Project router — which folder for which work
 
