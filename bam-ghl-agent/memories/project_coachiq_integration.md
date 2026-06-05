@@ -21,6 +21,40 @@ bridge (below) is the technical wedge that makes this possible.
 This started from a concrete case (pausing Knowl Beharie on BAM GTA) and grew
 into the general integration model.
 
+## ⭐ CURRENT ARCHITECTURE (DECIDED 2026-06-05) — supersedes the credit bridge
+
+**FullControl owns Stripe billing. CoachIQ stays academy-run for credits/
+scheduling. The link = the academy pastes the portal's sub_id into CoachIQ.**
+
+```
+FullControl (BAM builds):  creates + OWNS the Stripe sub → billing buttons
+                           (pause/cancel/change/refund) work. Surfaces the
+                           sub_id for the academy to copy.
+CoachIQ (academy runs, as today):  member's product/credits/expiry/scheduling.
+                           Academy pastes the portal sub_id into the CoachIQ
+                           product → CoachIQ does native credits off that sub.
+Plan change:  member changes in portal (Stripe) → ACADEMY re-links in CoachIQ
+              (delete old product, add new, paste sub_id, set credits) — this is
+              the academy's existing workflow, NOT BAM's systems team.
+```
+
+Why this won: BAM builds NO credit bridge → scales across many academies with
+zero per-academy credit setup. CoachIQ CAN watch an external (portal-owned)
+sub_id — Zoran confirmed from his GHL→CoachIQ "paste the sub id" experience.
+
+**DEPRECATED by this decision (built/explored but NOT used in the live model):**
+- The portal→CoachIQ credit webhook bridge (`api/coachiq.js` addCoachiqCredits),
+  the gated webhook wiring (PR #54), per-amount "Add Credits" automations, the
+  credit-amount model (4/8/12/48) + expiry hacks. All moot — the academy handles
+  credits in CoachIQ. (The webhook bridge IS proven and could be revived if BAM
+  ever wants to own credits too, but it's out of scope now.)
+
+**STILL IN SCOPE for BAM:** portal create-sub + ownership (`api/coachiq-billing.js`,
+PR #52) · the existing billing buttons (api/members.js, work on portal-owned subs)
+· make sub_id easy to copy · Track A funnel (portal payment) · Track B migration
+(recreate subs portal-owned → academy re-links sub_ids). `coachiq_member_id` is no
+longer load-bearing (was for the dropped credit push); keep as reference only.
+
 ## What CoachIQ is to academies
 
 CoachIQ is the **credits + scheduling engine** BAM GTA uses. Athletes get
