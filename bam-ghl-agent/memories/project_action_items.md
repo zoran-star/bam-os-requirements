@@ -68,7 +68,11 @@ an external connection signal):
 | 9 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
 | 10 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
 | 11 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
-| 12 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
+| 12 | `book_call_cam` | Book a call with Cam (marketing) | `cam_call_booked_at` | ✅ → dynamic CTA from marketing_manager `booking_url` (Cam) |
+| 13 | `submit_content` | Submit your raw content | `content_submitted_at` | ✅ → `_aiOpenNewCampaign()` opens the Marketing new-campaign wizard (bypasses the MARKETING_INCLUDED nav gate) |
+| 14 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
+
+GET also returns `mktg: { name, booking_url }` (first `marketing_manager` = Cam) alongside `sm`. Cam's `staff.booking_url` is unset — falls back to "Message us on Slack" until provided. `_aiBookingCta(person, fallback)` is the shared booking-button helper (SM + Cam).
 
 (2026-06-03: `offers` added as step 9; the first-login product tour was cut from 8 steps to a 2-step welcome that just points the client at this Action Items checklist — see [[project_client_portal_tour]].)
 
