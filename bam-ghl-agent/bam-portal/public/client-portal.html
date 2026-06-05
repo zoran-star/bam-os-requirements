@@ -2215,17 +2215,18 @@
   }
 
   .chat-input-wrap {
-    background: transparent;
+    background: var(--surface-el);
     border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 14px 18px;
+    border-radius: 22px;
+    padding: 8px 8px 8px 16px;
     display: flex;
     align-items: flex-end;
-    gap: 14px;
+    gap: 8px;
     transition: border-color 0.15s ease;
   }
 
-  .chat-input-wrap:focus-within { border-color: var(--gold); box-shadow: none; }
+  /* Calm focus — no bright gold box, just a slightly stronger hairline. */
+  .chat-input-wrap:focus-within { border-color: var(--border-str, rgba(255,255,255,0.22)); box-shadow: none; }
 
   .chat-input {
     flex: 1;
@@ -2247,10 +2248,33 @@
 
   .chat-input::placeholder { color: var(--text-mute); }
 
+  /* Long-press / right-click message menu (iMessage-style) */
+  #msg-ctx-backdrop { position: fixed; inset: 0; z-index: 10059; display: none; }
+  #msg-ctx-backdrop.open { display: block; }
+  #msg-ctx-menu {
+    position: fixed; z-index: 10060; display: none; flex-direction: column;
+    min-width: 168px; background: var(--surface-el, #1c1a16);
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 14px 44px rgba(0,0,0,0.55);
+    transform-origin: top center; animation: ctxIn 0.13s ease;
+  }
+  #msg-ctx-menu.open { display: flex; }
+  #msg-ctx-menu button {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    background: transparent; border: none; border-bottom: 1px solid var(--line);
+    color: var(--text); font-family: inherit; font-size: 15px; font-weight: 500;
+    padding: 13px 16px; cursor: pointer; text-align: left;
+  }
+  #msg-ctx-menu button:last-child { border-bottom: none; }
+  #msg-ctx-menu button:active { background: var(--surface); }
+  #msg-ctx-menu button.danger { color: var(--red, #E2683f); }
+  #msg-ctx-menu button .ic { opacity: 0.5; font-size: 15px; }
+  @keyframes ctxIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
   .chat-send {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-sm);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
     background: var(--gold);
     border: none;
     color: var(--ink);
@@ -2258,8 +2282,9 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
     flex-shrink: 0;
     transition: filter 0.15s ease;
   }
@@ -6126,6 +6151,8 @@ Then the call to action."]</div>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             Latest
           </button>
+          <div id="msg-ctx-backdrop" onclick="closeMsgMenu()"></div>
+          <div id="msg-ctx-menu"></div>
           <div class="chat-input-area">
             <div id="messages-pending-files" style="display:none;padding:0 4px 8px;font-size:12px;color:var(--text-mute)"></div>
             <div class="chat-input-wrap">
@@ -18774,6 +18801,7 @@ async function _msgApi(url, opts = {}) {
 
 // Entry point — called by switchView('messages').
 async function openMessagesView() {
+  initMessageLongPress();
   try {
     const json = await _msgApi('/api/messages?action=list-conversations');
     _msgConversations = json.conversations || [];
@@ -18935,7 +18963,7 @@ function renderMessageThread() {
     const time = isLast
       ? `<div class="msg-time">${m._optimistic ? 'Sending…' : (m._failed ? 'Failed' : msgShortTime(m.created_at))}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>`
       : '';
-    html += `<div class="msg-row${isMine ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}">${avatar}<div class="msg-bubble">${body}${filesHtml}</div>${time}</div>`;
+    html += `<div class="msg-row${isMine ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}" data-mid="${escapeAttr(m.id)}">${avatar}<div class="msg-bubble">${body}${filesHtml}</div>${time}</div>`;
   }
 
   // Typing indicator (animated dots)
@@ -18967,6 +18995,74 @@ function _msgThreadScroll() {
   if (!root) return;
   if ((root.scrollHeight - root.scrollTop - root.clientHeight) < 140) _setJumpPill(false);
 }
+
+// #10 — long-press (or right-click) a message → iMessage-style menu (Copy / Delete).
+let _msgLongPressInit = false;
+function initMessageLongPress() {
+  if (_msgLongPressInit) return;
+  _msgLongPressInit = true;
+  let timer = null, sx = 0, sy = 0;
+  const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  document.addEventListener('touchstart', (e) => {
+    const row = e.target.closest && e.target.closest('.msg-row[data-mid]');
+    if (!row) return;
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY;
+    clear();
+    timer = setTimeout(() => {
+      timer = null;
+      hapticTap('MEDIUM');
+      showMsgMenu(row.getAttribute('data-mid'), t.clientX, t.clientY);
+    }, 460);
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!timer) return;
+    const t = e.touches[0];
+    if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) clear();
+  }, { passive: true });
+  document.addEventListener('touchend', clear);
+  document.addEventListener('contextmenu', (e) => {
+    const row = e.target.closest && e.target.closest('.msg-row[data-mid]');
+    if (!row) return;
+    e.preventDefault();
+    showMsgMenu(row.getAttribute('data-mid'), e.clientX, e.clientY);
+  });
+}
+
+function showMsgMenu(mid, x, y) {
+  const m = _msgMessages.find(mm => String(mm.id) === String(mid));
+  const menu = document.getElementById('msg-ctx-menu');
+  const backdrop = document.getElementById('msg-ctx-backdrop');
+  if (!m || m.deleted_at || !menu || !backdrop) return;
+  const isMine = !m.author_staff_id;
+  const ageMs = Date.now() - new Date(m.created_at).getTime();
+  const canDelete = isMine && !m._optimistic && ageMs < MSG_EDIT_WINDOW_MS;
+  menu.innerHTML =
+    `<button onclick="copyMsg('${mid}')">Copy<span class="ic">⧉</span></button>` +
+    (canDelete ? `<button class="danger" onclick="deleteMsgFromMenu('${mid}')">Delete<span class="ic">🗑</span></button>` : '');
+  menu.classList.add('open');
+  backdrop.classList.add('open');
+  const mw = 168, mh = canDelete ? 100 : 50;
+  menu.style.left = Math.min(Math.max(8, x - mw / 2), window.innerWidth - mw - 8) + 'px';
+  menu.style.top = Math.min(y + 8, window.innerHeight - mh - 8) + 'px';
+}
+function closeMsgMenu() {
+  const menu = document.getElementById('msg-ctx-menu');
+  const backdrop = document.getElementById('msg-ctx-backdrop');
+  if (menu) menu.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+}
+function copyMsg(mid) {
+  const m = _msgMessages.find(mm => String(mm.id) === String(mid));
+  closeMsgMenu();
+  if (!m) return;
+  const text = m.body || '';
+  try {
+    const CB = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Clipboard;
+    if (CB && CB.write) { CB.write({ string: text }); return; }
+  } catch (e) {}
+  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
+}
+function deleteMsgFromMenu(mid) { closeMsgMenu(); deleteMsg(mid); }
 
 function subscribeMessagesRealtime(conversationId) {
   // Tear down old
@@ -19801,16 +19897,39 @@ function toggleTheme() {
     try {
       var Cap = window.Capacitor;
       var KB = Cap && Cap.Plugins && Cap.Plugins.Keyboard;
-      var on = function () { document.body.classList.add('keyboard-open'); };
-      var off = function () { document.body.classList.remove('keyboard-open'); };
+      function chatLayout() { return document.querySelector('#view-messages .chat-layout'); }
+      var preH = 0, kbH = 0;
+
+      function willShow(info) {
+        document.body.classList.add('keyboard-open');
+        preH = window.innerHeight;
+        kbH = (info && info.keyboardHeight) || 0;
+      }
+      function didShow() {
+        var cl = chatLayout();
+        if (!cl) return;
+        var h = window.innerHeight;
+        // If resize:native already shrank the viewport, fill it. Otherwise the
+        // viewport stayed full, so reserve room for the keyboard ourselves.
+        cl.style.height = (h < preH - 20 ? h : (h - kbH)) + 'px';
+        var thread = document.getElementById('messages-thread');
+        if (thread) thread.scrollTop = thread.scrollHeight;   // keep latest in view
+      }
+      function hide() {
+        document.body.classList.remove('keyboard-open');
+        var cl = chatLayout();
+        if (cl) cl.style.height = '';
+      }
+
       if (KB && KB.addListener) {
-        KB.addListener('keyboardWillShow', on);
-        KB.addListener('keyboardWillHide', off);
+        KB.addListener('keyboardWillShow', willShow);
+        KB.addListener('keyboardDidShow', didShow);
+        KB.addListener('keyboardWillHide', hide);
       } else {
         document.addEventListener('focusin', function (e) {
-          if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) on();
+          if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) document.body.classList.add('keyboard-open');
         });
-        document.addEventListener('focusout', off);
+        document.addEventListener('focusout', hide);
       }
     } catch (e) {}
   }
