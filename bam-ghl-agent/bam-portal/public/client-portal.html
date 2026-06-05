@@ -599,6 +599,25 @@
   .ai-stop.locked .ai-stop-circle { border-style: dashed; cursor: default; font-size: 12px; }
   .ai-stop-hint { font-size: 11px; color: var(--text-mute); }
 
+  /* ── Collapsible Action Items sections ── */
+  .ai-section { border-radius: 12px; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--line); }
+  .ai-section-onb { border-color: rgba(212,182,92,0.40); background: rgba(212,182,92,0.055); }
+  .ai-section-tasks { background: var(--surface); }
+  .ai-section-head {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 13px 16px; background: transparent; border: none; cursor: pointer;
+    color: var(--text); font-family: inherit; text-align: left;
+  }
+  .ai-sh-title { font-size: 13px; font-weight: 700; letter-spacing: 0.03em; }
+  .ai-sh-count { font-size: 12px; color: var(--text-mute); margin-left: auto; }
+  .ai-sh-chev { font-size: 11px; color: var(--text-mute); transition: transform .15s ease; }
+  .ai-section.collapsed .ai-sh-chev { transform: rotate(-90deg); }
+  .ai-onb-bar { height: 4px; background: rgba(255,255,255,0.08); margin: 0 16px; border-radius: 999px; overflow: hidden; }
+  .ai-section.collapsed .ai-onb-bar { margin-bottom: 14px; }
+  .ai-onb-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+  .ai-section-bd { padding: 12px 16px 14px; }
+  .ai-section.collapsed .ai-section-bd { display: none; }
+
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -13045,31 +13064,65 @@ function _aiOpenBB(card) {
   _bbNavigate(card);
 }
 
+// Collapse state for the two Action Items sections (persists across re-renders).
+let _aiOnbCollapsed = false;
+let _aiTasksCollapsed = false;
+function _aiToggleSection(which) {
+  if (which === 'onb') _aiOnbCollapsed = !_aiOnbCollapsed;
+  else _aiTasksCollapsed = !_aiTasksCollapsed;
+  _renderActionItems();
+}
+
 function _renderActionItems() {
   const container = document.getElementById('action-items-list');
   if (!container) return;
-  if (!_AI_ITEMS.length) {
-    container.innerHTML = '<div class="req-empty" style="padding:28px 0;text-align:center;color:var(--text-mute)">No action items yet.<br/>Tap the + button to add one.</div>';
-    return;
-  }
+
   const onb = _AI_ITEMS.filter(i => i.onboarding_key).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
   const rest = _AI_ITEMS.filter(i => !i.onboarding_key);
-  let html = '';
-
-  if (onb.length) {
-    const doneCount = onb.filter(i => i.completed_at).length;
-    html += `<div class="ai-group-label">Onboarding · ${doneCount}/${onb.length}</div>`;
-    html += `<div class="ai-subway">${onb.map(_aiOnbHTML).join('')}</div>`;
-  }
-
+  const onbDone = onb.filter(i => i.completed_at).length;
+  const showOnb = onb.length > 0 && onbDone < onb.length;   // disappears once fully done
   const open = rest.filter(i => !i.completed_at);
   const done = rest.filter(i => i.completed_at);
-  if (onb.length && (open.length || done.length)) html += `<div class="ai-group-label">Tasks</div>`;
-  html += open.map(_aiItemHTML).join('');
-  if (done.length) {
-    html += `<div class="ai-group-label">Done · ${done.length}</div>`;
-    html += done.map(_aiItemHTML).join('');
+  const hasTasks = open.length > 0 || done.length > 0;
+
+  let html = '';
+
+  // ── Onboarding panel (its own gold-tinted card) ──
+  if (showOnb) {
+    const pct = Math.round((onbDone / onb.length) * 100);
+    html += `<div class="ai-section ai-section-onb${_aiOnbCollapsed ? ' collapsed' : ''}">
+      <button class="ai-section-head" onclick="_aiToggleSection('onb')">
+        <span class="ai-sh-title">🚀 Onboarding</span>
+        <span class="ai-sh-count">${onbDone}/${onb.length} done</span>
+        <span class="ai-sh-chev">▾</span>
+      </button>
+      <div class="ai-onb-bar"><div class="ai-onb-bar-fill" style="width:${pct}%"></div></div>
+      <div class="ai-section-bd"><div class="ai-subway">${onb.map(_aiOnbHTML).join('')}</div></div>
+    </div>`;
   }
+
+  // ── Tasks panel (ad-hoc to-dos) ──
+  if (hasTasks) {
+    let body = open.map(_aiItemHTML).join('');
+    if (done.length) {
+      body += `<div class="ai-group-label" style="margin-top:14px">Done · ${done.length}</div>`;
+      body += done.map(_aiItemHTML).join('');
+    }
+    html += `<div class="ai-section ai-section-tasks${_aiTasksCollapsed ? ' collapsed' : ''}">
+      <button class="ai-section-head" onclick="_aiToggleSection('tasks')">
+        <span class="ai-sh-title">Tasks</span>
+        <span class="ai-sh-count">${open.length} open</span>
+        <span class="ai-sh-chev">▾</span>
+      </button>
+      <div class="ai-section-bd">${body}</div>
+    </div>`;
+  }
+
+  if (!html) {
+    const allDone = onb.length > 0 && onbDone === onb.length;
+    html = `<div class="req-empty" style="padding:28px 0;text-align:center;color:var(--text-mute)">${allDone ? '🎉 Onboarding complete!<br/>Add an action item with the + button.' : 'No action items yet.<br/>Tap the + button to add one.'}</div>`;
+  }
+
   container.innerHTML = html;
 }
 
