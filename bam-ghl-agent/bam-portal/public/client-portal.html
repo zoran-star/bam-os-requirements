@@ -2227,11 +2227,11 @@
   .chat-input-wrap {
     background: var(--surface-el);
     border: 1px solid var(--line);
-    border-radius: 22px;
-    padding: 8px 8px 8px 16px;
+    border-radius: 24px;
+    padding: 6px 6px 6px 10px;
     display: flex;
-    align-items: flex-end;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
     transition: border-color 0.15s ease;
   }
 
@@ -6175,7 +6175,7 @@ Then the call to action."]</div>
         <div class="chat-main" id="messages-main">
           <div class="chat-header" id="messages-header">
             <div>
-              <div class="chat-header-name" id="messages-header-name">Chat with our team</div>
+              <div class="chat-header-name" id="messages-header-name">Chat with the team</div>
             </div>
           </div>
           <div class="chat-messages" id="messages-thread" onscroll="_msgThreadScroll()">
@@ -6194,7 +6194,7 @@ Then the call to action."]</div>
               <label for="messages-file-input" style="cursor:pointer;padding:8px;color:var(--text-mute);display:inline-flex;align-items:center" title="Attach files">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
               </label>
-              <textarea class="chat-input" id="messages-input" rows="1" placeholder="Message BAM team…"
+              <textarea class="chat-input" id="messages-input" rows="1" placeholder="Message the team…"
                 oninput="onMessagesInputChange(event)"
                 onkeydown="onMessagesInputKeyDown(event)"></textarea>
               <div class="chat-send" id="messages-send-btn" onclick="sendCurrentMessage()" title="Send">↑</div>
@@ -8019,7 +8019,7 @@ function setMyAvatarDisplay(url) {
   } else {
     if (initialsEl) {
       initialsEl.style.display = '';
-      initialsEl.textContent = (document.getElementById('userName')?.textContent || '?').trim().slice(0, 2).toUpperCase();
+      initialsEl.textContent = _initials(document.getElementById('userName')?.textContent || '?');
     }
   }
 }
@@ -19001,6 +19001,15 @@ function dayLabel(d) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
 }
 
+// Initials: first letter of the first name + first letter of the last name
+// ("Zoran Savic" → "ZS"); single word falls back to its first two letters.
+function _initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 // Resolve a message's author identity for the group chat. Prefers the API's
 // enriched fields, falls back to the cached directory (covers realtime msgs).
 function _msgAuthor(m) {
@@ -19068,7 +19077,7 @@ function renderMessageThread() {
 
     // Other people get an avatar (photo or initials) on the last of their group
     // + a name label above the first. My own messages show neither.
-    const initials = (auth.name || '?').trim().slice(0, 2).toUpperCase();
+    const initials = _initials(auth.name);
     const avInner = auth.avatar_url
       ? `<img src="${escapeAttr(auth.avatar_url)}" alt="" class="msg-avatar-img">`
       : escapeHTML(initials);
