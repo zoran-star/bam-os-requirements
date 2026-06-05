@@ -5075,6 +5075,15 @@
     <nav class="nav">
       <div class="nav-label">§ Navigate</div>
 
+      <div class="nav-item" onclick="switchView('home', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>
+          </svg>
+        </span>
+        Home
+      </div>
+
       <div class="nav-item" onclick="switchView('messages', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5250,6 +5259,57 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button onclick="openGhlConnectModal()" style="background:var(--gold,#E8C547); color:#0B0B0D; border:none; padding:8px 16px; font-size:13px; font-weight:700; border-radius:4px; cursor:pointer; font-family:inherit;">Connect GHL ↗</button>
         <button onclick="_dismissGhlBanner()" title="Hide for this session" style="background:transparent; color:var(--text-mute); border:1px solid var(--border); padding:8px 12px; font-size:12px; border-radius:4px; cursor:pointer; font-family:inherit;">Hide</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         HOME / DASHBOARD VIEW (MVP)
+    ══════════════════════════════ -->
+    <style>
+      #view-home .home-greeting { font-family: var(--display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-bottom: 4px; }
+      #view-home .home-sub { color: var(--text-mute); font-size: 14px; margin-bottom: 26px; }
+      #view-home .home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      #view-home .home-tile {
+        text-align: left; cursor: pointer; font-family: inherit;
+        background: var(--surface); border: 1px solid var(--border-med);
+        border-radius: 12px; padding: 18px 16px; transition: border-color .15s, transform .1s;
+        display: flex; flex-direction: column; gap: 6px; min-height: 96px;
+      }
+      #view-home .home-tile:hover { border-color: var(--border-str); }
+      #view-home .home-tile:active { transform: scale(0.985); }
+      #view-home .home-tile-top { display: flex; align-items: center; justify-content: space-between; }
+      #view-home .home-tile-ic { font-size: 20px; line-height: 1; }
+      #view-home .home-tile-n { font-family: var(--display); font-size: 30px; font-weight: 600; color: var(--text); line-height: 1; }
+      #view-home .home-tile-n.dim { color: var(--text-mute); }
+      #view-home .home-tile-label { font-size: 13px; color: var(--text-sub); }
+      #view-home .home-tile.alert { border-color: #E8C54766; background: #E8C5470c; }
+      #view-home .home-actions { display: flex; flex-direction: column; gap: 10px; }
+      #view-home .home-action {
+        display: flex; align-items: center; gap: 10px; font-family: inherit; cursor: pointer;
+        background: var(--surface); border: 1px solid var(--border-med); color: var(--text);
+        border-radius: 10px; padding: 15px 16px; font-size: 15px; font-weight: 500; text-align: left;
+      }
+      #view-home .home-action:hover { border-color: var(--border-str); }
+      #view-home .home-action:active { transform: scale(0.99); }
+      #view-home .home-action-ic { font-size: 17px; color: var(--gold, #E8C547); }
+    </style>
+    <div class="view" id="view-home">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Home</span>
+          <div class="topbar-title">Dashboard</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="home-greeting" id="home-greeting">Welcome back</div>
+        <div class="home-sub" id="home-sub">Here's what needs you today.</div>
+        <div class="readout">Needs your attention</div>
+        <div class="home-tiles" id="home-tiles"></div>
+        <div class="readout" style="margin-top:28px">Quick actions</div>
+        <div class="home-actions">
+          <button class="home-action" onclick="homeNewRequest()"><span class="home-action-ic">＋</span> Open a request</button>
+          <button class="home-action" onclick="switchView('messages')"><span class="home-action-ic">💬</span> Message your team</button>
+        </div>
       </div>
     </div>
 
@@ -7463,6 +7523,12 @@ Then the call to action."]</div>
 
   <!-- ── Mobile bottom nav (phones only — replaces the hidden sidebar) ── -->
   <nav class="mobile-nav" id="mobileNav" aria-label="Primary">
+    <button type="button" class="mobile-nav-item" data-view="home" onclick="mobileSwitchView('home')" aria-label="Home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>
+      </svg>
+      <span class="mobile-nav-label">Home</span>
+    </button>
     <button type="button" class="mobile-nav-item" data-view="messages" onclick="mobileSwitchView('messages')" aria-label="Messages">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -7573,6 +7639,8 @@ function switchView(name, el) {
   // Business Blueprint > Staff. Old #view-team gone, no on-enter loader.
 
   // When entering Resources, load + render the library
+  if (name === 'home') openHomeView();
+
   if (name === 'resources') openResourcesView();
 
   // When entering Action Items, load the list
@@ -7592,6 +7660,69 @@ function syncMobileNav(name) {
     b.classList.toggle('active', b.dataset.view === name);
   });
 }
+// ── Home / dashboard (MVP) ──────────────────────────────────────────────
+// Landing screen: a time-of-day greeting + 4 "needs you" tiles that deep-link
+// into the real tabs, plus 2 quick actions. Counts come from data the app
+// already maintains (tickets global, _msgConversations) + one light query
+// for open action items. Renders instantly; numbers fill in as they resolve.
+async function openHomeView() {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const g = document.getElementById('home-greeting');
+  if (g) g.textContent = part;
+  const sub = document.getElementById('home-sub');
+  const acad = (document.getElementById('academyName')?.textContent || '').trim();
+  if (sub) sub.textContent = (acad && acad !== 'Loading…') ? acad : "Here's what needs you today.";
+
+  const counts = {};
+  try {
+    const terminal = new Set(['done', 'approved', 'cancelled']);
+    const open = (typeof tickets !== 'undefined' ? tickets : []).filter(t => !terminal.has(t.rawStatus));
+    counts.tickets = open.length;
+    counts.ticketsAlert = open.some(t => t.rawStatus === 'awaiting_client' || t.rawStatus === 'final_review');
+  } catch (e) {}
+  try {
+    counts.unread = (typeof _msgConversations !== 'undefined' ? _msgConversations : []).filter(c => c.has_unread).length;
+  } catch (e) {}
+  renderHomeTiles(counts);   // first paint with what we have
+
+  try {
+    if (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
+      const { data } = await _sb.from('action_items').select('id')
+        .eq('client_id', CLIENT_ID).is('completed_at', null);
+      counts.actions = (data || []).length;
+      renderHomeTiles(counts);
+    }
+  } catch (e) { /* leave the action-items tile dashed */ }
+}
+
+function renderHomeTiles(c) {
+  c = c || {};
+  const el = document.getElementById('home-tiles');
+  if (!el) return;
+  const tile = (icon, n, label, view, alert) => {
+    const num = (n === undefined || n === null)
+      ? '<span class="home-tile-n dim">—</span>'
+      : `<span class="home-tile-n">${n}</span>`;
+    return `<button class="home-tile ${alert ? 'alert' : ''}" onclick="switchView('${view}')">
+      <div class="home-tile-top"><span class="home-tile-ic">${icon}</span>${num}</div>
+      <div class="home-tile-label">${label}</div>
+    </button>`;
+  };
+  el.innerHTML =
+    tile('🎫', c.tickets, 'Open requests',   'systems',      c.ticketsAlert) +
+    tile('💬', c.unread,  'Unread messages', 'messages',     c.unread > 0) +
+    tile('✅', c.actions, 'Action items',    'action-items', false) +
+    `<button class="home-tile" onclick="switchView('marketing')">
+       <div class="home-tile-top"><span class="home-tile-ic">📣</span><span class="home-tile-n dim">›</span></div>
+       <div class="home-tile-label">Marketing</div>
+     </button>`;
+}
+
+function homeNewRequest() {
+  switchView('systems');   // lands on the "open a new request" screen
+}
+
 function mobileSwitchView(name) {
   if (name === 'marketing' && typeof MARKETING_INCLUDED !== 'undefined' && !MARKETING_INCLUDED) return;
   // Route through switchView via the matching sidebar item so every
@@ -18955,6 +19086,10 @@ async function boot() {
   // flag became v2_access and lost its onboarding-state meaning.)
   if (!clientRow?.onboarding_completed_at) {
     setTimeout(() => startOnboardingTour(), 600);
+  } else if (!location.hash) {
+    // Returning user (tour already done) → land on the Home dashboard.
+    // Skip when a deep link (e.g. #resource=…) already targets another view.
+    switchView('home');
   }
 
   // Strip any leftover ?meta=connected / ?meta=error query params if a
