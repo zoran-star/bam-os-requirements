@@ -7653,7 +7653,9 @@ function hapticTap(style) {
     if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
     var H = Cap.Plugins && Cap.Plugins.Haptics;
     if (!H || !H.impact) return;
-    H.impact({ style: style || 'Light' });
+    // ImpactStyle is an UPPERCASE enum ('LIGHT'|'MEDIUM'|'HEAVY') — 'Light'
+    // silently no-ops on the native side. Normalise + default to MEDIUM.
+    H.impact({ style: String(style || 'MEDIUM').toUpperCase() });
   } catch (e) { /* haptics are a nicety — never throw */ }
 }
 
@@ -19687,9 +19689,10 @@ function toggleTheme() {
   // client drags down from the very top past a threshold, reload the WebView.
   // Skipped on the Messages/chat view (it has its own scroll regions).
   function initPullToRefresh() {
-    var THRESHOLD = 72;       // px pulled before a release triggers refresh
-    var MAX = 110;            // visual cap on the indicator height
-    var ind, startY = 0, pulling = false, dist = 0;
+    var DEAD_ZONE = 28;       // ignore small drags — nothing happens below this
+    var TRIGGER = 150;        // px of ACTUAL finger travel needed to refresh (deliberate full pull)
+    var MAX = 96;             // visual cap on the indicator height
+    var ind, startY = 0, pulling = false, armed = false;
 
     function scroller() { return document.querySelector('.main'); }
     function onChat() { return !!document.querySelector('#view-messages.active'); }
@@ -19708,38 +19711,43 @@ function toggleTheme() {
       if (!sc || onChat()) return;
       if (sc.scrollTop > 0) return;                 // only from the very top
       startY = e.touches[0].clientY;
-      pulling = true; dist = 0;
+      pulling = true; armed = false;
     }, { passive: true });
 
     document.addEventListener('touchmove', function (e) {
       if (!pulling) return;
       var sc = scroller();
       if (!sc || sc.scrollTop > 0) { reset(); return; }
-      dist = e.touches[0].clientY - startY;
-      if (dist <= 0) { reset(); return; }
-      var h = Math.min(dist * 0.5, MAX);
+      var dist = e.touches[0].clientY - startY;
+      if (dist <= DEAD_ZONE) {                       // below the dead zone: don't engage at all
+        if (ind) ind.style.height = '0px';
+        return;
+      }
+      // Resistance: indicator grows slower than the finger, so it FEELS like a
+      // deliberate pull. `armed` flips only once real finger travel hits TRIGGER.
+      var pulled = dist - DEAD_ZONE;
+      var h = Math.min(pulled * 0.45, MAX);
+      armed = dist >= TRIGGER;
       var el = ensureIndicator();
       el.style.height = h + 'px';
-      el.querySelector('.ptr-label').textContent =
-        h >= THRESHOLD ? 'Release to refresh' : 'Pull to refresh';
+      el.querySelector('.ptr-label').textContent = armed ? 'Release to refresh' : 'Pull to refresh';
     }, { passive: true });
 
     document.addEventListener('touchend', function () {
       if (!pulling) return;
-      var el = ind;
-      if (el && parseFloat(el.style.height) >= THRESHOLD) {
-        el.classList.add('ptr-refreshing');
-        el.querySelector('.ptr-label').textContent = 'Refreshing…';
-        el.style.height = '44px';
+      if (armed && ind) {                            // require the full deliberate pull
+        ind.classList.add('ptr-refreshing');
+        ind.querySelector('.ptr-label').textContent = 'Refreshing…';
+        ind.style.height = '44px';
         setTimeout(function () { location.reload(); }, 180);
-        pulling = false;
+        pulling = false; armed = false;
         return;
       }
       reset();
     });
 
     function reset() {
-      pulling = false; dist = 0;
+      pulling = false; armed = false;
       if (ind) { ind.style.height = '0px'; ind.classList.remove('ptr-refreshing'); }
     }
   }
