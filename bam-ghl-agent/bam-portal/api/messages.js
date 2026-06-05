@@ -261,7 +261,44 @@ export default async function handler(req, res) {
       );
       // Reverse so UI gets oldest→newest in the page
       const messages = (rows || []).reverse();
-      return res.status(200).json({ messages });
+
+      // ── Group-chat identities: resolve each message's author (name + avatar).
+      // Build directories the client also caches to enrich realtime messages.
+      // Resilient: avatar_url may not exist yet (migration runs separately) —
+      // fall back to name-only so the chat never breaks during the gap.
+      const sbTry = async (withCol, withoutCol) => {
+        try { return await sb(withCol); } catch { return await sb(withoutCol); }
+      };
+      const staffDir = {};
+      const allStaffRows = await sbTry(`staff?select=id,name,avatar_url`, `staff?select=id,name`);
+      (allStaffRows || []).forEach(s => {
+        staffDir[s.id] = { name: s.name || "BAM team", avatar_url: s.avatar_url || null };
+      });
+      const userDir = {};
+      const cuRows = await sbTry(
+        `client_users?client_id=eq.${conversation.client_id}&select=user_id,name,avatar_url`,
+        `client_users?client_id=eq.${conversation.client_id}&select=user_id,name`
+      );
+      (cuRows || []).forEach(u => {
+        if (u.user_id) userDir[u.user_id] = { name: u.name || "Teammate", avatar_url: u.avatar_url || null };
+      });
+      messages.forEach(m => {
+        if (m.author_staff_id && staffDir[m.author_staff_id]) {
+          m.author_name = staffDir[m.author_staff_id].name;
+          m.author_avatar_url = staffDir[m.author_staff_id].avatar_url;
+          m.author_kind = "staff";
+        } else if (m.author_auth_user_id && userDir[m.author_auth_user_id]) {
+          m.author_name = userDir[m.author_auth_user_id].name;
+          m.author_avatar_url = userDir[m.author_auth_user_id].avatar_url;
+          m.author_kind = "client";
+        } else {
+          m.author_name = m.author_staff_id ? "BAM team" : "Someone";
+          m.author_avatar_url = null;
+          m.author_kind = m.author_staff_id ? "staff" : "client";
+        }
+      });
+
+      return res.status(200).json({ messages, directory: { staff: staffDir, users: userDir } });
     }
 
     if (req.method !== "POST") {

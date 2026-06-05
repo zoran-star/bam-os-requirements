@@ -2151,6 +2151,16 @@
   }
 
   .msg-avatar.bam { background: var(--accent-ghost); color: var(--accent); }
+  .msg-avatar { overflow: hidden; }
+  .msg-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* Group-chat sender name above the first bubble of someone else's run. */
+  .msg-sender {
+    font-size: 12px; font-weight: 600; color: var(--text-mute);
+    margin: 12px 0 3px 36px; letter-spacing: 0.01em;
+  }
+  /* the row right under a sender label keeps the label's spacing, not its own */
+  .msg-sender + .msg-row.grp-first { margin-top: 0 !important; }
 
   .msg-bubble {
     max-width: 74%;
@@ -18777,6 +18787,8 @@ async function _markOnboardingComplete() {
 let _msgConversations = [];        // all convos the user can see
 let _msgActiveConvoId = null;      // currently open thread
 let _msgMessages = [];             // messages for active thread
+let _msgDirectory = { staff: {}, users: {} };  // id → {name, avatar_url} for group-chat identities
+let _myAuthUserId = null;          // current user's auth id (to mark "my" messages)
 let _msgChannel = null;            // supabase realtime channel
 let _msgPendingFiles = [];         // [{file, attachment?, uploading, error}]
 let _msgTypingTimeout = null;
@@ -18876,6 +18888,8 @@ async function openMessageConvo(conversationId) {
   try {
     const json = await _msgApi('/api/messages?conversation_id=' + encodeURIComponent(conversationId) + '&limit=100');
     _msgMessages = json.messages || [];
+    if (json.directory) _msgDirectory = json.directory;
+    if (!_myAuthUserId) { try { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; } catch (e) {} }
     renderMessageThread();
     subscribeMessagesRealtime(conversationId);
     // Mark read
@@ -18906,6 +18920,21 @@ function dayLabel(d) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
 }
 
+// Resolve a message's author identity for the group chat. Prefers the API's
+// enriched fields, falls back to the cached directory (covers realtime msgs).
+function _msgAuthor(m) {
+  if (m.author_name) return { name: m.author_name, avatar_url: m.author_avatar_url || null, kind: m.author_kind || (m.author_staff_id ? 'staff' : 'client') };
+  if (m.author_staff_id && _msgDirectory.staff[m.author_staff_id]) {
+    const s = _msgDirectory.staff[m.author_staff_id];
+    return { name: s.name, avatar_url: s.avatar_url, kind: 'staff' };
+  }
+  if (m.author_auth_user_id && _msgDirectory.users[m.author_auth_user_id]) {
+    const u = _msgDirectory.users[m.author_auth_user_id];
+    return { name: u.name, avatar_url: u.avatar_url, kind: 'client' };
+  }
+  return { name: m.author_staff_id ? 'BAM team' : 'Someone', avatar_url: null, kind: m.author_staff_id ? 'staff' : 'client' };
+}
+
 function renderMessageThread() {
   const root = document.getElementById('messages-thread');
   if (!root) return;
@@ -18918,8 +18947,8 @@ function renderMessageThread() {
     return;
   }
 
-  const myInitials = (document.getElementById('userName')?.textContent || '?').slice(0, 2).toUpperCase();
-  const sameSide = (a, b) => (!!a.author_staff_id) === (!!b.author_staff_id);
+  const authorKey = (m) => m.author_staff_id ? ('s:' + m.author_staff_id) : ('u:' + (m.author_auth_user_id || ''));
+  const sameAuthor = (a, b) => authorKey(a) === authorKey(b);
   const within5 = (a, b) => Math.abs(new Date(a.created_at) - new Date(b.created_at)) < 5 * 60 * 1000;
   const sameDay = (a, b) => new Date(a.created_at).toDateString() === new Date(b.created_at).toDateString();
 
@@ -18932,11 +18961,13 @@ function renderMessageThread() {
     if (day !== prevDay) { html += `<div class="chat-date-divider">${escapeHTML(dayLabel(d))}</div>`; prevDay = day; }
 
     const prev = _msgMessages[i - 1], next = _msgMessages[i + 1];
-    const fromStaff = !!m.author_staff_id;
-    const isMine = !fromStaff;
-    // #1 grouping — a group breaks on different sender / >5min gap / new day.
-    const samePrev = prev && sameSide(prev, m) && within5(prev, m) && sameDay(prev, m);
-    const sameNext = next && sameSide(next, m) && within5(next, m) && sameDay(next, m);
+    const auth = _msgAuthor(m);
+    // Group-chat: "mine" = posted by the logged-in user; everyone else is an
+    // identified sender (staff or teammate) with their own name + avatar.
+    const isMine = _myAuthUserId ? (m.author_auth_user_id === _myAuthUserId) : !m.author_staff_id;
+    // Grouping breaks on a different AUTHOR / >5min gap / new day.
+    const samePrev = prev && sameAuthor(prev, m) && within5(prev, m) && sameDay(prev, m);
+    const sameNext = next && sameAuthor(next, m) && within5(next, m) && sameDay(next, m);
     const isFirst = !samePrev, isLast = !sameNext;
 
     const ageMs = Date.now() - d.getTime();
@@ -18954,16 +18985,20 @@ function renderMessageThread() {
         : `<a href="${safeUrl}" target="_blank" rel="noreferrer" class="msg-file-chip">📎 ${safeName}</a>`;
     }).join('') + '</div>';
 
-    // Avatar only for incoming (staff) messages, on the last of a group —
-    // iMessage-style: your own messages don't show your avatar.
-    const avatar = fromStaff
-      ? (isLast ? `<div class="msg-avatar bam">BA</div>` : '<div class="msg-avatar-spacer"></div>')
-      : '';
+    // Other people get an avatar (photo or initials) on the last of their group
+    // + a name label above the first. My own messages show neither.
+    const initials = (auth.name || '?').trim().slice(0, 2).toUpperCase();
+    const avInner = auth.avatar_url
+      ? `<img src="${escapeAttr(auth.avatar_url)}" alt="" class="msg-avatar-img">`
+      : escapeHTML(initials);
+    const avatar = isMine ? ''
+      : (isLast ? `<div class="msg-avatar${auth.kind === 'staff' ? ' bam' : ''}">${avInner}</div>` : '<div class="msg-avatar-spacer"></div>');
+    const nameLabel = (!isMine && isFirst) ? `<div class="msg-sender">${escapeHTML(auth.name)}</div>` : '';
     // Timestamp only on the last message of a group.
     const time = isLast
       ? `<div class="msg-time">${m._optimistic ? 'Sending…' : (m._failed ? 'Failed' : msgShortTime(m.created_at))}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>`
       : '';
-    html += `<div class="msg-row${isMine ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}" data-mid="${escapeAttr(m.id)}">${avatar}<div class="msg-bubble">${body}${filesHtml}</div>${time}</div>`;
+    html += nameLabel + `<div class="msg-row${isMine ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}" data-mid="${escapeAttr(m.id)}">${avatar}<div class="msg-bubble">${body}${filesHtml}</div>${time}</div>`;
   }
 
   // Typing indicator (animated dots)
