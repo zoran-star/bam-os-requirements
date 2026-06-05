@@ -5278,20 +5278,24 @@
       #view-home .home-tile:hover { border-color: var(--border-str); }
       #view-home .home-tile:active { transform: scale(0.985); }
       #view-home .home-tile-top { display: flex; align-items: center; justify-content: space-between; }
-      #view-home .home-tile-ic { font-size: 20px; line-height: 1; }
+      #view-home .home-tile-ic { color: var(--text-mute); display: flex; }
+      #view-home .home-tile-ic svg { width: 20px; height: 20px; display: block; }
+      #view-home .home-tile.alert .home-tile-ic { color: var(--gold, #E8C547); }
       #view-home .home-tile-n { font-family: var(--display); font-size: 30px; font-weight: 600; color: var(--text); line-height: 1; }
       #view-home .home-tile-n.dim { color: var(--text-mute); }
       #view-home .home-tile-label { font-size: 13px; color: var(--text-sub); }
       #view-home .home-tile.alert { border-color: #E8C54766; background: #E8C5470c; }
+      #view-home .home-tile.span2 { grid-column: 1 / -1; }
       #view-home .home-actions { display: flex; flex-direction: column; gap: 10px; }
       #view-home .home-action {
-        display: flex; align-items: center; gap: 10px; font-family: inherit; cursor: pointer;
+        display: flex; align-items: center; gap: 12px; font-family: inherit; cursor: pointer;
         background: var(--surface); border: 1px solid var(--border-med); color: var(--text);
         border-radius: 10px; padding: 15px 16px; font-size: 15px; font-weight: 500; text-align: left;
       }
       #view-home .home-action:hover { border-color: var(--border-str); }
       #view-home .home-action:active { transform: scale(0.99); }
-      #view-home .home-action-ic { font-size: 17px; color: var(--gold, #E8C547); }
+      #view-home .home-action-ic { color: var(--gold, #E8C547); display: flex; }
+      #view-home .home-action-ic svg { width: 18px; height: 18px; display: block; }
     </style>
     <div class="view" id="view-home">
       <div class="topbar">
@@ -5307,8 +5311,18 @@
         <div class="home-tiles" id="home-tiles"></div>
         <div class="readout" style="margin-top:28px">Quick actions</div>
         <div class="home-actions">
-          <button class="home-action" onclick="homeNewRequest()"><span class="home-action-ic">＋</span> Open a request</button>
-          <button class="home-action" onclick="switchView('messages')"><span class="home-action-ic">💬</span> Message your team</button>
+          <button class="home-action" onclick="homeNewRequest()">
+            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+            Open a request
+          </button>
+          <button class="home-action" onclick="switchView('messages')">
+            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+            Message your team
+          </button>
+          <button class="home-action" id="home-action-marketing" onclick="switchView('marketing')">
+            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
+            View marketing
+          </button>
         </div>
       </div>
     </div>
@@ -7700,23 +7714,25 @@ function renderHomeTiles(c) {
   c = c || {};
   const el = document.getElementById('home-tiles');
   if (!el) return;
-  const tile = (icon, n, label, view, alert) => {
+  // Inline line-icons (no emoji) — stroke matches the nav set.
+  const IC = {
+    requests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
+    messages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+    actions:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  };
+  const tile = (icon, n, label, view, alert, span) => {
     const num = (n === undefined || n === null)
       ? '<span class="home-tile-n dim">—</span>'
       : `<span class="home-tile-n">${n}</span>`;
-    return `<button class="home-tile ${alert ? 'alert' : ''}" onclick="switchView('${view}')">
+    return `<button class="home-tile ${alert ? 'alert' : ''} ${span ? 'span2' : ''}" onclick="switchView('${view}')">
       <div class="home-tile-top"><span class="home-tile-ic">${icon}</span>${num}</div>
       <div class="home-tile-label">${label}</div>
     </button>`;
   };
   el.innerHTML =
-    tile('🎫', c.tickets, 'Open requests',   'systems',      c.ticketsAlert) +
-    tile('💬', c.unread,  'Unread messages', 'messages',     c.unread > 0) +
-    tile('✅', c.actions, 'Action items',    'action-items', false) +
-    `<button class="home-tile" onclick="switchView('marketing')">
-       <div class="home-tile-top"><span class="home-tile-ic">📣</span><span class="home-tile-n dim">›</span></div>
-       <div class="home-tile-label">Marketing</div>
-     </button>`;
+    tile(IC.requests, c.tickets, 'Open requests',   'systems',      c.ticketsAlert, false) +
+    tile(IC.messages, c.unread,  'Unread messages', 'messages',     c.unread > 0,   false) +
+    tile(IC.actions,  c.actions, 'Action items',    'action-items', false,          true);
 }
 
 function homeNewRequest() {
