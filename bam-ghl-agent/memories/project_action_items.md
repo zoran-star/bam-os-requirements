@@ -4,6 +4,31 @@ Shipped 2026-06-01. A shared per-client to-do list. Same rows shown on both
 sides: the academy team in the client portal and BAM staff on the client's
 staff-portal page. Any field on any row is editable by anyone who can see it.
 
+> ## 📍 ONBOARDING STATE — read first (2026-06-05)
+>
+> **The client onboarding flow IS the Action Items "Onboarding" checklist — 17 fixed steps** (table below). Everything ships to `main` (auto-deploys to portal.byanymeansbusiness.com). Full end-to-end flow:
+>
+> ```
+> New client → first login → 2-step welcome points to ACTION ITEMS
+>   → work the 17-step Onboarding checklist (rendered as a SUBWAY MAP:
+>     circles + connecting line, in a collapsible gold "🚀 Onboarding" card
+>     that DISAPPEARS once all steps are done)
+>   → 3 booking steps resolve dynamic links: SM (per-client scaling_manager),
+>     Cam (marketing_manager ✅ link set), Ximena (marketing_executor ⏳ link pending)
+>   → staff-only steps (hidden from clients): trigger_buildout (creates the
+>     systems ticket, due +7d) + ready_for_review (gate that UNLOCKS the
+>     client's "Book review call" step)
+>   → systems ticket has 📋 Copy-for-Claude + per-field "mark incorrect" + Send-corrections
+> ```
+>
+> **Key code:** steps = `ONBOARDING_STEPS` in `api/action-items.js`; client UI = `ONB_UI` + `_aiOnbHTML` + `_renderActionItems` (subway + collapsible panels) in `client-portal.html`; staff = `onbRow` + `_AI_ONB_NOTES` in `ClientsCombinedView.jsx`. Booking links = `staff.booking_url` (data-driven). Systems ticket builder = `createSystemsOnboardingTicket()` (the old auto DB trigger was dropped).
+>
+> **⏳ OPEN ITEMS / next session:**
+> 1. **Ximena's booking link** — set `staff.booking_url` for the marketing_executor (id `24109bce-…`) when Zoran sends it (step 17 shows Slack fallback until then).
+> 2. **SM scheduling page** — decided GHL calendar (it 2-way-syncs Google) over custom Google build. Pending: confirm SMs have GHL users w/ Google connected + a BAM GHL location; then build a live free-slots booking page. (Currently we just deep-link to each SM's `booking_url`.)
+> 3. **New build-team onboarding fields** — convo never finished: whether to collect goals / current tools / hours / lead sources / A2P-SMS for the systems team.
+> 4. **A2P/SMS compliance block** in General — deferred.
+
 ## Where it lives
 
 | Surface | Location |
@@ -98,7 +123,8 @@ GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-0
   Note: `general_info` keys ONLY off `general_marked_done_at` (the explicit "I'm done with
   General" click), NOT the tracker's auto-derive (name+owner+email) — so it can read
   not-done even when the BB tracker shows general_done.
-- Onboarding rows **can't be deleted** (API guard); `sort_order` 1–9.
+- Onboarding rows **can't be deleted** (API guard); `sort_order` 1–17 (see the steps table above for the live order).
+- **UI (2026-06-05):** the Onboarding group renders as a **subway map** (`.ai-subway` / `.ai-stop` — circle nodes + connecting line that fills gold as steps complete) inside a **collapsible gold "🚀 Onboarding" card** (`.ai-section-onb` + `_aiToggleSection`) that **hides entirely once all steps are done**. Ad-hoc to-dos are a separate collapsible "Tasks" panel.
 - Migrations: `action_items_onboarding_key`, `action_items_onboarding_overridden`,
   `clients_timezone_kpis` (+ time_zone, kpi_data, kpi_marked_done_at; extended
   update_client_basics + mark_onboarding_section), `onboarding_progress_kpis`.
