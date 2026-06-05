@@ -1,0 +1,66 @@
+name: Portal CI
+
+# The "robot inspector" for the BAM portal. Runs automatically on every PR that
+# touches the portal and shows a ✅/❌ on the PR. It is NOT a required check yet —
+# it's advisory while Zoran watches it work. To make it block merges later, turn on
+# "Require status checks to pass" for `main` in GitHub branch protection and select
+# the "Build + checks" job. See bam-ghl-agent/docs/portal-engineering-guide.md.
+
+on:
+  pull_request:
+    paths:
+      - "bam-ghl-agent/bam-portal/**"
+      - ".github/workflows/portal-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "bam-ghl-agent/bam-portal/**"
+      - ".github/workflows/portal-ci.yml"
+
+# Cancel an in-progress run if the same PR/branch gets a new push.
+concurrency:
+  group: portal-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Build + checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bam-ghl-agent/bam-portal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: bam-ghl-agent/bam-portal/package-lock.json
+
+      - name: Install dependencies (clean, from lockfile)
+        run: npm ci
+
+      - name: Build the staff portal
+        run: npm run build
+
+      - name: Syntax-check every API function
+        run: |
+          fail=0
+          for f in $(find api -name '*.js'); do
+            if ! node --check "$f"; then
+              echo "::error file=bam-ghl-agent/bam-portal/$f::JavaScript syntax error"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "One or more API functions have a syntax error."
+            exit 1
+          fi
+          echo "All API functions parse OK."
+
+      - name: Verify client-portal onboarding tour targets
+        working-directory: bam-ghl-agent
+        run: node bam-portal/scripts/verify-client-portal-ui.mjs
