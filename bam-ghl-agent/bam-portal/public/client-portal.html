@@ -2153,21 +2153,31 @@
   .msg-avatar.bam { background: var(--accent-ghost); color: var(--accent); }
 
   .msg-bubble {
-    max-width: 65%;
-    padding: 12px 16px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    line-height: 1.55;
+    max-width: 74%;
+    padding: 9px 14px;
+    border-radius: 19px;
+    font-size: 14.5px;
+    line-height: 1.42;
     color: var(--text);
     background: var(--surface-el);
-    border: 1px solid var(--line);
+    border: none;
+    word-break: break-word;
   }
 
+  /* Outgoing = filled gold "you" bubble (iMessage-style), dark text. */
   .msg-row.outgoing .msg-bubble {
-    background: transparent;
-    border: 1px solid var(--gold);
-    color: var(--text);
+    background: var(--gold, #E8C547);
+    color: #16140F;
+    border: none;
   }
+  .msg-row.outgoing .msg-bubble a { color: #16140F; }
+
+  /* Connected-group corners: flatten the side that touches the next bubble in
+     a group so a run of messages reads as one stack. */
+  .msg-row.outgoing:not(.grp-first) .msg-bubble { border-top-right-radius: 6px; }
+  .msg-row.outgoing:not(.grp-last)  .msg-bubble { border-bottom-right-radius: 6px; }
+  .msg-row:not(.outgoing):not(.grp-first) .msg-bubble { border-top-left-radius: 6px; }
+  .msg-row:not(.outgoing):not(.grp-last)  .msg-bubble { border-bottom-left-radius: 6px; }
 
   .msg-time {
     font-size: 11px;
