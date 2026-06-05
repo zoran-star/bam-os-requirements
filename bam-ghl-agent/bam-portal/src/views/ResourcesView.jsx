@@ -273,6 +273,9 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
   const [existingFiles, setExistingFiles] = useState(resource?.resource_files || []);
   const [newFiles, setNewFiles]       = useState([]);   // File[] from input
   const [removeFileIds, setRemoveFileIds] = useState([]);
+  const [contentBlocks, setContentBlocks] = useState(
+    Array.isArray(resource?.content_blocks) ? resource.content_blocks : []
+  );
   const [saving, setSaving]           = useState(false);
   const [progress, setProgress]       = useState("");
   const [err, setErr]                 = useState(null);
@@ -304,7 +307,9 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
 
     if (!title.trim()) return setErr("Title is required.");
     if (!categoryId)   return setErr("Pick a category.");
-    if (!isEdit && newFiles.length === 0) return setErr("Add at least one file.");
+    if (!isEdit && newFiles.length === 0 && contentBlocks.length === 0) {
+      return setErr("Add some content blocks or a file.");
+    }
 
     setSaving(true);
     try {
@@ -315,6 +320,7 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
           title: title.trim(),
           description: description.trim() || null,
           category_id: categoryId,
+          content_blocks: contentBlocks,
         }).eq("id", resourceId);
         if (error) throw error;
       } else {
@@ -322,6 +328,7 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
           title: title.trim(),
           description: description.trim() || null,
           category_id: categoryId,
+          content_blocks: contentBlocks,
           created_by: me?.id || null,
         }).select().single();
         if (error) throw error;
@@ -409,7 +416,11 @@ function ResourceFormModal({ tokens: tk, resource, categories, me, onClose, onSa
         />
       </Field>
 
-      <Field label={`Files (${existingFiles.length + newFiles.length})`}>
+      <Field label="Content">
+        <BlockEditor tk={tk} blocks={contentBlocks} setBlocks={setContentBlocks} disabled={saving} />
+      </Field>
+
+      <Field label={`Attachments (${existingFiles.length + newFiles.length})`}>
         <div style={{
           border: `1px dashed ${tk.borderStr}`, borderRadius: 8, padding: 14,
           background: tk.surfaceAlt,
@@ -666,6 +677,155 @@ function btnIcon(tk) {
     background: "transparent", border: `1px solid ${tk.border}`,
     color: tk.textSub, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Content block editor — authors the interactive resource page.
+// Block shapes match the client renderer in client-portal.html
+// (_renderResourceBlock). Stored on resources.content_blocks (jsonb).
+// ─────────────────────────────────────────────────────────────────────
+const BLOCK_TYPES = [
+  { type: "heading",   label: "Heading" },
+  { type: "text",      label: "Text" },
+  { type: "callout",   label: "Callout" },
+  { type: "checklist", label: "Checklist" },
+  { type: "accordion", label: "Accordion" },
+  { type: "image",     label: "Image" },
+  { type: "video",     label: "Video" },
+  { type: "divider",   label: "Divider" },
+];
+
+function blockDefault(type) {
+  switch (type) {
+    case "callout":   return { type, variant: "tip", text: "" };
+    case "checklist": return { type, title: "", items: [] };
+    case "accordion": return { type, title: "", text: "" };
+    case "image":     return { type, url: "", caption: "" };
+    case "video":     return { type, url: "", caption: "" };
+    case "divider":   return { type };
+    default:          return { type, text: "" }; // heading, text
+  }
+}
+
+function BlockEditor({ tk, blocks, setBlocks, disabled }) {
+  const add    = (type) => setBlocks([...blocks, blockDefault(type)]);
+  const update = (i, patch) => setBlocks(blocks.map((b, j) => (j === i ? { ...b, ...patch } : b)));
+  const remove = (i) => setBlocks(blocks.filter((_, j) => j !== i));
+  const move   = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= blocks.length) return;
+    const copy = blocks.slice();
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+    setBlocks(copy);
+  };
+  return (
+    <div style={{ border: `1px dashed ${tk.borderStr}`, borderRadius: 8, padding: 12, background: tk.surfaceAlt }}>
+      {blocks.length === 0 && (
+        <div style={{ color: tk.textMute, fontSize: 13, marginBottom: 10 }}>
+          No content yet — add blocks to build a branded, interactive page.
+        </div>
+      )}
+      {blocks.map((b, i) => (
+        <BlockCard key={i} tk={tk} block={b} idx={i} total={blocks.length} disabled={disabled}
+          onUpdate={(patch) => update(i, patch)} onRemove={() => remove(i)} onMove={(d) => move(i, d)} />
+      ))}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: blocks.length ? 12 : 0 }}>
+        {BLOCK_TYPES.map((t) => (
+          <button key={t.type} type="button" onClick={() => add(t.type)} disabled={disabled} style={btnIcon(tk)}>
+            + {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlockCard({ tk, block: b, idx, total, disabled, onUpdate, onRemove, onMove }) {
+  const ti = inputStyle(tk);
+  const ta = { ...inputStyle(tk), resize: "vertical", fontFamily: "inherit", minHeight: 64 };
+  return (
+    <div style={{ border: `1px solid ${tk.borderMed}`, borderRadius: 8, padding: 12, marginBottom: 8, background: tk.surface }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: tk.textMute, flex: 1 }}>{b.type}</span>
+        <button type="button" onClick={() => onMove(-1)} disabled={disabled || idx === 0} style={btnIcon(tk)}>↑</button>
+        <button type="button" onClick={() => onMove(1)} disabled={disabled || idx === total - 1} style={btnIcon(tk)}>↓</button>
+        <button type="button" onClick={onRemove} disabled={disabled} style={btnIconDanger(tk)}>Remove</button>
+      </div>
+      {b.type === "heading" && (
+        <input style={ti} placeholder="Heading text" value={b.text || ""} onChange={(e) => onUpdate({ text: e.target.value })} disabled={disabled} />
+      )}
+      {b.type === "text" && (
+        <textarea style={ta} placeholder="Text — **bold**, *italic*, [link](url), and lines starting with '- ' become bullets." value={b.text || ""} onChange={(e) => onUpdate({ text: e.target.value })} disabled={disabled} />
+      )}
+      {b.type === "callout" && (
+        <>
+          <select style={{ ...ti, marginBottom: 8 }} value={b.variant || "tip"} onChange={(e) => onUpdate({ variant: e.target.value })} disabled={disabled}>
+            <option value="tip">Tip 💡</option>
+            <option value="warn">Warning ⚠️</option>
+            <option value="info">Info ℹ️</option>
+          </select>
+          <textarea style={ta} placeholder="Callout text" value={b.text || ""} onChange={(e) => onUpdate({ text: e.target.value })} disabled={disabled} />
+        </>
+      )}
+      {b.type === "checklist" && (
+        <>
+          <input style={{ ...ti, marginBottom: 8 }} placeholder="Checklist title (optional)" value={b.title || ""} onChange={(e) => onUpdate({ title: e.target.value })} disabled={disabled} />
+          <textarea style={ta} placeholder="One item per line" value={(b.items || []).join("\n")} onChange={(e) => onUpdate({ items: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })} disabled={disabled} />
+        </>
+      )}
+      {b.type === "accordion" && (
+        <>
+          <input style={{ ...ti, marginBottom: 8 }} placeholder="Section title (the part you tap)" value={b.title || ""} onChange={(e) => onUpdate({ title: e.target.value })} disabled={disabled} />
+          <textarea style={ta} placeholder="Hidden content — **bold**, *italic*, - bullets" value={b.text || ""} onChange={(e) => onUpdate({ text: e.target.value })} disabled={disabled} />
+        </>
+      )}
+      {b.type === "image" && (
+        <>
+          <input style={{ ...ti, marginBottom: 8 }} placeholder="Image URL" value={b.url || ""} onChange={(e) => onUpdate({ url: e.target.value })} disabled={disabled} />
+          <BlockImageUpload tk={tk} disabled={disabled} onUploaded={(url) => onUpdate({ url })} />
+          <input style={{ ...ti, marginTop: 8 }} placeholder="Caption (optional)" value={b.caption || ""} onChange={(e) => onUpdate({ caption: e.target.value })} disabled={disabled} />
+        </>
+      )}
+      {b.type === "video" && (
+        <>
+          <input style={{ ...ti, marginBottom: 8 }} placeholder="Video URL (mp4, YouTube, or Vimeo)" value={b.url || ""} onChange={(e) => onUpdate({ url: e.target.value })} disabled={disabled} />
+          <input style={ti} placeholder="Caption (optional)" value={b.caption || ""} onChange={(e) => onUpdate({ caption: e.target.value })} disabled={disabled} />
+        </>
+      )}
+      {b.type === "divider" && (
+        <div style={{ color: tk.textMute, fontSize: 12 }}>A horizontal divider line.</div>
+      )}
+    </div>
+  );
+}
+
+function BlockImageUpload({ tk, disabled, onUploaded }) {
+  const [busy, setBusy] = useState(false);
+  const pick = async (e) => {
+    const file = (e.target.files || [])[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+      const path = `_blocks/${Date.now()}-${slugify(file.name.replace(ext, ""))}${ext}`;
+      const { error } = await supabase.storage.from(STORAGE_BUCKET)
+        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+      if (error) throw error;
+      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+      onUploaded(data.publicUrl);
+    } catch (err) {
+      alert("Image upload failed: " + (err.message || err));
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+  return (
+    <label style={{ display: "inline-block", padding: "7px 12px", background: tk.surface, border: `1px solid ${tk.borderMed}`, borderRadius: 6, cursor: disabled ? "not-allowed" : "pointer", fontSize: 12, color: tk.text }}>
+      {busy ? "Uploading…" : "Or upload an image"}
+      <input type="file" accept="image/*" onChange={pick} style={{ display: "none" }} disabled={disabled || busy} />
+    </label>
+  );
 }
 
 function btnIconDanger(tk) {

@@ -6623,8 +6623,77 @@ Then the call to action."]</div>
       }
       #view-resources .res-viewer iframe { height:70vh; border:0; }
       #view-resources .res-viewer video { max-height:70vh; background:#000; }
+
+      /* ── Content blocks (interactive authored display) ── */
+      #view-resources .rb { margin: 0 0 18px; }
+      #view-resources .rb-heading {
+        font-family: var(--display); font-size: 19px; font-weight: 600;
+        color: var(--text); margin: 26px 0 10px; letter-spacing: -0.01em;
+      }
+      #view-resources .rb-text {
+        font-size: 15px; line-height: 1.7; color: var(--text-sub);
+      }
+      #view-resources .rb-text strong { color: var(--text); font-weight: 600; }
+      #view-resources .rb-text a { color: var(--accent); text-decoration: underline; }
+      #view-resources .rb-text ul { margin: 8px 0; padding-left: 20px; }
+      #view-resources .rb-text li { margin: 4px 0; }
+      #view-resources .rb-callout {
+        display: flex; gap: 12px; padding: 14px 16px; border-radius: 10px;
+        font-size: 14px; line-height: 1.6; color: var(--text);
+        border: 1px solid var(--border-med); background: var(--surface);
+      }
+      #view-resources .rb-callout .rb-ic { font-size: 18px; line-height: 1.4; flex-shrink: 0; }
+      #view-resources .rb-callout.tip  { border-color: #E8C54755; background: #E8C5470f; }
+      #view-resources .rb-callout.warn { border-color: #E2683f55; background: #E2683f0f; }
+      #view-resources .rb-callout.info { border-color: var(--border-str); }
+      #view-resources .rb-checklist {
+        border: 1px solid var(--border-med); border-radius: 10px;
+        background: var(--surface); padding: 14px 16px;
+      }
+      #view-resources .rb-checklist-title {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--text-mute); margin-bottom: 10px;
+      }
+      #view-resources .rb-check {
+        display: flex; align-items: flex-start; gap: 10px; padding: 7px 0;
+        cursor: pointer; font-size: 14px; color: var(--text-sub); line-height: 1.5;
+      }
+      #view-resources .rb-check .rb-box {
+        width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; margin-top: 1px;
+        border: 1.5px solid var(--border-str); display: flex; align-items: center;
+        justify-content: center; color: #16140F; font-size: 12px; transition: all .15s;
+      }
+      #view-resources .rb-check.done .rb-box { background: var(--accent); border-color: var(--accent); }
+      #view-resources .rb-check.done { color: var(--text-mute); text-decoration: line-through; }
+      #view-resources .rb-accordion {
+        border: 1px solid var(--border-med); border-radius: 10px;
+        background: var(--surface); overflow: hidden;
+      }
+      #view-resources .rb-acc-head {
+        display: flex; align-items: center; gap: 10px; padding: 14px 16px;
+        cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text);
+        user-select: none;
+      }
+      #view-resources .rb-acc-caret { transition: transform .2s; color: var(--text-mute); }
+      #view-resources .rb-accordion.open .rb-acc-caret { transform: rotate(90deg); }
+      #view-resources .rb-acc-body {
+        display: none; padding: 0 16px 16px; font-size: 14px; line-height: 1.7;
+        color: var(--text-sub);
+      }
+      #view-resources .rb-accordion.open .rb-acc-body { display: block; }
+      #view-resources .rb-figcap {
+        font-size: 12px; color: var(--text-mute); margin-top: 6px; text-align: center;
+      }
+      #view-resources .rb-divider { height: 1px; background: var(--border-med); margin: 24px 0; border: 0; }
+      #view-resources .res-attach-head {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--text-mute);
+        margin: 26px 0 12px; padding-top: 18px; border-top: 1px solid var(--border-med);
+      }
+
       @media (max-width: 720px) {
         #view-resources .res-detail-title { font-size:20px; }
+        #view-resources .rb-heading { font-size: 17px; }
       }
     </style>
 
@@ -8114,16 +8183,135 @@ function renderResourceDetail(id) {
   const cBorder = c ? `${c.color}55` : 'var(--accent-border)';
   const cColor = c ? c.color : 'var(--accent)';
   const files = r.resource_files || [];
+  const blocks = Array.isArray(r.content_blocks) ? r.content_blocks : [];
 
-  body.innerHTML = `
+  const head = `
     <span class="res-detail-cat" style="background:${cBg};color:${cColor};border:1px solid ${cBorder}">
       ${_escapeHtml(c ? c.name : '—')}
     </span>
     <div class="res-detail-title">${_escapeHtml(r.title)}</div>
     <div class="res-detail-meta">Added ${_formatRelative(r.created_at)}</div>
     ${r.description ? `<div class="res-detail-desc">${_escapeHtml(r.description)}</div>` : ''}
-    <div class="res-files-label">${files.length} file${files.length === 1 ? '' : 's'}</div>
-    ${files.map(f => _renderResourceFileBlock(f)).join('')}
+  `;
+
+  if (blocks.length) {
+    // NEW model — authored, interactive content. Files become downloads.
+    const attach = files.length ? `
+      <div class="res-attach-head">${files.length} attachment${files.length === 1 ? '' : 's'}</div>
+      ${files.map(f => _renderResourceAttachment(f)).join('')}
+    ` : '';
+    body.innerHTML = head +
+      blocks.map((b, i) => _renderResourceBlock(b, i, r.id)).join('') +
+      attach;
+  } else {
+    // LEGACY model — files-only resources keep their inline viewer.
+    body.innerHTML = head + `
+      <div class="res-files-label">${files.length} file${files.length === 1 ? '' : 's'}</div>
+      ${files.map(f => _renderResourceFileBlock(f)).join('')}
+    `;
+  }
+}
+
+// ── Content-block renderers (interactive authored display) ──────────────
+// markdown-lite: HTML-escape first, then **bold**, *italic*, [text](url),
+// "- " bullets, and newlines. Authored by admin staff only.
+function _resMdLite(text) {
+  let s = _escapeHtml(String(text || ''));
+  // bullets: group consecutive "- " lines into a <ul>
+  s = s.replace(/(?:^|\n)((?:- .*(?:\n|$))+)/g, (m, blk) => {
+    const lis = blk.trim().split('\n').map(l => `<li>${l.replace(/^-\s+/, '')}</li>`).join('');
+    return `<ul>${lis}</ul>`;
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+       .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+       .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+                '<a href="$2" target="_blank" rel="noopener">$1</a>')
+       .replace(/\n/g, '<br>');
+  return s;
+}
+
+function _resVideoEmbed(url) {
+  const u = String(url || '');
+  let m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/);
+  if (m) return `<div class="res-viewer"><iframe src="https://www.youtube.com/embed/${m[1]}" allowfullscreen style="height:42vh"></iframe></div>`;
+  m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (m) return `<div class="res-viewer"><iframe src="https://player.vimeo.com/video/${m[1]}" allowfullscreen style="height:42vh"></iframe></div>`;
+  return `<div class="res-viewer"><video controls src="${_escapeHtml(u)}"></video></div>`;
+}
+
+function _renderResourceBlock(b, idx, resId) {
+  if (!b || !b.type) return '';
+  switch (b.type) {
+    case 'heading':
+      return `<div class="rb rb-heading">${_escapeHtml(b.text || '')}</div>`;
+    case 'text':
+      return `<div class="rb rb-text">${_resMdLite(b.text)}</div>`;
+    case 'callout': {
+      const v = ['tip', 'warn', 'info'].includes(b.variant) ? b.variant : 'info';
+      const ic = v === 'tip' ? '💡' : v === 'warn' ? '⚠️' : 'ℹ️';
+      return `<div class="rb rb-callout ${v}"><span class="rb-ic">${ic}</span><div>${_resMdLite(b.text)}</div></div>`;
+    }
+    case 'checklist': {
+      const items = Array.isArray(b.items) ? b.items : [];
+      const ticked = _resGetChecks(resId, idx);
+      const rows = items.map((it, i) => `
+        <div class="rb-check ${ticked.includes(i) ? 'done' : ''}" onclick="_resToggleCheck('${resId}', ${idx}, ${i}, this)">
+          <span class="rb-box">${ticked.includes(i) ? '✓' : ''}</span>
+          <span>${_escapeHtml(it)}</span>
+        </div>`).join('');
+      return `<div class="rb rb-checklist">${b.title ? `<div class="rb-checklist-title">${_escapeHtml(b.title)}</div>` : ''}${rows}</div>`;
+    }
+    case 'accordion':
+      return `
+        <div class="rb rb-accordion">
+          <div class="rb-acc-head" onclick="this.parentElement.classList.toggle('open')">
+            <span class="rb-acc-caret">▸</span><span>${_escapeHtml(b.title || 'Details')}</span>
+          </div>
+          <div class="rb-acc-body">${_resMdLite(b.text)}</div>
+        </div>`;
+    case 'image':
+      return b.url ? `<div class="rb"><div class="res-viewer"><img src="${_escapeHtml(b.url)}" alt="${_escapeHtml(b.caption || '')}"></div>${b.caption ? `<div class="rb-figcap">${_escapeHtml(b.caption)}</div>` : ''}</div>` : '';
+    case 'video':
+      return b.url ? `<div class="rb">${_resVideoEmbed(b.url)}${b.caption ? `<div class="rb-figcap">${_escapeHtml(b.caption)}</div>` : ''}</div>` : '';
+    case 'divider':
+      return `<hr class="rb-divider">`;
+    default:
+      return '';
+  }
+}
+
+// Checklist tick state persists locally per resource+block (interactive,
+// sticky across reloads). Cosmetic-only — never hits the server.
+function _resCheckKey(resId, idx) { return `res-check-${resId}-${idx}`; }
+function _resGetChecks(resId, idx) {
+  try { return JSON.parse(localStorage.getItem(_resCheckKey(resId, idx)) || '[]'); }
+  catch (e) { return []; }
+}
+function _resToggleCheck(resId, idx, itemIdx, el) {
+  const set = new Set(_resGetChecks(resId, idx));
+  if (set.has(itemIdx)) set.delete(itemIdx); else set.add(itemIdx);
+  const arr = [...set];
+  try { localStorage.setItem(_resCheckKey(resId, idx), JSON.stringify(arr)); } catch (e) {}
+  const on = set.has(itemIdx);
+  el.classList.toggle('done', on);
+  const box = el.querySelector('.rb-box');
+  if (box) box.textContent = on ? '✓' : '';
+}
+
+// Attachment row — download only (no inline viewer) for the new model.
+function _renderResourceAttachment(f) {
+  const url = _resourceFileUrl(f.storage_path);
+  return `
+    <div class="res-file">
+      <div class="res-file-info">
+        <div class="res-file-name">${_escapeHtml(f.filename)}</div>
+        <div class="res-file-meta">${_formatBytes(f.size_bytes)}${f.mime_type ? ' · ' + _escapeHtml(f.mime_type) : ''}</div>
+      </div>
+      <div class="res-file-actions">
+        ${url ? `<a class="res-file-btn" href="${_escapeHtml(url)}" target="_blank" rel="noopener">Open</a>` : ''}
+        ${url ? `<a class="res-file-btn" href="${_escapeHtml(url)}" download="${_escapeHtml(f.filename)}">Download</a>` : ''}
+      </div>
+    </div>
   `;
 }
 
