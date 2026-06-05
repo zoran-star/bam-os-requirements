@@ -55,6 +55,22 @@ attachments below the content.
   public URL). `content_blocks` saved on insert/update. A resource can now be
   blocks-only (no file required).
 
+## PDF → content-block converter (AI, 2026-06-05)
+
+`api/resources/convert.js` (admin-gated) turns legacy PDF resources into
+`content_blocks` so they render as interactive pages instead of an embed.
+- Reads the resource's PDF attachment (public bucket URL) → base64 → Claude
+  (`claude-sonnet-4-6`) with a forced `emit_blocks` tool (structured JSON,
+  avoids the prefill footgun) → `sanitizeBlocks()` clamps to valid types →
+  PATCH `resources.content_blocks`. PDF stays as a download.
+- Actions: `GET ?action=eligible` (count), `POST ?action=convert` `{resourceId}`,
+  `POST ?action=convert-all` (batched `BATCH_CAP=6`/call, returns `remaining`).
+  `maxDuration=300`. PDFs capped at 24MB (Claude ~32MB ceiling).
+- Staff UI (`ResourcesView.jsx`): per-row **Convert** button (only when
+  `isLegacyPdf` = empty content_blocks + a PDF) + a top **Convert N PDFs**
+  button that loops convert-all until `remaining=0` (breaks if a batch fully
+  fails). Needs `ANTHROPIC_API_KEY` (already in Vercel).
+
 ## Quirks
 
 - Public bucket means anyone with a file URL can fetch it without auth. Matches existing `ticket-files` pattern. If signed URLs ever land, gate this bucket the same way.
