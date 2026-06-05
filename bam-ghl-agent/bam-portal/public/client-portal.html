@@ -459,7 +459,10 @@
 
   /* ── Top bar ── */
   .topbar {
-    padding: 28px 40px 20px;
+    /* env(safe-area-inset-top) is 0 on the web/desktop — only the notched
+       native app / PWA pays the inset, so the sticky header never tucks
+       under the status bar or Dynamic Island. Fixes the cut-off title. */
+    padding: calc(28px + env(safe-area-inset-top)) 40px 20px;
     border-bottom: 1px solid var(--line);
     display: flex;
     align-items: flex-end;
@@ -4903,6 +4906,53 @@
       font-size: 16px !important;
     }
   }
+
+  /* ───────────────────────────────────────────────────────────────────
+     Native app chrome — applies ONLY inside the Capacitor wrapper (and in
+     ?native=1 preview). Toggled by `body.native-app` (set in JS via
+     isNativeApp()). The web/PWA never gets these rules. */
+  /* #4 — keep scroll bounce inside the scroller, no page-level rubber-band
+     (.main is the scroll container; this kills the ugly native glow/bounce
+     so our intentional pull-to-refresh is the only top-pull gesture) */
+  body.native-app .main { overscroll-behavior-y: contain; }
+  /* #17 — pull-to-refresh indicator */
+  #ptr-indicator {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; height: 0; overflow: hidden;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text-mute);
+    background: var(--ink); z-index: 9; pointer-events: none;
+    transition: height 0.18s ease, opacity 0.18s ease;
+  }
+  #ptr-indicator .ptr-spin {
+    width: 13px; height: 13px; border-radius: 50%;
+    border: 2px solid var(--text-mute); border-top-color: var(--gold, #E8C547);
+  }
+  #ptr-indicator.ptr-refreshing .ptr-spin { animation: ptrspin 0.7s linear infinite; }
+  @keyframes ptrspin { to { transform: rotate(360deg); } }
+  /* #6 + #10 — strip the web-only tells: tap-highlight flash, long-press
+     callout, and stray selection of UI chrome */
+  body.native-app {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* …but keep selection/typing where a client genuinely needs it */
+  body.native-app input,
+  body.native-app textarea,
+  body.native-app [contenteditable],
+  body.native-app .chat-messages,
+  body.native-app .msg-bubble,
+  body.native-app .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+  /* #3/#7 — calmer feedback widget in-app so it stops fighting content */
+  body.native-app #admin-fb-btn { width: 44px; height: 44px; opacity: 0.9; }
+  body.native-app #admin-fb-btn:active { opacity: 1; }
 </style>
 
 <div id="admin-fb-wrap">
@@ -18957,6 +19007,79 @@ function toggleTheme() {
     </div>
   </div>
 </div>
+
+<!-- ── Native app body class (Capacitor wrapper + ?native=1 preview) ── -->
+<!-- Tags <body> so the native-only chrome rules in <style> apply inside   -->
+<!-- the app. No-op on the normal web / installed PWA.                     -->
+<script>
+  try {
+    if (typeof isNativeApp === 'function' && isNativeApp()) {
+      document.body.classList.add('native-app');
+      initPullToRefresh();
+    }
+  } catch (e) { /* never block boot on chrome tagging */ }
+
+  // #17 — Pull-to-refresh. The .main element is the scroll container; when a
+  // client drags down from the very top past a threshold, reload the WebView.
+  // Skipped on the Messages/chat view (it has its own scroll regions).
+  function initPullToRefresh() {
+    var THRESHOLD = 72;       // px pulled before a release triggers refresh
+    var MAX = 110;            // visual cap on the indicator height
+    var ind, startY = 0, pulling = false, dist = 0;
+
+    function scroller() { return document.querySelector('.main'); }
+    function onChat() { return !!document.querySelector('#view-messages.active'); }
+
+    function ensureIndicator() {
+      if (ind) return ind;
+      ind = document.createElement('div');
+      ind.id = 'ptr-indicator';
+      ind.innerHTML = '<span class="ptr-spin"></span><span class="ptr-label">Pull to refresh</span>';
+      document.body.appendChild(ind);
+      return ind;
+    }
+
+    document.addEventListener('touchstart', function (e) {
+      var sc = scroller();
+      if (!sc || onChat()) return;
+      if (sc.scrollTop > 0) return;                 // only from the very top
+      startY = e.touches[0].clientY;
+      pulling = true; dist = 0;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function (e) {
+      if (!pulling) return;
+      var sc = scroller();
+      if (!sc || sc.scrollTop > 0) { reset(); return; }
+      dist = e.touches[0].clientY - startY;
+      if (dist <= 0) { reset(); return; }
+      var h = Math.min(dist * 0.5, MAX);
+      var el = ensureIndicator();
+      el.style.height = h + 'px';
+      el.querySelector('.ptr-label').textContent =
+        h >= THRESHOLD ? 'Release to refresh' : 'Pull to refresh';
+    }, { passive: true });
+
+    document.addEventListener('touchend', function () {
+      if (!pulling) return;
+      var el = ind;
+      if (el && parseFloat(el.style.height) >= THRESHOLD) {
+        el.classList.add('ptr-refreshing');
+        el.querySelector('.ptr-label').textContent = 'Refreshing…';
+        el.style.height = '44px';
+        setTimeout(function () { location.reload(); }, 180);
+        pulling = false;
+        return;
+      }
+      reset();
+    });
+
+    function reset() {
+      pulling = false; dist = 0;
+      if (ind) { ind.style.height = '0px'; ind.classList.remove('ptr-refreshing'); }
+    }
+  }
+</script>
 
 <!-- ── PWA service worker registration ── -->
 <script>
