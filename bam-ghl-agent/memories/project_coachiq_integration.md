@@ -236,8 +236,8 @@ Pause/cancel → portal simply stops POSTing (or fires a redeem/revoke automatio
 ```
 
 This decouples credits from CoachIQ's sub_id, so #3 (portal-created new subs) and
-#4 (migrate the 33 live subs to portal-owned) both become viable without breaking
-credits. Migration card-reuse check: 26/33 have a reusable default PM, 7 need a
+#4 (migrate the ~50 live subs to portal-owned) both become viable without breaking
+credits. Migration card-reuse check: 46/50 have a reusable default PM, 4 need a
 re-collect (payment link).
 
 ## Creating new users + the onboarding flow
@@ -335,7 +335,7 @@ billing ownership is lost.
 
    The 4 "don't mess it up" risks:
    - Timing → anchor new sub trial_end to old current_period_end.
-   - Cards → 26/33 reuse silently, 7 need a payment-link re-collect.
+   - Cards → 46/50 reuse silently, 4 need a payment-link re-collect.
    - 🔴 CoachIQ "Subscription Cancelled" trigger may fire on cancel and revoke
      the member's access/credits → CHECK + disable/handle the academy's automations
      before cutover.
@@ -345,7 +345,7 @@ billing ownership is lost.
    Build order: (1) backfill coachiq_member_id → (2) #4 product/credit modeling →
    (3) build+test the credit webhook automation (#3) → (4) portal create-sub +
    Stripe-webhook→CoachIQ credit POST → (5) neutralize CoachIQ Subscription-
-   Cancelled automations → (6) THEN migrate the 33 live subs per-member.
+   Cancelled automations → (6) THEN migrate the ~50 live subs per-member.
    Fallback if cutover too risky: keep back-book on CoachIQ, manage those billing
    changes manually in Stripe (the Knowl in-place pattern); new members portal-native.
 6. **Sales motion** — once proven on BAM GTA, package this as the "keep CoachIQ,
@@ -373,7 +373,7 @@ should be rotated.
 ⏳ NOT built. Build order: (1) backfill coachiq_member_id from Stripe metadata →
    (2) #4 product/credit modeling → (3) build+test credit webhook automation →
    (4) portal create-sub + Stripe-webhook→credit POST → (5) handle CoachIQ
-   Subscription-Cancelled automations → (6) migrate the 33 live subs.
+   Subscription-Cancelled automations → (6) migrate the ~50 live subs.
 ```
 
 **Backfill DONE 2026-06-03:** populated `members.coachiq_member_id` for **22 of 54**
@@ -448,7 +448,7 @@ TRACK A (new customers): GHL/FC form → createCoachiqUser (capture id) → PORT
 TRACK B (migrate 68): prereqs first — backfill ids ✅(22/54; 32 need admin lookup),
    credit automation LIVE + tested, DISABLE CoachIQ "Subscription Cancelled"
    automation. Then per member: create portal sub (anchored) → cancel CoachIQ sub →
-   credits now via webhook. 26/33 silent, 7 need card re-collect.
+   credits now via webhook. 46/50 silent, 4 need card re-collect.
 
 EXTERNAL INPUTS STILL NEEDED FROM ZORAN:
    • admin-scoped CoachIQ token (or Zapier) → unblock create+enroll + the 32 ids
@@ -496,3 +496,13 @@ portal; never add a Products/payment connection to a CoachIQ form or use GHL che
 Blockers to ship Track A: #3 (create+enroll) + the credit automation/numbers +
 deploy sign-off. Everything else (form, payment page, webhook wiring) is specced
 and the helper code exists (api/coachiq.js, api/coachiq-billing.js).
+
+## MIGRATION SCOPE — accurate count (2026-06-05)
+
+Live migration set = members with an active membership + a stored sub:
+**~50 subs** (44 live, 5 paused w/ sub, 2 payment_failed; +2 paused have no sub).
+NOT 33 — that earlier figure only counted Stripe active+trialing subs and missed
+paused/payment_failed/past_due. Card-reuse check across all 50 (live Stripe data):
+**46 migrate SILENTLY** (reusable card on the customer) · **4 need a one-tap card
+re-collect**: Ebaad Wahid, Krishay, Luke Newton, Syed Faiz (paused). Determined by
+checking each customer's invoice_settings.default_payment_method / attached cards.
