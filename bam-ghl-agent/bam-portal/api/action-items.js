@@ -17,6 +17,8 @@
 // Auth: Supabase JWT in Authorization header. Caller must be BAM staff OR a
 // member of client_id (via client_users / owner / scaling manager).
 
+import { notifyClientPush } from "./push/_send.js";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -312,6 +314,10 @@ export default async function handler(req, res) {
         await postClientSlackNotification(
           it.client_id, `⏰ Action item due soon — *${it.title}*${dueLabel(it.due_date)}${who}`, req
         );
+        // #4 due-soon native push
+        notifyClientPush(it.client_id, "action-item-due-soon", {
+          label: it.title, itemId: it.id, view: "action-items",
+        }).catch(() => {});
         await sb(`action_items?id=eq.${it.id}`, {
           method: "PATCH",
           headers: { Prefer: "return=minimal" },
@@ -396,6 +402,10 @@ export default async function handler(req, res) {
       await postClientSlackNotification(
         clientId, `📋 New action item${who} — *${title}*${dueLabel(item.due_date)}`, req
       );
+      // #3 assigned native push
+      notifyClientPush(clientId, "action-item-assigned", {
+        label: title, itemId: item.id, view: "action-items",
+      }).catch(() => {});
       return res.status(200).json({ item });
     }
 
@@ -490,6 +500,10 @@ export default async function handler(req, res) {
           `📋 Action item reassigned to ${reassignedTo} — *${item.title}*${dueLabel(item.due_date)}`,
           req
         );
+        // #3 (reassign) native push
+        notifyClientPush(existing.client_id, "action-item-assigned", {
+          label: item.title, itemId: item.id, view: "action-items",
+        }).catch(() => {});
       }
       return res.status(200).json({ item });
     }

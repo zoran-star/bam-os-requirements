@@ -20,6 +20,8 @@
 //   - A client can only read + write conversations attached to their own
 //     clients (where clients.auth_user_id = their auth.uid())
 
+import { notifyClientPush } from "./push/_send.js";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
@@ -328,6 +330,21 @@ export default async function handler(req, res) {
           authorLabel,
           req,
         }).catch(err => console.warn("notifyMentionedStaff failed:", err?.message));
+      }
+
+      // #5 new-message push → the CLIENT, only when STAFF is the sender
+      // (the client has the native app; staff use the web portal). Fire and
+      // forget — a push failure must not affect the send.
+      if (ctx.staff) {
+        const preview = text
+          ? text.slice(0, 140)
+          : (files.length ? "Sent you an attachment" : "");
+        notifyClientPush(convo.client_id, "new-message", {
+          sender: ctx.staff.name || "BAM",
+          preview,
+          conversationId: convo.id,
+          view: "messages",
+        }).catch(() => {});
       }
 
       return res.status(200).json({ message: row });

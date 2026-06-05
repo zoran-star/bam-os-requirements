@@ -3,6 +3,7 @@
 // Client portal (public): GET/PATCH with ?public=1 and client_id
 
 import { SYSTEMS_ROLES, SYSTEMS_MANAGER_ROLES } from "./_roles.js";
+import { notifyClientPush } from "./push/_send.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -484,19 +485,33 @@ export default async function handler(req, res) {
       // Slack notify (fire-and-forget) on client-facing actions only.
       // Uniform template: {emoji} {Action} — {Type} [{CODE}] + optional body.
       const code = String(t.id || "").slice(0, 3).toUpperCase();
+      const ticketTitle = t.menu_item
+        || (t.type ? `${t.type[0].toUpperCase()}${t.type.slice(1)} request` : "your request");
       if (action === "request_client") {
         const ask = (body.client_action_request || "").trim();
         postClientSlackNotification(t.client_id,
           `🔔 Action requested — Systems [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+        // #1 action-needed native push
+        notifyClientPush(t.client_id, "ticket-action-needed", {
+          ticketTitle, ticketId: t.id, view: "systems",
+        }).catch(() => {});
       } else if (action === "cancel_client_request") {
         postClientSlackNotification(t.client_id,
           `↩️ Request withdrawn — Systems [${code}]`, req);
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);
+        // #2 ticket-complete native push
+        notifyClientPush(t.client_id, "ticket-complete", {
+          ticketTitle, ticketId: t.id, view: "systems",
+        }).catch(() => {});
       } else if (action === "send_for_final_review") {
         postClientSlackNotification(t.client_id,
           `🟢 Final review ready — Systems [${code}]\n_Open the portal to approve or send feedback._`, req);
+        // #1 action-needed (final review) native push
+        notifyClientPush(t.client_id, "ticket-action-needed", {
+          ticketTitle, ticketId: t.id, view: "systems",
+        }).catch(() => {});
       }
 
       return res.status(200).json({ data: enriched[0] });

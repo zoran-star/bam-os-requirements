@@ -7430,9 +7430,22 @@ Then the call to action."]</div>
 </div>
 
 <script>
+// #12 — haptics. Feature-detected: a light tap inside the native app when the
+// @capacitor/haptics plugin is present; a silent no-op on web / PWA.
+function hapticTap(style) {
+  try {
+    var Cap = window.Capacitor;
+    if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+    var H = Cap.Plugins && Cap.Plugins.Haptics;
+    if (!H || !H.impact) return;
+    H.impact({ style: style || 'Light' });
+  } catch (e) { /* haptics are a nicety — never throw */ }
+}
+
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
+  hapticTap('Light'); // #12 — tactile feedback on tab change (native only)
 
   // Update nav
   document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
@@ -18485,6 +18498,22 @@ function updateUnreadBadge() {
     if (count > 0) { mBadge.style.display = 'flex'; mBadge.textContent = count > 9 ? '9+' : count; }
     else { mBadge.style.display = 'none'; }
   }
+  // #13 — native app-icon badge (feature-detected; no-op on web / if the
+  // Badge plugin isn't installed). Mirrors the unread conversation count.
+  setAppIconBadge(count);
+}
+
+// #13 — set the iOS/Android app-icon badge. Safe everywhere: it only acts
+// inside the native wrapper when @capawesome/capacitor-badge is present.
+function setAppIconBadge(count) {
+  try {
+    var Cap = window.Capacitor;
+    if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+    var Badge = Cap.Plugins && Cap.Plugins.Badge;
+    if (!Badge) return;
+    if (count > 0) Badge.set({ count: count });
+    else if (Badge.clear) Badge.clear();
+  } catch (e) { /* badge is cosmetic — never throw */ }
 }
 
 function msgRelTime(iso) {
@@ -19034,8 +19063,68 @@ function toggleTheme() {
     if (typeof isNativeApp === 'function' && isNativeApp()) {
       document.body.classList.add('native-app');
       initPullToRefresh();
+      initBiometricLock();
     }
   } catch (e) { /* never block boot on chrome tagging */ }
+
+  // #11 — Face ID / biometric unlock. FAIL-OPEN + feature-detected: a total
+  // no-op until @aparajita/capacitor-biometric-auth is installed AND the user
+  // is logged in. On cancel/failure/timeout it ALWAYS reveals — it can never
+  // trap a user. (Hardening to keep the lock until success is a follow-up once
+  // it's verified on a device.)
+  function initBiometricLock() {
+    var Cap = window.Capacitor;
+    if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+    var Bio = Cap.Plugins && Cap.Plugins.BiometricAuth;
+    if (!Bio || !Bio.authenticate) return;          // plugin not installed → off
+    var locked = false;
+
+    function showOverlay() {
+      var el = document.getElementById('bio-lock');
+      if (el) return el;
+      el = document.createElement('div');
+      el.id = 'bio-lock';
+      el.style.cssText =
+        'position:fixed;inset:0;z-index:100000;background:var(--ink);display:flex;' +
+        'align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+      el.innerHTML =
+        '<div style="width:46px;height:46px;background:url(/brand-mark.svg) center/contain no-repeat;opacity:.9"></div>' +
+        '<div style="font-family:var(--mono);font-size:11px;letter-spacing:.18em;' +
+        'text-transform:uppercase;color:var(--text-mute)">Unlock to continue</div>';
+      document.body.appendChild(el);
+      return el;
+    }
+    function hide() {
+      var el = document.getElementById('bio-lock');
+      if (el) el.remove();
+      locked = false;
+    }
+    function requireAuth() {
+      try {
+        if (typeof _sb === 'undefined') return;
+        _sb.auth.getSession().then(function (r) {
+          if (!(r && r.data && r.data.session)) return;  // only when logged in
+          if (locked) return;
+          locked = true;
+          showOverlay();
+          var failSafe = setTimeout(hide, 6000);         // never trap the user
+          Bio.authenticate({
+            reason: 'Unlock BAM Portal',
+            cancelTitle: 'Cancel',
+            allowDeviceCredential: true,
+            iosFallbackTitle: 'Use Passcode',
+          }).then(function () { clearTimeout(failSafe); hide(); })
+            .catch(function () { clearTimeout(failSafe); hide(); }); // fail-open
+        }).catch(function () { hide(); });
+      } catch (e) { hide(); }
+    }
+
+    requireAuth();                                   // cold boot
+    var App = Cap.Plugins && Cap.Plugins.App;
+    if (App && App.addListener) {                    // re-lock on resume
+      App.addListener('appStateChange', function (s) { if (s && s.isActive) requireAuth(); });
+    }
+  }
 
   // #17 — Pull-to-refresh. The .main element is the scroll container; when a
   // client drags down from the very top past a threshold, reload the WebView.
@@ -19169,9 +19258,23 @@ function toggleTheme() {
   Push.addListener('registrationError', function (err) {
     console.warn('[push] registration error:', err);
   });
-  // Received / tapped — no-op for now; the staff "send" side is a later follow-up.
-  Push.addListener('pushNotificationReceived', function () {});
-  Push.addListener('pushNotificationActionPerformed', function () {});
+  // Foreground receipt — refresh the unread badge so counts stay live.
+  Push.addListener('pushNotificationReceived', function () {
+    try { if (typeof updateUnreadBadge === 'function') updateUnreadBadge(); } catch (e) {}
+  });
+  // #15 — Tapped: deep-link to the right screen using the data we attach in
+  // api/push/_send.js (view + ticketId/itemId/conversationId).
+  Push.addListener('pushNotificationActionPerformed', function (ev) {
+    try {
+      var data = (ev && ev.notification && ev.notification.data) || {};
+      var view = data.view || 'systems';
+      if (typeof switchView === 'function') switchView(view);
+      // Best-effort: open the exact conversation once Messages has loaded.
+      if (view === 'messages' && data.conversationId && typeof openConversation === 'function') {
+        setTimeout(function () { try { openConversation(data.conversationId); } catch (e) {} }, 600);
+      }
+    } catch (e) { console.warn('[push] deep-link failed:', e); }
+  });
 
   // Request permission + register — once, and only for a logged-in client.
   function ensureRegistered() {

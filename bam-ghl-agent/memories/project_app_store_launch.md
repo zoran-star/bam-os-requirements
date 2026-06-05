@@ -173,13 +173,40 @@ in `client-portal.html`. Fixed + a batch of native-feel polish.
 - All gated by a new `body.native-app` class (works in `?native=1` preview too).
 - Tour verifier passes.
 
-**TRACK 2 — native rebuild + resubmit (NOT built yet):** #11 Face ID unlock,
-#12 haptics, #13 app-icon badge, #15 deep-link push→ticket, #16 offline screen
-(bundle `offline.html` + `server.errorPath`), and **#14 push *sending*** (backend
-route + staff UI + **needs an APNs `.p8` key** created in the Apple Developer
-portal — manual). Push-notification content plan proposed (events 1–5: BAM
-reply/action, ticket complete, action-item assigned, action-item due-soon, new
-message) — awaiting Zoran/Coleman confirm before wiring.
+**TRACK 2 — native rebuild + resubmit. CODE DONE on branch `feat/app-v1-native-track2`
+(Coleman chose all 7 push events):**
+- **#14 push sending** — `api/push/_send.js` = dependency-free APNs sender
+  (Node `http2` + `crypto` ES256 JWT, sandbox/prod host auto-fallback, prunes
+  dead tokens, 7-event catalog). `api/push/send.js` = admin-gated manual/test
+  send + `?action=status`. Triggers wired beside existing Slack notifies (never
+  throw, no-op until APNS_* env set):
+  - #1 ticket-action-needed → tickets.js request_client + send_for_final_review;
+    marketing.js + content request-client-action
+  - #2 ticket-complete → tickets.js approve; marketing.js + content mark-completed
+  - #3 action-item-assigned → action-items.js create + reassign
+  - #4 action-item-due-soon → action-items.js cron-due-soon
+  - #5 new-message → messages.js send (only when STAFF sends)
+  - #7 weekly-digest → `api/push/cron-weekly.js` + vercel.json cron (Mon 14:00 UTC)
+  - #6 campaign-milestone → admin manual send only; auto-detect needs a Meta
+    status poller (campaigns live in Meta, not the portal) — documented follow-up
+- **#15 deep-link** — `pushNotificationActionPerformed` → `switchView(data.view)`
+  (+ best-effort openConversation). All pushes carry type + ids + view.
+- **#12 haptics** — `hapticTap()` on tab switch (`@capacitor/haptics` ^8.0.2 added).
+- **#13 badge** — `setAppIconBadge()` mirrors unread (`@capawesome/capacitor-badge` ^8.0.2 added).
+- **#11 Face ID** — `initBiometricLock()` FAIL-OPEN gate on boot/resume. Biometric
+  plugin NOT in package.json (Cap-8 compat unverified) — install on Mac; JS
+  feature-detects, so inert until then.
+- **#16 offline screen** — `bam-portal-app/www/offline.html` (self-contained) +
+  `server.errorPath`.
+
+**Manual steps left to ACTIVATE Track 2 (Coleman/Zoran):**
+1. **APNs `.p8` key** — Apple Developer → Keys → create APNs key. Save .p8 + Key ID + Team ID.
+2. **Vercel env** — `APNS_KEY_P8` (or `_BASE64`), `APNS_KEY_ID`, `APNS_TEAM_ID`,
+   `APNS_TOPIC=com.byanymeansbusiness.portal`. Until set, every push is a silent no-op.
+3. **On the Mac:** `cd bam-portal-app && npm install` (gets haptics+badge), optional
+   `npm install @aparajita/capacitor-biometric-auth` for Face ID, then `npx cap sync ios`.
+4. **Xcode:** confirm Push Notifications capability (already added), Archive, upload, resubmit.
+All Track 2 client JS is feature-detected/fail-safe → safe to deploy to web/current app NOW.
 
 **Out of scope (Coleman's call 2026-06-05):** hiding the feedback widget (#7 —
 improve instead), tab audit (#8), connect-copy reword (#9).
