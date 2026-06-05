@@ -118,11 +118,34 @@ returns **403 — WAF-blocked to server-side requests** even with browser header
 (Origin/Referer/UA) + the token. The dashboard creates users only in-browser
 (WAF + session cookies we can't replicate). So the portal CANNOT create+enroll a
 CoachIQ user via any token/API we can reach. **Use one of:** (a) Zapier "Create
-User" action (untested — does it enroll in the group?), or (b) manual creation in
-the CoachIQ UI. Credit bridge + (proposed) create-sub are unaffected.
+User" action, or (b) manual creation in the CoachIQ UI. Credit bridge +
+(proposed) create-sub are unaffected.
 
-⚠️ Test cleanup: signUp_V2 created ~2 "FCTEST DELETEME" users in BAM GTA — delete
-them in CoachIQ People (can't via API; deleteUser needs staff login).
+## ✅ CREATE+ENROLL SOLVED — Zapier "Create User" (CONFIRMED 2026-06-05)
+
+The Zapier "Create User" action IS the create+enroll path. Tested live:
+- Returned a CoachIQ user id (`2578c9b2-43ec-45da-9c81-31ab263adbd6`)
+- The user **appeared in the BAM GTA roster** (= ENROLLED in the group, unlike
+  the bare signUp_V2 account)
+- The credit webhook fired at that id **succeeded** (add_tag green, tag landed) →
+  the user is fully actionable/creditable.
+
+So the engine's create+enroll runs through Zapier (integration scope does what the
+API key + user tokens can't). Setup:
+- CoachIQ Zapier app is PRIVATE — invite link:
+  https://zapier.com/developer/public-invite/208528/e1b120aaaf4d5eb365a91028eb3bcfc2/
+- Connect with API key (…53f2) + Group ID 719bb0cf.
+- Action "Create User" fields: first, last, email, phone → returns the user id.
+- **Capture that id → members.coachiq_member_id.** Then credit via the webhook.
+
+New-member funnel step 2 = trigger Zapier "Create User" (GHL form → Zapier, or
+portal → Zapier webhook) → store returned id. ALL FOUR ENGINE COMPONENTS now
+proven: #1 create-sub (coded), #2 credits (proven), #3 create+enroll (proven via
+Zapier), #4 store id (backfill + Zapier-return). Remaining = wire/deploy + build
+Track A funnel + run Track B migration (need sign-off + prereqs).
+
+⚠️ Test cleanup: a few "FCTEST/ZAPTEST DELETEME" test users exist in BAM GTA —
+delete them in CoachIQ People when convenient.
 
 ## The CoachIQ API — what the key can do
 
