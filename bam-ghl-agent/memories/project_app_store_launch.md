@@ -152,8 +152,42 @@ The stale `CLIENT_PORTAL_URL` env var can still be deleted from Vercel.
 phone testing, screenshots + Play feature graphic, the Mac/Xcode compile
 (iOS archive) + Android `.aab`, then the two store submissions.
 
+## Native v1 polish pass (2026-06-05, branch `feat/app-v1-native-polish`)
+
+Coleman's pre-submit phone test surfaced a **status-bar collision** (sticky
+`.topbar` tucked under the Dynamic Island) — root cause = `contentInset:
+"never"` in `capacitor.config.json` with **no `safe-area-inset-top`** anywhere
+in `client-portal.html`. Fixed + a batch of native-feel polish.
+
+**TRACK 1 — portal only (deploy, NO resubmit). DONE on the branch:**
+- **#1 safe-area top** — `.topbar` padding now `calc(28px + env(safe-area-inset-top))`
+  (0 on web/desktop, only the notch pays). Kills the cut-off title.
+- **#2 status bar** — verified already correct (`style: DARK` on `#16140F` = light icons).
+- **#5 launch flash** — verified none: `--ink` = `#16140F` = Capacitor splash/bg color.
+- **#3/#7 feedback widget** — smaller (44px) + calmer opacity in-app (kept, not hidden).
+- **#4 overscroll** — `overscroll-behavior-y: contain` on `.main` (the scroller).
+- **#6 + #10 native tells** — tap-highlight/long-press-callout/stray selection killed,
+  scoped to `body.native-app` (set via `isNativeApp()`); selection re-enabled on
+  inputs + chat. Web/PWA untouched.
+- **#17 pull-to-refresh** — JS PTR on `.main`, native-only, skips the chat view.
+- All gated by a new `body.native-app` class (works in `?native=1` preview too).
+- Tour verifier passes.
+
+**TRACK 2 — native rebuild + resubmit (NOT built yet):** #11 Face ID unlock,
+#12 haptics, #13 app-icon badge, #15 deep-link push→ticket, #16 offline screen
+(bundle `offline.html` + `server.errorPath`), and **#14 push *sending*** (backend
+route + staff UI + **needs an APNs `.p8` key** created in the Apple Developer
+portal — manual). Push-notification content plan proposed (events 1–5: BAM
+reply/action, ticket complete, action-item assigned, action-item due-soon, new
+message) — awaiting Zoran/Coleman confirm before wiring.
+
+**Out of scope (Coleman's call 2026-06-05):** hiding the feedback widget (#7 —
+improve instead), tab audit (#8), connect-copy reword (#9).
+
 ## Related notes
 - [[project_client_portal_mobile]] — the mobile/phone layout pass that made
   the portal phone-ready (prerequisite for the app)
+- [[project_member_management_portal]] — the Members feature, now hidden in
+  the native app (still live on web)
 - [[project_member_management_portal]] — the Members feature, now hidden in
   the native app (still live on web)
