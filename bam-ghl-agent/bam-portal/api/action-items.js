@@ -117,6 +117,18 @@ async function loadTeam(clientId) {
   }));
 }
 
+// The client's assigned Scaling Manager (name + booking link) — powers the
+// "Book a call" onboarding step's dynamic button. Null if no SM assigned.
+async function loadClientSM(clientId) {
+  const crows = await sb(`clients?id=eq.${clientId}&select=scaling_manager_id`);
+  const smId = crows && crows[0] && crows[0].scaling_manager_id;
+  if (!smId) return null;
+  const srows = await sb(`staff?id=eq.${smId}&select=name,booking_url`);
+  const s = srows && srows[0];
+  if (!s) return null;
+  return { name: s.name || "your Scaling Manager", booking_url: s.booking_url || null };
+}
+
 function dueLabel(d) {
   if (!d) return "";
   return ` · due ${d}`;
@@ -140,7 +152,8 @@ const ONBOARDING_STEPS = [
   { key: "locations",      title: "Add your Locations",                  sort: 7, col: "locations_marked_done_at",     writable: true },
   { key: "brand",          title: "Set up Brand & Website",              sort: 8, col: "brand_marked_done_at",         writable: true },
   { key: "offers",         title: "Set up your Offers",                  sort: 9, col: "offers_marked_done_at",        writable: true },
-  { key: "kpis",           title: "Fill out your KPIs",                  sort: 10, col: "kpi_marked_done_at",           writable: true },
+  { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 10, col: "call_booked_at",            writable: true },
+  { key: "kpis",           title: "Fill out your KPIs",                  sort: 11, col: "kpi_marked_done_at",           writable: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
@@ -253,7 +266,8 @@ export default async function handler(req, res) {
         `&order=completed_at.asc.nullsfirst,due_date.asc.nullslast,created_at.desc`
       );
       const team = await loadTeam(clientId);
-      return res.status(200).json({ items: items || [], team });
+      const sm = await loadClientSM(clientId);
+      return res.status(200).json({ items: items || [], team, sm });
     }
 
     // ── POST: create ──────────────────────────────────────────────────────

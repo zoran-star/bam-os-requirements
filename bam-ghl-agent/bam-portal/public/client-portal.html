@@ -12673,6 +12673,7 @@ let _MEMBERS_FILTER_OPEN = false;
 // API: /api/action-items (GET list+team, POST create, PATCH update/toggle, DELETE).
 let _AI_ITEMS = [];
 let _AI_TEAM = [];
+let _AI_SM = null;   // { name, booking_url } — the client's assigned Scaling Manager
 let _aiEditingId = null;
 
 async function fetchAndRenderActionItems() {
@@ -12691,6 +12692,7 @@ async function fetchAndRenderActionItems() {
     if (!res.ok) throw new Error(json.error || ('HTTP ' + res.status));
     _AI_ITEMS = Array.isArray(json.items) ? json.items : [];
     _AI_TEAM = Array.isArray(json.team) ? json.team : [];
+    _AI_SM = json.sm || null;
     _renderActionItems();
     _updateActionItemsBadge();
   } catch (e) {
@@ -12720,8 +12722,19 @@ const ONB_UI = {
   locations:      { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('locations')" } },
   brand:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('brand')" } },
   offers:         { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('offers')" } },
+  book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
 };
+
+// "Book a call" CTA depends on the client's assigned SM: their personal
+// booking link, or a Slack fallback when no SM is set.
+function _aiBookCallCta() {
+  if (_AI_SM && _AI_SM.booking_url) {
+    const first = (_AI_SM.name || '').split(/\s+/)[0] || _AI_SM.name || 'your SM';
+    return `<a class="ai-onb-cta" href="${escapeHTML(_AI_SM.booking_url)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Book with ${escapeHTML(first)} ↗</a>`;
+  }
+  return `<button class="ai-onb-cta" onclick="window.open(ONB_SLACK_INVITE_URL,'_blank')">Message us on Slack ↗</button>`;
+}
 
 // Jump from an Action Items onboarding step to its Business Blueprint section.
 function _aiOpenBB(card) {
@@ -12768,8 +12781,9 @@ function _aiOnbHTML(it) {
   const status = isDone
     ? `<span class="ai-chip" style="color:#7BC47F">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
-  const cta = (!isDone && cfg.cta)
+  let cta = (!isDone && cfg.cta)
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
+  if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
   return `<div class="ai-item${isDone ? ' done' : ''}">
     ${check}
     <div class="ai-item-body">

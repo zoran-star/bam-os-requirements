@@ -66,9 +66,12 @@ an external connection signal):
 | 7 | `locations` | Add your Locations | `locations_marked_done_at` | ✅ → BB #bb=locations |
 | 8 | `brand` | Set up Brand & Website | `brand_marked_done_at` | ✅ → BB #bb=brand |
 | 9 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
-| 10 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+| 10 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
+| 11 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
 
 (2026-06-03: `offers` added as step 9; the first-login product tour was cut from 8 steps to a 2-step welcome that just points the client at this Action Items checklist — see [[project_client_portal_tour]].)
+
+**`book_call` (2026-06-05):** writable manual step. Its CTA is dynamic — the GET response now returns `sm: { name, booking_url }` (the client's `scaling_manager_id` → `staff.booking_url`). Client portal renders **"Book with {SM first name} ↗"** linking to that URL; if no SM / no link → **"Message us on Slack ↗"** (`ONB_SLACK_INVITE_URL`). New cols: `staff.booking_url`, `clients.call_booked_at`. Seeded SM links: Anthony McManus (Google) + Mike Eluki (GHL widget). Helpers: `loadClientSM()` (api), `_aiBookCallCta()` + `_AI_SM` (client). Migration `book_call_onboarding_step`.
 
 - `syncOnboardingItems()` reconciles every step from its `col` on each GET.
   **Writable** steps always mirror col (toggling writes col, so consistent) — this is
