@@ -572,6 +572,27 @@
   }
   .ai-onb-cta:hover { filter: brightness(1.07); }
 
+  /* ── Onboarding subway map ── */
+  .ai-subway { margin: 6px 0 8px; }
+  .ai-stop { display: flex; gap: 14px; }
+  .ai-stop-rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 28px; }
+  .ai-stop-circle {
+    width: 28px; height: 28px; flex-shrink: 0; border-radius: 50%;
+    border: 2px solid var(--text-mute); background: var(--surface); color: #0B0B0D;
+    padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .12s ease, border-color .12s ease;
+  }
+  .ai-stop-circle.on { background: var(--accent); border-color: var(--accent); }
+  .ai-stop-circle:hover { border-color: var(--accent); }
+  .ai-stop-line { width: 2px; flex: 1; min-height: 14px; background: var(--line); border-radius: 2px; margin: 3px 0; }
+  .ai-stop.done .ai-stop-line { background: var(--accent); }
+  .ai-stop:last-child .ai-stop-line { display: none; }
+  .ai-stop-body { flex: 1; min-width: 0; padding: 3px 0 22px; }
+  .ai-stop:last-child .ai-stop-body { padding-bottom: 4px; }
+  .ai-stop-title { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
+  .ai-stop.done .ai-stop-title { color: var(--text-mute); text-decoration: line-through; }
+  .ai-stop-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -12756,7 +12777,7 @@ function _renderActionItems() {
   if (onb.length) {
     const doneCount = onb.filter(i => i.completed_at).length;
     html += `<div class="ai-group-label">Onboarding · ${doneCount}/${onb.length}</div>`;
-    html += onb.map(_aiOnbHTML).join('');
+    html += `<div class="ai-subway">${onb.map(_aiOnbHTML).join('')}</div>`;
   }
 
   const open = rest.filter(i => !i.completed_at);
@@ -12777,20 +12798,20 @@ function _aiOnbHTML(it) {
   const isDone = !!it.completed_at;
   // Every step is check/uncheck-able by hand. Auto steps also self-complete
   // from the connection signal until someone overrides them by hand.
-  const check = `<button class="ai-check${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   const status = isDone
     ? `<span class="ai-chip" style="color:#7BC47F">✓ Done</span>`
     : (cfg.auto ? `<span class="ai-chip">Auto · not yet</span>` : `<span class="ai-chip">To do</span>`);
   let cta = (!isDone && cfg.cta)
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
   if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
-  return `<div class="ai-item${isDone ? ' done' : ''}">
-    ${check}
-    <div class="ai-item-body">
-      <div class="ai-item-title">${escapeHTML(it.title)}</div>
-      <div class="ai-meta">${status}</div>
+  // Subway "stop": a circle node on a vertical line + the step body to the right.
+  const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
+  return `<div class="ai-stop${isDone ? ' done' : ''}">
+    <div class="ai-stop-rail">${circle}<div class="ai-stop-line"></div></div>
+    <div class="ai-stop-body">
+      <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+      <div class="ai-stop-meta">${status}${cta}</div>
     </div>
-    <div class="ai-item-actions">${cta}</div>
   </div>`;
 }
 
