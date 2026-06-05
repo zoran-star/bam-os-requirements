@@ -5016,6 +5016,15 @@
   /* #3/#7 — calmer feedback widget in-app so it stops fighting content */
   body.native-app #admin-fb-btn { width: 44px; height: 44px; opacity: 0.9; }
   body.native-app #admin-fb-btn:active { opacity: 1; }
+
+  /* Native feel: no web scrollbars anywhere in the app wrapper. */
+  body.native-app *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+  body.native-app * { scrollbar-width: none !important; }
+
+  /* When the keyboard is open, hide the bottom tab bar so the composer sits
+     directly above the keyboard (no crammed nav strip between them). */
+  body.keyboard-open .mobile-nav { display: none !important; }
+  body.keyboard-open .chat-input-area { padding-bottom: 8px; }
 </style>
 
 <div id="admin-fb-wrap">
@@ -18907,10 +18916,11 @@ function renderMessageThread() {
         : `<a href="${safeUrl}" target="_blank" rel="noreferrer" class="msg-file-chip">📎 ${safeName}</a>`;
     }).join('') + '</div>';
 
-    // Avatar only on the LAST message of a group; spacer keeps bubbles aligned.
-    const avatar = isLast
-      ? `<div class="msg-avatar${fromStaff ? ' bam' : ''}" style="${fromStaff ? '' : 'background:var(--surface-el);color:var(--text-sub)'}">${escapeHTML(fromStaff ? 'BA' : myInitials)}</div>`
-      : '<div class="msg-avatar-spacer"></div>';
+    // Avatar only for incoming (staff) messages, on the last of a group —
+    // iMessage-style: your own messages don't show your avatar.
+    const avatar = fromStaff
+      ? (isLast ? `<div class="msg-avatar bam">BA</div>` : '<div class="msg-avatar-spacer"></div>')
+      : '';
     // Timestamp only on the last message of a group.
     const time = isLast
       ? `<div class="msg-time">${m._optimistic ? 'Sending…' : (m._failed ? 'Failed' : msgShortTime(m.created_at))}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>`
@@ -19716,6 +19726,7 @@ function toggleTheme() {
       fixNativeStatusBar();
       hideNativeSplash();      // kill the black-screen gap (splash held until paint)
       initEdgeSwipeBack();     // iOS-style swipe-from-left-edge to go back
+      initKeyboardChrome();    // hide the tab bar while the keyboard is up
       // Face ID dropped from v1 — the biometric plugin isn't SPM-compatible.
       // initBiometricLock() retained below (inert) for when an SPM plugin lands.
     }
@@ -19771,6 +19782,27 @@ function toggleTheme() {
       var t = e.changedTouches[0];
       if (t && (t.clientX - sx) > TRIGGER && Math.abs(t.clientY - sy) < 55) appGoBack();
     });
+  }
+
+  // Toggle body.keyboard-open from the native Keyboard plugin events so the
+  // bottom tab bar gets out of the way while typing. Falls back to focus/blur
+  // on text inputs if the plugin's events aren't available.
+  function initKeyboardChrome() {
+    try {
+      var Cap = window.Capacitor;
+      var KB = Cap && Cap.Plugins && Cap.Plugins.Keyboard;
+      var on = function () { document.body.classList.add('keyboard-open'); };
+      var off = function () { document.body.classList.remove('keyboard-open'); };
+      if (KB && KB.addListener) {
+        KB.addListener('keyboardWillShow', on);
+        KB.addListener('keyboardWillHide', off);
+      } else {
+        document.addEventListener('focusin', function (e) {
+          if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) on();
+        });
+        document.addEventListener('focusout', off);
+      }
+    } catch (e) {}
   }
 
   function appGoBack() {
@@ -19850,8 +19882,8 @@ function toggleTheme() {
   // client drags down from the very top past a threshold, reload the WebView.
   // Skipped on the Messages/chat view (it has its own scroll regions).
   function initPullToRefresh() {
-    var DEAD_ZONE = 28;       // ignore small drags — nothing happens below this
-    var TRIGGER = 150;        // px of ACTUAL finger travel needed to refresh (deliberate full pull)
+    var DEAD_ZONE = 60;       // big dead zone so normal scroll-to-top never shows the indicator
+    var TRIGGER = 160;        // px of ACTUAL finger travel needed to refresh (deliberate full pull)
     var MAX = 96;             // visual cap on the indicator height
     var ind, startY = 0, pulling = false, armed = false;
 
