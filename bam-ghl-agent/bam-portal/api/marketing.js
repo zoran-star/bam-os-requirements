@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
+import { notifyClientPush } from "./push/_send.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
 //
@@ -456,9 +457,15 @@ async function handleMarketingTickets(req, res) {
       const ask = (body.message || "").trim();
       postClientSlackNotification(ticket.client_id,
         `🔔 Action requested — Marketing [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+      notifyClientPush(ticket.client_id, "ticket-action-needed", {
+        ticketTitle: "a marketing request", ticketId: ticket.id, view: "marketing",
+      }).catch(() => {});
     } else if (action === "mark-completed") {
       postClientSlackNotification(ticket.client_id,
         `✅ Completed — Marketing [${code}]`, req);
+      notifyClientPush(ticket.client_id, "ticket-complete", {
+        ticketTitle: "Your marketing request", ticketId: ticket.id, view: "marketing",
+      }).catch(() => {});
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Marketing [${code}]`, req);
@@ -899,9 +906,15 @@ async function handleContentTickets(req, res) {
       const ask = (body.message || "").trim();
       postClientSlackNotification(ticket.client_id,
         `🔔 Action requested — Content [${code}]${ask ? `\n_${ask}_` : ""}`, req);
+      notifyClientPush(ticket.client_id, "ticket-action-needed", {
+        ticketTitle: "a content request", ticketId: ticket.id, view: "marketing",
+      }).catch(() => {});
     } else if (action === "mark-completed") {
       postClientSlackNotification(ticket.client_id,
         `✅ Completed — Content [${code}]`, req);
+      notifyClientPush(ticket.client_id, "ticket-complete", {
+        ticketTitle: "Your content request", ticketId: ticket.id, view: "marketing",
+      }).catch(() => {});
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Content [${code}]`, req);
