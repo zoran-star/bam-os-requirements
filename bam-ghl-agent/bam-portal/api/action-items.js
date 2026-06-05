@@ -129,6 +129,15 @@ async function loadClientSM(clientId) {
   return { name: s.name || "your Scaling Manager", booking_url: s.booking_url || null };
 }
 
+// The marketing manager (Cam) — fixed for everyone — powers the "Book a call
+// with Cam" step. Resolves the first marketing_manager's name + booking link.
+async function loadMarketingMgr() {
+  const rows = await sb(`staff?role=eq.marketing_manager&select=name,booking_url&order=created_at.asc&limit=1`);
+  const s = rows && rows[0];
+  if (!s) return null;
+  return { name: s.name || "Cam", booking_url: s.booking_url || null };
+}
+
 // Build the systems onboarding ticket from the client's data (replaces the old
 // auto DB trigger — now fired manually by staff via the trigger_buildout step).
 // Idempotent: bails if the client already has a systems_onboarding_ticket_id.
@@ -214,8 +223,10 @@ const ONBOARDING_STEPS = [
   { key: "kpis",           title: "Fill out your KPIs",                  sort: 9, col: "kpi_marked_done_at",            writable: true },
   { key: "offers",         title: "Set up your Offers",                  sort: 10, col: "offers_marked_done_at",       writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 11, col: "call_booked_at",            writable: true },
+  { key: "book_call_cam",  title: "Book a call with Cam (marketing)",    sort: 12, col: "cam_call_booked_at",          writable: true },
+  { key: "submit_content", title: "Submit your raw content",             sort: 13, col: "content_submitted_at",        writable: true },
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
-  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 14, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
@@ -335,7 +346,8 @@ export default async function handler(req, res) {
       }
       const team = await loadTeam(clientId);
       const sm = await loadClientSM(clientId);
-      return res.status(200).json({ items: visibleItems, team, sm });
+      const mktg = await loadMarketingMgr();
+      return res.status(200).json({ items: visibleItems, team, sm, mktg });
     }
 
     // ── POST: create ──────────────────────────────────────────────────────

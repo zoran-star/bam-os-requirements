@@ -12694,7 +12694,8 @@ let _MEMBERS_FILTER_OPEN = false;
 // API: /api/action-items (GET list+team, POST create, PATCH update/toggle, DELETE).
 let _AI_ITEMS = [];
 let _AI_TEAM = [];
-let _AI_SM = null;   // { name, booking_url } — the client's assigned Scaling Manager
+let _AI_SM = null;    // { name, booking_url } — the client's assigned Scaling Manager
+let _AI_MKTG = null;  // { name, booking_url } — the marketing manager (Cam)
 let _aiEditingId = null;
 
 async function fetchAndRenderActionItems() {
@@ -12714,6 +12715,7 @@ async function fetchAndRenderActionItems() {
     _AI_ITEMS = Array.isArray(json.items) ? json.items : [];
     _AI_TEAM = Array.isArray(json.team) ? json.team : [];
     _AI_SM = json.sm || null;
+    _AI_MKTG = json.mktg || null;
     _renderActionItems();
     _updateActionItemsBadge();
   } catch (e) {
@@ -12745,16 +12747,35 @@ const ONB_UI = {
   offers:         { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('offers')" } },
   book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
+  book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
+  submit_content: { auto: false, cta: { label: 'Submit content ↗', fn: '_aiOpenNewCampaign()' } },
 };
 
-// "Book a call" CTA depends on the client's assigned SM: their personal
-// booking link, or a Slack fallback when no SM is set.
-function _aiBookCallCta() {
-  if (_AI_SM && _AI_SM.booking_url) {
-    const first = (_AI_SM.name || '').split(/\s+/)[0] || _AI_SM.name || 'your SM';
-    return `<a class="ai-onb-cta" href="${escapeHTML(_AI_SM.booking_url)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Book with ${escapeHTML(first)} ↗</a>`;
+// Booking CTA: a person's booking link, or a Slack fallback when not set.
+function _aiBookingCta(person, fallbackName) {
+  if (person && person.booking_url) {
+    const first = (person.name || '').split(/\s+/)[0] || person.name || fallbackName;
+    return `<a class="ai-onb-cta" href="${escapeHTML(person.booking_url)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Book with ${escapeHTML(first)} ↗</a>`;
   }
   return `<button class="ai-onb-cta" onclick="window.open(ONB_SLACK_INVITE_URL,'_blank')">Message us on Slack ↗</button>`;
+}
+function _aiBookCallCta() { return _aiBookingCta(_AI_SM, 'your SM'); }
+function _aiCamCallCta()  { return _aiBookingCta(_AI_MKTG, 'Cam'); }
+
+// Open the Marketing new-campaign wizard directly — bypasses the
+// MARKETING_INCLUDED nav gate so clients can submit raw content during
+// onboarding even before marketing is fully set up.
+function _aiOpenNewCampaign() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const mv = document.getElementById('view-marketing');
+  if (mv) mv.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  const mNav = Array.from(document.querySelectorAll('.nav-item'))
+    .find(n => (n.getAttribute('onclick') || '').includes("'marketing'"));
+  if (mNav) mNav.classList.add('active');
+  if (typeof syncMobileNav === 'function') syncMobileNav('marketing');
+  if (typeof fetchAndRenderMarketingRequests === 'function') fetchAndRenderMarketingRequests();
+  if (typeof openNewCampaignWizard === 'function') openNewCampaignWizard();
 }
 
 // Jump from an Action Items onboarding step to its Business Blueprint section.
@@ -12804,6 +12825,7 @@ function _aiOnbHTML(it) {
   let cta = (!isDone && cfg.cta)
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
   if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
+  if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
   const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   return `<div class="ai-stop${isDone ? ' done' : ''}">
