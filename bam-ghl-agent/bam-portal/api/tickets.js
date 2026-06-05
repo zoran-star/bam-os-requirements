@@ -257,7 +257,7 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       if (req.query.resource === "staff") {
-        const data = await sb(`staff?role=in.(systems_manager,systems_executor)&select=id,name,role&order=name.asc`);
+        const data = await sb(`staff?role=in.(admin,systems_manager,systems_executor)&select=id,name,role&order=name.asc`);
         return res.status(200).json({ data });
       }
       if (req.query.id) {
