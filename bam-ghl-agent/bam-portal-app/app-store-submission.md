@@ -377,14 +377,14 @@ Contact: zoran@byanymeansbball.com
 - [ ] Part 2 testing checklist fully passed on a phone
 - [x] `privacy.html` + `support.html` live (pushed to `main`, deployed)
 - [x] Demo reviewer account created, seeded, and login tested *(Demo Academy + `zoran+appreview@…`; password set, login + tour done, 1 sample Change ticket w/ thread seeded 2026-06-01)*
-- [ ] Screenshots captured at the required sizes
+- [x] Screenshots captured (4 shots, iPhone 6.5" 1284x2778, dark mode) — 2026-06-05
 - [ ] Feature graphic made (Play)
 - [x] `appId` / `server.url` confirmed in `capacitor.config.json` *(verified 2026-05-20)*
 - [x] APNs `.p8` key created *(key `9295JX7ZGU`, Team `Z7GHSLAHA9`, 2026-06-05; Vercel `APNS_*` env set — push **sending** is live)*
-- [ ] iOS build archived + uploaded
+- [x] iOS build archived + uploaded (1.0 build 1, iPhone-only) — 2026-06-05
 - [ ] Android `.aab` built + uploaded
-- [ ] Listing copy + App Privacy + review notes entered in both consoles
-- [ ] Submitted to App Store Connect
+- [x] Listing copy + App Privacy + review notes entered (Apple) — 2026-06-05
+- [x] Submitted to App Store Connect — 2026-06-05 (FullControl, Apple ID 6773880619, iPhone-only, status: Waiting for Review)
 - [ ] Submitted to Google Play Console
 
 ---
