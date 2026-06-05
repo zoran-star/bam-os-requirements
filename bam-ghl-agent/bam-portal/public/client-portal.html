@@ -5364,6 +5364,21 @@
       /* #7 — capped width so the dashboard doesn't sprawl on desktop */
       #view-home .home-wrap { max-width: 720px; }
       #view-home .home-greeting { font-family: var(--display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-bottom: 6px; }
+      #view-home .home-profile-row { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+      #view-home .my-avatar {
+        position: relative; flex-shrink: 0; width: 52px; height: 52px; border-radius: 50%;
+        border: 1px solid var(--border-med); background: var(--surface-el, var(--surface));
+        cursor: pointer; overflow: hidden; padding: 0; font-family: inherit;
+        display: flex; align-items: center; justify-content: center;
+      }
+      #view-home .my-avatar-initials { font-family: var(--display); font-size: 18px; font-weight: 600; color: var(--text-sub); }
+      #view-home .my-avatar img { width: 100%; height: 100%; object-fit: cover; }
+      #view-home .my-avatar-cam {
+        position: absolute; right: -2px; bottom: -2px; width: 20px; height: 20px; border-radius: 50%;
+        background: var(--gold, #E8C547); color: #16140F; display: flex; align-items: center; justify-content: center;
+        border: 2px solid var(--ink);
+      }
+      #view-home .my-avatar-cam svg { width: 11px; height: 11px; }
       /* #2 — one-line status under the greeting */
       #view-home .home-status { color: var(--text-sub); font-size: 15px; display: flex; align-items: center; gap: 8px; }
       #view-home .home-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-mute); flex-shrink: 0; }
@@ -5437,8 +5452,17 @@
       </div>
       <div class="content">
         <div class="home-wrap">
-          <div class="home-greeting" id="home-greeting">Welcome back</div>
-          <div class="home-status" id="home-status"><span class="dot"></span><span id="home-status-text">Loading…</span></div>
+          <div class="home-profile-row">
+            <button class="my-avatar" id="my-avatar-btn" onclick="document.getElementById('my-avatar-input').click()" title="Change your photo">
+              <span class="my-avatar-initials" id="my-avatar-initials">—</span>
+              <span class="my-avatar-cam" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+            </button>
+            <input type="file" id="my-avatar-input" accept="image/*" style="display:none" onchange="uploadMyAvatar(event)">
+            <div style="flex:1;min-width:0">
+              <div class="home-greeting" id="home-greeting">Welcome back</div>
+              <div class="home-status" id="home-status"><span class="dot"></span><span id="home-status-text">Loading…</span></div>
+            </div>
+          </div>
 
           <div class="home-sec"><span class="home-sec-label">Needs your attention</span></div>
           <div class="home-tiles" id="home-tiles"></div>
@@ -7832,6 +7856,7 @@ async function openHomeView() {
   const first = (document.getElementById('userName')?.textContent || '').trim().split(/\s+/)[0] || '';
   const g = document.getElementById('home-greeting');
   if (g) g.textContent = (first && first !== '—') ? `${part}, ${first}` : part;
+  loadMyAvatar();   // show / refresh my profile photo
 
   const counts = {};
   try {
@@ -7977,6 +8002,62 @@ async function renderHomeWeek() {
 
 function homeNewRequest() {
   switchView('systems');   // lands on the "open a new request" screen
+}
+
+// ── My profile photo (shows in the group chat for everyone) ────────────────
+function setMyAvatarDisplay(url) {
+  const btn = document.getElementById('my-avatar-btn');
+  const initialsEl = document.getElementById('my-avatar-initials');
+  if (!btn) return;
+  const old = btn.querySelector('img');
+  if (old) old.remove();
+  if (url) {
+    if (initialsEl) initialsEl.style.display = 'none';
+    const img = document.createElement('img');
+    img.src = url; img.alt = '';
+    btn.insertBefore(img, btn.firstChild);
+  } else {
+    if (initialsEl) {
+      initialsEl.style.display = '';
+      initialsEl.textContent = (document.getElementById('userName')?.textContent || '?').trim().slice(0, 2).toUpperCase();
+    }
+  }
+}
+
+async function loadMyAvatar() {
+  setMyAvatarDisplay(null);   // initials immediately
+  try {
+    if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id || null; }
+    if (!_myAuthUserId) return;
+    const { data } = await _sb.from('client_users').select('avatar_url').eq('user_id', _myAuthUserId).limit(1);
+    const url = data && data[0] && data[0].avatar_url;
+    if (url) setMyAvatarDisplay(url);
+  } catch (e) { /* column may not exist yet — initials are fine */ }
+}
+
+async function uploadMyAvatar(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  evt.target.value = '';
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('Please pick an image file.'); return; }
+  if (file.size > 5 * 1024 * 1024) { alert('Max image size is 5 MB.'); return; }
+  const btn = document.getElementById('my-avatar-btn');
+  if (btn) btn.style.opacity = '0.5';
+  try {
+    if (!_myAuthUserId) { const u = await _sb.auth.getUser(); _myAuthUserId = u?.data?.user?.id; }
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = `user/${_myAuthUserId || 'me'}/${Date.now()}.${ext}`;
+    const { error: upErr } = await _sb.storage.from('member-avatars').upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
+    if (upErr) throw upErr;
+    const { data: pub } = _sb.storage.from('member-avatars').getPublicUrl(path);
+    await _msgApi('/api/profile?action=update-avatar', { method: 'POST', body: JSON.stringify({ avatar_url: pub.publicUrl }) });
+    setMyAvatarDisplay(pub.publicUrl);
+    hapticTap('LIGHT');
+  } catch (e) {
+    alert('Photo upload failed: ' + (e.message || e));
+  } finally {
+    if (btn) btn.style.opacity = '1';
+  }
 }
 
 function mobileSwitchView(name) {

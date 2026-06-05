@@ -28,6 +28,47 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
   const isMobile = useIsMobile();
   const me = useStaffMe(session);
   const [showNewStaff, setShowNewStaff] = useState(false);
+
+  // ─── Profile photo (shows under your name in the client group chat) ───
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!me?.id) return;
+    supabase.from("staff").select("avatar_url").eq("id", me.id).maybeSingle()
+      .then(({ data }) => { if (data?.avatar_url) setAvatarUrl(data.avatar_url); })
+      .catch(() => {});
+  }, [me?.id]);
+
+  const onPickAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { alert("Please pick an image file."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Max image size is 5 MB."); return; }
+    setAvatarUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `staff/${me.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("member-avatars")
+        .upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("member-avatars").getPublicUrl(path);
+      const { data: { session: sess } } = await supabase.auth.getSession();
+      const res = await fetch("/api/profile?action=update-avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.access_token}` },
+        body: JSON.stringify({ avatar_url: pub.publicUrl }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "save failed");
+      setAvatarUrl(pub.publicUrl);
+    } catch (err) {
+      alert("Photo upload failed: " + (err.message || err));
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
   // ─── Integration status ───
   const [integrationStatus, setIntegrationStatus] = useState({});
 
@@ -203,16 +244,23 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
         <div style={sectionTitle}>Profile</div>
         <div style={sectionDesc}>Your account details</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{
+          <div onClick={() => avatarInputRef.current?.click()} title="Change your photo" style={{
             width: 48, height: 48, borderRadius: 14, background: tokens.accentGhost,
             color: tokens.accent, display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 20, fontWeight: 700,
+            fontSize: 20, fontWeight: 700, cursor: "pointer", overflow: "hidden",
+            opacity: avatarUploading ? 0.5 : 1,
           }}>
-            {(userName || "M")[0].toUpperCase()}
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : (userName || "M")[0].toUpperCase()}
           </div>
+          <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPickAvatar} />
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: tokens.text }}>{userName || "User"}</div>
             <div style={{ fontSize: 13, color: tokens.textMute }}>{session?.user?.email || "—"}</div>
+            <div onClick={() => avatarInputRef.current?.click()} style={{ fontSize: 12, color: tokens.accent, cursor: "pointer", marginTop: 3 }}>
+              {avatarUploading ? "Uploading…" : (avatarUrl ? "Change photo" : "Add a photo")}
+            </div>
           </div>
         </div>
       </div>
