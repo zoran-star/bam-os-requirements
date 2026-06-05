@@ -162,6 +162,18 @@ Change-specific:
 it before you confirm. **It's skippable — but the summary-parse bug shipped because a step like
 this was skipped. Run it.**
 
+### CI — the automatic gate (GitHub Actions)
+
+Every PR that touches `bam-ghl-agent/bam-portal/**` triggers **Portal CI**
+(`.github/workflows/portal-ci.yml`): `npm ci` → `npm run build` → `node --check` on every API
+function → the client-portal tour verifier. It shows a ✅/❌ on the PR — run the same checks
+locally first so you're never surprised.
+
+> **Status:** advisory (not yet blocking) while we watch it. **To make it block merges:** GitHub →
+> repo Settings → Branches → branch protection for `main` → enable "Require status checks to pass
+> before merging" and select the **Build + checks** job. Once on, a PR that fails CI cannot merge.
+> (eslint is intentionally NOT in CI yet — its config doesn't cover `api/`; fix that first.)
+
 ---
 
 ## 6. Known footguns (the stuff that bites)
