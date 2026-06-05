@@ -1,7 +1,7 @@
 {
-  "name": "BAM Business Portal",
-  "short_name": "BAM Portal",
-  "description": "Your BAM Business client portal — support tickets, ad campaigns, and chat with your team.",
+  "name": "FullControl",
+  "short_name": "FullControl",
+  "description": "Your FullControl client portal — support tickets, ad campaigns, and chat with your team.",
   "start_url": "/client-portal.html",
   "scope": "/client-portal.html",
   "display": "standalone",

@@ -1,4 +1,4 @@
-# BAM Portal — App Store Submission Guide
+# FullControl — App Store Submission Guide
 
 The complete walkthrough for getting the BAM client portal onto the **Apple
 App Store** and **Google Play**. Work top to bottom. Steps marked
@@ -162,7 +162,7 @@ Privacy + support pages go live automatically on the next push to `main`.
 
 Paste these into App Store Connect and the Google Play Console.
 
-- **App name:** `BAM Portal`
+- **App name:** `FullControl`
 - **Subtitle (Apple, 30 char):** `Your academy, all in one place`
 - **Short description (Play, 80 char):** `Run your sports academy — roster, billing, marketing, and support in one app.`
 - **Promotional text (Apple, 170 char):**
@@ -177,7 +177,7 @@ Paste these into App Store Connect and the Google Play Console.
 **Full description** (paste into both stores):
 
 ```
-BAM Portal is the command center for sports academies that work with
+FullControl is the command center for sports academies that work with
 By Any Means.
 
 Sign in to run the parts of your academy that matter most — without
@@ -192,7 +192,7 @@ chasing emails or spreadsheets.
   sync.
 • NOTIFICATIONS — Get notified when something needs your attention.
 
-BAM Portal is built for academy owners and their staff. Access requires
+FullControl is built for academy owners and their staff. Access requires
 an account provided by By Any Means.
 
 Questions? Email zoran@byanymeansbball.com
@@ -296,7 +296,7 @@ Keep the demo account's data clean — no real client names in any shot.
 Build mechanics are in `README.md`. After the build is uploaded:
 
 1. **App Store Connect → My Apps → +** — create the app. Bundle ID
-   `com.byanymeansbusiness.portal`, name `BAM Portal`.
+   `com.byanymeansbusiness.portal`, name `FullControl`.
 2. Fill the version: description, keywords, subtitle, promo text, support
    URL (all from Part 4), screenshots (Part 7), 1024 icon.
 3. **App Privacy** — enter the declaration from Part 5.
@@ -317,7 +317,7 @@ Build mechanics are in `README.md`. After the build is uploaded:
 
 Build mechanics (`.aab`) are in `README.md`. In the Google Play Console:
 
-1. **Create app** — name `BAM Portal`, app (not game), free.
+1. **Create app** — name `FullControl`, app (not game), free.
 2. **Store listing** — short + full description, screenshots, feature
    graphic, app icon (Part 4 + Part 7).
 3. **Data safety** — enter the declaration from Part 5.
@@ -337,7 +337,7 @@ Written to clear the most likely rejections — keep it strong. Set the
 password line before pasting.
 
 ```
-BAM Portal is the mobile client for By Any Means — an established B2B
+FullControl is the mobile client for By Any Means — an established B2B
 service that manages marketing, CRM, and operations for sports
 academies. This is not a website: it is the companion app our existing
 business clients use to run their account day to day. It includes native

@@ -1,4 +1,4 @@
-# BAM Portal — native app (Capacitor wrapper)
+# FullControl — native app (Capacitor wrapper)
 
 This is the **native iOS / Android wrapper** for the BAM Business client
 portal. It is a thin Capacitor shell: the app loads the live portal
