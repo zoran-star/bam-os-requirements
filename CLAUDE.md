@@ -42,8 +42,11 @@ Run `/memory-audit` periodically. Memory drift wastes context.
 ## Repo slash commands and skills
 Slash commands available in this repo (in `.claude/commands/`, shared via git):
 - `/start` — session entry sequence: pull, show recent activity, project menu, route to a project, tell user what's next
+- `/setup` — **one-time setup for a new portal team member** (Cole, Cam, etc.): session-recording config, jq, git identity + a verify check. Run this first on a new machine.
 - `/setup-project-memory <folder>` — scaffold CLAUDE.md + memories/ for a new project folder
 - `/memory-audit` — audit all CLAUDE.md + memories/ folders for drift, stale notes, broken links
+
+**Portal build sessions** (in `bam-ghl-agent/`): `/showtime` primes the session (pulls latest, loads the engineering guide + safe-build rules) and starts recording; `/byebye` generates a test script for what changed, then saves the session to the staff review page.
 
 ### Core alignment
 
