@@ -544,6 +544,8 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [fieldEdits, setFieldEdits] = useState({});
   const [busy, setBusy] = useState(false);
   const [questionMap, setQuestionMap] = useState({});
+  const [flags, setFlags] = useState({});   // { fieldKey: { incorrect: bool, note: string } }
+  const [copied, setCopied] = useState(false);
 
   // Auto-refresh the ticket from the server when the modal opens, so we
   // pick up any client responses that landed after the list was loaded.
@@ -690,6 +692,16 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               Object.prototype.hasOwnProperty.call(fieldEdits, k) ? fieldEdits[k] : (ticket.fields || {})[k];
             return (
               <Section title="Submission" tokens={t}>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+                  <button
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(buildClaudeText(ticket.fields)); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+                      catch (e) { alert("Copy failed: " + (e?.message || e)); }
+                    }}
+                    style={btn(t, "secondary")}
+                  >{copied ? "✓ Copied" : "📋 Copy for Claude"}</button>
+                </div>
                 {Object.entries(ticket.fields || {}).map(([k, v]) => {
                   // Resolve label: real question text > custom-answer hint > raw key
                   let label = questionMap[k];
@@ -699,16 +711,34 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     label = base ? `${base} (other)` : "Other (custom answer)";
                   }
                   if (!label) label = k;
+                  const fl = flags[k] || {};
                   return (
-                    <EditableRow
-                      key={k}
-                      label={label}
-                      value={currentFieldValue(k)}
-                      originalValue={v}
-                      onChange={(nv) => setFieldEdits(prev => ({ ...prev, [k]: nv }))}
-                      disabled={fieldsLocked}
-                      tokens={t}
-                    />
+                    <div key={k}>
+                      <EditableRow
+                        label={label}
+                        value={currentFieldValue(k)}
+                        originalValue={v}
+                        onChange={(nv) => setFieldEdits(prev => ({ ...prev, [k]: nv }))}
+                        disabled={fieldsLocked}
+                        tokens={t}
+                      />
+                      {!fieldsLocked && (
+                        <div style={{ marginTop: 4, marginBottom: 8 }}>
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: fl.incorrect ? t.red : t.textMute, cursor: "pointer" }}>
+                            <input type="checkbox" checked={!!fl.incorrect} onChange={e => setFlags(p => ({ ...p, [k]: { ...p[k], incorrect: e.target.checked } }))} style={{ accentColor: t.red }} />
+                            ⚠ Mark incorrect
+                          </label>
+                          {fl.incorrect && (
+                            <textarea
+                              value={fl.note || ""}
+                              onChange={e => setFlags(p => ({ ...p, [k]: { ...p[k], note: e.target.value } }))}
+                              placeholder="What's wrong / what it should be"
+                              style={{ display: "block", width: "100%", marginTop: 6, padding: "8px 10px", background: t.bg, border: `1px solid ${t.red}66`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", minHeight: 46, resize: "vertical" }}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
                 {(ticket.files || []).length > 0 && (
@@ -741,6 +771,23 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     >Discard</button>
                     <span style={{ fontSize: 12, color: t.textMute }}>
                       {Object.keys(fieldEdits).length} field{Object.keys(fieldEdits).length === 1 ? "" : "s"} edited
+                    </span>
+                  </div>
+                )}
+                {/* Send flagged-incorrect fields back to the client */}
+                {Object.values(flags).some(f => f && f.incorrect) && !fieldsLocked && (
+                  <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}`, display: "flex", gap: 10, alignItems: "center" }}>
+                    <button
+                      onMouseDown={e => e.preventDefault()}
+                      disabled={busy}
+                      onClick={async () => {
+                        await wrap(() => requestClientAction(ticket.id, buildCorrectionsMsg(flags, questionMap)));
+                        setFlags({});
+                      }}
+                      style={btn(t, "primary")}
+                    >{busy ? "Sending…" : "Send corrections to client"}</button>
+                    <span style={{ fontSize: 12, color: t.red }}>
+                      {Object.values(flags).filter(f => f && f.incorrect).length} flagged incorrect
                     </span>
                   </div>
                 )}
@@ -1084,6 +1131,42 @@ function _fmtScalar(v) {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   return String(v);
 }
+
+function _labelize(k) {
+  return String(k || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// A clean, labeled, paste-into-Claude rendering of all the client's inputs.
+function buildClaudeText(fields) {
+  const f = fields || {};
+  const out = [];
+  out.push(f.summary || ("Systems build inputs — " + (f.business_name || "(client)")));
+  out.push("");
+  for (const [k, v] of Object.entries(f)) {
+    if (k === "summary") continue;
+    if (v == null || v === "") { out.push(`${_labelize(k)}: —`); continue; }
+    if (typeof v === "object") {
+      out.push(`${_labelize(k)}:`);
+      out.push(JSON.stringify(v, null, 2));
+      out.push("");
+    } else {
+      out.push(`${_labelize(k)}: ${v}`);
+    }
+  }
+  return out.join("\n");
+}
+
+// Compile the flagged-incorrect fields + notes into a client-action message.
+function buildCorrectionsMsg(flags, qmap) {
+  const items = Object.entries(flags || {})
+    .filter(([, x]) => x && x.incorrect)
+    .map(([k, x]) => {
+      const label = (qmap && qmap[k]) || _labelize(k);
+      return `• ${label}${x.note ? ` — ${x.note}` : ""}`;
+    });
+  return `A few things need fixing before we can build your systems:\n\n${items.join("\n")}\n\nPlease update these in your portal and let us know. Thanks!`;
+}
+
 function ComplexValue({ value, tokens: t, depth = 0 }) {
   if (value == null || value === "") return <span style={{ color: t.textMute }}>—</span>;
   if (typeof value !== "object") return <span>{_fmtScalar(value)}</span>;

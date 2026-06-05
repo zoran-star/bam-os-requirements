@@ -68,8 +68,13 @@ an external connection signal):
 | 9 | `offers` | Set up your Offers | `offers_marked_done_at` | ✅ → BB #bb=offers |
 | 10 | `book_call` | Book a call with your Scaling Manager | `call_booked_at` | ✅ → dynamic SM booking CTA |
 | 11 | `kpis` | Fill out your KPIs | `kpi_marked_done_at` | ✅ → BB #bb=kpis |
+| 12 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
 
 (2026-06-03: `offers` added as step 9; the first-login product tour was cut from 8 steps to a 2-step welcome that just points the client at this Action Items checklist — see [[project_client_portal_tour]].)
+
+**Staff-only steps (`staff_only: true` in ONBOARDING_STEPS):** hidden from clients — the GET filters them out when `!ctx.isStaff`; PATCH 403s a non-staff toggle. `ONBOARDING_STAFF_ONLY` set. Only `trigger_buildout` today.
+
+**`trigger_buildout` (2026-06-05):** staff checks it → `createSystemsOnboardingTicket()` (in api/action-items.js) builds the systems ticket (type onboarding, **due +7 days**, assigned to first systems_manager, full snapshot payload) and stamps `clients.systems_onboarding_ticket_id`. Idempotent. **This REPLACED the old auto-create DB trigger** `trg_systems_onboarding_ticket` (dropped) — see [[project_support_ticket_system]].
 
 **`book_call` (2026-06-05):** writable manual step. Its CTA is dynamic — the GET response now returns `sm: { name, booking_url }` (the client's `scaling_manager_id` → `staff.booking_url`). Client portal renders **"Book with {SM first name} ↗"** linking to that URL; if no SM / no link → **"Message us on Slack ↗"** (`ONB_SLACK_INVITE_URL`). New cols: `staff.booking_url`, `clients.call_booked_at`. Seeded SM links: Anthony McManus (Google) + Mike Eluki (GHL widget). Helpers: `loadClientSM()` (api), `_aiBookCallCta()` + `_AI_SM` (client). Migration `book_call_onboarding_step`.
 

@@ -129,6 +129,66 @@ async function loadClientSM(clientId) {
   return { name: s.name || "your Scaling Manager", booking_url: s.booking_url || null };
 }
 
+// Build the systems onboarding ticket from the client's data (replaces the old
+// auto DB trigger — now fired manually by staff via the trigger_buildout step).
+// Idempotent: bails if the client already has a systems_onboarding_ticket_id.
+// Due in 7 days.
+async function createSystemsOnboardingTicket(clientId) {
+  const crows = await sb(`clients?id=eq.${clientId}&select=*`);
+  const c = crows && crows[0];
+  if (!c) return null;
+  if (c.systems_onboarding_ticket_id) return c.systems_onboarding_ticket_id;
+
+  const staffRows  = await sb(`client_users?client_id=eq.${clientId}&status=eq.active&select=id,name,email,role&order=created_at.asc`);
+  const locRows    = await sb(`locations?client_id=eq.${clientId}&select=id,title,address,notes&order=sort_order.asc,created_at.asc`);
+  const allOffers  = await sb(`offers?client_id=eq.${clientId}&select=id,type,title,status,data&order=sort_order.asc,created_at.asc`);
+  const offers     = (allOffers || []).filter(o => (o.status || "") !== "archived");
+  const smgr       = await sb(`staff?role=eq.systems_manager&select=id&order=created_at.asc&limit=1`);
+  const assignee   = (smgr && smgr[0] && smgr[0].id) || null;
+
+  const bd = c.brand_data || {};
+  const body = {
+    summary: "Systems onboarding — " + (c.business_name || "(no business name)"),
+    client_id: c.id,
+    business_name: c.business_name, legal_name: c.legal_name, owner_name: c.owner_name,
+    email: c.email, phone: c.phone, address: c.address, time_zone: c.time_zone,
+    entity_type: c.entity_type, ein: c.ein,
+    website: bd.website_url || null, domain: bd.domain || null,
+    marketing_included: c.marketing_included === true,
+    slack_channel_id: c.slack_channel_id,
+    ghl: { location_id: c.ghl_location_id, company_id: c.ghl_company_id, connect_status: c.ghl_connect_status },
+    stripe: { account_id: c.stripe_connect_account_id, connect_status: c.stripe_connect_status },
+    brand: bd,
+    kpis: c.kpi_data || {},
+    staff: staffRows || [],
+    locations: locRows || [],
+    offers,
+    marked_done_at: {
+      staff: c.staff_marked_done_at, locations: c.locations_marked_done_at,
+      brand: c.brand_marked_done_at, offers: c.offers_marked_done_at,
+    },
+  };
+
+  const nowIso = new Date().toISOString();
+  const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rows = await sb(`tickets`, {
+    method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      client_id: c.id, type: "onboarding", status: "open", priority: "standard",
+      source: "portal", fields: body, assigned_to: assignee,
+      due_date: dueDate, submitted_at: nowIso, updated_at: nowIso,
+    }),
+  });
+  const ticket = Array.isArray(rows) ? rows[0] : rows;
+  if (ticket && ticket.id) {
+    await sb(`clients?id=eq.${clientId}`, {
+      method: "PATCH", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ systems_onboarding_ticket_id: ticket.id }),
+    });
+  }
+  return ticket && ticket.id;
+}
+
 function dueLabel(d) {
   if (!d) return "";
   return ` · due ${d}`;
@@ -154,9 +214,12 @@ const ONBOARDING_STEPS = [
   { key: "offers",         title: "Set up your Offers",                  sort: 9, col: "offers_marked_done_at",        writable: true },
   { key: "book_call",      title: "Book a call with your Scaling Manager", sort: 10, col: "call_booked_at",            writable: true },
   { key: "kpis",           title: "Fill out your KPIs",                  sort: 11, col: "kpi_marked_done_at",           writable: true },
+  // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
+  { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 12, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
+const ONBOARDING_STAFF_ONLY = new Set(ONBOARDING_STEPS.filter(s => s.staff_only).map(s => s.key));
 
 async function loadClientSignals(clientId) {
   const rows = await sb(`clients?id=eq.${clientId}&select=${ONBOARDING_SIGNAL_COLS}`);
@@ -265,9 +328,14 @@ export default async function handler(req, res) {
         // open first (completed_at null), then soonest due, then newest
         `&order=completed_at.asc.nullsfirst,due_date.asc.nullslast,created_at.desc`
       );
+      // Staff-only onboarding steps (e.g. trigger_buildout) are hidden from clients.
+      let visibleItems = items || [];
+      if (!ctx.isStaff) {
+        visibleItems = visibleItems.filter(it => !it.onboarding_key || !ONBOARDING_STAFF_ONLY.has(it.onboarding_key));
+      }
       const team = await loadTeam(clientId);
       const sm = await loadClientSM(clientId);
-      return res.status(200).json({ items: items || [], team, sm });
+      return res.status(200).json({ items: visibleItems, team, sm });
     }
 
     // ── POST: create ──────────────────────────────────────────────────────
@@ -324,6 +392,10 @@ export default async function handler(req, res) {
       if (!canAccess(ctx, existing.client_id)) return res.status(403).json({ error: "not your academy" });
 
       const obStep = existing.onboarding_key ? ONBOARDING_BY_KEY[existing.onboarding_key] : null;
+      // Staff-only steps (e.g. trigger_buildout) can't be toggled by clients.
+      if (obStep && obStep.staff_only && !ctx.isStaff) {
+        return res.status(403).json({ error: "staff only" });
+      }
 
       const patch = {};
       // Hand-toggling a SIGNAL step (Stripe/GHL connect) marks it overridden so
@@ -384,6 +456,12 @@ export default async function handler(req, res) {
           method: "PATCH", headers: { Prefer: "return=minimal" },
           body: JSON.stringify({ [obStep.col]: b.completed ? patch.completed_at : null }),
         });
+      }
+
+      // Checking "Trigger systems buildout" creates the systems ticket (due +7).
+      if (obStep && obStep.key === "trigger_buildout" && b.completed === true) {
+        try { await createSystemsOnboardingTicket(existing.client_id); }
+        catch (e) { console.error("createSystemsOnboardingTicket failed:", e?.message || e); }
       }
 
       // Slack ping only on a genuine reassignment to a person.
