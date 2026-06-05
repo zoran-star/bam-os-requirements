@@ -227,6 +227,10 @@ const ONBOARDING_STEPS = [
   { key: "submit_content", title: "Submit your raw content",             sort: 13, col: "content_submitted_at",        writable: true },
   // Staff-only: hidden from clients. Checking it CREATES the systems ticket.
   { key: "trigger_buildout", title: "Trigger systems buildout",         sort: 14, col: "systems_buildout_triggered_at", writable: true, staff_only: true },
+  // Staff-only gate. Flipping it UNLOCKS the client's "Book review call" step.
+  { key: "ready_for_review", title: "Ready for review call?",           sort: 15, col: "ready_for_review_at",         writable: true, staff_only: true },
+  // Client step — locked (greyed) until ready_for_review is done.
+  { key: "book_review_call", title: "Book review call with Scaling Manager", sort: 16, col: "review_call_booked_at", writable: true, locked_by: "ready_for_review" },
 ];
 const ONBOARDING_BY_KEY = Object.fromEntries(ONBOARDING_STEPS.map(s => [s.key, s]));
 const ONBOARDING_SIGNAL_COLS = [...new Set(ONBOARDING_STEPS.map(s => s.col))].join(",");
@@ -347,7 +351,10 @@ export default async function handler(req, res) {
       const team = await loadTeam(clientId);
       const sm = await loadClientSM(clientId);
       const mktg = await loadMarketingMgr();
-      return res.status(200).json({ items: visibleItems, team, sm, mktg });
+      // Whether the staff "Ready for review call?" gate is flipped — unlocks
+      // the client's book_review_call step.
+      const review_ready = (items || []).some(i => i.onboarding_key === "ready_for_review" && i.completed_at);
+      return res.status(200).json({ items: visibleItems, team, sm, mktg, review_ready });
     }
 
     // ── POST: create ──────────────────────────────────────────────────────

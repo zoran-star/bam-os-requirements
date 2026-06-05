@@ -2327,13 +2327,17 @@ function ActionItemsTab({ client, tokens, session }) {
   function onbRow(it) {
     const auto = _AI_ONB_AUTO.has(it.onboarding_key);
     const isDone = !!it.completed_at;
+    const note = _AI_ONB_NOTES[it.onboarding_key];
     return (
-      <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: isDone ? 0.6 : 1 }}>
+      <div key={it.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "11px 14px", background: t.surfaceEl, border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8, opacity: isDone ? 0.6 : 1 }}>
         <input type="checkbox" checked={isDone}
           onChange={() => toggle(it)}
           title={auto ? "Auto-completes when connected — or tick by hand" : ""}
-          style={{ width: 18, height: 18, cursor: "pointer", accentColor: t.accent }} />
-        <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</div>
+          style={{ width: 18, height: 18, marginTop: 2, cursor: "pointer", accentColor: t.accent }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: t.text, textDecoration: isDone ? "line-through" : "none" }}>{it.title}</div>
+          {note && <div style={{ fontSize: 12, color: t.textMute, marginTop: 3, lineHeight: 1.45 }}>{note}</div>}
+        </div>
         <span style={_aiChipStyle(t)}>{isDone ? "✓ Done" : (auto ? "Auto · waiting" : "To do")}</span>
       </div>
     );
@@ -2379,6 +2383,11 @@ function ActionItemsTab({ client, tokens, session }) {
 // Onboarding steps that complete automatically from a connection signal —
 // their checkbox is locked in both portals (mirrors the API guard).
 const _AI_ONB_AUTO = new Set(["connect_stripe", "connect_ghl"]);
+
+// Staff-facing notes shown under certain onboarding steps in the staff tab.
+const _AI_ONB_NOTES = {
+  ready_for_review: "Before flipping: confirm the systems are built & good for review, and the content for ads is good. This unlocks the client's “Book review call” step.",
+};
 
 // ─── Auth actions ───────────────────────────────────────────────────────────
 // Transfer ownership of a client to a different person. Opens a modal,
