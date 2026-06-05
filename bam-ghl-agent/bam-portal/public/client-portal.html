@@ -2054,6 +2054,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    position: relative;   /* anchors the "jump to latest" pill */
   }
 
   .chat-header {
@@ -2088,8 +2089,42 @@
     padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 2px;                 /* tight within a group; groups spaced below */
   }
+
+  /* iMessage/Slack-style grouping: consecutive same-sender messages stack
+     tight; a new group (different sender / >5min / new day) gets air. */
+  .msg-row.grp-first:not(:first-child) { margin-top: 14px; }
+  .msg-avatar-spacer { width: 28px; flex-shrink: 0; }
+  .msg-row.optimistic .msg-bubble { opacity: 0.55; }
+  .msg-row.optimistic .msg-time { color: var(--text-mute); }
+
+  .msg-files { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .msg-img-link { display: block; }
+  .msg-img { max-width: 240px; max-height: 240px; border-radius: 10px; display: block; }
+  .msg-file-chip {
+    font-size: 12px; color: var(--accent); text-decoration: none;
+    padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px;
+    display: inline-block;
+  }
+
+  /* Typing indicator with animated dots */
+  .msg-typing { display: flex; align-items: center; gap: 7px; padding: 4px 14px; color: var(--text-mute); font-size: 12px; font-style: italic; }
+  .msg-typing-dots { display: inline-flex; gap: 3px; }
+  .msg-typing-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--text-mute); animation: msgTypingBounce 1.2s infinite ease-in-out; }
+  .msg-typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .msg-typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes msgTypingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+
+  /* "Jump to latest" pill (shows when scrolled up) */
+  #msg-jump-pill {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: 88px; z-index: 5; display: none; align-items: center; gap: 6px;
+    background: var(--gold, #E8C547); color: #16140F; border: none; cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 600; padding: 8px 14px;
+    border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  #msg-jump-pill svg { width: 14px; height: 14px; }
 
   .msg-group { display: flex; flex-direction: column; gap: 6px; }
 
@@ -4907,7 +4942,9 @@
       border-bottom: 1px solid var(--line);
     }
     .chat-header { padding: 14px 16px; }
-    .chat-messages { padding: 16px; gap: 16px; }
+    .chat-messages { padding: 16px; gap: 2px; }
+    /* composer clears the home-indicator inside the native app */
+    body.native-app .chat-input-area { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
     .msg-bubble { max-width: 82%; }
     .chat-input-area { padding: 12px 16px; }
 
@@ -6063,9 +6100,13 @@ Then the call to action."]</div>
               <div class="chat-header-name" id="messages-header-name">Chat with our team</div>
             </div>
           </div>
-          <div class="chat-messages" id="messages-thread">
+          <div class="chat-messages" id="messages-thread" onscroll="_msgThreadScroll()">
             <div class="req-empty" style="padding:48px 24px;text-align:center">Loading messages…</div>
           </div>
+          <button type="button" id="msg-jump-pill" onclick="msgJumpToLatest()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            Latest
+          </button>
           <div class="chat-input-area">
             <div id="messages-pending-files" style="display:none;padding:0 4px 8px;font-size:12px;color:var(--text-mute)"></div>
             <div class="chat-input-wrap">
@@ -18808,52 +18849,103 @@ async function openMessageConvo(conversationId) {
   }
 }
 
+// Day-label for chat dividers: Today / Yesterday / weekday / date.
+function dayLabel(d) {
+  const now = new Date();
+  const ds = d.toDateString();
+  if (ds === now.toDateString()) return 'Today';
+  if (ds === new Date(now.getTime() - 86400000).toDateString()) return 'Yesterday';
+  if ((now - d) / 86400000 < 7) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+}
+
 function renderMessageThread() {
   const root = document.getElementById('messages-thread');
   if (!root) return;
+  // Smart-scroll: remember whether we were pinned to the bottom BEFORE re-render.
+  const wasNearBottom = (root.scrollHeight - root.scrollTop - root.clientHeight) < 140;
+
   if (_msgMessages.length === 0) {
     root.innerHTML = '<div class="req-empty" style="padding:48px 24px;text-align:center">No messages yet. Say hi 👋</div>';
+    _setJumpPill(false);
     return;
   }
-  const html = _msgMessages.map(m => {
-    const isMine = !m.author_staff_id;  // client side: my messages = client author
+
+  const myInitials = (document.getElementById('userName')?.textContent || '?').slice(0, 2).toUpperCase();
+  const sameSide = (a, b) => (!!a.author_staff_id) === (!!b.author_staff_id);
+  const within5 = (a, b) => Math.abs(new Date(a.created_at) - new Date(b.created_at)) < 5 * 60 * 1000;
+  const sameDay = (a, b) => new Date(a.created_at).toDateString() === new Date(b.created_at).toDateString();
+
+  let html = '';
+  let prevDay = '';
+  for (let i = 0; i < _msgMessages.length; i++) {
+    const m = _msgMessages[i];
+    const d = new Date(m.created_at);
+    const day = d.toDateString();
+    if (day !== prevDay) { html += `<div class="chat-date-divider">${escapeHTML(dayLabel(d))}</div>`; prevDay = day; }
+
+    const prev = _msgMessages[i - 1], next = _msgMessages[i + 1];
     const fromStaff = !!m.author_staff_id;
-    const avatar = fromStaff ? 'BA' : ((document.getElementById('userName')?.textContent || '?').slice(0, 2).toUpperCase());
-    const ageMs = Date.now() - new Date(m.created_at).getTime();
-    const canEdit = isMine && !m.deleted_at && ageMs < MSG_EDIT_WINDOW_MS;
+    const isMine = !fromStaff;
+    // #1 grouping — a group breaks on different sender / >5min gap / new day.
+    const samePrev = prev && sameSide(prev, m) && within5(prev, m) && sameDay(prev, m);
+    const sameNext = next && sameSide(next, m) && within5(next, m) && sameDay(next, m);
+    const isFirst = !samePrev, isLast = !sameNext;
+
+    const ageMs = Date.now() - d.getTime();
+    const canEdit = isMine && !m.deleted_at && !m._optimistic && ageMs < MSG_EDIT_WINDOW_MS;
     const body = m.deleted_at
       ? '<span style="color:var(--text-mute);font-style:italic">(deleted)</span>'
       : escapeHTML(m.body || '');
     const files = Array.isArray(m.files) ? m.files : [];
-    const filesHtml = files.length === 0 ? '' : '<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">' + files.map(f => {
+    const filesHtml = files.length === 0 ? '' : '<div class="msg-files">' + files.map(f => {
       const isImg = (f.mime || '').startsWith('image/');
       const safeUrl = escapeAttr(f.url || '#');
       const safeName = escapeHTML(f.name || 'file');
       return isImg
-        ? `<a href="${safeUrl}" target="_blank" rel="noreferrer"><img src="${safeUrl}" alt="${safeName}" style="max-width:240px;max-height:240px;border-radius:6px;display:block"></a>`
-        : `<a href="${safeUrl}" target="_blank" rel="noreferrer" style="font-size:12px;color:var(--accent);text-decoration:none;padding:5px 9px;border:1px solid var(--line);border-radius:6px;display:inline-block">📎 ${safeName}</a>`;
+        ? `<a href="${safeUrl}" target="_blank" rel="noreferrer" class="msg-img-link"><img src="${safeUrl}" alt="${safeName}" class="msg-img"></a>`
+        : `<a href="${safeUrl}" target="_blank" rel="noreferrer" class="msg-file-chip">📎 ${safeName}</a>`;
     }).join('') + '</div>';
-    return `
-      <div class="msg-group">
-        <div class="msg-row${isMine ? ' outgoing' : ''}">
-          <div class="msg-avatar${fromStaff ? ' bam' : ''}" style="${fromStaff ? '' : 'background:var(--surface-el);color:var(--text-sub)'}">${escapeHTML(avatar)}</div>
-          <div class="msg-bubble">
-            ${body}
-            ${filesHtml}
-          </div>
-          <div class="msg-time">${msgShortTime(m.created_at)}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-  // Typing indicator
+
+    // Avatar only on the LAST message of a group; spacer keeps bubbles aligned.
+    const avatar = isLast
+      ? `<div class="msg-avatar${fromStaff ? ' bam' : ''}" style="${fromStaff ? '' : 'background:var(--surface-el);color:var(--text-sub)'}">${escapeHTML(fromStaff ? 'BA' : myInitials)}</div>`
+      : '<div class="msg-avatar-spacer"></div>';
+    // Timestamp only on the last message of a group.
+    const time = isLast
+      ? `<div class="msg-time">${m._optimistic ? 'Sending…' : (m._failed ? 'Failed' : msgShortTime(m.created_at))}${m.edited_at ? ' · edited' : ''}${canEdit ? ` · <a href="#" onclick="event.preventDefault();deleteMsg('${m.id}')" style="color:var(--text-mute);text-decoration:underline">delete</a>` : ''}</div>`
+      : '';
+    html += `<div class="msg-row${isMine ? ' outgoing' : ''}${isFirst ? ' grp-first' : ''}${isLast ? ' grp-last' : ''}${m._optimistic ? ' optimistic' : ''}">${avatar}<div class="msg-bubble">${body}${filesHtml}</div>${time}</div>`;
+  }
+
+  // Typing indicator (animated dots)
   const typingNames = Object.values(_msgTypingUsers).map(u => u.name);
   const typingHtml = typingNames.length > 0
-    ? `<div style="padding:6px 14px;color:var(--text-mute);font-size:12px;font-style:italic">${typingNames.length === 1 ? escapeHTML(typingNames[0]) + ' is typing…' : typingNames.length + ' people typing…'}</div>`
+    ? `<div class="msg-typing">${typingNames.length === 1 ? escapeHTML(typingNames[0]) + ' is typing' : typingNames.length + ' people typing'}<span class="msg-typing-dots"><span></span><span></span><span></span></span></div>`
     : '';
   root.innerHTML = html + typingHtml;
-  // Auto-scroll to bottom
-  requestAnimationFrame(() => { root.scrollTop = root.scrollHeight; });
+
+  // #6 — only auto-scroll if the user was already at the bottom; else offer the pill.
+  if (wasNearBottom) {
+    requestAnimationFrame(() => { root.scrollTop = root.scrollHeight; _setJumpPill(false); });
+  } else {
+    _setJumpPill(true);
+  }
+}
+
+function _setJumpPill(show) {
+  const p = document.getElementById('msg-jump-pill');
+  if (p) p.style.display = show ? 'flex' : 'none';
+}
+function msgJumpToLatest() {
+  const root = document.getElementById('messages-thread');
+  if (root) root.scrollTo({ top: root.scrollHeight, behavior: 'smooth' });
+  _setJumpPill(false);
+}
+function _msgThreadScroll() {
+  const root = document.getElementById('messages-thread');
+  if (!root) return;
+  if ((root.scrollHeight - root.scrollTop - root.clientHeight) < 140) _setJumpPill(false);
 }
 
 function subscribeMessagesRealtime(conversationId) {
@@ -18985,22 +19077,40 @@ async function sendCurrentMessage() {
   const body = (input?.value || '').trim();
   const readyFiles = _msgPendingFiles.filter(f => f.attachment && !f.error).map(f => f.attachment);
   if (!body && readyFiles.length === 0) return;
+
+  hapticTap('LIGHT');   // tactile send feedback (native only)
+
+  // #3 — optimistic: show the message instantly (faded "Sending…"), clear the
+  // composer, then reconcile with the server's row. Feels like iMessage.
+  const tempId = 'tmp-' + Date.now();
+  _msgMessages.push({
+    id: tempId, body, files: readyFiles,
+    author_staff_id: null, author_client_id: 'me',
+    created_at: new Date().toISOString(), _optimistic: true,
+  });
+  input.value = '';
+  input.style.height = 'auto';
+  const sentFiles = readyFiles;
+  _msgPendingFiles = [];
+  renderPendingFiles();
+  renderMessageThread();
+
   const btn = document.getElementById('messages-send-btn');
   if (btn) btn.style.opacity = '0.5';
   try {
     const json = await _msgApi('/api/messages?action=send', {
       method: 'POST',
-      body: JSON.stringify({ conversation_id: _msgActiveConvoId, body, files: readyFiles }),
+      body: JSON.stringify({ conversation_id: _msgActiveConvoId, body, files: sentFiles }),
     });
+    // Swap the optimistic placeholder for the real row (realtime may also add it).
+    _msgMessages = _msgMessages.filter(m => m.id !== tempId);
     if (json.message && !_msgMessages.some(m => m.id === json.message.id)) {
       _msgMessages.push(json.message);
-      renderMessageThread();
     }
-    input.value = '';
-    input.style.height = 'auto';
-    _msgPendingFiles = [];
-    renderPendingFiles();
+    renderMessageThread();
   } catch (err) {
+    _msgMessages = _msgMessages.map(m => m.id === tempId ? { ...m, _optimistic: false, _failed: true } : m);
+    renderMessageThread();
     alert('Send failed: ' + err.message);
   } finally {
     if (btn) btn.style.opacity = '1';
@@ -19603,8 +19713,9 @@ function toggleTheme() {
     if (typeof isNativeApp === 'function' && isNativeApp()) {
       document.body.classList.add('native-app');
       initPullToRefresh();
-      initBiometricLock();
       fixNativeStatusBar();
+      // Face ID dropped from v1 — the biometric plugin isn't SPM-compatible.
+      // initBiometricLock() retained below (inert) for when an SPM plugin lands.
     }
   } catch (e) { /* never block boot on chrome tagging */ }
 
