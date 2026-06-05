@@ -12762,6 +12762,7 @@ let _AI_ITEMS = [];
 let _AI_TEAM = [];
 let _AI_SM = null;    // { name, booking_url } — the client's assigned Scaling Manager
 let _AI_MKTG = null;  // { name, booking_url } — the marketing manager (Cam)
+let _AI_ADS = null;   // { name, booking_url } — the ads specialist (Ximena)
 let _AI_REVIEW_READY = false;  // staff flipped "Ready for review call?" → unlocks book_review_call
 let _aiEditingId = null;
 
@@ -12783,6 +12784,7 @@ async function fetchAndRenderActionItems() {
     _AI_TEAM = Array.isArray(json.team) ? json.team : [];
     _AI_SM = json.sm || null;
     _AI_MKTG = json.mktg || null;
+    _AI_ADS = json.ads || null;
     _AI_REVIEW_READY = !!json.review_ready;
     _renderActionItems();
     _updateActionItemsBadge();
@@ -12816,6 +12818,7 @@ const ONB_UI = {
   book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
   book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
+  book_call_ximena: { auto: false, cta: null }, // CTA is dynamic — see _aiXimenaCallCta()
   submit_content: { auto: false, cta: { label: 'Submit content ↗', fn: '_aiOpenNewCampaign()' } },
   book_review_call: { auto: false, cta: null }, // locked until staff are ready; dynamic SM CTA
 };
@@ -12830,6 +12833,7 @@ function _aiBookingCta(person, fallbackName) {
 }
 function _aiBookCallCta() { return _aiBookingCta(_AI_SM, 'your SM'); }
 function _aiCamCallCta()  { return _aiBookingCta(_AI_MKTG, 'Cam'); }
+function _aiXimenaCallCta() { return _aiBookingCta(_AI_ADS, 'Ximena'); }
 
 // Open the Marketing new-campaign wizard directly — bypasses the
 // MARKETING_INCLUDED nav gate so clients can submit raw content during
@@ -12906,6 +12910,7 @@ function _aiOnbHTML(it) {
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
   if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
+  if (it.onboarding_key === 'book_call_ximena' && !isDone) cta = _aiXimenaCallCta();
   if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
   const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;

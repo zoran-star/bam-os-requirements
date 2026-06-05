@@ -73,8 +73,9 @@ an external connection signal):
 | 14 | `trigger_buildout` | Trigger systems buildout | `systems_buildout_triggered_at` | 🔒 **staff-only** → creates the systems ticket |
 | 15 | `ready_for_review` | Ready for review call? | `ready_for_review_at` | 🔒 **staff-only gate** → unlocks step 16. Staff note via `_AI_ONB_NOTES` |
 | 16 | `book_review_call` | Book review call with Scaling Manager | `review_call_booked_at` | client step — **LOCKED/greyed until step 15 done**; then dynamic SM booking CTA |
+| 17 | `book_call_ximena` | Book a call with Ximena (ads) | `ximena_call_booked_at` | ✅ → dynamic CTA from first `marketing_executor` (Ximena) `booking_url` |
 
-GET also returns `mktg: { name, booking_url }` (first `marketing_manager` = Cam) + `review_ready` (bool — whether `ready_for_review` is done). Cam's `staff.booking_url` is unset — falls back to "Message us on Slack" until provided. `_aiBookingCta(person, fallback)` is the shared booking-button helper (SM + Cam).
+GET also returns `mktg` (first `marketing_manager` = **Cam**, link set 2026-06-05: content-acceleration), `ads` (first `marketing_executor` = **Ximena**, link not set yet → Slack fallback), and `review_ready` (bool). `_aiBookingCta(person, fallback)` is the shared booking-button helper (SM `_AI_SM` · Cam `_AI_MKTG` · Ximena `_AI_ADS`).
 
 **Locking:** `book_review_call` has `locked_by: "ready_for_review"`. Client portal renders it greyed/non-interactive with a 🔒 + "Unlocks once your build is ready for review" until `_AI_REVIEW_READY` (from GET `review_ready`). The staff "Ready for review call?" step shows a reminder note (`_AI_ONB_NOTES`) to verify systems + ad content before flipping.
 
