@@ -391,8 +391,14 @@ PRODUCT/CREDIT MODEL (#4) — DECIDED 2026-06-05: **MASTER CREDITS, single autom
    3/wk:12, unlmtd:48 (48 = "effectively unlimited", big-grant approach). Per
    payment grant = monthly × months-in-cycle (4-wk→×1, 3mo→×3, 6mo→×6), e.g.
    2/wk 3-month = 24, unlmtd 6-month = 288. **Credits EXPIRE at end of each billing
-   cycle** (set expiry on the Add Credits action / send expiry in payload). Plan
-   tiers ARE enforced by credit count; unlmtd is just a high number.
+   cycle**. NOTE (2026-06-05): the "Add Credits" action has NO expiry field. Expiry
+   is done via **RESET-THEN-ADD** in the single Incoming Webhook automation:
+     (1) Data Source "Get User Credits" → current Master balance
+     (2) Action "Redeem Credits from a User" → amount = that balance (zeroes it)
+     (3) Action "Add Credits → Master" → {{payload.credits}}
+   Each payment SETS the balance to the new cycle's amount → unused credits don't
+   roll over = effective cycle-end expiry. Plan tiers ARE enforced by credit count;
+   unlmtd is just a high number (48).
 
 TRACK A (new customers): GHL/FC form → createCoachiqUser (capture id) → PORTAL
    Stripe Checkout (portal-owned sub) → webhook → addCoachiqCredits → app-download
