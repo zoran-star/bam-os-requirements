@@ -111,6 +111,16 @@ create+enroll, and admin read queries should resolve the 32 missing coachiq ids.
 Fallback if admin access can't be arranged: Zapier "Create User" (integration
 scope may enroll). signUp_V2 alone only makes bare, unenrolled accounts.
 
+**RESOLVED 2026-06-05 — direct-API create+enroll is a DEAD END.** Tested an
+admin-dashboard JWT (same user 9c343fbf): `adminAddUser` on api-v3 → "You are not
+allowed to do this", and `admin.coachiq.io/graphql` (the host the dashboard uses)
+returns **403 — WAF-blocked to server-side requests** even with browser headers
+(Origin/Referer/UA) + the token. The dashboard creates users only in-browser
+(WAF + session cookies we can't replicate). So the portal CANNOT create+enroll a
+CoachIQ user via any token/API we can reach. **Use one of:** (a) Zapier "Create
+User" action (untested — does it enroll in the group?), or (b) manual creation in
+the CoachIQ UI. Credit bridge + (proposed) create-sub are unaffected.
+
 ⚠️ Test cleanup: signUp_V2 created ~2 "FCTEST DELETEME" users in BAM GTA — delete
 them in CoachIQ People (can't via API; deleteUser needs staff login).
 
