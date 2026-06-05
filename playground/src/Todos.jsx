@@ -5,7 +5,7 @@ const TABLE = 'playground_todos'
 const INDENT = 26 // px per nesting level
 const SLIDE_THRESHOLD = 45 // px slide before it indents/outdents
 
-export default function Todos({ title = 'TODO', onClose }) {
+export default function Todos({ title = 'TODO', board = 'todo', onClose }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState({})
@@ -19,16 +19,17 @@ export default function Todos({ title = 'TODO', onClose }) {
   useEffect(() => {
     load()
     const ch = supabase
-      .channel('pg_todos')
-      .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, load)
+      .channel(`pg_todos_${board}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: TABLE, filter: `board=eq.${board}` }, load)
       .subscribe()
     return () => supabase.removeChannel(ch)
-  }, [])
+  }, [board])
 
   async function load() {
     const { data, error } = await supabase
       .from(TABLE)
       .select('*')
+      .eq('board', board)
       .order('section_position', { ascending: true })
       .order('position', { ascending: true })
     if (!error) setItems(data || [])
@@ -78,7 +79,7 @@ export default function Todos({ title = 'TODO', onClose }) {
     if (!label) return
     const position = items.filter((i) => i.section === section).length
     setAdding((a) => ({ ...a, [section]: '' }))
-    await supabase.from(TABLE).insert({ section, section_position: sectionPosition, label, position })
+    await supabase.from(TABLE).insert({ board, section, section_position: sectionPosition, label, position })
     load()
   }
 
@@ -87,7 +88,7 @@ export default function Todos({ title = 'TODO', onClose }) {
     if (!name) return
     const nextPos = sections.length ? Math.max(...sections.map((s) => s.pos)) + 1 : 0
     setNewSection('')
-    await supabase.from(TABLE).insert({ section: name, section_position: nextPos, label: 'new item', position: 0 })
+    await supabase.from(TABLE).insert({ board, section: name, section_position: nextPos, label: 'new item', position: 0 })
     load()
   }
 

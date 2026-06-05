@@ -161,7 +161,7 @@ export default function Whiteboard({ onOpen }) {
             }}
           >
             {w.type === 'todo' ? (
-              <TodoPreview title={w.title} />
+              <TodoPreview title={w.title} board={w.board} />
             ) : w.type === 'slack' ? (
               <div className="slack-preview">
                 <div className="sp-mark">#</div>

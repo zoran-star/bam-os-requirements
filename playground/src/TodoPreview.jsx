@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
 // Small read-only preview of the TODO board, shown on the whiteboard card.
-export default function TodoPreview({ title }) {
+export default function TodoPreview({ title, board = 'todo' }) {
   const [items, setItems] = useState([])
 
   useEffect(() => {
@@ -10,13 +10,14 @@ export default function TodoPreview({ title }) {
     supabase
       .from('playground_todos')
       .select('label, done, section, section_position, position')
+      .eq('board', board)
       .order('section_position', { ascending: true })
       .order('position', { ascending: true })
       .then(({ data }) => alive && setItems(data || []))
     return () => {
       alive = false
     }
-  }, [])
+  }, [board])
 
   const done = items.filter((i) => i.done).length
 

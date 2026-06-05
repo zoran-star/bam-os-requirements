@@ -17,7 +17,7 @@ export default function App() {
       {openWidget && (
         <div className="zoom-layer">
           {openWidget.type === 'todo' && (
-            <Todos title={openWidget.title} onClose={() => setOpenWidget(null)} />
+            <Todos title={openWidget.title} board={openWidget.board} onClose={() => setOpenWidget(null)} />
           )}
           {openWidget.type === 'slack' && (
             <SlackDigest title={openWidget.title} onClose={() => setOpenWidget(null)} />
