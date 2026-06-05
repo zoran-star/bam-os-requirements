@@ -5,7 +5,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SLACK_USER_ID = "U09A66CU5N2"; // Zoran (zoran@byanymeansbball.com)
-const MAX_CHANNELS = 60; // safety cap
+const MAX_CHANNELS = 200; // safety cap (covers most workspaces fully)
 const PER_CHANNEL_CHARS = 4000; // truncate transcript fed to Claude
 const MODEL = "claude-haiku-4-5-20251001";
 
