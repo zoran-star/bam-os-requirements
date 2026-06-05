@@ -19257,8 +19257,27 @@ function toggleTheme() {
       document.body.classList.add('native-app');
       initPullToRefresh();
       initBiometricLock();
+      fixNativeStatusBar();
     }
   } catch (e) { /* never block boot on chrome tagging */ }
+
+  // Status-bar fix. With `contentInset: "never"` in capacitor.config.json,
+  // env(safe-area-inset-top) reads 0 in this WebView, so the CSS padding has
+  // nothing to add and the sticky header tucks under the clock. Fix at the
+  // native layer: tell the status bar NOT to overlay the webview, so the web
+  // content sits *below* it. The configured ink background (#16140F) fills the
+  // bar, so it stays seamless. Uses the already-installed @capacitor/status-bar
+  // plugin → no rebuild, takes effect on the next app load.
+  function fixNativeStatusBar() {
+    try {
+      var Cap = window.Capacitor;
+      if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+      var SB = Cap.Plugins && Cap.Plugins.StatusBar;
+      if (!SB) return;
+      if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: false });
+      if (SB.setBackgroundColor) SB.setBackgroundColor({ color: '#16140F' });
+    } catch (e) { /* cosmetic — never throw */ }
+  }
 
   // #11 — Face ID / biometric unlock. FAIL-OPEN + feature-detected: a total
   // no-op until @aparajita/capacitor-biometric-auth is installed AND the user
