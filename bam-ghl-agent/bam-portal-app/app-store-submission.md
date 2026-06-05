@@ -373,7 +373,7 @@ Contact: zoran@byanymeansbball.com
 
 ## Part 11 — Final pre-submit checklist
 
-- [ ] Part 1 feature list approved
+- [x] Part 1 feature list approved *(Coleman, 2026-06-05 — Home/Messages-group-chat/Systems/Marketing + Resources, FullControl, push live)*
 - [ ] Part 2 testing checklist fully passed on a phone
 - [x] `privacy.html` + `support.html` live (pushed to `main`, deployed)
 - [x] Demo reviewer account created, seeded, and login tested *(Demo Academy + `zoran+appreview@…`; password set, login + tour done, 1 sample Change ticket w/ thread seeded 2026-06-01)*
