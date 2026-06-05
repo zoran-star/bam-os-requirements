@@ -4,7 +4,8 @@
   "webDir": "www",
   "backgroundColor": "#16140F",
   "server": {
-    "url": "https://portal.byanymeansbusiness.com/client-portal.html"
+    "url": "https://portal.byanymeansbusiness.com/client-portal.html",
+    "errorPath": "offline.html"
   },
   "ios": {
     "contentInset": "never"
