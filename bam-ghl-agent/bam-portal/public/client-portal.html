@@ -592,6 +592,9 @@
   .ai-stop-title { font-size: 14px; font-weight: 600; color: var(--text); word-break: break-word; }
   .ai-stop.done .ai-stop-title { color: var(--text-mute); text-decoration: line-through; }
   .ai-stop-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+  .ai-stop.locked { opacity: 0.6; }
+  .ai-stop.locked .ai-stop-circle { border-style: dashed; cursor: default; font-size: 12px; }
+  .ai-stop-hint { font-size: 11px; color: var(--text-mute); }
 
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -12696,6 +12699,7 @@ let _AI_ITEMS = [];
 let _AI_TEAM = [];
 let _AI_SM = null;    // { name, booking_url } — the client's assigned Scaling Manager
 let _AI_MKTG = null;  // { name, booking_url } — the marketing manager (Cam)
+let _AI_REVIEW_READY = false;  // staff flipped "Ready for review call?" → unlocks book_review_call
 let _aiEditingId = null;
 
 async function fetchAndRenderActionItems() {
@@ -12716,6 +12720,7 @@ async function fetchAndRenderActionItems() {
     _AI_TEAM = Array.isArray(json.team) ? json.team : [];
     _AI_SM = json.sm || null;
     _AI_MKTG = json.mktg || null;
+    _AI_REVIEW_READY = !!json.review_ready;
     _renderActionItems();
     _updateActionItemsBadge();
   } catch (e) {
@@ -12749,6 +12754,7 @@ const ONB_UI = {
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
   book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
   submit_content: { auto: false, cta: { label: 'Submit content ↗', fn: '_aiOpenNewCampaign()' } },
+  book_review_call: { auto: false, cta: null }, // locked until staff are ready; dynamic SM CTA
 };
 
 // Booking CTA: a person's booking link, or a Slack fallback when not set.
@@ -12817,6 +12823,17 @@ const _AI_CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 function _aiOnbHTML(it) {
   const cfg = ONB_UI[it.onboarding_key] || {};
   const isDone = !!it.completed_at;
+  // book_review_call is locked (greyed, non-interactive) until staff flip the
+  // "Ready for review call?" gate on their side.
+  if (it.onboarding_key === 'book_review_call' && !isDone && !_AI_REVIEW_READY) {
+    return `<div class="ai-stop locked">
+      <div class="ai-stop-rail"><span class="ai-stop-circle">🔒</span><div class="ai-stop-line"></div></div>
+      <div class="ai-stop-body">
+        <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+        <div class="ai-stop-meta"><span class="ai-chip">🔒 Locked</span><span class="ai-stop-hint">Unlocks once your build is ready for review.</span></div>
+      </div>
+    </div>`;
+  }
   // Every step is check/uncheck-able by hand. Auto steps also self-complete
   // from the connection signal until someone overrides them by hand.
   const status = isDone
@@ -12826,6 +12843,7 @@ function _aiOnbHTML(it) {
     ? `<button class="ai-onb-cta" onclick="${cfg.cta.fn}">${cfg.cta.label}</button>` : '';
   if (it.onboarding_key === 'book_call' && !isDone) cta = _aiBookCallCta();
   if (it.onboarding_key === 'book_call_cam' && !isDone) cta = _aiCamCallCta();
+  if (it.onboarding_key === 'book_review_call' && !isDone) cta = _aiBookCallCta();
   // Subway "stop": a circle node on a vertical line + the step body to the right.
   const circle = `<button class="ai-stop-circle${isDone ? ' on' : ''}" onclick="toggleActionItem('${it.id}', ${isDone ? 'false' : 'true'})" aria-label="${isDone ? 'Mark not done' : 'Mark done'}" title="${cfg.auto ? 'Auto-completes when connected — or tick by hand' : ''}">${isDone ? _AI_CHECK_ICON : ''}</button>`;
   return `<div class="ai-stop${isDone ? ' done' : ''}">
