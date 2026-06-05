@@ -12,9 +12,12 @@
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 1000,
+      "launchAutoHide": false,
+      "launchShowDuration": 6000,
       "backgroundColor": "#16140F",
-      "showSpinner": false
+      "showSpinner": true,
+      "spinnerStyle": "small",
+      "iosSpinnerStyle": "small"
     },
     "StatusBar": {
       "style": "DARK",

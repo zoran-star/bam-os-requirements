@@ -19714,6 +19714,8 @@ function toggleTheme() {
       document.body.classList.add('native-app');
       initPullToRefresh();
       fixNativeStatusBar();
+      hideNativeSplash();      // kill the black-screen gap (splash held until paint)
+      initEdgeSwipeBack();     // iOS-style swipe-from-left-edge to go back
       // Face ID dropped from v1 — the biometric plugin isn't SPM-compatible.
       // initBiometricLock() retained below (inert) for when an SPM plugin lands.
     }
@@ -19735,6 +19737,54 @@ function toggleTheme() {
       if (SB.setOverlaysWebView) SB.setOverlaysWebView({ overlay: false });
       if (SB.setBackgroundColor) SB.setBackgroundColor({ color: '#16140F' });
     } catch (e) { /* cosmetic — never throw */ }
+  }
+
+  // Hide the native splash the moment the portal has painted, so there's no
+  // black gap between the 1s splash and the WebView finishing its remote load.
+  // (capacitor.config sets launchAutoHide:false so the splash waits for us.)
+  function hideNativeSplash() {
+    try {
+      var Cap = window.Capacitor;
+      if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+      var SS = Cap.Plugins && Cap.Plugins.SplashScreen;
+      if (!SS || !SS.hide) return;
+      var hide = function () { try { SS.hide(); } catch (e) {} };
+      requestAnimationFrame(function () { setTimeout(hide, 60); });
+      window.addEventListener('load', hide);
+      setTimeout(hide, 6000);   // absolute safety so we never get stuck on splash
+    } catch (e) {}
+  }
+
+  // iOS-style edge-swipe-back: a swipe starting at the far-left edge goes "back"
+  // — close an open resource detail, else return to the Home tab.
+  function initEdgeSwipeBack() {
+    var EDGE = 26, TRIGGER = 70;
+    var sx = 0, sy = 0, tracking = false;
+    document.addEventListener('touchstart', function (e) {
+      var t = e.touches[0];
+      tracking = t && t.clientX <= EDGE;
+      if (tracking) { sx = t.clientX; sy = t.clientY; }
+    }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      tracking = false;
+      var t = e.changedTouches[0];
+      if (t && (t.clientX - sx) > TRIGGER && Math.abs(t.clientY - sy) < 55) appGoBack();
+    });
+  }
+
+  function appGoBack() {
+    try {
+      hapticTap('LIGHT');
+      // 1) An open resource detail → back to the resource list.
+      if (location.hash && location.hash.indexOf('#resource=') === 0
+          && typeof closeResourceDetail === 'function') { closeResourceDetail(); return; }
+      // 2) Any non-Home tab → Home (the app's root).
+      var active = document.querySelector('.view.active');
+      if (active && active.id !== 'view-home' && typeof switchView === 'function') {
+        switchView('home');
+      }
+    } catch (e) {}
   }
 
   // #11 — Face ID / biometric unlock. FAIL-OPEN + feature-detected: a total
