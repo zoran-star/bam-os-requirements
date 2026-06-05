@@ -50,6 +50,16 @@ export default async function handler(req, res) {
       checks[name] = { configured: envPresent(...vars), required: false };
     }
 
+    // APNs push needs ALL three (key + id + team) — envPresent is OR, so check
+    // them together. This is the quick "is push good to go?" signal.
+    checks.apns = {
+      configured:
+        envPresent("APNS_KEY_P8", "APNS_KEY_P8_BASE64") &&
+        envPresent("APNS_KEY_ID") &&
+        envPresent("APNS_TEAM_ID"),
+      required: false,
+    };
+
     // ── live Supabase ping (proves the key actually works, not just present) ──
     let supabaseLive = false;
     const url = firstEnv("VITE_SUPABASE_URL", "SUPABASE_URL");
