@@ -4,6 +4,25 @@ description: 2026-05-20 — getting the client portal onto the iOS App Store + G
 type: project
 ---
 
+## Submission prep — state as of 2026-06-05
+
+The app evolved a LOT (renamed **FullControl**; Home dashboard; **group chat**
+with per-author names + avatars; Resources via dashboard; native haptics/badge/
+keyboard/splash/edge-swipe-back; **push SENDING live**, 7 events, APNs key
+`9295JX7ZGU`). `app-store-submission.md` **refreshed** to match: Part 1 feature
+list, Part 4 listing copy + full description (dropped ROSTER/TEAM which are
+hidden in-app — was a rejection risk), Part 7 screenshots (Home/Messages/
+Systems/Marketing), Part 10 review notes, Part 11 checklist (APNs ✅).
+
+**Done:** assets, demo account, privacy/support pages, APNs key + Vercel env,
+both SQL migrations run, FullControl rename.
+**Remaining [Zoran]:** ① approve the refreshed feature set · ② final phone test
+(Part 2) · ③ screenshots (new UI, 4 screens, dark mode) · ④ **final Mac rebuild**
+(splash + plugins: `cd bam-portal-app && git pull && npx cap sync ios` → Xcode
+Archive → upload) · ⑤ Play feature graphic + `.aab` · ⑥ create App Store Connect
++ Play listings, paste copy/privacy/review notes · ⑦ submit both.
+⚠️ App is a thin wrapper over the LIVE portal — lock features before submit.
+
 ## Goal
 
 Get the BAM client portal (`bam-portal/public/client-portal.html`) onto the

@@ -29,32 +29,34 @@ day Apple/Google look at it. That's why feature approval + testing come
 
 ## Part 1 — Features in this release  *(approve before submitting)*
 
-The app shows the live client portal. An academy owner / team member signs
-in and sees these tabs:
+The app (**FullControl**) shows the live client portal. An academy owner /
+team member signs in and lands on a **Home dashboard**, then moves between
+these tabs (bottom bar = **Home · Messages · Systems · Marketing**):
 
 | Tab | What it does | State |
 |---|---|---|
-| **Systems** | Home view — overview of the academy's services with BAM | Live |
-| **Messages** | Support tickets + back-and-forth action threads with BAM | Live |
+| **Home** | Dashboard — greeting, "needs your attention" tiles (open requests, unread, action items), this-week ad snapshot, recent activity, quick actions, profile-photo upload | Live |
+| **Messages** | **Group chat** with the academy's BAM team — each staff member posts under their own name + avatar; iMessage-style bubbles, grouping, day dividers, typing indicator, long-press menu | Live |
+| **Systems** | Support tickets (Error / Change / Build) + status tracking of what's live/in-progress | Live |
 | **Marketing** | Ad performance (Meta) + marketing/content requests | Live |
+| **Resources** | Interactive content-library (reached from the dashboard "Browse resources" action) | Live |
 | **Members** | Athlete roster — **hidden in the app for v1**, live on web | Web only |
-| **Team** | Invite teammates + revoke access — **hidden in the app for v1**, live on web | Web only |
-| **Business Blueprint** | Owner-side academy setup (general, brand, staff, locations) — **hidden in the app for v1**, live on web | Web only |
-| Push notifications | Native push prompt on login; tokens captured | Live (sending side is later) |
-| First-login tour | 8-step guided tour for new users | Live |
+| **Team / Business Blueprint** | Owner-side setup — **hidden in the app for v1**, live on web | Web only |
+| Push notifications | Native push on 7 events (BAM reply, ticket complete, action items, new message, etc.) + first-login permission prompt | Live |
+| First-login tour | Guided tour for new users | Live |
 
-**Decided (2026-05-20, updated 2026-05-27):**
-- **Members, Team, and Business Blueprint are hidden in the app for v1.**
-  The portal is one codebase for web + app, so `isNativeApp()` in
-  `client-portal.html` hides those tabs inside the native wrapper while
-  they stay live on the web. Members keeps developing on the web portal;
-  when its billing actions (Phase 3) are ready, remove its `isNativeApp()`
-  check and resubmit. Team and Business Blueprint are out of app v1
-  scope — owner-side setup happens on desktop, not the phone.
-- **The app's v1 = 3 tabs** — Systems, Messages, Marketing — plus
-  push notifications and the first-login tour.
-- Push **capture** works; staff **sending** notifications is a later
-  build. The app still ships — it just won't send anything yet.
+**Decided (updated 2026-06-05):**
+- **App name is FullControl** (was "BAM Portal" — a placeholder). Bundle ID
+  stays `com.byanymeansbusiness.portal` (permanent).
+- **Bottom bar = Home · Messages · Systems · Marketing.** Resources is reached
+  from the Home dashboard (not a 5th tab). **Members, Team, and Business
+  Blueprint stay hidden in the app** via `isNativeApp()` — owner-side setup
+  happens on desktop; bring them into the app + resubmit when ready.
+- **Native push notifications now SEND** (7 events, APNs `.p8` key `9295JX7ZGU`),
+  not just capture — the single strongest defense against Apple's 4.2
+  "just a website" rejection.
+- **Native feel**: haptics, app-icon badge, native keyboard, branded splash,
+  edge-swipe-back, profile-photo uploads (staff + client).
 
 ---
 
@@ -164,11 +166,11 @@ Paste these into App Store Connect and the Google Play Console.
 
 - **App name:** `FullControl`
 - **Subtitle (Apple, 30 char):** `Your academy, all in one place`
-- **Short description (Play, 80 char):** `Run your sports academy — roster, billing, marketing, and support in one app.`
+- **Short description (Play, 80 char):** `Run your academy — requests, marketing, and a direct line to your BAM team.`
 - **Promotional text (Apple, 170 char):**
-  `Your roster, marketing, and support team in one place — and a direct line to By Any Means wherever you are.`
+  `Your requests, marketing, and your By Any Means team — all in one place, with a real group chat and a push the moment something needs you.`
 - **Keywords (Apple, 100 char):**
-  `academy,sports,basketball,roster,members,billing,marketing,coaching,management,portal`
+  `academy,sports,basketball,coaching,marketing,support,chat,requests,management,portal`
 - **Primary category:** Business    **Secondary:** Sports
 - **Support URL:** `https://portal.byanymeansbusiness.com/support.html`
 - **Marketing URL:** *(optional — leave blank or your company site)*
@@ -183,14 +185,16 @@ By Any Means.
 Sign in to run the parts of your academy that matter most — without
 chasing emails or spreadsheets.
 
-• ROSTER — See your athletes, their plans, and their status at a glance.
-• MARKETING — Track ad performance and send requests to your marketing
-  and content team.
-• SUPPORT — Open requests and message the By Any Means team directly,
-  with full back-and-forth threads.
-• TEAM — Invite teammates into your portal so the whole staff stays in
-  sync.
-• NOTIFICATIONS — Get notified when something needs your attention.
+• DASHBOARD — See what needs you the moment you open the app: open
+  requests, unread messages, and this week's ad performance.
+• MESSAGES — A real group chat with your By Any Means team — everyone
+  posts under their own name, with full back-and-forth threads.
+• REQUESTS — Open Error, Change, or Build requests and track exactly
+  what's live and what's in progress.
+• MARKETING — Track your ad performance and send requests to your
+  marketing and content team.
+• RESOURCES — Guides and playbooks built for your academy.
+• NOTIFICATIONS — Get a push the moment something needs your attention.
 
 FullControl is built for academy owners and their staff. Access requires
 an account provided by By Any Means.
@@ -280,14 +284,17 @@ build is on TestFlight, or use a browser at the exact pixel sizes.
 - **Tablet:** 7" and 10" shots (since the app is universal)
 - **Feature graphic:** 1024 × 500 px — required by Play
 
-**Shoot these 3 screens** — the app's actual tabs. Open the portal with
-`?native=1` in a browser to see the exact app view (Members + Team
-hidden), signed in as the demo account:
-1. **Systems** — the home overview · caption: "Your academy at a glance"
-2. **Messages** — a ticket thread · caption: "A direct line to your team"
-3. **Marketing** — ad performance · caption: "Track every campaign"
+**Shoot these 4 screens** — open the portal with `?native=1` in a browser
+(or shoot on a real device via TestFlight) to see the exact app view
+(Members/Team/Blueprint hidden, 4-tab bottom bar), signed in as the demo
+account:
+1. **Home** — the dashboard · caption: "Your academy at a glance"
+2. **Messages** — the group chat with a thread · caption: "A direct line to your team"
+3. **Systems** — the request tiles + live tickets · caption: "Open a request, track what's live"
+4. **Marketing** — ad performance · caption: "Track every campaign"
 
 Keep the demo account's data clean — no real client names in any shot.
+Shoot in dark mode (the app's default) for a consistent on-brand set.
 
 ---
 
@@ -354,8 +361,9 @@ Demo account for review:
   Email:    zoran+appreview@byanymeansbball.com
   Password: [paste the password you set]
 
-After signing in, the reviewer can browse every tab — Systems, Messages,
-and Marketing — and receive push notifications. The app contains no
+After signing in, the reviewer lands on the Home dashboard and can browse
+every tab — Home, Messages (a group chat with our team), Systems, and
+Marketing — and receive native push notifications. The app contains no
 public user-generated content, no ads, and no tracking.
 
 Contact: zoran@byanymeansbball.com
@@ -372,8 +380,7 @@ Contact: zoran@byanymeansbball.com
 - [ ] Screenshots captured at the required sizes
 - [ ] Feature graphic made (Play)
 - [x] `appId` / `server.url` confirmed in `capacitor.config.json` *(verified 2026-05-20)*
-- [ ] APNs `.p8` key created (needed before push *sending* — not blocking
-      this submission)
+- [x] APNs `.p8` key created *(key `9295JX7ZGU`, Team `Z7GHSLAHA9`, 2026-06-05; Vercel `APNS_*` env set — push **sending** is live)*
 - [ ] iOS build archived + uploaded
 - [ ] Android `.aab` built + uploaded
 - [ ] Listing copy + App Privacy + review notes entered in both consoles
