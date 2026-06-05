@@ -4770,6 +4770,10 @@
       box-shadow: 0 -2px 14px rgba(0,0,0,0.35);
       padding-bottom: env(safe-area-inset-bottom);
     }
+    /* App v1 mobile bottom bar = Home · Messages · Systems · Marketing only.
+       Blueprint + Members never appear in the bottom bar (web or app). */
+    .mobile-nav .mobile-nav-item[data-view="blueprint"],
+    .mobile-nav .mobile-nav-item[data-view="members"] { display: none !important; }
     .mobile-nav-item {
       flex: 1;
       display: flex;
@@ -5266,36 +5270,72 @@
          HOME / DASHBOARD VIEW (MVP)
     ══════════════════════════════ -->
     <style>
-      #view-home .home-greeting { font-family: var(--display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-bottom: 4px; }
-      #view-home .home-sub { color: var(--text-mute); font-size: 14px; margin-bottom: 26px; }
+      /* #7 — capped width so the dashboard doesn't sprawl on desktop */
+      #view-home .home-wrap { max-width: 720px; }
+      #view-home .home-greeting { font-family: var(--display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-bottom: 6px; }
+      /* #2 — one-line status under the greeting */
+      #view-home .home-status { color: var(--text-sub); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+      #view-home .home-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-mute); flex-shrink: 0; }
+      #view-home .home-status.attention .dot { background: var(--gold, #E8C547); }
+      #view-home .home-status.clear .dot { background: #5BBF8A; }
+      /* #8 — section label + hairline rule */
+      #view-home .home-sec { display: flex; align-items: center; gap: 12px; margin: 30px 0 12px; }
+      #view-home .home-sec-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute); white-space: nowrap; }
+      #view-home .home-sec::after { content: ''; flex: 1; height: 1px; background: var(--border-med); }
       #view-home .home-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       #view-home .home-tile {
         text-align: left; cursor: pointer; font-family: inherit;
         background: var(--surface); border: 1px solid var(--border-med);
         border-radius: 12px; padding: 18px 16px; transition: border-color .15s, transform .1s;
-        display: flex; flex-direction: column; gap: 6px; min-height: 96px;
+        display: flex; flex-direction: column; gap: 5px; min-height: 104px;
       }
       #view-home .home-tile:hover { border-color: var(--border-str); }
-      #view-home .home-tile:active { transform: scale(0.985); }
+      #view-home .home-tile:active { transform: scale(0.985); }   /* #9 */
       #view-home .home-tile-top { display: flex; align-items: center; justify-content: space-between; }
       #view-home .home-tile-ic { color: var(--text-mute); display: flex; }
       #view-home .home-tile-ic svg { width: 20px; height: 20px; display: block; }
       #view-home .home-tile.alert .home-tile-ic { color: var(--gold, #E8C547); }
       #view-home .home-tile-n { font-family: var(--display); font-size: 30px; font-weight: 600; color: var(--text); line-height: 1; }
-      #view-home .home-tile-n.dim { color: var(--text-mute); }
-      #view-home .home-tile-label { font-size: 13px; color: var(--text-sub); }
-      #view-home .home-tile.alert { border-color: #E8C54766; background: #E8C5470c; }
+      #view-home .home-tile-check { color: #5BBF8A; display: flex; }   /* #5 zero state */
+      #view-home .home-tile-check svg { width: 24px; height: 24px; }
+      #view-home .home-tile-label { font-size: 14px; color: var(--text); font-weight: 500; }
+      #view-home .home-tile-sub { font-size: 12px; color: var(--text-mute); }   /* #3 */
+      #view-home .home-tile.alert { border-color: #E8C54766; background: #E8C5470c; }   /* #4 */
       #view-home .home-tile.span2 { grid-column: 1 / -1; }
+      /* #10 — this-week snapshot */
+      #view-home .home-week {
+        width: 100%; text-align: left; font-family: inherit; cursor: pointer;
+        background: var(--surface); border: 1px solid var(--border-med); border-radius: 12px;
+        padding: 16px 18px; display: flex; align-items: center; gap: 22px; transition: border-color .15s, transform .1s;
+      }
+      #view-home .home-week:hover { border-color: var(--border-str); }
+      #view-home .home-week:active { transform: scale(0.99); }
+      #view-home .home-week-stat { display: flex; flex-direction: column; gap: 3px; }
+      #view-home .home-week-v { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--text); line-height: 1; }
+      #view-home .home-week-l { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute); }
+      #view-home .home-week-chev { margin-left: auto; color: var(--text-mute); display: flex; transition: transform .15s; }
+      #view-home .home-week:hover .home-week-chev { transform: translateX(3px); }
+      /* #6 — recent activity feed */
+      #view-home .home-activity { display: flex; flex-direction: column; }
+      #view-home .home-act-row { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--border-med); }
+      #view-home .home-act-row:last-child { border-bottom: none; }
+      #view-home .home-act-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-mute); flex-shrink: 0; }
+      #view-home .home-act-dot.gold { background: var(--gold, #E8C547); }
+      #view-home .home-act-text { font-size: 14px; color: var(--text-sub); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #view-home .home-act-time { font-size: 12px; color: var(--text-mute); flex-shrink: 0; }
       #view-home .home-actions { display: flex; flex-direction: column; gap: 10px; }
       #view-home .home-action {
         display: flex; align-items: center; gap: 12px; font-family: inherit; cursor: pointer;
         background: var(--surface); border: 1px solid var(--border-med); color: var(--text);
         border-radius: 10px; padding: 15px 16px; font-size: 15px; font-weight: 500; text-align: left;
+        transition: border-color .15s, transform .1s;
       }
       #view-home .home-action:hover { border-color: var(--border-str); }
       #view-home .home-action:active { transform: scale(0.99); }
       #view-home .home-action-ic { color: var(--gold, #E8C547); display: flex; }
       #view-home .home-action-ic svg { width: 18px; height: 18px; display: block; }
+      #view-home .home-action-chev { margin-left: auto; color: var(--text-mute); display: flex; transition: transform .15s; }   /* #9 */
+      #view-home .home-action:hover .home-action-chev { transform: translateX(3px); }
     </style>
     <div class="view" id="view-home">
       <div class="topbar">
@@ -5305,24 +5345,37 @@
         </div>
       </div>
       <div class="content">
-        <div class="home-greeting" id="home-greeting">Welcome back</div>
-        <div class="home-sub" id="home-sub">Here's what needs you today.</div>
-        <div class="readout">Needs your attention</div>
-        <div class="home-tiles" id="home-tiles"></div>
-        <div class="readout" style="margin-top:28px">Quick actions</div>
-        <div class="home-actions">
-          <button class="home-action" onclick="homeNewRequest()">
-            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
-            Open a request
-          </button>
-          <button class="home-action" onclick="switchView('messages')">
-            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
-            Message your team
-          </button>
-          <button class="home-action" id="home-action-marketing" onclick="switchView('marketing')">
-            <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
-            View marketing
-          </button>
+        <div class="home-wrap">
+          <div class="home-greeting" id="home-greeting">Welcome back</div>
+          <div class="home-status" id="home-status"><span class="dot"></span><span id="home-status-text">Loading…</span></div>
+
+          <div class="home-sec"><span class="home-sec-label">Needs your attention</span></div>
+          <div class="home-tiles" id="home-tiles"></div>
+
+          <div class="home-sec" id="home-week-sec"><span class="home-sec-label">This week</span></div>
+          <button class="home-week" id="home-week" onclick="switchView('marketing')"></button>
+
+          <div class="home-sec" id="home-activity-sec"><span class="home-sec-label">Recent activity</span></div>
+          <div class="home-activity" id="home-activity"></div>
+
+          <div class="home-sec"><span class="home-sec-label">Quick actions</span></div>
+          <div class="home-actions">
+            <button class="home-action" onclick="homeNewRequest()">
+              <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+              Open a request
+              <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </button>
+            <button class="home-action" onclick="switchView('messages')">
+              <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              Message your team
+              <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </button>
+            <button class="home-action" id="home-action-marketing" onclick="switchView('marketing')">
+              <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg></span>
+              View marketing
+              <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -7564,20 +7617,9 @@ Then the call to action."]</div>
       </svg>
       <span class="mobile-nav-label">Marketing</span>
     </button>
-    <button type="button" class="mobile-nav-item" data-view="resources" onclick="mobileSwitchView('resources')" aria-label="Resources">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-      </svg>
-      <span class="mobile-nav-label">Resources</span>
-    </button>
-    <button type="button" class="mobile-nav-item" data-view="action-items" onclick="mobileSwitchView('action-items')" aria-label="Action Items">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M9 11l3 3L22 4"/>
-        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-      </svg>
-      <span class="mobile-nav-label">Actions</span>
-    </button>
+    <!-- Resources + Action Items intentionally NOT in the mobile bottom bar
+         (app v1 = Home · Messages · Systems · Marketing). They stay on the
+         web sidebar; surface Resources from the dashboard later if needed. -->
     <button type="button" class="mobile-nav-item" data-feature="blueprint" data-view="blueprint" onclick="mobileSwitchView('blueprint')" aria-label="Business Blueprint">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M3 3h18v18H3zM3 9h18M9 21V9"/>
@@ -7680,25 +7722,27 @@ function syncMobileNav(name) {
 // already maintains (tickets global, _msgConversations) + one light query
 // for open action items. Renders instantly; numbers fill in as they resolve.
 async function openHomeView() {
+  // #1 — greeting + first name
   const hour = new Date().getHours();
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const first = (document.getElementById('userName')?.textContent || '').trim().split(/\s+/)[0] || '';
   const g = document.getElementById('home-greeting');
-  if (g) g.textContent = part;
-  const sub = document.getElementById('home-sub');
-  const acad = (document.getElementById('academyName')?.textContent || '').trim();
-  if (sub) sub.textContent = (acad && acad !== 'Loading…') ? acad : "Here's what needs you today.";
+  if (g) g.textContent = (first && first !== '—') ? `${part}, ${first}` : part;
 
   const counts = {};
   try {
     const terminal = new Set(['done', 'approved', 'cancelled']);
     const open = (typeof tickets !== 'undefined' ? tickets : []).filter(t => !terminal.has(t.rawStatus));
     counts.tickets = open.length;
-    counts.ticketsAlert = open.some(t => t.rawStatus === 'awaiting_client' || t.rawStatus === 'final_review');
+    counts.ticketsNeedReply = open.filter(t => t.rawStatus === 'awaiting_client' || t.rawStatus === 'final_review').length;
   } catch (e) {}
   try {
     counts.unread = (typeof _msgConversations !== 'undefined' ? _msgConversations : []).filter(c => c.has_unread).length;
   } catch (e) {}
-  renderHomeTiles(counts);   // first paint with what we have
+  renderHomeTiles(counts);
+  renderHomeStatus(counts);
+  renderHomeActivity();   // #6
+  renderHomeWeek();       // #10
 
   try {
     if (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) {
@@ -7706,33 +7750,125 @@ async function openHomeView() {
         .eq('client_id', CLIENT_ID).is('completed_at', null);
       counts.actions = (data || []).length;
       renderHomeTiles(counts);
+      renderHomeStatus(counts);
     }
   } catch (e) { /* leave the action-items tile dashed */ }
+}
+
+// #2 — one-line status. "Needs you" = tickets awaiting your reply + unread
+// messages (action items are a backlog, not urgent).
+function renderHomeStatus(c) {
+  const el = document.getElementById('home-status');
+  const t = document.getElementById('home-status-text');
+  if (!el || !t) return;
+  const need = (c.ticketsNeedReply || 0) + (c.unread || 0);
+  el.classList.remove('attention', 'clear');
+  if (need > 0) {
+    el.classList.add('attention');
+    t.textContent = `${need} thing${need === 1 ? '' : 's'} need${need === 1 ? 's' : ''} your attention`;
+  } else {
+    el.classList.add('clear');
+    t.textContent = "You're all caught up";
+  }
 }
 
 function renderHomeTiles(c) {
   c = c || {};
   const el = document.getElementById('home-tiles');
   if (!el) return;
-  // Inline line-icons (no emoji) — stroke matches the nav set.
   const IC = {
     requests: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
     messages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
     actions:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   };
-  const tile = (icon, n, label, view, alert, span) => {
-    const num = (n === undefined || n === null)
-      ? '<span class="home-tile-n dim">—</span>'
-      : `<span class="home-tile-n">${n}</span>`;
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  // #3 subtext, #5 zero-state, #4 urgency
+  const tile = (icon, n, label, sub, view, alert, span) => {
+    let val;
+    if (n === undefined || n === null) val = '<span class="home-tile-n" style="color:var(--text-mute)">—</span>';
+    else if (n === 0) val = `<span class="home-tile-check">${CHECK}</span>`;
+    else val = `<span class="home-tile-n">${n}</span>`;
     return `<button class="home-tile ${alert ? 'alert' : ''} ${span ? 'span2' : ''}" onclick="switchView('${view}')">
-      <div class="home-tile-top"><span class="home-tile-ic">${icon}</span>${num}</div>
+      <div class="home-tile-top"><span class="home-tile-ic">${icon}</span>${val}</div>
       <div class="home-tile-label">${label}</div>
+      <div class="home-tile-sub">${sub}</div>
     </button>`;
   };
+  const reqSub = (c.tickets === undefined) ? '' :
+    c.tickets === 0 ? 'All clear' :
+    (c.ticketsNeedReply > 0 ? `${c.ticketsNeedReply} awaiting your reply` : 'in progress');
+  const msgSub = (c.unread === undefined) ? '' : (c.unread > 0 ? 'from your BAM team' : 'All caught up');
+  const actSub = (c.actions === undefined) ? '' : (c.actions > 0 ? 'on your list' : 'All done');
   el.innerHTML =
-    tile(IC.requests, c.tickets, 'Open requests',   'systems',      c.ticketsAlert, false) +
-    tile(IC.messages, c.unread,  'Unread messages', 'messages',     c.unread > 0,   false) +
-    tile(IC.actions,  c.actions, 'Action items',    'action-items', false,          true);
+    tile(IC.requests, c.tickets, 'Open requests',   reqSub, 'systems',      c.ticketsNeedReply > 0, false) +
+    tile(IC.messages, c.unread,  'Unread messages', msgSub, 'messages',     c.unread > 0,           false) +
+    tile(IC.actions,  c.actions, 'Action items',    actSub, 'action-items', false,                  true);
+}
+
+// #6 — recent activity from the tickets the app already loaded.
+function renderHomeActivity() {
+  const el = document.getElementById('home-activity');
+  const sec = document.getElementById('home-activity-sec');
+  if (!el) return;
+  const list = (typeof tickets !== 'undefined' ? tickets : []).slice(0, 4);
+  if (!list.length) { if (sec) sec.style.display = 'none'; el.style.display = 'none'; return; }
+  if (sec) sec.style.display = ''; el.style.display = '';
+  const SL = {
+    awaiting_client: 'Awaiting your reply', final_review: 'Ready for your review',
+    in_progress: 'In progress', in_review: 'In review', needs_rework: 'Needs rework',
+    done: 'Completed', approved: 'Approved', cancelled: 'Cancelled',
+  };
+  el.innerHTML = list.map(t => {
+    const title = escapeHTML(t.title || t.menu_item || (t.type ? t.type[0].toUpperCase() + t.type.slice(1) + ' request' : 'Request'));
+    const st = SL[t.rawStatus] || t.rawStatus || '';
+    const time = _formatRelative(t.updatedAt || t.updated_at || t.submittedAt || t.submitted_at || '');
+    const gold = (t.rawStatus === 'awaiting_client' || t.rawStatus === 'final_review');
+    return `<div class="home-act-row">
+      <span class="home-act-dot ${gold ? 'gold' : ''}"></span>
+      <span class="home-act-text">${title} — ${escapeHTML(st)}</span>
+      <span class="home-act-time">${escapeHTML(time)}</span>
+    </div>`;
+  }).join('');
+}
+
+// #10 — "this week" ad snapshot. Sums the same campaigns the Marketing tab
+// shows (real when Meta-connected, sample otherwise). Hidden if no marketing.
+async function renderHomeWeek() {
+  const card = document.getElementById('home-week');
+  const sec = document.getElementById('home-week-sec');
+  if (!card) return;
+  if (typeof MARKETING_INCLUDED !== 'undefined' && !MARKETING_INCLUDED) {
+    if (sec) sec.style.display = 'none'; card.style.display = 'none'; return;
+  }
+  if (sec) sec.style.display = ''; card.style.display = '';
+  const chev = '<span class="home-week-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>';
+  const money = (v) => (v == null ? '—' : '$' + Number(v).toLocaleString(undefined, { maximumFractionDigits: 0 }));
+  const render = (leads, spend, cpl) => {
+    card.innerHTML =
+      `<div class="home-week-stat"><span class="home-week-v">${leads == null ? '—' : leads}</span><span class="home-week-l">Leads</span></div>` +
+      `<div class="home-week-stat"><span class="home-week-v">${money(spend)}</span><span class="home-week-l">Spend</span></div>` +
+      `<div class="home-week-stat"><span class="home-week-v">${cpl == null ? '—' : money(cpl)}</span><span class="home-week-l">Cost / lead</span></div>` +
+      chev;
+  };
+  render(null, null, null);
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/meta/campaigns', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    const sampleReasons = ['no_staff_token', 'not_connected', 'no_ad_account'];
+    const camps = (json && sampleReasons.includes(json.reason))
+      ? (typeof _DEMO_CAMPAIGNS !== 'undefined' ? _DEMO_CAMPAIGNS : [])
+      : ((json && json.campaigns) || []);
+    let leads = 0, spend = 0, haveSpend = false;
+    camps.forEach(c => {
+      leads += Number(c.results) || 0;
+      const s = (typeof c.spend === 'number') ? c.spend
+        : parseFloat(String(c.spend_display || '').replace(/[^0-9.]/g, ''));
+      if (!isNaN(s)) { spend += s; haveSpend = true; }
+    });
+    const cpl = (haveSpend && leads > 0) ? spend / leads : null;
+    render(leads, haveSpend ? spend : null, cpl);
+  } catch (e) { render(null, null, null); }
 }
 
 function homeNewRequest() {
