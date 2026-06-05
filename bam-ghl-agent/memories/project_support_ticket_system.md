@@ -78,10 +78,11 @@ Real magic-link auth is the next planned step.
 - **Overview CLIENT ACTIONS now includes `final_review`** (not just `awaiting_client`). Both = ball in client's court; matches the "Awaiting client" tab. Fixes "marked for client review didn't show in Client Actions."
 - **Ticket modal renders complex submission values** (brand/staff/offers/locations/kpis) via the read-only `ComplexValue` component — no more "(complex value — edit via direct DB)". Structural editing still goes through the DB.
 
-## Systems onboarding ticket (auto-created)
+## Systems onboarding ticket (STAFF-triggered as of 2026-06-05)
 
-- Trigger `trg_systems_onboarding_ticket` → `maybe_create_systems_onboarding_ticket()` on `clients` UPDATE. Fires ONCE when all 5 BB sections done (General auto = name+owner+email; staff/locations/brand/offers `_marked_done_at`). Idempotent via `clients.systems_onboarding_ticket_id`. Inserts a `type='onboarding'` ticket assigned to the first `systems_manager`, `fields` = full snapshot.
-- **Payload (2026-06-02 enriched):** business fields + entity_type + ein + **time_zone** + **website/domain** (from brand_data) + **marketing_included** + **slack_channel_id** + **ghl{location_id,company_id,connect_status}** + **stripe{account_id,connect_status}** + brand + **kpis** + staff[] + locations[] + offers[] + marked_done_at. Existing onboarding tickets were backfilled with the new keys. Migration `systems_onboarding_ticket_more_fields`.
+- **No longer auto-created.** The old DB trigger `trg_systems_onboarding_ticket` was **dropped**. The ticket is now created when staff check the **`trigger_buildout`** onboarding Action Item (staff-only, step 12) — `createSystemsOnboardingTicket()` in `api/action-items.js` builds it. **Due +7 days**, `type='onboarding'`, assigned to first `systems_manager`, idempotent via `clients.systems_onboarding_ticket_id`. (`maybe_create_systems_onboarding_ticket()` fn still exists but is unused.)
+- **Payload:** business fields + entity_type + ein + time_zone + website/domain + marketing_included + slack_channel_id + ghl{…} + stripe{…} + brand + kpis + staff[] + locations[] + offers[] + marked_done_at.
+- **Ticket modal (SystemsView) extras (2026-06-05):** **📋 Copy for Claude** button (`buildClaudeText` → labeled text of all `fields` to clipboard); per-field **"⚠ Mark incorrect"** checkbox + note; **"Send corrections to client"** button bundles flagged fields + notes (`buildCorrectionsMsg`) and fires `requestClientAction`. Complex values render read-only (`ComplexValue`); simple fields stay editable.
 
 ## Next steps (priority order)
 
