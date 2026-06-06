@@ -286,6 +286,139 @@ async function ghlWebhook(req, res) {
   return res.status(200).json({ ok: true, event: eventType });
 }
 
+// Minimal auth: verify the caller is a logged-in Supabase user (staff or client).
+async function requireUser(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token || !SB_URL || !SB_KEY) return null;
+  try {
+    const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` } });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u?.id ? u : null;
+  } catch { return null; }
+}
+
+async function insertEvents(rows) {
+  if (!rows.length) return 0;
+  try {
+    await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify(rows),
+    });
+  } catch { /* dupes / partial — non-fatal */ }
+  return rows.length;
+}
+
+// Pull leads (form submissions) + bookings (calendar) + responses (conversations)
+// for ONE client into ghl_funnel_events, then stamp clients.ghl_synced_at. Each
+// source is best-effort (try/catch) so one failing doesn't block the others.
+// Reads the GHL location + lead form ids from clients.ghl_kpi_config.
+async function refreshFunnel(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const user = await requireUser(req);
+  if (!user) return res.status(401).json({ error: "auth required" });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  const clientId = req.query.client_id;
+  if (!clientId) return res.status(400).json({ error: "client_id required" });
+
+  let client;
+  try {
+    const rows = await sbReq(`clients?id=eq.${clientId}&select=id,ghl_kpi_config&limit=1`);
+    client = rows?.[0];
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+  const cfg = client?.ghl_kpi_config || {};
+  const locName = cfg.ghl_location;
+  if (!locName) return res.status(200).json({ ok: true, skipped: "no ghl_location in config" });
+
+  const rawLoc = getLocation(locName);
+  if (!rawLoc) return res.status(200).json({ ok: true, skipped: `location "${locName}" not configured` });
+  const loc = getLocForAction(rawLoc, "contacts"); // V2
+  if (!isV2(loc)) return res.status(200).json({ ok: true, skipped: "v1 location" });
+  const base = getBaseUrl(loc);
+  const headers = makeHeaders(loc);
+  const locationId = await getLocationId(loc);
+  if (!locationId) return res.status(200).json({ ok: true, skipped: "no locationId" });
+
+  const sinceMs = Date.now() - 35 * 86400000; // 35d window (covers the 30d KPI view)
+  const result = { leads: 0, bookings: 0, responses: 0, errors: [] };
+
+  // ── Leads: submissions of the configured lead forms ──
+  const leadFormIds = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
+  for (const formId of leadFormIds) {
+    try {
+      const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100" });
+      const r = await fetch(url, { headers });
+      if (!r.ok) { result.errors.push(`forms ${r.status}`); continue; }
+      const j = await r.json();
+      const subs = j.submissions || j.data || [];
+      const rows = [];
+      for (const s of subs) {
+        const created = s.createdAt || s.dateAdded || s.date || null;
+        if (created && new Date(created).getTime() < sinceMs) continue;
+        rows.push({
+          client_id: clientId, ghl_location: locationId, event_type: "lead",
+          contact_id: s.contactId || s.contact?.id || null,
+          contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
+          ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
+          raw: { formId, submissionId: s.id },
+        });
+      }
+      result.leads += await insertEvents(rows);
+    } catch (e) { result.errors.push(`forms:${(e.message || "").slice(0, 60)}`); }
+  }
+
+  // ── Bookings: trial-calendar appointments (best-effort; may need a calendar id) ──
+  try {
+    const calId = cfg.booking_calendar_id || null;
+    const params = { locationId, startTime: String(sinceMs), endTime: String(Date.now()) };
+    if (calId) params.calendarId = calId;
+    const r = await fetch(`${base}/calendars/events?` + new URLSearchParams(params), { headers });
+    if (r.ok) {
+      const j = await r.json();
+      const events = j.events || j.data || [];
+      const rows = events.map(ev => ({
+        client_id: clientId, ghl_location: locationId, event_type: "booking",
+        contact_id: ev.contactId || null,
+        ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
+        raw: { appointmentId: ev.id },
+      }));
+      result.bookings += await insertEvents(rows);
+    } else { result.errors.push(`calendar ${r.status}`); }
+  } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
+
+  // ── Responses: conversations with an inbound message (best-effort) ──
+  try {
+    const r = await fetch(`${base}/conversations/search?` + new URLSearchParams({ locationId, limit: "100" }), { headers });
+    if (r.ok) {
+      const j = await r.json();
+      const convos = j.conversations || j.data || [];
+      const rows = [];
+      for (const c of convos) {
+        const inbound = (c.lastMessageDirection || c.lastMessageType || "").toLowerCase().includes("inbound") || c.inbound === true;
+        const when = c.lastMessageDate || c.dateUpdated || null;
+        if (!inbound) continue;
+        if (when && new Date(when).getTime() < sinceMs) continue;
+        rows.push({
+          client_id: clientId, ghl_location: locationId, event_type: "response",
+          contact_id: c.contactId || null,
+          ref: `conv:${c.id}`, occurred_at: when || new Date().toISOString(),
+          raw: { conversationId: c.id },
+        });
+      }
+      result.responses += await insertEvents(rows);
+    } else { result.errors.push(`conversations ${r.status}`); }
+  } catch (e) { result.errors.push(`conversations:${(e.message || "").slice(0, 60)}`); }
+
+  // Stamp last-synced.
+  try {
+    await sbReq(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_synced_at: new Date().toISOString() }) });
+  } catch { /* non-fatal */ }
+
+  return res.status(200).json({ ok: true, ...result });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
@@ -294,6 +427,11 @@ export default async function handler(req, res) {
   // --- Funnel-event webhook ingest (GHL workflow → us; ?key=GHL_WEBHOOK_SECRET) ---
   if (action === "webhook") {
     return ghlWebhook(req, res);
+  }
+
+  // --- Funnel refresh: pull leads/bookings/responses for one client (stale-while-revalidate) ---
+  if (action === "refresh-funnel") {
+    return refreshFunnel(req, res);
   }
 
   // --- Locations (no auth needed, not cached) ---

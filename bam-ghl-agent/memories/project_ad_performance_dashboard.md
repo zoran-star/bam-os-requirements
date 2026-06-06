@@ -69,23 +69,27 @@ KPIs are sourced from live events, not stage occupancy:
   one row per event, type ∈ lead/response/booking/conversion, with client_id,
   contact_id/email, ref (idempotency via partial unique on (event_type, ref)),
   value, occurred_at, raw. RLS on / service-role only.
-- **GHL webhook ingest** `POST /api/ghl?action=webhook` (`?key=GHL_WEBHOOK_SECRET`).
-  GHL workflows POST here on form-submit / inbound-message / appointment-booked;
-  classifies (lead only if formId ∈ client's `ghl_kpi_config.lead_form_ids`,
-  response on inbound msg, booking on appointment), matches client by
-  `clients.ghl_location_id`, inserts an event. Acks 200 on dupes.
-- **Stripe conversion** in `api/stripe/webhook.js` `handleSubCreated` — when a sub
-  goes live and links to a member, also inserts a `conversion` event tied to the
-  lead by email (ref=sub.id).
-- **KPI read** `GET /api/marketing?resource=ghl-kpis&client_id=&days=30` — counts
-  leads (form events), responded/booked/converted (distinct contacts), rates vs
-  leads, revenue, and CAC vs Meta spend (per lead/booking/member). Returns
-  `ready:false` if the table doesn't exist yet. Shown in the GHL KPIs (beta) panel
-  as a "Live funnel — last 30 days" readout.
-- **Zoran must configure (GHL side):** workflows that POST to the webhook URL with
-  `{event|formId|appointmentId|direction, locationId, contactId, email, phone}`;
-  and a Stripe webhook for `customer.subscription.created` (already handled).
-  Forward-only — fills as events arrive.
+- **PULL model (chosen 2026-06-06) — stale-while-revalidate, no GHL setup, no cron.**
+  - **Refresh** `POST /api/ghl?action=refresh-funnel&client_id=` (any logged-in user)
+    pulls for that client's `ghl_kpi_config.ghl_location`: form submissions for the
+    configured `lead_form_ids` → `lead`; calendar events → `booking` (best-effort,
+    may need `ghl_kpi_config.booking_calendar_id`); conversations w/ inbound →
+    `response` (best-effort). Upserts events (ignore-dupes on event_type+ref),
+    stamps `clients.ghl_synced_at`. 35-day window. Each source try/catch'd.
+  - **Conversions** still arrive via the EXISTING platform Stripe webhook
+    (`api/stripe/webhook.js handleSubCreated`) → `conversion` event tied to lead by
+    email. No new Stripe setup.
+  - **Read** `GET /api/marketing?resource=ghl-kpis&client_id=&days=30` reads the DB
+    (instant): leads, responded/booked/converted (distinct contacts), rates,
+    revenue, CAC vs Meta spend, + `synced_at`. `ready:false` if table missing.
+  - **Panel** loads the read (instant), and if `synced_at` is null/>10 min old,
+    fires `refresh-funnel` in the background then re-reads ("refreshing…").
+- **GHL webhook** `POST /api/ghl?action=webhook` still exists as an OPTIONAL
+  real-time booster (push) but is NOT required — the pull covers everything.
+- **Zoran's only setup:** run `/apply-sql` + pick the lead forms. No GHL workflows,
+  no cron. Pull also backfills (not forward-only).
+- ⚠️ Untested against live GHL — forms pull is solid; calendar/conversations pulls
+  are best-effort and may need endpoint/param tweaks once real data is seen.
 
 **SQL self-serve:** `/apply-sql` skill (`.claude/commands/apply-sql.md`) +
 `scripts/migration/apply-pending-sql.mjs` — runs marketing_goals.sql +

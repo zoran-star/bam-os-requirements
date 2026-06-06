@@ -1713,12 +1713,20 @@ async function handleGhlKpis(req, res) {
   const since = new Date(now.getTime() - days * 86400000);
   const sinceIso = since.toISOString();
 
+  // Client meta (for CAC) + last sync time (for stale-while-revalidate).
+  let adAccount = null, syncedAt = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at`);
+    adAccount = rows?.[0]?.meta_ad_account_id || null;
+    syncedAt = rows?.[0]?.ghl_synced_at || null;
+  } catch { /* columns may not exist yet */ }
+
   let events = [];
   try {
     events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&occurred_at=gte.${encodeURIComponent(sinceIso)}&select=event_type,contact_id,contact_email,value&limit=10000`) || [];
   } catch {
     // table may not exist yet (migration not run) — treat as no data.
-    return res.status(200).json({ days, since: sinceIso, ready: false, leads: 0, responded: 0, booked: 0, converted: 0 });
+    return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, responded: 0, booked: 0, converted: 0 });
   }
 
   const key = (e) => e.contact_id || e.contact_email || Math.random().toString();
@@ -1736,11 +1744,9 @@ async function handleGhlKpis(req, res) {
   // CAC vs Meta spend over the same window.
   let spend = null;
   try {
-    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id`);
-    const acct = rows?.[0]?.meta_ad_account_id;
     const token = await getAnyStaffMetaToken();
-    if (acct && token) {
-      const adAcct = acct.startsWith("act_") ? acct : `act_${acct}`;
+    if (adAccount && token) {
+      const adAcct = adAccount.startsWith("act_") ? adAccount : `act_${adAccount}`;
       const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
         fields: "spend",
         time_range: JSON.stringify({ since: sinceIso.slice(0, 10), until: now.toISOString().slice(0, 10) }),
@@ -1754,7 +1760,7 @@ async function handleGhlKpis(req, res) {
 
   const round2 = (n) => Math.round(n * 100) / 100;
   return res.status(200).json({
-    days, since: sinceIso, ready: true,
+    days, since: sinceIso, ready: true, synced_at: syncedAt,
     leads, responded, booked, converted, revenue: round2(revenue),
     rates: {
       response_rate: pct(responded, leads),
