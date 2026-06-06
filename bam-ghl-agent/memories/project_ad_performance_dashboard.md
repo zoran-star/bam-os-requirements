@@ -63,26 +63,36 @@ GHL automations move leads between these on response/ghosting/no-show.
 `conversations`. Show rate needs the calendar/appointments endpoint (not wired).
 api/ghl.js has **no auth gate** (keyed by location name) — pre-existing footgun.
 
-**Stage-movement tracker (build A, 2026-06-06):** GHL keeps no pullable stage
-history, and snapshot counts ≠ conversion rates (a lead sits in one stage at a
-time). So we record the flow ourselves:
-- Tables (`supabase/ghl_stage_tracking.sql`, **must be run**): `ghl_opp_state`
-  (last-seen stage per opp) + `ghl_stage_transitions` (every detected move). RLS
-  on, no policies → service-role/API only.
-- Hourly cron `GET /api/ghl?action=track-stages` (Bearer CRON_SECRET; folded into
-  ghl.js to respect the function cap; vercel.json `30 * * * *`). For each V2
-  location: build stageId→name map, page all opportunities (capped 15×100), map
-  each to canonical via `mapStageName`, upsert `ghl_opp_state`, and insert a
-  `ghl_stage_transitions` row whenever canonical changed vs last snapshot.
-  Per-location try/catch, breaks on non-OK, V1 locations skipped.
-- **Forward-only, no backfill** — rates get accurate as data accumulates. KPIs
-  will COUNT transitions by `to_canonical` in a date range (read endpoint = next).
-- Verify: after a couple hours, `ghl_stage_transitions` should have rows; the cron
-  response returns a per-location {opps, moves} summary.
-- Core-alignment note: this is portal-local operational telemetry (not a core
-  domain entity); couldn't pull fc-core-srvc from the build sandbox.
+**Event-based wiring (2026-06-06) — replaces the snapshot cron (removed).** The
+KPIs are sourced from live events, not stage occupancy:
+- Table `ghl_funnel_events` (`supabase/ghl_funnel_events.sql`, **must be run**):
+  one row per event, type ∈ lead/response/booking/conversion, with client_id,
+  contact_id/email, ref (idempotency via partial unique on (event_type, ref)),
+  value, occurred_at, raw. RLS on / service-role only.
+- **GHL webhook ingest** `POST /api/ghl?action=webhook` (`?key=GHL_WEBHOOK_SECRET`).
+  GHL workflows POST here on form-submit / inbound-message / appointment-booked;
+  classifies (lead only if formId ∈ client's `ghl_kpi_config.lead_form_ids`,
+  response on inbound msg, booking on appointment), matches client by
+  `clients.ghl_location_id`, inserts an event. Acks 200 on dupes.
+- **Stripe conversion** in `api/stripe/webhook.js` `handleSubCreated` — when a sub
+  goes live and links to a member, also inserts a `conversion` event tied to the
+  lead by email (ref=sub.id).
+- **KPI read** `GET /api/marketing?resource=ghl-kpis&client_id=&days=30` — counts
+  leads (form events), responded/booked/converted (distinct contacts), rates vs
+  leads, revenue, and CAC vs Meta spend (per lead/booking/member). Returns
+  `ready:false` if the table doesn't exist yet. Shown in the GHL KPIs (beta) panel
+  as a "Live funnel — last 30 days" readout.
+- **Zoran must configure (GHL side):** workflows that POST to the webhook URL with
+  `{event|formId|appointmentId|direction, locationId, contactId, email, phone}`;
+  and a Stripe webhook for `customer.subscription.created` (already handled).
+  Forward-only — fills as events arrive.
 
-**Next steps (designed, not built):** `clients.ghl_kpi_config` jsonb to persist
+**SQL self-serve:** `/apply-sql` skill (`.claude/commands/apply-sql.md`) +
+`scripts/migration/apply-pending-sql.mjs` — runs marketing_goals.sql +
+ghl_kpi_config.sql + ghl_funnel_events.sql via the Supabase Management API given
+an `sbp_` PAT. Idempotent. (Replaces the manual "run these SQL files" asks.)
+
+**Next steps:** `clients.ghl_kpi_config` jsonb to persist
 the mapping + KPI on/off + goals; a staff editor; a corrections log fed back as
 few-shot examples so guesses improve. Then compute KPIs → feeds true
 cost-per-customer / ROAS (Meta spend→leads + GHL leads→members + Stripe revenue).

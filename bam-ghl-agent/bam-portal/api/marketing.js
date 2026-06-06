@@ -186,6 +186,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpi-suggest") {
       return handleGhlKpiSuggest(req, res);
     }
+    if (resource === "ghl-kpis") {
+      return handleGhlKpis(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -201,7 +204,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1689,6 +1692,81 @@ async function handleGhlKpiSuggest(req, res) {
     kpis, hidden_kpis: hidden,
     canonical: CANONICAL_FUNNEL,
     source: "rules",
+  });
+}
+
+// GET ?resource=ghl-kpis&client_id=<id>&days=<n>
+// The live funnel KPIs, counted from ghl_funnel_events (forms/messages/bookings)
+// + Stripe conversions, with CAC vs Meta spend. Leads = form submissions;
+// response/booking/conversion = distinct contacts; rates are vs leads.
+async function handleGhlKpis(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.client) targetClientId = ctx.client.id;
+  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
+  const now = new Date();
+  const since = new Date(now.getTime() - days * 86400000);
+  const sinceIso = since.toISOString();
+
+  let events = [];
+  try {
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&occurred_at=gte.${encodeURIComponent(sinceIso)}&select=event_type,contact_id,contact_email,value&limit=10000`) || [];
+  } catch {
+    // table may not exist yet (migration not run) — treat as no data.
+    return res.status(200).json({ days, since: sinceIso, ready: false, leads: 0, responded: 0, booked: 0, converted: 0 });
+  }
+
+  const key = (e) => e.contact_id || e.contact_email || Math.random().toString();
+  const respondedSet = new Set(), bookedSet = new Set(), convertedSet = new Set();
+  let leads = 0, revenue = 0;
+  for (const e of events) {
+    if (e.event_type === "lead") leads++;
+    else if (e.event_type === "response") respondedSet.add(key(e));
+    else if (e.event_type === "booking") { bookedSet.add(key(e)); respondedSet.add(key(e)); } // booking implies a response
+    else if (e.event_type === "conversion") { convertedSet.add(key(e)); revenue += Number(e.value) || 0; }
+  }
+  const responded = respondedSet.size, booked = bookedSet.size, converted = convertedSet.size;
+  const pct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 : null;
+
+  // CAC vs Meta spend over the same window.
+  let spend = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id`);
+    const acct = rows?.[0]?.meta_ad_account_id;
+    const token = await getAnyStaffMetaToken();
+    if (acct && token) {
+      const adAcct = acct.startsWith("act_") ? acct : `act_${acct}`;
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        fields: "spend",
+        time_range: JSON.stringify({ since: sinceIso.slice(0, 10), until: now.toISOString().slice(0, 10) }),
+        access_token: token,
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (r.ok) spend = parseFloat(j.data?.[0]?.spend || "0") || 0;
+    }
+  } catch { /* spend stays null */ }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  return res.status(200).json({
+    days, since: sinceIso, ready: true,
+    leads, responded, booked, converted, revenue: round2(revenue),
+    rates: {
+      response_rate: pct(responded, leads),
+      booking_rate: pct(booked, leads),
+      conversion_rate: pct(converted, leads),
+    },
+    spend: spend == null ? null : round2(spend),
+    cac: spend == null ? null : {
+      per_lead: leads ? round2(spend / leads) : null,
+      per_booking: booked ? round2(spend / booked) : null,
+      per_member: converted ? round2(spend / converted) : null,
+    },
   });
 }
 

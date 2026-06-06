@@ -1,9 +1,6 @@
 // Unified GHL Serverless Function — locations, contacts, conversations, pipelines
 // Supports both V1 (rest.gohighlevel.com) and V2 (services.leadconnectorhq.com) APIs
-// Routes via ?action=locations|contacts|conversations|pipelines|track-stages
-
-import { timingSafeEqual } from "node:crypto";
-import { mapStageName } from "./_ghl_funnel.js";
+// Routes via ?action=locations|contacts|conversations|pipelines|forms|webhook
 
 const GHL_V1 = "https://rest.gohighlevel.com/v1";
 const GHL_V2 = "https://services.leadconnectorhq.com";
@@ -224,83 +221,69 @@ function mapConvo(c) {
   };
 }
 
-// Hourly cron: snapshot every opportunity's current stage and log any change as
-// a transition. GHL keeps no stage history we can pull, so this builds it. Runs
-// over all configured locations; degrades safely (per-location try/catch, capped
-// pagination, breaks on any non-OK response). V1-only locations are skipped for
-// now (V2 is the modern path most clients use).
-async function trackStages(req, res) {
-  const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  const expected = process.env.CRON_SECRET;
-  if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
-  const gb = Buffer.from(got), eb = Buffer.from(expected);
-  if (gb.length !== eb.length || !timingSafeEqual(gb, eb)) return res.status(401).json({ error: "unauthorized" });
+// Funnel-event webhook ingest. GHL workflows POST here on form submit / inbound
+// message / appointment booked; we classify and log to ghl_funnel_events. The
+// recommended workflow payload is { event, locationId, contactId, email, phone,
+// formId, refId } but we also best-effort parse GHL's native fields. Lead events
+// only count for forms in the client's ghl_kpi_config.lead_form_ids.
+async function ghlWebhook(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const secret = process.env.GHL_WEBHOOK_SECRET;
+  if (secret && (req.query.key || "") !== secret) return res.status(401).json({ error: "unauthorized" });
   if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
 
-  const now = new Date().toISOString();
-  const summary = [];
+  const b = req.body || {};
+  const locationId = b.locationId || b.location_id || b.location?.id || null;
+  const contactId  = b.contactId  || b.contact_id  || b.contact?.id  || null;
+  const email = (b.email || b.contact?.email || "").toLowerCase() || null;
+  const phone = b.phone || b.contact?.phone || null;
+  const formId = b.formId || b.form_id || b.form?.id || null;
+  const apptId = b.appointmentId || b.appointment?.id || b.calendar?.appointmentId || null;
+  const msgId  = b.messageId || b.message?.id || null;
+  const direction = (b.direction || b.message?.direction || "").toLowerCase();
+  const explicit  = (b.event || b.type || b.eventType || "").toLowerCase();
+  const occurredAt = b.occurredAt || b.dateAdded || b.date || new Date().toISOString();
 
-  for (const rawLoc of loadLocations()) {
-    const name = rawLoc.name;
+  // Match to a portal client by GHL location.
+  let client = null;
+  if (locationId) {
     try {
-      const loc = getLocForAction(rawLoc, "contacts"); // V2 view
-      if (!isV2(loc)) { summary.push({ location: name, skipped: "v1" }); continue; }
-      const base = getBaseUrl(loc);
-      const headers = makeHeaders(loc);
-      const locationId = await getLocationId(loc);
-      if (!locationId) { summary.push({ location: name, skipped: "no locationId" }); continue; }
-
-      // stageId -> stage name
-      const pr = await fetch(`${base}/opportunities/pipelines?locationId=${locationId}`, { headers });
-      if (!pr.ok) { summary.push({ location: name, skipped: `pipelines ${pr.status}` }); continue; }
-      const pd = await pr.json();
-      const stageMap = {};
-      (pd.pipelines || []).forEach(p => (p.stages || []).forEach(s => { stageMap[s.id] = s.name; }));
-
-      // page through opportunities (capped)
-      const opps = [];
-      let startAfterId = null, startAfter = null, pages = 0;
-      while (pages < 15) {
-        const params = { location_id: locationId, limit: 100 };
-        if (startAfterId) { params.startAfterId = startAfterId; if (startAfter) params.startAfter = startAfter; }
-        const or = await fetch(`${base}/opportunities/search?${new URLSearchParams(params)}`, { headers });
-        if (!or.ok) break;
-        const od = await or.json();
-        const batch = od.opportunities || [];
-        opps.push(...batch);
-        pages++;
-        const meta = od.meta || {};
-        if (batch.length < 100 || !meta.startAfterId) break;
-        startAfterId = meta.startAfterId; startAfter = meta.startAfter;
-      }
-
-      // prior snapshot for this location
-      const prior = await sbReq(`ghl_opp_state?location=eq.${encodeURIComponent(name)}&select=opp_id,canonical,stage_name`);
-      const priorMap = {};
-      (prior || []).forEach(r => { priorMap[r.opp_id] = r; });
-
-      const upserts = [], transitions = [];
-      for (const o of opps) {
-        const stageName = stageMap[o.pipelineStageId] || "";
-        const canonical = mapStageName(stageName) || "(unmapped)";
-        const contactId = o.contact?.id || o.contactId || null;
-        upserts.push({ location: name, opp_id: o.id, contact_id: contactId, pipeline_id: o.pipelineId || null, stage_name: stageName, canonical, monetary_value: o.monetaryValue || 0, source: o.source || null, updated_at: now });
-        const prev = priorMap[o.id];
-        if (prev && prev.canonical !== canonical) {
-          transitions.push({ location: name, opp_id: o.id, contact_id: contactId, from_stage: prev.stage_name, from_canonical: prev.canonical, to_stage: stageName, to_canonical: canonical, moved_at: now });
-        }
-      }
-
-      if (transitions.length) await sbReq("ghl_stage_transitions", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(transitions) });
-      if (upserts.length) await sbReq("ghl_opp_state?on_conflict=location,opp_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(upserts) });
-
-      summary.push({ location: name, opps: opps.length, moves: transitions.length });
-    } catch (e) {
-      summary.push({ location: name, error: (e.message || "error").slice(0, 120) });
-    }
+      const rows = await sbReq(`clients?ghl_location_id=eq.${encodeURIComponent(locationId)}&select=id,ghl_kpi_config&limit=1`);
+      client = rows?.[0] || null;
+    } catch { /* leave unmatched */ }
   }
 
-  return res.status(200).json({ ok: true, ran_at: now, summary });
+  let eventType = null, ref = null;
+  if (formId || explicit.includes("form")) {
+    const leadForms = client?.ghl_kpi_config?.lead_form_ids || [];
+    if (formId && leadForms.length && !leadForms.includes(formId)) return res.status(200).json({ ok: true, skipped: "form not in lead set" });
+    if (formId && !leadForms.length) return res.status(200).json({ ok: true, skipped: "no lead forms configured" });
+    eventType = "lead";
+    ref = b.refId || b.submissionId || (formId ? `${formId}:${contactId || ""}:${occurredAt}` : null);
+  } else if (apptId || explicit.includes("appointment") || explicit.includes("booking")) {
+    eventType = "booking";
+    ref = apptId || b.refId || null;
+  } else if (explicit.includes("inbound") || direction === "inbound" || (explicit.includes("message") && direction === "inbound")) {
+    eventType = "response";
+    ref = msgId || b.refId || null;
+  } else if (["lead", "response", "booking"].includes(explicit)) {
+    eventType = explicit;
+    ref = b.refId || null;
+  }
+  if (!eventType) return res.status(200).json({ ok: true, skipped: "unclassified" });
+
+  const row = {
+    client_id: client?.id || null, ghl_location: locationId, event_type: eventType,
+    contact_id: contactId, contact_email: email, contact_phone: phone,
+    ref, occurred_at: occurredAt, raw: b,
+  };
+  try {
+    await sbReq("ghl_funnel_events", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(row) });
+  } catch (e) {
+    // Most likely a duplicate (unique event_type+ref) on a webhook retry — ack so GHL stops retrying.
+    return res.status(200).json({ ok: true, note: (e.message || "").slice(0, 120) });
+  }
+  return res.status(200).json({ ok: true, event: eventType });
 }
 
 export default async function handler(req, res) {
@@ -308,9 +291,9 @@ export default async function handler(req, res) {
 
   const action = req.query.action || "locations";
 
-  // --- Stage-movement tracker cron (Bearer CRON_SECRET; loops all locations) ---
-  if (action === "track-stages") {
-    return trackStages(req, res);
+  // --- Funnel-event webhook ingest (GHL workflow → us; ?key=GHL_WEBHOOK_SECRET) ---
+  if (action === "webhook") {
+    return ghlWebhook(req, res);
   }
 
   // --- Locations (no auth needed, not cached) ---

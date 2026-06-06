@@ -22,6 +22,21 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [picked, setPicked] = useState(() => new Set(cfg.lead_form_ids || []));
   const [savingForms, setSavingForms] = useState(false);
   const [formsMsg, setFormsMsg] = useState(cfg.lead_form_ids?.length ? `${cfg.lead_form_ids.length} form(s) saved` : null);
+  const [kpis, setKpis] = useState(null);
+
+  // Live funnel KPIs (from ghl_funnel_events + Stripe), last 30 days.
+  useEffect(() => {
+    if (!client?.id) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=30`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+        const j = await res.json();
+        if (alive && res.ok) setKpis(j);
+      } catch { /* leave null */ }
+    })();
+    return () => { alive = false; };
+  }, [client, session]);
 
   useEffect(() => {
     let alive = true;
@@ -108,8 +123,42 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const lbl = { fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 };
   const conf = (c) => c === "high" ? t.text : c === "med" ? t.textSub : t.textMute;
 
+  const money = (n) => n == null ? "—" : "$" + Number(n).toLocaleString();
+  const kpiStat = (label, val, rate) => (
+    <div key={label}>
+      <div style={{ fontSize: 24, fontWeight: 600, color: t.text, lineHeight: 1 }}>{val ?? 0}</div>
+      <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 6 }}>{label}</div>
+      {rate != null && <div style={{ fontSize: 11, color: t.textSub, marginTop: 3 }}>{rate}% of leads</div>}
+    </div>
+  );
+
   return (
     <div>
+      {kpis && (
+        <div style={card}>
+          <div style={lbl}>Live funnel — last 30 days</div>
+          {!kpis.ready ? (
+            <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
+              No funnel data yet. Run the SQL (/apply-sql) and connect the GHL + Stripe webhooks — numbers fill in as events arrive.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 30px" }}>
+                {kpiStat("Leads in", kpis.leads)}
+                {kpiStat("Responded", kpis.responded, kpis.rates?.response_rate)}
+                {kpiStat("Booked", kpis.booked, kpis.rates?.booking_rate)}
+                {kpiStat("Members", kpis.converted, kpis.rates?.conversion_rate)}
+              </div>
+              {kpis.cac && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}`, fontSize: 12, color: t.textSub }}>
+                  Spend {money(kpis.spend)} · {kpis.cac.per_lead != null ? `${money(kpis.cac.per_lead)}/lead` : "—/lead"} · {kpis.cac.per_member != null ? `${money(kpis.cac.per_member)}/member (CAC)` : "—/member"}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <div style={{ ...card, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
         <div>
           <div style={lbl}>GHL location</div>
