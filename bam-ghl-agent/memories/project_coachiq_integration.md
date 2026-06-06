@@ -78,23 +78,27 @@ is superseded for CoachIQ-ON academies by this auto-create+allocate model.)
 **NEW staff-portal config (per-client) — "CoachIQ Integration" settings section:**
 - toggle: "This academy uses CoachIQ"
 - API key + Group ID
-- **PRODUCT MAPPING**: each plan (Steady 1×, Accelerated 2×, Elevate 3×, Dominate
-  unltd) → a CoachIQ **product id** (or **automation id** — see open test below).
-- [Test connection] + [Save]. Stored per-client → onboarding fires the matching
-  product for the chosen plan. (Suggested storage: `clients.coachiq_*` columns or a
-  `coachiq_product_map` jsonb.)
+- **PRODUCT MAPPING**: each plan × term combo (Steady/Accelerated/Elevate/Dominate ×
+  monthly/3mo/6mo, ≈12 rows) → a CoachIQ **automation id** (resolved test below: one
+  automation per product, so the field holds the automationId that grants that product).
+- [Test connection] + [Save]. Stored per-client → onboarding POSTs to the matching
+  automationId for the member's plan+term. (Suggested storage: a `coachiq_product_map`
+  jsonb on `clients`, keyed by plan+term → automationId, + `coachiq_enabled`/key/group.)
 
-**OPEN — fixed-field test (2026-06-06):** CoachIQ's "Add Credits" Number field is a
-FIXED stepper that rejects variables (proven). MUST test whether "Add a Product
-Purchase to a User" accepts a DYNAMIC product id ({{payload.productId}}):
-- If YES → ONE automation, staff section stores **product ids**.
-- If NO  → ONE automation PER product, staff section stores **automation ids**.
-The staff UI is identical either way; only what the field holds changes.
-Test = build an "Add Product Purchase" automation in CoachIQ UI, check if the product
-field offers an Insert-Field/variable option (like the credits field lacked); confirm
-by firing a webhook with {user:{id}, productId:...} and seeing the product resolve.
-Blocked on: CoachIQ API key + group id + a test automation id (key not in repo;
-rotate the one pasted 2026-06-01).
+**RESOLVED — fixed-field test (2026-06-06, screenshot-confirmed):** "Add a Product
+Purchase to a User" → the **Product field is a fixed searchable dropdown** ("Select a
+product"), NO Insert-Field/variable/{{ }} option (same limitation as "Add Credits").
+→ **NO dynamic product id. ONE automation PER product. Staff section stores AUTOMATION
+IDs** (the portal POSTs to the automationId that matches the member's plan+term).
+
+⚠️ **Per-TERM wrinkle:** in CoachIQ each term is its OWN product, not just each plan
+(seen in the dropdown: "Elevate" $335/4wks · "Elevate - 3 months" $905 · "Elevate -
+6 months" $1675 · "Accelerated" $280/4wks · …). So the mapping is **PLAN × TERM**,
+≈ 4 plans × 3 terms = up to 12 products → up to 12 automations. The staff config maps
+each plan+term combo → its automation id.
+- Data cleanliness flag: a product **"3 Trainings / Wk - Monthly" is priced $280**
+  (that's the 2×/Accelerated price, not the 3×/Elevate $335) — looks like a
+  mislabel/dupe in CoachIQ; clean up the product list before wiring the map.
 
 **Front-end note:** all of the above is BEHIND THE SCENES — the parent-facing funnel
 (input → offer → sign+pay) does NOT change; no new parent-facing screens. The only
