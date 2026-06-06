@@ -1,10 +1,26 @@
 // Unified GHL Serverless Function — locations, contacts, conversations, pipelines
 // Supports both V1 (rest.gohighlevel.com) and V2 (services.leadconnectorhq.com) APIs
-// Routes via ?action=locations|contacts|conversations|pipelines
+// Routes via ?action=locations|contacts|conversations|pipelines|track-stages
+
+import { timingSafeEqual } from "node:crypto";
+import { mapStageName } from "./_ghl_funnel.js";
 
 const GHL_V1 = "https://rest.gohighlevel.com/v1";
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
+
+// Supabase (service role) — only used by the stage-tracking cron.
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+async function sbReq(path, init = {}) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : null;
+}
 
 // ─── Response Cache (in-memory with TTL) ───
 // Default 5 min. Some endpoints (locations) are essentially static — use the
@@ -208,10 +224,94 @@ function mapConvo(c) {
   };
 }
 
+// Hourly cron: snapshot every opportunity's current stage and log any change as
+// a transition. GHL keeps no stage history we can pull, so this builds it. Runs
+// over all configured locations; degrades safely (per-location try/catch, capped
+// pagination, breaks on any non-OK response). V1-only locations are skipped for
+// now (V2 is the modern path most clients use).
+async function trackStages(req, res) {
+  const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+  const gb = Buffer.from(got), eb = Buffer.from(expected);
+  if (gb.length !== eb.length || !timingSafeEqual(gb, eb)) return res.status(401).json({ error: "unauthorized" });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  const now = new Date().toISOString();
+  const summary = [];
+
+  for (const rawLoc of loadLocations()) {
+    const name = rawLoc.name;
+    try {
+      const loc = getLocForAction(rawLoc, "contacts"); // V2 view
+      if (!isV2(loc)) { summary.push({ location: name, skipped: "v1" }); continue; }
+      const base = getBaseUrl(loc);
+      const headers = makeHeaders(loc);
+      const locationId = await getLocationId(loc);
+      if (!locationId) { summary.push({ location: name, skipped: "no locationId" }); continue; }
+
+      // stageId -> stage name
+      const pr = await fetch(`${base}/opportunities/pipelines?locationId=${locationId}`, { headers });
+      if (!pr.ok) { summary.push({ location: name, skipped: `pipelines ${pr.status}` }); continue; }
+      const pd = await pr.json();
+      const stageMap = {};
+      (pd.pipelines || []).forEach(p => (p.stages || []).forEach(s => { stageMap[s.id] = s.name; }));
+
+      // page through opportunities (capped)
+      const opps = [];
+      let startAfterId = null, startAfter = null, pages = 0;
+      while (pages < 15) {
+        const params = { location_id: locationId, limit: 100 };
+        if (startAfterId) { params.startAfterId = startAfterId; if (startAfter) params.startAfter = startAfter; }
+        const or = await fetch(`${base}/opportunities/search?${new URLSearchParams(params)}`, { headers });
+        if (!or.ok) break;
+        const od = await or.json();
+        const batch = od.opportunities || [];
+        opps.push(...batch);
+        pages++;
+        const meta = od.meta || {};
+        if (batch.length < 100 || !meta.startAfterId) break;
+        startAfterId = meta.startAfterId; startAfter = meta.startAfter;
+      }
+
+      // prior snapshot for this location
+      const prior = await sbReq(`ghl_opp_state?location=eq.${encodeURIComponent(name)}&select=opp_id,canonical,stage_name`);
+      const priorMap = {};
+      (prior || []).forEach(r => { priorMap[r.opp_id] = r; });
+
+      const upserts = [], transitions = [];
+      for (const o of opps) {
+        const stageName = stageMap[o.pipelineStageId] || "";
+        const canonical = mapStageName(stageName) || "(unmapped)";
+        const contactId = o.contact?.id || o.contactId || null;
+        upserts.push({ location: name, opp_id: o.id, contact_id: contactId, pipeline_id: o.pipelineId || null, stage_name: stageName, canonical, monetary_value: o.monetaryValue || 0, source: o.source || null, updated_at: now });
+        const prev = priorMap[o.id];
+        if (prev && prev.canonical !== canonical) {
+          transitions.push({ location: name, opp_id: o.id, contact_id: contactId, from_stage: prev.stage_name, from_canonical: prev.canonical, to_stage: stageName, to_canonical: canonical, moved_at: now });
+        }
+      }
+
+      if (transitions.length) await sbReq("ghl_stage_transitions", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(transitions) });
+      if (upserts.length) await sbReq("ghl_opp_state?on_conflict=location,opp_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(upserts) });
+
+      summary.push({ location: name, opps: opps.length, moves: transitions.length });
+    } catch (e) {
+      summary.push({ location: name, error: (e.message || "error").slice(0, 120) });
+    }
+  }
+
+  return res.status(200).json({ ok: true, ran_at: now, summary });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   const action = req.query.action || "locations";
+
+  // --- Stage-movement tracker cron (Bearer CRON_SECRET; loops all locations) ---
+  if (action === "track-stages") {
+    return trackStages(req, res);
+  }
 
   // --- Locations (no auth needed, not cached) ---
   if (action === "locations") {

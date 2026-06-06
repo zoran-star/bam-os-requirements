@@ -36,6 +36,25 @@ GHL automations move leads between these on response/ghosting/no-show.
 `conversations`. Show rate needs the calendar/appointments endpoint (not wired).
 api/ghl.js has **no auth gate** (keyed by location name) — pre-existing footgun.
 
+**Stage-movement tracker (build A, 2026-06-06):** GHL keeps no pullable stage
+history, and snapshot counts ≠ conversion rates (a lead sits in one stage at a
+time). So we record the flow ourselves:
+- Tables (`supabase/ghl_stage_tracking.sql`, **must be run**): `ghl_opp_state`
+  (last-seen stage per opp) + `ghl_stage_transitions` (every detected move). RLS
+  on, no policies → service-role/API only.
+- Hourly cron `GET /api/ghl?action=track-stages` (Bearer CRON_SECRET; folded into
+  ghl.js to respect the function cap; vercel.json `30 * * * *`). For each V2
+  location: build stageId→name map, page all opportunities (capped 15×100), map
+  each to canonical via `mapStageName`, upsert `ghl_opp_state`, and insert a
+  `ghl_stage_transitions` row whenever canonical changed vs last snapshot.
+  Per-location try/catch, breaks on non-OK, V1 locations skipped.
+- **Forward-only, no backfill** — rates get accurate as data accumulates. KPIs
+  will COUNT transitions by `to_canonical` in a date range (read endpoint = next).
+- Verify: after a couple hours, `ghl_stage_transitions` should have rows; the cron
+  response returns a per-location {opps, moves} summary.
+- Core-alignment note: this is portal-local operational telemetry (not a core
+  domain entity); couldn't pull fc-core-srvc from the build sandbox.
+
 **Next steps (designed, not built):** `clients.ghl_kpi_config` jsonb to persist
 the mapping + KPI on/off + goals; a staff editor; a corrections log fed back as
 few-shot examples so guesses improve. Then compute KPIs → feeds true
