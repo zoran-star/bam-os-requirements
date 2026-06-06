@@ -176,6 +176,9 @@ export default async function handler(req, res) {
     if (resource === "meta-kpis") {
       return handleMetaKpis(req, res);
     }
+    if (resource === "meta-report") {
+      return handleMetaReport(req, res);
+    }
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
@@ -188,7 +191,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1325,6 +1328,159 @@ async function handleMetaKpis(req, res) {
     weekBefore: { start: wbStart, end: wbEnd, ...shape(buckets.weekBefore) },
     leadChangePct,
   });
+}
+
+// Sum a single Meta action type (e.g. "landing_page_view") out of the
+// insights `actions` array. Same shape as countLeads but for one type.
+function countAction(actions, type) {
+  if (!Array.isArray(actions)) return 0;
+  let n = 0;
+  for (const a of actions) {
+    if (a.action_type === type) n += parseInt(a.value, 10) || 0;
+  }
+  return n;
+}
+
+// Industry benchmark defaults — Ximena's hand-noted standards for the
+// sports/training/coaching niche. These are the fallback "goal lines" when
+// a client has no custom goal set (clients.meta_cpl_goal / meta_monthly_budget).
+const MKT_BENCHMARKS = {
+  cpl: 25,                     // target cost-per-lead ($); "good to keep around $25"
+  ctr_min: 1.5, ctr_max: 2.5,  // link CTR % — sports/coaching industry
+  freq_min: 2,  freq_max: 4,   // monthly frequency — sports/coaching industry
+};
+
+const MONTH_NAMES = ["January","February","March","April","May","June",
+  "July","August","September","October","November","December"];
+
+// GET ?resource=meta-report&client_id=<id>&months=<n>
+// Automates Ximena's monthly KPI sheet: per-campaign, per-month Meta metrics
+// (leads, CPL, spend, reach, impressions, link clicks, landing page views,
+// CTR, frequency) for the last N months in ONE Meta call (level=campaign,
+// time_increment=monthly). Also returns the client's goals + industry
+// benchmark defaults so the frontend can colour against the right target.
+async function handleMetaReport(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.client) targetClientId = ctx.client.id;
+  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const months = Math.min(Math.max(parseInt(req.query.months || "8", 10) || 8, 1), 24);
+
+  // Resilient select: meta_cpl_goal / meta_monthly_budget may not exist yet
+  // (migration: supabase/marketing_goals.sql). Fall back without them so the
+  // report works before AND after the columns are added.
+  let clientFull = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget`);
+    clientFull = rows?.[0] || null;
+  } catch {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
+    clientFull = rows?.[0] || null;
+  }
+
+  const goals = {
+    cpl_goal: clientFull?.meta_cpl_goal != null ? Number(clientFull.meta_cpl_goal) : null,
+    monthly_budget: clientFull?.meta_monthly_budget != null ? Number(clientFull.meta_monthly_budget) : null,
+  };
+  const base = { goals, benchmarks: MKT_BENCHMARKS };
+
+  if (!clientFull?.meta_ad_account_id) return res.status(200).json({ reason: "no_ad_account", ...base });
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ reason: "no_staff_token", ...base });
+
+  const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
+    ? clientFull.meta_ad_account_id
+    : `act_${clientFull.meta_ad_account_id}`;
+
+  // Date window: first day of (this month − (months−1)) through today.
+  const now = new Date();
+  const startMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const since = startMonth.toISOString().slice(0, 10);
+  const until = now.toISOString().slice(0, 10);
+
+  const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+    level: "campaign",
+    fields: "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions",
+    time_range: JSON.stringify({ since, until }),
+    time_increment: "monthly",
+    access_token: staffToken,
+    limit: "500",
+  });
+  const r = await fetch(url);
+  const j = await r.json();
+  if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
+
+  // Optional per-client campaign filter (so clients don't see staff experiments).
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? new Set(clientFull.meta_campaign_ids) : null;
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const monthsMap = new Map(); // "YYYY-MM" → { campaigns: [...] }
+
+  for (const row of (j.data || [])) {
+    if (allow && !allow.has(row.campaign_id)) continue;
+    const monthKey = (row.date_start || "").slice(0, 7);
+    if (!monthKey) continue;
+
+    const spend = parseFloat(row.spend || "0") || 0;
+    const impressions = parseInt(row.impressions || "0", 10) || 0;
+    const reach = parseInt(row.reach || "0", 10) || 0;
+    const frequency = parseFloat(row.frequency || "0") || 0;
+    const linkClicks = parseInt(row.inline_link_clicks || "0", 10) || 0;
+    const leads = countLeads(row.actions);
+    const lpv = countAction(row.actions, "landing_page_view");
+
+    const campaign = {
+      id: row.campaign_id,
+      name: row.campaign_name || "(unnamed)",
+      leads,
+      cpl: leads > 0 ? round2(spend / leads) : null,
+      spend: round2(spend),
+      reach,
+      impressions,
+      link_clicks: linkClicks,
+      landing_page_views: lpv,
+      ctr: impressions > 0 ? round2((linkClicks / impressions) * 100) : null,
+      frequency: round2(frequency),
+    };
+    if (!monthsMap.has(monthKey)) monthsMap.set(monthKey, []);
+    monthsMap.get(monthKey).push(campaign);
+  }
+
+  // Build descending-by-month array with a per-month totals row.
+  const monthsOut = [...monthsMap.keys()].sort().reverse().map((key) => {
+    const campaigns = monthsMap.get(key);
+    const [yy, mm] = key.split("-");
+    const t = campaigns.reduce((acc, c) => {
+      acc.spend += c.spend; acc.leads += c.leads;
+      acc.impressions += c.impressions; acc.reach += c.reach;
+      acc.link_clicks += c.link_clicks; acc.landing_page_views += c.landing_page_views;
+      return acc;
+    }, { spend: 0, leads: 0, impressions: 0, reach: 0, link_clicks: 0, landing_page_views: 0 });
+    return {
+      key,
+      label: `${MONTH_NAMES[parseInt(mm, 10) - 1]} ${yy}`,
+      campaigns,
+      totals: {
+        spend: round2(t.spend),
+        leads: t.leads,
+        cpl: t.leads > 0 ? round2(t.spend / t.leads) : null,
+        impressions: t.impressions,
+        reach: t.reach,
+        link_clicks: t.link_clicks,
+        landing_page_views: t.landing_page_views,
+        ctr: t.impressions > 0 ? round2((t.link_clicks / t.impressions) * 100) : null,
+        frequency: t.reach > 0 ? round2(t.impressions / t.reach) : null,
+      },
+    };
+  });
+
+  return res.status(200).json({ ad_account: adAcct, months: monthsOut, ...base });
 }
 
 // GET ?resource=meta-creatives&campaign_id=<id>
