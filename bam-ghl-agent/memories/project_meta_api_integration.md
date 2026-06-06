@@ -22,6 +22,10 @@ The Meta integration supports BOTH:
 - `clients.meta_ad_account_id` — text, nullable. Required for real campaigns. Settable by staff (via Client Setup) OR by the client themselves (via the native-prompt picker after connecting their own Meta).
 - `clients.meta_campaign_ids` — array, filters which campaigns surface on the client portal (so clients don't see staff's experimental campaigns).
 
+## OAuth scopes
+
+`META_OAUTH_SCOPES` (api/marketing.js): `ads_read`, **`ads_management`**, **`business_management`**, `public_profile`. Write scopes added 2026-06-06 (PR #105) for the upcoming upload→creative→ad-create build. ⚠️ Requires `ads_management` + `business_management` granted on the Meta app (Standard Access, no App Review under staff-token model) AND staff must **reconnect Meta** after deploy for the existing read-only token to gain write perms.
+
 ## Env vars (Vercel `bam-portal` production)
 
 - `META_APP_ID = 2059912628202822` (public)

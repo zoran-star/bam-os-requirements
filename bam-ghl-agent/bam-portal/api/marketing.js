@@ -941,7 +941,7 @@ async function handleContentTickets(req, res) {
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
-const META_OAUTH_SCOPES = ["ads_read", "public_profile"];
+const META_OAUTH_SCOPES = ["ads_read", "ads_management", "business_management", "public_profile"];
 
 function metaGetOrigin(req) {
   // Pinned to the canonical staff URL — the Meta OAuth redirect URI
