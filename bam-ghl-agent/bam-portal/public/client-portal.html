@@ -751,6 +751,97 @@
     background: var(--gold-hi);
   }
 
+  /* ── Ad Performance report (auto from Meta) ── */
+  .report-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin: 8px 0 18px;
+  }
+  .report-controls { display: flex; align-items: center; gap: 10px; }
+  .report-month-select {
+    background: var(--surface-el); color: var(--text);
+    border: 1px solid var(--line-str); border-radius: 8px;
+    padding: 9px 12px; font-family: var(--mono); font-size: 11px;
+    letter-spacing: 0.08em; cursor: pointer;
+  }
+  .report-toggle {
+    display: inline-flex; background: var(--surface-el);
+    border: 1px solid var(--line-str); border-radius: var(--radius-full); padding: 3px;
+  }
+  .report-toggle-btn {
+    border: none; background: transparent; color: var(--text-mute);
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    padding: 7px 16px; border-radius: var(--radius-full); cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .report-toggle-btn.active { background: var(--gold); color: var(--ink); }
+
+  .report-headline {
+    border: 1px solid var(--accent-border); background: var(--accent-ghost);
+    border-radius: var(--radius); padding: 18px 20px; margin-bottom: 18px;
+    font-family: var(--display); font-size: 17px; line-height: 1.5; color: var(--text);
+  }
+  .report-headline .rec {
+    display: block; margin-top: 8px; font-family: var(--sans);
+    font-size: 13px; color: var(--text-sub); line-height: 1.5;
+  }
+
+  .report-card {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--surface); padding: 22px; margin-bottom: 16px;
+    border-left: 3px solid var(--text-mute);
+  }
+  .report-card.is-go   { border-left-color: var(--green); }
+  .report-card.is-warn { border-left-color: var(--amber); }
+  .report-card.is-stop { border-left-color: var(--red); }
+
+  .report-card-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+  }
+  .report-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-mute); flex: none; }
+  .report-card.is-go   .report-dot { background: var(--green); }
+  .report-card.is-warn .report-dot { background: var(--amber); }
+  .report-card.is-stop .report-dot { background: var(--red); }
+  .report-card-title { font-family: var(--display); font-size: 16px; font-weight: 600; color: var(--text); }
+
+  .report-bigstats { display: flex; flex-wrap: wrap; gap: 28px; }
+  .report-bigstat .v { font-family: var(--display); font-size: 30px; font-weight: 600; color: var(--text); line-height: 1; }
+  .report-bigstat .v small { font-size: 14px; color: var(--text-mute); font-weight: 500; }
+  .report-bigstat .l {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--text-mute); margin-top: 8px;
+  }
+  .report-bigstat .vs { font-size: 13px; }
+  .vs-go { color: var(--green); } .vs-warn { color: var(--amber); } .vs-stop { color: var(--red); }
+
+  /* funnel */
+  .report-funnel { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .funnel-row { display: grid; grid-template-columns: 120px 1fr auto; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .funnel-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-sub); }
+  .funnel-track { height: 22px; background: var(--surface-el); border-radius: 5px; overflow: hidden; }
+  .funnel-fill { height: 100%; background: var(--gold); border-radius: 5px; min-width: 3px; }
+  .funnel-val { font-family: var(--display); font-size: 14px; color: var(--text); font-weight: 600; min-width: 64px; text-align: right; }
+  .funnel-conv { font-family: var(--mono); font-size: 10px; color: var(--text-mute); letter-spacing: 0.06em; padding: 2px 0 6px 132px; }
+  .funnel-conv b { color: var(--text-sub); font-weight: 600; }
+
+  /* advanced metric grid */
+  .report-grid {
+    margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 18px 20px;
+  }
+  .report-metric .mv { font-family: var(--display); font-size: 19px; font-weight: 600; color: var(--text); }
+  .report-metric .ml { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); margin-top: 5px; }
+  .report-metric .mb { font-size: 11px; margin-top: 4px; font-family: var(--sans); }
+
+  @media (max-width: 768px) {
+    .report-head { gap: 12px; }
+    .report-controls { width: 100%; justify-content: space-between; }
+    .report-bigstats { gap: 18px 24px; }
+    .funnel-row { grid-template-columns: 84px 1fr auto; gap: 8px; }
+    .funnel-conv { padding-left: 92px; }
+    .funnel-val { min-width: 52px; font-size: 13px; }
+  }
+
   /* ── Change a campaign (detail) ── */
   .spend-bar {
     display: flex;
@@ -5814,7 +5905,22 @@
 
         <div class="content">
 
-          <div class="readout">Active Campaigns</div>
+          <!-- ── Ad Performance report (auto from Meta) ── -->
+          <div class="report-head">
+            <div class="readout" style="margin:0">Ad Performance</div>
+            <div class="report-controls">
+              <select id="report-month" class="report-month-select" onchange="_onReportMonthChange()" aria-label="Report month"></select>
+              <div class="report-toggle" role="group" aria-label="Detail level">
+                <button type="button" id="report-simple-btn" class="report-toggle-btn active" onclick="setReportMode('simple')">Simple</button>
+                <button type="button" id="report-adv-btn" class="report-toggle-btn" onclick="setReportMode('advanced')">Advanced</button>
+              </div>
+            </div>
+          </div>
+          <div id="ad-report-container">
+            <div class="req-empty" style="padding:20px 0">Loading performance…</div>
+          </div>
+
+          <div class="readout" style="margin-top:48px">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
           <div id="marketing-campaigns-container">
@@ -15813,6 +15919,8 @@ async function fetchAndRenderMarketingRequests() {
   }
   // Independently render real Meta campaigns (or connect/picker states).
   _renderMarketingCampaigns();
+  // Independently load the auto Ad Performance report (monthly KPIs).
+  _loadAdReport();
 }
 
 // Sample campaign data shown when the client has no real campaigns wired —
@@ -16015,6 +16123,245 @@ async function _renderMarketingCampaigns() {
   } catch (e) {
     containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load campaigns: ${escapeHTML(e.message)}</div>`;
   }
+}
+
+
+// ─────────────────────────────────────────────────────────
+// Ad Performance report — auto-built monthly KPI dashboard
+// Replaces Ximena's by-hand Meta → spreadsheet workflow. Pulls
+// /api/marketing?resource=meta-report (one Meta call, per-campaign,
+// per-month) and renders a Simple (default) / Advanced view with a
+// conversion funnel, auto health colours, and a plain-English insight.
+// ─────────────────────────────────────────────────────────
+
+let _adReport = null;          // { months, goals, benchmarks, demo? }
+let _reportMode = 'simple';    // 'simple' | 'advanced'
+let _reportMonthKey = null;    // selected "YYYY-MM"
+
+function _fmtNum(n) { return (Number(n) || 0).toLocaleString('en-US'); }
+function _fmtMoney(n) {
+  n = Number(n) || 0;
+  const hasCents = Math.round(n * 100) % 100 !== 0;
+  return '$' + n.toLocaleString('en-US', {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function _cplHealth(cpl, target) {
+  if (cpl == null) return 'warn';            // spent, no leads yet
+  if (!target || cpl <= target) return 'go';
+  if (cpl <= target * 1.5) return 'warn';
+  return 'stop';
+}
+
+// Plain-English headline + one recommendation. Works on a single campaign
+// OR a month-totals object (same metric shape). This is the "heavy lifting"
+// — we read the funnel and tell them the single thing that matters.
+function _reportInsight(c, goals, bm) {
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  if (!c.leads) {
+    return {
+      headline: `Spent ${_fmtMoney(c.spend)} this month — no leads recorded yet.`,
+      rec: (c.ctr != null && c.ctr < bm.ctr_min)
+        ? `Your click-through rate is low — the creative isn't pulling people in. Refresh the ad before spending more.`
+        : `Give it a few more days, or check that lead tracking is firing on your landing page.`,
+    };
+  }
+  const headline = `Spent ${_fmtMoney(c.spend)} → ${c.leads} lead${c.leads === 1 ? '' : 's'} → ${_fmtMoney(c.cpl)} each.`;
+  let rec;
+  if (c.ctr != null && c.ctr < bm.ctr_min) {
+    rec = `Biggest leak: click-through (${c.ctr}% vs the ${bm.ctr_min}–${bm.ctr_max}% industry range). Your creative isn't earning clicks — try a fresh hook or thumbnail.`;
+  } else if (c.frequency != null && c.frequency > bm.freq_max) {
+    rec = `People have seen this ad ${c.frequency}× (industry tops out around ${bm.freq_max}×). That's audience fatigue — refresh the creative or widen the audience.`;
+  } else if (target && c.cpl > target) {
+    const over = Math.round(((c.cpl - target) / target) * 100);
+    rec = `Cost per lead is ${over}% over your ${_fmtMoney(target)} target. Tighten targeting or improve the landing page.`;
+  } else {
+    rec = `On track — leads are coming in at or below your ${_fmtMoney(target)} target. Keep it running. 🎉`;
+  }
+  return { headline, rec };
+}
+
+function _funnelHTML(c) {
+  const imp = c.impressions || 0;
+  const pct = (v) => imp > 0 ? Math.max((v / imp) * 100, 0.6) : 0;
+  const conv = (a, b, label) => {
+    if (!a) return '';
+    const r = Math.round((b / a) * 1000) / 10;
+    return `<div class="funnel-conv">↓ <b>${r}%</b> ${label}</div>`;
+  };
+  const stage = (label, val) => `
+    <div class="funnel-row">
+      <div class="funnel-label">${label}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${pct(val).toFixed(1)}%"></div></div>
+      <div class="funnel-val">${_fmtNum(val)}</div>
+    </div>`;
+  return `<div class="report-funnel">
+    ${stage('Impressions', c.impressions)}
+    ${conv(c.impressions, c.link_clicks, 'clicked')}
+    ${stage('Link clicks', c.link_clicks)}
+    ${conv(c.link_clicks, c.landing_page_views, 'loaded the page')}
+    ${stage('Page views', c.landing_page_views)}
+    ${conv(c.landing_page_views || c.link_clicks, c.leads, 'became leads')}
+    ${stage('Leads', c.leads)}
+  </div>`;
+}
+
+function _advGridHTML(c, bm) {
+  const ctrClass = c.ctr == null ? '' : (c.ctr < bm.ctr_min ? 'vs-stop' : 'vs-go');
+  const ctrNote = c.ctr == null ? '' :
+    `<div class="mb ${ctrClass}">${c.ctr < bm.ctr_min ? 'below' : 'in / above'} industry ${bm.ctr_min}–${bm.ctr_max}%</div>`;
+  const freqClass = c.frequency == null ? '' : (c.frequency > bm.freq_max ? 'vs-warn' : 'vs-go');
+  const freqNote = c.frequency == null ? '' :
+    `<div class="mb ${freqClass}">${c.frequency > bm.freq_max ? 'fatigue risk' : 'healthy'} · ind. ${bm.freq_min}–${bm.freq_max}×</div>`;
+  const m = (v, l, extra = '') => `<div class="report-metric"><div class="mv">${v}</div><div class="ml">${l}</div>${extra}</div>`;
+  return `<div class="report-grid">
+    ${m(_fmtNum(c.reach), 'Reach')}
+    ${m(_fmtNum(c.impressions), 'Impressions')}
+    ${m(_fmtNum(c.link_clicks), 'Link clicks')}
+    ${m(c.landing_page_views ? _fmtNum(c.landing_page_views) : '—', 'Page views')}
+    ${m(c.ctr != null ? c.ctr + '%' : '—', 'CTR (link)', ctrNote)}
+    ${m(c.frequency != null ? c.frequency + '×' : '—', 'Frequency', freqNote)}
+  </div>`;
+}
+
+function _reportCardHTML(c, goals, bm, mode) {
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  const health = _cplHealth(c.cpl, target);
+  const cls = health === 'go' ? 'is-go' : health === 'warn' ? 'is-warn' : 'is-stop';
+  const vsClass = health === 'go' ? 'vs-go' : health === 'warn' ? 'vs-warn' : 'vs-stop';
+  const goalWord = (goals && goals.cpl_goal != null) ? 'goal' : 'target';
+  const insight = _reportInsight(c, goals, bm);
+  const budget = (goals && goals.monthly_budget != null) ? goals.monthly_budget : null;
+
+  const cplVs = c.cpl == null ? '' :
+    `<div class="vs ${vsClass}">${c.cpl <= target ? '✓ at / under' : '▲ over'} ${_fmtMoney(target)} ${goalWord}</div>`;
+  const spendVs = budget == null ? '' :
+    `<div class="vs ${c.spend <= budget ? 'vs-go' : 'vs-warn'}">${Math.round((c.spend / budget) * 100)}% of ${_fmtMoney(budget)} budget</div>`;
+
+  return `<div class="report-card ${cls}">
+    <div class="report-card-head"><span class="report-dot"></span><span class="report-card-title">${escapeHTML(c.name)}</span></div>
+    <div class="report-bigstats">
+      <div class="report-bigstat"><div class="v">${c.leads}</div><div class="l">Leads</div></div>
+      <div class="report-bigstat"><div class="v">${c.cpl != null ? _fmtMoney(c.cpl) : '—'}</div><div class="l">Cost / lead</div>${cplVs}</div>
+      <div class="report-bigstat"><div class="v">${_fmtMoney(c.spend)}</div><div class="l">Spent</div>${spendVs}</div>
+    </div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:13px;color:var(--text-sub);line-height:1.55">${escapeHTML(insight.rec)}</div>
+    ${mode === 'advanced' ? _funnelHTML(c) + _advGridHTML(c, bm) : ''}
+  </div>`;
+}
+
+function _reportTotals(camps) {
+  const t = camps.reduce((a, c) => {
+    a.spend += c.spend; a.leads += c.leads;
+    a.impressions += c.impressions; a.reach += c.reach;
+    a.link_clicks += c.link_clicks; a.landing_page_views += c.landing_page_views;
+    return a;
+  }, { spend: 0, leads: 0, impressions: 0, reach: 0, link_clicks: 0, landing_page_views: 0 });
+  const r2 = (n) => Math.round(n * 100) / 100;
+  return {
+    spend: r2(t.spend), leads: t.leads, impressions: t.impressions, reach: t.reach,
+    link_clicks: t.link_clicks, landing_page_views: t.landing_page_views,
+    cpl: t.leads > 0 ? r2(t.spend / t.leads) : null,
+    ctr: t.impressions > 0 ? r2((t.link_clicks / t.impressions) * 100) : null,
+    frequency: t.reach > 0 ? r2(t.impressions / t.reach) : null,
+  };
+}
+
+// Sample report shown until the client's ad account is wired (mirrors the
+// demo-campaigns fallback). Numbers modelled on real academy data so the
+// dashboard looks alive for testers / onboarding.
+function _buildDemoReport() {
+  const mk = (key, label, campaigns) => ({ key, label, campaigns, totals: _reportTotals(campaigns) });
+  const months = [
+    mk('2026-04', 'April 2026', [
+      { id: 'd_udp', name: 'UDP', leads: 5, cpl: 136.80, spend: 684, reach: 4451, impressions: 31854, link_clicks: 176, landing_page_views: 152, ctr: 0.55, frequency: 7.16 },
+      { id: 'd_pgp', name: 'PGP', leads: 5, cpl: 5.60, spend: 28, reach: 645, impressions: 1331, link_clicks: 28, landing_page_views: 21, ctr: 2.10, frequency: 2.06 },
+      { id: 'd_ms',  name: 'Mental Skills', leads: 15, cpl: 33.07, spend: 496, reach: 5188, impressions: 25791, link_clicks: 519, landing_page_views: 467, ctr: 2.00, frequency: 4.95 },
+    ]),
+    mk('2026-03', 'March 2026', [
+      { id: 'd_udp', name: 'UDP', leads: 13, cpl: 48.85, spend: 635, reach: 5710, impressions: 40078, link_clicks: 281, landing_page_views: 257, ctr: 0.70, frequency: 7.02 },
+      { id: 'd_pgp', name: 'PGP', leads: 10, cpl: 15.30, spend: 153, reach: 2176, impressions: 7616, link_clicks: 280, landing_page_views: 262, ctr: 3.68, frequency: 3.5 },
+    ]),
+    mk('2026-02', 'February 2026', [
+      { id: 'd_udp', name: 'UDP', leads: 6, cpl: 102.33, spend: 614, reach: 4642, impressions: 44727, link_clicks: 243, landing_page_views: 169, ctr: 0.54, frequency: 9.64 },
+    ]),
+  ];
+  return {
+    demo: true,
+    months,
+    goals: { cpl_goal: null, monthly_budget: null },
+    benchmarks: { cpl: 25, ctr_min: 1.5, ctr_max: 2.5, freq_min: 2, freq_max: 4 },
+  };
+}
+
+async function _loadAdReport() {
+  const el = document.getElementById('ad-report-container');
+  if (!el) return;
+  try {
+    const token = await _mreqAuthToken();
+    const res = await fetch('/api/marketing?resource=meta-report&months=8', { headers: { Authorization: 'Bearer ' + token } });
+    const json = await _safeJson(res);
+    if (!res.ok) {
+      el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
+      return;
+    }
+    // No ad account / no token / no months → sample data so the tab is alive.
+    if (json.reason || !(Array.isArray(json.months) && json.months.length)) {
+      _adReport = _buildDemoReport();
+      if (json.benchmarks) _adReport.benchmarks = json.benchmarks;
+      if (json.goals) _adReport.goals = json.goals;
+    } else {
+      _adReport = json;
+    }
+    _populateMonthDropdown();
+    _renderAdReport();
+  } catch (e) {
+    el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _populateMonthDropdown() {
+  const sel = document.getElementById('report-month');
+  if (!sel || !_adReport || !_adReport.months.length) return;
+  sel.innerHTML = _adReport.months.map(m => `<option value="${m.key}">${escapeHTML(m.label)}</option>`).join('');
+  if (!_reportMonthKey || !_adReport.months.some(m => m.key === _reportMonthKey)) {
+    _reportMonthKey = _adReport.months[0].key;
+  }
+  sel.value = _reportMonthKey;
+}
+
+function _onReportMonthChange() {
+  const sel = document.getElementById('report-month');
+  if (sel) { _reportMonthKey = sel.value; _renderAdReport(); }
+}
+
+function setReportMode(mode) {
+  _reportMode = mode;
+  const s = document.getElementById('report-simple-btn');
+  const a = document.getElementById('report-adv-btn');
+  if (s) s.classList.toggle('active', mode === 'simple');
+  if (a) a.classList.toggle('active', mode === 'advanced');
+  _renderAdReport();
+}
+
+function _renderAdReport() {
+  const el = document.getElementById('ad-report-container');
+  if (!el || !_adReport) return;
+  const month = _adReport.months.find(m => m.key === _reportMonthKey) || _adReport.months[0];
+  if (!month) { el.innerHTML = '<div class="req-empty" style="padding:18px 0">No performance data yet.</div>'; return; }
+
+  const goals = _adReport.goals || {};
+  const bm = _adReport.benchmarks || { cpl: 25, ctr_min: 1.5, ctr_max: 2.5, freq_min: 2, freq_max: 4 };
+  const demoNote = _adReport.demo
+    ? `<div style="font-family:var(--mono);font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-mute);margin-bottom:14px">Sample data — your real numbers appear once your ad account is connected</div>`
+    : '';
+
+  const ti = _reportInsight(month.totals, goals, bm);
+  const head = `<div class="report-headline">${escapeHTML(ti.headline)}<span class="rec">${escapeHTML(ti.rec)}</span></div>`;
+  const cards = month.campaigns.map(c => _reportCardHTML(c, goals, bm, _reportMode)).join('');
+  el.innerHTML = demoNote + head + cards;
 }
 
 

@@ -39,6 +39,7 @@ Clean URLs via `vercel.json` rewrites:
 - `GET  /api/meta/adaccounts` — list ad accounts the connected staff has access to
 - `POST /api/meta/adaccounts` — staff picks an ad account for a client (writes `clients.meta_ad_account_id` + `clients.meta_campaign_ids`)
 - `GET  /api/meta/campaigns?client_id=...` — real campaigns + insights, last 30d
+- `GET  /api/marketing?resource=meta-report&client_id=...&months=<n>` — per-campaign, per-month KPI report (leads/CPL/spend/reach/impressions/link clicks/LP views/CTR/frequency) powering the **Ad Performance dashboard**. See [[project_ad_performance_dashboard]].
 - `GET  /api/meta/campaigns?client_id=...&staff_picker=1` — staff-only mode that bypasses `meta_campaign_ids` filter (for picking which campaigns to surface)
 - `GET  /api/marketing?resource=meta-creatives&campaign_id=...` — real ad creatives for a campaign
 
