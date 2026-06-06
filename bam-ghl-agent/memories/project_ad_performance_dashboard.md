@@ -10,11 +10,21 @@ Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's
 GHL pipeline differs (stage names, some have no trial), so KPIs can't be
 hardcoded. Plan (Zoran): AI best-guesses the mapping → staff edit → agent learns.
 
+**Confirmed GTA stage semantics (Zoran 2026-06-06) — pattern recurs across academies:**
+`Interested`=lead submitted info (form) → **Lead**; `Responded`=lead replied →
+**Contacted**; `Scheduled Trial`=booked a trial → **Booked**; `Done Trial`=showed
+up + finished → **Showed**; then **Won** (member) / **Lost** (ghost/no-show/etc).
+GHL automations move leads between these on response/ghosting/no-show.
+
 **Spike shipped (read-only, no schema):**
-- `POST /api/marketing?resource=ghl-kpi-suggest` (staff only, Claude haiku-4-5) —
-  takes a client's GHL pipeline stages + opportunity counts, proposes a canonical
-  funnel mapping (Lead·Contacted·Booked·Showed·Trial·Won·Lost), which KPIs matter,
-  which to skip (e.g. no trial → hide trial show-rate). Returns JSON only.
+- `api/_ghl_funnel.js` — **deterministic** stage-name→canonical matcher (keyword
+  rules, GTA semantics baked in) + `buildKpis(present)` (KPIs only for steps that
+  exist; explains skipped ones). This replaced the pure-AI guess so GTA + lookalikes
+  map correctly every time; truly unusual stages come back `(unmapped)` for staff.
+- `POST /api/marketing?resource=ghl-kpi-suggest` (staff only) — runs the matcher,
+  returns `{summary, mapping, missing, unmapped, kpis, hidden_kpis, canonical}`.
+  No AI call anymore (rules are the encoded knowledge); AI returns later for
+  unmapped-stage guessing + the learning loop.
 - `src/components/GhlKpiDiscovery.jsx` — staff panel: GHL location dropdown
   (`/api/ghl?action=locations`) → "Analyze" → fetches `?action=pipelines` →
   computes stage counts → calls ghl-kpi-suggest → renders mapping + KPIs. Lives in

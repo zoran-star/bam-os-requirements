@@ -85,6 +85,27 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         <>
           {result.summary && <div style={{ ...card, fontSize: 15, lineHeight: 1.5, color: t.text }}>{result.summary}</div>}
 
+          {Array.isArray(result.unmapped) && result.unmapped.length > 0 && (
+            <div style={{ ...card, borderColor: t.accentBorder }}>
+              <div style={lbl}>Needs your call</div>
+              <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.5 }}>
+                Couldn't confidently place: <b style={{ color: t.text }}>{result.unmapped.join(", ")}</b>. Tell me which funnel step each is and I'll teach the matcher.
+              </div>
+            </div>
+          )}
+
+          {Array.isArray(result.canonical) && (
+            <div style={card}>
+              <div style={lbl}>Funnel steps (what each means)</div>
+              {result.canonical.map((c, i) => (
+                <div key={c.step} style={{ display: "flex", gap: 10, padding: "5px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
+                  <span style={{ minWidth: 78, fontSize: 12, fontWeight: 600, color: t.text }}>{c.step}</span>
+                  <span style={{ flex: 1, fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>{c.desc}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div style={card}>
             <div style={lbl}>Stage → funnel mapping {result.source === "ai" && <span style={{ color: t.accent }}>· AI proposed</span>}</div>
             {(result.mapping || []).map((m, i) => (

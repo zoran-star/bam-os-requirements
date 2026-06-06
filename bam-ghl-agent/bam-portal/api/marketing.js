@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
+import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
@@ -1642,56 +1643,53 @@ async function handleMetaInsight(req, res) {
 }
 
 // POST ?resource=ghl-kpi-suggest  (staff only) — DISCOVERY SPIKE.
-// Given an academy's GHL pipeline stages (+ opportunity counts per stage),
-// Claude proposes how to map them onto a canonical acquisition funnel and which
-// KPIs actually matter for THIS academy (e.g., skip trial show-rate if there's
-// no trial stage). Read-only suggestion — staff review/edit before anything is
-// saved. Body: { businessName, pipelines:[{name,stages:[{name}]}], stageCounts:{stageName:n} }.
+// Maps an academy's GHL pipeline stages onto the canonical acquisition funnel
+// and recommends KPIs. Deterministic stage-name matcher (see _ghl_funnel.js) —
+// confirmed against BAM GTA's stage semantics, and the pattern recurs across
+// academies. Stages it can't confidently match are returned "(unmapped)" for
+// staff to fix. Read-only; nothing is saved. Body: { businessName,
+// pipelines:[{name,stages:[{name}]}], stageCounts:{stageName:n} }.
 async function handleGhlKpiSuggest(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
   if (!ctx.staff) return res.status(403).json({ error: "staff only" });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(200).json({ error: "ANTHROPIC_API_KEY not configured" });
-
   const body = req.body || {};
-  const payload = JSON.stringify({
-    business: String(body.businessName || "this academy").slice(0, 80),
-    pipelines: body.pipelines || [],
-    stage_counts: body.stageCounts || {},
-  }, null, 0);
+  const pipelines = Array.isArray(body.pipelines) ? body.pipelines : [];
+  const stageCounts = body.stageCounts || {};
 
-  const system = [
-    "You map a sports academy's GoHighLevel sales pipeline onto a canonical acquisition funnel and recommend which KPIs matter for THEM.",
-    "Canonical funnel steps (in order): Lead, Contacted, Booked (appointment set), Showed (attended), Trial (free trial started), Won (became a paying member), Lost.",
-    "Academies differ — some have no free trial, some no booking step. Only recommend KPIs the data can actually support. If a step is missing, list it under 'missing' and put any KPI that depends on it under 'hidden_kpis' with a plain reason.",
-    "Plain language, no emojis, no jargon (say 'show rate' not 'attendance conversion').",
-    "Return ONLY valid JSON with keys: summary (1-2 sentences), mapping (array of {stage, canonical, confidence:'high'|'med'|'low'}), missing (array of canonical step names), kpis (array of {id, label, formula, recommended:boolean, why}), hidden_kpis (array of {label, why}).",
-  ].join(" ");
-
-  try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1500,
-        system,
-        messages: [{ role: "user", content: `Here is the academy's GHL pipeline data as JSON:\n\n${payload}\n\nProduce the mapping JSON now.` }],
-      }),
-    });
-    if (!r.ok) return res.status(200).json({ error: "AI call failed (" + r.status + ")" });
-    const j = await r.json();
-    const text = j.content?.[0]?.text || "";
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return res.status(200).json({ error: "AI returned no JSON", raw: text.slice(0, 400) });
-    const parsed = JSON.parse(match[0]);
-    return res.status(200).json({ ...parsed, source: "ai" });
-  } catch (err) {
-    return res.status(200).json({ error: err?.message || "AI error" });
+  // Unique stage names across all pipelines, in pipeline order.
+  const seen = new Set();
+  const stageNames = [];
+  for (const p of pipelines) for (const s of (p.stages || [])) {
+    const nm = (s?.name || "").trim();
+    if (nm && !seen.has(nm)) { seen.add(nm); stageNames.push(nm); }
   }
+
+  const mapping = stageNames.map(name => {
+    const canonical = mapStageName(name);
+    return { stage: name, canonical: canonical || "(unmapped)", confidence: canonical ? "high" : "low", count: stageCounts[name] ?? null };
+  });
+
+  const order = ["Lead", "Contacted", "Booked", "Showed", "Trial", "Won", "Lost"];
+  const present = [...new Set(mapping.map(m => m.canonical).filter(c => order.includes(c)))];
+  const missing = ["Lead", "Contacted", "Booked", "Showed", "Won"].filter(s => !present.includes(s));
+  const unmapped = mapping.filter(m => m.canonical === "(unmapped)").map(m => m.stage);
+  const { kpis, hidden } = buildKpis(present);
+
+  const matched = mapping.filter(m => m.confidence === "high").length;
+  let summary = `Recognised ${matched} of ${mapping.length} stages and mapped them onto the funnel (Lead → Contacted → Booked → Showed → Won, with Lost tracked).`;
+  if (unmapped.length) summary += ` Needs your call on: ${unmapped.join(", ")}.`;
+  else if (missing.length) summary += ` No stage detected for: ${missing.join(", ")}.`;
+  else summary += " All core funnel steps are represented.";
+
+  return res.status(200).json({
+    summary, mapping, missing, unmapped,
+    kpis, hidden_kpis: hidden,
+    canonical: CANONICAL_FUNNEL,
+    source: "rules",
+  });
 }
 
 // GET ?resource=meta-overview  (staff only)
