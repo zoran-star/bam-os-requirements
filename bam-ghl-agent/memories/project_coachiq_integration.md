@@ -47,6 +47,59 @@ Naming trap: the existing `parent-onboarding.html` is the ACADEMY-OWNER setup st
 it is NOT the parent-facing input→offer→sign+pay funnel described above (that funnel
 is the thing to design/build; the portal payment is its step 3).
 
+## ⭐⭐⭐ CoachIQ-ON onboarding = portal AUTO-creates user + allocates product (DECIDED, Zoran 2026-06-06)
+
+For academies with the CoachIQ toggle ON, the portal does the CoachIQ side
+AUTOMATICALLY during onboarding — **this replaces the manual "academy pastes the
+sub_id" step** for new signups (Zoran picked "Portal auto-creates + allocates").
+
+```
+EVENT          PORTAL DOES                         COACHIQ RESULT
+─────────────────────────────────────────────────────────────────────────
+Signup + pay → create CoachIQ user (Zapier        → user enrolled in group
+               "Create User", returns user id;
+               store in members.coachiq_member_id)
+             → allocate the MAPPED product         → product + program access
+               ("Add a Product Purchase to a          + initial credits granted
+               User" automation, no payment)          (no CoachIQ payment taken)
+Renewal pays → portal PUSHES to CoachIQ            → next cycle's credits  ⟵ REVIVED
+Pause/cancel → portal stops pushing                → no new credits
+```
+
+⚠️ **CONSEQUENCE — this UN-DEPRECATES the credit/webhook bridge.** Because the PORTAL
+takes payment (not CoachIQ), CoachIQ has no payment trigger to top up credits on
+renewal → the portal must PUSH to CoachIQ each cycle. That is exactly the webhook
+bridge (`api/coachiq.js` addCoachiqCredits / triggerCoachiqAutomation, the closed
+PR #54 wiring). So the "DEPRECATED" note below is now PARTIALLY REVERSED:
+`api/coachiq.js` is back in scope; signup uses "Add Product Purchase", renewals use
+a per-cycle push. (The 2026-06-05 "academy pastes sub_id, BAM builds no bridge" plan
+is superseded for CoachIQ-ON academies by this auto-create+allocate model.)
+
+**NEW staff-portal config (per-client) — "CoachIQ Integration" settings section:**
+- toggle: "This academy uses CoachIQ"
+- API key + Group ID
+- **PRODUCT MAPPING**: each plan (Steady 1×, Accelerated 2×, Elevate 3×, Dominate
+  unltd) → a CoachIQ **product id** (or **automation id** — see open test below).
+- [Test connection] + [Save]. Stored per-client → onboarding fires the matching
+  product for the chosen plan. (Suggested storage: `clients.coachiq_*` columns or a
+  `coachiq_product_map` jsonb.)
+
+**OPEN — fixed-field test (2026-06-06):** CoachIQ's "Add Credits" Number field is a
+FIXED stepper that rejects variables (proven). MUST test whether "Add a Product
+Purchase to a User" accepts a DYNAMIC product id ({{payload.productId}}):
+- If YES → ONE automation, staff section stores **product ids**.
+- If NO  → ONE automation PER product, staff section stores **automation ids**.
+The staff UI is identical either way; only what the field holds changes.
+Test = build an "Add Product Purchase" automation in CoachIQ UI, check if the product
+field offers an Insert-Field/variable option (like the credits field lacked); confirm
+by firing a webhook with {user:{id}, productId:...} and seeing the product resolve.
+Blocked on: CoachIQ API key + group id + a test automation id (key not in repo;
+rotate the one pasted 2026-06-01).
+
+**Front-end note:** all of the above is BEHIND THE SCENES — the parent-facing funnel
+(input → offer → sign+pay) does NOT change; no new parent-facing screens. The only
+new UI is the staff-portal CoachIQ config section.
+
 ## ⭐ CURRENT ARCHITECTURE (DECIDED 2026-06-05) — supersedes the credit bridge
 
 **FullControl owns Stripe billing. CoachIQ stays academy-run for credits/
