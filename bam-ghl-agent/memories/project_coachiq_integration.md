@@ -47,6 +47,36 @@ Naming trap: the existing `parent-onboarding.html` is the ACADEMY-OWNER setup st
 it is NOT the parent-facing input→offer→sign+pay funnel described above (that funnel
 is the thing to design/build; the portal payment is its step 3).
 
+## ✅ SETTLED END-TO-END — signup→first-session (Zoran, 2026-06-06)
+
+This is the FINAL agreed flow (supersedes the back-and-forth below). Two parts:
+SIGNUP is AUTOMATED; RENEWALS are a systems-team TICKET for now.
+
+```
+SIGNUP → FIRST SESSION  (automated — every piece is already proven):
+  1. Parent pays in the portal      → portal creates + OWNS the Stripe sub
+  2. Zapier "Create User"           → creates CoachIQ user + enrolls in group,
+                                       returns user id (store on the member)
+  3. Webhook → the per-product       → "Add a Product Purchase to a User"
+     automation for the member's       grants product + access + credits
+     PLAN×TERM, payload {user:{id}}    IMMEDIATELY (credits land right away)
+  4. Parent downloads CoachIQ app    → logs in (email match → set password)
+  5. Sees product + credits          → books first session
+  Portal selects the automationId from the staff-config PLAN×TERM map, then POSTs
+  {user:{id}} to it (one automation per product — fixed-field test result).
+
+RENEWALS + sub_id link  = systems-team TICKET (manual now, productize later):
+  The signup "Add Product Purchase" grants credits ONCE. CoachIQ has no payment
+  trigger (portal takes payment), so each renewal's top-up is handled by a systems-
+  team action-item ticket (e.g. attach/track the portal sub_id in CoachIQ). The
+  repeatable ticketed flow gets BUILT LATER, once the end-to-end is proven, so it
+  scales to onboard OTHER CoachIQ academies. NOT auto-pushed by the portal for now
+  (so api/coachiq.js renewal push is NOT being wired yet — see consequence note).
+```
+
+Front-end unchanged: the parent funnel (input→offer→sign+pay) is the same; all CoachIQ
+steps are behind the scenes. Only new UI = the staff-portal CoachIQ config (below).
+
 ## ⭐⭐⭐ CoachIQ-ON onboarding = portal AUTO-creates user + allocates product (DECIDED, Zoran 2026-06-06)
 
 For academies with the CoachIQ toggle ON, the portal does the CoachIQ side
@@ -66,12 +96,13 @@ Renewal pays → portal PUSHES to CoachIQ            → next cycle's credits  �
 Pause/cancel → portal stops pushing                → no new credits
 ```
 
-⚠️ **CONSEQUENCE — this UN-DEPRECATES the credit/webhook bridge.** Because the PORTAL
-takes payment (not CoachIQ), CoachIQ has no payment trigger to top up credits on
-renewal → the portal must PUSH to CoachIQ each cycle. That is exactly the webhook
-bridge (`api/coachiq.js` addCoachiqCredits / triggerCoachiqAutomation, the closed
-PR #54 wiring). So the "DEPRECATED" note below is now PARTIALLY REVERSED:
-`api/coachiq.js` is back in scope; signup uses "Add Product Purchase", renewals use
+⚠️ **CONSEQUENCE / UPDATE (superseded by the SETTLED section above):** renewals were
+the open problem — the portal takes payment so CoachIQ has no renewal trigger. RESOLVED
+2026-06-06: renewals are handled by a **systems-team ticket for now**, NOT an auto
+portal push. So the credit/webhook bridge push is **NOT being wired yet** (`api/coachiq.js`
+stays unused for renewals; revisit if/when the ticket flow is productized). Signup still
+uses the webhook to fire the per-product automation (that part IS built/automated).
+Historical note (still true mechanically): if BAM ever DID auto-push renewals it'd be
 a per-cycle push. (The 2026-06-05 "academy pastes sub_id, BAM builds no bridge" plan
 is superseded for CoachIQ-ON academies by this auto-create+allocate model.)
 

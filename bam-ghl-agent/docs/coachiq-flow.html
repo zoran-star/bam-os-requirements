@@ -205,8 +205,8 @@
 
   <!-- SECTION 1: TRACK A -->
   <section id="trackA">
-    <div class="sec-head"><span class="num">1</span><h2>New member — with CoachIQ turned ON</h2></div>
-    <p class="sec-sub">The full path when an academy uses CoachIQ. Steps 1–2 are the normal portal funnel everyone gets; steps 3–5 are the optional CoachIQ add-on.</p>
+    <div class="sec-head"><span class="num">1</span><h2>New member — signup → first session (SETTLED)</h2></div>
+    <p class="sec-sub">The settled automated flow when an academy uses CoachIQ. Step 1 is the universal portal payment; steps 2–5 are the behind-the-scenes CoachIQ automation — all proven. Renewals are handled separately (see Gaps).</p>
     <div id="trackA-steps"></div>
   </section>
 
@@ -246,16 +246,16 @@
 /* ---------- DATA ---------- */
 const DATA = {
   "trackA-steps":[
-    {id:"a1", who:"parent", title:"Parent fills out your branded form", status:"done",
-     desc:"FullControl / GHL form — picks plan & term. Lands in GHL + Supabase."},
-    {id:"a2", who:"bam", title:"Parent pays on YOUR payment page", status:"todo",
-     desc:"Portal Stripe checkout → the portal CREATES & OWNS the subscription. NEVER pay on a CoachIQ form."},
-    {id:"a3", who:"bam", title:"Portal shows the sub-id (easy to copy)", status:"todo",
-     desc:"The new subscription id is surfaced so it can be linked into CoachIQ."},
-    {id:"a4", who:"iq", title:"Academy pastes sub-id into CoachIQ", status:"confirm",
-     desc:"CoachIQ links to the portal-owned sub and sets up the product/credits on their side."},
-    {id:"a5", who:"parent", title:"Parent downloads the branded app & books", status:"todo",
-     desc:"First open → sets a password (matched by email) → books sessions with the credits."},
+    {id:"a1", who:"parent", title:"Parent pays in the portal", status:"todo",
+     desc:"Parent funnel (input → choose offer → sign + pay). Portal Stripe checkout → the portal CREATES & OWNS the subscription. NEVER pay on a CoachIQ form."},
+    {id:"a2", who:"bam", title:"Zapier creates the CoachIQ user", status:"done",
+     desc:"After payment, Zapier 'Create User' runs → creates + enrols the CoachIQ user, returns the user id (stored on the member). PROVEN working."},
+    {id:"a3", who:"bam", title:"Webhook fires the per-product automation", status:"done",
+     desc:"Portal POSTs {user:{id}} to the automation id mapped to the member's PLAN×TERM → 'Add a Product Purchase to a User' → grants product + access + credits IMMEDIATELY. One automation per product (fixed-field confirmed)."},
+    {id:"a4", who:"parent", title:"Parent downloads the CoachIQ app & logs in", status:"done",
+     desc:"First open → set password (matched by email). Self-serve, no welcome email needed. PROVEN."},
+    {id:"a5", who:"parent", title:"Sees credits → books first session", status:"done",
+     desc:"Product + credits are already there → parent books their first session. Signup→first-session is fully solved."},
   ],
   "trackB-steps":[
     {id:"b1", who:"bam", title:"Portal makes a NEW subscription it OWNS", status:"todo",
@@ -268,17 +268,19 @@ const DATA = {
      desc:"Ebaad Wahid, Krishay, Luke Newton, Syed Faiz need a one-tap payment link first."},
   ],
   "gaps-steps":[
-    {id:"g1", who:"", title:"Does 'paste the sub-id' actually link?", status:"confirm",
-     desc:"You believe yes (from your GHL experience) but it's NOT been tested live in this direction. The whole plan rests on this."},
-    {id:"g2", who:"", title:"Who does the re-linking?", status:"confirm",
-     desc:"Academy staff manually, or do we automate it? Currently assumed = academy's existing workflow."},
-    {id:"g3", who:"", title:"Turn OFF CoachIQ auto-cancel automation", status:"blocker",
-     desc:"Before any migration — or members lose access/credits when the old sub is cancelled."},
-    {id:"g4", who:"", title:"Hook create-sub to a real button + test on ONE throwaway", status:"blocker",
-     desc:"The code tool (PR #52) exists but nothing calls it yet. Test on a single fake member first."},
-    {id:"g5", who:"", title:"Build the portal payment page (Track A)", status:"todo",
-     desc:"Stripe checkout on the academy's connected account so the sub is portal-owned."},
-    {id:"g6", who:"", title:"Your final go-ahead to flip it on", status:"todo",
+    {id:"g1", who:"", title:"Renewals = systems-team ticket (for now)", status:"confirm",
+     desc:"Signup grants credits once. Renewals/sub-id tracking handled by a manual systems-team ticket for now; the repeatable ticketed flow gets built later (to scale to other CoachIQ academies)."},
+    {id:"g2", who:"", title:"Build the parent payment funnel", status:"todo",
+     desc:"Input → choose offer → sign + pay. Stripe checkout on the connected account so the sub is portal-owned. The engine (createPortalSub) exists; the parent-facing pages + first-time card capture do not."},
+    {id:"g3", who:"", title:"Build the staff CoachIQ config section", status:"todo",
+     desc:"Per-client: toggle + API key + group id + PLAN×TERM → automation id map. Drives which automation onboarding fires."},
+    {id:"g4", who:"", title:"Wire signup → Zapier create + webhook fire", status:"todo",
+     desc:"After payment: call Zapier 'Create User', store the id, POST {user:{id}} to the mapped automation id. All pieces proven; needs wiring."},
+    {id:"g5", who:"", title:"Clean up CoachIQ product list", status:"todo",
+     desc:"The '3 Trainings/Wk - Monthly' product is priced $280 (the 2× price) — likely a mislabel/dupe. Tidy before building the automation map."},
+    {id:"g6", who:"", title:"Rotate + store the CoachIQ API key", status:"blocker",
+     desc:"Key was pasted in chat (2026-06-01) — rotate it and store in Vercel env, not the repo."},
+    {id:"g7", who:"", title:"Final go-ahead to flip it on", status:"todo",
      desc:"Sign-off + deploy."},
   ]
 };
