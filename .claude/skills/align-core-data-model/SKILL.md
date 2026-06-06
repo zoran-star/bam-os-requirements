@@ -33,6 +33,7 @@ If this fails, stop. Do not stash, reset, merge, overwrite, or clean the core ch
 Core match:
 New core concept:
 Prototype plan:
+Production data guardrails:
 Deliberate deviations:
 Handoff:
 ```
@@ -40,6 +41,37 @@ Handoff:
 5. Implement the prototype change.
 6. Update the relevant [`docs/core-handoff/<domain>.md`](../../../docs/core-handoff/README.md), plus affected memory and schema docs.
 7. Finish with the core commit reviewed, handoff link/state, new core concepts, and deviations.
+
+## Production Data Guardrails
+
+The prototype may move faster than core, but production facts must remain easy to
+normalize into the core service later.
+
+- Prefer additive schema changes. Do not rename/drop/rewrite production columns,
+  tables, enums, or RLS policies without explicit review.
+- Every durable table must have a stable primary key plus `created_at` and
+  `updated_at` unless it is intentionally append-only.
+- Do not use display names as durable identifiers. Names such as athlete,
+  parent, plan, trainer, academy, or location names are labels only.
+- Preserve auth linkage when a row is owned by a real user:
+  `auth_user_id`, `user_id`, or an equivalent Supabase Auth UUID.
+- Preserve tenant linkage on all academy-scoped data:
+  `client_id`, `academy_id`, or an explicit legacy-to-core mapping.
+- Preserve member/customer linkage on parent-facing data:
+  `member_id`, `parent_email`, `parent_auth_user_id`, `customer_profile_id`,
+  `student_id`, or an explicit join table.
+- Preserve provider IDs instead of deriving them later:
+  `stripe_customer_id`, `stripe_subscription_id`, `stripe_price_id`,
+  `stripe_product_id`, `stripe_account_id`, `ghl_contact_id`,
+  `ghl_location_id`, `ghl_appointment_id`.
+- Billing, membership, refund, pause, cancel, credit, and plan-change workflows
+  must leave an append-only event/audit record or a clearly recoverable status
+  transition.
+- For new persisted concepts, include the future core mapping in the handoff:
+  source table, target core table/model, owning domain, lifecycle statuses,
+  provider IDs, and any known migration caveats.
+- If a feature cannot satisfy these guardrails, stop and call out the migration
+  risk before implementing it.
 
 ## Rules
 
