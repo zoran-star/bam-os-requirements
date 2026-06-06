@@ -789,19 +789,14 @@
   .report-card {
     border: 1px solid var(--line); border-radius: var(--radius);
     background: var(--surface); padding: 22px; margin-bottom: 16px;
-    border-left: 3px solid var(--text-mute);
   }
-  .report-card.is-go   { border-left-color: var(--green); }
-  .report-card.is-warn { border-left-color: var(--amber); }
-  .report-card.is-stop { border-left-color: var(--red); }
+  /* Health is conveyed by the gauge + wording, not a traffic-light stripe. */
+  .report-card.is-go, .report-card.is-warn, .report-card.is-stop { border-left: 1px solid var(--line); }
 
   .report-card-head {
     display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
   }
-  .report-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-mute); flex: none; }
-  .report-card.is-go   .report-dot { background: var(--green); }
-  .report-card.is-warn .report-dot { background: var(--amber); }
-  .report-card.is-stop .report-dot { background: var(--red); }
+  .report-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex: none; opacity: 0.8; }
   .report-card-title { font-family: var(--display); font-size: 16px; font-weight: 600; color: var(--text); }
 
   .report-bigstats { display: flex; flex-wrap: wrap; gap: 28px; }
@@ -812,7 +807,8 @@
     text-transform: uppercase; color: var(--text-mute); margin-top: 8px;
   }
   .report-bigstat .vs { font-size: 13px; }
-  .vs-go { color: var(--green); } .vs-warn { color: var(--amber); } .vs-stop { color: var(--red); }
+  /* Neutralised — health reads from the wording, not red/amber/green text. */
+  .vs-go, .vs-warn, .vs-stop { color: var(--text-sub); }
 
   /* funnel */
   .report-funnel { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
@@ -848,12 +844,12 @@
   .report-verdict .vdot { width: 12px; height: 12px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--text-mute); }
   .report-verdict .vlabel { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 6px; }
   .report-verdict .vhead { font-family: var(--display); font-size: 18px; line-height: 1.45; color: var(--text); }
-  .report-verdict.v-strong { border-color: rgba(76,199,106,0.4); background: var(--green-soft); }
-  .report-verdict.v-strong .vdot { background: var(--green); }
-  .report-verdict.v-steady { border-color: var(--accent-border); background: var(--accent-ghost); }
-  .report-verdict.v-steady .vdot { background: var(--gold); }
-  .report-verdict.v-attention { border-color: rgba(240,184,74,0.42); background: var(--amber-soft); }
-  .report-verdict.v-attention .vdot { background: var(--amber); }
+  /* One clean look for all states — the wording carries the verdict, gold is
+     the only accent (per the Full Control brand). No traffic-light panels. */
+  .report-verdict.v-strong, .report-verdict.v-steady, .report-verdict.v-attention {
+    border-color: var(--line); background: var(--surface);
+  }
+  .report-verdict .vdot { background: var(--gold); }
   .report-verdict .ai-pill { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute); border: 1px solid var(--line); border-radius: var(--radius-full); padding: 3px 8px; flex: none; align-self: center; }
 
   /* biggest win / what to look at */
@@ -861,8 +857,8 @@
   .winfix-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; background: var(--surface); }
   .winfix-card .wf-l { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; margin-bottom: 7px; }
   .winfix-card .wf-t { font-size: 13px; line-height: 1.5; color: var(--text-sub); }
-  .winfix-card.win { border-left: 3px solid var(--green); } .winfix-card.win .wf-l { color: var(--green); }
-  .winfix-card.fix { border-left: 3px solid var(--amber); } .winfix-card.fix .wf-l { color: var(--amber); }
+  .winfix-card.win .wf-l { color: var(--gold); }
+  .winfix-card.fix .wf-l { color: var(--text-mute); }
 
   /* per-campaign Claude/rule note */
   .report-rec { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-sub); line-height: 1.55; }
@@ -16141,12 +16137,11 @@ async function _renderMarketingCampaigns() {
       return;
     }
 
-    // No real campaigns available (Meta not connected, no ad account picked,
-    // or no staff token). Show sample data + a Connect Meta CTA so the tab
-    // is demo-able and testers see the full UI.
+    // No real campaigns available (Meta not connected / no ad account / no
+    // staff token). Show a clean pending state — never fake sample campaigns,
+    // which confuse real connected clients.
     if (json.reason === 'no_staff_token' || json.reason === 'not_connected' || json.reason === 'no_ad_account') {
-      const metaConnected = json.meta_connected === true;
-      containerEl.innerHTML = _buildDemoCampaignsHTML(metaConnected);
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Your campaigns will appear here once your ad account is connected.</div>`;
       return;
     }
     const campaigns = json.campaigns || [];
@@ -16293,15 +16288,14 @@ function _deltaHTML(cur, prev, mode, suffix) {
   if (cur == null || prev == null || prev === 0) return '';
   const pct = Math.round(((cur - prev) / Math.abs(prev)) * 100);
   const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '■';
-  let col = 'var(--text-mute)';
-  if (pct !== 0 && mode !== 'neutral') { const good = mode === 'lower' ? pct < 0 : pct > 0; col = good ? 'var(--green)' : 'var(--amber)'; }
+  // Neutral text — the arrow shows direction; we don't traffic-light it.
   const txt = pct === 0 ? `no change ${suffix}` : `${arrow} ${Math.abs(pct)}% ${suffix}`;
-  return `<div class="stat-delta" style="color:${col}">${txt}</div>`;
+  return `<div class="stat-delta" style="color:var(--text-sub)">${txt}</div>`;
 }
 function _gaugeSVG(value, target, health) {
   const frac = (value == null || !target) ? 0 : Math.max(0, Math.min(value / (target * 2), 1));
   const R = 34, C = 2 * Math.PI * R, dash = C * frac;
-  const col = health === 'go' ? 'var(--green)' : health === 'warn' ? 'var(--amber)' : health === 'stop' ? 'var(--red)' : 'var(--text-mute)';
+  const col = 'var(--gold)'; // single accent; health is read from the wording, not colour
   return `<div class="gauge">
     <svg width="84" height="84" viewBox="0 0 84 84">
       <circle cx="42" cy="42" r="${R}" fill="none" stroke="var(--surface-el)" stroke-width="8"/>
@@ -16422,9 +16416,9 @@ function _reportCardHTML(c, ctx) {
 
   const cplVs = c.cpl == null
     ? `<div class="stat-delta" style="color:var(--text-mute)">no leads yet</div>`
-    : `<div class="stat-delta" style="color:${c.cpl <= target ? 'var(--green)' : 'var(--amber)'}">${c.cpl <= target ? 'at / under' : 'over'} ${_fmtMoney(target)} ${goalWord}</div>`;
+    : `<div class="stat-delta" style="color:var(--text-sub)">${c.cpl <= target ? 'at / under' : 'over'} ${_fmtMoney(target)} ${goalWord}</div>`;
   const cplDelta = prev ? _deltaHTML(c.cpl, prev.cpl, 'lower', deltaSuffix) : '';
-  const budgetLine = budget == null ? '' : `<div class="stat-delta" style="color:${c.spend <= budget ? 'var(--green)' : 'var(--amber)'}">${Math.round((c.spend / budget) * 100)}% of ${_fmtMoney(budget)} budget</div>`;
+  const budgetLine = budget == null ? '' : `<div class="stat-delta" style="color:var(--text-sub)">${Math.round((c.spend / budget) * 100)}% of ${_fmtMoney(budget)} budget</div>`;
 
   const advanced = _reportMode === 'advanced' ? (_funnelHTML(c) + `<div class="report-grid">
     ${_metricCell('reach', _fmtNum(c.reach), c, bm)}
@@ -16603,11 +16597,10 @@ async function _loadLast7() {
     if (res.ok && !json.reason && Array.isArray(json.periods) && json.periods.length) {
       _reportLast7 = json;
     } else {
-      _reportLast7 = _buildDemoLast7();
-      if (json && json.benchmarks) _reportLast7.benchmarks = json.benchmarks;
-      if (json && json.goals) _reportLast7.goals = json.goals;
+      // Never show fake numbers — empty state instead.
+      _reportLast7 = { empty: true, periods: [], goals: (json && json.goals) || {}, benchmarks: (json && json.benchmarks) || DEFAULT_BM };
     }
-  } catch { _reportLast7 = _buildDemoLast7(); }
+  } catch { _reportLast7 = { empty: true, periods: [], goals: {}, benchmarks: DEFAULT_BM }; }
 }
 
 async function _loadAdReport() {
@@ -16621,13 +16614,19 @@ async function _loadAdReport() {
       el.innerHTML = `<div class="req-empty" style="padding:18px 0">Couldn't load report: ${escapeHTML(json.error || ('HTTP ' + res.status))}</div>`;
       return;
     }
+    const controls = document.querySelector('.report-head .report-controls');
     if (json.reason || !(Array.isArray(json.periods) && json.periods.length)) {
-      _reportMonthly = _buildDemoReport();
-      if (json.benchmarks) _reportMonthly.benchmarks = json.benchmarks;
-      if (json.goals) _reportMonthly.goals = json.goals;
-    } else {
-      _reportMonthly = json;
+      // Connected clients (and everyone) see a clean state — never sample data.
+      if (controls) controls.style.display = 'none';
+      const msg = json.reason
+        ? 'Your ad performance will show here once your ad account is connected.'
+        : "No campaign data yet — it'll appear once your ads have been running a little while.";
+      el.innerHTML = `<div class="req-empty" style="padding:20px 0">${msg}</div>`;
+      _reportMonthly = null;
+      return;
     }
+    if (controls) controls.style.display = '';
+    _reportMonthly = json;
     _populateMonthDropdown();
     _renderAdReport();
   } catch (e) {

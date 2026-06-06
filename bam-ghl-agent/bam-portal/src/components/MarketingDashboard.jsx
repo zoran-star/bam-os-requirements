@@ -13,13 +13,8 @@ function fmtMoney(n) {
   const cents = Math.round(n * 100) % 100 !== 0;
   return "$" + n.toLocaleString("en-US", { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 });
 }
-function cplHealth(cpl, target) {
-  if (cpl == null) return "warn";
-  if (!target || cpl <= target) return "go";
-  if (cpl <= target * 1.5) return "warn";
-  return "stop";
-}
-const healthColor = (h, t) => h === "go" ? t.green : h === "warn" ? t.amber : h === "stop" ? t.red : t.textMute;
+// Gold is the only accent (Full Control brand) — health reads from the wording,
+// not red/amber/green traffic-light colours.
 
 // Instant rule-based insight; Claude upgrades it when it returns.
 function localInsight(period, goals, bm) {
@@ -64,10 +59,10 @@ const METRIC_INFO = {
   frequency: { name: "Times each person saw it", term: "Frequency", explain: (c, bm) => `On average, how many times the same person saw your ad${c.frequency != null ? ` — ${c.frequency} times` : ""}. Above ${bm.freq_max} usually means people are starting to tune it out.` },
 };
 
-function Gauge({ value, target, health, t }) {
+function Gauge({ value, target, t }) {
   const frac = (value == null || !target) ? 0 : Math.max(0, Math.min(value / (target * 2), 1));
   const R = 34, C = 2 * Math.PI * R, dash = C * frac;
-  const col = healthColor(health, t);
+  const col = t.accent;
   return (
     <div style={{ position: "relative", width: 84, height: 84 }}>
       <svg width="84" height="84" viewBox="0 0 84 84">
@@ -116,10 +111,10 @@ function MetricCell({ mkey, value, c, bm, t }) {
   let bench = null;
   if (mkey === "ctr" && c.ctr != null) {
     const ok = c.ctr >= bm.ctr_min;
-    bench = <div style={{ fontSize: 11, marginTop: 4, color: ok ? t.green : t.red }}>{ok ? "in / above" : "below"} industry {bm.ctr_min}–{bm.ctr_max}%</div>;
+    bench = <div style={{ fontSize: 11, marginTop: 4, color: t.textSub }}>{ok ? "in / above" : "below"} industry {bm.ctr_min}–{bm.ctr_max}%</div>;
   } else if (mkey === "frequency" && c.frequency != null) {
     const fatigue = c.frequency > bm.freq_max;
-    bench = <div style={{ fontSize: 11, marginTop: 4, color: fatigue ? t.amber : t.green }}>{fatigue ? "fatigue risk" : "healthy"} · ind. {bm.freq_min}–{bm.freq_max}×</div>;
+    bench = <div style={{ fontSize: 11, marginTop: 4, color: t.textSub }}>{fatigue ? "shown often" : "healthy"} · ind. {bm.freq_min}–{bm.freq_max}×</div>;
   }
   return (
     <div onClick={() => setOpen(o => !o)} style={{ cursor: "pointer" }}>
@@ -134,44 +129,42 @@ function MetricCell({ mkey, value, c, bm, t }) {
   );
 }
 
-function Delta({ cur, prev, mode, suffix, t }) {
+function Delta({ cur, prev, suffix, t }) {
   if (cur == null || prev == null || prev === 0) return null;
   const pct = Math.round(((cur - prev) / Math.abs(prev)) * 100);
   const arrow = pct > 0 ? "▲" : pct < 0 ? "▼" : "■";
-  let col = t.textMute;
-  if (pct !== 0 && mode !== "neutral") { const good = mode === "lower" ? pct < 0 : pct > 0; col = good ? t.green : t.amber; }
-  return <div style={{ fontSize: 11, marginTop: 5, color: col }}>{pct === 0 ? `no change ${suffix}` : `${arrow} ${Math.abs(pct)}% ${suffix}`}</div>;
+  // Neutral — the arrow shows direction; no traffic-light colour.
+  return <div style={{ fontSize: 11, marginTop: 5, color: t.textSub }}>{pct === 0 ? `no change ${suffix}` : `${arrow} ${Math.abs(pct)}% ${suffix}`}</div>;
 }
 
 function CampaignCard({ c, ctx, t }) {
   const { goals, bm, compare, deltaSuffix, mode, note } = ctx;
   const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
-  const health = cplHealth(c.cpl, target);
   const goalWord = (goals && goals.cpl_goal != null) ? "goal" : "target";
   const prev = compare.campaigns[c.id] || null;
   const budget = (goals && goals.monthly_budget != null) ? goals.monthly_budget : null;
   return (
-    <div style={{ border: `1px solid ${t.border}`, borderLeft: `3px solid ${healthColor(health, t)}`, borderRadius: 12, background: t.surface, padding: 20, marginBottom: 14 }}>
+    <div style={{ border: `1px solid ${t.border}`, borderRadius: 12, background: t.surface, padding: 20, marginBottom: 14 }}>
       <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 16 }}>{c.name}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "20px 32px", alignItems: "flex-start" }}>
         <div>
           <div style={{ fontSize: 28, fontWeight: 600, color: t.text, lineHeight: 1 }}>{fmtNum(c.leads)}</div>
           <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 7 }}>New leads · <span style={{ opacity: 0.7 }}>Leads</span></div>
-          <Delta cur={c.leads} prev={prev?.leads} mode="higher" suffix={deltaSuffix} t={t} />
+          <Delta cur={c.leads} prev={prev?.leads} suffix={deltaSuffix} t={t} />
         </div>
         <div>
-          <Gauge value={c.cpl} target={target} health={health} t={t} />
+          <Gauge value={c.cpl} target={target} t={t} />
           <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 6 }}>Cost per lead · <span style={{ opacity: 0.7 }}>CPL</span></div>
-          <div style={{ fontSize: 11, marginTop: 5, color: c.cpl == null ? t.textMute : (c.cpl <= target ? t.green : t.amber) }}>
+          <div style={{ fontSize: 11, marginTop: 5, color: c.cpl == null ? t.textMute : t.textSub }}>
             {c.cpl == null ? "no leads yet" : `${c.cpl <= target ? "at / under" : "over"} ${fmtMoney(target)} ${goalWord}`}
           </div>
-          <Delta cur={c.cpl} prev={prev?.cpl} mode="lower" suffix={deltaSuffix} t={t} />
+          <Delta cur={c.cpl} prev={prev?.cpl} suffix={deltaSuffix} t={t} />
         </div>
         <div>
           <div style={{ fontSize: 28, fontWeight: 600, color: t.text, lineHeight: 1 }}>{fmtMoney(c.spend)}</div>
           <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 7 }}>Amount spent · <span style={{ opacity: 0.7 }}>Ad spend</span></div>
-          {budget != null && <div style={{ fontSize: 11, marginTop: 5, color: c.spend <= budget ? t.green : t.amber }}>{Math.round((c.spend / budget) * 100)}% of {fmtMoney(budget)} budget</div>}
-          <Delta cur={c.spend} prev={prev?.spend} mode="neutral" suffix={deltaSuffix} t={t} />
+          {budget != null && <div style={{ fontSize: 11, marginTop: 5, color: t.textSub }}>{Math.round((c.spend / budget) * 100)}% of {fmtMoney(budget)} budget</div>}
+          <Delta cur={c.spend} prev={prev?.spend} suffix={deltaSuffix} t={t} />
         </div>
       </div>
       {note && <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${t.border}`, fontSize: 13, color: t.textSub, lineHeight: 1.55 }}>{note}</div>}
@@ -285,8 +278,6 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
     return { totals: prev ? prev.totals : null, campaigns: m };
   })();
   const deltaSuffix = view === "last7" ? "vs prev 7d" : view === "this_month" ? "vs last month" : "vs prior month";
-  const vColor = insight.verdict === "strong" ? t.green : insight.verdict === "attention" ? t.amber : t.accent;
-  const vBg = insight.verdict === "strong" ? t.greenSoft : insight.verdict === "attention" ? t.amberSoft : t.accentGhost;
 
   const seg = (id, label) => (
     <button key={id} onClick={() => setView(id)} style={{ border: 0, background: view === id ? t.surfaceHov : "transparent", color: view === id ? t.text : t.textMute, fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", padding: "7px 12px", borderRadius: 999, cursor: "pointer" }}>{label}</button>
@@ -317,8 +308,8 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
         <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : "."}</div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", border: `1px solid ${vColor}`, background: vBg, borderRadius: 12, padding: "18px 20px", marginBottom: 16 }}>
-            <span style={{ width: 12, height: 12, borderRadius: "50%", background: vColor, marginTop: 5, flex: "none" }} />
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: "18px 20px", marginBottom: 16 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: t.accent, marginTop: 7, flex: "none", opacity: 0.8 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase", color: t.textMute, marginBottom: 6 }}>{insight.verdict_label}</div>
               <div style={{ fontSize: 18, lineHeight: 1.45, color: t.text }}>{insight.headline}</div>
@@ -327,12 +318,12 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 24 }}>
-            <div style={{ border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.green}`, borderRadius: 12, padding: "15px 16px", background: t.surface }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: t.green, marginBottom: 7 }}>Biggest win</div>
+            <div style={{ border: `1px solid ${t.border}`, borderRadius: 12, padding: "15px 16px", background: t.surface }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: t.accent, marginBottom: 7 }}>Biggest win</div>
               <div style={{ fontSize: 13, lineHeight: 1.5, color: t.textSub }}>{insight.win}</div>
             </div>
-            <div style={{ border: `1px solid ${t.border}`, borderLeft: `3px solid ${t.amber}`, borderRadius: 12, padding: "15px 16px", background: t.surface }}>
-              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: t.amber, marginBottom: 7 }}>What to look at</div>
+            <div style={{ border: `1px solid ${t.border}`, borderRadius: 12, padding: "15px 16px", background: t.surface }}>
+              <div style={{ fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: t.textMute, marginBottom: 7 }}>What to look at</div>
               <div style={{ fontSize: 13, lineHeight: 1.5, color: t.textSub }}>{insight.fix}</div>
             </div>
           </div>

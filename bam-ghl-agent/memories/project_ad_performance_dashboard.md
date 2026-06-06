@@ -4,6 +4,22 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## Design polish (2026-06-06) — de-coloured + no sample data
+
+Zoran feedback: the red/amber/green cards looked "vibe-coded"; real connected
+clients were seeing hardcoded sample campaigns ("Spring Free Trial", UDP/PGP/MS).
+
+- **Removed traffic-light colours** on client + staff dashboards. Now monochrome
+  with **gold as the only accent** (per Full Control brand). Health reads from the
+  **wording** (verdict + "over/under target" text), not card colours. CPL gauge,
+  deltas, verdict banner, win/fix, bench notes all neutralised.
+- **Killed sample/demo data in the live portal.** Connected (or any real) clients
+  never see fake campaigns/numbers — they get a clean "appears once your ad
+  account is connected" state instead. Demo builders (`_buildDemoReport`,
+  `_buildDemoLast7`, `_buildDemoCampaignsHTML`) are no longer called (dead code;
+  `_DEMO_CAMPAIGNS` still referenced elsewhere so kept).
+- Toolbar (time/Simple-Advanced controls) hides when there's no data.
+
 ## Staff side (2026-06-06, same day) — staff marketing portal
 
 Built the staff-facing side: cross-client overview + per-client dashboard +
