@@ -23,17 +23,32 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [savingForms, setSavingForms] = useState(false);
   const [formsMsg, setFormsMsg] = useState(cfg.lead_form_ids?.length ? `${cfg.lead_form_ids.length} form(s) saved` : null);
   const [kpis, setKpis] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Live funnel KPIs (from ghl_funnel_events + Stripe), last 30 days.
+  // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
+  // (if it's stale) pull fresh GHL data in the background and re-read.
   useEffect(() => {
     if (!client?.id) return;
     let alive = true;
+    const load = async () => {
+      const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=30`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      return res.ok ? res.json() : null;
+    };
     (async () => {
-      try {
-        const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=30`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
-        const j = await res.json();
-        if (alive && res.ok) setKpis(j);
-      } catch { /* leave null */ }
+      let data = null;
+      try { data = await load(); } catch { /* ignore */ }
+      if (!alive) return;
+      if (data) setKpis(data);
+      const stale = !data?.synced_at || (Date.now() - new Date(data.synced_at).getTime() > 10 * 60 * 1000);
+      if (stale) {
+        setRefreshing(true);
+        try {
+          await fetch(`/api/ghl?action=refresh-funnel&client_id=${client.id}`, { method: "POST", headers: { Authorization: `Bearer ${session?.access_token}` } });
+          const updated = await load();
+          if (alive && updated) setKpis(updated);
+        } catch { /* keep stored */ }
+        if (alive) setRefreshing(false);
+      }
     })();
     return () => { alive = false; };
   }, [client, session]);
@@ -136,7 +151,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     <div>
       {kpis && (
         <div style={card}>
-          <div style={lbl}>Live funnel — last 30 days</div>
+          <div style={lbl}>Live funnel — last 30 days{refreshing ? " · refreshing…" : ""}</div>
           {!kpis.ready ? (
             <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
               No funnel data yet. Run the SQL (/apply-sql) and connect the GHL + Stripe webhooks — numbers fill in as events arrive.
