@@ -4,6 +4,33 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## v2 enhancements (2026-06-06, same day)
+
+UX pass per Zoran. **No emojis anywhere.** Constructive verdict wording (never
+"bad"): strong→"Performing well", steady→"On track", attention→"Worth revisiting".
+
+- **Time windows** — segmented control: Last 7 days / This month (default) / History.
+  `?window=last7` returns last 7 complete days vs previous 7 (one Meta call,
+  `time_increment=1` over 14 days, bucketed). Monthly default unchanged. Data is
+  **live on every open** — "monthly" is the grouping, not the refresh cadence.
+- **Verdict banner** + **Biggest win / What to look at** cards (constructive wording).
+- **Claude-written coaching** — `POST ?resource=meta-insight` (model
+  `claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`). Returns verdict, headline,
+  win, fix, per-campaign notes. Renders rule-based **instantly**, then upgrades to
+  AI when it returns (cached per period). `ruleInsight()` is the server+client
+  fallback if no key/error — UI never breaks. "AI summary" pill shows when AI.
+- **CPL goal gauge** (SVG ring), **month-over-month deltas** (▲/▼, no emoji),
+  **sparklines** (monthly views), **tap-to-explain** on every advanced metric
+  (plain "what it is + what it means", via `METRIC_INFO`), **human-first labels**
+  ("New leads" big, "Leads" small), **subtle celebratory** glow + "Lowest cost
+  yet"/"Most leads yet" record badge (monthly, respects prefers-reduced-motion).
+- **Response shape changed:** `months` → `periods`, added `view`. Each period has
+  `campaigns` + `totals`; last7 also `compareTotals`/`compareCampaigns`.
+
+Implemented ideas from the 15-idea list: #1 verdict, #2 win/fix, #4 human names,
+#5 tap-to-explain, #8 sparklines, #10 time toggle, #11 gauge, #14 celebratory,
+plus #6/#9 (money framing, benchmark notes) and #7 (Claude coaching).
+
 ## TL;DR (2026-06-06)
 
 Ximena used to copy Meta KPIs into a Google Sheet by hand every month (one row
