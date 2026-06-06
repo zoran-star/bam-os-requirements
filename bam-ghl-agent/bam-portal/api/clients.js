@@ -1804,6 +1804,15 @@ export default async function handler(req, res) {
           patch.meta_monthly_budget = v;
         }
 
+        // GHL KPI config (jsonb) — staff-confirmed funnel wiring (lead forms, etc.)
+        if (wasSet("ghl_kpi_config")) {
+          const v = body.ghl_kpi_config;
+          if (v !== null && (typeof v !== "object" || Array.isArray(v))) {
+            return res.status(400).json({ error: "ghl_kpi_config must be an object or null" });
+          }
+          patch.ghl_kpi_config = v;
+        }
+
         // v2_access — formerly named "onboarding_in_progress". Renamed
         // 2026-05-27 to match its new semantics (V2 portal opt-in, not
         // onboarding state). The staff "V2 access?" toggle posts this.

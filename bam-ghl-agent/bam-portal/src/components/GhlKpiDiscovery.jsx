@@ -15,6 +15,14 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [pipelines, setPipelines] = useState(null);
   const [result, setResult] = useState(null);
 
+  // Lead-forms picker state
+  const cfg = client?.ghl_kpi_config || {};
+  const [forms, setForms] = useState(null);
+  const [formsErr, setFormsErr] = useState("");
+  const [picked, setPicked] = useState(() => new Set(cfg.lead_form_ids || []));
+  const [savingForms, setSavingForms] = useState(false);
+  const [formsMsg, setFormsMsg] = useState(cfg.lead_form_ids?.length ? `${cfg.lead_form_ids.length} form(s) saved` : null);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -24,13 +32,52 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         if (!alive) return;
         const names = (j.data || []).map(l => l.name);
         setLocations(names);
-        // Best-effort default: a location whose name matches the business.
+        // Best-effort default: saved config, else a name matching the business.
         const guess = names.find(n => client?.business_name && n.toLowerCase().includes(client.business_name.toLowerCase().split(" ")[0]));
-        setLocation(guess || names[0] || "");
+        setLocation(cfg.ghl_location || guess || names[0] || "");
       } catch { /* leave empty */ }
     })();
     return () => { alive = false; };
-  }, [client]);
+  }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load this location's forms whenever the selected location changes.
+  useEffect(() => {
+    if (!location) { setForms(null); return; }
+    let alive = true;
+    setForms(null); setFormsErr("");
+    (async () => {
+      try {
+        const res = await fetch(`/api/ghl?action=forms&location=${encodeURIComponent(location)}`);
+        const j = await res.json();
+        if (!alive) return;
+        if (!res.ok) { setFormsErr(j.error || `HTTP ${res.status}`); return; }
+        setForms(j.data || []);
+      } catch (e) { if (alive) setFormsErr(e.message); }
+    })();
+    return () => { alive = false; };
+  }, [location]);
+
+  function toggleForm(id) {
+    setPicked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
+
+  async function saveForms() {
+    setSavingForms(true); setFormsMsg(null);
+    try {
+      const ids = [...picked];
+      const names = (forms || []).filter(f => picked.has(f.id)).map(f => f.name);
+      const next = { ...(client?.ghl_kpi_config || {}), ghl_location: location, lead_form_ids: ids, lead_form_names: names };
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, ghl_kpi_config: next }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      setFormsMsg(`Saved ${ids.length} form(s) as "leads in"`);
+    } catch (e) { setFormsMsg("Couldn't save: " + e.message); }
+    finally { setSavingForms(false); }
+  }
 
   async function analyze() {
     if (!location) { setErr("Pick a GHL location first."); return; }
@@ -77,6 +124,31 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         <div style={{ flex: 1, minWidth: 180, fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
           Read-only. Pulls this academy's pipeline and proposes a funnel mapping + the KPIs that matter. Nothing is saved yet.
         </div>
+      </div>
+
+      {/* Lead-forms picker — defines "leads in" */}
+      <div style={card}>
+        <div style={lbl}>Leads in — which forms count?</div>
+        <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5, marginBottom: 12 }}>
+          Tick the forms whose submissions count as a new lead (e.g. free-trial booking form + contact form). This becomes the config the KPIs read.
+        </div>
+        {formsErr && <div style={{ fontSize: 12, color: t.red, marginBottom: 8 }}>Couldn't load forms: {formsErr}</div>}
+        {!forms && !formsErr && <div style={{ fontSize: 12, color: t.textMute }}>Loading forms…</div>}
+        {forms && forms.length === 0 && <div style={{ fontSize: 12, color: t.textMute }}>No forms found for this location.</div>}
+        {forms && forms.map(f => (
+          <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", cursor: "pointer", fontSize: 13, color: t.text }}>
+            <input type="checkbox" checked={picked.has(f.id)} onChange={() => toggleForm(f.id)} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
+            {f.name}
+          </label>
+        ))}
+        {forms && forms.length > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+            <button onClick={saveForms} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>
+              {savingForms ? "Saving…" : "Save lead forms"}
+            </button>
+            {formsMsg && <span style={{ fontSize: 12, color: t.textSub }}>{formsMsg}</span>}
+          </div>
+        )}
       </div>
 
       {err && <div style={{ ...card, color: t.red }}>Couldn't analyze: {err}</div>}
