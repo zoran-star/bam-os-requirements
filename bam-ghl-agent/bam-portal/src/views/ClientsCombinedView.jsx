@@ -4,6 +4,7 @@ import MessageThread from "../components/MessageThread";
 import { TicketModal } from "./SystemsView";
 import { fetchTickets, fetchDelegationPool } from "../services/ticketsService";
 import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard";
+import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -1365,6 +1366,7 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
           { id: "performance", label: "Performance" },
           { id: "campaigns", label: "Campaigns" },
           { id: "kpis", label: "KPIs" },
+          { id: "ghl", label: "GHL KPIs (beta)" },
         ].map(st => (
           <button
             key={st.id}
@@ -1388,6 +1390,10 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
 
       {marketingSubTab === "kpis" && (
         <MarketingKpis client={client} tokens={t} session={session} />
+      )}
+
+      {marketingSubTab === "ghl" && (
+        <GhlKpiDiscovery client={client} tokens={t} session={session} />
       )}
 
       {marketingSubTab === "campaigns" && <>

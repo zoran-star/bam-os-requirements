@@ -182,6 +182,9 @@ export default async function handler(req, res) {
     if (resource === "meta-insight") {
       return handleMetaInsight(req, res);
     }
+    if (resource === "ghl-kpi-suggest") {
+      return handleGhlKpiSuggest(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -197,7 +200,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1635,6 +1638,59 @@ async function handleMetaInsight(req, res) {
     return res.status(200).json(parsed);
   } catch {
     return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+  }
+}
+
+// POST ?resource=ghl-kpi-suggest  (staff only) — DISCOVERY SPIKE.
+// Given an academy's GHL pipeline stages (+ opportunity counts per stage),
+// Claude proposes how to map them onto a canonical acquisition funnel and which
+// KPIs actually matter for THIS academy (e.g., skip trial show-rate if there's
+// no trial stage). Read-only suggestion — staff review/edit before anything is
+// saved. Body: { businessName, pipelines:[{name,stages:[{name}]}], stageCounts:{stageName:n} }.
+async function handleGhlKpiSuggest(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(200).json({ error: "ANTHROPIC_API_KEY not configured" });
+
+  const body = req.body || {};
+  const payload = JSON.stringify({
+    business: String(body.businessName || "this academy").slice(0, 80),
+    pipelines: body.pipelines || [],
+    stage_counts: body.stageCounts || {},
+  }, null, 0);
+
+  const system = [
+    "You map a sports academy's GoHighLevel sales pipeline onto a canonical acquisition funnel and recommend which KPIs matter for THEM.",
+    "Canonical funnel steps (in order): Lead, Contacted, Booked (appointment set), Showed (attended), Trial (free trial started), Won (became a paying member), Lost.",
+    "Academies differ — some have no free trial, some no booking step. Only recommend KPIs the data can actually support. If a step is missing, list it under 'missing' and put any KPI that depends on it under 'hidden_kpis' with a plain reason.",
+    "Plain language, no emojis, no jargon (say 'show rate' not 'attendance conversion').",
+    "Return ONLY valid JSON with keys: summary (1-2 sentences), mapping (array of {stage, canonical, confidence:'high'|'med'|'low'}), missing (array of canonical step names), kpis (array of {id, label, formula, recommended:boolean, why}), hidden_kpis (array of {label, why}).",
+  ].join(" ");
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1500,
+        system,
+        messages: [{ role: "user", content: `Here is the academy's GHL pipeline data as JSON:\n\n${payload}\n\nProduce the mapping JSON now.` }],
+      }),
+    });
+    if (!r.ok) return res.status(200).json({ error: "AI call failed (" + r.status + ")" });
+    const j = await r.json();
+    const text = j.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(200).json({ error: "AI returned no JSON", raw: text.slice(0, 400) });
+    const parsed = JSON.parse(match[0]);
+    return res.status(200).json({ ...parsed, source: "ai" });
+  } catch (err) {
+    return res.status(200).json({ error: err?.message || "AI error" });
   }
 }
 
