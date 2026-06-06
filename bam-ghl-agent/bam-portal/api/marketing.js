@@ -182,6 +182,9 @@ export default async function handler(req, res) {
     if (resource === "meta-insight") {
       return handleMetaInsight(req, res);
     }
+    if (resource === "meta-overview") {
+      return handleMetaOverview(req, res);
+    }
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
@@ -194,7 +197,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1356,6 +1359,16 @@ const MKT_BENCHMARKS = {
 const MONTH_NAMES = ["January","February","March","April","May","June",
   "July","August","September","October","November","December"];
 
+const META_CAMPAIGN_FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
+
+function daysInUTCMonth(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); }
+function verdictFor(cpl, target) {
+  if (cpl == null) return { verdict: "attention", verdict_label: "Worth revisiting" };
+  if (!target || cpl <= target) return { verdict: "strong", verdict_label: "Performing well" };
+  if (cpl <= target * 1.5) return { verdict: "steady", verdict_label: "On track" };
+  return { verdict: "attention", verdict_label: "Worth revisiting" };
+}
+
 const _r2 = (n) => Math.round(n * 100) / 100;
 
 // Fold one Meta insights row into a running campaign accumulator.
@@ -1622,6 +1635,133 @@ async function handleMetaInsight(req, res) {
     return res.status(200).json(parsed);
   } catch {
     return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+  }
+}
+
+// GET ?resource=meta-overview  (staff only)
+// Cross-client marketing roster: this-month vs last-month totals per
+// marketing-included client, plus goal, verdict, trend, and budget pacing —
+// the "single marketing portal" overview. One Meta call per connected client
+// (level=campaign, monthly, last 2 months), run in parallel.
+async function handleMetaOverview(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+  if (req.method === "POST") return metaOverviewSlackAlert(req, res);
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+
+  let clients = [];
+  const sel = "id,business_name,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget,marketing_included,status";
+  try { clients = await sb(`clients?select=${sel}&order=business_name.asc`); }
+  catch { clients = await sb(`clients?select=id,business_name,meta_ad_account_id,meta_campaign_ids,marketing_included,status&order=business_name.asc`); }
+  clients = (clients || []).filter(c => c.marketing_included !== false);
+
+  const staffToken = await getAnyStaffMetaToken();
+  const now = new Date();
+  const curKey = now.toISOString().slice(0, 7);
+  const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastKey = lastMonthDate.toISOString().slice(0, 7);
+  const since = lastMonthDate.toISOString().slice(0, 10);
+  const until = now.toISOString().slice(0, 10);
+  const monthPct = Math.round((now.getUTCDate() / daysInUTCMonth(now)) * 100);
+  const bm = MKT_BENCHMARKS;
+
+  const pctChange = (cur, prev) => (prev == null || prev === 0 || cur == null) ? null : Math.round(((cur - prev) / Math.abs(prev)) * 100);
+
+  const rows = await Promise.all(clients.map(async (c) => {
+    const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
+    const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
+    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget };
+    if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
+    try {
+      const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+      const allow = Array.isArray(c.meta_campaign_ids) && c.meta_campaign_ids.length ? new Set(c.meta_campaign_ids) : null;
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        level: "campaign", fields: META_CAMPAIGN_FIELDS,
+        time_range: JSON.stringify({ since, until }), time_increment: "monthly",
+        access_token: staffToken, limit: "500",
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (!r.ok) return { ...baseRow, connected: true, error: true };
+      const cur = newAcc(), prev = newAcc();
+      for (const row of (j.data || [])) {
+        if (allow && !allow.has(row.campaign_id)) continue;
+        const mk = (row.date_start || "").slice(0, 7);
+        if (mk === curKey) sumRowInto(cur, row);
+        else if (mk === lastKey) sumRowInto(prev, row);
+      }
+      const m = finalizeMetrics(cur), pm = finalizeMetrics(prev);
+      const target = goal_cpl != null ? goal_cpl : bm.cpl;
+      const v = verdictFor(m.cpl, target);
+      const pacing = monthly_budget != null
+        ? { spent_pct: monthly_budget > 0 ? Math.round((m.spend / monthly_budget) * 100) : null, month_pct: monthPct }
+        : null;
+      const overPace = pacing && pacing.spent_pct != null && pacing.spent_pct > monthPct + 15;
+      const attention = (m.cpl == null && m.spend > 5) || (m.cpl != null && m.cpl > target) || overPace;
+      return {
+        ...baseRow, connected: true,
+        spend: m.spend, leads: m.leads, cpl: m.cpl, impressions: m.impressions, reach: m.reach,
+        link_clicks: m.link_clicks, ctr: m.ctr, frequency: m.frequency,
+        ...v,
+        trend: { leads_pct: pctChange(m.leads, pm.leads), cpl_pct: pctChange(m.cpl, pm.cpl), spend_pct: pctChange(m.spend, pm.spend) },
+        pacing, attention,
+        _prev: pm,
+      };
+    } catch { return { ...baseRow, connected: true, error: true }; }
+  }));
+
+  // Roll-up across connected clients.
+  const live = rows.filter(r => r.connected && !r.error);
+  const sum = (k) => live.reduce((a, r) => a + (r[k] || 0), 0);
+  const prevSpend = live.reduce((a, r) => a + (r._prev?.spend || 0), 0);
+  const prevLeads = live.reduce((a, r) => a + (r._prev?.leads || 0), 0);
+  const totalSpend = _r2(sum("spend")), totalLeads = sum("leads");
+  const rollup = {
+    clients: live.length,
+    spend: totalSpend,
+    leads: totalLeads,
+    cpl: totalLeads > 0 ? _r2(totalSpend / totalLeads) : null,
+    spend_pct: pctChange(totalSpend, prevSpend),
+    leads_pct: pctChange(totalLeads, prevLeads),
+    attention: live.filter(r => r.attention).length,
+  };
+  rows.forEach(r => { delete r._prev; });
+
+  return res.status(200).json({
+    as_of: now.toISOString(),
+    month_label: `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`,
+    month_pct: monthPct,
+    rollup, clients: rows, benchmarks: bm,
+  });
+}
+
+// POST ?resource=meta-overview  (staff) — post a "needs attention" digest to
+// the marketing-team Slack channel. Frontend sends the already-computed list.
+// Requires SLACK_BOT_TOKEN + MARKETING_ALERTS_SLACK_CHANNEL (channel id).
+async function metaOverviewSlackAlert(req, res) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.MARKETING_ALERTS_SLACK_CHANNEL;
+  if (!token || !channel) return res.status(200).json({ sent: false, reason: "slack_not_configured" });
+
+  const { month_label, items } = req.body || {};
+  const list = Array.isArray(items) ? items : [];
+  const lines = list.length
+    ? list.map(i => `• *${i.name}* — ${i.reason || "worth a look"}`).join("\n")
+    : "All marketing clients are on or under target right now. Nice work.";
+  const text = `:bar_chart: *Marketing check${month_label ? ` — ${month_label}` : ""}*\n${lines}`;
+
+  try {
+    const r = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text }),
+    });
+    const j = await r.json();
+    if (!j.ok) return res.status(200).json({ sent: false, reason: j.error || "slack_error" });
+    return res.status(200).json({ sent: true, count: list.length });
+  } catch (err) {
+    return res.status(200).json({ sent: false, reason: err?.message || "slack_error" });
   }
 }
 

@@ -4,6 +4,48 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## Staff side (2026-06-06, same day) — staff marketing portal
+
+Built the staff-facing side: cross-client overview + per-client dashboard +
+goal setting. Reuses the same `meta-report`/`meta-insight` endpoints (they
+already accept `?client_id=` for staff).
+
+**Backend (api/marketing.js + api/clients.js):**
+- `GET ?resource=meta-overview` (staff only) — cross-client roster: this-month
+  vs last-month totals per marketing-included client (one Meta call each,
+  parallel `Promise.all`), with goal, verdict (`verdictFor`), trend, and budget
+  pacing. Returns `{ rollup, clients[], month_label, month_pct, benchmarks }`.
+  Roll-up = blended spend/leads/CPL + vs-last-month + attention count.
+- `POST ?resource=meta-overview` — posts a "needs attention" digest to Slack.
+  Needs `SLACK_BOT_TOKEN` + **`MARKETING_ALERTS_SLACK_CHANNEL`** (env, not set
+  yet → returns `slack_not_configured`).
+- `api/clients.js` `update-fields` now accepts **`meta_cpl_goal` +
+  `meta_monthly_budget`** (numeric or null) → the goal editor writes here.
+
+**Frontend (React, staff portal):**
+- `src/components/MarketingDashboard.jsx` — shared React port of the client
+  dashboard (verdict, win/fix, per-campaign cards w/ CPL gauge + deltas, funnel,
+  advanced tap-to-explain, Last 7 / This month / History, Simple/Advanced,
+  Claude insight). Pass `key={clientId}` (remounts per client). Exports
+  `GoalEditor` too.
+- `src/views/MarketingOverview.jsx` — the cross-client portal: roll-up strip +
+  sortable roster (needs-attention floats up, amber row tint) + CSV export +
+  Print/PDF + "Send digest to Slack" + drill-in modal (GoalEditor +
+  MarketingDashboard per client).
+- `MarketingView.jsx` — added a **Performance | Tickets** switcher; Performance
+  is the default landing (the "single marketing portal"). Tickets = the old
+  queue.
+- `ClientsCombinedView.jsx` → per-client Marketing tab: new **Performance**
+  sub-tab (default) = GoalEditor + MarketingDashboard for that client.
+
+**Extras shipped:** needs-attention queue, CSV + Print/PDF export, budget
+pacing (spent% vs month%), Slack digest button.
+
+**Meta read/write:** still `ads_read` (READ-ONLY). Write (auto-upload videos /
+create ads) needs `ads_management` + Business Verification — Zoran doing the
+Meta-side prereqs in the background; code build is a later follow-up. Logged as
+a future item (Open Loop).
+
 ## v2 enhancements (2026-06-06, same day)
 
 UX pass per Zoran. **No emojis anywhere.** Constructive verdict wording (never
