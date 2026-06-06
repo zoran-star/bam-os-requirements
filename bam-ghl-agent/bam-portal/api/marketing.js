@@ -1663,6 +1663,11 @@ async function handleStaffMetaAuth(req, res) {
       redirect_uri: metaStaffRedirectUri(req),
       scope: META_OAUTH_SCOPES.join(","),
       response_type: "code",
+      // Force Facebook to show the permission screen even when the app is already
+      // authorized, so a reconnect actually grants newly-added scopes (e.g. the
+      // ads_management/business_management write scopes) instead of silently
+      // returning the previously-granted read-only set.
+      auth_type: "rerequest",
       state,
     });
 
