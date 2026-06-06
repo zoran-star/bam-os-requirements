@@ -4,6 +4,91 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## Design polish (2026-06-06) — de-coloured + no sample data
+
+Zoran feedback: the red/amber/green cards looked "vibe-coded"; real connected
+clients were seeing hardcoded sample campaigns ("Spring Free Trial", UDP/PGP/MS).
+
+- **Removed traffic-light colours** on client + staff dashboards. Now monochrome
+  with **gold as the only accent** (per Full Control brand). Health reads from the
+  **wording** (verdict + "over/under target" text), not card colours. CPL gauge,
+  deltas, verdict banner, win/fix, bench notes all neutralised.
+- **Killed sample/demo data in the live portal.** Connected (or any real) clients
+  never see fake campaigns/numbers — they get a clean "appears once your ad
+  account is connected" state instead. Demo builders (`_buildDemoReport`,
+  `_buildDemoLast7`, `_buildDemoCampaignsHTML`) are no longer called (dead code;
+  `_DEMO_CAMPAIGNS` still referenced elsewhere so kept).
+- Toolbar (time/Simple-Advanced controls) hides when there's no data.
+
+## Staff side (2026-06-06, same day) — staff marketing portal
+
+Built the staff-facing side: cross-client overview + per-client dashboard +
+goal setting. Reuses the same `meta-report`/`meta-insight` endpoints (they
+already accept `?client_id=` for staff).
+
+**Backend (api/marketing.js + api/clients.js):**
+- `GET ?resource=meta-overview` (staff only) — cross-client roster: this-month
+  vs last-month totals per marketing-included client (one Meta call each,
+  parallel `Promise.all`), with goal, verdict (`verdictFor`), trend, and budget
+  pacing. Returns `{ rollup, clients[], month_label, month_pct, benchmarks }`.
+  Roll-up = blended spend/leads/CPL + vs-last-month + attention count.
+- `POST ?resource=meta-overview` — posts a "needs attention" digest to Slack.
+  Needs `SLACK_BOT_TOKEN` + **`MARKETING_ALERTS_SLACK_CHANNEL`** (env, not set
+  yet → returns `slack_not_configured`).
+- `api/clients.js` `update-fields` now accepts **`meta_cpl_goal` +
+  `meta_monthly_budget`** (numeric or null) → the goal editor writes here.
+
+**Frontend (React, staff portal):**
+- `src/components/MarketingDashboard.jsx` — shared React port of the client
+  dashboard (verdict, win/fix, per-campaign cards w/ CPL gauge + deltas, funnel,
+  advanced tap-to-explain, Last 7 / This month / History, Simple/Advanced,
+  Claude insight). Pass `key={clientId}` (remounts per client). Exports
+  `GoalEditor` too.
+- `src/views/MarketingOverview.jsx` — the cross-client portal: roll-up strip +
+  sortable roster (needs-attention floats up, amber row tint) + CSV export +
+  Print/PDF + "Send digest to Slack" + drill-in modal (GoalEditor +
+  MarketingDashboard per client).
+- `MarketingView.jsx` — added a **Performance | Tickets** switcher; Performance
+  is the default landing (the "single marketing portal"). Tickets = the old
+  queue.
+- `ClientsCombinedView.jsx` → per-client Marketing tab: new **Performance**
+  sub-tab (default) = GoalEditor + MarketingDashboard for that client.
+
+**Extras shipped:** needs-attention queue, CSV + Print/PDF export, budget
+pacing (spent% vs month%), Slack digest button.
+
+**Meta read/write:** still `ads_read` (READ-ONLY). Write (auto-upload videos /
+create ads) needs `ads_management` + Business Verification — Zoran doing the
+Meta-side prereqs in the background; code build is a later follow-up. Logged as
+a future item (Open Loop).
+
+## v2 enhancements (2026-06-06, same day)
+
+UX pass per Zoran. **No emojis anywhere.** Constructive verdict wording (never
+"bad"): strong→"Performing well", steady→"On track", attention→"Worth revisiting".
+
+- **Time windows** — segmented control: Last 7 days / This month (default) / History.
+  `?window=last7` returns last 7 complete days vs previous 7 (one Meta call,
+  `time_increment=1` over 14 days, bucketed). Monthly default unchanged. Data is
+  **live on every open** — "monthly" is the grouping, not the refresh cadence.
+- **Verdict banner** + **Biggest win / What to look at** cards (constructive wording).
+- **Claude-written coaching** — `POST ?resource=meta-insight` (model
+  `claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`). Returns verdict, headline,
+  win, fix, per-campaign notes. Renders rule-based **instantly**, then upgrades to
+  AI when it returns (cached per period). `ruleInsight()` is the server+client
+  fallback if no key/error — UI never breaks. "AI summary" pill shows when AI.
+- **CPL goal gauge** (SVG ring), **month-over-month deltas** (▲/▼, no emoji),
+  **sparklines** (monthly views), **tap-to-explain** on every advanced metric
+  (plain "what it is + what it means", via `METRIC_INFO`), **human-first labels**
+  ("New leads" big, "Leads" small), **subtle celebratory** glow + "Lowest cost
+  yet"/"Most leads yet" record badge (monthly, respects prefers-reduced-motion).
+- **Response shape changed:** `months` → `periods`, added `view`. Each period has
+  `campaigns` + `totals`; last7 also `compareTotals`/`compareCampaigns`.
+
+Implemented ideas from the 15-idea list: #1 verdict, #2 win/fix, #4 human names,
+#5 tap-to-explain, #8 sparklines, #10 time toggle, #11 gauge, #14 celebratory,
+plus #6/#9 (money framing, benchmark notes) and #7 (Claude coaching).
+
 ## TL;DR (2026-06-06)
 
 Ximena used to copy Meta KPIs into a Google Sheet by hand every month (one row

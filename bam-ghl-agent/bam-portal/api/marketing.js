@@ -179,6 +179,12 @@ export default async function handler(req, res) {
     if (resource === "meta-report") {
       return handleMetaReport(req, res);
     }
+    if (resource === "meta-insight") {
+      return handleMetaInsight(req, res);
+    }
+    if (resource === "meta-overview") {
+      return handleMetaOverview(req, res);
+    }
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
@@ -191,7 +197,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1353,12 +1359,63 @@ const MKT_BENCHMARKS = {
 const MONTH_NAMES = ["January","February","March","April","May","June",
   "July","August","September","October","November","December"];
 
-// GET ?resource=meta-report&client_id=<id>&months=<n>
-// Automates Ximena's monthly KPI sheet: per-campaign, per-month Meta metrics
-// (leads, CPL, spend, reach, impressions, link clicks, landing page views,
-// CTR, frequency) for the last N months in ONE Meta call (level=campaign,
-// time_increment=monthly). Also returns the client's goals + industry
-// benchmark defaults so the frontend can colour against the right target.
+const META_CAMPAIGN_FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
+
+function daysInUTCMonth(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); }
+function verdictFor(cpl, target) {
+  if (cpl == null) return { verdict: "attention", verdict_label: "Worth revisiting" };
+  if (!target || cpl <= target) return { verdict: "strong", verdict_label: "Performing well" };
+  if (cpl <= target * 1.5) return { verdict: "steady", verdict_label: "On track" };
+  return { verdict: "attention", verdict_label: "Worth revisiting" };
+}
+
+const _r2 = (n) => Math.round(n * 100) / 100;
+
+// Fold one Meta insights row into a running campaign accumulator.
+function sumRowInto(acc, row) {
+  acc.spend += parseFloat(row.spend || "0") || 0;
+  acc.impressions += parseInt(row.impressions || "0", 10) || 0;
+  acc.reach += parseInt(row.reach || "0", 10) || 0;
+  acc.link_clicks += parseInt(row.inline_link_clicks || "0", 10) || 0;
+  acc.leads += countLeads(row.actions);
+  acc.landing_page_views += countAction(row.actions, "landing_page_view");
+  return acc;
+}
+function newAcc() {
+  return { spend: 0, impressions: 0, reach: 0, link_clicks: 0, leads: 0, landing_page_views: 0 };
+}
+// Turn an accumulator into the public campaign/totals metric shape.
+function finalizeMetrics(acc) {
+  return {
+    leads: acc.leads,
+    cpl: acc.leads > 0 ? _r2(acc.spend / acc.leads) : null,
+    spend: _r2(acc.spend),
+    reach: acc.reach,
+    impressions: acc.impressions,
+    link_clicks: acc.link_clicks,
+    landing_page_views: acc.landing_page_views,
+    ctr: acc.impressions > 0 ? _r2((acc.link_clicks / acc.impressions) * 100) : null,
+    frequency: acc.reach > 0 ? _r2(acc.impressions / acc.reach) : null,
+  };
+}
+function totalsFromCampaigns(campaigns) {
+  const acc = campaigns.reduce((a, c) => {
+    a.spend += c.spend; a.leads += c.leads;
+    a.impressions += c.impressions; a.reach += c.reach;
+    a.link_clicks += c.link_clicks; a.landing_page_views += c.landing_page_views;
+    return a;
+  }, newAcc());
+  return finalizeMetrics(acc);
+}
+
+// GET ?resource=meta-report&client_id=<id>&months=<n>&window=monthly|last7
+// Automates Ximena's KPI sheet: per-campaign Meta metrics (leads, CPL, spend,
+// reach, impressions, link clicks, landing page views, CTR, frequency).
+//   window=monthly (default) → one row per campaign per month, last N months,
+//     ONE Meta call (level=campaign, time_increment=monthly).
+//   window=last7 → last 7 complete days vs the previous 7 (for deltas), ONE
+//     Meta call (level=campaign, time_increment=1 over 14 days, bucketed).
+// Always returns the client's goals + industry benchmark defaults.
 async function handleMetaReport(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
@@ -1397,90 +1454,315 @@ async function handleMetaReport(req, res) {
     ? clientFull.meta_ad_account_id
     : `act_${clientFull.meta_ad_account_id}`;
 
-  // Date window: first day of (this month − (months−1)) through today.
+  // Optional per-client campaign filter (so clients don't see staff experiments).
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? new Set(clientFull.meta_campaign_ids) : null;
+
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
+
+  // ── window=last7: last 7 complete days vs previous 7 ──────────────────
+  if (req.query.window === "last7") {
+    const now = new Date();
+    const until = new Date(now); until.setUTCDate(now.getUTCDate() - 1);   // yesterday (complete)
+    const since = new Date(until); since.setUTCDate(until.getUTCDate() - 13); // 14-day span
+    const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "campaign", fields: FIELDS,
+      time_range: JSON.stringify({ since: fmt(since), until: fmt(until) }),
+      time_increment: "1", access_token: staffToken, limit: "500",
+    });
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
+
+    const splitDay = fmt(new Date(Date.UTC(until.getUTCFullYear(), until.getUTCMonth(), until.getUTCDate() - 6)));
+    const cur = new Map();   // id → { name, acc }
+    const prev = new Map();
+    for (const row of (j.data || [])) {
+      if (allow && !allow.has(row.campaign_id)) continue;
+      const bucket = (row.date_start >= splitDay) ? cur : prev;
+      if (!bucket.has(row.campaign_id)) bucket.set(row.campaign_id, { name: row.campaign_name || "(unnamed)", acc: newAcc() });
+      sumRowInto(bucket.get(row.campaign_id).acc, row);
+    }
+    const campaigns = [...cur.entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
+    const prevCampaigns = [...prev.entries()].map(([id, v]) => ({ id, ...finalizeMetrics(v.acc) }));
+    const period = {
+      key: "last7",
+      label: "Last 7 days",
+      campaigns,
+      totals: totalsFromCampaigns(campaigns),
+      compareTotals: totalsFromCampaigns(prevCampaigns),
+      compareLabel: "previous 7 days",
+      compareCampaigns: prevCampaigns,
+    };
+    return res.status(200).json({ ad_account: adAcct, view: "last7", periods: [period], ...base });
+  }
+
+  // ── window=monthly (default): one row per campaign per month ──────────
   const now = new Date();
   const startMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
-  const since = startMonth.toISOString().slice(0, 10);
-  const until = now.toISOString().slice(0, 10);
-
   const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
-    level: "campaign",
-    fields: "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions",
-    time_range: JSON.stringify({ since, until }),
-    time_increment: "monthly",
-    access_token: staffToken,
-    limit: "500",
+    level: "campaign", fields: FIELDS,
+    time_range: JSON.stringify({ since: fmt(startMonth), until: fmt(now) }),
+    time_increment: "monthly", access_token: staffToken, limit: "500",
   });
   const r = await fetch(url);
   const j = await r.json();
   if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
 
-  // Optional per-client campaign filter (so clients don't see staff experiments).
-  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
-    ? new Set(clientFull.meta_campaign_ids) : null;
-
-  const round2 = (n) => Math.round(n * 100) / 100;
-  const monthsMap = new Map(); // "YYYY-MM" → { campaigns: [...] }
-
+  const monthsMap = new Map(); // "YYYY-MM" → Map(id → {name, acc})
   for (const row of (j.data || [])) {
     if (allow && !allow.has(row.campaign_id)) continue;
     const monthKey = (row.date_start || "").slice(0, 7);
     if (!monthKey) continue;
-
-    const spend = parseFloat(row.spend || "0") || 0;
-    const impressions = parseInt(row.impressions || "0", 10) || 0;
-    const reach = parseInt(row.reach || "0", 10) || 0;
-    const frequency = parseFloat(row.frequency || "0") || 0;
-    const linkClicks = parseInt(row.inline_link_clicks || "0", 10) || 0;
-    const leads = countLeads(row.actions);
-    const lpv = countAction(row.actions, "landing_page_view");
-
-    const campaign = {
-      id: row.campaign_id,
-      name: row.campaign_name || "(unnamed)",
-      leads,
-      cpl: leads > 0 ? round2(spend / leads) : null,
-      spend: round2(spend),
-      reach,
-      impressions,
-      link_clicks: linkClicks,
-      landing_page_views: lpv,
-      ctr: impressions > 0 ? round2((linkClicks / impressions) * 100) : null,
-      frequency: round2(frequency),
-    };
-    if (!monthsMap.has(monthKey)) monthsMap.set(monthKey, []);
-    monthsMap.get(monthKey).push(campaign);
+    if (!monthsMap.has(monthKey)) monthsMap.set(monthKey, new Map());
+    const m = monthsMap.get(monthKey);
+    if (!m.has(row.campaign_id)) m.set(row.campaign_id, { name: row.campaign_name || "(unnamed)", acc: newAcc() });
+    sumRowInto(m.get(row.campaign_id).acc, row);
   }
 
-  // Build descending-by-month array with a per-month totals row.
-  const monthsOut = [...monthsMap.keys()].sort().reverse().map((key) => {
-    const campaigns = monthsMap.get(key);
+  const periods = [...monthsMap.keys()].sort().reverse().map((key) => {
+    const campaigns = [...monthsMap.get(key).entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
     const [yy, mm] = key.split("-");
-    const t = campaigns.reduce((acc, c) => {
-      acc.spend += c.spend; acc.leads += c.leads;
-      acc.impressions += c.impressions; acc.reach += c.reach;
-      acc.link_clicks += c.link_clicks; acc.landing_page_views += c.landing_page_views;
-      return acc;
-    }, { spend: 0, leads: 0, impressions: 0, reach: 0, link_clicks: 0, landing_page_views: 0 });
     return {
       key,
       label: `${MONTH_NAMES[parseInt(mm, 10) - 1]} ${yy}`,
       campaigns,
-      totals: {
-        spend: round2(t.spend),
-        leads: t.leads,
-        cpl: t.leads > 0 ? round2(t.spend / t.leads) : null,
-        impressions: t.impressions,
-        reach: t.reach,
-        link_clicks: t.link_clicks,
-        landing_page_views: t.landing_page_views,
-        ctr: t.impressions > 0 ? round2((t.link_clicks / t.impressions) * 100) : null,
-        frequency: t.reach > 0 ? round2(t.impressions / t.reach) : null,
-      },
+      totals: totalsFromCampaigns(campaigns),
     };
   });
 
-  return res.status(200).json({ ad_account: adAcct, months: monthsOut, ...base });
+  return res.status(200).json({ ad_account: adAcct, view: "monthly", periods, ...base });
+}
+
+// Deterministic fallback insight (no Claude key / API error). Mirrors the
+// wording tiers Zoran approved — never says "bad", always constructive.
+function ruleInsight(totals, campaigns, goals, bm) {
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  const t = totals || {};
+  const money = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US");
+
+  let verdict, verdict_label;
+  if (t.cpl == null) { verdict = "attention"; verdict_label = "Worth revisiting"; }
+  else if (t.cpl <= target) { verdict = "strong"; verdict_label = "Performing well"; }
+  else if (t.cpl <= target * 1.5) { verdict = "steady"; verdict_label = "On track"; }
+  else { verdict = "attention"; verdict_label = "Worth revisiting"; }
+
+  const headline = t.cpl == null
+    ? `Spent ${money(t.spend)} so far — no leads recorded yet.`
+    : `Spent ${money(t.spend)} and brought in ${t.leads} lead${t.leads === 1 ? "" : "s"} at ${money(t.cpl)} each.`;
+
+  const list = Array.isArray(campaigns) ? campaigns : [];
+  const withLeads = list.filter(c => c.cpl != null);
+  const best = withLeads.slice().sort((a, b) => a.cpl - b.cpl)[0];
+  const worst = list.slice().sort((a, b) => (b.cpl == null ? 1e9 : b.cpl) - (a.cpl == null ? 1e9 : a.cpl))[0];
+  const win = best ? `${best.name} is your most efficient — ${money(best.cpl)} per lead.` : `Leads are still coming in — give campaigns a few more days of data.`;
+  let fix = `Everything's tracking near target — keep it running.`;
+  if (worst) {
+    if (worst.ctr != null && worst.ctr < bm.ctr_min) fix = `${worst.name}'s click rate is low — refresh the creative so more people click.`;
+    else if (worst.frequency != null && worst.frequency > bm.freq_max) fix = `${worst.name} is being shown too often to the same people — widen the audience or refresh the ad.`;
+    else if (worst.cpl != null && worst.cpl > target) fix = `${worst.name}'s cost per lead is above target — tighten targeting or improve the landing page.`;
+  }
+
+  const perCampaign = {};
+  for (const c of list) {
+    if (c.cpl == null) perCampaign[c.id] = `Spent ${money(c.spend)} with no leads yet.`;
+    else if (c.ctr != null && c.ctr < bm.ctr_min) perCampaign[c.id] = `${money(c.cpl)} per lead. Few people are clicking — a fresh hook would help.`;
+    else if (c.frequency != null && c.frequency > bm.freq_max) perCampaign[c.id] = `${money(c.cpl)} per lead. People have seen this a lot — time to refresh.`;
+    else if (c.cpl > target) perCampaign[c.id] = `${money(c.cpl)} per lead, a bit over your ${money(target)} target.`;
+    else perCampaign[c.id] = `${money(c.cpl)} per lead — at or under your ${money(target)} target.`;
+  }
+  return { verdict, verdict_label, headline, win, fix, campaigns: perCampaign, source: "rule" };
+}
+
+// POST ?resource=meta-insight  → Claude-written, plain-English coaching for a
+// period: a constructive verdict, a money-framed headline, the biggest win,
+// the biggest fix, and a one-line note per campaign. Falls back to ruleInsight
+// when ANTHROPIC_API_KEY is missing or the call fails, so the UI never breaks.
+// Body: { label, totals, campaigns, goals, benchmarks }.
+async function handleMetaInsight(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client && !ctx.staff) return res.status(403).json({ error: "client or staff required" });
+
+  const body = req.body || {};
+  const goals = body.goals || { cpl_goal: null, monthly_budget: null };
+  const bm = body.benchmarks || MKT_BENCHMARKS;
+  const totals = body.totals || {};
+  const campaigns = Array.isArray(body.campaigns) ? body.campaigns : [];
+  const label = String(body.label || "this period").slice(0, 60);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  const data = JSON.stringify({ period: label, target_cpl: target, monthly_budget: goals.monthly_budget,
+    benchmarks: bm, totals, campaigns }, null, 0);
+
+  const system = [
+    "You are a friendly, plain-spoken marketing coach writing for a sports-academy owner who does NOT understand advertising jargon.",
+    "Read the Meta ad metrics and explain what they MEAN and what to DO — never just restate numbers.",
+    "Rules: No emojis. No jargon (say 'click rate' not 'CTR', 'how often people saw it' not 'frequency'). Frame in plain money where useful.",
+    "Tone: constructive and encouraging. NEVER say performance is 'bad' or 'poor'. For weak results say 'worth revisiting' or 'room to improve'.",
+    "verdict must be exactly one of: strong, steady, attention.",
+    "verdict_label must be one of: 'Performing well' (strong), 'On track' (steady), 'Worth revisiting' (attention).",
+    "Keep headline to one sentence. win and fix to one sentence each. Each per-campaign note one short sentence.",
+    "Return ONLY valid JSON, no markdown, with exactly these keys: verdict, verdict_label, headline, win, fix, campaigns (an object mapping each campaign id to its note string).",
+  ].join(" ");
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 900,
+        system,
+        messages: [{ role: "user", content: `Here is the ad data as JSON:\n\n${data}\n\nWrite the coaching JSON now.` }],
+      }),
+    });
+    if (!r.ok) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    const j = await r.json();
+    const text = j.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    const parsed = JSON.parse(match[0]);
+    // Guard the required shape; fall back if Claude drifted.
+    if (!parsed.verdict || !parsed.headline) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    if (!parsed.campaigns || typeof parsed.campaigns !== "object") parsed.campaigns = {};
+    parsed.source = "ai";
+    return res.status(200).json(parsed);
+  } catch {
+    return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+  }
+}
+
+// GET ?resource=meta-overview  (staff only)
+// Cross-client marketing roster: this-month vs last-month totals per
+// marketing-included client, plus goal, verdict, trend, and budget pacing —
+// the "single marketing portal" overview. One Meta call per connected client
+// (level=campaign, monthly, last 2 months), run in parallel.
+async function handleMetaOverview(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+  if (req.method === "POST") return metaOverviewSlackAlert(req, res);
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+
+  let clients = [];
+  const sel = "id,business_name,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget,marketing_included,status";
+  try { clients = await sb(`clients?select=${sel}&order=business_name.asc`); }
+  catch { clients = await sb(`clients?select=id,business_name,meta_ad_account_id,meta_campaign_ids,marketing_included,status&order=business_name.asc`); }
+  clients = (clients || []).filter(c => c.marketing_included !== false);
+
+  const staffToken = await getAnyStaffMetaToken();
+  const now = new Date();
+  const curKey = now.toISOString().slice(0, 7);
+  const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastKey = lastMonthDate.toISOString().slice(0, 7);
+  const since = lastMonthDate.toISOString().slice(0, 10);
+  const until = now.toISOString().slice(0, 10);
+  const monthPct = Math.round((now.getUTCDate() / daysInUTCMonth(now)) * 100);
+  const bm = MKT_BENCHMARKS;
+
+  const pctChange = (cur, prev) => (prev == null || prev === 0 || cur == null) ? null : Math.round(((cur - prev) / Math.abs(prev)) * 100);
+
+  const rows = await Promise.all(clients.map(async (c) => {
+    const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
+    const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
+    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget };
+    if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
+    try {
+      const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+      const allow = Array.isArray(c.meta_campaign_ids) && c.meta_campaign_ids.length ? new Set(c.meta_campaign_ids) : null;
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        level: "campaign", fields: META_CAMPAIGN_FIELDS,
+        time_range: JSON.stringify({ since, until }), time_increment: "monthly",
+        access_token: staffToken, limit: "500",
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (!r.ok) return { ...baseRow, connected: true, error: true };
+      const cur = newAcc(), prev = newAcc();
+      for (const row of (j.data || [])) {
+        if (allow && !allow.has(row.campaign_id)) continue;
+        const mk = (row.date_start || "").slice(0, 7);
+        if (mk === curKey) sumRowInto(cur, row);
+        else if (mk === lastKey) sumRowInto(prev, row);
+      }
+      const m = finalizeMetrics(cur), pm = finalizeMetrics(prev);
+      const target = goal_cpl != null ? goal_cpl : bm.cpl;
+      const v = verdictFor(m.cpl, target);
+      const pacing = monthly_budget != null
+        ? { spent_pct: monthly_budget > 0 ? Math.round((m.spend / monthly_budget) * 100) : null, month_pct: monthPct }
+        : null;
+      const overPace = pacing && pacing.spent_pct != null && pacing.spent_pct > monthPct + 15;
+      const attention = (m.cpl == null && m.spend > 5) || (m.cpl != null && m.cpl > target) || overPace;
+      return {
+        ...baseRow, connected: true,
+        spend: m.spend, leads: m.leads, cpl: m.cpl, impressions: m.impressions, reach: m.reach,
+        link_clicks: m.link_clicks, ctr: m.ctr, frequency: m.frequency,
+        ...v,
+        trend: { leads_pct: pctChange(m.leads, pm.leads), cpl_pct: pctChange(m.cpl, pm.cpl), spend_pct: pctChange(m.spend, pm.spend) },
+        pacing, attention,
+        _prev: pm,
+      };
+    } catch { return { ...baseRow, connected: true, error: true }; }
+  }));
+
+  // Roll-up across connected clients.
+  const live = rows.filter(r => r.connected && !r.error);
+  const sum = (k) => live.reduce((a, r) => a + (r[k] || 0), 0);
+  const prevSpend = live.reduce((a, r) => a + (r._prev?.spend || 0), 0);
+  const prevLeads = live.reduce((a, r) => a + (r._prev?.leads || 0), 0);
+  const totalSpend = _r2(sum("spend")), totalLeads = sum("leads");
+  const rollup = {
+    clients: live.length,
+    spend: totalSpend,
+    leads: totalLeads,
+    cpl: totalLeads > 0 ? _r2(totalSpend / totalLeads) : null,
+    spend_pct: pctChange(totalSpend, prevSpend),
+    leads_pct: pctChange(totalLeads, prevLeads),
+    attention: live.filter(r => r.attention).length,
+  };
+  rows.forEach(r => { delete r._prev; });
+
+  return res.status(200).json({
+    as_of: now.toISOString(),
+    month_label: `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`,
+    month_pct: monthPct,
+    rollup, clients: rows, benchmarks: bm,
+  });
+}
+
+// POST ?resource=meta-overview  (staff) — post a "needs attention" digest to
+// the marketing-team Slack channel. Frontend sends the already-computed list.
+// Requires SLACK_BOT_TOKEN + MARKETING_ALERTS_SLACK_CHANNEL (channel id).
+async function metaOverviewSlackAlert(req, res) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.MARKETING_ALERTS_SLACK_CHANNEL;
+  if (!token || !channel) return res.status(200).json({ sent: false, reason: "slack_not_configured" });
+
+  const { month_label, items } = req.body || {};
+  const list = Array.isArray(items) ? items : [];
+  const lines = list.length
+    ? list.map(i => `• *${i.name}* — ${i.reason || "worth a look"}`).join("\n")
+    : "All marketing clients are on or under target right now. Nice work.";
+  const text = `:bar_chart: *Marketing check${month_label ? ` — ${month_label}` : ""}*\n${lines}`;
+
+  try {
+    const r = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text }),
+    });
+    const j = await r.json();
+    if (!j.ok) return res.status(200).json({ sent: false, reason: j.error || "slack_error" });
+    return res.status(200).json({ sent: true, count: list.length });
+  } catch (err) {
+    return res.status(200).json({ sent: false, reason: err?.message || "slack_error" });
+  }
 }
 
 // GET ?resource=meta-creatives&campaign_id=<id>
