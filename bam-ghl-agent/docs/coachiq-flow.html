@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoachIQ Integration — Flow, Gaps & Notes</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#1f2430; --muted:#6b7384;
+    --line:#e6e9f2; --accent:#3b6ef6; --accent-soft:#e8f0ff;
+    --green:#1f9d6b; --green-bg:#e6f7ef;
+    --amber:#c9871f; --amber-bg:#fdf3e0;
+    --red:#d8483f; --red-bg:#fdeae8;
+    --purple:#7b54d6; --purple-bg:#f0eafc;
+    --shadow:0 2px 10px rgba(31,36,48,.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5; padding-bottom:120px;
+  }
+  .wrap{max-width:920px; margin:0 auto; padding:24px 20px;}
+
+  /* Header */
+  header{text-align:center; padding:28px 0 8px;}
+  header h1{font-size:30px; margin:0 0 6px; letter-spacing:-.5px;}
+  header p{color:var(--muted); margin:0; font-size:16px;}
+  .legend{
+    display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin:18px 0 6px;
+  }
+  .pill{
+    display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600;
+    padding:5px 11px; border-radius:999px; border:1px solid transparent;
+  }
+  .pill .dot{width:9px;height:9px;border-radius:50%;}
+  .pill.done{background:var(--green-bg);color:var(--green);} .pill.done .dot{background:var(--green);}
+  .pill.confirm{background:var(--amber-bg);color:var(--amber);} .pill.confirm .dot{background:var(--amber);}
+  .pill.blocker{background:var(--red-bg);color:var(--red);} .pill.blocker .dot{background:var(--red);}
+
+  /* Split overview */
+  .split{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:22px 0 8px;}
+  .split .col{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; box-shadow:var(--shadow);}
+  .split .col h3{margin:0 0 10px; font-size:15px; display:flex; align-items:center; gap:8px;}
+  .split .col ul{margin:0; padding-left:18px; color:var(--muted); font-size:13.5px;}
+  .split .col li{margin-bottom:5px;}
+  .tag{font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px;}
+  .tag.bam{background:var(--accent-soft); color:var(--accent);}
+  .tag.iq{background:var(--purple-bg); color:var(--purple);}
+  .tag.parent{background:var(--green-bg); color:var(--green);}
+
+  /* Section */
+  section{margin:38px 0 0;}
+  .sec-head{display:flex; align-items:baseline; gap:10px; margin:0 0 4px;}
+  .sec-head h2{font-size:22px; margin:0; letter-spacing:-.4px;}
+  .sec-head .num{
+    width:30px;height:30px;border-radius:9px;background:var(--accent);color:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:0 0 auto;
+  }
+  .sec-sub{color:var(--muted); margin:2px 0 16px; font-size:14.5px;}
+
+  /* Step card */
+  .step{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--accent);
+    border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .step.s-done{border-left-color:var(--green);}
+  .step.s-confirm{border-left-color:var(--amber);}
+  .step.s-blocker{border-left-color:var(--red);}
+  .step-top{display:flex; align-items:flex-start; gap:12px;}
+  .step-n{
+    flex:0 0 auto; width:28px;height:28px;border-radius:8px;background:var(--accent-soft);
+    color:var(--accent); font-weight:700; display:flex;align-items:center;justify-content:center;font-size:14px;
+  }
+  .step-body{flex:1;}
+  .step-title{font-weight:700; font-size:16px; margin:2px 0 4px;}
+  .step-desc{color:var(--muted); font-size:14px; margin:0;}
+  .who{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;margin-left:6px;vertical-align:middle;}
+  .who.bam{background:var(--accent-soft);color:var(--accent);}
+  .who.iq{background:var(--purple-bg);color:var(--purple);}
+  .who.parent{background:var(--green-bg);color:var(--green);}
+
+  /* Status selector */
+  .status-row{display:flex; gap:6px; margin:12px 0 0; flex-wrap:wrap;}
+  .status-btn{
+    cursor:pointer; font-size:12px; font-weight:600; padding:5px 11px; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--muted); transition:.12s;
+  }
+  .status-btn:hover{border-color:var(--accent);}
+  .status-btn.active.st-done{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+  .status-btn.active.st-confirm{background:var(--amber-bg);border-color:var(--amber);color:var(--amber);}
+  .status-btn.active.st-blocker{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+  .status-btn.active.st-todo{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+
+  /* Inputs */
+  .field{margin-top:11px;}
+  .field label{display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px;}
+  textarea{
+    width:100%; border:1.5px solid var(--line); border-radius:9px; padding:10px 12px;
+    font-family:inherit; font-size:14px; color:var(--ink); resize:vertical; min-height:46px; background:#fcfdff;
+  }
+  textarea:focus{outline:none; border-color:var(--accent); background:#fff;}
+  textarea.q{background:#fffdf6; border-color:#f0e4c4;}
+  textarea.q:focus{border-color:var(--amber);}
+
+  .callout{
+    background:var(--red-bg); border:1px solid #f3cfca; border-radius:10px; padding:12px 14px;
+    margin:14px 0; color:#9c352d; font-size:14px; font-weight:500;
+  }
+  .callout.note{background:var(--amber-bg); border-color:#f0dcae; color:#8a6314;}
+  .callout b{color:inherit;}
+
+  table.split-tbl{width:100%; border-collapse:collapse; margin-top:8px; background:var(--card);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; box-shadow:var(--shadow);}
+  table.split-tbl th{background:#f0f3fa; text-align:left; padding:10px 14px; font-size:13px;}
+  table.split-tbl td{padding:10px 14px; border-top:1px solid var(--line); font-size:13.5px; color:var(--muted);}
+
+  /* Sticky action bar */
+  .bar{
+    position:fixed; bottom:0; left:0; right:0; background:rgba(255,255,255,.92);
+    backdrop-filter:blur(8px); border-top:1px solid var(--line); padding:12px 16px;
+    display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; z-index:50;
+  }
+  .btn{
+    cursor:pointer; font-weight:700; font-size:14px; padding:11px 18px; border-radius:10px; border:none;
+    transition:.12s;
+  }
+  .btn.primary{background:var(--accent); color:#fff;}
+  .btn.primary:hover{background:#2c5be0;}
+  .btn.ghost{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
+  .btn.ghost:hover{border-color:var(--accent);}
+  .saved{font-size:12.5px; color:var(--muted);}
+  .saved b{color:var(--green);}
+
+  @media(max-width:680px){
+    .split{grid-template-columns:1fr;}
+    header h1{font-size:24px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🏀 CoachIQ Integration</h1>
+    <p>End-to-end flow · where the gaps are · your notes &amp; questions</p>
+    <div class="legend">
+      <span class="pill done"><span class="dot"></span>Done / decided</span>
+      <span class="pill confirm"><span class="dot"></span>Needs confirm</span>
+      <span class="pill blocker"><span class="dot"></span>Blocker — do first</span>
+    </div>
+  </header>
+
+  <div class="callout note" style="text-align:center;">
+    <b>The big idea:</b> the <b>portal parent-onboarding funnel</b> is the core product — every academy gets it,
+    and it ends in <b>payment on the portal</b>. <b>CoachIQ is an OPTIONAL add-on</b> an academy turns on
+    <i>only if they use CoachIQ</i> — it links the portal-owned sub so CoachIQ handles their credits.
+  </div>
+
+  <!-- CORE vs ADD-ON -->
+  <div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:8px 0 4px;box-shadow:var(--shadow);">
+    <div style="font-weight:700;font-size:15px;margin-bottom:14px;">🧭 How CoachIQ fits</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13.5px;font-weight:600;">
+      <span style="background:var(--accent-soft);color:var(--accent);padding:8px 12px;border-radius:9px;">1 · Input info</span>
+      <span style="color:var(--muted);">→</span>
+      <span style="background:var(--accent-soft);color:var(--accent);padding:8px 12px;border-radius:9px;">2 · Choose offer</span>
+      <span style="color:var(--muted);">→</span>
+      <span style="background:var(--accent-soft);color:var(--accent);padding:8px 12px;border-radius:9px;">3 · Sign + Pay</span>
+      <span style="color:var(--green);font-weight:700;">✅ portal owns the sub — ENDS HERE</span>
+    </div>
+    <div style="margin:14px 0 0;padding:12px 14px;border-left:3px solid var(--purple);background:var(--purple-bg);border-radius:0 9px 9px 0;font-size:13.5px;color:#5a3da8;">
+      <b>↳ OPTIONAL: CoachIQ toggle</b> — only if the academy is connected to CoachIQ.<br>
+      After payment → portal shows the sub-id → academy pastes it into CoachIQ → CoachIQ runs their credits/scheduling.
+      <br><span style="color:var(--muted);font-weight:500;">Academies not on CoachIQ never see this — they just use the funnel above.</span>
+    </div>
+  </div>
+
+  <!-- WHO DOES WHAT -->
+  <div class="split">
+    <div class="col">
+      <h3><span class="tag bam">FULLCONTROL</span></h3>
+      <ul>
+        <li>Owns the Stripe subscription</li>
+        <li>Pause / cancel / refund buttons</li>
+        <li>Shows the sub-id to copy</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3><span class="tag iq">COACHIQ</span></h3>
+      <ul>
+        <li>Credits + expiry</li>
+        <li>Scheduling / booking</li>
+        <li>Pastes the sub-id to link it</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3><span class="tag parent">PARENT</span></h3>
+      <ul>
+        <li>Pays on your portal</li>
+        <li>Uses the branded app</li>
+        <li>Books with credits</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- SECTION 1: TRACK A -->
+  <section id="trackA">
+    <div class="sec-head"><span class="num">1</span><h2>New member — with CoachIQ turned ON</h2></div>
+    <p class="sec-sub">The full path when an academy uses CoachIQ. Steps 1–2 are the normal portal funnel everyone gets; steps 3–5 are the optional CoachIQ add-on.</p>
+    <div id="trackA-steps"></div>
+  </section>
+
+  <!-- SECTION 2: TRACK B -->
+  <section id="trackB">
+    <div class="sec-head"><span class="num">2</span><h2>Migrating your ~50 existing members</h2></div>
+    <p class="sec-sub">Moving members BAM can't bill today → BAM-owned billing. One at a time ("Track B").</p>
+    <div class="callout">
+      <b>🔴 The landmine:</b> CoachIQ may auto-cancel a member when the old subscription dies.
+      Turn that automation OFF before starting — non-negotiable.
+    </div>
+    <div class="callout note">
+      <b>Numbers (re-counted Jun 5):</b> ~50 members · 46 move silently (card on file) ·
+      4 need a quick card re-collect → <b>Ebaad Wahid · Krishay · Luke Newton · Syed Faiz</b>.
+    </div>
+    <div id="trackB-steps"></div>
+  </section>
+
+  <!-- SECTION 3: GAPS -->
+  <section id="gaps">
+    <div class="sec-head"><span class="num">3</span><h2>Gaps &amp; what's left</h2></div>
+    <p class="sec-sub">The open questions and the must-do-before-live list.</p>
+    <div id="gaps-steps"></div>
+  </section>
+
+</div>
+
+<!-- STICKY BAR -->
+<div class="bar">
+  <button class="btn primary" onclick="copyAll()">📋 Copy everything</button>
+  <button class="btn ghost" onclick="copyQuestions()">❓ Copy just my questions</button>
+  <button class="btn ghost" onclick="resetNotes()">↺ Reset notes</button>
+  <span class="saved" id="saved"></span>
+</div>
+
+<script>
+/* ---------- DATA ---------- */
+const DATA = {
+  "trackA-steps":[
+    {id:"a1", who:"parent", title:"Parent fills out your branded form", status:"done",
+     desc:"FullControl / GHL form — picks plan & term. Lands in GHL + Supabase."},
+    {id:"a2", who:"bam", title:"Parent pays on YOUR payment page", status:"todo",
+     desc:"Portal Stripe checkout → the portal CREATES & OWNS the subscription. NEVER pay on a CoachIQ form."},
+    {id:"a3", who:"bam", title:"Portal shows the sub-id (easy to copy)", status:"todo",
+     desc:"The new subscription id is surfaced so it can be linked into CoachIQ."},
+    {id:"a4", who:"iq", title:"Academy pastes sub-id into CoachIQ", status:"confirm",
+     desc:"CoachIQ links to the portal-owned sub and sets up the product/credits on their side."},
+    {id:"a5", who:"parent", title:"Parent downloads the branded app & books", status:"todo",
+     desc:"First open → sets a password (matched by email) → books sessions with the credits."},
+  ],
+  "trackB-steps":[
+    {id:"b1", who:"bam", title:"Portal makes a NEW subscription it OWNS", status:"todo",
+     desc:"Reuses the card on file. Starts exactly when the OLD one would next charge → no double charge, no gap."},
+    {id:"b2", who:"bam", title:"Cancel the OLD subscription", status:"todo",
+     desc:"Only after the new one is in place and anchored to the right date."},
+    {id:"b3", who:"iq", title:"Academy re-links the new sub-id in CoachIQ", status:"confirm",
+     desc:"Paste the new sub-id so credits keep flowing against the BAM-owned sub."},
+    {id:"b4", who:"bam", title:"Handle the 4 card re-collects", status:"todo",
+     desc:"Ebaad Wahid, Krishay, Luke Newton, Syed Faiz need a one-tap payment link first."},
+  ],
+  "gaps-steps":[
+    {id:"g1", who:"", title:"Does 'paste the sub-id' actually link?", status:"confirm",
+     desc:"You believe yes (from your GHL experience) but it's NOT been tested live in this direction. The whole plan rests on this."},
+    {id:"g2", who:"", title:"Who does the re-linking?", status:"confirm",
+     desc:"Academy staff manually, or do we automate it? Currently assumed = academy's existing workflow."},
+    {id:"g3", who:"", title:"Turn OFF CoachIQ auto-cancel automation", status:"blocker",
+     desc:"Before any migration — or members lose access/credits when the old sub is cancelled."},
+    {id:"g4", who:"", title:"Hook create-sub to a real button + test on ONE throwaway", status:"blocker",
+     desc:"The code tool (PR #52) exists but nothing calls it yet. Test on a single fake member first."},
+    {id:"g5", who:"", title:"Build the portal payment page (Track A)", status:"todo",
+     desc:"Stripe checkout on the academy's connected account so the sub is portal-owned."},
+    {id:"g6", who:"", title:"Your final go-ahead to flip it on", status:"todo",
+     desc:"Sign-off + deploy."},
+  ]
+};
+
+const WHO_LABEL = {bam:"FullControl", iq:"CoachIQ", parent:"Parent"};
+const STATUSES = [
+  {k:"done", label:"✓ Done"},
+  {k:"confirm", label:"? Confirm"},
+  {k:"blocker", label:"! Blocker"},
+  {k:"todo", label:"○ To do"},
+];
+const STORE_KEY = "coachiq_flow_v1";
+let saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+
+/* ---------- RENDER ---------- */
+function render(containerId){
+  const host = document.getElementById(containerId);
+  host.innerHTML = "";
+  DATA[containerId].forEach((s,i)=>{
+    const st = (saved[s.id] && saved[s.id].status) || s.status;
+    const note = (saved[s.id] && saved[s.id].note) || "";
+    const q = (saved[s.id] && saved[s.id].q) || "";
+    const card = document.createElement("div");
+    card.className = "step s-"+st;
+    card.id = "card-"+s.id;
+    const whoBadge = s.who ? `<span class="who ${s.who}">${WHO_LABEL[s.who]}</span>` : "";
+    card.innerHTML = `
+      <div class="step-top">
+        <div class="step-n">${i+1}</div>
+        <div class="step-body">
+          <div class="step-title">${s.title}${whoBadge}</div>
+          <p class="step-desc">${s.desc}</p>
+          <div class="status-row">
+            ${STATUSES.map(x=>`<button class="status-btn st-${x.k} ${x.k===st?'active':''}"
+              onclick="setStatus('${containerId}','${s.id}','${x.k}')">${x.label}</button>`).join("")}
+          </div>
+          <div class="field">
+            <label>📝 Notes</label>
+            <textarea oninput="save('${s.id}','note',this.value)" placeholder="Add your thoughts, decisions, details…">${esc(note)}</textarea>
+          </div>
+          <div class="field">
+            <label>❓ Question / what I need answered</label>
+            <textarea class="q" oninput="save('${s.id}','q',this.value)" placeholder="Anything unclear or blocking here?">${esc(q)}</textarea>
+          </div>
+        </div>
+      </div>`;
+    host.appendChild(card);
+  });
+}
+function esc(s){return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function setStatus(containerId,id,k){
+  saved[id] = saved[id] || {};
+  saved[id].status = k;
+  persist();
+  render(containerId);
+}
+function save(id,field,val){
+  saved[id] = saved[id] || {};
+  saved[id][field] = val;
+  persist();
+}
+function persist(){
+  localStorage.setItem(STORE_KEY, JSON.stringify(saved));
+  flashSaved();
+}
+let t;
+function flashSaved(){
+  const el = document.getElementById("saved");
+  el.innerHTML = "<b>✓ saved</b>";
+  clearTimeout(t);
+  t = setTimeout(()=>{ el.innerHTML = "auto-saves to this browser"; }, 1400);
+}
+
+/* ---------- COPY ---------- */
+const STATUS_TXT = {done:"✅ DONE", confirm:"❓ NEEDS CONFIRM", blocker:"🔴 BLOCKER", todo:"○ TO DO"};
+const SECTIONS = [
+  {id:"trackA-steps", title:"TRACK A — New member signs up"},
+  {id:"trackB-steps", title:"TRACK B — Migrate ~50 existing members"},
+  {id:"gaps-steps",   title:"GAPS & WHAT'S LEFT"},
+];
+function buildText(onlyQuestions){
+  let out = "# CoachIQ Integration — Flow & Notes\n\n";
+  out += "Model: FullControl owns billing · CoachIQ does credits · link = paste sub-id.\n\n";
+  SECTIONS.forEach(sec=>{
+    let block = `## ${sec.title}\n`;
+    let any = false;
+    DATA[sec.id].forEach((s,i)=>{
+      const st = (saved[s.id]&&saved[s.id].status)||s.status;
+      const note = (saved[s.id]&&saved[s.id].note)||"";
+      const q = (saved[s.id]&&saved[s.id].q)||"";
+      if(onlyQuestions){
+        if(q.trim()){ block += `\n${i+1}. ${s.title}\n   ❓ ${q.trim()}\n`; any=true; }
+      } else {
+        block += `\n${i+1}. [${STATUS_TXT[st]}] ${s.title}${s.who?` (${WHO_LABEL[s.who]})`:""}\n   ${s.desc}\n`;
+        if(note.trim()) block += `   📝 ${note.trim()}\n`;
+        if(q.trim())    block += `   ❓ ${q.trim()}\n`;
+        any=true;
+      }
+    });
+    if(any) out += block + "\n";
+  });
+  return out.trim();
+}
+function copyAll(){ doCopy(buildText(false), "Everything copied"); }
+function copyQuestions(){
+  const txt = buildText(true);
+  if(!txt.includes("❓")){ toast("No questions written yet ✍️"); return; }
+  doCopy(txt, "Questions copied");
+}
+function doCopy(text, msg){
+  navigator.clipboard.writeText(text).then(()=>toast("📋 "+msg)).catch(()=>{
+    const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove(); toast("📋 "+msg);
+  });
+}
+function toast(m){
+  const el=document.getElementById("saved"); el.innerHTML="<b>"+m+"</b>";
+  clearTimeout(t); t=setTimeout(()=>{el.textContent="auto-saves to this browser";},1800);
+}
+function resetNotes(){
+  if(!confirm("Clear ALL your notes, questions and status changes?")) return;
+  saved={}; localStorage.removeItem(STORE_KEY);
+  SECTIONS.forEach(s=>render(s.id));
+  toast("Notes cleared");
+}
+
+/* ---------- INIT ---------- */
+SECTIONS.forEach(s=>render(s.id));
+document.getElementById("saved").textContent="auto-saves to this browser";
+</script>
+</body>
+</html>

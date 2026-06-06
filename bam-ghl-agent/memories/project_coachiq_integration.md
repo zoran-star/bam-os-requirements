@@ -21,10 +21,37 @@ bridge (below) is the technical wedge that makes this possible.
 This started from a concrete case (pausing Knowl Beharie on BAM GTA) and grew
 into the general integration model.
 
+## ⭐⭐ CoachIQ IS AN OPTIONAL ADD-ON, NOT THE CORE FUNNEL (Zoran, 2026-06-06)
+
+**Reframe — read this first.** CoachIQ is NOT the main flow. The core product is
+the **portal parent-onboarding funnel** that EVERY academy gets:
+
+```
+THE PORTAL FUNNEL (universal, all academies):
+   1. Input info  →  2. Choose offer  →  3. Sign contract + PAY
+                                          → portal creates + OWNS the Stripe sub
+                                          ← THIS is the endpoint TODAY.
+
+   CoachIQ = an OPTIONAL toggle an academy switches ON *only if they use CoachIQ*:
+          after payment → portal surfaces the sub_id → academy pastes it into
+          CoachIQ → CoachIQ handles that academy's credits/scheduling.
+```
+
+So everything below (billing ownership, sub_id linking, migration) is the **CoachIQ
+add-on layer** — it hangs off the normal portal payment, it is not the payment funnel
+itself. An academy NOT on CoachIQ just uses the portal funnel and never sees any of it.
+Don't let the rest of this note imply CoachIQ is the whole flow — it's one integration.
+
+Naming trap: the existing `parent-onboarding.html` is the ACADEMY-OWNER setup step
+(owner picks which fields to collect from parents) and is archived/reference-only —
+it is NOT the parent-facing input→offer→sign+pay funnel described above (that funnel
+is the thing to design/build; the portal payment is its step 3).
+
 ## ⭐ CURRENT ARCHITECTURE (DECIDED 2026-06-05) — supersedes the credit bridge
 
 **FullControl owns Stripe billing. CoachIQ stays academy-run for credits/
 scheduling. The link = the academy pastes the portal's sub_id into CoachIQ.**
+(This whole section is the CoachIQ add-on layer — see the reframe above.)
 
 ```
 FullControl (BAM builds):  creates + OWNS the Stripe sub → billing buttons
