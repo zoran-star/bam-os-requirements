@@ -88,7 +88,7 @@ function getLocation(name) {
 // If loc has both apiKey (V1) and apiKeyV2, we can pick the right one per action
 function getLocForAction(loc, action) {
   // Actions that need V2 (conversations, contacts, messages)
-  const v2Actions = ["conversations", "contacts", "contact", "messages"];
+  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms"];
   // Actions that need V1 (pipelines/opportunities when V1 key is available)
   const v1Actions = ["pipelines"];
 
@@ -401,9 +401,27 @@ export default async function handler(req, res) {
     }
 
     // ─── Conversations ───
+    // ─── Forms (list a location's forms — powers the lead-form picker) ───
+    if (action === "forms") {
+      if (!v2) return res.status(200).json({ data: [], reason: "v1_unsupported" });
+      const params = { limit: "100" };
+      if (locationId) params.locationId = locationId;
+      const url = `${base}/forms/?${new URLSearchParams(params)}`;
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        const errText = await response.text();
+        if (isRateLimited(response.status, errText) && cached) return sendCached(res, cached, true);
+        return res.status(response.status).json({ error: `GHL forms error ${response.status}: ${errText.slice(0, 120)}` });
+      }
+      const data = await response.json();
+      const forms = (data.forms || []).map(f => ({ id: f.id, name: f.name || "(unnamed form)" }));
+      const body = { data: forms };
+      cacheSet(ck, 200, body);
+      return res.status(200).json(body);
+    }
+
     if (action === "conversations") {
       const contactId = req.query.contactId;
-
       let url;
       if (v2) {
         const params = {};
@@ -628,7 +646,7 @@ export default async function handler(req, res) {
       return res.status(200).json(body);
     }
 
-    return res.status(400).json({ error: "Invalid action. Use: locations, contacts, conversations, pipelines, contact, messages" });
+    return res.status(400).json({ error: "Invalid action. Use: locations, contacts, conversations, pipelines, forms, contact, messages" });
   } catch (err) {
     console.error(`GHL error (${locationName}):`, err.message);
     // On network errors, return cached data if available (even stale)

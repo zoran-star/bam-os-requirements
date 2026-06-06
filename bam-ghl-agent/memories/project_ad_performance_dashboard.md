@@ -10,6 +10,33 @@ Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's
 GHL pipeline differs (stage names, some have no trial), so KPIs can't be
 hardcoded. Plan (Zoran): AI best-guesses the mapping → staff edit → agent learns.
 
+## GTA KPI definitions — LOCKED (Zoran 2026-06-06)
+
+The funnel KPIs are **not** sourced from pipeline-stage occupancy. Confirmed
+definitions + sources:
+
+| KPI | Definition | Source |
+|---|---|---|
+| **Leads in** | # submissions of the free-trial form + contact form | GHL **form submissions** |
+| **Response rate** | (leads who messaged back **OR** booked) ÷ leads | GHL **conversations** (inbound) + bookings |
+| **Booking rate** | # who booked a trial ÷ leads | **GHL calendar** appointment (source of truth) |
+| **Conversion** | # who go live on **Stripe** ÷ leads, **tied to the lead** by email/phone | **Stripe** active subscription |
+| ~~Show rate~~ | **CUT** | — |
+| **CAC** | Meta spend ÷ members (Stripe) | Meta + Stripe |
+
+⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
+Replace with **GHL webhooks** (form submit / inbound message / appointment
+booked, fire instantly) + **Stripe** for conversion. The stage-transition tracker
+is parked; these four signals are event-based, not stage-based. (Cron still
+deployed but superseded — disable/remove when webhooks land.)
+
+**Forms picker (shipped):** `clients.ghl_kpi_config` jsonb (migration
+`supabase/ghl_kpi_config.sql`, **must be run**) holds the wiring. `GET
+/api/ghl?action=forms&location=` lists a location's forms; the GHL KPIs (beta)
+panel lets staff tick which forms = "leads in" and saves
+`{ghl_location, lead_form_ids, lead_form_names}` via clients `update-fields`.
+Next: webhook ingest + Stripe-tie + the KPI read endpoint off this config.
+
 **Confirmed GTA stage semantics (Zoran 2026-06-06) — pattern recurs across academies:**
 `Interested`=lead submitted info (form) → **Lead**; `Responded`=lead replied →
 **Contacted**; `Scheduled Trial`=booked a trial → **Booked**; `Done Trial`=showed
