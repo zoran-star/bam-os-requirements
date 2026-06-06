@@ -4,6 +4,34 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## GHL KPI discovery spike (2026-06-06) — bottom-of-funnel groundwork
+
+Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's
+GHL pipeline differs (stage names, some have no trial), so KPIs can't be
+hardcoded. Plan (Zoran): AI best-guesses the mapping → staff edit → agent learns.
+
+**Spike shipped (read-only, no schema):**
+- `POST /api/marketing?resource=ghl-kpi-suggest` (staff only, Claude haiku-4-5) —
+  takes a client's GHL pipeline stages + opportunity counts, proposes a canonical
+  funnel mapping (Lead·Contacted·Booked·Showed·Trial·Won·Lost), which KPIs matter,
+  which to skip (e.g. no trial → hide trial show-rate). Returns JSON only.
+- `src/components/GhlKpiDiscovery.jsx` — staff panel: GHL location dropdown
+  (`/api/ghl?action=locations`) → "Analyze" → fetches `?action=pipelines` →
+  computes stage counts → calls ghl-kpi-suggest → renders mapping + KPIs. Lives in
+  the client profile Marketing tab, sub-tab **"GHL KPIs (beta)"**.
+- Nothing saved yet — this is the discovery step to SEE real data before designing.
+
+**What GHL already exposes (api/ghl.js, per location via `GHL_LOCATIONS_JSON`):**
+`pipelines`+opportunities (the funnel, stage names + counts), `contacts`,
+`conversations`. Show rate needs the calendar/appointments endpoint (not wired).
+api/ghl.js has **no auth gate** (keyed by location name) — pre-existing footgun.
+
+**Next steps (designed, not built):** `clients.ghl_kpi_config` jsonb to persist
+the mapping + KPI on/off + goals; a staff editor; a corrections log fed back as
+few-shot examples so guesses improve. Then compute KPIs → feeds true
+cost-per-customer / ROAS (Meta spend→leads + GHL leads→members + Stripe revenue).
+Run `align-core-data-model` before the schema change.
+
 ## Design polish (2026-06-06) — de-coloured + no sample data
 
 Zoran feedback: the red/amber/green cards looked "vibe-coded"; real connected
