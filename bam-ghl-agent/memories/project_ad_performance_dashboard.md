@@ -76,6 +76,16 @@ Simplified to 3 KPIs. Sources + definitions:
     (reverts to default).
   - ⚠️ A form/calendar must be pulled at least once to have data — can't retro-count a
     form that was never selected.
+- **Journey board per month (2026-06-07):** a ▦ button on the hero + each month row opens a
+  3-column **Leads → Trials → Sales** board for that month (modal). Each person = a card
+  (name + date/amount). Built entirely from `ghl-kpi-detail` (fetched 3× per month:
+  lead / trial / clients_all) — no new endpoint; just added `key` (identity =
+  contact_id||email||phone) to detail items for cross-column matching.
+  - **Filled** card = the person also has a card in the column to the LEFT (came from the
+    prior stage); **outline** = they joined at this stage (no prior card — walk-in / mid-funnel).
+  - **Hover** a card → same `key` highlights across all 3 columns (trace the journey).
+  - **✕** deletes that person's record for that stage via `ghl-kpi-delete`, then re-reads
+    monthly counts. SALES column = **All purchases** (client_new + client_existing), Zoran's call.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
