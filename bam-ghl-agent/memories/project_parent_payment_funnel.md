@@ -35,14 +35,21 @@ STEP 1 — PARENT FUNNEL (Vercel; pages from Claude design)
 
 STEP 2 — ON PAYMENT SUCCESS → fan out to 3 systems
   💳 STRIPE   sub created + owned → save stripe_subscription_id on the member
-  📇 GHL      portal → GHL API: upsert CONTACT (email+phone; GHL de-dupes on email
-              OR phone → free phone fallback) + add tag "paid-signup".
-              The tag triggers a GHL WORKFLOW:
-                 Find Opportunity (native action, for this contact)
-                    ├ FOUND     → Update Opportunity → status WON
-                    └ NOT FOUND → "Opportunity Not Found" branch → flag staff
-                                  (+ portal Pipelines-page banner: pick card / New Client)
-              Save ghl_contact_id (+ opportunity_id on win) on the member.
+  📇 GHL      portal POSTs an EXISTING GHL inbound-webhook workflow with
+              `{ details: { user: { email }, product: { id } } }` (the CoachIQ-shaped
+              payload the workflow already expects). That workflow is ALREADY BUILT
+              (Zoran, 2026-06-06) and does it all:
+                 • Condition "GHL Membership Plan" → branches by product id
+                   (20 segments = product→plan already mapped)
+                 • Find Contact (by email) → found / not-found → Create Contact
+                 • tag active member ("liveclient")
+                 • mark the pipeline opportunity WON (step below the screenshot)
+                 • send the emails + more
+              → So there is NO new GHL build in the portal — just fire the webhook
+                with the member's email + the product id for their plan×term.
+              Save ghl_contact_id on the member.
+              ⚠️ Avoid double-fire: this webhook is currently fired BY CoachIQ too —
+              pick ONE trigger (the portal) so contacts/emails don't run twice.
   🏀 COACHIQ  (only if academy toggle ON):
                  Zapier "Create User" → CoachIQ user (enrolled), returns id →
                    save coachiq_member_id
@@ -61,15 +68,16 @@ STEP 4 — ONGOING
     because portal owns the sub). GHL pipeline now shows Won; comms run in GHL.
 ```
 
-## Find-and-win = GHL-native (decided 2026-06-06)
+## Find-and-win = REUSE the existing GHL workflow (decided 2026-06-06)
 
-Rather than the portal searching+matching+marking-won via API, GHL's **"Find
-Opportunity" workflow action** does it (matches the opportunity linked to the contact;
-multiple → earliest/latest; none → "Opportunity Not Found" branch). So the portal only
-upserts the contact + adds a tag; the GHL workflow does Find Opportunity → Update →
-Won. Phone fallback is handled by GHL's contact de-dupe (email OR phone). No-match →
-staff flag (GHL branch and/or the Pipelines-page banner). Match auto-Win on email OR
-phone (Zoran: "phone is enough").
+UPDATE: Zoran already has a GHL workflow (inbound-webhook triggered) that finds/creates
+the contact by email, branches by product id (20 plan segments), tags active member,
+**marks the opportunity WON**, and sends emails. So we DON'T build new GHL contact/
+find-opportunity logic in the portal — the portal just **fires that existing webhook**
+after payment with `{details:{user:{email}, product:{id}}}` and the workflow does
+everything. (GHL's Find Contact de-dupes on email; the "find opportunity → won" lives
+in the workflow below the visible screenshot.) Only open item: ensure ONE trigger
+(portal vs the current CoachIQ trigger) to avoid double contacts/emails.
 
 ## The member row is the glue
 
@@ -79,16 +87,19 @@ phone (Zoran: "phone is enough").
 ## What exists vs what's new
 
 ```
-✅ EXISTS    createPortalSub (PR #52) · GHL stage-move + send-message (api/ghl/*)
-             · ghl_contact_id link / convert flow · CoachIQ user-create (Zapier) +
-             product automation (proven) · Stripe connected + pricing_catalog
+✅ EXISTS    createPortalSub (PR #52) · CoachIQ user-create (Zapier) + product
+             automation (proven) · Stripe connected + pricing_catalog
+             · GHL: the whole contact+plan+tag+WON+emails WORKFLOW is already built
+               (inbound-webhook triggered) → portal just fires it, no new GHL code
 🔨 NEW       parent funnel pages (Claude design) · /api/onboarding/checkout (first-
-             time card capture — the "missing bit") · GHL contact upsert + tag · GHL
-             "Find Opportunity → Won" workflow · staff CoachIQ config screen ·
-             unmatched-signup banner on the Pipelines page · save opportunity_id
+             time card capture — the "missing bit") · portal POSTs the GHL webhook
+             ({user.email, product.id}) · staff CoachIQ config screen
 🔑 ZORAN     CoachIQ per-product automations + IDs · Zapier connect · rotate+supply
-             API key (Vercel env) · build the GHL workflow · CoachIQ product cleanup
+             API key (Vercel env) · CoachIQ product cleanup · de-dup the GHL webhook
+             trigger (portal vs CoachIQ) so it doesn't fire twice
 ```
+(The earlier "GHL contact upsert + tag + build Find-Opportunity workflow + unmatched
+banner" items are DROPPED — the existing workflow already covers find/create/win.)
 
 ## GHL connection — grounded in existing code
 
