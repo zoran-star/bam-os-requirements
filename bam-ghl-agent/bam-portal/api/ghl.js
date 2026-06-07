@@ -364,6 +364,7 @@ async function refreshFunnel(req, res) {
           client_id: clientId, ghl_location: locationId, event_type: "lead",
           contact_id: s.contactId || s.contact?.id || null,
           contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
+          contact_phone: s.phone || s.contact?.phone || null,
           ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
           raw: { formId, submissionId: s.id, name },
         });
@@ -386,6 +387,7 @@ async function refreshFunnel(req, res) {
         client_id: clientId, ghl_location: locationId, event_type: "trial",
         contact_id: ev.contactId || null,
         contact_email: (ev.contact?.email || "").toLowerCase() || null,
+        contact_phone: ev.contact?.phone || null,
         ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
         raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: ev.contactName || ev.contact?.name || ev.title || null },
       }));
@@ -438,7 +440,8 @@ async function refreshFunnel(req, res) {
       const evType = classify(email, occurredSec || sinceSec);
       const n = await insertEvents([{
         client_id: clientId, ghl_location: locationId, event_type: evType,
-        contact_email: email, ref: id, value: amount != null ? amount : null,
+        contact_email: email, contact_phone: (cust && cust.phone) || null,
+        ref: id, value: amount != null ? amount : null,
         occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
         raw: { stripe_account: stripeAcct, name, kind },
       }]);

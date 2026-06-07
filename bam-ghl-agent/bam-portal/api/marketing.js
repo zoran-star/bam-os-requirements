@@ -1741,25 +1741,29 @@ async function handleGhlKpis(req, res) {
     // Fetch all events for the client and window-filter in JS. (A PostgREST
     // occurred_at=gte filter with a URL-encoded timestamp silently matched
     // nothing — the verify count proved JS filtering is correct.)
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,occurred_at&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
   } catch {
     // table may not exist yet (migration not run) — treat as no data.
     return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, trials: 0, clients_new: 0, clients_existing: 0 });
   }
 
   // GTA's 3-KPI funnel: Leads in → Trials booked → New clients.
-  const key = (e) => e.contact_id || e.contact_email || Math.random().toString();
-  const trialSet = new Set();        // dedupe trials to one per person
-  let leads = 0, clients_new = 0, clients_existing = 0;
+  // Dedupe EVERY stage to one unique person (GHL contact → email → phone).
+  const key = (e) => e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
+  const leadSet = new Set(), trialSet = new Set(), newSet = new Set(), existingSet = new Set(), allSet = new Set();
   for (const e of events) {
     if (e.occurred_at && e.occurred_at < sinceIso) continue; // window filter (in JS)
-    if (e.event_type === "lead") leads++;
-    else if (e.event_type === "trial") trialSet.add(key(e));
-    else if (e.event_type === "client_new") clients_new++;
-    else if (e.event_type === "client_existing") clients_existing++;
+    const k = key(e);
+    if (e.event_type === "lead") leadSet.add(k);
+    else if (e.event_type === "trial") trialSet.add(k);
+    else if (e.event_type === "client_new") { newSet.add(k); allSet.add(k); }
+    else if (e.event_type === "client_existing") { existingSet.add(k); allSet.add(k); }
   }
+  const leads = leadSet.size;
   const trials = trialSet.size;
-  const clients_all = clients_new + clients_existing;
+  const clients_new = newSet.size;
+  const clients_existing = existingSet.size;
+  const clients_all = allSet.size;
   const pct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 : null;
 
   // CAC vs Meta spend over the same window.
@@ -1815,24 +1819,22 @@ async function handleGhlKpiDetail(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_email,contact_id,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
   } catch { return res.status(200).json({ type, days, count: 0, items: [] }); }
 
   const wanted = type === "clients_all"
     ? new Set(["client_new", "client_existing"])
     : new Set([type]);
 
+  // Dedupe to one row per unique person (most recent kept), matching the KPI counts.
   const seen = new Set();
   const items = [];
   for (const e of events) {
     if (e.occurred_at && e.occurred_at < sinceIso) continue;
     if (!wanted.has(e.event_type)) continue;
-    // dedupe trials (and clients_all) to one per person, matching the KPI counts
-    if (type === "trial") {
-      const k = e.contact_id || e.contact_email || Math.random().toString();
-      if (seen.has(k)) continue;
-      seen.add(k);
-    }
+    const k = e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
+    if (seen.has(k)) continue;
+    seen.add(k);
     items.push({
       name: (e.raw && e.raw.name) || e.contact_email || "(unknown)",
       email: e.contact_email || null,
