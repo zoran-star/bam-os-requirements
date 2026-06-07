@@ -21,7 +21,8 @@ Simplified to 3 KPIs. Sources + definitions:
 | **New clients** | new Stripe **subscription** or **one-time product purchase**, counted **all**, by purchase date, with a **New vs Existing** toggle | **Stripe Connect** (client's `stripe_connect_account_id`) |
 | **CAC** | Meta spend ÷ new clients | Meta + Stripe |
 
-- **New vs existing client:** "new" = the Stripe **customer was created within the window**; "existing" = pre-existing customer (upsell/renewal). Panel has a New / All-purchases toggle (All shows "N new · M existing"). *(Proxy = customer.created in window; revisit if Zoran wants "not already a member" instead.)*
+- **New vs existing client (Zoran 2026-06-07):** "new" = the buyer is **not already a member** of this academy — refreshFunnel loads `members` for the client, builds email→earliest-membership-start, and a purchase is `client_existing` if a membership for that email began before the purchase (60s tolerance so the purchase's own member row reads as new), else `client_new`. Panel toggle New / All ("N new · M existing").
+- **Selectable range (2026-06-07):** panel has 7d / 30d / 90d / This month buttons → `ghl-kpis?days=`. refreshFunnel pulls a **95-day** window to cover them (each GHL/Stripe call capped at 100 rows — paginate later if a client exceeds that in 90d).
 - Dropped from the earlier model: response rate, show rate, the lead→member email-tie (now counts all purchases).
 - Event types in `ghl_funnel_events`: `lead`, `trial`, `client_new`, `client_existing` (no schema change — event_type is free text).
 - `ghl_kpi_config` now also stores `booking_calendar_ids` / `booking_calendar_names` (the trial calendars).

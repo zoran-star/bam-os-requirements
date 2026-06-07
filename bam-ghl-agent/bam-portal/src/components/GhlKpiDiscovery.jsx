@@ -30,6 +30,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [kpis, setKpis] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
+  const [rangeKey, setRangeKey] = useState("30");          // '7' | '30' | '90' | 'month'
+  const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
   // (if it's stale) pull fresh GHL data in the background and re-read.
@@ -37,7 +39,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     if (!client?.id) return;
     let alive = true;
     const load = async () => {
-      const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=30`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       return res.ok ? res.json() : null;
     };
     (async () => {
@@ -57,7 +59,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       }
     })();
     return () => { alive = false; };
-  }, [client, session]);
+  }, [client, session, rangeDays]);
 
   useEffect(() => {
     let alive = true;
@@ -186,7 +188,20 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     <div>
       {kpis && (
         <div style={card}>
-          <div style={lbl}>Live funnel — last 30 days{refreshing ? " · refreshing…" : ""}</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+            <div style={lbl}>Live funnel{refreshing ? " · refreshing…" : ""}</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[["7", "7d"], ["30", "30d"], ["90", "90d"], ["month", "This month"]].map(([k, label]) => (
+                <button key={k} onClick={() => setRangeKey(k)} style={{
+                  border: `1px solid ${rangeKey === k ? t.accent : t.borderMed}`,
+                  background: rangeKey === k ? t.accent : "transparent",
+                  color: rangeKey === k ? "#0A0A0B" : t.textMute,
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                  padding: "5px 10px", borderRadius: 999, cursor: "pointer",
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
           {!kpis.ready ? (
             <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
               No funnel data yet. Run <b>/apply-sql</b>, then pick the lead forms + trial calendars below — numbers fill in on the next refresh.
