@@ -33,9 +33,14 @@ function App() {
   var tl = React.useState(false); var loading = tl[0], setLoading = tl[1];
   var ll = React.useState('Processing…'); var loadLabel = ll[0], setLoadLabel = ll[1];
   var pe = React.useState(null); var payErr = pe[0], setPayErr = pe[1];
+  var sr = React.useState(false); var stripeReady = sr[0], setStripeReady = sr[1];
+  var df = React.useState(false); var demoFallback = df[0], setDemoFallback = df[1];
   var appEnabled = false; // success "download the app" variant — wire per-academy later
 
   var bodyRef = React.useRef(null);
+  var stripeRef = React.useRef(null);
+  var elementsRef = React.useRef(null);
+  var attemptedRef = React.useRef(false);
 
   React.useEffect(function () {
     var el = document.querySelector('.fbody, .success');
@@ -51,59 +56,78 @@ function App() {
 
   var BAM = window.BAM;
   var plan = BAM.getPlan(selectedPlan);
-
-  var s1valid = window.validateStep1(form).valid;
-  var s3valid = agreed && window.paymentValid(pay);
   var charge = BAM.charge(plan, term);
 
-  // ---- real checkout: create the portal-owned sub, then pay ----
-  // Falls back to the demo advance if the backend/Stripe isn't configured yet,
-  // so the funnel is always demoable. Full card capture (Payment Element) is
-  // wired once STRIPE_PUBLISHABLE_KEY is returned by the endpoint.
-  function signAndPay() {
-    if (!s3valid) return;
-    setPayErr(null);
-    setLoadLabel('Processing payment…');
-    setLoading(true);
+  // Live intent: ?live=1 in the URL, window.FUNNEL_LIVE, or the LIVE_CHECKOUT flag.
+  // `liveMode` is the actual mode after any fallback (e.g. publishable key missing).
+  var wantLive = LIVE_CHECKOUT || window.FUNNEL_LIVE ||
+    (typeof location !== 'undefined' && new URLSearchParams(location.search).has('live'));
+  var liveMode = wantLive && !demoFallback;
 
-    // Demo mode (default): no backend call, no sub created.
-    if (!(LIVE_CHECKOUT || window.FUNNEL_LIVE)) {
-      window.setTimeout(function () { setLoading(false); setStep('success'); }, 1200);
-      return;
-    }
+  var s1valid = window.validateStep1(form).valid;
+  var s3valid = agreed && (liveMode ? stripeReady : window.paymentValid(pay));
 
-    var payload = {
+  function checkoutPayload() {
+    return {
       client_id: CLIENT_ID,
       plan: selectedPlan,                 // steady|accelerated|elevate|dominate (backend aliases map these)
       term: term,                         // monthly|3mo|6mo (backend aliases map these)
       parent:  { first: form.pFirst, last: form.pLast, email: form.pEmail, phone: form.pMobile },
       athlete: { first: form.aFirst, last: '', dob: form.aDob },
     };
+  }
 
-    fetch(CHECKOUT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+  // On entering step 3 in LIVE mode: create the portal-owned sub, then mount the
+  // Stripe Payment Element with the returned client_secret. Any failure (no backend,
+  // no publishable key, Stripe.js absent) flips to demoFallback so the funnel still
+  // works as a click-through. NOTE (v1): don't go back and change plan after reaching
+  // payment — the sub is created on first step-3 entry.
+  React.useEffect(function () {
+    if (step !== 3 || !wantLive || stripeReady || demoFallback || attemptedRef.current) return;
+    attemptedRef.current = true;
+    setPayErr(null);
+    fetch(CHECKOUT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(checkoutPayload()) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
         if (!res.ok) throw new Error((res.j && res.j.error) || 'checkout failed');
         var data = res.j;
-        // No publishable key yet → backend created the sub; show success (demo
-        // path) until Stripe card capture is switched on.
-        if (!data.publishable_key || !data.client_secret || !window.Stripe) {
-          setLoading(false); setStep('success'); return;
-        }
-        // Real card capture via Stripe Payment Element (connected account).
-        return window.__confirmStripePayment(data)
-          .then(function () { setLoading(false); setStep('success'); })
-          .catch(function (e) { setLoading(false); setPayErr(e.message || 'Payment failed'); });
+        if (!data.client_secret || !data.publishable_key || !window.Stripe) { setDemoFallback(true); return; }
+        var stripe = window.Stripe(data.publishable_key, data.stripe_account ? { stripeAccount: data.stripe_account } : undefined);
+        var elements = stripe.elements({ clientSecret: data.client_secret });
+        var paymentEl = elements.create('payment');
+        window.setTimeout(function () {
+          if (!document.getElementById('payment-element')) { setDemoFallback(true); return; }
+          paymentEl.mount('#payment-element');
+          stripeRef.current = stripe; elementsRef.current = elements;
+          setStripeReady(true);
+        }, 0);
       })
-      .catch(function (e) {
-        // Network/endpoint not reachable in a pure preview → demo advance.
-        console.warn('[funnel] checkout error, demo advance:', e.message);
-        setLoading(false); setStep('success');
-      });
+      .catch(function (e) { console.warn('[funnel] live checkout failed → demo:', e.message); setDemoFallback(true); });
+  }, [step, wantLive, stripeReady, demoFallback]);
+
+  // ---- pay ----
+  function signAndPay() {
+    if (!s3valid) return;
+    setPayErr(null);
+
+    // Demo: no backend call, no charge.
+    if (!liveMode || !stripeReady) {
+      setLoadLabel('Processing payment…'); setLoading(true);
+      window.setTimeout(function () { setLoading(false); setStep('success'); }, 1200);
+      return;
+    }
+
+    // Real charge via the mounted Payment Element.
+    setLoadLabel('Processing payment…'); setLoading(true);
+    stripeRef.current.confirmPayment({
+      elements: elementsRef.current,
+      confirmParams: { return_url: location.href },
+      redirect: 'if_required',
+    }).then(function (result) {
+      setLoading(false);
+      if (result && result.error) { setPayErr(result.error.message || 'Payment failed'); return; }
+      setStep('success');
+    }).catch(function (e) { setLoading(false); setPayErr(e.message || 'Payment failed'); });
   }
 
   // ---- per-step footer / CTA ----
@@ -142,6 +166,7 @@ function App() {
     else inner = <Step3 form={form} term={term} selectedPlan={selectedPlan}
       pay={pay} setPay={setPay} agreed={agreed} onAgree={function (e) { setAgreed(e.target.checked); }}
       sig={sig} onSig={setSig} ui={ui} setUi={setUi} payErr={payErr}
+      live={liveMode} stripeReady={stripeReady}
       onChangePlan={function () { setStep(2); }} />;
     screen = (
       <React.Fragment>

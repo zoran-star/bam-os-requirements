@@ -54,6 +54,21 @@ function Payment(props) {
   function choose(m) { setPay(Object.assign({}, pay, { method: m })); }
   function fillCard() { setPay(Object.assign({}, pay, { method: 'card', cardFilled: true })); }
 
+  // LIVE: real Stripe Payment Element (card + Apple/Google Pay) mounts into
+  // #payment-element from app.jsx. This node has NO React children so Stripe
+  // owns its DOM. The mock card below is the demo fallback.
+  if (props.live) {
+    return (
+      <div className="paysect">
+        <div className="fgroup-label">Payment</div>
+        {!props.stripeReady && <div className="express__or" style={{ textAlign: 'left', margin: '4px 0 12px' }}>Loading secure payment…</div>}
+        <div id="payment-element" style={{ minHeight: props.stripeReady ? 'auto' : 0 }} />
+        {props.payErr && <div className="field__msg is-error" style={{ marginTop: 10 }}><span>{props.payErr}</span></div>}
+        <div className="poweredby" style={{ marginTop: 12 }}><IcLock size={12} /> Secured by Stripe</div>
+      </div>
+    );
+  }
+
   return (
     <div className="paysect">
       <div className="fgroup-label">Express checkout</div>
@@ -159,7 +174,7 @@ function Step3(props) {
 
       <OrderSummary plan={plan} term={props.term} onChange={props.onChangePlan} />
 
-      <Payment pay={props.pay} setPay={props.setPay} />
+      <Payment pay={props.pay} setPay={props.setPay} live={props.live} stripeReady={props.stripeReady} payErr={props.payErr} />
 
       <div className="fgroup-label" style={{ marginTop: 26 }}>Agreement &amp; signature</div>
       <Agreement
