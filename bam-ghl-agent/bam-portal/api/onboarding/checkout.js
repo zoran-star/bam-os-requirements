@@ -54,8 +54,22 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
+// TEST SANDBOX: if ONBOARDING_STRIPE_SECRET_KEY is set to a test key (sk_test_…),
+// onboarding runs in Stripe TEST mode WITHOUT disturbing the rest of the portal
+// (which keeps using the live STRIPE_CONNECT_SECRET_KEY). In test mode we charge on
+// the platform test account (no Stripe-Account header) and build the price INLINE
+// from the catalog amount — so no test products/prices/connected-account are needed.
 function stripeKey() {
-  return process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  return process.env.ONBOARDING_STRIPE_SECRET_KEY || process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+}
+function isTestMode() {
+  return String(process.env.ONBOARDING_STRIPE_SECRET_KEY || "").indexOf("sk_test") === 0;
+}
+// Stripe recurring interval for an inline (test) price, derived from our term.
+function intervalFor(term) {
+  if (term === "3_months") return { interval: "month", interval_count: 3 };
+  if (term === "6_months") return { interval: "month", interval_count: 6 };
+  return { interval: "week", interval_count: 4 }; // 4_weeks (monthly billing)
 }
 
 async function stripeFetch(path, { method = "GET", body, stripeAccount, idempotencyKey } = {}) {
@@ -118,12 +132,14 @@ export default async function handler(req, res) {
     if (!parentEmail)  return res.status(400).json({ error: "parent email required" });
     if (!athleteName)  return res.status(400).json({ error: "athlete name required" });
 
-    // ── Academy must exist + be Stripe-connected ──
+    const testMode = isTestMode();
+
+    // ── Academy must exist + be Stripe-connected (connected account skipped in test) ──
     const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,stripe_connect_status&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
     if (!client) return res.status(404).json({ error: "academy not found" });
-    const stripeAccount = client.stripe_connect_account_id;
-    if (!stripeAccount) return res.status(409).json({ error: "academy is not connected to Stripe" });
+    const stripeAccount = testMode ? null : client.stripe_connect_account_id;
+    if (!testMode && !stripeAccount) return res.status(409).json({ error: "academy is not connected to Stripe" });
 
     // ── Price (server-side only — never trust a client-sent price) ──
     const priceRows = await sb(
@@ -134,8 +150,11 @@ export default async function handler(req, res) {
       `&select=stripe_price_id,amount_cents,currency&limit=1`
     );
     const price = Array.isArray(priceRows) && priceRows[0];
-    if (!price || !price.stripe_price_id) {
+    if (!price || (!testMode && !price.stripe_price_id)) {
       return res.status(409).json({ error: "no routable price for that plan + term", plan, term });
+    }
+    if (testMode && (price.amount_cents == null)) {
+      return res.status(409).json({ error: "no catalog amount for that plan + term (needed for inline test price)", plan, term });
     }
 
     // ── Idempotency: reuse an existing member + in-flight sub ──
@@ -195,22 +214,35 @@ export default async function handler(req, res) {
     }
 
     // ── Create the PORTAL-OWNED subscription (default_incomplete → client_secret) ──
+    // LIVE: charge the catalog's real price on the connected account.
+    // TEST: inline price_data from the catalog amount on the platform test account
+    //       (no test products/prices to set up).
+    const subBody = {
+      customer: customerId,
+      payment_behavior: "default_incomplete",
+      "payment_settings[save_default_payment_method]": "on_subscription",
+      "expand[0]": "latest_invoice.payment_intent",
+      "metadata[origin]": "fullcontrol-portal",
+      "metadata[plan]": plan,
+      "metadata[term]": term,
+      "metadata[client_id]": clientId,
+      "metadata[parent_email]": parentEmail,
+      "metadata[athlete_name]": athleteName,
+    };
+    if (testMode) {
+      const iv = intervalFor(term);
+      subBody["items[0][price_data][currency]"] = price.currency || "cad";
+      subBody["items[0][price_data][unit_amount]"] = price.amount_cents;
+      subBody["items[0][price_data][product_data][name]"] = `${plan} · ${term} (test)`;
+      subBody["items[0][price_data][recurring][interval]"] = iv.interval;
+      subBody["items[0][price_data][recurring][interval_count]"] = iv.interval_count;
+    } else {
+      subBody["items[0][price]"] = price.stripe_price_id;
+    }
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
-      idempotencyKey: `onb-sub-${clientId}-${parentEmail}-${athleteName}-${price.stripe_price_id}`.slice(0, 200),
-      body: {
-        customer: customerId,
-        "items[0][price]": price.stripe_price_id,
-        payment_behavior: "default_incomplete",
-        "payment_settings[save_default_payment_method]": "on_subscription",
-        "expand[0]": "latest_invoice.payment_intent",
-        "metadata[origin]": "fullcontrol-portal",
-        "metadata[plan]": plan,
-        "metadata[term]": term,
-        "metadata[client_id]": clientId,
-        "metadata[parent_email]": parentEmail,
-        "metadata[athlete_name]": athleteName,
-      },
+      idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}`.slice(0, 200),
+      body: subBody,
     });
     const clientSecret = piSecretFromSub(sub);
 
