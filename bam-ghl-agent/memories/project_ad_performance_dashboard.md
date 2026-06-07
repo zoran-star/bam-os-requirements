@@ -33,6 +33,19 @@ Simplified to 3 KPIs. Sources + definitions:
 - **Working (2026-06-07):** after fixing (a) non-partial unique index, (b) JS window-filter in ghl-kpis, (c) client_id precedence (staff+`?client_id=` beats `ctx.client` — was reading the wrong client), GTA shows real numbers (e.g. leads 38 / trials 15 / new clients 20 / CAC $41). `insertEvents` uses **merge-duplicates** so re-pulls backfill names/amounts.
 - **Dedupe (2026-06-07):** ALL stages now count **one unique person** (was: leads/clients counted every event). Identity = `contact_id` → `contact_email` → `contact_phone`. Applied in both ghl-kpis (counts) and ghl-kpi-detail (lists). Phone now captured in the pulls; merge-duplicates backfills it onto existing rows.
 - **Drill-down (2026-06-07):** click any KPI number → `GET ?resource=ghl-kpi-detail&type=lead|trial|client_new|clients_all` lists the records (name · email · date · amount, new/existing tag) for verification, with CSV export. Names captured into `raw.name` (forms/calendar/Stripe customer); Stripe amount into `value`.
+- **Drill-down cleanup + names + dates (2026-06-07, kpi-drilldown-cleanup):**
+  - **Trial names fixed:** calendar events only carry `contactId` + an appointment
+    `title` ("By Any Means Trial") — old code stored the title as the name.
+    `refreshFunnel` now `resolveTrialName(ev)` → looks up the contact by `contactId`
+    (cached) for the real first/last name. Re-run "Refresh now" to backfill old rows
+    (merge-duplicates on stable `ref=appt:<id>`).
+  - **Delete from drill-down:** `ghl-kpi-detail` now returns `ids[]` (every event row
+    behind a deduped person). New `POST ?resource=ghl-kpi-delete {client_id, ids}`
+    (staff/owner, client-scoped) hard-deletes those rows; the ✕ button removes the row
+    + re-reads `ghl-kpis` so the headline drops. ⚠️ A later refresh re-adds anything
+    still live at the GHL/Stripe source — for junk/test/stale rows (durable exclusion
+    list = possible follow-up).
+  - **Dates:** drill-down shows `niceDate()` → "Tuesday, May 2nd", larger + name-stacked.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.

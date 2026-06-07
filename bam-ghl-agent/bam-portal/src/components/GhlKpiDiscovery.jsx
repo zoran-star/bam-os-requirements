@@ -136,6 +136,40 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     a.download = `${detail.title.replace(/\s+/g, "-").toLowerCase()}-${rangeDays}d.csv`; a.click();
   }
 
+  // Pretty date for the drill-down, e.g. "Tuesday, May 2nd".
+  function niceDate(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso).slice(0, 10);
+    const day = d.getDate();
+    const ord = (day % 10 === 1 && day !== 11) ? "st"
+      : (day % 10 === 2 && day !== 12) ? "nd"
+      : (day % 10 === 3 && day !== 13) ? "rd" : "th";
+    const wd = d.toLocaleDateString("en-US", { weekday: "long" });
+    const mo = d.toLocaleDateString("en-US", { month: "long" });
+    return `${wd}, ${mo} ${day}${ord}`;
+  }
+
+  // Delete a drill-down record (data cleaning). Removes ALL underlying event
+  // rows for that person+type, then re-reads the KPI tallies so the headline
+  // number drops too. (A later "Refresh now" re-adds anything still live at the
+  // source — this is for junk/test/stale rows.)
+  async function deleteDetailRow(it) {
+    if (!it?.ids?.length) return;
+    if (!window.confirm(`Remove "${it.name}" from ${detail.title}?\n\nThis deletes the record from your KPI data.`)) return;
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, ids: it.ids }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
+      setDetail(d => ({ ...d, items: d.items.filter(x => x !== it), count: Math.max(0, (d.count ?? d.items.length) - 1) }));
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setKpis(await kr.json());
+    } catch (e) { alert("Delete failed: " + e.message); }
+  }
+
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
   async function doRefresh() {
@@ -457,11 +491,21 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
               : (
                 <div>
                   {detail.items.map((it, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
-                      <span style={{ flex: 1, fontSize: 13, color: t.text }}>{it.name}{it.email && it.email !== it.name ? <span style={{ color: t.textMute }}> · {it.email}</span> : ""}</span>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{it.name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: t.textSub, marginTop: 2 }}>{niceDate(it.date)}</div>
+                        {it.email && it.email !== it.name && <div style={{ fontSize: 11, color: t.textMute, marginTop: 1 }}>{it.email}</div>}
+                      </div>
                       {detail.type === "clients_all" && <span style={{ fontSize: 10, color: it.is_new ? t.accent : t.textMute, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{it.is_new ? "new" : "existing"}</span>}
-                      {it.amount != null && <span style={{ fontSize: 12, color: t.textSub, minWidth: 60, textAlign: "right" }}>${it.amount.toLocaleString()}</span>}
-                      <span style={{ fontSize: 11, color: t.textMute, minWidth: 76, textAlign: "right" }}>{String(it.date || "").slice(0, 10)}</span>
+                      {it.amount != null && <span style={{ fontSize: 13, fontWeight: 600, color: t.textSub, minWidth: 60, textAlign: "right" }}>${it.amount.toLocaleString()}</span>}
+                      <button
+                        onClick={() => deleteDetailRow(it)}
+                        title="Remove this record from your KPI data"
+                        style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 14, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}
+                        onMouseEnter={e => { e.currentTarget.style.background = `${t.red}1a`; e.currentTarget.style.color = t.red; e.currentTarget.style.borderColor = t.red; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textMute; e.currentTarget.style.borderColor = t.border; }}
+                      >✕</button>
                     </div>
                   ))}
                 </div>

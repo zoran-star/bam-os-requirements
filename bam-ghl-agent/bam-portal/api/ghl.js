@@ -376,6 +376,31 @@ async function refreshFunnel(req, res) {
   // ── Trials: appointments in the selected trial calendar(s). Stored per
   // appointment; the read endpoint dedupes to one trial per person. ──
   const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  // Calendar events usually carry only a contactId — the `title` field is the
+  // appointment name (e.g. "By Any Means Trial"), NOT the person. Resolve the
+  // real contact name via a per-contact lookup (cached) so the drill-down shows
+  // who booked instead of the calendar title.
+  const _trialNameCache = new Map();
+  const resolveTrialName = async (ev) => {
+    const inline = ev.contactName || ev.contact?.name
+      || [ev.contact?.firstName, ev.contact?.lastName].filter(Boolean).join(" ").trim();
+    if (inline) return inline;
+    const cid = ev.contactId;
+    if (!cid) return ev.contact?.email || ev.title || null;
+    if (_trialNameCache.has(cid)) return _trialNameCache.get(cid);
+    let nm = null;
+    try {
+      const cr = await fetch(`${base}/contacts/${cid}`, { headers });
+      if (cr.ok) {
+        const c = (await cr.json()).contact || {};
+        nm = [c.firstName, c.lastName].filter(Boolean).join(" ").trim()
+          || c.name || c.contactName || c.email || null;
+      }
+    } catch { /* fall through to title */ }
+    if (!nm) nm = ev.title || null;
+    _trialNameCache.set(cid, nm);
+    return nm;
+  };
   for (const calId of calIds) {
     try {
       const params = { locationId, calendarId: calId, startTime: String(sinceMs), endTime: String(Date.now()) };
@@ -383,14 +408,17 @@ async function refreshFunnel(req, res) {
       if (!r.ok) { result.errors.push(`calendar ${r.status}`); continue; }
       const j = await r.json();
       const events = j.events || j.data || [];
-      const rows = events.map(ev => ({
-        client_id: clientId, ghl_location: locationId, event_type: "trial",
-        contact_id: ev.contactId || null,
-        contact_email: (ev.contact?.email || "").toLowerCase() || null,
-        contact_phone: ev.contact?.phone || null,
-        ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
-        raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: ev.contactName || ev.contact?.name || ev.title || null },
-      }));
+      const rows = [];
+      for (const ev of events) {
+        rows.push({
+          client_id: clientId, ghl_location: locationId, event_type: "trial",
+          contact_id: ev.contactId || null,
+          contact_email: (ev.contact?.email || "").toLowerCase() || null,
+          contact_phone: ev.contact?.phone || null,
+          ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
+          raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: await resolveTrialName(ev) },
+        });
+      }
       result.trials += await insertEvents(rows);
     } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
   }

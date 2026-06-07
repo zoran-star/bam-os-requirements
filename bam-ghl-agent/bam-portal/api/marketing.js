@@ -192,6 +192,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpi-detail") {
       return handleGhlKpiDetail(req, res);
     }
+    if (resource === "ghl-kpi-delete") {
+      return handleGhlKpiDelete(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -1819,7 +1822,7 @@ async function handleGhlKpiDetail(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=id,event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
   } catch { return res.status(200).json({ type, days, count: 0, items: [] }); }
 
   const wanted = type === "clients_all"
@@ -1827,24 +1830,59 @@ async function handleGhlKpiDetail(req, res) {
     : new Set([type]);
 
   // Dedupe to one row per unique person (most recent kept), matching the KPI counts.
-  const seen = new Set();
+  // `ids` collects EVERY underlying event row for that person+type so the
+  // drill-down can delete all of them in one click (data cleaning).
+  const byKey = new Map();
   const items = [];
   for (const e of events) {
     if (e.occurred_at && e.occurred_at < sinceIso) continue;
     if (!wanted.has(e.event_type)) continue;
-    const k = e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
-    if (seen.has(k)) continue;
-    seen.add(k);
-    items.push({
+    const k = e.contact_id || e.contact_email || e.contact_phone || `row:${e.id}`;
+    if (byKey.has(k)) { byKey.get(k).ids.push(e.id); continue; }
+    const item = {
+      ids: [e.id],
       name: (e.raw && e.raw.name) || e.contact_email || "(unknown)",
       email: e.contact_email || null,
       date: e.occurred_at,
       amount: e.value != null ? Number(e.value) : null,
       is_new: e.event_type === "client_new",
       kind: e.raw && e.raw.kind || null,
-    });
+    };
+    byKey.set(k, item);
+    items.push(item);
   }
   return res.status(200).json({ type, days, count: items.length, items });
+}
+
+// POST ?resource=ghl-kpi-delete  { client_id?, ids: [..] }
+// Hard-deletes funnel-event rows behind a drill-down entry (staff data cleaning).
+// Scoped to the resolved client so one academy can't delete another's rows.
+// NOTE: a subsequent "Refresh now" re-pulls from GHL/Stripe and will re-add any
+// entry that still exists at the source — use this for junk/test/stale rows.
+async function handleGhlKpiDelete(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.staff && req.body?.client_id) targetClientId = String(req.body.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map(n => parseInt(n, 10)).filter(Number.isInteger)
+    : [];
+  if (!ids.length) return res.status(400).json({ error: "ids required" });
+
+  try {
+    const deleted = await sb(
+      `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
+      { method: "DELETE", headers: { Prefer: "return=representation" } }
+    );
+    return res.status(200).json({ deleted: Array.isArray(deleted) ? deleted.length : 0 });
+  } catch (e) {
+    return res.status(500).json({ error: `delete failed: ${e.message}` });
+  }
 }
 
 // GET ?resource=meta-overview  (staff only)
