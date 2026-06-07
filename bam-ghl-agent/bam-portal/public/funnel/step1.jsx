@@ -29,7 +29,6 @@ function validateStep1(f) {
     var age = window.BAM.ageFrom(f.aDob);
     if (age == null) e.aDob = 'Enter a valid date';
     else if (age < 5) e.aDob = 'Athletes must be at least 5 years old';
-    else if (age > 18) e.aDob = 'This program is for athletes up to 18';
   }
   return { errors: e, valid: Object.keys(e).length === 0 };
 }
@@ -45,10 +44,10 @@ function DobPicker(props) {
   var y = parts[0] || '', m = parts[1] || '', d = parts[2] || '';
   var hasError = !!props.error;
 
-  // birth-year range: athletes ~4–19 today (validation enforces 5–18)
+  // birth-year range: all ages (youngest ~4; validation enforces ≥5). Adults welcome.
   var thisYear = window.BAM.TODAY.getFullYear();
   var years = [];
-  for (var yr = thisYear - 4; yr >= thisYear - 19; yr--) years.push(String(yr));
+  for (var yr = thisYear - 4; yr >= thisYear - 80; yr--) years.push(String(yr));
 
   var maxDay = daysInMonth(y, m);
   var days = [];
