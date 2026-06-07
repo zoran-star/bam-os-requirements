@@ -341,7 +341,7 @@ async function refreshFunnel(req, res) {
   const locationId = await getLocationId(loc);
   if (!locationId) return res.status(200).json({ ok: true, skipped: "no locationId" });
 
-  const sinceMs = Date.now() - 35 * 86400000; // 35d window (covers the 30d KPI view)
+  const sinceMs = Date.now() - 95 * 86400000; // 95d pull covers selectable ranges up to 90d (each source capped at 100 rows/call)
   const result = { leads: 0, trials: 0, clients_new: 0, clients_existing: 0, errors: [] };
 
   // ── Leads: submissions of the configured lead forms ──
@@ -390,9 +390,10 @@ async function refreshFunnel(req, res) {
   }
 
   // ── New clients: purchases on the client's connected Stripe account.
-  // A 'client_new' if the Stripe customer was created within the window, else
-  // 'client_existing' (already in the system). Counts new subscriptions +
-  // standalone one-time charges (charge with no invoice = a product purchase). ──
+  // 'client_new' if the buyer is NOT already a member of this academy (no member
+  // row for that email starting before this purchase), else 'client_existing'
+  // (already in the system). Counts new subscriptions + standalone one-time
+  // charges (a charge with no invoice = a product purchase). ──
   const stripeAcct = client.stripe_connect_account_id;
   const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
   if (stripeAcct && stripeKey) {
@@ -402,16 +403,38 @@ async function refreshFunnel(req, res) {
       if (!r.ok) throw new Error(`stripe ${r.status}`);
       return r.json();
     };
-    const isNew = (cust) => {
-      const created = (cust && cust.created) ? cust.created : 0;
-      return created >= sinceSec;
+
+    // Existing-member lookup: earliest membership start (seconds) per email for
+    // THIS academy. A buyer is "existing" if a membership for their email began
+    // before this purchase (the purchase's own member row starts ~now, so it
+    // won't falsely flag a genuinely new client).
+    const memberStart = {};
+    try {
+      const members = await sbReq(`members?client_id=eq.${clientId}&select=parent_email,stripe_joined_at,joined_date,created_at&limit=5000`);
+      for (const m of (members || [])) {
+        const email = (m.parent_email || "").toLowerCase();
+        if (!email) continue;
+        const t = [m.stripe_joined_at, m.joined_date, m.created_at].map(d => d ? new Date(d).getTime() : null).filter(Boolean);
+        const earliest = t.length ? Math.min(...t) : 0; // 0 = exists but undated → treat as pre-existing
+        memberStart[email] = email in memberStart ? Math.min(memberStart[email], earliest) : earliest;
+      }
+    } catch (e) { result.errors.push(`members:${(e.message || "").slice(0, 40)}`); }
+
+    const EPS = 60 * 1000; // 60s tolerance so the purchase's own member row reads as new
+    const classify = (email, purchaseSec) => {
+      const e = (email || "").toLowerCase();
+      if (!(e in memberStart)) return "client_new";
+      const start = memberStart[e];
+      if (start === 0) return "client_existing";          // member exists, undated → pre-existing
+      return start < (purchaseSec * 1000 - EPS) ? "client_existing" : "client_new";
     };
     const pushClient = async (id, cust, occurredSec) => {
-      const evType = isNew(cust) ? "client_new" : "client_existing";
+      const email = (cust && cust.email || "").toLowerCase() || null;
+      const evType = classify(email, occurredSec || sinceSec);
       const n = await insertEvents([{
         client_id: clientId, ghl_location: locationId, event_type: evType,
-        contact_email: (cust && cust.email || "").toLowerCase() || null,
-        ref: id, occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
+        contact_email: email, ref: id,
+        occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
         raw: { stripe_account: stripeAcct },
       }]);
       if (evType === "client_new") result.clients_new += n; else result.clients_existing += n;
