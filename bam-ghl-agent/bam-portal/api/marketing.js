@@ -1836,16 +1836,38 @@ async function handleGhlKpisMonthly(req, res) {
   }
   const byKey = new Map(buckets.map(b => [b.key, b]));
 
-  let adAccount = null, syncedAt = null;
+  let adAccount = null, syncedAt = null, cfg = {};
   try {
-    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at`);
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at,ghl_kpi_config`);
     adAccount = rows?.[0]?.meta_ad_account_id || null;
     syncedAt = rows?.[0]?.ghl_synced_at || null;
+    cfg = rows?.[0]?.ghl_kpi_config || {};
   } catch { /* columns may not exist */ }
+
+  // Effective-dated forms/calendars: each month uses the latest `effective_configs`
+  // entry with from<=month, else the top-level default selection. An empty set =
+  // "no filter" (count all lead/trial events), so default behaviour is unchanged.
+  const overrides = (Array.isArray(cfg.effective_configs) ? cfg.effective_configs : [])
+    .slice().sort((a, b) => String(a.from || "").localeCompare(String(b.from || "")));
+  const defForms = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
+  const defCals = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  const effectiveFor = (monthKey) => {
+    let chosen = null;
+    for (const o of overrides) { if (String(o.from || "") <= monthKey) chosen = o; else break; }
+    return chosen
+      ? { from: chosen.from, forms: chosen.lead_form_ids || [], cals: chosen.booking_calendar_ids || [],
+          formNames: chosen.lead_form_names || [], calNames: chosen.booking_calendar_names || [] }
+      : { from: null, forms: defForms, cals: defCals, formNames: cfg.lead_form_names || [], calNames: cfg.booking_calendar_names || [] };
+  };
+  for (const b of buckets) {
+    b._eff = effectiveFor(b.key);
+    b._formSet = new Set(b._eff.forms);
+    b._calSet = new Set(b._eff.cals);
+  }
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at,raw&limit=20000`) || [];
   } catch {
     return res.status(200).json({ ready: false, synced_at: syncedAt, months: [] });
   }
@@ -1857,9 +1879,12 @@ async function handleGhlKpisMonthly(req, res) {
     const b = byKey.get(monthKeyOf(e.occurred_at));
     if (!b) continue;
     const k = key(e);
-    if (e.event_type === "lead") b._sets.lead.add(k);
-    else if (e.event_type === "trial") b._sets.trial.add(k);
-    else if (e.event_type === "client_new") { b._sets.client_new.add(k); b._sets.all.add(k); }
+    if (e.event_type === "lead") {
+      // Count only forms tied to this month (empty set = count all).
+      if (b._formSet.size === 0 || (e.raw && b._formSet.has(e.raw.formId))) b._sets.lead.add(k);
+    } else if (e.event_type === "trial") {
+      if (b._calSet.size === 0 || (e.raw && b._calSet.has(e.raw.calendarId))) b._sets.trial.add(k);
+    } else if (e.event_type === "client_new") { b._sets.client_new.add(k); b._sets.all.add(k); }
     else if (e.event_type === "client_existing") { b._sets.client_existing.add(k); b._sets.all.add(k); }
   }
 
@@ -1899,10 +1924,21 @@ async function handleGhlKpisMonthly(req, res) {
         per_trial: trials ? round2(spend / trials) : null,
         per_new_client: clients_new ? round2(spend / clients_new) : null,
       },
+      // Which forms/calendars feed THIS month (effective-dated). override_from is
+      // the `from` of the override in effect, or null when using the default.
+      forms: { ids: [...b._formSet], names: b._eff.formNames },
+      calendars: { ids: [...b._calSet], names: b._eff.calNames },
+      override_from: b._eff.from,
     };
   });
 
-  return res.status(200).json({ ready: true, synced_at: syncedAt, months });
+  return res.status(200).json({
+    ready: true, synced_at: syncedAt, months,
+    config: {
+      default: { lead_form_ids: defForms, lead_form_names: cfg.lead_form_names || [], booking_calendar_ids: defCals, booking_calendar_names: cfg.booking_calendar_names || [] },
+      effective_configs: overrides,
+    },
+  });
 }
 
 // GET ?resource=ghl-kpi-detail&client_id=&days=&type=&month=YYYY-MM

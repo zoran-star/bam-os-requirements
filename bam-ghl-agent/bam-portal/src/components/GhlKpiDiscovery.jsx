@@ -33,6 +33,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
   const [rangeKey, setRangeKey] = useState("30");          // '7' | '30' | '90' | 'month'
   const [detail, setDetail] = useState(null);              // drill-down modal
+  const [cfgEdit, setCfgEdit] = useState(null);            // per-month forms/calendars editor
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -172,6 +173,50 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     } catch (e) { alert("Delete failed: " + e.message); }
   }
 
+  // Per-month forms/calendars (effective-dated). Opening prefills with the
+  // month's currently-effective selection; saving writes an effective_configs
+  // entry { from: <monthKey> } that applies from that month onward.
+  function openCfgEdit(month) {
+    setCfgEdit({
+      monthKey: month.key, monthLabel: month.label,
+      formIds: new Set(month.forms?.ids || []),
+      calIds: new Set(month.calendars?.ids || []),
+      saving: false, msg: null,
+    });
+  }
+  async function saveCfgEdit() {
+    if (!cfgEdit) return;
+    setCfgEdit(e => ({ ...e, saving: true, msg: null }));
+    try {
+      const fIds = [...cfgEdit.formIds], cIds = [...cfgEdit.calIds];
+      const fNames = (forms || []).filter(f => cfgEdit.formIds.has(f.id)).map(f => f.name);
+      const cNames = (cals || []).filter(c => cfgEdit.calIds.has(c.id)).map(c => c.name);
+      const existing = Array.isArray(monthly?.config?.effective_configs) ? monthly.config.effective_configs : [];
+      const others = existing.filter(o => o.from !== cfgEdit.monthKey);
+      // Clearing everything removes the override → this month reverts to the
+      // inherited default. Otherwise add/replace the entry for this month.
+      const effective_configs = (fIds.length === 0 && cIds.length === 0)
+        ? others
+        : [...others, { from: cfgEdit.monthKey, lead_form_ids: fIds, lead_form_names: fNames, booking_calendar_ids: cIds, booking_calendar_names: cNames }]
+            .sort((a, b) => String(a.from).localeCompare(String(b.from)));
+      const next = { ...(client?.ghl_kpi_config || {}), effective_configs };
+      const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, ghl_kpi_config: next }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      if (client) client.ghl_kpi_config = next;   // keep prefill base fresh for re-opens
+      setCfgEdit(null);
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setMonthly(await kr.json());
+    } catch (e) { setCfgEdit(ed => ({ ...ed, saving: false, msg: "Couldn't save: " + e.message })); }
+  }
+  function clearCfgOverride() {
+    if (!cfgEdit) return;
+    setCfgEdit(e => ({ ...e, formIds: new Set(), calIds: new Set() }));
+  }
+
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
   async function doRefresh() {
@@ -263,6 +308,14 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>{label}</div>
     </div>
   );
+  // Forms/calendars gear — opens the per-month editor. Accent when a custom
+  // override is in effect for this month; muted when using the default.
+  const gearBtn = (month) => (
+    <button onClick={() => openCfgEdit(month)} title="Forms & calendars from this month onward"
+      style={{ flexShrink: 0, height: 26, padding: "0 9px", borderRadius: 8, border: `1px solid ${month.override_from ? t.accent : t.border}`, background: "transparent", color: month.override_from ? t.accent : t.textMute, cursor: "pointer", fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+      ⚙ <span style={{ fontSize: 10 }}>{(month.forms?.ids?.length || 0)}f·{(month.calendars?.ids?.length || 0)}c</span>
+    </button>
+  );
 
   return (
     <div>
@@ -296,7 +349,10 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
               <>
                 {cur && (
                   <div style={{ border: `1px solid ${t.borderMed}`, borderRadius: 12, background: t.surfaceEl, padding: 16, marginTop: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent, marginBottom: 14 }}>{cur.label} · so far</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent }}>{cur.label} · so far</div>
+                      {gearBtn(cur)}
+                    </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 34px", alignItems: "flex-start" }}>
                       {heroStat("Leads in", cur.leads, () => openDetail("lead", `Leads in · ${cur.label}`, cur.key))}
                       {heroStat("Trials booked", cur.trials, () => openDetail("trial", `Trials booked · ${cur.label}`, cur.key))}
@@ -321,6 +377,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                           <div style={{ fontSize: 13, fontWeight: 600, color: t.textSub }}>{m.cac?.per_new_client != null ? money(m.cac.per_new_client) : "—"}</div>
                           <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>CAC</div>
                         </div>
+                        {gearBtn(m)}
                       </div>
                     ))}
                   </div>
@@ -525,6 +582,52 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                   ))}
                 </div>
               )}
+          </div>
+        </div>
+      )}
+
+      {cfgEdit && (
+        <div onClick={() => setCfgEdit(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Forms &amp; calendars</div>
+            <div style={{ fontSize: 12.5, color: t.textSub, marginTop: 4, lineHeight: 1.5 }}>
+              Applies to <b style={{ color: t.text }}>{cfgEdit.monthLabel}</b> and every month after — until you set a different mapping on a later month. Leave everything unchecked to fall back to the default selection.
+            </div>
+
+            <div style={{ marginTop: 16, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Lead forms → Leads</div>
+            {!forms ? <div style={{ fontSize: 12, color: t.textMute }}>Loading forms… (open the setup section below once if this stays empty)</div>
+              : forms.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>No forms found for this location.</div>
+              : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 180, overflowY: "auto" }}>
+                  {forms.map(f => (
+                    <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: t.text, cursor: "pointer" }}>
+                      <input type="checkbox" checked={cfgEdit.formIds.has(f.id)} onChange={() => setCfgEdit(e => { const n = new Set(e.formIds); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return { ...e, formIds: n }; })} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
+                      {f.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+            <div style={{ marginTop: 16, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Trial calendars → Trials</div>
+            {!cals ? <div style={{ fontSize: 12, color: t.textMute }}>Loading calendars…</div>
+              : cals.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>No calendars found for this location.</div>
+              : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 160, overflowY: "auto" }}>
+                  {cals.map(c => (
+                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: t.text, cursor: "pointer" }}>
+                      <input type="checkbox" checked={cfgEdit.calIds.has(c.id)} onChange={() => setCfgEdit(e => { const n = new Set(e.calIds); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return { ...e, calIds: n }; })} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+            {cfgEdit.msg && <div style={{ marginTop: 12, fontSize: 12, color: t.red }}>{cfgEdit.msg}</div>}
+            <div style={{ marginTop: 18, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
+              <button onClick={clearCfgOverride} style={{ marginRight: "auto", background: "transparent", border: `1px solid ${t.border}`, color: t.textMute, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontSize: 12 }}>Use default</button>
+              <button onClick={() => setCfgEdit(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>Cancel</button>
+              <button onClick={saveCfgEdit} disabled={cfgEdit.saving} style={{ background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, padding: "8px 16px", cursor: cfgEdit.saving ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}>{cfgEdit.saving ? "Saving…" : `Apply from ${cfgEdit.monthLabel}`}</button>
+            </div>
           </div>
         </div>
       )}
