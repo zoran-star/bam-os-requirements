@@ -463,19 +463,19 @@ async function refreshFunnel(req, res) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-
   const action = req.query.action || "locations";
 
-  // --- Funnel-event webhook ingest (GHL workflow → us; ?key=GHL_WEBHOOK_SECRET) ---
+  // POST actions — these run BEFORE the GET-only guard (they do their own method
+  // check). Putting them after the guard 405'd every POST.
   if (action === "webhook") {
     return ghlWebhook(req, res);
   }
-
-  // --- Funnel refresh: pull leads/bookings/responses for one client (stale-while-revalidate) ---
   if (action === "refresh-funnel") {
     return refreshFunnel(req, res);
   }
+
+  // Everything below is GET.
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   // --- Locations (no auth needed, not cached) ---
   if (action === "locations") {
