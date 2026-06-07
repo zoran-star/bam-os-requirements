@@ -10,19 +10,24 @@ Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's
 GHL pipeline differs (stage names, some have no trial), so KPIs can't be
 hardcoded. Plan (Zoran): AI best-guesses the mapping → staff edit → agent learns.
 
-## GTA KPI definitions — LOCKED (Zoran 2026-06-06)
+## GTA KPI definitions — FINAL 3-KPI model (Zoran 2026-06-07)
 
-The funnel KPIs are **not** sourced from pipeline-stage occupancy. Confirmed
-definitions + sources:
+Simplified to 3 KPIs. Sources + definitions:
 
 | KPI | Definition | Source |
 |---|---|---|
-| **Leads in** | # submissions of the free-trial form + contact form | GHL **form submissions** |
-| **Response rate** | (leads who messaged back **OR** booked) ÷ leads | GHL **conversations** (inbound) + bookings |
-| **Booking rate** | # who booked a trial ÷ leads | **GHL calendar** appointment (source of truth) |
-| **Conversion** | # who go live on **Stripe** ÷ leads, **tied to the lead** by email/phone | **Stripe** active subscription |
-| ~~Show rate~~ | **CUT** | — |
-| **CAC** | Meta spend ÷ members (Stripe) | Meta + Stripe |
+| **Leads in** | count of submissions of the selected lead forms | GHL **form submissions** (picked forms) |
+| **Trials booked** | **one per person** (dedupe by contact, all statuses) with an appt in the selected trial calendar(s) | **GHL calendar(s)** (new calendar picker) |
+| **New clients** | new Stripe **subscription** or **one-time product purchase**, counted **all**, by purchase date, with a **New vs Existing** toggle | **Stripe Connect** (client's `stripe_connect_account_id`) |
+| **CAC** | Meta spend ÷ new clients | Meta + Stripe |
+
+- **New vs existing client:** "new" = the Stripe **customer was created within the window**; "existing" = pre-existing customer (upsell/renewal). Panel has a New / All-purchases toggle (All shows "N new · M existing"). *(Proxy = customer.created in window; revisit if Zoran wants "not already a member" instead.)*
+- Dropped from the earlier model: response rate, show rate, the lead→member email-tie (now counts all purchases).
+- Event types in `ghl_funnel_events`: `lead`, `trial`, `client_new`, `client_existing` (no schema change — event_type is free text).
+- `ghl_kpi_config` now also stores `booking_calendar_ids` / `booking_calendar_names` (the trial calendars).
+- `?action=calendars` lists a location's calendars (V1+V2, diagnostics) for the picker.
+- refreshFunnel pulls: forms→lead, selected calendars→trial, Stripe Connect subs+standalone charges→client_new/client_existing (customer.created proxy). Stripe via `STRIPE_CONNECT_SECRET_KEY` + `Stripe-Account` header.
+- ⚠️ Untested vs live GHL/Stripe — forms solid; calendars + Stripe-connect pulls best-effort, may need param tweaks once real data flows.
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
 Replace with **GHL webhooks** (form submit / inbound message / appointment
