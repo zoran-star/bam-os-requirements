@@ -23,8 +23,13 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [picked, setPicked] = useState(() => new Set(cfg.lead_form_ids || []));
   const [savingForms, setSavingForms] = useState(false);
   const [formsMsg, setFormsMsg] = useState(cfg.lead_form_ids?.length ? `${cfg.lead_form_ids.length} form(s) saved` : null);
+  // Trial-calendar picker state
+  const [cals, setCals] = useState(null);
+  const [calsInfo, setCalsInfo] = useState(null);
+  const [pickedCals, setPickedCals] = useState(() => new Set(cfg.booking_calendar_ids || []));
   const [kpis, setKpis] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
   // (if it's stale) pull fresh GHL data in the background and re-read.
@@ -89,16 +94,44 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     return () => { alive = false; };
   }, [location]);
 
+  // Load this location's calendars (for the trial-calendar picker).
+  useEffect(() => {
+    if (!location) { setCals(null); return; }
+    let alive = true;
+    setCals(null); setCalsInfo(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/ghl?action=calendars&location=${encodeURIComponent(location)}`);
+        const j = await res.json();
+        if (!alive) return;
+        setCalsInfo(j);
+        if (res.ok) setCals(j.data || []);
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, [location]);
+
   function toggleForm(id) {
     setPicked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
+  function toggleCal(id) {
+    setPickedCals(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
+  // Saves the whole funnel config: lead forms + trial calendars.
   async function saveForms() {
     setSavingForms(true); setFormsMsg(null);
     try {
       const ids = [...picked];
       const names = (forms || []).filter(f => picked.has(f.id)).map(f => f.name);
-      const next = { ...(client?.ghl_kpi_config || {}), ghl_location: location, lead_form_ids: ids, lead_form_names: names };
+      const calIds = [...pickedCals];
+      const calNames = (cals || []).filter(c => pickedCals.has(c.id)).map(c => c.name);
+      const next = {
+        ...(client?.ghl_kpi_config || {}),
+        ghl_location: location,
+        lead_form_ids: ids, lead_form_names: names,
+        booking_calendar_ids: calIds, booking_calendar_names: calNames,
+      };
       const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
@@ -106,7 +139,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-      setFormsMsg(`Saved ${ids.length} form(s) as "leads in"`);
+      setFormsMsg(`Saved ${ids.length} form(s) + ${calIds.length} calendar(s)`);
     } catch (e) { setFormsMsg("Couldn't save: " + e.message); }
     finally { setSavingForms(false); }
   }
@@ -156,19 +189,34 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           <div style={lbl}>Live funnel — last 30 days{refreshing ? " · refreshing…" : ""}</div>
           {!kpis.ready ? (
             <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
-              No funnel data yet. Run the SQL (/apply-sql) and connect the GHL + Stripe webhooks — numbers fill in as events arrive.
+              No funnel data yet. Run <b>/apply-sql</b>, then pick the lead forms + trial calendars below — numbers fill in on the next refresh.
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 30px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 30px", alignItems: "flex-start" }}>
                 {kpiStat("Leads in", kpis.leads)}
-                {kpiStat("Responded", kpis.responded, kpis.rates?.response_rate)}
-                {kpiStat("Booked", kpis.booked, kpis.rates?.booking_rate)}
-                {kpiStat("Members", kpis.converted, kpis.rates?.conversion_rate)}
+                {kpiStat("Trials booked", kpis.trials, kpis.rates?.trial_rate)}
+                {kpiStat(clientFilter === "new" ? "New clients" : "All clients",
+                  clientFilter === "new" ? kpis.clients_new : kpis.clients_all,
+                  clientFilter === "new" ? kpis.rates?.new_client_rate : null)}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                {["new", "all"].map(f => (
+                  <button key={f} onClick={() => setClientFilter(f)} style={{
+                    border: `1px solid ${clientFilter === f ? t.accent : t.borderMed}`,
+                    background: clientFilter === f ? t.accent : "transparent",
+                    color: clientFilter === f ? "#0A0A0B" : t.textMute,
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                    padding: "5px 11px", borderRadius: 999, cursor: "pointer",
+                  }}>{f === "new" ? "New clients" : "All purchases"}</button>
+                ))}
+                {clientFilter === "all" && kpis.clients_existing != null && (
+                  <span style={{ fontSize: 11, color: t.textMute, alignSelf: "center" }}>({kpis.clients_new} new · {kpis.clients_existing} existing)</span>
+                )}
               </div>
               {kpis.cac && (
                 <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}`, fontSize: 12, color: t.textSub }}>
-                  Spend {money(kpis.spend)} · {kpis.cac.per_lead != null ? `${money(kpis.cac.per_lead)}/lead` : "—/lead"} · {kpis.cac.per_member != null ? `${money(kpis.cac.per_member)}/member (CAC)` : "—/member"}
+                  Spend {money(kpis.spend)} · {kpis.cac.per_lead != null ? `${money(kpis.cac.per_lead)}/lead` : "—/lead"} · {kpis.cac.per_new_client != null ? `${money(kpis.cac.per_new_client)}/new client (CAC)` : "—/new client"}
                 </div>
               )}
             </>
@@ -213,14 +261,31 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             {f.name}
           </label>
         ))}
-        {forms && forms.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
-            <button onClick={saveForms} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>
-              {savingForms ? "Saving…" : "Save lead forms"}
-            </button>
-            {formsMsg && <span style={{ fontSize: 12, color: t.textSub }}>{formsMsg}</span>}
+
+        {/* Trial calendars */}
+        <div style={{ ...lbl, marginTop: 20 }}>Trials booked — which calendar(s)?</div>
+        <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5, marginBottom: 10 }}>
+          Tick the calendar(s) where trials get booked. A booked appointment there = a trial (deduped to one per person).
+        </div>
+        {!cals && <div style={{ fontSize: 12, color: t.textMute }}>Loading calendars…</div>}
+        {cals && cals.length === 0 && (
+          <div style={{ fontSize: 12, color: t.textMute }}>
+            No calendars returned.{calsInfo && <span style={{ color: t.textSub }}> (GHL v{calsInfo.version}{calsInfo.status ? ` · HTTP ${calsInfo.status}` : ""}{calsInfo.reason ? ` · ${calsInfo.reason}` : ""})</span>}
           </div>
         )}
+        {cals && cals.map(c => (
+          <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", cursor: "pointer", fontSize: 13, color: t.text }}>
+            <input type="checkbox" checked={pickedCals.has(c.id)} onChange={() => toggleCal(c.id)} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
+            {c.name}
+          </label>
+        ))}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+          <button onClick={saveForms} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>
+            {savingForms ? "Saving…" : "Save funnel config"}
+          </button>
+          {formsMsg && <span style={{ fontSize: 12, color: t.textSub }}>{formsMsg}</span>}
+        </div>
       </div>
 
       {err && <div style={{ ...card, color: t.red }}>Couldn't analyze: {err}</div>}

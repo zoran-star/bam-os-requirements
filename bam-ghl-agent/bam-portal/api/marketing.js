@@ -1723,22 +1723,24 @@ async function handleGhlKpis(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&occurred_at=gte.${encodeURIComponent(sinceIso)}&select=event_type,contact_id,contact_email,value&limit=10000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&occurred_at=gte.${encodeURIComponent(sinceIso)}&select=event_type,contact_id,contact_email&limit=10000`) || [];
   } catch {
     // table may not exist yet (migration not run) — treat as no data.
-    return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, responded: 0, booked: 0, converted: 0 });
+    return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, trials: 0, clients_new: 0, clients_existing: 0 });
   }
 
+  // GTA's 3-KPI funnel: Leads in → Trials booked → New clients.
   const key = (e) => e.contact_id || e.contact_email || Math.random().toString();
-  const respondedSet = new Set(), bookedSet = new Set(), convertedSet = new Set();
-  let leads = 0, revenue = 0;
+  const trialSet = new Set();        // dedupe trials to one per person
+  let leads = 0, clients_new = 0, clients_existing = 0;
   for (const e of events) {
     if (e.event_type === "lead") leads++;
-    else if (e.event_type === "response") respondedSet.add(key(e));
-    else if (e.event_type === "booking") { bookedSet.add(key(e)); respondedSet.add(key(e)); } // booking implies a response
-    else if (e.event_type === "conversion") { convertedSet.add(key(e)); revenue += Number(e.value) || 0; }
+    else if (e.event_type === "trial") trialSet.add(key(e));
+    else if (e.event_type === "client_new") clients_new++;
+    else if (e.event_type === "client_existing") clients_existing++;
   }
-  const responded = respondedSet.size, booked = bookedSet.size, converted = convertedSet.size;
+  const trials = trialSet.size;
+  const clients_all = clients_new + clients_existing;
   const pct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 : null;
 
   // CAC vs Meta spend over the same window.
@@ -1761,17 +1763,16 @@ async function handleGhlKpis(req, res) {
   const round2 = (n) => Math.round(n * 100) / 100;
   return res.status(200).json({
     days, since: sinceIso, ready: true, synced_at: syncedAt,
-    leads, responded, booked, converted, revenue: round2(revenue),
+    leads, trials, clients_new, clients_existing, clients_all,
     rates: {
-      response_rate: pct(responded, leads),
-      booking_rate: pct(booked, leads),
-      conversion_rate: pct(converted, leads),
+      trial_rate: pct(trials, leads),         // leads → trials booked
+      new_client_rate: pct(clients_new, leads), // leads → new clients
     },
     spend: spend == null ? null : round2(spend),
     cac: spend == null ? null : {
       per_lead: leads ? round2(spend / leads) : null,
-      per_booking: booked ? round2(spend / booked) : null,
-      per_member: converted ? round2(spend / converted) : null,
+      per_trial: trials ? round2(spend / trials) : null,
+      per_new_client: clients_new ? round2(spend / clients_new) : null,
     },
   });
 }

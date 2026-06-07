@@ -85,7 +85,7 @@ function getLocation(name) {
 // If loc has both apiKey (V1) and apiKeyV2, we can pick the right one per action
 function getLocForAction(loc, action) {
   // Actions that need V2 (conversations, contacts, messages)
-  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms"];
+  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars"];
   // Actions that need V1 (pipelines/opportunities when V1 key is available)
   const v1Actions = ["pipelines"];
 
@@ -325,7 +325,7 @@ async function refreshFunnel(req, res) {
 
   let client;
   try {
-    const rows = await sbReq(`clients?id=eq.${clientId}&select=id,ghl_kpi_config&limit=1`);
+    const rows = await sbReq(`clients?id=eq.${clientId}&select=id,ghl_kpi_config,stripe_connect_account_id&limit=1`);
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
   const cfg = client?.ghl_kpi_config || {};
@@ -342,7 +342,7 @@ async function refreshFunnel(req, res) {
   if (!locationId) return res.status(200).json({ ok: true, skipped: "no locationId" });
 
   const sinceMs = Date.now() - 35 * 86400000; // 35d window (covers the 30d KPI view)
-  const result = { leads: 0, bookings: 0, responses: 0, errors: [] };
+  const result = { leads: 0, trials: 0, clients_new: 0, clients_existing: 0, errors: [] };
 
   // ── Leads: submissions of the configured lead forms ──
   const leadFormIds = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
@@ -369,47 +369,67 @@ async function refreshFunnel(req, res) {
     } catch (e) { result.errors.push(`forms:${(e.message || "").slice(0, 60)}`); }
   }
 
-  // ── Bookings: trial-calendar appointments (best-effort; may need a calendar id) ──
-  try {
-    const calId = cfg.booking_calendar_id || null;
-    const params = { locationId, startTime: String(sinceMs), endTime: String(Date.now()) };
-    if (calId) params.calendarId = calId;
-    const r = await fetch(`${base}/calendars/events?` + new URLSearchParams(params), { headers });
-    if (r.ok) {
+  // ── Trials: appointments in the selected trial calendar(s). Stored per
+  // appointment; the read endpoint dedupes to one trial per person. ──
+  const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  for (const calId of calIds) {
+    try {
+      const params = { locationId, calendarId: calId, startTime: String(sinceMs), endTime: String(Date.now()) };
+      const r = await fetch(`${base}/calendars/events?` + new URLSearchParams(params), { headers });
+      if (!r.ok) { result.errors.push(`calendar ${r.status}`); continue; }
       const j = await r.json();
       const events = j.events || j.data || [];
       const rows = events.map(ev => ({
-        client_id: clientId, ghl_location: locationId, event_type: "booking",
+        client_id: clientId, ghl_location: locationId, event_type: "trial",
         contact_id: ev.contactId || null,
         ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
-        raw: { appointmentId: ev.id },
+        raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null },
       }));
-      result.bookings += await insertEvents(rows);
-    } else { result.errors.push(`calendar ${r.status}`); }
-  } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
+      result.trials += await insertEvents(rows);
+    } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
+  }
 
-  // ── Responses: conversations with an inbound message (best-effort) ──
-  try {
-    const r = await fetch(`${base}/conversations/search?` + new URLSearchParams({ locationId, limit: "100" }), { headers });
-    if (r.ok) {
-      const j = await r.json();
-      const convos = j.conversations || j.data || [];
-      const rows = [];
-      for (const c of convos) {
-        const inbound = (c.lastMessageDirection || c.lastMessageType || "").toLowerCase().includes("inbound") || c.inbound === true;
-        const when = c.lastMessageDate || c.dateUpdated || null;
-        if (!inbound) continue;
-        if (when && new Date(when).getTime() < sinceMs) continue;
-        rows.push({
-          client_id: clientId, ghl_location: locationId, event_type: "response",
-          contact_id: c.contactId || null,
-          ref: `conv:${c.id}`, occurred_at: when || new Date().toISOString(),
-          raw: { conversationId: c.id },
-        });
+  // ── New clients: purchases on the client's connected Stripe account.
+  // A 'client_new' if the Stripe customer was created within the window, else
+  // 'client_existing' (already in the system). Counts new subscriptions +
+  // standalone one-time charges (charge with no invoice = a product purchase). ──
+  const stripeAcct = client.stripe_connect_account_id;
+  const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (stripeAcct && stripeKey) {
+    const sinceSec = Math.floor(sinceMs / 1000);
+    const sFetch = async (path) => {
+      const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
+      if (!r.ok) throw new Error(`stripe ${r.status}`);
+      return r.json();
+    };
+    const isNew = (cust) => {
+      const created = (cust && cust.created) ? cust.created : 0;
+      return created >= sinceSec;
+    };
+    const pushClient = async (id, cust, occurredSec) => {
+      const evType = isNew(cust) ? "client_new" : "client_existing";
+      const n = await insertEvents([{
+        client_id: clientId, ghl_location: locationId, event_type: evType,
+        contact_email: (cust && cust.email || "").toLowerCase() || null,
+        ref: id, occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
+        raw: { stripe_account: stripeAcct },
+      }]);
+      if (evType === "client_new") result.clients_new += n; else result.clients_existing += n;
+    };
+    try {
+      const subs = await sFetch(`/subscriptions?status=all&created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const s of (subs.data || [])) await pushClient(`sub:${s.id}`, s.customer, s.created);
+    } catch (e) { result.errors.push(`stripe-subs:${(e.message || "").slice(0, 40)}`); }
+    try {
+      const charges = await sFetch(`/charges?created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const c of (charges.data || [])) {
+        if (!c.paid || c.refunded || c.invoice) continue; // standalone product purchases only
+        await pushClient(`ch:${c.id}`, c.customer, c.created);
       }
-      result.responses += await insertEvents(rows);
-    } else { result.errors.push(`conversations ${r.status}`); }
-  } catch (e) { result.errors.push(`conversations:${(e.message || "").slice(0, 60)}`); }
+    } catch (e) { result.errors.push(`stripe-charges:${(e.message || "").slice(0, 40)}`); }
+  } else {
+    result.errors.push("no stripe_connect_account_id");
+  }
 
   // Stamp last-synced.
   try {
@@ -555,6 +575,37 @@ export default async function handler(req, res) {
       const data = await response.json();
       const forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
       const body = { data: forms, count: forms.length, version: v2 ? 2 : 1, location: locationName };
+      cacheSet(ck, 200, body);
+      return res.status(200).json(body);
+    }
+
+    // ─── Calendars (list a location's calendars — powers the trial-calendar picker) ───
+    if (action === "calendars") {
+      let response, usedUrl;
+      if (v2) {
+        const params = {};
+        if (locationId) params.locationId = locationId;
+        usedUrl = `${base}/calendars/?${new URLSearchParams(params)}`;
+        response = await fetch(usedUrl, { headers });
+        if (!response.ok && !locationId) {
+          const discovered = await discoverV2LocationId(loc);
+          if (discovered) {
+            usedUrl = `${base}/calendars/?${new URLSearchParams({ locationId: discovered })}`;
+            response = await fetch(usedUrl, { headers });
+          }
+        }
+      } else {
+        usedUrl = `${base}/calendars/`;
+        response = await fetch(usedUrl, { headers });
+      }
+      if (!response.ok) {
+        const errText = await response.text();
+        if (isRateLimited(response.status, errText) && cached) return sendCached(res, cached, true);
+        return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
+      }
+      const data = await response.json();
+      const cals = (data.calendars || data.data || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
+      const body = { data: cals, count: cals.length, version: v2 ? 2 : 1, location: locationName };
       cacheSet(ck, 200, body);
       return res.status(200).json(body);
     }
