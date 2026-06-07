@@ -343,39 +343,75 @@ async function refreshFunnel(req, res) {
   const locationId = await getLocationId(loc);
   if (!locationId) return res.status(200).json({ ok: true, skipped: "no locationId" });
 
-  const sinceMs = Date.now() - 95 * 86400000; // 95d pull covers selectable ranges up to 90d (each source capped at 100 rows/call)
+  // 6-month window (+buffer) so the month-by-month view has history. Each source
+  // is paginated below so we're not capped at 100 rows over that range.
+  const sinceMs = Date.now() - 200 * 86400000;
   const result = { leads: 0, trials: 0, clients_new: 0, clients_existing: 0, errors: [] };
 
-  // ── Leads: submissions of the configured lead forms ──
+  // ── Leads: submissions of the configured lead forms (paginated, newest-first) ──
   const leadFormIds = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
   for (const formId of leadFormIds) {
     try {
-      const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100" });
-      const r = await fetch(url, { headers });
-      if (!r.ok) { result.errors.push(`forms ${r.status}`); continue; }
-      const j = await r.json();
-      const subs = j.submissions || j.data || [];
-      const rows = [];
-      for (const s of subs) {
-        const created = s.createdAt || s.dateAdded || s.date || null;
-        if (created && new Date(created).getTime() < sinceMs) continue;
-        const name = s.name || s.fullName || [s.firstName, s.lastName].filter(Boolean).join(" ") || s.contact?.name || null;
-        rows.push({
-          client_id: clientId, ghl_location: locationId, event_type: "lead",
-          contact_id: s.contactId || s.contact?.id || null,
-          contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
-          contact_phone: s.phone || s.contact?.phone || null,
-          ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
-          raw: { formId, submissionId: s.id, name },
-        });
+      let page = 1;
+      for (; page <= 40; page++) {            // 40 pages × 100 = 4000 subs cap
+        const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100", page: String(page) });
+        const r = await fetch(url, { headers });
+        if (!r.ok) { result.errors.push(`forms ${r.status}`); break; }
+        const j = await r.json();
+        const subs = j.submissions || j.data || [];
+        if (!subs.length) break;
+        const rows = [];
+        let sawInWindow = false;
+        for (const s of subs) {
+          const created = s.createdAt || s.dateAdded || s.date || null;
+          if (created && new Date(created).getTime() < sinceMs) continue;
+          sawInWindow = true;
+          const name = s.name || s.fullName || [s.firstName, s.lastName].filter(Boolean).join(" ") || s.contact?.name || null;
+          rows.push({
+            client_id: clientId, ghl_location: locationId, event_type: "lead",
+            contact_id: s.contactId || s.contact?.id || null,
+            contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
+            contact_phone: s.phone || s.contact?.phone || null,
+            ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
+            raw: { formId, submissionId: s.id, name },
+          });
+        }
+        result.leads += await insertEvents(rows);
+        // Stop at the last page, or once a full page is entirely older than the
+        // window (submissions come back newest-first).
+        if (subs.length < 100 || !sawInWindow) break;
       }
-      result.leads += await insertEvents(rows);
     } catch (e) { result.errors.push(`forms:${(e.message || "").slice(0, 60)}`); }
   }
 
   // ── Trials: appointments in the selected trial calendar(s). Stored per
   // appointment; the read endpoint dedupes to one trial per person. ──
   const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  // Calendar events usually carry only a contactId — the `title` field is the
+  // appointment name (e.g. "By Any Means Trial"), NOT the person. Resolve the
+  // real contact name via a per-contact lookup (cached) so the drill-down shows
+  // who booked instead of the calendar title.
+  const _trialNameCache = new Map();
+  const resolveTrialName = async (ev) => {
+    const inline = ev.contactName || ev.contact?.name
+      || [ev.contact?.firstName, ev.contact?.lastName].filter(Boolean).join(" ").trim();
+    if (inline) return inline;
+    const cid = ev.contactId;
+    if (!cid) return ev.contact?.email || ev.title || null;
+    if (_trialNameCache.has(cid)) return _trialNameCache.get(cid);
+    let nm = null;
+    try {
+      const cr = await fetch(`${base}/contacts/${cid}`, { headers });
+      if (cr.ok) {
+        const c = (await cr.json()).contact || {};
+        nm = [c.firstName, c.lastName].filter(Boolean).join(" ").trim()
+          || c.name || c.contactName || c.email || null;
+      }
+    } catch { /* fall through to title */ }
+    if (!nm) nm = ev.title || null;
+    _trialNameCache.set(cid, nm);
+    return nm;
+  };
   for (const calId of calIds) {
     try {
       const params = { locationId, calendarId: calId, startTime: String(sinceMs), endTime: String(Date.now()) };
@@ -383,14 +419,17 @@ async function refreshFunnel(req, res) {
       if (!r.ok) { result.errors.push(`calendar ${r.status}`); continue; }
       const j = await r.json();
       const events = j.events || j.data || [];
-      const rows = events.map(ev => ({
-        client_id: clientId, ghl_location: locationId, event_type: "trial",
-        contact_id: ev.contactId || null,
-        contact_email: (ev.contact?.email || "").toLowerCase() || null,
-        contact_phone: ev.contact?.phone || null,
-        ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
-        raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: ev.contactName || ev.contact?.name || ev.title || null },
-      }));
+      const rows = [];
+      for (const ev of events) {
+        rows.push({
+          client_id: clientId, ghl_location: locationId, event_type: "trial",
+          contact_id: ev.contactId || null,
+          contact_email: (ev.contact?.email || "").toLowerCase() || null,
+          contact_phone: ev.contact?.phone || null,
+          ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
+          raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: await resolveTrialName(ev) },
+        });
+      }
       result.trials += await insertEvents(rows);
     } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
   }
@@ -408,6 +447,20 @@ async function refreshFunnel(req, res) {
       const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
       if (!r.ok) throw new Error(`stripe ${r.status}`);
       return r.json();
+    };
+    // Page through a Stripe list endpoint via starting_after until has_more=false.
+    const sFetchAll = async (path) => {
+      const out = [];
+      let after = null;
+      for (let guard = 0; guard < 40; guard++) {   // 40 × 100 = 4000 rows cap
+        const sep = path.includes("?") ? "&" : "?";
+        const j = await sFetch(path + (after ? `${sep}starting_after=${after}` : ""));
+        const data = j.data || [];
+        out.push(...data);
+        if (!j.has_more || !data.length) break;
+        after = data[data.length - 1].id;
+      }
+      return out;
     };
 
     // Existing-member lookup: earliest membership start (seconds) per email for
@@ -448,15 +501,15 @@ async function refreshFunnel(req, res) {
       if (evType === "client_new") result.clients_new += n; else result.clients_existing += n;
     };
     try {
-      const subs = await sFetch(`/subscriptions?status=all&created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
-      for (const s of (subs.data || [])) {
+      const subs = await sFetchAll(`/subscriptions?status=all&created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const s of subs) {
         const amt = (s.items?.data?.[0]?.price?.unit_amount || 0) / 100;
         await pushClient(`sub:${s.id}`, s.customer, s.created, amt, "subscription");
       }
     } catch (e) { result.errors.push(`stripe-subs:${(e.message || "").slice(0, 40)}`); }
     try {
-      const charges = await sFetch(`/charges?created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
-      for (const c of (charges.data || [])) {
+      const charges = await sFetchAll(`/charges?created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const c of charges) {
         if (!c.paid || c.refunded || c.invoice) continue; // standalone product purchases only
         await pushClient(`ch:${c.id}`, c.customer, c.created, (c.amount || 0) / 100, "charge");
       }
