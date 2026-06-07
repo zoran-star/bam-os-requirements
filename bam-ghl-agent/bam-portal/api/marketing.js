@@ -1146,9 +1146,12 @@ async function handleMetaCampaigns(req, res) {
 
   // Both clients (viewing their own portal) and staff (debugging/preview) can call this.
   // For client requests, scope to the client. For staff requests, expect ?client_id=...
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
@@ -1260,9 +1263,12 @@ async function handleMetaKpis(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
 
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
@@ -1428,9 +1434,12 @@ async function handleMetaReport(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
 
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const months = Math.min(Math.max(parseInt(req.query.months || "8", 10) || 8, 1), 24);
@@ -1703,9 +1712,12 @@ async function handleGhlKpis(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
@@ -1767,6 +1779,7 @@ async function handleGhlKpis(req, res) {
   const round2 = (n) => Math.round(n * 100) / 100;
   return res.status(200).json({
     days, since: sinceIso, ready: true, synced_at: syncedAt,
+    debug: { fetched: events.length, used_client_id: targetClientId },
     leads, trials, clients_new, clients_existing, clients_all,
     rates: {
       trial_rate: pct(trials, leads),         // leads → trials booked
