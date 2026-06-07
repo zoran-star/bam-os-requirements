@@ -34,6 +34,7 @@
 // request body with the webhook signing secret.
 
 import crypto from "node:crypto";
+import { fireOnboardingActivations } from "../onboarding/activations.js";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -183,6 +184,13 @@ export default async function handler(req, res) {
 async function handleSubCreated(event, connectedAccount, res) {
   const sub = event.data && event.data.object;
   if (!sub) return res.status(200).json({ skipped: "no sub object" });
+  // PORTAL-OWNED onboarding subs are created by api/onboarding/checkout.js as
+  // `incomplete` and already carry their member's stripe_subscription_id. Do NOT
+  // flip them to live here (payment isn't confirmed yet) — handleInvoiceSucceeded
+  // activates them on the first paid invoice.
+  if (sub.metadata && sub.metadata.origin === "fullcontrol-portal") {
+    return res.status(200).json({ skipped: "portal-owned sub — activated on first paid invoice" });
+  }
   const customerId = sub.customer;
   const customer = await stripeFetch(`/customers/${customerId}`, connectedAccount);
   const email = ((customer && customer.email) || "").toLowerCase().trim();
@@ -411,6 +419,38 @@ async function handleInvoiceSucceeded(event, connectedAccount, res) {
     if (Array.isArray(r) && r[0]) member = r[0];
   }
   if (!member) return res.status(200).json({ skipped: "no member match for invoice" });
+
+  // ── Portal-native onboarding: first paid invoice on a PORTAL-OWNED sub ──
+  // The parent just paid on the funnel → flip to live and fire the downstream
+  // activations (GHL webhook + CoachIQ). Gated to portal-owned onboarding subs so
+  // it never touches CoachIQ/GHL/manual subs. Non-fatal: an activation failure
+  // must never break Stripe webhook handling.
+  if (member.status === "payment_method_required" && subId) {
+    let onbSub = null;
+    try { onbSub = await stripeFetch(`/subscriptions/${subId}`, connectedAccount); } catch (_) { onbSub = null; }
+    if (onbSub && onbSub.metadata && onbSub.metadata.origin === "fullcontrol-portal") {
+      await sb(`members?id=eq.${member.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "live", updated_at: nowIso() }),
+      });
+      let activations = null;
+      try {
+        activations = await fireOnboardingActivations(member, {
+          plan: onbSub.metadata.plan, term: onbSub.metadata.term, sb, writeAudit,
+        });
+      } catch (e) {
+        activations = { error: String((e && e.message) || e) };
+      }
+      await writeAudit({
+        client_id: member.client_id, member_id: member.id,
+        action_type: "onboarding-activated",
+        args: { invoice_id: inv.id, sub_id: subId, plan: onbSub.metadata.plan, term: onbSub.metadata.term, activations },
+        db_changes: { members: { status: { from: "payment_method_required", to: "live" } } },
+      });
+      return res.status(200).json({ ok: true, action: "onboarding-activated", member_id: member.id, activations });
+    }
+  }
+
   const RECOVERABLE = new Set(["payment_failed", "paused"]);
   if (!RECOVERABLE.has(member.status)) {
     return res.status(200).json({ skipped: "member not in recoverable state", current_status: member.status });
