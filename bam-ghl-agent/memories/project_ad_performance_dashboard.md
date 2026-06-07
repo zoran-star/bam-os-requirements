@@ -29,6 +29,7 @@ Simplified to 3 KPIs. Sources + definitions:
 - `?action=calendars` lists a location's calendars (V1+V2, diagnostics) for the picker.
 - refreshFunnel pulls: forms→lead, selected calendars→trial, Stripe Connect subs+standalone charges→client_new/client_existing (customer.created proxy). Stripe via `STRIPE_CONNECT_SECRET_KEY` + `Stripe-Account` header.
 - ⚠️ Untested vs live GHL/Stripe — forms solid; calendars + Stripe-connect pulls best-effort, may need param tweaks once real data flows.
+- **Debug (2026-06-07):** panel has a **"Refresh now"** button + diagnostic line showing the refresh result (`pulled — leads/trials/new/existing` or `skipped:`/`error:` + per-source `issues:` from `result.errors`). Use it when KPIs read 0 to see which source (forms/calendars/stripe) is failing.
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
 Replace with **GHL webhooks** (form submit / inbound message / appointment

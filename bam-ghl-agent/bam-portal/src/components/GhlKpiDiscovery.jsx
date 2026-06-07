@@ -29,6 +29,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [pickedCals, setPickedCals] = useState(() => new Set(cfg.booking_calendar_ids || []));
   const [kpis, setKpis] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshInfo, setRefreshInfo] = useState(null);
   const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
   const [rangeKey, setRangeKey] = useState("30");          // '7' | '30' | '90' | 'month'
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
@@ -51,7 +52,9 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       if (stale) {
         setRefreshing(true);
         try {
-          await fetch(`/api/ghl?action=refresh-funnel&client_id=${client.id}`, { method: "POST", headers: { Authorization: `Bearer ${session?.access_token}` } });
+          const rr = await fetch(`/api/ghl?action=refresh-funnel&client_id=${client.id}`, { method: "POST", headers: { Authorization: `Bearer ${session?.access_token}` } });
+          const info = await rr.json().catch(() => ({}));
+          if (alive) setRefreshInfo(info);
           const updated = await load();
           if (alive && updated) setKpis(updated);
         } catch { /* keep stored */ }
@@ -112,6 +115,20 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     })();
     return () => { alive = false; };
   }, [location]);
+
+  // Manual refresh — always pulls (ignores the stale gate) and surfaces the
+  // pull result (per-source counts + errors) so we can diagnose empties.
+  async function doRefresh() {
+    if (!client?.id) return;
+    setRefreshing(true); setRefreshInfo(null);
+    try {
+      const rr = await fetch(`/api/ghl?action=refresh-funnel&client_id=${client.id}`, { method: "POST", headers: { Authorization: `Bearer ${session?.access_token}` } });
+      setRefreshInfo(await rr.json().catch(() => ({ error: `HTTP ${rr.status}` })));
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setKpis(await kr.json());
+    } catch (e) { setRefreshInfo({ error: e.message }); }
+    finally { setRefreshing(false); }
+  }
 
   function toggleForm(id) {
     setPicked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -235,6 +252,22 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                 </div>
               )}
             </>
+          )}
+
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <button onClick={doRefresh} disabled={refreshing} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: refreshing ? "wait" : "pointer" }}>
+              {refreshing ? "Refreshing…" : "Refresh now"}
+            </button>
+            {refreshInfo && (
+              <span style={{ fontSize: 11, color: t.textMute, fontFamily: "monospace" }}>
+                {refreshInfo.skipped ? `skipped: ${refreshInfo.skipped}`
+                  : refreshInfo.error ? `error: ${refreshInfo.error}`
+                  : `pulled — leads ${refreshInfo.leads ?? 0} · trials ${refreshInfo.trials ?? 0} · new ${refreshInfo.clients_new ?? 0} · existing ${refreshInfo.clients_existing ?? 0}`}
+              </span>
+            )}
+          </div>
+          {refreshInfo && Array.isArray(refreshInfo.errors) && refreshInfo.errors.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: t.amber, fontFamily: "monospace" }}>issues: {refreshInfo.errors.join(" · ")}</div>
           )}
         </div>
       )}
