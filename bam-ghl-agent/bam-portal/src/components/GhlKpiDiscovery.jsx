@@ -19,6 +19,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const cfg = client?.ghl_kpi_config || {};
   const [forms, setForms] = useState(null);
   const [formsErr, setFormsErr] = useState("");
+  const [formsInfo, setFormsInfo] = useState(null);
   const [picked, setPicked] = useState(() => new Set(cfg.lead_form_ids || []));
   const [savingForms, setSavingForms] = useState(false);
   const [formsMsg, setFormsMsg] = useState(cfg.lead_form_ids?.length ? `${cfg.lead_form_ids.length} form(s) saved` : null);
@@ -74,12 +75,13 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   useEffect(() => {
     if (!location) { setForms(null); return; }
     let alive = true;
-    setForms(null); setFormsErr("");
+    setForms(null); setFormsErr(""); setFormsInfo(null);
     (async () => {
       try {
         const res = await fetch(`/api/ghl?action=forms&location=${encodeURIComponent(location)}`);
         const j = await res.json();
         if (!alive) return;
+        setFormsInfo(j);
         if (!res.ok) { setFormsErr(j.error || `HTTP ${res.status}`); return; }
         setForms(j.data || []);
       } catch (e) { if (alive) setFormsErr(e.message); }
@@ -198,7 +200,13 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         </div>
         {formsErr && <div style={{ fontSize: 12, color: t.red, marginBottom: 8 }}>Couldn't load forms: {formsErr}</div>}
         {!forms && !formsErr && <div style={{ fontSize: 12, color: t.textMute }}>Loading forms…</div>}
-        {forms && forms.length === 0 && <div style={{ fontSize: 12, color: t.textMute }}>No forms found for this location.</div>}
+        {forms && forms.length === 0 && (
+          <div style={{ fontSize: 12, color: t.textMute, lineHeight: 1.5 }}>
+            No forms returned for this location.
+            {formsInfo && <span> <span style={{ color: t.textSub }}>(GHL v{formsInfo.version} · location "{formsInfo.location}"{formsInfo.reason ? ` · ${formsInfo.reason}` : ""}{formsInfo.status ? ` · HTTP ${formsInfo.status}` : ""})</span></span>}
+            <div style={{ marginTop: 6 }}>If this location has forms in GHL, the diagnostic above tells us why they're not coming through — send it to Cole.</div>
+          </div>
+        )}
         {forms && forms.map(f => (
           <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", cursor: "pointer", fontSize: 13, color: t.text }}>
             <input type="checkbox" checked={picked.has(f.id)} onChange={() => toggleForm(f.id)} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />

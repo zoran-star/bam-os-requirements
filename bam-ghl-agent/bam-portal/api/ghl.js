@@ -523,20 +523,38 @@ export default async function handler(req, res) {
 
     // ─── Conversations ───
     // ─── Forms (list a location's forms — powers the lead-form picker) ───
+    // Handles BOTH V2 (services.leadconnectorhq.com) and V1 (rest.gohighlevel.com).
+    // Always 200s with diagnostics (version/status/count/reason) so the picker can
+    // explain an empty result instead of silently showing nothing.
     if (action === "forms") {
-      if (!v2) return res.status(200).json({ data: [], reason: "v1_unsupported" });
-      const params = { limit: "100" };
-      if (locationId) params.locationId = locationId;
-      const url = `${base}/forms/?${new URLSearchParams(params)}`;
-      const response = await fetch(url, { headers });
+      let response, usedUrl;
+      if (v2) {
+        const params = { limit: "100" };
+        if (locationId) params.locationId = locationId;
+        usedUrl = `${base}/forms/?${new URLSearchParams(params)}`;
+        response = await fetch(usedUrl, { headers });
+        // V2 token without a known locationId → discover it, then retry.
+        if (!response.ok && !locationId) {
+          const discovered = await discoverV2LocationId(loc);
+          if (discovered) {
+            usedUrl = `${base}/forms/?${new URLSearchParams({ limit: "100", locationId: discovered })}`;
+            response = await fetch(usedUrl, { headers });
+          }
+        }
+      } else {
+        // V1: GET https://rest.gohighlevel.com/v1/forms/
+        usedUrl = `${base}/forms/?limit=100`;
+        response = await fetch(usedUrl, { headers });
+      }
+
       if (!response.ok) {
         const errText = await response.text();
         if (isRateLimited(response.status, errText) && cached) return sendCached(res, cached, true);
-        return res.status(response.status).json({ error: `GHL forms error ${response.status}: ${errText.slice(0, 120)}` });
+        return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
       }
       const data = await response.json();
-      const forms = (data.forms || []).map(f => ({ id: f.id, name: f.name || "(unnamed form)" }));
-      const body = { data: forms };
+      const forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
+      const body = { data: forms, count: forms.length, version: v2 ? 2 : 1, location: locationName };
       cacheSet(ck, 200, body);
       return res.status(200).json(body);
     }
