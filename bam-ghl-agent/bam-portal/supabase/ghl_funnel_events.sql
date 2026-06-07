@@ -28,10 +28,14 @@ create table if not exists public.ghl_funnel_events (
   created_at    timestamptz not null default now()
 );
 
--- Idempotency: the same event (same type + source id) only counts once, even if
--- the webhook retries. ref is null for some legacy rows, so this is a partial unique.
+-- Idempotency: the same event (same type + source id) only counts once on retry.
+-- Must be NON-partial: PostgREST's on_conflict=event_type,ref can only use a plain
+-- unique index as the conflict arbiter (a partial index needs its WHERE predicate,
+-- which PostgREST doesn't send → inserts error out). All pulled events set `ref`,
+-- and unique treats NULLs as distinct, so a plain unique is safe.
+drop index if exists uq_ghl_event_type_ref;
 create unique index if not exists uq_ghl_event_type_ref
-  on public.ghl_funnel_events (event_type, ref) where ref is not null;
+  on public.ghl_funnel_events (event_type, ref);
 
 create index if not exists idx_ghl_events_client_time
   on public.ghl_funnel_events (client_id, occurred_at);
