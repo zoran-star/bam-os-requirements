@@ -1723,7 +1723,10 @@ async function handleGhlKpis(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&occurred_at=gte.${encodeURIComponent(sinceIso)}&select=event_type,contact_id,contact_email&limit=10000`) || [];
+    // Fetch all events for the client and window-filter in JS. (A PostgREST
+    // occurred_at=gte filter with a URL-encoded timestamp silently matched
+    // nothing — the verify count proved JS filtering is correct.)
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,occurred_at&limit=20000`) || [];
   } catch {
     // table may not exist yet (migration not run) — treat as no data.
     return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, trials: 0, clients_new: 0, clients_existing: 0 });
@@ -1734,6 +1737,7 @@ async function handleGhlKpis(req, res) {
   const trialSet = new Set();        // dedupe trials to one per person
   let leads = 0, clients_new = 0, clients_existing = 0;
   for (const e of events) {
+    if (e.occurred_at && e.occurred_at < sinceIso) continue; // window filter (in JS)
     if (e.event_type === "lead") leads++;
     else if (e.event_type === "trial") trialSet.add(key(e));
     else if (e.event_type === "client_new") clients_new++;
