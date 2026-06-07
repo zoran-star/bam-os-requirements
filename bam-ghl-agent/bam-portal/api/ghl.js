@@ -302,9 +302,10 @@ async function insertEvents(rows) {
   if (!rows.length) return 0;
   // Let DB errors propagate to the caller (which records them in result.errors) —
   // swallowing here is exactly what hid the failed inserts behind a healthy count.
+  // merge-duplicates so re-pulls refresh existing rows (e.g. backfill names/amounts).
   await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
     method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify(rows),
   });
   return rows.length;
@@ -358,12 +359,13 @@ async function refreshFunnel(req, res) {
       for (const s of subs) {
         const created = s.createdAt || s.dateAdded || s.date || null;
         if (created && new Date(created).getTime() < sinceMs) continue;
+        const name = s.name || s.fullName || [s.firstName, s.lastName].filter(Boolean).join(" ") || s.contact?.name || null;
         rows.push({
           client_id: clientId, ghl_location: locationId, event_type: "lead",
           contact_id: s.contactId || s.contact?.id || null,
           contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
           ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
-          raw: { formId, submissionId: s.id },
+          raw: { formId, submissionId: s.id, name },
         });
       }
       result.leads += await insertEvents(rows);
@@ -383,8 +385,9 @@ async function refreshFunnel(req, res) {
       const rows = events.map(ev => ({
         client_id: clientId, ghl_location: locationId, event_type: "trial",
         contact_id: ev.contactId || null,
+        contact_email: (ev.contact?.email || "").toLowerCase() || null,
         ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
-        raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null },
+        raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: ev.contactName || ev.contact?.name || ev.title || null },
       }));
       result.trials += await insertEvents(rows);
     } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
@@ -429,26 +432,30 @@ async function refreshFunnel(req, res) {
       if (start === 0) return "client_existing";          // member exists, undated → pre-existing
       return start < (purchaseSec * 1000 - EPS) ? "client_existing" : "client_new";
     };
-    const pushClient = async (id, cust, occurredSec) => {
+    const pushClient = async (id, cust, occurredSec, amount, kind) => {
       const email = (cust && cust.email || "").toLowerCase() || null;
+      const name = (cust && (cust.name || cust.description)) || null;
       const evType = classify(email, occurredSec || sinceSec);
       const n = await insertEvents([{
         client_id: clientId, ghl_location: locationId, event_type: evType,
-        contact_email: email, ref: id,
+        contact_email: email, ref: id, value: amount != null ? amount : null,
         occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
-        raw: { stripe_account: stripeAcct },
+        raw: { stripe_account: stripeAcct, name, kind },
       }]);
       if (evType === "client_new") result.clients_new += n; else result.clients_existing += n;
     };
     try {
       const subs = await sFetch(`/subscriptions?status=all&created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
-      for (const s of (subs.data || [])) await pushClient(`sub:${s.id}`, s.customer, s.created);
+      for (const s of (subs.data || [])) {
+        const amt = (s.items?.data?.[0]?.price?.unit_amount || 0) / 100;
+        await pushClient(`sub:${s.id}`, s.customer, s.created, amt, "subscription");
+      }
     } catch (e) { result.errors.push(`stripe-subs:${(e.message || "").slice(0, 40)}`); }
     try {
       const charges = await sFetch(`/charges?created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
       for (const c of (charges.data || [])) {
         if (!c.paid || c.refunded || c.invoice) continue; // standalone product purchases only
-        await pushClient(`ch:${c.id}`, c.customer, c.created);
+        await pushClient(`ch:${c.id}`, c.customer, c.created, (c.amount || 0) / 100, "charge");
       }
     } catch (e) { result.errors.push(`stripe-charges:${(e.message || "").slice(0, 40)}`); }
   } else {
