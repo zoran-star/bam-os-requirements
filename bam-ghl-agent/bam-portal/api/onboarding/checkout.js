@@ -213,12 +213,32 @@ export default async function handler(req, res) {
       customerId = cust.id;
     }
 
+    // ── Resolve the price to charge ──
+    // LIVE: the catalog's real price on the connected account.
+    // TEST: create a price (with an inline product) from the catalog amount on the
+    //       platform test account — subscription price_data needs a real product, so
+    //       we mint one via POST /prices (idempotent per plan+term+amount).
+    let priceIdToUse = price.stripe_price_id;
+    if (testMode) {
+      const iv = intervalFor(term);
+      const testPrice = await stripeFetch(`/prices`, {
+        method: "POST", stripeAccount,
+        idempotencyKey: `onb-price-${plan}-${term}-${price.amount_cents}`.slice(0, 200),
+        body: {
+          currency: price.currency || "cad",
+          unit_amount: price.amount_cents,
+          "recurring[interval]": iv.interval,
+          "recurring[interval_count]": iv.interval_count,
+          "product_data[name]": `${plan} · ${term} (FC onboarding test)`,
+        },
+      });
+      priceIdToUse = testPrice.id;
+    }
+
     // ── Create the PORTAL-OWNED subscription (default_incomplete → client_secret) ──
-    // LIVE: charge the catalog's real price on the connected account.
-    // TEST: inline price_data from the catalog amount on the platform test account
-    //       (no test products/prices to set up).
     const subBody = {
       customer: customerId,
+      "items[0][price]": priceIdToUse,
       payment_behavior: "default_incomplete",
       "payment_settings[save_default_payment_method]": "on_subscription",
       "expand[0]": "latest_invoice.payment_intent",
@@ -229,16 +249,6 @@ export default async function handler(req, res) {
       "metadata[parent_email]": parentEmail,
       "metadata[athlete_name]": athleteName,
     };
-    if (testMode) {
-      const iv = intervalFor(term);
-      subBody["items[0][price_data][currency]"] = price.currency || "cad";
-      subBody["items[0][price_data][unit_amount]"] = price.amount_cents;
-      subBody["items[0][price_data][product_data][name]"] = `${plan} · ${term} (test)`;
-      subBody["items[0][price_data][recurring][interval]"] = iv.interval;
-      subBody["items[0][price_data][recurring][interval_count]"] = iv.interval_count;
-    } else {
-      subBody["items[0][price]"] = price.stripe_price_id;
-    }
     const sub = await stripeFetch(`/subscriptions`, {
       method: "POST", stripeAccount,
       idempotencyKey: `onb-sub-${testMode ? "test-" : ""}${clientId}-${parentEmail}-${athleteName}-${plan}-${term}`.slice(0, 200),
