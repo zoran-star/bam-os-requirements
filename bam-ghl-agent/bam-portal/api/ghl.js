@@ -300,13 +300,13 @@ async function requireUser(req) {
 
 async function insertEvents(rows) {
   if (!rows.length) return 0;
-  try {
-    await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
-      method: "POST",
-      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
-      body: JSON.stringify(rows),
-    });
-  } catch { /* dupes / partial — non-fatal */ }
+  // Let DB errors propagate to the caller (which records them in result.errors) —
+  // swallowing here is exactly what hid the failed inserts behind a healthy count.
+  await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify(rows),
+  });
   return rows.length;
 }
 

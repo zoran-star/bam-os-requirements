@@ -30,6 +30,7 @@ Simplified to 3 KPIs. Sources + definitions:
 - refreshFunnel pulls: forms→lead, selected calendars→trial, Stripe Connect subs+standalone charges→client_new/client_existing (customer.created proxy). Stripe via `STRIPE_CONNECT_SECRET_KEY` + `Stripe-Account` header.
 - ⚠️ Untested vs live GHL/Stripe — forms solid; calendars + Stripe-connect pulls best-effort, may need param tweaks once real data flows.
 - **Debug (2026-06-07):** panel has a **"Refresh now"** button + diagnostic line showing the refresh result (`pulled — leads/trials/new/existing` or `skipped:`/`error:` + per-source `issues:` from `result.errors`). Use it when KPIs read 0 to see which source (forms/calendars/stripe) is failing.
+- **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
 Replace with **GHL webhooks** (form submit / inbound message / appointment
