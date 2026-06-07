@@ -48,8 +48,8 @@ STEP 2 — ON PAYMENT SUCCESS → fan out to 3 systems
               → So there is NO new GHL build in the portal — just fire the webhook
                 with the member's email + the product id for their plan×term.
               Save ghl_contact_id on the member.
-              ⚠️ Avoid double-fire: this webhook is currently fired BY CoachIQ too —
-              pick ONE trigger (the portal) so contacts/emails don't run twice.
+              ⚠️ PORTAL is the ONLY trigger (decided): turn OFF CoachIQ's "Send to
+              External Webhook → GHL" step so the workflow doesn't run twice.
   🏀 COACHIQ  (only if academy toggle ON):
                  Zapier "Create User" → CoachIQ user (enrolled), returns id →
                    save coachiq_member_id
@@ -76,8 +76,12 @@ the contact by email, branches by product id (20 plan segments), tags active mem
 find-opportunity logic in the portal — the portal just **fires that existing webhook**
 after payment with `{details:{user:{email}, product:{id}}}` and the workflow does
 everything. (GHL's Find Contact de-dupes on email; the "find opportunity → won" lives
-in the workflow below the visible screenshot.) Only open item: ensure ONE trigger
-(portal vs the current CoachIQ trigger) to avoid double contacts/emails.
+in the workflow below the visible screenshot.)
+
+**TRIGGER DECIDED (Zoran, 2026-06-06): the PORTAL is the ONLY thing that fires this
+GHL webhook** (not CoachIQ). Setup task: turn OFF CoachIQ's "Send to External Webhook
+→ GHL" step in the product automation so it doesn't double-fire. Single source of
+truth = portal fires GHL (and CoachIQ) on payment.
 
 ## The member row is the glue
 
@@ -95,8 +99,8 @@ in the workflow below the visible screenshot.) Only open item: ensure ONE trigge
              time card capture — the "missing bit") · portal POSTs the GHL webhook
              ({user.email, product.id}) · staff CoachIQ config screen
 🔑 ZORAN     CoachIQ per-product automations + IDs · Zapier connect · rotate+supply
-             API key (Vercel env) · CoachIQ product cleanup · de-dup the GHL webhook
-             trigger (portal vs CoachIQ) so it doesn't fire twice
+             API key (Vercel env) · CoachIQ product cleanup · turn OFF CoachIQ's
+             "Send to External Webhook → GHL" step (portal is the only GHL trigger)
 ```
 (The earlier "GHL contact upsert + tag + build Find-Opportunity workflow + unmatched
 banner" items are DROPPED — the existing workflow already covers find/create/win.)
