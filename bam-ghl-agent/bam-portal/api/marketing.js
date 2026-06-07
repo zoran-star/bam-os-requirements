@@ -189,6 +189,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpis") {
       return handleGhlKpis(req, res);
     }
+    if (resource === "ghl-kpi-detail") {
+      return handleGhlKpiDetail(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -204,7 +207,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'ghl-kpi-detail' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -1792,6 +1795,54 @@ async function handleGhlKpis(req, res) {
       per_new_client: clients_new ? round2(spend / clients_new) : null,
     },
   });
+}
+
+// GET ?resource=ghl-kpi-detail&client_id=&days=&type=
+// The records BEHIND a KPI number, so staff can verify the count by name.
+// type: 'lead' | 'trial' | 'client_new' | 'clients_all'
+async function handleGhlKpiDetail(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
+  const type = String(req.query.type || "client_new");
+  const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+
+  let events = [];
+  try {
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_email,contact_id,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
+  } catch { return res.status(200).json({ type, days, count: 0, items: [] }); }
+
+  const wanted = type === "clients_all"
+    ? new Set(["client_new", "client_existing"])
+    : new Set([type]);
+
+  const seen = new Set();
+  const items = [];
+  for (const e of events) {
+    if (e.occurred_at && e.occurred_at < sinceIso) continue;
+    if (!wanted.has(e.event_type)) continue;
+    // dedupe trials (and clients_all) to one per person, matching the KPI counts
+    if (type === "trial") {
+      const k = e.contact_id || e.contact_email || Math.random().toString();
+      if (seen.has(k)) continue;
+      seen.add(k);
+    }
+    items.push({
+      name: (e.raw && e.raw.name) || e.contact_email || "(unknown)",
+      email: e.contact_email || null,
+      date: e.occurred_at,
+      amount: e.value != null ? Number(e.value) : null,
+      is_new: e.event_type === "client_new",
+      kind: e.raw && e.raw.kind || null,
+    });
+  }
+  return res.status(200).json({ type, days, count: items.length, items });
 }
 
 // GET ?resource=meta-overview  (staff only)

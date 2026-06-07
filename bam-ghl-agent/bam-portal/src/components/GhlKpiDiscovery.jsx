@@ -32,6 +32,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
   const [rangeKey, setRangeKey] = useState("30");          // '7' | '30' | '90' | 'month'
+  const [detail, setDetail] = useState(null);              // drill-down modal
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -116,6 +117,25 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     return () => { alive = false; };
   }, [location]);
 
+  // Drill-down: the records behind a KPI number (to verify by name).
+  async function openDetail(type, title) {
+    setDetail({ type, title, loading: true, items: [] });
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&days=${rangeDays}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const j = await res.json();
+      setDetail({ type, title, loading: false, items: j.items || [], count: j.count });
+    } catch (e) { setDetail({ type, title, loading: false, items: [], error: e.message }); }
+  }
+  function exportDetailCsv() {
+    if (!detail?.items?.length) return;
+    const head = ["Name", "Email", "Date", "Amount", "Status"];
+    const lines = detail.items.map(i => [i.name, i.email || "", String(i.date || "").slice(0, 10), i.amount != null ? i.amount : "", i.is_new ? "new" : (detail.type === "clients_all" ? "existing" : "")]
+      .map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    const blob = new Blob([[head.join(","), ...lines].join("\n")], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `${detail.title.replace(/\s+/g, "-").toLowerCase()}-${rangeDays}d.csv`; a.click();
+  }
+
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
   async function doRefresh() {
@@ -193,9 +213,9 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const conf = (c) => c === "high" ? t.text : c === "med" ? t.textSub : t.textMute;
 
   const money = (n) => n == null ? "—" : "$" + Number(n).toLocaleString();
-  const kpiStat = (label, val, rate) => (
-    <div key={label}>
-      <div style={{ fontSize: 24, fontWeight: 600, color: t.text, lineHeight: 1 }}>{val ?? 0}</div>
+  const kpiStat = (label, val, rate, onClick) => (
+    <div key={label} onClick={onClick} title={onClick ? "Click to see the list" : undefined} style={{ cursor: onClick ? "pointer" : "default" }}>
+      <div style={{ fontSize: 24, fontWeight: 600, color: t.text, lineHeight: 1, textDecoration: onClick ? "underline dotted" : "none", textUnderlineOffset: 4 }}>{val ?? 0}</div>
       <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 6 }}>{label}</div>
       {rate != null && <div style={{ fontSize: 11, color: t.textSub, marginTop: 3 }}>{rate}% of leads</div>}
     </div>
@@ -226,11 +246,12 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           ) : (
             <>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 30px", alignItems: "flex-start" }}>
-                {kpiStat("Leads in", kpis.leads)}
-                {kpiStat("Trials booked", kpis.trials, kpis.rates?.trial_rate)}
+                {kpiStat("Leads in", kpis.leads, null, () => openDetail("lead", "Leads in"))}
+                {kpiStat("Trials booked", kpis.trials, kpis.rates?.trial_rate, () => openDetail("trial", "Trials booked"))}
                 {kpiStat(clientFilter === "new" ? "New clients" : "All clients",
                   clientFilter === "new" ? kpis.clients_new : kpis.clients_all,
-                  clientFilter === "new" ? kpis.rates?.new_client_rate : null)}
+                  clientFilter === "new" ? kpis.rates?.new_client_rate : null,
+                  () => openDetail(clientFilter === "new" ? "client_new" : "clients_all", clientFilter === "new" ? "New clients" : "All purchases"))}
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
                 {["new", "all"].map(f => (
@@ -418,6 +439,35 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             Next step (not built yet): a Save/edit screen that persists this mapping per client and feeds your edits back so the next academy's guess is better.
           </div>
         </>
+      )}
+
+      {detail && (
+        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 640, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{detail.title}{detail.items ? ` · ${detail.count ?? detail.items.length}` : ""} <span style={{ fontSize: 12, color: t.textMute }}>(last {rangeDays}d)</span></div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {detail.items?.length > 0 && <button onClick={exportDetailCsv} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>CSV</button>}
+                <button onClick={() => setDetail(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+              </div>
+            </div>
+            {detail.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
+              : detail.error ? <div style={{ color: t.red, fontSize: 13 }}>{detail.error}</div>
+              : detail.items.length === 0 ? <div style={{ color: t.textSub, fontSize: 13 }}>No records in this window.</div>
+              : (
+                <div>
+                  {detail.items.map((it, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
+                      <span style={{ flex: 1, fontSize: 13, color: t.text }}>{it.name}{it.email && it.email !== it.name ? <span style={{ color: t.textMute }}> · {it.email}</span> : ""}</span>
+                      {detail.type === "clients_all" && <span style={{ fontSize: 10, color: it.is_new ? t.accent : t.textMute, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>{it.is_new ? "new" : "existing"}</span>}
+                      {it.amount != null && <span style={{ fontSize: 12, color: t.textSub, minWidth: 60, textAlign: "right" }}>${it.amount.toLocaleString()}</span>}
+                      <span style={{ fontSize: 11, color: t.textMute, minWidth: 76, textAlign: "right" }}>{String(it.date || "").slice(0, 10)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        </div>
       )}
     </div>
   );
