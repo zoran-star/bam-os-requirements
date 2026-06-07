@@ -60,6 +60,22 @@ Simplified to 3 KPIs. Sources + definitions:
     Stripe `starting_after` loop (subs + charges). Calendars stay range-based.
     Month buckets are **UTC** — near month boundaries a client tz could shift a row;
     revisit with `clients.time_zone` if it matters.
+- **Effective-dated forms/calendars per month (2026-06-07):** forms/calendars that feed
+  Leads/Trials can change over time. `ghl_kpi_config.effective_configs[]` = `{from:'YYYY-MM',
+  lead_form_ids/names, booking_calendar_ids/names}`. A month uses the latest override with
+  `from<=month`, else the top-level **default** (string compare on YYYY-MM = chronological).
+  - `ghl-kpis-monthly` resolves per-month forms/cals, filters `lead` events by `raw.formId`
+    and `trial` events by `raw.calendarId` (empty set = no filter / count all). Stripe
+    (new/existing) events are unaffected. Returns per-month `forms/calendars/override_from`
+    + a `config{default, effective_configs}` block.
+  - `refreshFunnel` pulls the **union** of all forms/calendars across default + every
+    override (so an old period's sources still have data).
+  - UI: a **⚙ Nf·Mc** button on the hero + each month row (accent when an override is
+    active) → modal with form/calendar checkboxes → saves an `effective_configs` entry
+    "from {month} onward" via clients `update-fields`. Clearing all = removes the override
+    (reverts to default).
+  - ⚠️ A form/calendar must be pulled at least once to have data — can't retro-count a
+    form that was never selected.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.

@@ -348,8 +348,17 @@ async function refreshFunnel(req, res) {
   const sinceMs = Date.now() - 200 * 86400000;
   const result = { leads: 0, trials: 0, clients_new: 0, clients_existing: 0, errors: [] };
 
+  // Union of every form/calendar ever assigned (default + effective-dated
+  // overrides) so an old period's forms/calendars still have data to count.
+  const effCfgs = Array.isArray(cfg.effective_configs) ? cfg.effective_configs : [];
+  const unionIds = (topKey, ovKey) => {
+    const s = new Set(Array.isArray(cfg[topKey]) ? cfg[topKey] : []);
+    for (const o of effCfgs) for (const id of (o[ovKey] || [])) s.add(id);
+    return [...s];
+  };
+
   // ── Leads: submissions of the configured lead forms (paginated, newest-first) ──
-  const leadFormIds = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
+  const leadFormIds = unionIds("lead_form_ids", "lead_form_ids");
   for (const formId of leadFormIds) {
     try {
       let page = 1;
@@ -386,7 +395,7 @@ async function refreshFunnel(req, res) {
 
   // ── Trials: appointments in the selected trial calendar(s). Stored per
   // appointment; the read endpoint dedupes to one trial per person. ──
-  const calIds = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  const calIds = unionIds("booking_calendar_ids", "booking_calendar_ids");
   // Calendar events usually carry only a contactId — the `title` field is the
   // appointment name (e.g. "By Any Means Trial"), NOT the person. Resolve the
   // real contact name via a per-contact lookup (cached) so the drill-down shows
