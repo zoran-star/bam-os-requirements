@@ -266,6 +266,11 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
               </span>
             )}
           </div>
+          {refreshInfo && (refreshInfo.stored_total != null) && (
+            <div style={{ marginTop: 6, fontSize: 11, color: t.textMute, fontFamily: "monospace" }}>
+              stored for this client: {refreshInfo.stored_total} total · {refreshInfo.stored_30d} in last 30d{refreshInfo.sample_occurred_at ? ` · sample date ${String(refreshInfo.sample_occurred_at).slice(0, 10)}` : ""}
+            </div>
+          )}
           {refreshInfo && Array.isArray(refreshInfo.errors) && refreshInfo.errors.length > 0 && (
             <div style={{ marginTop: 6, fontSize: 11, color: t.amber, fontFamily: "monospace" }}>issues: {refreshInfo.errors.join(" · ")}</div>
           )}

@@ -455,6 +455,17 @@ async function refreshFunnel(req, res) {
     result.errors.push("no stripe_connect_account_id");
   }
 
+  // Verify what actually LANDED for this client (vs what we attempted) — this is
+  // the apples-to-apples check against what the read endpoint sees.
+  try {
+    const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const stored = await sbReq(`ghl_funnel_events?client_id=eq.${clientId}&select=occurred_at,event_type&limit=10000`);
+    result.stored_total = (stored || []).length;
+    result.stored_30d = (stored || []).filter(r => r.occurred_at >= since30).length;
+    const sample = (stored || [])[0];
+    if (sample) result.sample_occurred_at = sample.occurred_at;
+  } catch (e) { result.errors.push(`verify:${(e.message || "").slice(0, 40)}`); }
+
   // Stamp last-synced.
   try {
     await sbReq(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_synced_at: new Date().toISOString() }) });
