@@ -30,6 +30,14 @@ booked, fire instantly) + **Stripe** for conversion. The stage-transition tracke
 is parked; these four signals are event-based, not stage-based. (Cron still
 deployed but superseded — disable/remove when webhooks land.)
 
+**Forms endpoint v1 + diagnostics (2026-06-06):** GTA's forms weren't showing
+(showed for other clients). Fix: `?action=forms` now handles **V1** GHL
+(`rest.gohighlevel.com/v1/forms/`) as well as V2, adds a V2 locationId-discover
+retry, and always 200s with diagnostics `{version, location, status, reason,
+count}`. The panel shows that diagnostic when 0 forms come back, so we can see why
+(v1 vs locationId vs HTTP error) instead of a blank "no forms". Likely cause for
+GTA: it's a V1 location (was previously gated to V2-only).
+
 **Forms picker (shipped):** `clients.ghl_kpi_config` jsonb (migration
 `supabase/ghl_kpi_config.sql`, **must be run**) holds the wiring. `GET
 /api/ghl?action=forms&location=` lists a location's forms; the GHL KPIs (beta)
