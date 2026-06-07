@@ -34,6 +34,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [rangeKey, setRangeKey] = useState("30");          // '7' | '30' | '90' | 'month'
   const [detail, setDetail] = useState(null);              // drill-down modal
   const [cfgEdit, setCfgEdit] = useState(null);            // per-month forms/calendars editor
+  const [board, setBoard] = useState(null);                // per-month journey board
+  const [boardHi, setBoardHi] = useState(null);            // highlighted person (key) across columns
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -217,6 +219,32 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     setCfgEdit(e => ({ ...e, formIds: new Set(), calIds: new Set() }));
   }
 
+  // Journey board — Leads → Trials → Sales for one month, each person a card.
+  async function openBoard(month) {
+    setBoard({ key: month.key, label: month.label, loading: true, leads: [], trials: [], sales: [] });
+    const fetchType = async (type) => {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&month=${month.key}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      return (await res.json().catch(() => ({}))).items || [];
+    };
+    try {
+      const [leads, trials, sales] = await Promise.all([fetchType("lead"), fetchType("trial"), fetchType("clients_all")]);
+      setBoard({ key: month.key, label: month.label, loading: false, leads, trials, sales });
+    } catch (e) { setBoard({ key: month.key, label: month.label, loading: false, leads: [], trials: [], sales: [], error: e.message }); }
+  }
+  async function deleteBoardCard(stage, person) {
+    if (!person?.ids?.length) return;
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-delete`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, ids: person.ids }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
+      setBoard(b => ({ ...b, [stage]: b[stage].filter(p => p !== person) }));
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setMonthly(await kr.json());
+    } catch (e) { alert("Delete failed: " + e.message); }
+  }
+
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
   async function doRefresh() {
@@ -316,6 +344,35 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       ⚙ <span style={{ fontSize: 10 }}>{(month.forms?.ids?.length || 0)}f·{(month.calendars?.ids?.length || 0)}c</span>
     </button>
   );
+  // Opens the journey board for a month.
+  const boardBtn = (month) => (
+    <button onClick={() => openBoard(month)} title="Journey board — map each person Leads → Trials → Sales"
+      style={{ flexShrink: 0, height: 26, padding: "0 10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 13, fontWeight: 600, lineHeight: 1 }}>▦</button>
+  );
+  // One person card in the journey board. filled = continued from the prior stage.
+  const boardCard = (person, stage, filled) => {
+    const hi = boardHi && person.key === boardHi;
+    return (
+      <div key={stage + ":" + (person.key || person.ids?.[0])}
+        onMouseEnter={() => setBoardHi(person.key)} onMouseLeave={() => setBoardHi(null)}
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, marginBottom: 8,
+          border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : "transparent",
+          boxShadow: hi ? `0 0 0 2px ${t.accent}` : "none", transition: "box-shadow .12s ease" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{person.name}</div>
+          <div style={{ fontSize: 10.5, color: t.textMute, marginTop: 2 }}>{niceDate(person.date)}{person.amount != null ? ` · $${person.amount.toLocaleString()}` : ""}</div>
+        </div>
+        <button onClick={() => deleteBoardCard(stage, person)} title="Delete this record"
+          style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
+      </div>
+    );
+  };
+  const boardColumn = (title, list, stage, filledFn) => (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: t.text, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}`, marginBottom: 12 }}>{title} <span style={{ color: t.textMute, fontWeight: 600 }}>{list.length}</span></div>
+      {list.length === 0 ? <div style={{ fontSize: 11, color: t.textMute, textAlign: "center" }}>—</div> : list.map(p => boardCard(p, stage, filledFn(p)))}
+    </div>
+  );
 
   return (
     <div>
@@ -351,7 +408,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                   <div style={{ border: `1px solid ${t.borderMed}`, borderRadius: 12, background: t.surfaceEl, padding: 16, marginTop: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent }}>{cur.label} · so far</div>
-                      {gearBtn(cur)}
+                      <div style={{ display: "flex", gap: 6 }}>{boardBtn(cur)}{gearBtn(cur)}</div>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 34px", alignItems: "flex-start" }}>
                       {heroStat("Leads in", cur.leads, () => openDetail("lead", `Leads in · ${cur.label}`, cur.key))}
@@ -377,6 +434,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                           <div style={{ fontSize: 13, fontWeight: 600, color: t.textSub }}>{m.cac?.per_new_client != null ? money(m.cac.per_new_client) : "—"}</div>
                           <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>CAC</div>
                         </div>
+                        {boardBtn(m)}
                         {gearBtn(m)}
                       </div>
                     ))}
@@ -628,6 +686,33 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
               <button onClick={() => setCfgEdit(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>Cancel</button>
               <button onClick={saveCfgEdit} disabled={cfgEdit.saving} style={{ background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, padding: "8px 16px", cursor: cfgEdit.saving ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}>{cfgEdit.saving ? "Saving…" : `Apply from ${cfgEdit.monthLabel}`}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {board && (
+        <div onClick={() => { setBoard(null); setBoardHi(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 1000, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Journey board · {board.label}</div>
+              <button onClick={() => { setBoard(null); setBoardHi(null); }} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+            </div>
+            <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
+              Hover a person to trace them across stages. <span style={{ color: t.accent }}>■</span> filled = came from the previous stage · ▢ outline = joined here. ✕ deletes the record.
+            </div>
+            {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
+              : board.error ? <div style={{ color: t.red, fontSize: 13 }}>{board.error}</div>
+              : (() => {
+                  const leadKeys = new Set(board.leads.map(p => p.key));
+                  const trialKeys = new Set(board.trials.map(p => p.key));
+                  return (
+                    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                      {boardColumn("LEADS", board.leads, "leads", () => true)}
+                      {boardColumn("TRIALS", board.trials, "trials", p => leadKeys.has(p.key))}
+                      {boardColumn("SALES", board.sales, "sales", p => trialKeys.has(p.key))}
+                    </div>
+                  );
+                })()}
           </div>
         </div>
       )}
