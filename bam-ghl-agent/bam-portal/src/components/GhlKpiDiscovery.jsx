@@ -27,7 +27,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [cals, setCals] = useState(null);
   const [calsInfo, setCalsInfo] = useState(null);
   const [pickedCals, setPickedCals] = useState(() => new Set(cfg.booking_calendar_ids || []));
-  const [kpis, setKpis] = useState(null);
+  const [monthly, setMonthly] = useState(null);   // { ready, synced_at, months:[...] }
   const [refreshing, setRefreshing] = useState(false);
   const [refreshInfo, setRefreshInfo] = useState(null);
   const [clientFilter, setClientFilter] = useState("new"); // 'new' | 'all'
@@ -41,14 +41,14 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     if (!client?.id) return;
     let alive = true;
     const load = async () => {
-      const res = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const res = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       return res.ok ? res.json() : null;
     };
     (async () => {
       let data = null;
       try { data = await load(); } catch { /* ignore */ }
       if (!alive) return;
-      if (data) setKpis(data);
+      if (data) setMonthly(data);
       const stale = !data?.synced_at || (Date.now() - new Date(data.synced_at).getTime() > 10 * 60 * 1000);
       if (stale) {
         setRefreshing(true);
@@ -57,13 +57,13 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           const info = await rr.json().catch(() => ({}));
           if (alive) setRefreshInfo(info);
           const updated = await load();
-          if (alive && updated) setKpis(updated);
+          if (alive && updated) setMonthly(updated);
         } catch { /* keep stored */ }
         if (alive) setRefreshing(false);
       }
     })();
     return () => { alive = false; };
-  }, [client, session, rangeDays]);
+  }, [client, session]);
 
   useEffect(() => {
     let alive = true;
@@ -117,14 +117,16 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     return () => { alive = false; };
   }, [location]);
 
-  // Drill-down: the records behind a KPI number (to verify by name).
-  async function openDetail(type, title) {
-    setDetail({ type, title, loading: true, items: [] });
+  // Drill-down: the records behind a KPI number (to verify by name). `month`
+  // (YYYY-MM) scopes to a calendar month; without it, falls back to rangeDays.
+  async function openDetail(type, title, month) {
+    setDetail({ type, title, month, loading: true, items: [] });
     try {
-      const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&days=${rangeDays}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const win = month ? `month=${month}` : `days=${rangeDays}`;
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&${win}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const j = await res.json();
-      setDetail({ type, title, loading: false, items: j.items || [], count: j.count });
-    } catch (e) { setDetail({ type, title, loading: false, items: [], error: e.message }); }
+      setDetail({ type, title, month, loading: false, items: j.items || [], count: j.count });
+    } catch (e) { setDetail({ type, title, month, loading: false, items: [], error: e.message }); }
   }
   function exportDetailCsv() {
     if (!detail?.items?.length) return;
@@ -165,8 +167,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
       setDetail(d => ({ ...d, items: d.items.filter(x => x !== it), count: Math.max(0, (d.count ?? d.items.length) - 1) }));
-      const kr = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
-      if (kr.ok) setKpis(await kr.json());
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setMonthly(await kr.json());
     } catch (e) { alert("Delete failed: " + e.message); }
   }
 
@@ -178,8 +180,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     try {
       const rr = await fetch(`/api/ghl?action=refresh-funnel&client_id=${client.id}`, { method: "POST", headers: { Authorization: `Bearer ${session?.access_token}` } });
       setRefreshInfo(await rr.json().catch(() => ({ error: `HTTP ${rr.status}` })));
-      const kr = await fetch(`/api/marketing?resource=ghl-kpis&client_id=${client.id}&days=${rangeDays}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
-      if (kr.ok) setKpis(await kr.json());
+      const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      if (kr.ok) setMonthly(await kr.json());
     } catch (e) { setRefreshInfo({ error: e.message }); }
     finally { setRefreshing(false); }
   }
@@ -247,69 +249,87 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const conf = (c) => c === "high" ? t.text : c === "med" ? t.textSub : t.textMute;
 
   const money = (n) => n == null ? "—" : "$" + Number(n).toLocaleString();
-  const kpiStat = (label, val, rate, onClick) => (
+  // Big stat for the "this month so far" hero card.
+  const heroStat = (label, val, onClick) => (
     <div key={label} onClick={onClick} title={onClick ? "Click to see the list" : undefined} style={{ cursor: onClick ? "pointer" : "default" }}>
-      <div style={{ fontSize: 24, fontWeight: 600, color: t.text, lineHeight: 1, textDecoration: onClick ? "underline dotted" : "none", textUnderlineOffset: 4 }}>{val ?? 0}</div>
-      <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 6 }}>{label}</div>
-      {rate != null && <div style={{ fontSize: 11, color: t.textSub, marginTop: 3 }}>{rate}% of leads</div>}
+      <div style={{ fontSize: 28, fontWeight: 700, color: t.text, lineHeight: 1, textDecoration: onClick ? "underline dotted" : "none", textUnderlineOffset: 4 }}>{val ?? 0}</div>
+      <div style={{ fontSize: 9.5, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginTop: 7 }}>{label}</div>
+    </div>
+  );
+  // Compact metric for a month-by-month row.
+  const monthMetric = (label, val, onClick) => (
+    <div key={label} onClick={onClick} title={onClick ? "Click to see the list" : undefined} style={{ minWidth: 56, textAlign: "right", cursor: onClick ? "pointer" : "default" }}>
+      <div style={{ fontSize: 15, fontWeight: 600, color: t.text, textDecoration: onClick ? "underline dotted" : "none", textUnderlineOffset: 3 }}>{val ?? 0}</div>
+      <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>{label}</div>
     </div>
   );
 
   return (
     <div>
-      {kpis && (
+      {monthly && (
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <div style={lbl}>Live funnel{refreshing ? " · refreshing…" : ""}</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              {[["7", "7d"], ["30", "30d"], ["90", "90d"], ["month", "This month"]].map(([k, label]) => (
-                <button key={k} onClick={() => setRangeKey(k)} style={{
-                  border: `1px solid ${rangeKey === k ? t.accent : t.borderMed}`,
-                  background: rangeKey === k ? t.accent : "transparent",
-                  color: rangeKey === k ? "#0A0A0B" : t.textMute,
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                  padding: "5px 10px", borderRadius: 999, cursor: "pointer",
-                }}>{label}</button>
+            <div style={lbl}>Monthly KPIs{refreshing ? " · refreshing…" : ""}</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["new", "all"].map(f => (
+                <button key={f} onClick={() => setClientFilter(f)} style={{
+                  border: `1px solid ${clientFilter === f ? t.accent : t.borderMed}`,
+                  background: clientFilter === f ? t.accent : "transparent",
+                  color: clientFilter === f ? "#0A0A0B" : t.textMute,
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                  padding: "5px 11px", borderRadius: 999, cursor: "pointer",
+                }}>{f === "new" ? "New clients" : "All purchases"}</button>
               ))}
             </div>
           </div>
-          {!kpis.ready ? (
+          {!monthly.ready ? (
             <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
               No funnel data yet. Run <b>/apply-sql</b>, then pick the lead forms + trial calendars below — numbers fill in on the next refresh.
             </div>
-          ) : (
-            <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "18px 30px", alignItems: "flex-start" }}>
-                {kpiStat("Leads in", kpis.leads, null, () => openDetail("lead", "Leads in"))}
-                {kpiStat("Trials booked", kpis.trials, kpis.rates?.trial_rate, () => openDetail("trial", "Trials booked"))}
-                {kpiStat(clientFilter === "new" ? "New clients" : "All clients",
-                  clientFilter === "new" ? kpis.clients_new : kpis.clients_all,
-                  clientFilter === "new" ? kpis.rates?.new_client_rate : null,
-                  () => openDetail(clientFilter === "new" ? "client_new" : "clients_all", clientFilter === "new" ? "New clients" : "All purchases"))}
-              </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                {["new", "all"].map(f => (
-                  <button key={f} onClick={() => setClientFilter(f)} style={{
-                    border: `1px solid ${clientFilter === f ? t.accent : t.borderMed}`,
-                    background: clientFilter === f ? t.accent : "transparent",
-                    color: clientFilter === f ? "#0A0A0B" : t.textMute,
-                    fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-                    padding: "5px 11px", borderRadius: 999, cursor: "pointer",
-                  }}>{f === "new" ? "New clients" : "All purchases"}</button>
-                ))}
-                {clientFilter === "all" && kpis.clients_existing != null && (
-                  <span style={{ fontSize: 11, color: t.textMute, alignSelf: "center" }}>({kpis.clients_new} new · {kpis.clients_existing} existing)</span>
+          ) : (() => {
+            const cur = monthly.months.find(m => m.is_current) || monthly.months[0];
+            const past = monthly.months.filter(m => m !== cur);
+            const cVal = (m) => clientFilter === "new" ? m.clients_new : m.clients_all;
+            const cType = clientFilter === "new" ? "client_new" : "clients_all";
+            const cLabel = clientFilter === "new" ? "New clients" : "All purchases";
+            return (
+              <>
+                {cur && (
+                  <div style={{ border: `1px solid ${t.borderMed}`, borderRadius: 12, background: t.surfaceEl, padding: 16, marginTop: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent, marginBottom: 14 }}>{cur.label} · so far</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 34px", alignItems: "flex-start" }}>
+                      {heroStat("Leads in", cur.leads, () => openDetail("lead", `Leads in · ${cur.label}`, cur.key))}
+                      {heroStat("Trials booked", cur.trials, () => openDetail("trial", `Trials booked · ${cur.label}`, cur.key))}
+                      {heroStat(cLabel, cVal(cur), () => openDetail(cType, `${cLabel} · ${cur.label}`, cur.key))}
+                      {heroStat("CAC", cur.cac?.per_new_client != null ? money(cur.cac.per_new_client) : "—", null)}
+                    </div>
+                    <div style={{ fontSize: 11, color: t.textMute, marginTop: 10 }}>
+                      {clientFilter === "all" ? `${cur.clients_new} new · ${cur.clients_existing} existing · ` : ""}spend {money(cur.spend)}
+                    </div>
+                  </div>
                 )}
-              </div>
-              {kpis.cac && (
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${t.border}`, fontSize: 12, color: t.textSub }}>
-                  Spend {money(kpis.spend)} · {kpis.cac.per_lead != null ? `${money(kpis.cac.per_lead)}/lead` : "—/lead"} · {kpis.cac.per_new_client != null ? `${money(kpis.cac.per_new_client)}/new client (CAC)` : "—/new client"}
-                </div>
-              )}
-            </>
-          )}
+                {past.length > 0 && (
+                  <div style={{ marginTop: 18 }}>
+                    <div style={{ ...lbl, marginBottom: 6 }}>Month by month</div>
+                    {past.map((m, i) => (
+                      <div key={m.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 0", borderTop: i ? `1px solid ${t.border}` : "none" }}>
+                        <div style={{ flex: 1, minWidth: 90, fontSize: 13, fontWeight: 600, color: t.text }}>{m.label}</div>
+                        {monthMetric("Leads", m.leads, () => openDetail("lead", `Leads in · ${m.label}`, m.key))}
+                        {monthMetric("Trials", m.trials, () => openDetail("trial", `Trials booked · ${m.label}`, m.key))}
+                        {monthMetric(clientFilter === "new" ? "New" : "All", cVal(m), () => openDetail(cType, `${cLabel} · ${m.label}`, m.key))}
+                        <div style={{ minWidth: 64, textAlign: "right" }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: t.textSub }}>{m.cac?.per_new_client != null ? money(m.cac.per_new_client) : "—"}</div>
+                          <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>CAC</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <button onClick={doRefresh} disabled={refreshing} style={{ padding: "7px 14px", background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: refreshing ? "wait" : "pointer" }}>
               {refreshing ? "Refreshing…" : "Refresh now"}
             </button>
@@ -324,11 +344,6 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           {refreshInfo && (refreshInfo.stored_total != null) && (
             <div style={{ marginTop: 6, fontSize: 11, color: t.textMute, fontFamily: "monospace" }}>
               stored for this client: {refreshInfo.stored_total} total · {refreshInfo.stored_30d} in last 30d{refreshInfo.sample_occurred_at ? ` · sample date ${String(refreshInfo.sample_occurred_at).slice(0, 10)}` : ""}
-            </div>
-          )}
-          {kpis.debug && (
-            <div style={{ marginTop: 4, fontSize: 11, color: t.textMute, fontFamily: "monospace" }}>
-              read: fetched {kpis.debug.fetched} for id …{String(kpis.debug.used_client_id || "").slice(-6)}
             </div>
           )}
           {refreshInfo && Array.isArray(refreshInfo.errors) && refreshInfo.errors.length > 0 && (

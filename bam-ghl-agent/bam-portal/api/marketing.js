@@ -189,6 +189,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpis") {
       return handleGhlKpis(req, res);
     }
+    if (resource === "ghl-kpis-monthly") {
+      return handleGhlKpisMonthly(req, res);
+    }
     if (resource === "ghl-kpi-detail") {
       return handleGhlKpiDetail(req, res);
     }
@@ -1804,9 +1807,108 @@ async function handleGhlKpis(req, res) {
   });
 }
 
-// GET ?resource=ghl-kpi-detail&client_id=&days=&type=
+// GET ?resource=ghl-kpis-monthly&client_id=&months=
+// Month-by-month KPIs: current month-to-date (first entry) + N prior full months.
+// Same 3-KPI model + CAC as ghl-kpis, but bucketed by calendar month (UTC) and
+// deduped to one unique person PER MONTH. CAC uses per-month Meta spend.
+async function handleGhlKpisMonthly(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const monthsBack = Math.min(Math.max(parseInt(req.query.months || "6", 10) || 6, 1), 24);
+
+  // Build the month buckets, newest first. key=YYYY-MM (UTC), with ISO start/end.
+  const now = new Date();
+  const buckets = [];
+  for (let i = 0; i < monthsBack; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const label = start.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    buckets.push({ key, label, start, end, is_current: i === 0,
+      _sets: { lead: new Set(), trial: new Set(), client_new: new Set(), client_existing: new Set(), all: new Set() } });
+  }
+  const byKey = new Map(buckets.map(b => [b.key, b]));
+
+  let adAccount = null, syncedAt = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at`);
+    adAccount = rows?.[0]?.meta_ad_account_id || null;
+    syncedAt = rows?.[0]?.ghl_synced_at || null;
+  } catch { /* columns may not exist */ }
+
+  let events = [];
+  try {
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
+  } catch {
+    return res.status(200).json({ ready: false, synced_at: syncedAt, months: [] });
+  }
+
+  const key = (e) => e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
+  const monthKeyOf = (iso) => { const d = new Date(iso); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+  for (const e of events) {
+    if (!e.occurred_at) continue;
+    const b = byKey.get(monthKeyOf(e.occurred_at));
+    if (!b) continue;
+    const k = key(e);
+    if (e.event_type === "lead") b._sets.lead.add(k);
+    else if (e.event_type === "trial") b._sets.trial.add(k);
+    else if (e.event_type === "client_new") { b._sets.client_new.add(k); b._sets.all.add(k); }
+    else if (e.event_type === "client_existing") { b._sets.client_existing.add(k); b._sets.all.add(k); }
+  }
+
+  // Per-month Meta spend (one monthly-increment insights call across the range).
+  const spendByMonth = {};
+  try {
+    const token = await getAnyStaffMetaToken();
+    if (adAccount && token) {
+      const adAcct = adAccount.startsWith("act_") ? adAccount : `act_${adAccount}`;
+      const since = buckets[buckets.length - 1].start.toISOString().slice(0, 10);
+      const until = now.toISOString().slice(0, 10);
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        fields: "spend", time_increment: "monthly",
+        time_range: JSON.stringify({ since, until }), access_token: token,
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (r.ok) for (const row of (j.data || [])) {
+        const mk = (row.date_start || "").slice(0, 7);
+        if (mk) spendByMonth[mk] = parseFloat(row.spend || "0") || 0;
+      }
+    }
+  } catch { /* spend stays empty → CAC null */ }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const months = buckets.map(b => {
+    const leads = b._sets.lead.size, trials = b._sets.trial.size;
+    const clients_new = b._sets.client_new.size, clients_existing = b._sets.client_existing.size, clients_all = b._sets.all.size;
+    const spend = b.key in spendByMonth ? round2(spendByMonth[b.key]) : null;
+    return {
+      key: b.key, label: b.label, is_current: b.is_current,
+      start: b.start.toISOString(), end: b.end.toISOString(),
+      leads, trials, clients_new, clients_existing, clients_all,
+      spend,
+      cac: spend == null ? null : {
+        per_lead: leads ? round2(spend / leads) : null,
+        per_trial: trials ? round2(spend / trials) : null,
+        per_new_client: clients_new ? round2(spend / clients_new) : null,
+      },
+    };
+  });
+
+  return res.status(200).json({ ready: true, synced_at: syncedAt, months });
+}
+
+// GET ?resource=ghl-kpi-detail&client_id=&days=&type=&month=YYYY-MM
 // The records BEHIND a KPI number, so staff can verify the count by name.
-// type: 'lead' | 'trial' | 'client_new' | 'clients_all'
+// type: 'lead' | 'trial' | 'client_new' | 'clients_all'. Pass month=YYYY-MM to
+// scope to a calendar month (else uses days= as a rolling window).
 async function handleGhlKpiDetail(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
@@ -1818,7 +1920,18 @@ async function handleGhlKpiDetail(req, res) {
 
   const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
   const type = String(req.query.type || "client_new");
-  const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+
+  // Window: a calendar month (?month=YYYY-MM) takes precedence over the rolling
+  // ?days= window. monthEnd is exclusive (first instant of the next month).
+  let sinceIso, untilIso = null;
+  const monthParam = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : null;
+  if (monthParam) {
+    const [y, m] = monthParam.split("-").map(Number);
+    sinceIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    untilIso = new Date(Date.UTC(y, m, 1)).toISOString();
+  } else {
+    sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+  }
 
   let events = [];
   try {
@@ -1836,6 +1949,7 @@ async function handleGhlKpiDetail(req, res) {
   const items = [];
   for (const e of events) {
     if (e.occurred_at && e.occurred_at < sinceIso) continue;
+    if (untilIso && e.occurred_at && e.occurred_at >= untilIso) continue;
     if (!wanted.has(e.event_type)) continue;
     const k = e.contact_id || e.contact_email || e.contact_phone || `row:${e.id}`;
     if (byKey.has(k)) { byKey.get(k).ids.push(e.id); continue; }

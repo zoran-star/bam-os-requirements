@@ -46,6 +46,20 @@ Simplified to 3 KPIs. Sources + definitions:
     still live at the GHL/Stripe source — for junk/test/stale rows (durable exclusion
     list = possible follow-up).
   - **Dates:** drill-down shows `niceDate()` → "Tuesday, May 2nd", larger + name-stacked.
+- **Month-by-month view (2026-06-07, kpi-drilldown-cleanup):** replaced the 7/30/90/month
+  range picker with a monthly layout — a **"{Month} · so far"** hero (current month-to-date:
+  Leads/Trials/New/CAC) + a **month-by-month** list below (each prior month's KPIs, newest
+  first). Each month's number is clickable → drill-down/delete scoped to that month.
+  - New `GET ?resource=ghl-kpis-monthly&client_id=&months=6` — buckets events by calendar
+    month (UTC), dedupes to one person PER month, per-month CAC from ONE monthly-increment
+    Meta insights call (`time_increment=monthly`).
+  - `ghl-kpi-detail` now takes `month=YYYY-MM` (calendar-month window, exclusive end);
+    `days=` still works as the rolling fallback.
+  - **Pull window extended 95d → ~200d (6mo) + pagination** so older months have data:
+    forms page-loop (newest-first, stops when a full page is older than the window),
+    Stripe `starting_after` loop (subs + charges). Calendars stay range-based.
+    Month buckets are **UTC** — near month boundaries a client tz could shift a row;
+    revisit with `clients.time_zone` if it matters.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
