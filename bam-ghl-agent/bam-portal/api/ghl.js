@@ -315,7 +315,8 @@ async function insertEvents(rows) {
 // source is best-effort (try/catch) so one failing doesn't block the others.
 // Reads the GHL location + lead form ids from clients.ghl_kpi_config.
 async function refreshFunnel(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  // Accept GET or POST — it only pulls/upserts; this removes method as a failure mode.
+  if (req.method !== "POST" && req.method !== "GET") return res.status(405).json({ error: "GET or POST" });
   const user = await requireUser(req);
   if (!user) return res.status(401).json({ error: "auth required" });
   if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
