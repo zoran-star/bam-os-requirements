@@ -161,15 +161,15 @@ async function aiMatch(targets, prices) {
     "an allin_cents amount (base + 13% tax). For EACH live price, pick the single best matching " +
     "offer_price_key (or null if none). Match the live amount_cents to EITHER the base OR the all-in " +
     "amount of a target (small rounding differences are fine), then by NAME, then by interval. " +
-    "Assign a tier:\n" +
-    "  canonical  = amount matches a target closely (the standard current price for that plan+term)\n" +
-    "  legacy     = a grandfathered/odd-amount variant of a target (recognize old subs only)\n" +
-    "  deprecated = clearly retired/old plan name\n" +
-    "  sale       = a promo/discounted variant\n" +
-    "If a live price matches NO target BUT has members on it (sub_count>0), set offer_price_key=null, " +
-    "needs_review=true, and note in reason it may be a plan missing from the offer. Amounts are cents. " +
-    "Respond with ONLY a JSON array, one object per input price, no prose:\n" +
-    '[{"price_id","offer_price_key"(or null),"tier","confidence"(0-1),"needs_review"(bool),"reason"(<=18 words)}]';
+    "Assign a tier — ONLY two values:\n" +
+    "  live   = the current standard price for that plan+term (amount matches the target closely)\n" +
+    "  legacy = any older/grandfathered/odd-amount/promo variant of that plan+term (recognize old subs only)\n" +
+    "RULE: for each offer_price_key, mark AT MOST ONE price as 'live' (the closest match); every other " +
+    "price for that same key MUST be 'legacy'. If a live price matches NO target BUT has members on it " +
+    "(sub_count>0), set offer_price_key=null, needs_review=true, and note in reason it may be a plan " +
+    "missing from the offer. Amounts are cents. Respond with ONLY a JSON array, one object per input " +
+    "price, no prose:\n" +
+    '[{"price_id","offer_price_key"(or null),"tier":"live"|"legacy","confidence"(0-1),"needs_review"(bool),"reason"(<=18 words)}]';
 
   const payload = {
     offer_price_targets: targets.map(t => ({ key: t.key, label: t.label, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents })),
@@ -272,6 +272,18 @@ export default async function handler(req, res) {
         );
         results.push({ price_id: a.price_id, updated: Array.isArray(r) ? r.length : 0 });
       }
+      // ENFORCE one LIVE (canonical) price per offer-price: for every key we just
+      // set to canonical, demote any OTHER canonical row on that key to legacy.
+      const liveByKey = {};
+      for (const a of approvals) { if (a.tier === "canonical" && a.offer_price_key) liveByKey[a.offer_price_key] = a.price_id; }
+      for (const [key, winner] of Object.entries(liveByKey)) {
+        await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&offer_price_key=eq.${encodeURIComponent(key)}` +
+          `&tier=eq.canonical&stripe_price_id=neq.${encodeURIComponent(winner)}`,
+          { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ tier: "legacy_unknown", updated_at: nowIso() }) }
+        ).catch(() => {});
+      }
       return res.status(200).json({ ok: true, applied: results });
     }
 
@@ -327,7 +339,7 @@ export default async function handler(req, res) {
         prior_tier: p.prior_tier || null,
         proposed_offer_price_key: key,
         offer_id: tgt ? tgt.offer_id : null,
-        proposed_tier: m.tier || null,
+        proposed_tier: m.tier === "live" ? "canonical" : (m.tier ? "legacy_unknown" : null), // live→canonical, anything else→legacy
         confidence: m.confidence != null ? m.confidence : null,
         needs_review: unmatchedWithMembers || m.needs_review === true || (m.confidence != null && m.confidence < 0.75),
         reason: unmatchedWithMembers ? `${p.sub_count} member(s) here but no matching offer — add it to the offer?` : (m.reason || null),

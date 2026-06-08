@@ -14758,9 +14758,10 @@ async function _ibSendReply() {
 
 // ── AI price matcher (Phase 3 UI — additive) ────────────────────────────────
 let _AI_DATA = { proposals: [], targets: [] };
-const _AI_TIER_OPTS = [['canonical', 'Canonical'], ['legacy_unknown', 'Legacy'], ['deprecated', 'Deprecated'], ['lil_sale', 'Sale']];
+const _AI_TIER_OPTS = [['canonical', 'Live'], ['legacy_unknown', 'Legacy']];
 function _aiTierNormalize(t) {
-  return ({ canonical:'canonical', legacy:'legacy_unknown', deprecated:'deprecated', sale:'lil_sale' })[t] || t || 'legacy_unknown';
+  // Only two tiers: Live (canonical) and Legacy (everything else).
+  return (t === 'live' || t === 'canonical') ? 'canonical' : 'legacy_unknown';
 }
 function _aiClientId() { return (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? CLIENT_ID : null; }
 
@@ -14815,10 +14816,26 @@ function _aiRow(p, checkedDefault) {
         <div style="font-size:10.5px; color:var(--text-mute,#888); font-family:monospace;">${escapeHTML(p.price_id)} · ${members}${conf ? ' · ' + conf : ''}${ciq}</div>
         ${p.reason ? `<div style="font-size:10.5px;color:#e0a93f;margin-top:2px;">${escapeHTML(p.reason)}</div>` : ''}
       </div>
-      <select class="ai-plan" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${_aiPlanOptions(p.proposed_offer_price_key)}</select>
-      <select class="ai-tier" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${tierOpts}</select>
+      <select class="ai-plan" onchange="_aiRowChanged(this)" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${_aiPlanOptions(p.proposed_offer_price_key)}</select>
+      <select class="ai-tier" onchange="_aiRowChanged(this)" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${tierOpts}</select>
     </div>`;
 }
+
+// One Live (canonical) per plan slot: when a row becomes Live, demote any other
+// Live row in the same plan to Legacy.
+function _aiEnforceOneLive(row) {
+  const tierEl = row.querySelector('.ai-tier');
+  if (!tierEl || tierEl.value !== 'canonical') return;
+  const plan = (row.querySelector('.ai-plan') || {}).value;
+  if (!plan) return;
+  document.querySelectorAll('#pc-aimatch-modal .ai-row').forEach(r => {
+    if (r === row) return;
+    const rp = (r.querySelector('.ai-plan') || {}).value;
+    const rt = r.querySelector('.ai-tier');
+    if (rp === plan && rt && rt.value === 'canonical') rt.value = 'legacy_unknown';
+  });
+}
+function _aiRowChanged(el) { const row = el.closest('.ai-row'); if (row) _aiEnforceOneLive(row); }
 
 function _renderAiMatchModal() {
   const modal = document.getElementById('pc-aimatch-modal');
@@ -14945,15 +14962,13 @@ async function fetchAndRenderPricing() {
 }
 
 function _pricingTierLabel(tier) {
-  return ({
-    canonical:       'Canonical',
-    lil_sale:        'Lil sale',
-    legacy_match:    'Legacy',
-    legacy_unknown:  'Legacy',
-    deprecated:      'Deprecated',
-    uncatalogued:    'Unknown $',
-  })[tier] || tier;
+  // Two tiers only: Live (canonical) vs Legacy (everything else).
+  if (tier === 'canonical') return 'Live';
+  if (tier === 'uncatalogued') return 'Unknown $';
+  return 'Legacy';
 }
+// Collapse any tier to one of two buckets for filtering/grouping.
+function _pricingTierBucket(tier) { return tier === 'canonical' ? 'canonical' : 'legacy'; }
 
 function _pricingTierBadge(tier) {
   const label = _pricingTierLabel(tier);
@@ -14976,12 +14991,12 @@ function _renderPricingView() {
   const uncatalogued = _PRICING_DATA.uncatalogued || [];
   const totalMembers = (_PRICING_DATA.totals && _PRICING_DATA.totals.members_with_price) || 0;
 
-  // Filter chips
-  const tiers = ['all', 'canonical', 'lil_sale', 'legacy_match', 'legacy_unknown', 'deprecated'];
+  // Filter chips — two tiers only: Live + Legacy.
+  const tiers = ['all', 'canonical', 'legacy'];
   const filterChips = tiers.map(t => {
     const sel = _PRICING_FILTER === t;
-    const label = t === 'all' ? 'All' : _pricingTierLabel(t);
-    const count = t === 'all' ? catalog.length : catalog.filter(r => r.tier === t).length;
+    const label = t === 'all' ? 'All' : (t === 'canonical' ? 'Live' : 'Legacy');
+    const count = t === 'all' ? catalog.length : catalog.filter(r => _pricingTierBucket(r.tier) === t).length;
     return `<button onclick="_pricingSetFilter('${t}')" style="
       font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer;
       border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'};
@@ -14997,18 +15012,17 @@ function _renderPricingView() {
     ${uncatalogued.length ? `<span>·</span><span style="color:#9a3b2f"><strong>${uncatalogued.length}</strong> uncatalogued price(s)</span>` : ''}
   `;
 
-  // Filter
+  // Filter (by Live/Legacy bucket)
   const filtered = _PRICING_FILTER === 'all'
     ? catalog
-    : catalog.filter(r => r.tier === _PRICING_FILTER);
+    : catalog.filter(r => _pricingTierBucket(r.tier) === _PRICING_FILTER);
 
-  // Group by tier (skip grouping if filtered to one tier)
-  const order = ['canonical', 'lil_sale', 'legacy_match', 'legacy_unknown', 'deprecated'];
+  // Group into Live then Legacy
+  const order = ['canonical', 'legacy'];
   const groups = new Map();
   for (const t of order) groups.set(t, []);
   for (const row of filtered) {
-    if (!groups.has(row.tier)) groups.set(row.tier, []);
-    groups.get(row.tier).push(row);
+    groups.get(_pricingTierBucket(row.tier)).push(row);
   }
 
   const renderRow = (row) => `
