@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Data Map — what's collectable (BAM GTA)</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#fff; --ink:#1f2430; --muted:#6b7384; --line:#e6e9f2;
+    --accent:#3b6ef6; --accent-soft:#e8f0ff;
+    --green:#1f9d6b; --green-bg:#e6f7ef; --amber:#c9871f; --amber-bg:#fdf3e0;
+    --red:#d8483f; --red-bg:#fdeae8; --purple:#7b54d6; --purple-bg:#f0eafc;
+    --shadow:0 2px 10px rgba(31,36,48,.06);
+    --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;padding-bottom:60px}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px 20px}
+  header{text-align:center;padding:26px 0 6px}
+  header h1{font-size:28px;margin:0 0 6px;letter-spacing:-.5px}
+  header p{color:var(--muted);margin:0;font-size:15px}
+  .callout{background:var(--amber-bg);border:1px solid #f0dcae;border-radius:10px;padding:12px 16px;margin:18px 0;color:#8a6314;font-size:14.5px;text-align:center}
+  .callout b{color:#6d4e10}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .src{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .src .head{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .src .head .tag{font-size:11px;font-weight:800;padding:3px 9px;border-radius:7px;letter-spacing:.4px}
+  .tag.stripe{background:var(--purple-bg);color:var(--purple)}
+  .tag.coachiq{background:#e7f6f2;color:#0f8a6a}
+  .tag.ghl{background:var(--accent-soft);color:var(--accent)}
+  .tag.supa{background:var(--green-bg);color:var(--green)}
+  .src .head h3{margin:0;font-size:15.5px}
+  .src .head .sub{font-size:12px;color:var(--muted)}
+  .src .body{padding:14px 18px}
+  .obj{margin-bottom:14px}
+  .obj:last-child{margin-bottom:0}
+  .obj .o-name{font-weight:700;font-size:13.5px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px}
+  .pill.yes{background:var(--green-bg);color:var(--green)}
+  .pill.no{background:var(--red-bg);color:var(--red)}
+  .pill.partial{background:var(--amber-bg);color:var(--amber)}
+  .fields{font-family:var(--mono);font-size:12px;color:var(--ink);background:#f7f9fd;border:1px solid var(--line);border-radius:8px;padding:8px 10px;line-height:1.7}
+  .fields .k{color:var(--purple)}
+  .fields .ex{color:var(--muted)}
+  .note{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+  h2.sec{font-size:20px;margin:34px 0 4px;letter-spacing:-.3px}
+  .sec-sub{color:var(--muted);font-size:14px;margin:0 0 14px}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow);font-size:13px}
+  th{background:#f0f3fa;text-align:left;padding:9px 12px;font-size:12px}
+  td{padding:9px 12px;border-top:1px solid var(--line);color:var(--ink)}
+  td.mono{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .tier{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px}
+  .tier.canonical{background:var(--green-bg);color:var(--green)}
+  .tier.legacy{background:var(--amber-bg);color:var(--amber)}
+  .tier.deprecated{background:var(--red-bg);color:var(--red)}
+  .tier.sale{background:var(--purple-bg);color:var(--purple)}
+
+  .signals{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .sig{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;box-shadow:var(--shadow)}
+  .sig b{color:var(--accent)}
+  .stat{display:inline-flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin:4px;box-shadow:var(--shadow)}
+  .stat .n{font-size:22px;font-weight:800;letter-spacing:-.5px}
+  .stat .l{font-size:11.5px;color:var(--muted)}
+  .stats{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🗺️ API Data Map — what's collectable</h1>
+    <p>Everything the AI matcher can pull about a live subscription · BAM GTA as the example</p>
+  </header>
+
+  <div class="callout">
+    <b>The matcher's job:</b> take each live sub → figure out which <b>offer-price</b> it is
+    (plan × term), mark canonical vs legacy, and grab its CoachIQ product. Here's the raw
+    material it has to work with, per system.
+  </div>
+
+  <div class="stats">
+    <div class="stat"><span class="n">54</span><span class="l">members</span></div>
+    <div class="stat"><span class="n">50</span><span class="l">with a Stripe sub</span></div>
+    <div class="stat"><span class="n">27</span><span class="l">distinct Stripe products</span></div>
+    <div class="stat"><span class="n">31</span><span class="l">price rows (catalog)</span></div>
+    <div class="stat"><span class="n">12</span><span class="l">canonical · rest legacy</span></div>
+    <div class="stat"><span class="n">21/54</span><span class="l">have a CoachIQ id</span></div>
+    <div class="stat"><span class="n">54/54</span><span class="l">have a GHL contact</span></div>
+  </div>
+
+  <h2 class="sec">The four sources</h2>
+  <p class="sec-sub">✅ collectable · ⚠️ partial / indirect · ❌ blocked</p>
+
+  <div class="grid">
+
+    <!-- STRIPE -->
+    <div class="src">
+      <div class="head"><span class="tag stripe">STRIPE</span><div><h3>Connected account</h3><div class="sub">acct_1P7kUC… · platform key + Stripe-Account header</div></div></div>
+      <div class="body">
+        <div class="obj">
+          <div class="o-name">Subscription <span class="pill yes">✅ full</span></div>
+          <div class="fields"><span class="k">id, status, customer, current_period_end,<br>default_payment_method, created,<br>items[].price, application</span> <span class="ex">← creator</span><br><span class="k">metadata{ }</span> <span class="ex">← the goldmine ↓</span></div>
+          <div class="note"><b>application</b> tells you who made it: CoachIQ (ca_G3zg…), GHL (ca_D5Mp…), or null = manual.</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Sub metadata (CoachIQ-made subs) <span class="pill yes">✅</span></div>
+          <div class="fields"><span class="k">userId</span> <span class="ex">= CoachIQ user id</span><br><span class="k">profileId, userEmail,</span> <span class="k">productId</span> <span class="ex">← CoachIQ product!</span></div>
+          <div class="note">This is how we harvest CoachIQ product ids without the CoachIQ API.</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Price / Product / Customer / Invoice <span class="pill yes">✅</span></div>
+          <div class="fields"><span class="k">price</span>: id, unit_amount, currency, recurring{interval,count}, product, nickname<br><span class="k">product</span>: id, name<br><span class="k">customer</span>: email, name, phone<br><span class="k">invoice/charge</span>: amount_paid, status</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COACHIQ -->
+    <div class="src">
+      <div class="head"><span class="tag coachiq">COACHIQ</span><div><h3>api-v3.coachiq.io</h3><div class="sub">public API key (limited) + webhook</div></div></div>
+      <div class="body">
+        <div class="obj">
+          <div class="o-name">List products / users / bookings <span class="pill no">❌ blocked</span></div>
+          <div class="note">The public API key is auth-walled — admin/list queries return "must be logged in", and the dashboard host is WAF-blocked to server requests. No clean "list my products."</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Create user <span class="pill partial">⚠️ via Zapier</span></div>
+          <div class="note">signUp_V2 makes a bare account; the enrolling "Create User" runs through the Zapier integration.</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Fire an automation (Add Product/Credits) <span class="pill yes">✅ webhook</span></div>
+          <div class="fields">POST /hook/automation/trigger/{id}<br>Bearer key · x-group-id · body {user:{id}}</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Product ids <span class="pill partial">⚠️ via Stripe</span></div>
+          <div class="note">Not from CoachIQ directly — harvested from the Stripe sub <b>metadata.productId</b> (above). New products with no sub yet = manual entry.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GHL -->
+    <div class="src">
+      <div class="head"><span class="tag ghl">GHL</span><div><h3>LeadConnector API</h3><div class="sub">per-academy keys (already wired)</div></div></div>
+      <div class="body">
+        <div class="obj">
+          <div class="o-name">Contact <span class="pill yes">✅</span></div>
+          <div class="fields"><span class="k">id, name, email, phone, tags[],<br>customFields, source</span></div>
+          <div class="note">Match key into GHL = email / phone. All 54 GTA members already have a ghl_contact_id.</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Opportunity / Pipeline <span class="pill yes">✅</span></div>
+          <div class="fields"><span class="k">opportunity</span>: id, pipelineStageId, status (open/won/lost), monetaryValue, source, contact{email,phone}</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">Conversations / messages <span class="pill yes">✅ read+send</span></div>
+          <div class="note">Useful context, not for price-matching.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPABASE -->
+    <div class="src">
+      <div class="head"><span class="tag supa">SUPABASE</span><div><h3>Already-collected</h3><div class="sub">portal DB — service key</div></div></div>
+      <div class="body">
+        <div class="obj">
+          <div class="o-name">members <span class="pill yes">✅</span></div>
+          <div class="fields"><span class="k">athlete_name, parent_name/email/phone,<br>plan, status, stripe_customer_id,<br>stripe_subscription_id, stripe_price_id,<br>ghl_contact_id, coachiq_member_id,<br>joined_date, stripe_joined_at</span></div>
+          <div class="note">The join table — already ties Stripe ↔ GHL ↔ CoachIQ per athlete.</div>
+        </div>
+        <div class="obj">
+          <div class="o-name">pricing_catalog <span class="pill yes">✅ the reconciled map</span></div>
+          <div class="fields"><span class="k">stripe_price_id, stripe_product_id,<br>display_name, canonical_plan, tier,<br>interval, amount_cents, hst_mode,<br>is_routable, notes, metadata{ }</span></div>
+          <div class="note"><b>This is last time's AI match, frozen.</b> The empty <span class="k">metadata{}</span> is where the CoachIQ product id will live.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ASSEMBLED RECORD -->
+  <h2 class="sec">What the matcher sees per sub (assembled)</h2>
+  <p class="sec-sub">One live sub, enriched across all four sources — a real GTA-shaped example.</p>
+  <div class="fields" style="font-size:12.5px;line-height:1.9;max-width:100%">
+    <span class="k">sub</span>      sub_1TWoQ0… · status=active · application=CoachIQ · created=…<br>
+    <span class="k">price</span>    plan_ThYK86w2Zd8fp3 · $316 all-in · interval=4_weeks · product=prod_ThYKhylhLqORpC "Accelerated"<br>
+    <span class="k">metadata</span> userId=97511a32… · productId=&lt;CoachIQ product&gt; · userEmail=…<br>
+    <span class="k">customer</span> cus_… · email/name/phone<br>
+    <span class="k">member</span>   Ryan Liu · plan=2/wk · coachiq_member_id=97511a32… · ghl_contact_id=…<br>
+    <span class="k">ghl</span>      contact + tags + opportunity (stage / won?)<br>
+    <span class="ex">⇒ matcher concludes:  offer = Training · price = "Accelerate · Monthly" · tier = canonical</span>
+  </div>
+
+  <!-- TIER REALITY -->
+  <h2 class="sec">The messy reality (why AI + your eyes)</h2>
+  <p class="sec-sub">One plan, many real prices. The matcher groups these under one offer-price; only the canonical is offerable to new signups.</p>
+  <table>
+    <tr><th>Plan</th><th>Price (GTA)</th><th>Amount</th><th>Tier</th><th>Who / why</th></tr>
+    <tr><td rowspan="3">2×/wk<br>Accelerate</td><td class="mono">plan_ThYK86w2Zd8fp3</td><td>$316 all-in</td><td><span class="tier canonical">canonical</span></td><td>$280 + HST</td></tr>
+    <tr><td class="mono">price_…Rr8dw / @770</td><td>$770</td><td><span class="tier legacy">legacy</span></td><td>Tushar, Arnav (3mo)</td></tr>
+    <tr><td class="mono">plan_TwBKohteBM6Aru</td><td>$280</td><td><span class="tier legacy">legacy</span></td><td>Syed Faiz pre-tax variant</td></tr>
+    <tr><td>1×/wk<br>Steady</td><td class="mono">plan_TkDoRpQsPJ3US7</td><td>$213</td><td><span class="tier legacy">legacy</span></td><td>Joey "GHL Dynamic" ($13 under)</td></tr>
+    <tr><td>Unlimited<br>Dominate</td><td class="mono">plan_TdXYS4LMehFf3f</td><td>$395.50</td><td><span class="tier sale">lil sale</span></td><td>Asher, Emaad promo</td></tr>
+    <tr><td>2×/wk</td><td class="mono">price_…PVeLU @356</td><td>$356</td><td><span class="tier deprecated">deprecated</span></td><td>Qundi Li old "Advanced"</td></tr>
+  </table>
+
+  <!-- SIGNALS -->
+  <h2 class="sec">What the AI matches on</h2>
+  <div class="signals">
+    <div class="sig"><b>Amount</b> — strongest signal, incl. odd legacy ($213, $770, $356)</div>
+    <div class="sig"><b>Product / price name</b> — "2 Trainings/wk - 3 Month"</div>
+    <div class="sig"><b>Billing interval</b> — 4_weeks / 3_months / 6_months</div>
+    <div class="sig"><b>Sub metadata</b> — productId, userId, plan</div>
+    <div class="sig"><b>application</b> — CoachIQ / GHL / manual origin</div>
+    <div class="sig"><b>Ask you</b> — flags the uncertain ones for your call</div>
+  </div>
+
+</div>
+</body>
+</html>
