@@ -43,6 +43,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [trash, setTrash] = useState([]);                  // recently deleted (for undo)
   const trashSeq = useRef(0);
   const [stripeView, setStripeView] = useState(null);      // a person's Stripe history
+  const [formActivity, setFormActivity] = useState(null);  // submissions per form by month
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -340,6 +341,16 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       setStripeView({ name: cell.name, email: cell.email, loading: false, data });
     } catch (e) { setStripeView({ name: cell.name, email: cell.email, loading: false, data: { found: false, reason: "error", error: e.message } }); }
   }
+  // Diagnostic: submissions per form, by month — to find which form was used when.
+  async function loadFormActivity() {
+    if (!location) return;
+    setFormActivity({ loading: true });
+    try {
+      const res = await fetch(`/api/ghl?action=form-activity&months=8&location=${encodeURIComponent(location)}`);
+      const j = await res.json().catch(() => ({}));
+      setFormActivity({ loading: false, data: j.data || [], months: j.months || [], error: j.reason });
+    } catch (e) { setFormActivity({ loading: false, data: [], months: [], error: e.message }); }
+  }
 
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
@@ -625,7 +636,10 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
 
       {/* Lead-forms picker — defines "leads in" */}
       <div style={card}>
-        <div style={lbl}>Leads in — which forms count?</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={lbl}>Leads in — which forms count?</div>
+          <button onClick={loadFormActivity} disabled={!location} style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: location ? "pointer" : "default", marginBottom: 8 }}>📊 Submissions by month</button>
+        </div>
         <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5, marginBottom: 12 }}>
           Tick the forms whose submissions count as a new lead (e.g. free-trial booking form + contact form). This becomes the config the KPIs read.
         </div>
@@ -1022,6 +1036,54 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           </div>
         );
       })()}
+
+      {formActivity && (
+        <div onClick={() => setFormActivity(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1300, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 900, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Form submissions by month</div>
+              <button onClick={() => setFormActivity(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+            </div>
+            <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
+              Every form's submissions per month — spot which form was the lead form in a given month. <span style={{ color: t.accent }}>✓</span> = currently counted as a lead form.
+            </div>
+            {formActivity.loading ? <div style={{ fontSize: 13, color: t.textSub }}>Tallying submissions… (this can take a few seconds)</div>
+              : formActivity.error ? <div style={{ fontSize: 13, color: t.textSub }}>Couldn't load ({formActivity.error}).</div>
+              : !formActivity.data?.length ? <div style={{ fontSize: 13, color: t.textSub }}>No forms found.</div>
+              : (() => {
+                  const mcols = [...formActivity.months].sort();   // oldest → newest
+                  const shortM = (k) => { const [y, m] = k.split("-"); return new Date(Date.UTC(+y, +m - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }); };
+                  return (
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left", padding: "6px 10px 8px 2px", color: t.textMute, fontWeight: 700, position: "sticky", left: 0, background: t.bg }}>FORM</th>
+                            {mcols.map(m => <th key={m} style={{ padding: "6px 8px 8px", color: t.textMute, fontWeight: 700, textAlign: "center", minWidth: 52 }}>{shortM(m)}</th>)}
+                            <th style={{ padding: "6px 8px 8px", color: t.textMute, fontWeight: 700, textAlign: "center" }}>Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {formActivity.data.map(f => (
+                            <tr key={f.id} style={{ borderTop: `1px solid ${t.border}` }}>
+                              <td style={{ padding: "8px 10px 8px 2px", color: t.text, fontWeight: 600, whiteSpace: "nowrap", position: "sticky", left: 0, background: t.bg }}>
+                                {picked.has(f.id) && <span style={{ color: t.accent, fontWeight: 800 }}>✓ </span>}{f.name}
+                              </td>
+                              {mcols.map(m => {
+                                const n = f.months?.[m] || 0;
+                                return <td key={m} style={{ padding: "8px", textAlign: "center", color: n ? t.text : t.textMute, fontWeight: n ? 700 : 400, background: n ? `${t.accent}14` : "transparent" }}>{n || "·"}</td>;
+                              })}
+                              <td style={{ padding: "8px", textAlign: "center", color: t.textSub, fontWeight: 700 }}>{f.total}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
