@@ -14804,7 +14804,7 @@ function _renderAiMatchModal(data) {
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
           <label style="font-size:11px; color:var(--text-mute,#888);">Offer-price
-            <input class="ai-key" data-i="${i}" value="${escapeHTML(p.proposed_offer_price_key || '')}" placeholder="e.g. 2/wk|3_months"
+            <input class="ai-key" data-i="${i}" value="${escapeHTML(p.proposed_offer_price_key || '')}" placeholder="e.g. Steady|monthly"
               style="width:100%; margin-top:3px; padding:6px 8px; border-radius:7px; border:1px solid var(--border,#2a2a31); background:var(--bg,#0d0d10); color:var(--text,#eee); font-size:12px;"/>
           </label>
           <label style="font-size:11px; color:var(--text-mute,#888);">Tier
@@ -14854,7 +14854,7 @@ async function applyAiMatch() {
     const key = (document.querySelector('.ai-key[data-i="' + i + '"]') || {}).value || null;
     const tier = (document.querySelector('.ai-tier[data-i="' + i + '"]') || {}).value || null;
     const ciq = (document.querySelector('.ai-ciq[data-i="' + i + '"]') || {}).value || null;
-    approvals.push({ price_id: p.price_id, offer_price_key: key, tier, coachiq_product_id: ciq, confidence: p.confidence });
+    approvals.push({ price_id: p.price_id, offer_price_key: key, offer_id: p.offer_id || null, tier, coachiq_product_id: ciq, confidence: p.confidence });
   });
   if (!approvals.length) { alert('Nothing approved — tick the prices you want to save.'); return; }
   try {
