@@ -4,6 +4,10 @@ description: Multi-round chat between staff and client on a ticket — schema, A
 type: project
 ---
 
+> **2026-06-08 — free-form notes (ungated by the state machine).** On top of the request/respond flow, both sides can now message a systems ticket **anytime** (any non-terminal status, no status change):
+> - **Client:** `action=client_note` (public PATCH) — appends `client_to_staff`. UI = always-on "Add a note for the team" box in the client-portal ticket detail (`renderDetail` → `submitClientNote`). Pings the client Slack channel.
+> - **Staff:** `action=staff_reply` (staff PATCH) — appends `staff_to_client` (does NOT flip to awaiting_client, unlike `request_client`). UI = "Reply to client" box in the SystemsView "Client conversation" section (now shown for any active ticket). Service: `staffReply`. Slack + push notify the client.
+
 ## Schema
 
 `tickets.messages` (jsonb, default `[]`). Each entry:
