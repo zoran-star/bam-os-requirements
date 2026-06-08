@@ -156,20 +156,23 @@ async function aiMatch(targets, prices) {
   if (!apiKey) throw Object.assign(new Error("ANTHROPIC_API_KEY not configured"), { status: 500 });
 
   const system =
-    "You reconcile a sports academy's messy live Stripe prices to a clean set of OFFER-PRICES " +
-    "(plan × term). For EACH live price, choose the single best matching offer_price_key from the " +
-    "provided targets (or null if it matches none), and a tier:\n" +
-    "  canonical  = the standard current price for that offer-price (amount ≈ target amount, on-name)\n" +
-    "  legacy     = a grandfathered/old/odd-amount variant of an offer-price (recognize old subs only)\n" +
+    "You reconcile a sports academy's messy live Stripe prices to the academy's OWN offer prices " +
+    "(the plans + terms they typed into their Offers). Each target has BOTH a base_cents amount and " +
+    "an allin_cents amount (base + 13% tax). For EACH live price, pick the single best matching " +
+    "offer_price_key (or null if none). Match the live amount_cents to EITHER the base OR the all-in " +
+    "amount of a target (small rounding differences are fine), then by NAME, then by interval. " +
+    "Assign a tier:\n" +
+    "  canonical  = amount matches a target closely (the standard current price for that plan+term)\n" +
+    "  legacy     = a grandfathered/odd-amount variant of a target (recognize old subs only)\n" +
     "  deprecated = clearly retired/old plan name\n" +
     "  sale       = a promo/discounted variant\n" +
-    "Match primarily on AMOUNT, then product/price NAME, then BILLING INTERVAL, then the creator " +
-    "(application id). Amounts are in cents. Be conservative: if unsure, set needs_review=true and " +
-    "lower confidence. Respond with ONLY a JSON array, one object per input price, no prose:\n" +
+    "If a live price matches NO target BUT has members on it (sub_count>0), set offer_price_key=null, " +
+    "needs_review=true, and note in reason it may be a plan missing from the offer. Amounts are cents. " +
+    "Respond with ONLY a JSON array, one object per input price, no prose:\n" +
     '[{"price_id","offer_price_key"(or null),"tier","confidence"(0-1),"needs_review"(bool),"reason"(<=18 words)}]';
 
   const payload = {
-    offer_price_targets: targets, // [{ key, plan, interval, canonical_amount_cents, label }]
+    offer_price_targets: targets.map(t => ({ key: t.key, label: t.label, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents })),
     live_prices: prices.map(p => ({
       price_id: p.price_id, amount_cents: p.unit_amount, currency: p.currency,
       interval: p.interval, interval_count: p.interval_count,
@@ -194,6 +197,46 @@ async function aiMatch(targets, prices) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+// Term from a free-text commitment length ("12 Weeks (3 Months)" → 3_months).
+function _termFromLength(s) {
+  const t = String(s || "").toLowerCase();
+  if (/3\s*month/.test(t) || /\b12\s*week/.test(t)) return "3_months";
+  if (/6\s*month/.test(t) || /\b24\s*week/.test(t)) return "6_months";
+  return null;
+}
+
+// Build the match TARGETS from what the academy filled out in their Offers →
+// Pricing section (data.pricing.pricing_offerings). Each Membership offering →
+// a monthly target + one per commitment, with base + all-in (×1.13) amounts.
+async function buildOfferTargets(clientId) {
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`) || [];
+  const targets = [];
+  const HST = 1.13;
+  const cents = n => Math.round(n * 100);
+  for (const o of offers) {
+    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+    for (const off of offerings) {
+      if (String(off.type || "").toLowerCase() !== "membership") continue; // skip Other/test junk
+      const title = String(off.title || "").trim();
+      if (!title) continue;
+      const base = parseFloat(off.price);
+      if (!isNaN(base)) {
+        targets.push({ key: `${title}|monthly`, offer_id: o.id, offering: title, term: "monthly",
+          base_cents: cents(base), allin_cents: cents(base * HST), label: `${title} · Monthly` });
+      }
+      for (const c of (off.commitments || [])) {
+        const term = _termFromLength(c.length);
+        const cb = parseFloat(c.price);
+        if (term && !isNaN(cb)) {
+          targets.push({ key: `${title}|${term}`, offer_id: o.id, offering: title, term,
+            base_cents: cents(cb), allin_cents: cents(cb * HST), label: `${title} · ${term.replace("_", " ")}` });
+        }
+      }
+    }
+  }
+  return targets;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
@@ -212,7 +255,7 @@ export default async function handler(req, res) {
       for (const a of approvals) {
         if (!a.price_id) continue;
         const patch = {
-          offer_id: body.offer_id || null,
+          offer_id: a.offer_id || body.offer_id || null,
           offer_price_key: a.offer_price_key || null,
           coachiq_product_id: a.coachiq_product_id || null,
           tier: a.tier || undefined,
@@ -255,20 +298,22 @@ export default async function handler(req, res) {
       if (c) { p.prior_tier = c.tier; p.prior_plan = c.canonical_plan; }
     }
 
-    // Offer-price targets = canonical rows (plan × term) for this academy
-    const canon = catalog.filter(c => c.tier === "canonical");
-    const targets = canon.map(c => ({
-      key: `${c.canonical_plan}|${c.interval}`,
-      plan: c.canonical_plan, interval: c.interval,
-      canonical_amount_cents: c.amount_cents,
-      label: `${c.canonical_plan} · ${c.interval}`,
-    }));
+    // Targets = what the academy filled out in their Offers → Pricing section.
+    const targets = await buildOfferTargets(clientId);
+    if (!targets.length) {
+      return res.status(200).json({ ok: true, proposals: [], note: "no Membership offers filled out yet — add prices in Offers → Pricing first" });
+    }
+    const targetByKey = Object.fromEntries(targets.map(t => [t.key, t]));
 
     const matches = await aiMatch(targets, prices);
     const byId = Object.fromEntries(matches.map(m => [m.price_id, m]));
 
     const proposals = prices.map(p => {
       const m = byId[p.price_id] || {};
+      const key = m.offer_price_key || null;
+      const tgt = key ? targetByKey[key] : null;
+      // Flag: a price with members on it that matched no offer → likely a plan missing from the offer.
+      const unmatchedWithMembers = !key && p.sub_count > 0;
       return {
         price_id: p.price_id,
         product_id: p.product_id,
@@ -280,11 +325,12 @@ export default async function handler(req, res) {
         application: p.application,
         coachiq_product_id: p.coachiq_product_id,   // harvested from metadata
         prior_tier: p.prior_tier || null,
-        proposed_offer_price_key: m.offer_price_key || null,
+        proposed_offer_price_key: key,
+        offer_id: tgt ? tgt.offer_id : null,
         proposed_tier: m.tier || null,
         confidence: m.confidence != null ? m.confidence : null,
-        needs_review: m.needs_review === true || (m.confidence != null && m.confidence < 0.75),
-        reason: m.reason || null,
+        needs_review: unmatchedWithMembers || m.needs_review === true || (m.confidence != null && m.confidence < 0.75),
+        reason: unmatchedWithMembers ? `${p.sub_count} member(s) here but no matching offer — add it to the offer?` : (m.reason || null),
       };
     }).sort((a, b) => (a.proposed_offer_price_key || "~").localeCompare(b.proposed_offer_price_key || "~") || (b.amount_cents - a.amount_cents));
 
