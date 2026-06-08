@@ -22,6 +22,21 @@ The Meta integration supports BOTH:
 - `clients.meta_ad_account_id` — text, nullable. Required for real campaigns. Settable by staff (via Client Setup) OR by the client themselves (via the native-prompt picker after connecting their own Meta).
 - `clients.meta_campaign_ids` — array, filters which campaigns surface on the client portal (so clients don't see staff's experimental campaigns).
 
+## OAuth scopes
+
+`META_OAUTH_SCOPES` (api/marketing.js): `ads_read`, **`ads_management`**, **`business_management`**, `public_profile`. Write scopes added 2026-06-06 (PR #105) for the upcoming upload→creative→ad-create build. ⚠️ Requires `ads_management` + `business_management` granted on the Meta app (Standard Access, no App Review under staff-token model) AND staff must **reconnect Meta** after deploy for the existing read-only token to gain write perms.
+
+## Access model — WHY the staff-token model stays at Standard Access (no App Review)
+
+Verified against Meta docs 2026-06-06. The "staff token at Standard Access, no App Review" approach is valid **only because** of two conditions — if either breaks, write/read silently returns nothing or 403s:
+
+1. **The token user must have an APP ROLE** (Admin/Developer/Tester) on app `2059912628202822`. Meta: *"the assets you can access under Standard Access are limited to those owned by **admins, developers, and testers of your app**."* A staff member who only OAuth'd through the portal but is NOT in App Roles will only see their own owned assets.
+2. **That user must be granted Admin/Advertiser** on each client's ad account + Page + IG (via Leadsie/Business Manager partner share). Meta: ads_management covers accounts *"owned, or has been granted access to, by the account owner"* — so granted access counts; you don't need to OWN them.
+
+Standard Access explicitly supports agency multi-client use (~25–50 client accounts) → **no App Review / Business Verification needed** as long as it's ONE app-team member's token over shared accounts. Advanced Access + App Review is only required for the *other* model: arbitrary third-party businesses' own users authenticating through our app (client-side OAuth at scale).
+
+⚠️ **Robustness gap — personal token vs System User:** the live token is **Ximena's personal** long-lived token (60-day expiry, no auto-refresh — breaks if she resets pw / loses asset access / leaves). Best practice for agency server-to-server = a **non-expiring System User token** in BAM's Business Manager with client assets shared to BAM's business. Migrating to a System User is the hardening step before staff rely on ad-create daily. See the `/meta-write-access` skill for the step-by-step. Open Loop candidate.
+
 ## Env vars (Vercel `bam-portal` production)
 
 - `META_APP_ID = 2059912628202822` (public)
@@ -39,6 +54,7 @@ Clean URLs via `vercel.json` rewrites:
 - `GET  /api/meta/adaccounts` — list ad accounts the connected staff has access to
 - `POST /api/meta/adaccounts` — staff picks an ad account for a client (writes `clients.meta_ad_account_id` + `clients.meta_campaign_ids`)
 - `GET  /api/meta/campaigns?client_id=...` — real campaigns + insights, last 30d
+- `GET  /api/marketing?resource=meta-report&client_id=...&months=<n>` — per-campaign, per-month KPI report (leads/CPL/spend/reach/impressions/link clicks/LP views/CTR/frequency) powering the **Ad Performance dashboard**. See [[project_ad_performance_dashboard]].
 - `GET  /api/meta/campaigns?client_id=...&staff_picker=1` — staff-only mode that bypasses `meta_campaign_ids` filter (for picking which campaigns to surface)
 - `GET  /api/marketing?resource=meta-creatives&campaign_id=...` — real ad creatives for a campaign
 

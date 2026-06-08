@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
+import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
 import { notifyClientPush } from "./push/_send.js";
 
 // Vercel Serverless Function — Marketing (combined: tickets + guide cards)
@@ -176,6 +177,39 @@ export default async function handler(req, res) {
     if (resource === "meta-kpis") {
       return handleMetaKpis(req, res);
     }
+    if (resource === "meta-report") {
+      return handleMetaReport(req, res);
+    }
+    if (resource === "meta-insight") {
+      return handleMetaInsight(req, res);
+    }
+    if (resource === "ghl-kpi-suggest") {
+      return handleGhlKpiSuggest(req, res);
+    }
+    if (resource === "ghl-kpis") {
+      return handleGhlKpis(req, res);
+    }
+    if (resource === "ghl-kpis-monthly") {
+      return handleGhlKpisMonthly(req, res);
+    }
+    if (resource === "ghl-kpi-detail") {
+      return handleGhlKpiDetail(req, res);
+    }
+    if (resource === "ghl-kpi-delete") {
+      return handleGhlKpiDelete(req, res);
+    }
+    if (resource === "ghl-kpi-restore") {
+      return handleGhlKpiRestore(req, res);
+    }
+    if (resource === "ghl-kpi-stripe") {
+      return handleGhlKpiStripe(req, res);
+    }
+    if (resource === "ghl-kpi-trash") {
+      return handleGhlKpiTrash(req, res);
+    }
+    if (resource === "meta-overview") {
+      return handleMetaOverview(req, res);
+    }
     if (resource === "meta-creatives") {
       return handleMetaCreatives(req, res);
     }
@@ -188,7 +222,7 @@ export default async function handler(req, res) {
     if (resource === "onboarding") {
       return handleOnboarding(req, res);
     }
-    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
+    return res.status(400).json({ error: "missing or invalid ?resource= (expected 'tickets' | 'guide-cards' | 'content-tickets' | 'meta-adaccounts' | 'meta-campaigns' | 'meta-kpis' | 'meta-report' | 'meta-insight' | 'meta-overview' | 'ghl-kpi-suggest' | 'ghl-kpis' | 'ghl-kpi-detail' | 'meta-creatives' | 'meta-staff-auth' | 'meta-staff-status' | 'onboarding')" });
   } catch (err) {
     return res.status(500).json({ error: err.message || "internal error" });
   }
@@ -938,7 +972,7 @@ async function handleContentTickets(req, res) {
 
 const META_API_VERSION = "v22.0";
 const META_GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
-const META_OAUTH_SCOPES = ["ads_read", "public_profile"];
+const META_OAUTH_SCOPES = ["ads_read", "ads_management", "business_management", "public_profile"];
 
 function metaGetOrigin(req) {
   // Pinned to the canonical staff URL — the Meta OAuth redirect URI
@@ -1130,9 +1164,12 @@ async function handleMetaCampaigns(req, res) {
 
   // Both clients (viewing their own portal) and staff (debugging/preview) can call this.
   // For client requests, scope to the client. For staff requests, expect ?client_id=...
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
@@ -1244,9 +1281,12 @@ async function handleMetaKpis(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
 
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
   let targetClientId = null;
-  if (ctx.client) targetClientId = ctx.client.id;
-  else if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
   const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
@@ -1325,6 +1365,957 @@ async function handleMetaKpis(req, res) {
     weekBefore: { start: wbStart, end: wbEnd, ...shape(buckets.weekBefore) },
     leadChangePct,
   });
+}
+
+// Sum a single Meta action type (e.g. "landing_page_view") out of the
+// insights `actions` array. Same shape as countLeads but for one type.
+function countAction(actions, type) {
+  if (!Array.isArray(actions)) return 0;
+  let n = 0;
+  for (const a of actions) {
+    if (a.action_type === type) n += parseInt(a.value, 10) || 0;
+  }
+  return n;
+}
+
+// Industry benchmark defaults — Ximena's hand-noted standards for the
+// sports/training/coaching niche. These are the fallback "goal lines" when
+// a client has no custom goal set (clients.meta_cpl_goal / meta_monthly_budget).
+const MKT_BENCHMARKS = {
+  cpl: 25,                     // target cost-per-lead ($); "good to keep around $25"
+  ctr_min: 1.5, ctr_max: 2.5,  // link CTR % — sports/coaching industry
+  freq_min: 2,  freq_max: 4,   // monthly frequency — sports/coaching industry
+};
+
+const MONTH_NAMES = ["January","February","March","April","May","June",
+  "July","August","September","October","November","December"];
+
+const META_CAMPAIGN_FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
+
+function daysInUTCMonth(d) { return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); }
+function verdictFor(cpl, target) {
+  if (cpl == null) return { verdict: "attention", verdict_label: "Worth revisiting" };
+  if (!target || cpl <= target) return { verdict: "strong", verdict_label: "Performing well" };
+  if (cpl <= target * 1.5) return { verdict: "steady", verdict_label: "On track" };
+  return { verdict: "attention", verdict_label: "Worth revisiting" };
+}
+
+const _r2 = (n) => Math.round(n * 100) / 100;
+
+// Fold one Meta insights row into a running campaign accumulator.
+function sumRowInto(acc, row) {
+  acc.spend += parseFloat(row.spend || "0") || 0;
+  acc.impressions += parseInt(row.impressions || "0", 10) || 0;
+  acc.reach += parseInt(row.reach || "0", 10) || 0;
+  acc.link_clicks += parseInt(row.inline_link_clicks || "0", 10) || 0;
+  acc.leads += countLeads(row.actions);
+  acc.landing_page_views += countAction(row.actions, "landing_page_view");
+  return acc;
+}
+function newAcc() {
+  return { spend: 0, impressions: 0, reach: 0, link_clicks: 0, leads: 0, landing_page_views: 0 };
+}
+// Turn an accumulator into the public campaign/totals metric shape.
+function finalizeMetrics(acc) {
+  return {
+    leads: acc.leads,
+    cpl: acc.leads > 0 ? _r2(acc.spend / acc.leads) : null,
+    spend: _r2(acc.spend),
+    reach: acc.reach,
+    impressions: acc.impressions,
+    link_clicks: acc.link_clicks,
+    landing_page_views: acc.landing_page_views,
+    ctr: acc.impressions > 0 ? _r2((acc.link_clicks / acc.impressions) * 100) : null,
+    frequency: acc.reach > 0 ? _r2(acc.impressions / acc.reach) : null,
+  };
+}
+function totalsFromCampaigns(campaigns) {
+  const acc = campaigns.reduce((a, c) => {
+    a.spend += c.spend; a.leads += c.leads;
+    a.impressions += c.impressions; a.reach += c.reach;
+    a.link_clicks += c.link_clicks; a.landing_page_views += c.landing_page_views;
+    return a;
+  }, newAcc());
+  return finalizeMetrics(acc);
+}
+
+// GET ?resource=meta-report&client_id=<id>&months=<n>&window=monthly|last7
+// Automates Ximena's KPI sheet: per-campaign Meta metrics (leads, CPL, spend,
+// reach, impressions, link clicks, landing page views, CTR, frequency).
+//   window=monthly (default) → one row per campaign per month, last N months,
+//     ONE Meta call (level=campaign, time_increment=monthly).
+//   window=last7 → last 7 complete days vs the previous 7 (for deltas), ONE
+//     Meta call (level=campaign, time_increment=1 over 14 days, bucketed).
+// Always returns the client's goals + industry benchmark defaults.
+async function handleMetaReport(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const months = Math.min(Math.max(parseInt(req.query.months || "8", 10) || 8, 1), 24);
+
+  // Resilient select: meta_cpl_goal / meta_monthly_budget may not exist yet
+  // (migration: supabase/marketing_goals.sql). Fall back without them so the
+  // report works before AND after the columns are added.
+  let clientFull = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget`);
+    clientFull = rows?.[0] || null;
+  } catch {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
+    clientFull = rows?.[0] || null;
+  }
+
+  const goals = {
+    cpl_goal: clientFull?.meta_cpl_goal != null ? Number(clientFull.meta_cpl_goal) : null,
+    monthly_budget: clientFull?.meta_monthly_budget != null ? Number(clientFull.meta_monthly_budget) : null,
+  };
+  const base = { goals, benchmarks: MKT_BENCHMARKS };
+
+  if (!clientFull?.meta_ad_account_id) return res.status(200).json({ reason: "no_ad_account", ...base });
+  const staffToken = await getAnyStaffMetaToken();
+  if (!staffToken) return res.status(200).json({ reason: "no_staff_token", ...base });
+
+  const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
+    ? clientFull.meta_ad_account_id
+    : `act_${clientFull.meta_ad_account_id}`;
+
+  // Optional per-client campaign filter (so clients don't see staff experiments).
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? new Set(clientFull.meta_campaign_ids) : null;
+
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
+
+  // ── window=last7: last 7 complete days vs previous 7 ──────────────────
+  if (req.query.window === "last7") {
+    const now = new Date();
+    const until = new Date(now); until.setUTCDate(now.getUTCDate() - 1);   // yesterday (complete)
+    const since = new Date(until); since.setUTCDate(until.getUTCDate() - 13); // 14-day span
+    const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+      level: "campaign", fields: FIELDS,
+      time_range: JSON.stringify({ since: fmt(since), until: fmt(until) }),
+      time_increment: "1", access_token: staffToken, limit: "500",
+    });
+    const r = await fetch(url);
+    const j = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
+
+    const splitDay = fmt(new Date(Date.UTC(until.getUTCFullYear(), until.getUTCMonth(), until.getUTCDate() - 6)));
+    const cur = new Map();   // id → { name, acc }
+    const prev = new Map();
+    for (const row of (j.data || [])) {
+      if (allow && !allow.has(row.campaign_id)) continue;
+      const bucket = (row.date_start >= splitDay) ? cur : prev;
+      if (!bucket.has(row.campaign_id)) bucket.set(row.campaign_id, { name: row.campaign_name || "(unnamed)", acc: newAcc() });
+      sumRowInto(bucket.get(row.campaign_id).acc, row);
+    }
+    const campaigns = [...cur.entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
+    const prevCampaigns = [...prev.entries()].map(([id, v]) => ({ id, ...finalizeMetrics(v.acc) }));
+    const period = {
+      key: "last7",
+      label: "Last 7 days",
+      campaigns,
+      totals: totalsFromCampaigns(campaigns),
+      compareTotals: totalsFromCampaigns(prevCampaigns),
+      compareLabel: "previous 7 days",
+      compareCampaigns: prevCampaigns,
+    };
+    return res.status(200).json({ ad_account: adAcct, view: "last7", periods: [period], ...base });
+  }
+
+  // ── window=monthly (default): one row per campaign per month ──────────
+  const now = new Date();
+  const startMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+    level: "campaign", fields: FIELDS,
+    time_range: JSON.stringify({ since: fmt(startMonth), until: fmt(now) }),
+    time_increment: "monthly", access_token: staffToken, limit: "500",
+  });
+  const r = await fetch(url);
+  const j = await r.json();
+  if (!r.ok) return res.status(r.status).json({ error: j?.error?.message || "Meta API error", ...base });
+
+  const monthsMap = new Map(); // "YYYY-MM" → Map(id → {name, acc})
+  for (const row of (j.data || [])) {
+    if (allow && !allow.has(row.campaign_id)) continue;
+    const monthKey = (row.date_start || "").slice(0, 7);
+    if (!monthKey) continue;
+    if (!monthsMap.has(monthKey)) monthsMap.set(monthKey, new Map());
+    const m = monthsMap.get(monthKey);
+    if (!m.has(row.campaign_id)) m.set(row.campaign_id, { name: row.campaign_name || "(unnamed)", acc: newAcc() });
+    sumRowInto(m.get(row.campaign_id).acc, row);
+  }
+
+  const periods = [...monthsMap.keys()].sort().reverse().map((key) => {
+    const campaigns = [...monthsMap.get(key).entries()].map(([id, v]) => ({ id, name: v.name, ...finalizeMetrics(v.acc) }));
+    const [yy, mm] = key.split("-");
+    return {
+      key,
+      label: `${MONTH_NAMES[parseInt(mm, 10) - 1]} ${yy}`,
+      campaigns,
+      totals: totalsFromCampaigns(campaigns),
+    };
+  });
+
+  return res.status(200).json({ ad_account: adAcct, view: "monthly", periods, ...base });
+}
+
+// Deterministic fallback insight (no Claude key / API error). Mirrors the
+// wording tiers Zoran approved — never says "bad", always constructive.
+function ruleInsight(totals, campaigns, goals, bm) {
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  const t = totals || {};
+  const money = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US");
+
+  let verdict, verdict_label;
+  if (t.cpl == null) { verdict = "attention"; verdict_label = "Worth revisiting"; }
+  else if (t.cpl <= target) { verdict = "strong"; verdict_label = "Performing well"; }
+  else if (t.cpl <= target * 1.5) { verdict = "steady"; verdict_label = "On track"; }
+  else { verdict = "attention"; verdict_label = "Worth revisiting"; }
+
+  const headline = t.cpl == null
+    ? `Spent ${money(t.spend)} so far — no leads recorded yet.`
+    : `Spent ${money(t.spend)} and brought in ${t.leads} lead${t.leads === 1 ? "" : "s"} at ${money(t.cpl)} each.`;
+
+  const list = Array.isArray(campaigns) ? campaigns : [];
+  const withLeads = list.filter(c => c.cpl != null);
+  const best = withLeads.slice().sort((a, b) => a.cpl - b.cpl)[0];
+  const worst = list.slice().sort((a, b) => (b.cpl == null ? 1e9 : b.cpl) - (a.cpl == null ? 1e9 : a.cpl))[0];
+  const win = best ? `${best.name} is your most efficient — ${money(best.cpl)} per lead.` : `Leads are still coming in — give campaigns a few more days of data.`;
+  let fix = `Everything's tracking near target — keep it running.`;
+  if (worst) {
+    if (worst.ctr != null && worst.ctr < bm.ctr_min) fix = `${worst.name}'s click rate is low — refresh the creative so more people click.`;
+    else if (worst.frequency != null && worst.frequency > bm.freq_max) fix = `${worst.name} is being shown too often to the same people — widen the audience or refresh the ad.`;
+    else if (worst.cpl != null && worst.cpl > target) fix = `${worst.name}'s cost per lead is above target — tighten targeting or improve the landing page.`;
+  }
+
+  const perCampaign = {};
+  for (const c of list) {
+    if (c.cpl == null) perCampaign[c.id] = `Spent ${money(c.spend)} with no leads yet.`;
+    else if (c.ctr != null && c.ctr < bm.ctr_min) perCampaign[c.id] = `${money(c.cpl)} per lead. Few people are clicking — a fresh hook would help.`;
+    else if (c.frequency != null && c.frequency > bm.freq_max) perCampaign[c.id] = `${money(c.cpl)} per lead. People have seen this a lot — time to refresh.`;
+    else if (c.cpl > target) perCampaign[c.id] = `${money(c.cpl)} per lead, a bit over your ${money(target)} target.`;
+    else perCampaign[c.id] = `${money(c.cpl)} per lead — at or under your ${money(target)} target.`;
+  }
+  return { verdict, verdict_label, headline, win, fix, campaigns: perCampaign, source: "rule" };
+}
+
+// POST ?resource=meta-insight  → Claude-written, plain-English coaching for a
+// period: a constructive verdict, a money-framed headline, the biggest win,
+// the biggest fix, and a one-line note per campaign. Falls back to ruleInsight
+// when ANTHROPIC_API_KEY is missing or the call fails, so the UI never breaks.
+// Body: { label, totals, campaigns, goals, benchmarks }.
+async function handleMetaInsight(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.client && !ctx.staff) return res.status(403).json({ error: "client or staff required" });
+
+  const body = req.body || {};
+  const goals = body.goals || { cpl_goal: null, monthly_budget: null };
+  const bm = body.benchmarks || MKT_BENCHMARKS;
+  const totals = body.totals || {};
+  const campaigns = Array.isArray(body.campaigns) ? body.campaigns : [];
+  const label = String(body.label || "this period").slice(0, 60);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+
+  const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
+  const data = JSON.stringify({ period: label, target_cpl: target, monthly_budget: goals.monthly_budget,
+    benchmarks: bm, totals, campaigns }, null, 0);
+
+  const system = [
+    "You are a friendly, plain-spoken marketing coach writing for a sports-academy owner who does NOT understand advertising jargon.",
+    "Read the Meta ad metrics and explain what they MEAN and what to DO — never just restate numbers.",
+    "Rules: No emojis. No jargon (say 'click rate' not 'CTR', 'how often people saw it' not 'frequency'). Frame in plain money where useful.",
+    "Tone: constructive and encouraging. NEVER say performance is 'bad' or 'poor'. For weak results say 'worth revisiting' or 'room to improve'.",
+    "verdict must be exactly one of: strong, steady, attention.",
+    "verdict_label must be one of: 'Performing well' (strong), 'On track' (steady), 'Worth revisiting' (attention).",
+    "Keep headline to one sentence. win and fix to one sentence each. Each per-campaign note one short sentence.",
+    "Return ONLY valid JSON, no markdown, with exactly these keys: verdict, verdict_label, headline, win, fix, campaigns (an object mapping each campaign id to its note string).",
+  ].join(" ");
+
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 900,
+        system,
+        messages: [{ role: "user", content: `Here is the ad data as JSON:\n\n${data}\n\nWrite the coaching JSON now.` }],
+      }),
+    });
+    if (!r.ok) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    const j = await r.json();
+    const text = j.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    const parsed = JSON.parse(match[0]);
+    // Guard the required shape; fall back if Claude drifted.
+    if (!parsed.verdict || !parsed.headline) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    if (!parsed.campaigns || typeof parsed.campaigns !== "object") parsed.campaigns = {};
+    parsed.source = "ai";
+    return res.status(200).json(parsed);
+  } catch {
+    return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+  }
+}
+
+// POST ?resource=ghl-kpi-suggest  (staff only) — DISCOVERY SPIKE.
+// Maps an academy's GHL pipeline stages onto the canonical acquisition funnel
+// and recommends KPIs. Deterministic stage-name matcher (see _ghl_funnel.js) —
+// confirmed against BAM GTA's stage semantics, and the pattern recurs across
+// academies. Stages it can't confidently match are returned "(unmapped)" for
+// staff to fix. Read-only; nothing is saved. Body: { businessName,
+// pipelines:[{name,stages:[{name}]}], stageCounts:{stageName:n} }.
+async function handleGhlKpiSuggest(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+
+  const body = req.body || {};
+  const pipelines = Array.isArray(body.pipelines) ? body.pipelines : [];
+  const stageCounts = body.stageCounts || {};
+
+  // Unique stage names across all pipelines, in pipeline order.
+  const seen = new Set();
+  const stageNames = [];
+  for (const p of pipelines) for (const s of (p.stages || [])) {
+    const nm = (s?.name || "").trim();
+    if (nm && !seen.has(nm)) { seen.add(nm); stageNames.push(nm); }
+  }
+
+  const mapping = stageNames.map(name => {
+    const canonical = mapStageName(name);
+    return { stage: name, canonical: canonical || "(unmapped)", confidence: canonical ? "high" : "low", count: stageCounts[name] ?? null };
+  });
+
+  const order = ["Lead", "Contacted", "Booked", "Showed", "Trial", "Won", "Lost"];
+  const present = [...new Set(mapping.map(m => m.canonical).filter(c => order.includes(c)))];
+  const missing = ["Lead", "Contacted", "Booked", "Showed", "Won"].filter(s => !present.includes(s));
+  const unmapped = mapping.filter(m => m.canonical === "(unmapped)").map(m => m.stage);
+  const { kpis, hidden } = buildKpis(present);
+
+  const matched = mapping.filter(m => m.confidence === "high").length;
+  let summary = `Recognised ${matched} of ${mapping.length} stages and mapped them onto the funnel (Lead → Contacted → Booked → Showed → Won, with Lost tracked).`;
+  if (unmapped.length) summary += ` Needs your call on: ${unmapped.join(", ")}.`;
+  else if (missing.length) summary += ` No stage detected for: ${missing.join(", ")}.`;
+  else summary += " All core funnel steps are represented.";
+
+  return res.status(200).json({
+    summary, mapping, missing, unmapped,
+    kpis, hidden_kpis: hidden,
+    canonical: CANONICAL_FUNNEL,
+    source: "rules",
+  });
+}
+
+// GET ?resource=ghl-kpis&client_id=<id>&days=<n>
+// The live funnel KPIs, counted from ghl_funnel_events (forms/messages/bookings)
+// + Stripe conversions, with CAC vs Meta spend. Leads = form submissions;
+// response/booking/conversion = distinct contacts; rates are vs leads.
+async function handleGhlKpis(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  // Staff viewing a specific client via ?client_id= must win over any ctx.client
+  // the caller might also resolve to (otherwise a staff user who is also a client
+  // would silently read THEIR data, not the academy they opened).
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
+  const now = new Date();
+  const since = new Date(now.getTime() - days * 86400000);
+  const sinceIso = since.toISOString();
+
+  // Client meta (for CAC) + last sync time (for stale-while-revalidate).
+  let adAccount = null, syncedAt = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at`);
+    adAccount = rows?.[0]?.meta_ad_account_id || null;
+    syncedAt = rows?.[0]?.ghl_synced_at || null;
+  } catch { /* columns may not exist yet */ }
+
+  let events = [];
+  try {
+    // Fetch all events for the client and window-filter in JS. (A PostgREST
+    // occurred_at=gte filter with a URL-encoded timestamp silently matched
+    // nothing — the verify count proved JS filtering is correct.)
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
+  } catch {
+    // table may not exist yet (migration not run) — treat as no data.
+    return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, trials: 0, clients_new: 0, clients_existing: 0 });
+  }
+
+  // GTA's 3-KPI funnel: Leads in → Trials booked → New clients.
+  // Dedupe EVERY stage to one unique person (GHL contact → email → phone).
+  const key = (e) => e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
+  const leadSet = new Set(), trialSet = new Set(), newSet = new Set(), existingSet = new Set(), allSet = new Set();
+  for (const e of events) {
+    if (e.occurred_at && e.occurred_at < sinceIso) continue; // window filter (in JS)
+    const k = key(e);
+    if (e.event_type === "lead") leadSet.add(k);
+    else if (e.event_type === "trial") trialSet.add(k);
+    else if (e.event_type === "client_new") { newSet.add(k); allSet.add(k); }
+    else if (e.event_type === "client_existing") { existingSet.add(k); allSet.add(k); }
+  }
+  const leads = leadSet.size;
+  const trials = trialSet.size;
+  const clients_new = newSet.size;
+  const clients_existing = existingSet.size;
+  const clients_all = allSet.size;
+  const pct = (n, d) => d > 0 ? Math.round((n / d) * 1000) / 10 : null;
+
+  // CAC vs Meta spend over the same window.
+  let spend = null;
+  try {
+    const token = await getAnyStaffMetaToken();
+    if (adAccount && token) {
+      const adAcct = adAccount.startsWith("act_") ? adAccount : `act_${adAccount}`;
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        fields: "spend",
+        time_range: JSON.stringify({ since: sinceIso.slice(0, 10), until: now.toISOString().slice(0, 10) }),
+        access_token: token,
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (r.ok) spend = parseFloat(j.data?.[0]?.spend || "0") || 0;
+    }
+  } catch { /* spend stays null */ }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  return res.status(200).json({
+    days, since: sinceIso, ready: true, synced_at: syncedAt,
+    debug: { fetched: events.length, used_client_id: targetClientId },
+    leads, trials, clients_new, clients_existing, clients_all,
+    rates: {
+      trial_rate: pct(trials, leads),         // leads → trials booked
+      new_client_rate: pct(clients_new, leads), // leads → new clients
+    },
+    spend: spend == null ? null : round2(spend),
+    cac: spend == null ? null : {
+      per_lead: leads ? round2(spend / leads) : null,
+      per_trial: trials ? round2(spend / trials) : null,
+      per_new_client: clients_new ? round2(spend / clients_new) : null,
+    },
+  });
+}
+
+// GET ?resource=ghl-kpis-monthly&client_id=&months=
+// Month-by-month KPIs: current month-to-date (first entry) + N prior full months.
+// Same 3-KPI model + CAC as ghl-kpis, but bucketed by calendar month (UTC) and
+// deduped to one unique person PER MONTH. CAC uses per-month Meta spend.
+async function handleGhlKpisMonthly(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
+
+  const monthsBack = Math.min(Math.max(parseInt(req.query.months || "6", 10) || 6, 1), 24);
+
+  // Build the month buckets, newest first. key=YYYY-MM (UTC), with ISO start/end.
+  const now = new Date();
+  const buckets = [];
+  for (let i = 0; i < monthsBack; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const label = start.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+    buckets.push({ key, label, start, end, is_current: i === 0,
+      _sets: { lead: new Set(), trial: new Set(), client_new: new Set(), client_existing: new Set(), all: new Set() } });
+  }
+  const byKey = new Map(buckets.map(b => [b.key, b]));
+
+  let adAccount = null, syncedAt = null, cfg = {};
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=meta_ad_account_id,ghl_synced_at,ghl_kpi_config`);
+    adAccount = rows?.[0]?.meta_ad_account_id || null;
+    syncedAt = rows?.[0]?.ghl_synced_at || null;
+    cfg = rows?.[0]?.ghl_kpi_config || {};
+  } catch { /* columns may not exist */ }
+
+  // Effective-dated forms/calendars: each month uses the latest `effective_configs`
+  // entry with from<=month, else the top-level default selection. An empty set =
+  // "no filter" (count all lead/trial events), so default behaviour is unchanged.
+  const overrides = (Array.isArray(cfg.effective_configs) ? cfg.effective_configs : [])
+    .slice().sort((a, b) => String(a.from || "").localeCompare(String(b.from || "")));
+  const defForms = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
+  const defCals = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  const effectiveFor = (monthKey) => {
+    let chosen = null;
+    for (const o of overrides) { if (String(o.from || "") <= monthKey) chosen = o; else break; }
+    return chosen
+      ? { from: chosen.from, forms: chosen.lead_form_ids || [], cals: chosen.booking_calendar_ids || [],
+          formNames: chosen.lead_form_names || [], calNames: chosen.booking_calendar_names || [] }
+      : { from: null, forms: defForms, cals: defCals, formNames: cfg.lead_form_names || [], calNames: cfg.booking_calendar_names || [] };
+  };
+  for (const b of buckets) {
+    b._eff = effectiveFor(b.key);
+    b._formSet = new Set(b._eff.forms);
+    b._calSet = new Set(b._eff.cals);
+  }
+
+  let events = [];
+  try {
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=event_type,contact_id,contact_email,contact_phone,occurred_at,raw&limit=20000`) || [];
+  } catch {
+    return res.status(200).json({ ready: false, synced_at: syncedAt, months: [] });
+  }
+
+  const key = (e) => e.contact_id || e.contact_email || e.contact_phone || Math.random().toString();
+  const monthKeyOf = (iso) => { const d = new Date(iso); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+  for (const e of events) {
+    if (!e.occurred_at) continue;
+    const b = byKey.get(monthKeyOf(e.occurred_at));
+    if (!b) continue;
+    const k = key(e);
+    if (e.event_type === "lead") {
+      // Count only forms tied to this month (empty set = count all).
+      if (b._formSet.size === 0 || (e.raw && b._formSet.has(e.raw.formId))) b._sets.lead.add(k);
+    } else if (e.event_type === "trial") {
+      if (b._calSet.size === 0 || (e.raw && b._calSet.has(e.raw.calendarId))) b._sets.trial.add(k);
+    } else if (e.event_type === "client_new") { b._sets.client_new.add(k); b._sets.all.add(k); }
+    else if (e.event_type === "client_existing") { b._sets.client_existing.add(k); b._sets.all.add(k); }
+  }
+
+  // Per-month Meta spend (one monthly-increment insights call across the range).
+  const spendByMonth = {};
+  try {
+    const token = await getAnyStaffMetaToken();
+    if (adAccount && token) {
+      const adAcct = adAccount.startsWith("act_") ? adAccount : `act_${adAccount}`;
+      const since = buckets[buckets.length - 1].start.toISOString().slice(0, 10);
+      const until = now.toISOString().slice(0, 10);
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        fields: "spend", time_increment: "monthly",
+        time_range: JSON.stringify({ since, until }), access_token: token,
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (r.ok) for (const row of (j.data || [])) {
+        const mk = (row.date_start || "").slice(0, 7);
+        if (mk) spendByMonth[mk] = parseFloat(row.spend || "0") || 0;
+      }
+    }
+  } catch { /* spend stays empty → CAC null */ }
+
+  const round2 = (n) => Math.round(n * 100) / 100;
+  const months = buckets.map(b => {
+    const leads = b._sets.lead.size, trials = b._sets.trial.size;
+    const clients_new = b._sets.client_new.size, clients_existing = b._sets.client_existing.size, clients_all = b._sets.all.size;
+    const spend = b.key in spendByMonth ? round2(spendByMonth[b.key]) : null;
+    return {
+      key: b.key, label: b.label, is_current: b.is_current,
+      start: b.start.toISOString(), end: b.end.toISOString(),
+      leads, trials, clients_new, clients_existing, clients_all,
+      spend,
+      cac: spend == null ? null : {
+        per_lead: leads ? round2(spend / leads) : null,
+        per_trial: trials ? round2(spend / trials) : null,
+        per_new_client: clients_new ? round2(spend / clients_new) : null,
+      },
+      // Which forms/calendars feed THIS month (effective-dated). override_from is
+      // the `from` of the override in effect, or null when using the default.
+      forms: { ids: [...b._formSet], names: b._eff.formNames },
+      calendars: { ids: [...b._calSet], names: b._eff.calNames },
+      override_from: b._eff.from,
+    };
+  });
+
+  return res.status(200).json({
+    ready: true, synced_at: syncedAt, months,
+    config: {
+      default: { lead_form_ids: defForms, lead_form_names: cfg.lead_form_names || [], booking_calendar_ids: defCals, booking_calendar_names: cfg.booking_calendar_names || [] },
+      effective_configs: overrides,
+    },
+  });
+}
+
+// GET ?resource=ghl-kpi-detail&client_id=&days=&type=&month=YYYY-MM
+// The records BEHIND a KPI number, so staff can verify the count by name.
+// type: 'lead' | 'trial' | 'client_new' | 'clients_all'. Pass month=YYYY-MM to
+// scope to a calendar month (else uses days= as a rolling window).
+async function handleGhlKpiDetail(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const days = Math.min(Math.max(parseInt(req.query.days || "30", 10) || 30, 1), 365);
+  const type = String(req.query.type || "client_new");
+
+  // Window: a calendar month (?month=YYYY-MM) takes precedence over the rolling
+  // ?days= window. monthEnd is exclusive (first instant of the next month).
+  let sinceIso, untilIso = null;
+  const monthParam = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : null;
+  if (monthParam) {
+    const [y, m] = monthParam.split("-").map(Number);
+    sinceIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    untilIso = new Date(Date.UTC(y, m, 1)).toISOString();
+  } else {
+    sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+  }
+
+  let events = [];
+  try {
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=id,event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
+  } catch { return res.status(200).json({ type, days, count: 0, items: [] }); }
+
+  const wanted = type === "clients_all"
+    ? new Set(["client_new", "client_existing"])
+    : new Set([type]);
+
+  // Dedupe to one row per unique person (most recent kept), matching the KPI counts.
+  // `ids` collects EVERY underlying event row for that person+type so the
+  // drill-down can delete all of them in one click (data cleaning).
+  const byKey = new Map();
+  const items = [];
+  for (const e of events) {
+    if (e.occurred_at && e.occurred_at < sinceIso) continue;
+    if (untilIso && e.occurred_at && e.occurred_at >= untilIso) continue;
+    if (!wanted.has(e.event_type)) continue;
+    const k = e.contact_id || e.contact_email || e.contact_phone || `row:${e.id}`;
+    if (byKey.has(k)) { byKey.get(k).ids.push(e.id); continue; }
+    const item = {
+      ids: [e.id],
+      key: k,   // identity for matching the same person across funnel stages (board view)
+      contact_id: e.contact_id || null,
+      phone: e.contact_phone || null,
+      name: (e.raw && e.raw.name) || e.contact_email || "(unknown)",
+      email: e.contact_email || null,
+      date: e.occurred_at,
+      amount: e.value != null ? Number(e.value) : null,
+      is_new: e.event_type === "client_new",
+      kind: e.raw && e.raw.kind || null,
+    };
+    byKey.set(k, item);
+    items.push(item);
+  }
+  return res.status(200).json({ type, days, count: items.length, items });
+}
+
+// POST ?resource=ghl-kpi-delete  { client_id?, ids: [..] }
+// Hard-deletes funnel-event rows behind a drill-down entry (staff data cleaning).
+// Scoped to the resolved client so one academy can't delete another's rows.
+// NOTE: a subsequent "Refresh now" re-pulls from GHL/Stripe and will re-add any
+// entry that still exists at the source — use this for junk/test/stale rows.
+async function handleGhlKpiDelete(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.staff && req.body?.client_id) targetClientId = String(req.body.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map(n => parseInt(n, 10)).filter(Number.isInteger)
+    : [];
+  if (!ids.length) return res.status(400).json({ error: "ids required" });
+
+  try {
+    // Soft-delete: mark excluded (persists + survives re-pull) instead of removing.
+    const updated = await sb(
+      `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
+      { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ excluded: true, excluded_at: nowIso() }) }
+    );
+    return res.status(200).json({ deleted: Array.isArray(updated) ? updated.length : 0, rows: updated || [] });
+  } catch (e) {
+    return res.status(500).json({ error: `delete failed: ${e.message}` });
+  }
+}
+
+// POST ?resource=ghl-kpi-restore  { client_id?, rows: [<deleted ghl_funnel_events rows>] }
+// Undo for the board/drill-down delete: clears the `excluded` flag on those rows
+// (POST { client_id?, ids: [...] }). Soft-delete means the rows never left, so
+// undo just un-hides them.
+async function handleGhlKpiRestore(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.staff && req.body?.client_id) targetClientId = String(req.body.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map(n => parseInt(n, 10)).filter(Number.isInteger)
+    : [];
+  if (!ids.length) return res.status(400).json({ error: "ids required" });
+
+  try {
+    const updated = await sb(
+      `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
+      { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ excluded: false, excluded_at: null }) }
+    );
+    return res.status(200).json({ restored: Array.isArray(updated) ? updated.length : 0 });
+  } catch (e) {
+    return res.status(500).json({ error: `restore failed: ${e.message}` });
+  }
+}
+
+// GET ?resource=ghl-kpi-trash&client_id=&month=YYYY-MM
+// The excluded (soft-deleted) records for a month, grouped by person + stage —
+// powers the persistent trash bin / undo. Survives a page refresh because it
+// reads from the DB, not browser memory.
+async function handleGhlKpiTrash(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  let sinceIso = null, untilIso = null;
+  const monthParam = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : null;
+  if (monthParam) {
+    const [y, m] = monthParam.split("-").map(Number);
+    sinceIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    untilIso = new Date(Date.UTC(y, m, 1)).toISOString();
+  }
+
+  let rows = [];
+  try {
+    rows = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.true&select=id,event_type,contact_id,contact_email,contact_phone,occurred_at,raw,excluded_at&order=excluded_at.desc.nullslast&limit=5000`) || [];
+  } catch { return res.status(200).json({ items: [] }); }
+
+  const bucket = (t) => t === "lead" ? "lead" : t === "trial" ? "trial" : "sale"; // client_new/existing → sale
+  const items = [];
+  const byKey = new Map();
+  for (const e of rows) {
+    if (monthParam) { if (!e.occurred_at || e.occurred_at < sinceIso || e.occurred_at >= untilIso) continue; }
+    const k = (e.contact_id || e.contact_email || e.contact_phone || `row:${e.id}`) + "|" + bucket(e.event_type);
+    if (byKey.has(k)) { byKey.get(k).ids.push(e.id); continue; }
+    const item = { ids: [e.id], name: (e.raw && e.raw.name) || e.contact_email || "(unknown)", excluded_at: e.excluded_at || null };
+    byKey.set(k, item);
+    items.push(item);
+  }
+  return res.status(200).json({ items });
+}
+
+// GET ?resource=ghl-kpi-stripe&client_id=&email=
+// A person's Stripe history on the client's connected account, so staff can judge
+// if they're a live paying member. Looks the customer up by email, returns their
+// subscriptions + recent charges + a simple live/not verdict.
+async function handleGhlKpiStripe(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email) return res.status(200).json({ found: false, reason: "no_email" });
+
+  let stripeAcct = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=stripe_connect_account_id`);
+    stripeAcct = rows?.[0]?.stripe_connect_account_id || null;
+  } catch { /* ignore */ }
+  const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!stripeAcct || !stripeKey) return res.status(200).json({ found: false, reason: "no_stripe" });
+
+  const sFetch = async (path) => {
+    const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
+    if (!r.ok) throw new Error(`stripe ${r.status}`);
+    return r.json();
+  };
+
+  try {
+    const custRes = await sFetch(`/customers?email=${encodeURIComponent(email)}&limit=5`);
+    const customers = custRes.data || [];
+    if (!customers.length) return res.status(200).json({ found: false, reason: "no_customer", email });
+    const cust = customers[0];
+
+    const [subRes, chRes] = await Promise.all([
+      sFetch(`/subscriptions?customer=${cust.id}&status=all&limit=20`),
+      sFetch(`/charges?customer=${cust.id}&limit=25`),
+    ]);
+
+    const subscriptions = (subRes.data || []).map(s => ({
+      id: s.id, status: s.status,
+      amount: (s.items?.data?.[0]?.price?.unit_amount || 0) / 100,
+      interval: s.items?.data?.[0]?.price?.recurring?.interval || null,
+      current_period_end: s.current_period_end ? new Date(s.current_period_end * 1000).toISOString() : null,
+      cancel_at_period_end: !!s.cancel_at_period_end,
+      created: s.created ? new Date(s.created * 1000).toISOString() : null,
+    }));
+    const charges = (chRes.data || []).map(c => ({
+      id: c.id, amount: (c.amount || 0) / 100, currency: c.currency,
+      created: c.created ? new Date(c.created * 1000).toISOString() : null,
+      paid: !!c.paid, refunded: !!c.refunded, status: c.status,
+      description: c.description || null,
+    }));
+
+    const activeSub = subscriptions.find(s => s.status === "active" || s.status === "trialing");
+    const pastDue = subscriptions.find(s => s.status === "past_due" || s.status === "unpaid");
+    const totalPaid = charges.filter(c => c.paid && !c.refunded).reduce((a, c) => a + c.amount, 0);
+    const verdict = activeSub ? "live" : pastDue ? "at_risk" : (totalPaid > 0 ? "former" : "none");
+
+    return res.status(200).json({
+      found: true, email,
+      customer: { id: cust.id, name: cust.name || null, email: cust.email || email, created: cust.created ? new Date(cust.created * 1000).toISOString() : null },
+      customers_count: customers.length,
+      subscriptions, charges,
+      verdict, total_paid: Math.round(totalPaid * 100) / 100,
+    });
+  } catch (e) {
+    return res.status(200).json({ found: false, reason: "error", error: e.message, email });
+  }
+}
+
+// GET ?resource=meta-overview  (staff only)
+// Cross-client marketing roster: this-month vs last-month totals per
+// marketing-included client, plus goal, verdict, trend, and budget pacing —
+// the "single marketing portal" overview. One Meta call per connected client
+// (level=campaign, monthly, last 2 months), run in parallel.
+async function handleMetaOverview(req, res) {
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  if (!ctx.staff) return res.status(403).json({ error: "staff only" });
+  if (req.method === "POST") return metaOverviewSlackAlert(req, res);
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+
+  let clients = [];
+  const sel = "id,business_name,meta_ad_account_id,meta_campaign_ids,meta_cpl_goal,meta_monthly_budget,marketing_included,status";
+  try { clients = await sb(`clients?select=${sel}&order=business_name.asc`); }
+  catch { clients = await sb(`clients?select=id,business_name,meta_ad_account_id,meta_campaign_ids,marketing_included,status&order=business_name.asc`); }
+  clients = (clients || []).filter(c => c.marketing_included !== false);
+
+  const staffToken = await getAnyStaffMetaToken();
+  const now = new Date();
+  const curKey = now.toISOString().slice(0, 7);
+  const lastMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastKey = lastMonthDate.toISOString().slice(0, 7);
+  const since = lastMonthDate.toISOString().slice(0, 10);
+  const until = now.toISOString().slice(0, 10);
+  const monthPct = Math.round((now.getUTCDate() / daysInUTCMonth(now)) * 100);
+  const bm = MKT_BENCHMARKS;
+
+  const pctChange = (cur, prev) => (prev == null || prev === 0 || cur == null) ? null : Math.round(((cur - prev) / Math.abs(prev)) * 100);
+
+  const rows = await Promise.all(clients.map(async (c) => {
+    const goal_cpl = c.meta_cpl_goal != null ? Number(c.meta_cpl_goal) : null;
+    const monthly_budget = c.meta_monthly_budget != null ? Number(c.meta_monthly_budget) : null;
+    const baseRow = { id: c.id, business_name: c.business_name, goal_cpl, monthly_budget };
+    if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
+    try {
+      const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+      const allow = Array.isArray(c.meta_campaign_ids) && c.meta_campaign_ids.length ? new Set(c.meta_campaign_ids) : null;
+      const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
+        level: "campaign", fields: META_CAMPAIGN_FIELDS,
+        time_range: JSON.stringify({ since, until }), time_increment: "monthly",
+        access_token: staffToken, limit: "500",
+      });
+      const r = await fetch(url);
+      const j = await r.json();
+      if (!r.ok) return { ...baseRow, connected: true, error: true };
+      const cur = newAcc(), prev = newAcc();
+      for (const row of (j.data || [])) {
+        if (allow && !allow.has(row.campaign_id)) continue;
+        const mk = (row.date_start || "").slice(0, 7);
+        if (mk === curKey) sumRowInto(cur, row);
+        else if (mk === lastKey) sumRowInto(prev, row);
+      }
+      const m = finalizeMetrics(cur), pm = finalizeMetrics(prev);
+      const target = goal_cpl != null ? goal_cpl : bm.cpl;
+      const v = verdictFor(m.cpl, target);
+      const pacing = monthly_budget != null
+        ? { spent_pct: monthly_budget > 0 ? Math.round((m.spend / monthly_budget) * 100) : null, month_pct: monthPct }
+        : null;
+      const overPace = pacing && pacing.spent_pct != null && pacing.spent_pct > monthPct + 15;
+      const attention = (m.cpl == null && m.spend > 5) || (m.cpl != null && m.cpl > target) || overPace;
+      return {
+        ...baseRow, connected: true,
+        spend: m.spend, leads: m.leads, cpl: m.cpl, impressions: m.impressions, reach: m.reach,
+        link_clicks: m.link_clicks, ctr: m.ctr, frequency: m.frequency,
+        ...v,
+        trend: { leads_pct: pctChange(m.leads, pm.leads), cpl_pct: pctChange(m.cpl, pm.cpl), spend_pct: pctChange(m.spend, pm.spend) },
+        pacing, attention,
+        _prev: pm,
+      };
+    } catch { return { ...baseRow, connected: true, error: true }; }
+  }));
+
+  // Roll-up across connected clients.
+  const live = rows.filter(r => r.connected && !r.error);
+  const sum = (k) => live.reduce((a, r) => a + (r[k] || 0), 0);
+  const prevSpend = live.reduce((a, r) => a + (r._prev?.spend || 0), 0);
+  const prevLeads = live.reduce((a, r) => a + (r._prev?.leads || 0), 0);
+  const totalSpend = _r2(sum("spend")), totalLeads = sum("leads");
+  const rollup = {
+    clients: live.length,
+    spend: totalSpend,
+    leads: totalLeads,
+    cpl: totalLeads > 0 ? _r2(totalSpend / totalLeads) : null,
+    spend_pct: pctChange(totalSpend, prevSpend),
+    leads_pct: pctChange(totalLeads, prevLeads),
+    attention: live.filter(r => r.attention).length,
+  };
+  rows.forEach(r => { delete r._prev; });
+
+  return res.status(200).json({
+    as_of: now.toISOString(),
+    month_label: `${MONTH_NAMES[now.getUTCMonth()]} ${now.getUTCFullYear()}`,
+    month_pct: monthPct,
+    rollup, clients: rows, benchmarks: bm,
+  });
+}
+
+// POST ?resource=meta-overview  (staff) — post a "needs attention" digest to
+// the marketing-team Slack channel. Frontend sends the already-computed list.
+// Requires SLACK_BOT_TOKEN + MARKETING_ALERTS_SLACK_CHANNEL (channel id).
+async function metaOverviewSlackAlert(req, res) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.MARKETING_ALERTS_SLACK_CHANNEL;
+  if (!token || !channel) return res.status(200).json({ sent: false, reason: "slack_not_configured" });
+
+  const { month_label, items } = req.body || {};
+  const list = Array.isArray(items) ? items : [];
+  const lines = list.length
+    ? list.map(i => `• *${i.name}* — ${i.reason || "worth a look"}`).join("\n")
+    : "All marketing clients are on or under target right now. Nice work.";
+  const text = `:bar_chart: *Marketing check${month_label ? ` — ${month_label}` : ""}*\n${lines}`;
+
+  try {
+    const r = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text }),
+    });
+    const j = await r.json();
+    if (!j.ok) return res.status(200).json({ sent: false, reason: j.error || "slack_error" });
+    return res.status(200).json({ sent: true, count: list.length });
+  } catch (err) {
+    return res.status(200).json({ sent: false, reason: err?.message || "slack_error" });
+  }
 }
 
 // GET ?resource=meta-creatives&campaign_id=<id>
@@ -1507,6 +2498,11 @@ async function handleStaffMetaAuth(req, res) {
       redirect_uri: metaStaffRedirectUri(req),
       scope: META_OAUTH_SCOPES.join(","),
       response_type: "code",
+      // Force Facebook to show the permission screen even when the app is already
+      // authorized, so a reconnect actually grants newly-added scopes (e.g. the
+      // ads_management/business_management write scopes) instead of silently
+      // returning the previously-granted read-only set.
+      auth_type: "rerequest",
       state,
     });
 

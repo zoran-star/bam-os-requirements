@@ -1,10 +1,23 @@
 // Unified GHL Serverless Function — locations, contacts, conversations, pipelines
 // Supports both V1 (rest.gohighlevel.com) and V2 (services.leadconnectorhq.com) APIs
-// Routes via ?action=locations|contacts|conversations|pipelines
+// Routes via ?action=locations|contacts|conversations|pipelines|forms|webhook
 
 const GHL_V1 = "https://rest.gohighlevel.com/v1";
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
+
+// Supabase (service role) — only used by the stage-tracking cron.
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+async function sbReq(path, init = {}) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", ...(init.headers || {}) },
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : null;
+}
 
 // ─── Response Cache (in-memory with TTL) ───
 // Default 5 min. Some endpoints (locations) are essentially static — use the
@@ -72,7 +85,7 @@ function getLocation(name) {
 // If loc has both apiKey (V1) and apiKeyV2, we can pick the right one per action
 function getLocForAction(loc, action) {
   // Actions that need V2 (conversations, contacts, messages)
-  const v2Actions = ["conversations", "contacts", "contact", "messages"];
+  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars"];
   // Actions that need V1 (pipelines/opportunities when V1 key is available)
   const v1Actions = ["pipelines"];
 
@@ -208,10 +221,345 @@ function mapConvo(c) {
   };
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+// Funnel-event webhook ingest. GHL workflows POST here on form submit / inbound
+// message / appointment booked; we classify and log to ghl_funnel_events. The
+// recommended workflow payload is { event, locationId, contactId, email, phone,
+// formId, refId } but we also best-effort parse GHL's native fields. Lead events
+// only count for forms in the client's ghl_kpi_config.lead_form_ids.
+async function ghlWebhook(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const secret = process.env.GHL_WEBHOOK_SECRET;
+  if (secret && (req.query.key || "") !== secret) return res.status(401).json({ error: "unauthorized" });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
 
+  const b = req.body || {};
+  const locationId = b.locationId || b.location_id || b.location?.id || null;
+  const contactId  = b.contactId  || b.contact_id  || b.contact?.id  || null;
+  const email = (b.email || b.contact?.email || "").toLowerCase() || null;
+  const phone = b.phone || b.contact?.phone || null;
+  const formId = b.formId || b.form_id || b.form?.id || null;
+  const apptId = b.appointmentId || b.appointment?.id || b.calendar?.appointmentId || null;
+  const msgId  = b.messageId || b.message?.id || null;
+  const direction = (b.direction || b.message?.direction || "").toLowerCase();
+  const explicit  = (b.event || b.type || b.eventType || "").toLowerCase();
+  const occurredAt = b.occurredAt || b.dateAdded || b.date || new Date().toISOString();
+
+  // Match to a portal client by GHL location.
+  let client = null;
+  if (locationId) {
+    try {
+      const rows = await sbReq(`clients?ghl_location_id=eq.${encodeURIComponent(locationId)}&select=id,ghl_kpi_config&limit=1`);
+      client = rows?.[0] || null;
+    } catch { /* leave unmatched */ }
+  }
+
+  let eventType = null, ref = null;
+  if (formId || explicit.includes("form")) {
+    const leadForms = client?.ghl_kpi_config?.lead_form_ids || [];
+    if (formId && leadForms.length && !leadForms.includes(formId)) return res.status(200).json({ ok: true, skipped: "form not in lead set" });
+    if (formId && !leadForms.length) return res.status(200).json({ ok: true, skipped: "no lead forms configured" });
+    eventType = "lead";
+    ref = b.refId || b.submissionId || (formId ? `${formId}:${contactId || ""}:${occurredAt}` : null);
+  } else if (apptId || explicit.includes("appointment") || explicit.includes("booking")) {
+    eventType = "booking";
+    ref = apptId || b.refId || null;
+  } else if (explicit.includes("inbound") || direction === "inbound" || (explicit.includes("message") && direction === "inbound")) {
+    eventType = "response";
+    ref = msgId || b.refId || null;
+  } else if (["lead", "response", "booking"].includes(explicit)) {
+    eventType = explicit;
+    ref = b.refId || null;
+  }
+  if (!eventType) return res.status(200).json({ ok: true, skipped: "unclassified" });
+
+  const row = {
+    client_id: client?.id || null, ghl_location: locationId, event_type: eventType,
+    contact_id: contactId, contact_email: email, contact_phone: phone,
+    ref, occurred_at: occurredAt, raw: b,
+  };
+  try {
+    await sbReq("ghl_funnel_events", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(row) });
+  } catch (e) {
+    // Most likely a duplicate (unique event_type+ref) on a webhook retry — ack so GHL stops retrying.
+    return res.status(200).json({ ok: true, note: (e.message || "").slice(0, 120) });
+  }
+  return res.status(200).json({ ok: true, event: eventType });
+}
+
+// Minimal auth: verify the caller is a logged-in Supabase user (staff or client).
+async function requireUser(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token || !SB_URL || !SB_KEY) return null;
+  try {
+    const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` } });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u?.id ? u : null;
+  } catch { return null; }
+}
+
+async function insertEvents(rows) {
+  if (!rows.length) return 0;
+  // Let DB errors propagate to the caller (which records them in result.errors) —
+  // swallowing here is exactly what hid the failed inserts behind a healthy count.
+  // merge-duplicates so re-pulls refresh existing rows (e.g. backfill names/amounts).
+  await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows),
+  });
+  return rows.length;
+}
+
+// Pull leads (form submissions) + bookings (calendar) + responses (conversations)
+// for ONE client into ghl_funnel_events, then stamp clients.ghl_synced_at. Each
+// source is best-effort (try/catch) so one failing doesn't block the others.
+// Reads the GHL location + lead form ids from clients.ghl_kpi_config.
+async function refreshFunnel(req, res) {
+  // Accept GET or POST — it only pulls/upserts; this removes method as a failure mode.
+  if (req.method !== "POST" && req.method !== "GET") return res.status(405).json({ error: "GET or POST" });
+  const user = await requireUser(req);
+  if (!user) return res.status(401).json({ error: "auth required" });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  const clientId = req.query.client_id;
+  if (!clientId) return res.status(400).json({ error: "client_id required" });
+
+  let client;
+  try {
+    const rows = await sbReq(`clients?id=eq.${clientId}&select=id,ghl_kpi_config,stripe_connect_account_id&limit=1`);
+    client = rows?.[0];
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+  const cfg = client?.ghl_kpi_config || {};
+  const locName = cfg.ghl_location;
+  if (!locName) return res.status(200).json({ ok: true, skipped: "no ghl_location in config" });
+
+  const rawLoc = getLocation(locName);
+  if (!rawLoc) return res.status(200).json({ ok: true, skipped: `location "${locName}" not configured` });
+  const loc = getLocForAction(rawLoc, "contacts"); // V2
+  if (!isV2(loc)) return res.status(200).json({ ok: true, skipped: "v1 location" });
+  const base = getBaseUrl(loc);
+  const headers = makeHeaders(loc);
+  const locationId = await getLocationId(loc);
+  if (!locationId) return res.status(200).json({ ok: true, skipped: "no locationId" });
+
+  // 6-month window (+buffer) so the month-by-month view has history. Each source
+  // is paginated below so we're not capped at 100 rows over that range.
+  const sinceMs = Date.now() - 200 * 86400000;
+  const result = { leads: 0, trials: 0, clients_new: 0, clients_existing: 0, errors: [] };
+
+  // Union of every form/calendar ever assigned (default + effective-dated
+  // overrides) so an old period's forms/calendars still have data to count.
+  const effCfgs = Array.isArray(cfg.effective_configs) ? cfg.effective_configs : [];
+  const unionIds = (topKey, ovKey) => {
+    const s = new Set(Array.isArray(cfg[topKey]) ? cfg[topKey] : []);
+    for (const o of effCfgs) for (const id of (o[ovKey] || [])) s.add(id);
+    return [...s];
+  };
+
+  // ── Leads: submissions of the configured lead forms (paginated, newest-first) ──
+  const leadFormIds = unionIds("lead_form_ids", "lead_form_ids");
+  for (const formId of leadFormIds) {
+    try {
+      let page = 1;
+      for (; page <= 40; page++) {            // 40 pages × 100 = 4000 subs cap
+        const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100", page: String(page) });
+        const r = await fetch(url, { headers });
+        if (!r.ok) { result.errors.push(`forms ${r.status}`); break; }
+        const j = await r.json();
+        const subs = j.submissions || j.data || [];
+        if (!subs.length) break;
+        const rows = [];
+        let sawInWindow = false;
+        for (const s of subs) {
+          const created = s.createdAt || s.dateAdded || s.date || null;
+          if (created && new Date(created).getTime() < sinceMs) continue;
+          sawInWindow = true;
+          const name = s.name || s.fullName || [s.firstName, s.lastName].filter(Boolean).join(" ") || s.contact?.name || null;
+          rows.push({
+            client_id: clientId, ghl_location: locationId, event_type: "lead",
+            contact_id: s.contactId || s.contact?.id || null,
+            contact_email: (s.email || s.contact?.email || "").toLowerCase() || null,
+            contact_phone: s.phone || s.contact?.phone || null,
+            ref: `sub:${s.id}`, occurred_at: created || new Date().toISOString(),
+            raw: { formId, submissionId: s.id, name },
+          });
+        }
+        result.leads += await insertEvents(rows);
+        // Stop at the last page, or once a full page is entirely older than the
+        // window (submissions come back newest-first).
+        if (subs.length < 100 || !sawInWindow) break;
+      }
+    } catch (e) { result.errors.push(`forms:${(e.message || "").slice(0, 60)}`); }
+  }
+
+  // ── Trials: appointments in the selected trial calendar(s). Stored per
+  // appointment; the read endpoint dedupes to one trial per person. ──
+  const calIds = unionIds("booking_calendar_ids", "booking_calendar_ids");
+  // Calendar events usually carry only a contactId — the `title` field is the
+  // appointment name (e.g. "By Any Means Trial"), NOT the person. Resolve the
+  // real contact name via a per-contact lookup (cached) so the drill-down shows
+  // who booked instead of the calendar title.
+  const _trialNameCache = new Map();
+  const resolveTrialName = async (ev) => {
+    const inline = ev.contactName || ev.contact?.name
+      || [ev.contact?.firstName, ev.contact?.lastName].filter(Boolean).join(" ").trim();
+    if (inline) return inline;
+    const cid = ev.contactId;
+    if (!cid) return ev.contact?.email || ev.title || null;
+    if (_trialNameCache.has(cid)) return _trialNameCache.get(cid);
+    let nm = null;
+    try {
+      const cr = await fetch(`${base}/contacts/${cid}`, { headers });
+      if (cr.ok) {
+        const c = (await cr.json()).contact || {};
+        nm = [c.firstName, c.lastName].filter(Boolean).join(" ").trim()
+          || c.name || c.contactName || c.email || null;
+      }
+    } catch { /* fall through to title */ }
+    if (!nm) nm = ev.title || null;
+    _trialNameCache.set(cid, nm);
+    return nm;
+  };
+  for (const calId of calIds) {
+    try {
+      const params = { locationId, calendarId: calId, startTime: String(sinceMs), endTime: String(Date.now()) };
+      const r = await fetch(`${base}/calendars/events?` + new URLSearchParams(params), { headers });
+      if (!r.ok) { result.errors.push(`calendar ${r.status}`); continue; }
+      const j = await r.json();
+      const events = j.events || j.data || [];
+      const rows = [];
+      for (const ev of events) {
+        rows.push({
+          client_id: clientId, ghl_location: locationId, event_type: "trial",
+          contact_id: ev.contactId || null,
+          contact_email: (ev.contact?.email || "").toLowerCase() || null,
+          contact_phone: ev.contact?.phone || null,
+          ref: `appt:${ev.id}`, occurred_at: ev.startTime || ev.dateAdded || new Date().toISOString(),
+          raw: { appointmentId: ev.id, calendarId: calId, status: ev.appointmentStatus || ev.status || null, name: await resolveTrialName(ev) },
+        });
+      }
+      result.trials += await insertEvents(rows);
+    } catch (e) { result.errors.push(`calendar:${(e.message || "").slice(0, 60)}`); }
+  }
+
+  // ── New clients: purchases on the client's connected Stripe account.
+  // 'client_new' if the buyer is NOT already a member of this academy (no member
+  // row for that email starting before this purchase), else 'client_existing'
+  // (already in the system). Counts new subscriptions + standalone one-time
+  // charges (a charge with no invoice = a product purchase). ──
+  const stripeAcct = client.stripe_connect_account_id;
+  const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (stripeAcct && stripeKey) {
+    const sinceSec = Math.floor(sinceMs / 1000);
+    const sFetch = async (path) => {
+      const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
+      if (!r.ok) throw new Error(`stripe ${r.status}`);
+      return r.json();
+    };
+    // Page through a Stripe list endpoint via starting_after until has_more=false.
+    const sFetchAll = async (path) => {
+      const out = [];
+      let after = null;
+      for (let guard = 0; guard < 40; guard++) {   // 40 × 100 = 4000 rows cap
+        const sep = path.includes("?") ? "&" : "?";
+        const j = await sFetch(path + (after ? `${sep}starting_after=${after}` : ""));
+        const data = j.data || [];
+        out.push(...data);
+        if (!j.has_more || !data.length) break;
+        after = data[data.length - 1].id;
+      }
+      return out;
+    };
+
+    // Existing-member lookup: earliest membership start (seconds) per email for
+    // THIS academy. A buyer is "existing" if a membership for their email began
+    // before this purchase (the purchase's own member row starts ~now, so it
+    // won't falsely flag a genuinely new client).
+    const memberStart = {};
+    try {
+      const members = await sbReq(`members?client_id=eq.${clientId}&select=parent_email,stripe_joined_at,joined_date,created_at&limit=5000`);
+      for (const m of (members || [])) {
+        const email = (m.parent_email || "").toLowerCase();
+        if (!email) continue;
+        const t = [m.stripe_joined_at, m.joined_date, m.created_at].map(d => d ? new Date(d).getTime() : null).filter(Boolean);
+        const earliest = t.length ? Math.min(...t) : 0; // 0 = exists but undated → treat as pre-existing
+        memberStart[email] = email in memberStart ? Math.min(memberStart[email], earliest) : earliest;
+      }
+    } catch (e) { result.errors.push(`members:${(e.message || "").slice(0, 40)}`); }
+
+    const EPS = 60 * 1000; // 60s tolerance so the purchase's own member row reads as new
+    const classify = (email, purchaseSec) => {
+      const e = (email || "").toLowerCase();
+      if (!(e in memberStart)) return "client_new";
+      const start = memberStart[e];
+      if (start === 0) return "client_existing";          // member exists, undated → pre-existing
+      return start < (purchaseSec * 1000 - EPS) ? "client_existing" : "client_new";
+    };
+    const pushClient = async (id, cust, occurredSec, amount, kind) => {
+      const email = (cust && cust.email || "").toLowerCase() || null;
+      const name = (cust && (cust.name || cust.description)) || null;
+      const evType = classify(email, occurredSec || sinceSec);
+      const n = await insertEvents([{
+        client_id: clientId, ghl_location: locationId, event_type: evType,
+        contact_email: email, contact_phone: (cust && cust.phone) || null,
+        ref: id, value: amount != null ? amount : null,
+        occurred_at: new Date((occurredSec || sinceSec) * 1000).toISOString(),
+        raw: { stripe_account: stripeAcct, name, kind },
+      }]);
+      if (evType === "client_new") result.clients_new += n; else result.clients_existing += n;
+    };
+    try {
+      const subs = await sFetchAll(`/subscriptions?status=all&created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const s of subs) {
+        const amt = (s.items?.data?.[0]?.price?.unit_amount || 0) / 100;
+        await pushClient(`sub:${s.id}`, s.customer, s.created, amt, "subscription");
+      }
+    } catch (e) { result.errors.push(`stripe-subs:${(e.message || "").slice(0, 40)}`); }
+    try {
+      const charges = await sFetchAll(`/charges?created[gte]=${sinceSec}&limit=100&expand[]=data.customer`);
+      for (const c of charges) {
+        if (!c.paid || c.refunded || c.invoice) continue; // standalone product purchases only
+        await pushClient(`ch:${c.id}`, c.customer, c.created, (c.amount || 0) / 100, "charge");
+      }
+    } catch (e) { result.errors.push(`stripe-charges:${(e.message || "").slice(0, 40)}`); }
+  } else {
+    result.errors.push("no stripe_connect_account_id");
+  }
+
+  // Verify what actually LANDED for this client (vs what we attempted) — this is
+  // the apples-to-apples check against what the read endpoint sees.
+  try {
+    const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const stored = await sbReq(`ghl_funnel_events?client_id=eq.${clientId}&select=occurred_at,event_type&limit=10000`);
+    result.stored_total = (stored || []).length;
+    result.stored_30d = (stored || []).filter(r => r.occurred_at >= since30).length;
+    const sample = (stored || [])[0];
+    if (sample) result.sample_occurred_at = sample.occurred_at;
+  } catch (e) { result.errors.push(`verify:${(e.message || "").slice(0, 40)}`); }
+
+  // Stamp last-synced.
+  try {
+    await sbReq(`clients?id=eq.${clientId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ ghl_synced_at: new Date().toISOString() }) });
+  } catch { /* non-fatal */ }
+
+  return res.status(200).json({ ok: true, ...result });
+}
+
+export default async function handler(req, res) {
   const action = req.query.action || "locations";
+
+  // POST actions — these run BEFORE the GET-only guard (they do their own method
+  // check). Putting them after the guard 405'd every POST.
+  if (action === "webhook") {
+    return ghlWebhook(req, res);
+  }
+  if (action === "refresh-funnel") {
+    return refreshFunnel(req, res);
+  }
+
+  // Everything below is GET.
+  if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   // --- Locations (no auth needed, not cached) ---
   if (action === "locations") {
@@ -301,9 +649,76 @@ export default async function handler(req, res) {
     }
 
     // ─── Conversations ───
+    // ─── Forms (list a location's forms — powers the lead-form picker) ───
+    // Handles BOTH V2 (services.leadconnectorhq.com) and V1 (rest.gohighlevel.com).
+    // Always 200s with diagnostics (version/status/count/reason) so the picker can
+    // explain an empty result instead of silently showing nothing.
+    if (action === "forms") {
+      let response, usedUrl;
+      if (v2) {
+        const params = { limit: "100" };
+        if (locationId) params.locationId = locationId;
+        usedUrl = `${base}/forms/?${new URLSearchParams(params)}`;
+        response = await fetch(usedUrl, { headers });
+        // V2 token without a known locationId → discover it, then retry.
+        if (!response.ok && !locationId) {
+          const discovered = await discoverV2LocationId(loc);
+          if (discovered) {
+            usedUrl = `${base}/forms/?${new URLSearchParams({ limit: "100", locationId: discovered })}`;
+            response = await fetch(usedUrl, { headers });
+          }
+        }
+      } else {
+        // V1: GET https://rest.gohighlevel.com/v1/forms/
+        usedUrl = `${base}/forms/?limit=100`;
+        response = await fetch(usedUrl, { headers });
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        if (isRateLimited(response.status, errText) && cached) return sendCached(res, cached, true);
+        return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
+      }
+      const data = await response.json();
+      const forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
+      const body = { data: forms, count: forms.length, version: v2 ? 2 : 1, location: locationName };
+      cacheSet(ck, 200, body);
+      return res.status(200).json(body);
+    }
+
+    // ─── Calendars (list a location's calendars — powers the trial-calendar picker) ───
+    if (action === "calendars") {
+      let response, usedUrl;
+      if (v2) {
+        const params = {};
+        if (locationId) params.locationId = locationId;
+        usedUrl = `${base}/calendars/?${new URLSearchParams(params)}`;
+        response = await fetch(usedUrl, { headers });
+        if (!response.ok && !locationId) {
+          const discovered = await discoverV2LocationId(loc);
+          if (discovered) {
+            usedUrl = `${base}/calendars/?${new URLSearchParams({ locationId: discovered })}`;
+            response = await fetch(usedUrl, { headers });
+          }
+        }
+      } else {
+        usedUrl = `${base}/calendars/`;
+        response = await fetch(usedUrl, { headers });
+      }
+      if (!response.ok) {
+        const errText = await response.text();
+        if (isRateLimited(response.status, errText) && cached) return sendCached(res, cached, true);
+        return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
+      }
+      const data = await response.json();
+      const cals = (data.calendars || data.data || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
+      const body = { data: cals, count: cals.length, version: v2 ? 2 : 1, location: locationName };
+      cacheSet(ck, 200, body);
+      return res.status(200).json(body);
+    }
+
     if (action === "conversations") {
       const contactId = req.query.contactId;
-
       let url;
       if (v2) {
         const params = {};
@@ -528,7 +943,7 @@ export default async function handler(req, res) {
       return res.status(200).json(body);
     }
 
-    return res.status(400).json({ error: "Invalid action. Use: locations, contacts, conversations, pipelines, contact, messages" });
+    return res.status(400).json({ error: "Invalid action. Use: locations, contacts, conversations, pipelines, forms, contact, messages" });
   } catch (err) {
     console.error(`GHL error (${locationName}):`, err.message);
     // On network errors, return cached data if available (even stale)

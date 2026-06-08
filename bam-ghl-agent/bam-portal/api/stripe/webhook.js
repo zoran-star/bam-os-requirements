@@ -253,6 +253,27 @@ async function handleSubCreated(event, connectedAccount, res) {
     db_changes:      { members: { status: "payment_method_required → live", linked: true, plan: planFromPrice || "(unchanged — non-canonical price)" } },
   });
 
+  // Funnel KPI: record the conversion (lead went live on Stripe), tied to the
+  // lead by email. Best-effort — never blocks member linking. ref=sub.id keeps
+  // it idempotent on webhook retries.
+  try {
+    const amount = (sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].price
+      && sub.items.data[0].price.unit_amount || 0) / 100;
+    await sb(`ghl_funnel_events`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{
+        client_id: target.client_id,
+        event_type: "conversion",
+        contact_email: email,
+        ref: sub.id,
+        value: amount || null,
+        occurred_at: sub.created ? new Date(sub.created * 1000).toISOString() : nowIso(),
+        raw: { sub_id: sub.id, event_id: event.id, customer_id: customerId },
+      }]),
+    });
+  } catch { /* non-fatal — funnel telemetry only */ }
+
   return res.status(200).json({ ok: true, linked_member_id: target.id });
 }
 

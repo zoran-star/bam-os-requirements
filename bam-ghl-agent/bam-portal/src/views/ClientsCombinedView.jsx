@@ -3,6 +3,8 @@ import { supabase } from "../lib/supabase";
 import MessageThread from "../components/MessageThread";
 import { TicketModal } from "./SystemsView";
 import { fetchTickets, fetchDelegationPool } from "../services/ticketsService";
+import MarketingDashboard, { GoalEditor } from "../components/MarketingDashboard";
+import GhlKpiDiscovery from "../components/GhlKpiDiscovery";
 
 // ─── Combined Clients page ──────────────────────────────────────────────────
 // Replaces the old Clients tab + Client Setup tab. Two states:
@@ -1107,7 +1109,7 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
 
   // Sub-tab within the Marketing tab: "campaigns" (setup + active campaigns)
   // or "kpis" (yesterday + week-over-week lead KPIs).
-  const [marketingSubTab, setMarketingSubTab] = useState("campaigns");
+  const [marketingSubTab, setMarketingSubTab] = useState("performance");
 
   async function toggleMarketingIncluded(nextValue) {
     setSavingFlag(true); setFlagErr(null);
@@ -1361,8 +1363,10 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
       {/* Sub-tab bar: Campaigns | KPIs */}
       <div style={{ display: "flex", gap: 4, marginBottom: 22, borderBottom: `1px solid ${t.border}` }}>
         {[
+          { id: "performance", label: "Performance" },
           { id: "campaigns", label: "Campaigns" },
           { id: "kpis", label: "KPIs" },
+          { id: "ghl", label: "GHL KPIs (beta)" },
         ].map(st => (
           <button
             key={st.id}
@@ -1379,8 +1383,17 @@ function MarketingTab({ client, tokens, role, session, onChanged }) {
         ))}
       </div>
 
+      {marketingSubTab === "performance" && <>
+        {canEdit && <GoalEditor client={client} tokens={t} session={session} onChanged={onChanged} onSaved={onChanged} />}
+        <MarketingDashboard key={client.id} clientId={client.id} tokens={t} session={session} />
+      </>}
+
       {marketingSubTab === "kpis" && (
         <MarketingKpis client={client} tokens={t} session={session} />
+      )}
+
+      {marketingSubTab === "ghl" && (
+        <GhlKpiDiscovery client={client} tokens={t} session={session} />
       )}
 
       {marketingSubTab === "campaigns" && <>

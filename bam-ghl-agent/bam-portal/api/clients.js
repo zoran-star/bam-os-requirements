@@ -1785,6 +1785,34 @@ export default async function handler(req, res) {
           patch.marketing_included = v;
         }
 
+        // Marketing goals for the Ad Performance dashboard (numeric or null).
+        // null/"" clears the goal → dashboard falls back to industry benchmark.
+        const setNum = (k) => {
+          if (body[k] === null || body[k] === "") return null;
+          const n = Number(body[k]);
+          if (!Number.isFinite(n) || n < 0) return undefined; // invalid sentinel
+          return Math.round(n * 100) / 100;
+        };
+        if (wasSet("meta_cpl_goal")) {
+          const v = setNum("meta_cpl_goal");
+          if (v === undefined) return res.status(400).json({ error: "meta_cpl_goal must be a positive number or null" });
+          patch.meta_cpl_goal = v;
+        }
+        if (wasSet("meta_monthly_budget")) {
+          const v = setNum("meta_monthly_budget");
+          if (v === undefined) return res.status(400).json({ error: "meta_monthly_budget must be a positive number or null" });
+          patch.meta_monthly_budget = v;
+        }
+
+        // GHL KPI config (jsonb) — staff-confirmed funnel wiring (lead forms, etc.)
+        if (wasSet("ghl_kpi_config")) {
+          const v = body.ghl_kpi_config;
+          if (v !== null && (typeof v !== "object" || Array.isArray(v))) {
+            return res.status(400).json({ error: "ghl_kpi_config must be an object or null" });
+          }
+          patch.ghl_kpi_config = v;
+        }
+
         // v2_access — formerly named "onboarding_in_progress". Renamed
         // 2026-05-27 to match its new semantics (V2 portal opt-in, not
         // onboarding state). The staff "V2 access?" toggle posts this.
