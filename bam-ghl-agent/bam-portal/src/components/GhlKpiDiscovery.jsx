@@ -638,7 +638,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       <div style={card}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
           <div style={lbl}>Leads in — which forms count?</div>
-          <button onClick={loadFormActivity} disabled={!location} style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: location ? "pointer" : "default", marginBottom: 8 }}>📊 Submissions by month</button>
+          <button onClick={loadFormActivity} disabled={!location} style={{ fontSize: 11, fontWeight: 600, padding: "5px 10px", borderRadius: 7, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: location ? "pointer" : "default", marginBottom: 8 }}>📊 When were forms used?</button>
         </div>
         <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5, marginBottom: 12 }}>
           Tick the forms whose submissions count as a new lead (e.g. free-trial booking form + contact form). This becomes the config the KPIs read.
@@ -1039,46 +1039,46 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
 
       {formActivity && (
         <div onClick={() => setFormActivity(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1300, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 900, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 620, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Form submissions by month</div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Forms — when was each used?</div>
               <button onClick={() => setFormActivity(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
             </div>
             <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
-              Every form's submissions per month — spot which form was the lead form in a given month. <span style={{ color: t.accent }}>✓</span> = currently counted as a lead form.
+              Each form's first &amp; last submission and total, most-popular first. Tick the ones that are real lead forms — the KPIs will count every ticked form's submissions, so old + new forms backfill the right months automatically.
             </div>
-            {formActivity.loading ? <div style={{ fontSize: 13, color: t.textSub }}>Tallying submissions… (this can take a few seconds)</div>
+            {formActivity.loading ? <div style={{ fontSize: 13, color: t.textSub }}>Studying form submissions… (a few seconds)</div>
               : formActivity.error ? <div style={{ fontSize: 13, color: t.textSub }}>Couldn't load ({formActivity.error}).</div>
               : !formActivity.data?.length ? <div style={{ fontSize: 13, color: t.textSub }}>No forms found.</div>
               : (() => {
-                  const mcols = [...formActivity.months].sort();   // oldest → newest
-                  const shortM = (k) => { const [y, m] = k.split("-"); return new Date(Date.UTC(+y, +m - 1, 1)).toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }); };
+                  const fmt = (iso) => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
                   return (
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%", fontSize: 12 }}>
-                        <thead>
-                          <tr>
-                            <th style={{ textAlign: "left", padding: "6px 10px 8px 2px", color: t.textMute, fontWeight: 700, position: "sticky", left: 0, background: t.bg }}>FORM</th>
-                            {mcols.map(m => <th key={m} style={{ padding: "6px 8px 8px", color: t.textMute, fontWeight: 700, textAlign: "center", minWidth: 52 }}>{shortM(m)}</th>)}
-                            <th style={{ padding: "6px 8px 8px", color: t.textMute, fontWeight: 700, textAlign: "center" }}>Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {formActivity.data.map(f => (
-                            <tr key={f.id} style={{ borderTop: `1px solid ${t.border}` }}>
-                              <td style={{ padding: "8px 10px 8px 2px", color: t.text, fontWeight: 600, whiteSpace: "nowrap", position: "sticky", left: 0, background: t.bg }}>
-                                {picked.has(f.id) && <span style={{ color: t.accent, fontWeight: 800 }}>✓ </span>}{f.name}
-                              </td>
-                              {mcols.map(m => {
-                                const n = f.months?.[m] || 0;
-                                return <td key={m} style={{ padding: "8px", textAlign: "center", color: n ? t.text : t.textMute, fontWeight: n ? 700 : 400, background: n ? `${t.accent}14` : "transparent" }}>{n || "·"}</td>;
-                              })}
-                              <td style={{ padding: "8px", textAlign: "center", color: t.textSub, fontWeight: 700 }}>{f.total}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <>
+                      <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                        {formActivity.data.map(f => {
+                          const sel = picked.has(f.id);
+                          return (
+                            <div key={f.id} onClick={() => toggleForm(f.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 10px", borderRadius: 9, cursor: "pointer", marginBottom: 4, border: `1.5px solid ${sel ? t.accent : "transparent"}`, background: sel ? `${t.accent}14` : "transparent" }}>
+                              <span style={{ width: 16, flexShrink: 0, color: t.accent, fontWeight: 800 }}>{sel ? "✓" : ""}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
+                                <div style={{ fontSize: 11, color: t.textMute, marginTop: 2 }}>{f.total > 0 ? `${fmt(f.first)} → ${fmt(f.last)}` : "no submissions"}</div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: f.total ? t.text : t.textMute }}>{f.total}</div>
+                                <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute }}>subs</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, paddingTop: 14, borderTop: `1px solid ${t.border}` }}>
+                        <button onClick={async () => { await saveForms(); setFormActivity(null); }} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>
+                          {savingForms ? "Saving…" : "Save selected as lead forms"}
+                        </button>
+                        <span style={{ fontSize: 12, color: t.textSub }}>{picked.size} selected</span>
+                      </div>
+                    </>
                   );
                 })()}
           </div>

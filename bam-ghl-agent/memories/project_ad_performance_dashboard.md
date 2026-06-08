@@ -85,10 +85,12 @@ Simplified to 3 KPIs. Sources + definitions:
     (`/calendars/events`). Counts are V2-only + best-effort (parallel, null on failure → hidden +
     unsorted). `counts` is in the GHL cache key so counted/uncounted don't collide. Used in both the
     main setup picker and the per-month effective-config editor.
-  - **Form activity diagnostic (2026-06-07):** `?action=form-activity&location=&months=8` lists
-    EVERY form with a **month-by-month submission count** (paginates each form, buckets by month).
-    Powers a "Submissions by month" button + table modal in the forms picker — to find which form
-    was the lead form in a given month. V2-only. **GTA reality (2026-06-07):** lead events only
+  - **Form activity diagnostic (2026-06-07; simplified 2026-06-08):** `?action=form-activity&location=`
+    lists EVERY form with its **first + last submission date and total** (paginates each form ~3yr,
+    tracks min/max createdAt + count), sorted most-popular first. Powers a "When were forms used?"
+    button → a **selectable list modal** (tick a form → toggles `picked`; Save = saveForms). The whole
+    point: pick the real lead forms (old + new) and the backend counts every ticked form's submissions
+    as leads, so old months backfill — no per-month override needed for the common case. V2-only. **GTA reality (2026-06-07):** lead events only
     exist **May→onward**; trials (calendars) + sales (Stripe) go back to Nov 2025. So pre-May
     "0 leads" = the tracked lead forms had no earlier submissions, not a bug — likely an older lead
     form was used before May.
