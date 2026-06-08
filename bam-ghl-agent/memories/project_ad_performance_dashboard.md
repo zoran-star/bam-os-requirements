@@ -96,11 +96,14 @@ Simplified to 3 KPIs. Sources + definitions:
     Rows sorted furthest-stage desc then completeness, so continuers sit near the top of each
     column. Same-stage dups merge (×N amber badge). `deleteBoardCard` re-fetches + re-aligns.
   - **Board ⇄ Timeline toggle (2026-06-07):** `boardView` state toggles the journey modal between
-    the column **Board** and a vertical **Timeline** (time top→bottom, one row per date that has
-    events; the 3 stages are lanes across the width; each date's events chip into their lane,
-    flex-wrap uses the width when busy). SAME measured-SVG connectors link a person's steps across
-    dates/lanes. Reuses `cardRefs` + the arrows effect (deps include `boardView`). Modal widens to
-    1240px in timeline; undated events skipped there.
+    the column **Board** and a **Timeline**. First timeline attempt (stage-lanes + time-down) was
+    spaghetti — connectors crossed everywhere. **FIXED → per-person rows (Gantt-style):** ONE ROW
+    per person, time left→right; date columns = only the dates that have events. Each person's
+    events are stage pills (Lead muted / Trial accent-outline / Sale filled-accent) in their date
+    column, and the measured-SVG connector is a short HORIZONTAL line within that row → **lines can
+    never cross**. Rows sorted most-complete-journey first (filledCount, furthest, first date).
+    Reuses `cardRefs[`${stage}:${i}`]` + the arrows effect (deps include `boardView`). Horizontal
+    scroll if many date columns; modal widens to 1240px; undated events skipped.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
