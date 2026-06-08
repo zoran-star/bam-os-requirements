@@ -44,6 +44,17 @@
         },
       },
     });
+
+    try {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get("sentry_test") === "client") {
+        setTimeout(function () {
+          throw new Error("[Sentry test] BAM Portal client portal error (" + surface + ")");
+        }, 0);
+      }
+    } catch (e) {
+      // Ignore test hook parsing failures.
+    }
   };
 </script>
 <script src="https://js.sentry-cdn.com/12f4dd6848a4f322f66695c8a789ea5c.min.js" crossorigin="anonymous" data-lazy="no"></script>
