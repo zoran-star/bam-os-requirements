@@ -181,7 +181,7 @@ export default async function handler(req, res) {
         const { id, action } = req.query;
         const body = req.body || {};
         if (!id) return res.status(400).json({ error: "id required" });
-        const validActions = ["client_respond", "final_approve", "final_feedback"];
+        const validActions = ["client_respond", "final_approve", "final_feedback", "client_note"];
         if (!validActions.includes(action)) return res.status(400).json({ error: "invalid action" });
 
         const existing = await sb(`tickets?id=eq.${id}&select=id,client_id,status,messages,user_guide`);
@@ -245,6 +245,29 @@ export default async function handler(req, res) {
           });
           postClientSlackNotification(t.client_id,
             `🔄 Client sent feedback on final review — Systems [${String(id).slice(0, 8).toUpperCase()}]`, req);
+          return res.status(200).json({ data: updated?.[0] });
+        }
+
+        // Free-form client note — add to the ticket ANYTIME (not gated on
+        // awaiting_client). Does not change status.
+        if (action === "client_note") {
+          if (["done", "approved", "cancelled"].includes(t.status)) {
+            return res.status(400).json({ error: "ticket is closed" });
+          }
+          const note = (body.body || body.note || "").trim();
+          const files = body.files || body.client_action_files || [];
+          if (!note && !files.length) return res.status(400).json({ error: "note or files required" });
+          const newMsg = {
+            direction: "client_to_staff",
+            body: note, files,
+            author_id: null, created_at: now,
+          };
+          const updated = await sbPatch(`tickets?id=eq.${id}`, {
+            messages: [...(t.messages || []), newMsg],
+            updated_at: now,
+          });
+          postClientSlackNotification(t.client_id,
+            `💬 Client added a note — Systems [${String(id).slice(0, 8).toUpperCase()}]${note ? `\n_${note}_` : ""}`, req);
           return res.status(200).json({ data: updated?.[0] });
         }
       }
@@ -384,6 +407,19 @@ export default async function handler(req, res) {
           ];
           break;
 
+        case "staff_reply": {
+          // Free-form staff message to the client — does NOT change status
+          // (unlike request_client). Any systems-team member can reply.
+          const replyText = (body.body || "").trim();
+          const replyFiles = body.files || [];
+          if (!replyText && !replyFiles.length) return res.status(400).json({ error: "message or files required" });
+          update.messages = [
+            ...(t.messages || []),
+            { direction: "staff_to_client", body: replyText, files: replyFiles, author_id: me.id, created_at: now },
+          ];
+          break;
+        }
+
         case "submit_review":
           if (t.assigned_to !== me.id && !isManager(me)) return res.status(403).json({ error: "not your ticket" });
           update.user_guide = body.user_guide || "";
@@ -498,6 +534,11 @@ export default async function handler(req, res) {
       } else if (action === "cancel_client_request") {
         postClientSlackNotification(t.client_id,
           `↩️ Request withdrawn — Systems [${code}]`, req);
+      } else if (action === "staff_reply") {
+        const msg = (body.body || "").trim();
+        postClientSlackNotification(t.client_id,
+          `💬 Message from BAM — Systems [${code}]${msg ? `\n_${msg}_` : ""}`, req);
+        pushClient("New message from BAM", msg || "Open the portal to read it.");
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);

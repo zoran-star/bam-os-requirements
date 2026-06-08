@@ -18010,6 +18010,20 @@ function renderDetail() {
 
   const dateBit = t.target ? `<div class="detail-date">target completion: ${t.target}</div>` : '';
 
+  // Always-on note box — client can add anything to the ticket after
+  // submitting (any non-closed ticket). Posts a free client_note.
+  const isClosed = ['done', 'approved', 'cancelled'].includes(t.rawStatus);
+  const noteFormHTML = isClosed ? '' : `
+    <div style="margin-top:24px">
+      <div style="font-size:11px;font-weight:700;color:var(--text-mute);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Add a note for the team</div>
+      <textarea id="client-note-input" placeholder="Add anything to this ticket — extra context, a change, a question…" rows="3" style="width:100%;padding:10px;background:var(--surface);border:1px solid var(--line-str);border-radius:8px;color:var(--text);font:inherit;resize:vertical;margin-bottom:8px"></textarea>
+      <div id="client-note-files" class="file-list" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label class="mini-btn" style="cursor:pointer">Attach files<input type="file" multiple onchange="handleFile(this, 'client-note-files')"></label>
+        <button class="btn btn-primary" style="margin-left:auto" onclick="submitClientNote()">Send note →</button>
+      </div>
+    </div>`;
+
   document.getElementById('detail-body').innerHTML = `
     <div class="detail-header">
       <button class="detail-back" onclick="closeDetail()" aria-label="Back">←</button>
@@ -18022,7 +18036,30 @@ function renderDetail() {
     ${finalReviewHTML}
     ${fieldsHTML}
     ${threadHTML}
+    ${noteFormHTML}
   `;
+}
+
+async function submitClientNote() {
+  const t = getTicket(_currentTicketId);
+  if (!t) return;
+  const note = (document.getElementById('client-note-input')?.value || '').trim();
+  const files = await _uploadFiles('client-note-files', t.id);
+  if (!note && files.length === 0) { alert('Add a note or a file first.'); return; }
+  const res = await fetch(`/api/tickets?id=${t.id}&action=client_note&public=1`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await _authHeaders()) },
+    body: JSON.stringify({ body: note, files }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    alert('Send failed: ' + (err.error || res.status));
+    return;
+  }
+  _pendingFiles['client-note-files'] = [];
+  await loadTickets();
+  const refreshed = getTicket(_currentTicketId);
+  if (refreshed) renderDetail(); else closeDetail();
 }
 
 // ── Final-review actions (client-side approval workflow) ──────────

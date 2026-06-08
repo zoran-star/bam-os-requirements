@@ -7,6 +7,7 @@ import {
   startTicket,
   saveTicketNotes,
   requestClientAction,
+  staffReply,
   cancelClientRequest,
   submitForReview,
   saveUserGuide,
@@ -535,6 +536,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [notes, setNotes] = useState(initial.staff_notes || "");
   const [userGuide, setUserGuide] = useState(initial.user_guide || "");
   const [clientRequest, setClientRequest] = useState("");
+  const [clientReply, setClientReply] = useState("");
   const [denyNotes, setDenyNotes] = useState("");
   const [assignee, setAssignee] = useState(initial.assigned_to || "");
   const [showDeny, setShowDeny] = useState(false);
@@ -804,8 +806,9 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             </Section>
           )}
 
-          {/* Client action thread (multi-round) */}
-          {((ticket.messages || []).length > 0 || ticket.client_action_request || ticket.client_action_response) && (
+          {/* Client action thread (multi-round) — shows for any active ticket
+              so staff can message the client even before any request. */}
+          {((ticket.messages || []).length > 0 || ticket.client_action_request || ticket.client_action_response || !["done", "approved", "cancelled"].includes(ticket.status)) && (
             <Section title="Client conversation" tokens={t}>
               {ticket.status === "awaiting_client" && canClientComm && (
                 <div style={{ marginBottom: 12, padding: 10, background: dark ? "rgba(232,191,96,0.08)" : "rgba(232,191,96,0.12)", border: `1px solid ${t.accent}33`, borderRadius: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -852,6 +855,26 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                       )}
                     </>
                   )}
+              {/* Free reply — message the client anytime (no status change). */}
+              {!["done", "approved", "cancelled"].includes(ticket.status) && (
+                <div style={{ marginTop: 12 }}>
+                  <textarea
+                    value={clientReply}
+                    onChange={e => setClientReply(e.target.value)}
+                    placeholder="Reply to the client…"
+                    rows={2}
+                    style={{ width: "100%", padding: "8px 10px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+                  />
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                    <button
+                      disabled={!clientReply.trim() || busy}
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={async () => { await wrap(() => staffReply(ticket.id, clientReply.trim())); setClientReply(""); }}
+                      style={btn(t, "primary")}
+                    >{busy ? "Sending…" : "Send reply"}</button>
+                  </div>
+                </div>
+              )}
             </Section>
           )}
 
