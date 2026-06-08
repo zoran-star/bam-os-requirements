@@ -40,6 +40,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const boardRowsRef = useRef([]);                          // rows from the last board render
   const [arrows, setArrows] = useState([]);                // measured connector lines
   const [boardView, setBoardView] = useState("board");     // 'board' | 'timeline'
+  const [trash, setTrash] = useState([]);                  // recently deleted (for undo)
+  const trashSeq = useRef(0);
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -260,6 +262,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   // Journey board — Leads → Trials → Sales for one month, each person a card.
   async function openBoard(month) {
     setBoard({ key: month.key, label: month.label, loading: true, leads: [], trials: [], sales: [] });
+    setTrash([]);
     const fetchType = async (type) => {
       const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&month=${month.key}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       return (await res.json().catch(() => ({}))).items || [];
@@ -269,18 +272,52 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       setBoard({ key: month.key, label: month.label, loading: false, leads, trials, sales });
     } catch (e) { setBoard({ key: month.key, label: month.label, loading: false, leads: [], trials: [], sales: [], error: e.message }); }
   }
+  // Silent re-fetch of the open board (no loading flash) — keeps scroll position.
+  async function refetchBoardSilent() {
+    if (!board) return;
+    const fetchType = async (type) => {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-detail&client_id=${client.id}&month=${board.key}&type=${type}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      return (await res.json().catch(() => ({}))).items || [];
+    };
+    const [leads, trials, sales] = await Promise.all([fetchType("lead"), fetchType("trial"), fetchType("clients_all")]);
+    setBoard(b => b ? ({ ...b, leads, trials, sales }) : b);
+  }
+  async function refreshMonthlyCounts() {
+    const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+    if (kr.ok) setMonthly(await kr.json());
+  }
+  // Smooth delete: remove the card from view instantly (no reload), then delete in
+  // the background and stash the removed rows in the trash for Undo.
   async function deleteBoardCard(cell) {
     if (!cell?.ids?.length || !board) return;
+    const idset = new Set(cell.ids);
+    const drop = (arr) => (arr || []).filter(it => !it.ids.some(id => idset.has(id)));
+    setBoard(b => b ? ({ ...b, leads: drop(b.leads), trials: drop(b.trials), sales: drop(b.sales) }) : b);
     try {
       const res = await fetch(`/api/marketing?resource=ghl-kpi-delete`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({ client_id: client.id, ids: cell.ids }),
       });
-      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
-      await openBoard({ key: board.key, label: board.label });   // re-fetch + re-align
-      const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
-      if (kr.ok) setMonthly(await kr.json());
-    } catch (e) { alert("Delete failed: " + e.message); }
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { alert("Delete failed: " + (j.error || res.status)); refetchBoardSilent(); return; }
+      setTrash(tr => [{ key: ++trashSeq.current, name: cell.name || "record", rows: j.rows || [] }, ...tr].slice(0, 50));
+      refreshMonthlyCounts();
+    } catch (e) { alert("Delete failed: " + e.message); refetchBoardSilent(); }
+  }
+  // Undo a delete — re-insert the stashed rows, then silently re-sync.
+  async function undoDelete(entry) {
+    if (!entry) return;
+    if (!entry.rows?.length) { setTrash(tr => tr.filter(x => x !== entry)); return; }
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-restore`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ client_id: client.id, rows: entry.rows }),
+      });
+      if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Undo failed: " + (j.error || res.status)); return; }
+      setTrash(tr => tr.filter(x => x !== entry));
+      await refetchBoardSilent();
+      refreshMonthlyCounts();
+    } catch (e) { alert("Undo failed: " + e.message); }
   }
 
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
@@ -887,6 +924,23 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                   );
                 })()}
           </div>
+
+          {trash.length > 0 && (
+            <div onClick={e => e.stopPropagation()} style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1200, width: 268, background: t.surface, border: `1px solid ${t.borderMed}`, borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.45)", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "11px 12px", borderBottom: `1px solid ${t.border}` }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: t.text }}>🗑 Recently deleted <span style={{ color: t.textMute }}>({trash.length})</span></div>
+                <button onClick={() => undoDelete(trash[0])} style={{ fontSize: 11, fontWeight: 700, padding: "5px 10px", borderRadius: 7, border: "none", background: t.accent, color: "#0A0A0B", cursor: "pointer" }}>↩ Undo</button>
+              </div>
+              <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                {trash.map(entry => (
+                  <div key={entry.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "8px 12px", borderBottom: `1px solid ${t.border}` }}>
+                    <span style={{ fontSize: 12, color: t.textSub, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</span>
+                    <button onClick={() => undoDelete(entry)} title="Restore this record" style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: "pointer" }}>↩</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

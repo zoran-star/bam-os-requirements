@@ -198,6 +198,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpi-delete") {
       return handleGhlKpiDelete(req, res);
     }
+    if (resource === "ghl-kpi-restore") {
+      return handleGhlKpiRestore(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -2032,9 +2035,46 @@ async function handleGhlKpiDelete(req, res) {
       `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
       { method: "DELETE", headers: { Prefer: "return=representation" } }
     );
-    return res.status(200).json({ deleted: Array.isArray(deleted) ? deleted.length : 0 });
+    // Return the deleted rows so the client can offer Undo (restore).
+    return res.status(200).json({ deleted: Array.isArray(deleted) ? deleted.length : 0, rows: deleted || [] });
   } catch (e) {
     return res.status(500).json({ error: `delete failed: ${e.message}` });
+  }
+}
+
+// POST ?resource=ghl-kpi-restore  { client_id?, rows: [<deleted ghl_funnel_events rows>] }
+// Undo for the drill-down/board delete: re-inserts the exact rows the delete
+// returned. Strips id (DB assigns a fresh one), forces client_id to the resolved
+// client, and upserts on (event_type, ref) so a re-restore is idempotent.
+async function handleGhlKpiRestore(req, res) {
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+
+  let targetClientId = null;
+  if (ctx.staff && req.body?.client_id) targetClientId = String(req.body.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (!rows.length) return res.status(400).json({ error: "rows required" });
+
+  const allowed = ["ghl_location", "event_type", "contact_id", "contact_email", "contact_phone", "ref", "value", "occurred_at", "raw"];
+  const clean = rows.map(r => {
+    const o = { client_id: targetClientId };
+    for (const k of allowed) if (r[k] !== undefined) o[k] = r[k];
+    return o;
+  });
+
+  try {
+    const inserted = await sb(`ghl_funnel_events?on_conflict=event_type,ref`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify(clean),
+    });
+    return res.status(200).json({ restored: Array.isArray(inserted) ? inserted.length : 0 });
+  } catch (e) {
+    return res.status(500).json({ error: `restore failed: ${e.message}` });
   }
 }
 

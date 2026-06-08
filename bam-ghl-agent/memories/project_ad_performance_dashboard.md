@@ -104,6 +104,14 @@ Simplified to 3 KPIs. Sources + definitions:
     never cross**. Rows sorted most-complete-journey first (filledCount, furthest, first date).
     Reuses `cardRefs[`${stage}:${i}`]` + the arrows effect (deps include `boardView`). Horizontal
     scroll if many date columns; modal widens to 1240px; undated events skipped.
+  - **Smooth delete + trash/undo (2026-06-07):** ✕ no longer reloads the board (`openBoard` flashed
+    "Loading…" and lost scroll). Now **optimistic**: removes the matching items from `board.leads/
+    trials/sales` locally (instant), then deletes in the background. `ghl-kpi-delete` returns the
+    deleted rows; they go into a `trash[]` (cleared on `openBoard`). A **bottom-right trash panel**
+    (fixed, z1200) lists deleted names with per-item **↩** restore + an **Undo** (last). Undo →
+    new `ghl-kpi-restore` endpoint re-inserts the exact rows (strips id, forces client_id, upsert
+    on `event_type,ref`) then `refetchBoardSilent()` (no loading flag) re-syncs. Monthly counts
+    refresh in the background on both.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
