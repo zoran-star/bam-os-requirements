@@ -85,7 +85,7 @@ function getLocation(name) {
 // If loc has both apiKey (V1) and apiKeyV2, we can pick the right one per action
 function getLocForAction(loc, action) {
   // Actions that need V2 (conversations, contacts, messages)
-  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars"];
+  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars", "form-activity"];
   // Actions that need V1 (pipelines/opportunities when V1 key is available)
   const v1Actions = ["pipelines"];
 
