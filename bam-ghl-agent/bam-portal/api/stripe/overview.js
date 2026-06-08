@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Stripe Financial Overview
 // GET: MRR, revenue, expenses, customer list, recent invoices
 
@@ -38,7 +39,7 @@ async function stripeFetchAll(path) {
   return all;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const section = req.query.section || (req.method === "GET" ? "summary" : null);
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
@@ -277,3 +278,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

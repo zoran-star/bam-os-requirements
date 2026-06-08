@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // ─────────────────────────────────────────────────────────────────────────
 // api/profile.js — update the signed-in user's own profile (avatar for now)
 // ─────────────────────────────────────────────────────────────────────────
@@ -30,7 +31,7 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST" || req.query?.action !== "update-avatar") {
     return res.status(400).json({ error: "unknown action" });
   }
@@ -75,3 +76,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

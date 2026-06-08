@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // ─────────────────────────────────────────────────────────────────────────
 // api/push/cron-weekly.js — #7 weekly performance digest push (cron)
 // ─────────────────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ async function sb(path) {
   return txt ? JSON.parse(txt) : null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const expected = process.env.CRON_SECRET;
   if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
   if ((req.headers.authorization || "") !== `Bearer ${expected}`) {
@@ -56,3 +57,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

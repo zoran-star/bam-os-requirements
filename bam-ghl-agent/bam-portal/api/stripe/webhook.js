@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Stripe webhook (Connect events)
 //
 // Single platform-level Stripe webhook receiving events from every
@@ -137,7 +138,7 @@ async function writeAudit({ client_id, member_id, action_type, args, stripe_resp
 // Handler
 // ─────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).end();
 
   const rawBody = await readRawBody(req);
@@ -737,3 +738,5 @@ async function handlePriceUpserted(event, connectedAccount, res) {
 
   return res.status(200).json({ ok: true, action: event.type, price_id: price.id, tier });
 }
+
+export default withSentryApiRoute(handler);

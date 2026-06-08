@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Agent Sessions
 //
 // Captures Claude Code session transcripts via /showtime → /byebye skills,
@@ -225,7 +226,7 @@ function compactTranscript(transcript) {
 }
 
 // ── handler ─────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     // Fail loudly if core config is missing, instead of failing deep in a request.
     requireEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY");
@@ -348,3 +349,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message || "internal error" });
   }
 }
+
+export default withSentryApiRoute(handler);

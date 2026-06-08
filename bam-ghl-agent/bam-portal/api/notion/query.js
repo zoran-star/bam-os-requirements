@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Unified Notion Query Endpoint
 // POST: accepts { type, clientName?, pageId?, category? }
 
@@ -630,7 +631,7 @@ function isValidNotionPageId(id) {
 
 // ─── Handler ────────────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!process.env.NOTION_API_KEY) {
     return res.status(500).json({ error: "NOTION_API_KEY not configured" });
   }
@@ -704,3 +705,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // ─────────────────────────────────────────────────────────────────────────
 // api/push/send.js — staff-triggered / test push endpoint (admin-gated)
 // ─────────────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ async function resolveStaff(req) {
   return { role: rows?.[0]?.role || null };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const action = req.query?.action;
 
   // ?action=status — booleans only, no secrets. Open to any logged-in staff.
@@ -82,3 +83,5 @@ export default async function handler(req, res) {
 
   return res.status(400).json({ error: "unknown action" });
 }
+
+export default withSentryApiRoute(handler);

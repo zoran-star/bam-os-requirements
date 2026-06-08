@@ -17,6 +17,36 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  window.sentryOnLoad = function () {
+    var prodHosts = ["portal.byanymeansbusiness.com", "fullcontrol.vercel.app"];
+    var isProductionHost = prodHosts.indexOf(window.location.hostname) !== -1;
+
+    if (!isProductionHost) {
+      window.Sentry.init({ enabled: false });
+      return;
+    }
+
+    var cap = window.Capacitor;
+    var isNative = !!(
+      cap &&
+      ((typeof cap.isNativePlatform === "function" && cap.isNativePlatform()) ||
+        (typeof cap.getPlatform === "function" && cap.getPlatform() !== "web"))
+    );
+    var surface = isNative ? "client-mobile-webview" : "client-web";
+
+    window.Sentry.init({
+      environment: "production",
+      initialScope: {
+        tags: {
+          surface: surface,
+          portal: "bam-portal",
+        },
+      },
+    });
+  };
+</script>
+<script src="https://js.sentry-cdn.com/12f4dd6848a4f322f66695c8a789ea5c.min.js" crossorigin="anonymous" data-lazy="no"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

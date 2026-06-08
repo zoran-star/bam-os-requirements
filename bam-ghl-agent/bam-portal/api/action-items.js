@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Action Items (v1)
 //
 // A shared per-client to-do list. Visible to the academy team (client portal)
@@ -298,7 +299,7 @@ async function syncOnboardingItems(clientId) {
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   const action = req.query && req.query.action;
 
   // ── Cron: due-soon Slack reminders (no user auth — CRON_SECRET) ──────────
@@ -537,3 +538,5 @@ export default async function handler(req, res) {
     return res.status(e.status || 500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

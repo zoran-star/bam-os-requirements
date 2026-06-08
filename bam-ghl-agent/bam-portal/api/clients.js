@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Clients (Supabase clients table + live Stripe revenue)
 // GET /api/clients               → list all clients
 // GET /api/clients?id=<uuid>     → single client
@@ -676,7 +677,7 @@ function portalUrls(req) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing (need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)" });
   }
@@ -2658,3 +2659,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Google Calendar OAuth — per-staff connect flow.
 // Reached via explicit vercel.json rewrites (the dynamic [step].js route
 // did not resolve under this project's rewrites — same reason the Meta
@@ -42,7 +43,7 @@ function staffBaseUrl(req) {
   return "https://staff.byanymeansbusiness.com";
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const step = req.query.step;
   const redirectUri = `${staffBaseUrl(req)}/api/auth/google/callback`;
 
@@ -141,3 +142,5 @@ export default async function handler(req, res) {
 
   return res.status(404).json({ error: "unknown step (expected login or callback)" });
 }
+
+export default withSentryApiRoute(handler);

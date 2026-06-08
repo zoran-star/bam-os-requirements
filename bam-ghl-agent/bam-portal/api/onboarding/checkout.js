@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Parent payment funnel, step 3 (PUBLIC)
 //
 // Creates a PORTAL-OWNED Stripe subscription (so the academy's billing buttons —
@@ -101,7 +102,7 @@ function piSecretFromSub(sub) {
   return pi && typeof pi === "object" ? pi.client_secret : null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
 
   try {
@@ -318,3 +319,5 @@ export default async function handler(req, res) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });
   }
 }
+
+export default withSentryApiRoute(handler);

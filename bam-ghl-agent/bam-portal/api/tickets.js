@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Tickets
 // Staff (authenticated): GET/PATCH via Bearer token (Supabase access token)
 // Client portal (public): GET/PATCH with ?public=1 and client_id
@@ -147,7 +148,7 @@ async function enrichTickets(tickets) {
   }));
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const isPublic = req.query.public === "1";
 
@@ -564,3 +565,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

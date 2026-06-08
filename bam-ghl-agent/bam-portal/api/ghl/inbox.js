@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Per-academy GHL Inbox
 //
 //   GET /api/ghl/inbox?client_id=<uuid>
@@ -140,7 +141,7 @@ async function pickGhlToken(client) {
 // ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
 
   let ctx;
@@ -272,3 +273,5 @@ export default async function handler(req, res) {
     },
   });
 }
+
+export default withSentryApiRoute(handler);

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Unified GHL Serverless Function — locations, contacts, conversations, pipelines
 // Supports both V1 (rest.gohighlevel.com) and V2 (services.leadconnectorhq.com) APIs
 // Routes via ?action=locations|contacts|conversations|pipelines|forms|webhook
@@ -546,7 +547,7 @@ async function refreshFunnel(req, res) {
   return res.status(200).json({ ok: true, ...result });
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const action = req.query.action || "locations";
 
   // POST actions — these run BEFORE the GET-only guard (they do their own method
@@ -1018,3 +1019,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

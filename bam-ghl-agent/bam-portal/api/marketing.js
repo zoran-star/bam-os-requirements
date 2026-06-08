@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
@@ -156,7 +157,7 @@ async function enrichWithClient(tickets) {
 // Main handler — routes by ?resource=
 // ─────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const resource = req.query.resource;
     if (resource === "tickets") {
@@ -2607,3 +2608,5 @@ async function handleStaffMetaStatus(req, res) {
     team_fb_user_name: team?.fb_user_name || null,
   });
 }
+
+export default withSentryApiRoute(handler);

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // One-shot backfill: populate members.ghl_contact_id for any member where
 // it's still null but we have a parent_email or parent_phone we can use to
 // look them up in GHL.
@@ -138,7 +139,7 @@ async function lookupGhlContact({ token, locationId, email, phone }) {
   return null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Auth — bearer CRON_SECRET, constant-time compare
   const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const expected = process.env.CRON_SECRET;
@@ -239,3 +240,5 @@ export default async function handler(req, res) {
     errors:             errors.slice(0, 20),
   });
 }
+
+export default withSentryApiRoute(handler);

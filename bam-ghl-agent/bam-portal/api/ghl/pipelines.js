@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Per-academy GHL Pipelines (kanban + moves)
 //
 //   GET   /api/ghl/pipelines?client_id=<uuid>
@@ -170,7 +171,7 @@ async function loadAcademyAndToken(clientId, ctx, res) {
 // ─────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   let ctx;
   try { ctx = await resolveUser(req); }
   catch (e) { return res.status(e.status || 401).json({ error: e.message }); }
@@ -356,3 +357,5 @@ export default async function handler(req, res) {
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
   } });
 }
+
+export default withSentryApiRoute(handler);

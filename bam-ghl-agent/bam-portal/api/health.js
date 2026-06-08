@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // GET /api/health — operational readiness probe.
 //
 // Reports which integrations are wired (env present) + a live Supabase ping, so a deleted
@@ -28,7 +29,7 @@ const OPTIONAL = {
   google_client_secret: ["GOOGLE_CLIENT_SECRET"],
 };
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     // ── auth (shared cron secret) ──
     const cronSecret = process.env.CRON_SECRET;
@@ -85,3 +86,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: e.message || "internal error" });
   }
 }
+
+export default withSentryApiRoute(handler);

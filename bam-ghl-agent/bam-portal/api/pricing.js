@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Pricing catalog (read-only)
 //
 // GET /api/pricing?client_id=<uuid>
@@ -50,7 +51,7 @@ async function resolveUser(req) {
   return { user, isStaff, clientIds };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET only" });
 
   try {
@@ -139,3 +140,5 @@ export default async function handler(req, res) {
     return res.status(e.status || 500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

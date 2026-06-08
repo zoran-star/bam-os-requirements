@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Google Calendar Events (per-staff)
 //   GET    /api/calendar/events  → the signed-in staff member's calendar
 //   DELETE /api/calendar/events  → disconnect (remove their stored token)
@@ -71,7 +72,7 @@ async function fetchCalendarEvents(calendarId, accessToken, timeMin, timeMax) {
   }));
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const bearer = (req.headers.authorization || "").startsWith("Bearer ")
     ? req.headers.authorization.slice(7)
     : null;
@@ -130,3 +131,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message, connected: false });
   }
 }
+
+export default withSentryApiRoute(handler);
