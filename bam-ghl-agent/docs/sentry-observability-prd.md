@@ -79,6 +79,13 @@ Admins should be able to answer:
 - Production only.
 - Empty state: "No production errors in this window."
 - Error state: explain the failure without exposing provider tokens or raw sensitive responses.
+- Include admin-only test controls for initial verification:
+  - Staff app test: throw a real browser error from the staff React app.
+  - API test: call an admin-only API test action that throws server-side, letting the Sentry API wrapper capture it.
+  - Client portal test: open a production client portal test URL that throws after Sentry initializes.
+  - Mobile WebView test: copy the same client portal test URL; it only produces `client-mobile-webview` when opened inside the Capacitor app/WebView.
+
+Test controls should create real thrown errors, not manual `captureException` calls. Remove or hide them later if they become noisy.
 
 ### Sentry Issues List
 

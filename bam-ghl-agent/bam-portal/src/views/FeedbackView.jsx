@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import AgentSessionsPanel from "./AgentSessionsPanel";
+import AppErrorsPanel from "./AppErrorsPanel";
 
 // ─── Feedback tab ────────────────────────────────────────────────────────────
 // ADMIN-ONLY view that lists all submissions from portal_feedback.
@@ -13,9 +14,9 @@ import AgentSessionsPanel from "./AgentSessionsPanel";
 // float to the top; resolved items sink to the bottom and dim out.
 // ────────────────────────────────────────────────────────────────────────────
 
-export default function FeedbackView({ tokens, dark, me, session }) {
+export default function FeedbackView({ tokens, dark, session }) {
   const t = tokens;
-  // Top-level switcher: 'feedback' (default) | 'sessions' (Claude Code transcripts)
+  // Top-level switcher: 'feedback' (default) | 'sessions' | 'app-errors'
   const [section, setSection] = useState("feedback");
   const [feedback, setFeedback] = useState([]);
   const [staffMap, setStaffMap] = useState({});
@@ -115,6 +116,7 @@ export default function FeedbackView({ tokens, dark, me, session }) {
       <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
         {[
           { key: "feedback", label: "Feedback" },
+          { key: "app-errors", label: "App errors" },
           { key: "sessions", label: "Agent sessions" },
         ].map(s => {
           const active = section === s.key;
@@ -141,6 +143,8 @@ export default function FeedbackView({ tokens, dark, me, session }) {
 
       {section === "sessions" ? (
         <AgentSessionsPanel tokens={t} dark={dark} />
+      ) : section === "app-errors" ? (
+        <AppErrorsPanel tokens={t} session={session} />
       ) : (<>
       {/* Header counts */}
       <div style={{ display: "flex", gap: 32, marginBottom: 24, alignItems: "baseline", flexWrap: "wrap" }}>

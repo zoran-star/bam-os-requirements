@@ -782,7 +782,7 @@ export default function BAMPortal() {
               {nav === "marketing" && canSeeMarketing && <MarketingView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "team" && canSeeTeam && <TeamView tokens={tk} dark={dark} session={session} me={me} />}
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
-              {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} me={me} session={session} />}
+              {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
               {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
             </Suspense>
             </div>
