@@ -12635,6 +12635,18 @@ async function switchClient(newId) {
   applyMarketingNavState();
   applyV2NavState(row.v2_access === true);   // re-gate Members/Calendar for the new client
   renderClientSwitcher();
+  // Refresh the point-of-contact name/avatar for the newly-selected academy
+  // (was stuck on the first-loaded academy — switchClient never re-set it).
+  (function () {
+    const un = document.getElementById('userName');
+    const ue = document.getElementById('userEmail');
+    const av = document.getElementById('userAvatar');
+    const on = (row.owner_name || '').trim();
+    const em = (ue && ue.title) || '';   // logged-in email (stored as the title at boot)
+    if (un) { un.textContent = on || em; un.title = on || em; }
+    if (ue) { ue.textContent = on ? em : ''; ue.style.display = on ? 'block' : 'none'; }
+    if (av) av.textContent = (on || em).slice(0, 1).toUpperCase() || '·';
+  })();
   await loadAcademyName();
   await loadTickets();
   subscribeTicketsRealtime();   // re-scope tickets subscription to new CLIENT_ID
