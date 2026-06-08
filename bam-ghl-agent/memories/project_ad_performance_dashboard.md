@@ -112,6 +112,14 @@ Simplified to 3 KPIs. Sources + definitions:
     new `ghl-kpi-restore` endpoint re-inserts the exact rows (strips id, forces client_id, upsert
     on `event_type,ref`) then `refetchBoardSilent()` (no loading flag) re-syncs. Monthly counts
     refresh in the background on both.
+  - **Click a card → Stripe history (2026-06-07):** clicking a board cell / timeline pill opens
+    a modal (`stripeView`) with that person's Stripe history so staff can judge if they're a live
+    member. New `GET ?resource=ghl-kpi-stripe&client_id=&email=` looks the customer up **by email**
+    on the client's `stripe_connect_account_id` (key `STRIPE_CONNECT_SECRET_KEY`), returns
+    subscriptions + last 25 charges + a **verdict** (live = active/trialing sub · at_risk = past_due/
+    unpaid · former = paid before, no active sub · none) + lifetime paid + a multi-customer warning.
+    The ✕ delete buttons `stopPropagation` so they don't trigger the lookup. No email / no customer /
+    no connected Stripe are handled gracefully.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
