@@ -226,13 +226,6 @@ async function handler(req, res) {
     return listSentryIssues(req, res);
   }
 
-  if (action === "test-api-error") {
-    if (req.method !== "POST") return res.status(405).json({ error: "method not allowed" });
-    const staff = await requireAdmin(req, res);
-    if (!staff) return;
-    throw new Error(`[Sentry test] BAM Portal API error (${new Date().toISOString()})`);
-  }
-
   return res.status(400).json({ error: "unknown action" });
 }
 

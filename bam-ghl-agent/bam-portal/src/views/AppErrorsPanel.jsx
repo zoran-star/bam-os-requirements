@@ -5,7 +5,8 @@ const WINDOWS = [
   { value: "7d", label: "Last 7d" },
 ];
 
-const MOBILE_TEST_URL = "https://portal.byanymeansbusiness.com/client-portal.html?sentry_test=client";
+const SENTRY_PURPLE = "#A78BFA";
+const CLAUDE_ORANGE = "#D97757";
 
 export default function AppErrorsPanel({ tokens, session }) {
   const t = tokens;
@@ -14,7 +15,6 @@ export default function AppErrorsPanel({ tokens, session }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [refresh, setRefresh] = useState(0);
-  const [testStatus, setTestStatus] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -47,40 +47,6 @@ export default function AppErrorsPanel({ tokens, session }) {
     return { count, users };
   }, [issues]);
 
-  const triggerStaffError = () => {
-    setTestStatus("Staff app test error queued.");
-    setTimeout(() => {
-      throw new Error(`[Sentry test] BAM Portal staff app error (${new Date().toISOString()})`);
-    }, 0);
-  };
-
-  const triggerApiError = async () => {
-    setTestStatus("Sending API test error...");
-    try {
-      await fetch("/api/app-errors?action=test-api-error", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${session?.access_token || ""}` },
-      });
-      setTestStatus("API test error sent.");
-    } catch (e) {
-      setTestStatus(`API test request failed: ${e.message}`);
-    }
-  };
-
-  const openClientPortalError = () => {
-    window.open(MOBILE_TEST_URL, "_blank", "noopener,noreferrer");
-    setTestStatus("Client portal test opened.");
-  };
-
-  const copyMobileLink = async () => {
-    try {
-      await navigator.clipboard.writeText(MOBILE_TEST_URL);
-      setTestStatus("Mobile test link copied.");
-    } catch {
-      setTestStatus(MOBILE_TEST_URL);
-    }
-  };
-
   return (
     <div>
       <div style={{ display: "flex", gap: 32, marginBottom: 24, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -111,31 +77,7 @@ export default function AppErrorsPanel({ tokens, session }) {
         <button onClick={() => setRefresh((x) => x + 1)} style={outlineButton(t)}>
           Refresh
         </button>
-        <div style={{ flex: 1 }} />
-        <button onClick={triggerStaffError} style={dangerButton(t)}>
-          App Error
-        </button>
-        <button onClick={triggerApiError} style={dangerButton(t)}>
-          API Error
-        </button>
-        <button onClick={openClientPortalError} style={dangerButton(t)}>
-          Client Error
-        </button>
-        <button onClick={copyMobileLink} style={outlineButton(t)}>
-          Mobile Link
-        </button>
       </div>
-
-      {testStatus && (
-        <div style={{
-          marginBottom: 18,
-          color: t.textMute,
-          fontSize: 12,
-          fontFamily: "JetBrains Mono, monospace",
-        }}>
-          {testStatus}
-        </div>
-      )}
 
       {loading && <div style={{ color: t.textMute, padding: 24 }}>Loading app errors...</div>}
       {err && <div style={{ color: t.red, padding: 24 }}>Error: {err}</div>}
@@ -157,30 +99,41 @@ export default function AppErrorsPanel({ tokens, session }) {
 
 function IssueRow({ issue, tokens }) {
   const t = tokens;
+  const borderColor = surfaceColor(issue.surface, t);
+  const secondaryText = t.textSub || t.text;
   return (
     <div style={{
       background: t.surfaceEl,
-      border: `1px solid ${t.border}`,
+      border: `1px solid ${t.borderStr || t.border}`,
       borderRadius: 8,
       padding: "14px 18px 16px",
-      borderLeft: `3px solid ${surfaceColor(issue.surface, t)}`,
     }}>
       <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+            {issue.shortId && (
+              <span style={{
+                color: t.text,
+                fontSize: 12,
+                fontWeight: 800,
+                fontFamily: "JetBrains Mono, monospace",
+                letterSpacing: "0.02em",
+              }}>
+                {issue.shortId}
+              </span>
+            )}
             <Chip label={issue.projectSlug} color={issue.projectSlug === "bam-portal-api" ? "#6EB4FF" : t.amber} />
-            <Chip label={issue.surface || "unknown"} color={surfaceColor(issue.surface, t)} />
-            {issue.shortId && <span style={{ color: t.textMute, fontSize: 12, fontFamily: "JetBrains Mono, monospace" }}>{issue.shortId}</span>}
+            <Chip label={surfaceLabel(issue.surface)} color={borderColor} />
           </div>
           <div style={{ color: t.text, fontSize: 15, fontWeight: 700, lineHeight: 1.4, marginBottom: 6 }}>
             {issue.title}
           </div>
           {issue.culprit && (
-            <div style={{ color: t.textMute, fontSize: 12, fontFamily: "JetBrains Mono, monospace", marginBottom: 10, overflowWrap: "anywhere" }}>
+            <div style={{ color: secondaryText, fontSize: 12, fontFamily: "JetBrains Mono, monospace", marginBottom: 10, overflowWrap: "anywhere" }}>
               {issue.culprit}
             </div>
           )}
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", color: t.textMute, fontSize: 12 }}>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", color: secondaryText, fontSize: 12 }}>
             <span><strong style={{ color: t.text }}>{formatNumber(issue.count)}</strong> events</span>
             <span><strong style={{ color: t.text }}>{formatNumber(issue.userCount)}</strong> users</span>
             <span>First {formatDate(issue.firstSeen)}</span>
@@ -188,10 +141,12 @@ function IssueRow({ issue, tokens }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <a href={issue.permalink} target="_blank" rel="noreferrer" style={linkButton(t)}>
+          <a href={issue.permalink} target="_blank" rel="noreferrer" style={actionButton(t, SENTRY_PURPLE)}>
             View in Sentry
+            <IconArrowUpRight />
           </a>
-          <button onClick={() => copyClaudePrompt(issue)} style={outlineButton(t)}>
+          <button onClick={() => copyClaudePrompt(issue)} style={actionButton(t, CLAUDE_ORANGE)}>
+            <IconClipboard />
             Copy Claude Prompt
           </button>
         </div>
@@ -255,27 +210,32 @@ function outlineButton(t) {
   };
 }
 
-function dangerButton(t) {
-  return {
-    ...outlineButton(t),
-    color: t.red || "#ED7969",
-    border: `1px solid ${t.red || "#ED7969"}66`,
-  };
-}
-
-function linkButton(t) {
+function actionButton(t, color) {
   return {
     ...outlineButton(t),
     display: "inline-flex",
     alignItems: "center",
+    gap: 7,
+    color: t.text || "#FFFFFF",
+    border: `1px solid ${color}`,
+    whiteSpace: "nowrap",
   };
+}
+
+function surfaceLabel(surface) {
+  if (surface === "staff-web" || surface === "public-web") return "Staff app";
+  if (surface === "client-web") return "Client web";
+  if (surface === "client-mobile-webview") return "Mobile webview";
+  if (surface === "vercel-api") return "API";
+  if (surface === "vercel-cron") return "Cron";
+  return surface || "Unknown";
 }
 
 function surfaceColor(surface, t) {
   if (surface === "vercel-api" || surface === "vercel-cron") return "#6EB4FF";
   if (surface === "client-mobile-webview") return "#C787FF";
   if (surface === "client-web") return t.green || "#7ED996";
-  if (surface === "staff-web") return t.amber || "#E8C547";
+  if (surface === "staff-web" || surface === "public-web") return t.red || "#FB7185";
   return t.textMute || "#9A978F";
 }
 
@@ -298,4 +258,22 @@ async function copyClaudePrompt(issue) {
     "If it requires fixing, propose a fix.",
   ].join("\n");
   await navigator.clipboard.writeText(prompt);
+}
+
+function IconArrowUpRight() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 17 17 7" />
+      <path d="M8 7h9v9" />
+    </svg>
+  );
+}
+
+function IconClipboard() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="8" y="4" width="8" height="4" rx="1" />
+      <path d="M16 6h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2" />
+    </svg>
+  );
 }

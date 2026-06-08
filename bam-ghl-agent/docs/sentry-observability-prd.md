@@ -1,6 +1,6 @@
 # PRD: App Errors for BAM Portal
 
-Status: Draft  
+Status: Complete / MVP implemented
 Last updated: 2026-06-08  
 Primary app: `bam-portal`  
 Related app: `bam-portal-app` Capacitor wrapper
@@ -36,7 +36,7 @@ Relevant existing surfaces:
 
 1. Give admins production error visibility inside the staff app.
 2. Keep App Errors separate from Feedback.
-3. Show top Sentry issue groups across frontend, mobile WebView, public web, and backend API/cron surfaces.
+3. Show top Sentry issue groups across staff app, client web, mobile WebView, and backend API/cron surfaces.
 4. Support "View in Sentry" and "Copy Claude prompt" actions.
 5. Avoid writing Sentry issue data into Supabase for the MVP.
 6. Avoid exposing Sentry auth tokens to the browser.
@@ -60,7 +60,7 @@ Primary user: admin staff, initially Zoran.
 Admins should be able to answer:
 
 - What are the hottest production app errors right now?
-- Is this staff web, client web, mobile WebView, public web, or backend API?
+- Is this staff app, client web, mobile WebView, or backend API?
 - Which Sentry project produced it?
 - How many times did it happen in the current window?
 - When was it last seen?
@@ -79,13 +79,6 @@ Admins should be able to answer:
 - Production only.
 - Empty state: "No production errors in this window."
 - Error state: explain the failure without exposing provider tokens or raw sensitive responses.
-- Include admin-only test controls for initial verification:
-  - Staff app test: throw a real browser error from the staff React app.
-  - API test: call an admin-only API test action that throws server-side, letting the Sentry API wrapper capture it.
-  - Client portal test: open a production client portal test URL that throws after Sentry initializes.
-  - Mobile WebView test: copy the same client portal test URL; it only produces `client-mobile-webview` when opened inside the Capacitor app/WebView.
-
-Test controls should create real thrown errors, not manual `captureException` calls. Remove or hide them later if they become noisy.
 
 ### Sentry Issues List
 
@@ -102,7 +95,6 @@ Test controls should create real thrown errors, not manual `captureException` ca
     - `staff-web`
     - `client-web`
     - `client-mobile-webview`
-    - `public-web`
     - `vercel-api`
     - `vercel-cron`
   - count in the selected window
@@ -195,8 +187,7 @@ Likely implementation:
 - Import it first in `bam-portal/src/main.jsx`.
 - Initialize only when `import.meta.env.PROD` and `VITE_SENTRY_DSN` are present.
 - Use `environment=production`.
-- Set `surface=staff-web` after a staff session is known.
-- Tag unauthenticated/non-staff React routes as `surface=public-web` where they are not clearly staff-only.
+- Set `surface=staff-web` for the staff React app, including unauthenticated staff shell/login errors.
 - Wrap the app in a Sentry error boundary or use React root error handlers depending on the React version.
 - Configure source map upload in the Vercel build pipeline with Sentry's Vite/source-map tooling. Staff React source maps are required for MVP.
 - Do not add manual capture for failed API responses in the staff frontend.
@@ -337,7 +328,7 @@ Risk: one noisy client-side loop, backend exception loop, or bad deploy can gene
 7. Add client portal browser Sentry initialization.
 8. Add Vercel API function Sentry helper/wrapper and apply it to API routes and cron actions.
 9. Add source map upload for staff React; attempt static client/public page source maps only if it stays low-effort.
-10. Verify with intentional production-safe test errors, then remove or lock test triggers.
+10. Verify Sentry ingestion without leaving persistent test triggers in the app.
 
 ## Open Questions
 
@@ -354,13 +345,12 @@ Risk: one noisy client-side loop, backend exception loop, or bad deploy can gene
 - Non-admin users cannot see the page and receive 403 from provider proxy APIs.
 - The page supports `Last 24h` and `Last 7d`, and rows disappear from a view when they have no matching errors in that selected window.
 - The App Errors list shows at most 5 unresolved production Sentry issues sorted by frequency across `bam-portal-web` and `bam-portal-api`.
-- Rows show project and surface chips so admins can tell web vs API and staff/client/mobile/public/API/cron apart.
+- Rows show project and surface chips so admins can tell staff app/client/mobile/API/cron apart.
 - Sentry provider tokens are never exposed to browser code.
-- A production staff-web test error appears in Sentry with environment, release, and `surface=staff-web`.
-- A production client-portal test error appears in Sentry from both browser and Capacitor WebView contexts with different surface tags.
-- A production public-web test error appears in Sentry with `surface=public-web`.
-- A production Vercel API test exception appears in Sentry with `surface=vercel-api`.
-- A production Vercel cron route test exception appears in Sentry with `surface=vercel-cron`.
+- Production staff-web errors include environment, release, and `surface=staff-web`.
+- Production client-portal errors include `surface=client-web` in browsers and `surface=client-mobile-webview` in the Capacitor WebView.
+- Production Vercel API exceptions include `surface=vercel-api`.
+- Production Vercel cron route exceptions include `surface=vercel-cron`.
 - A frontend API 400 or 500 response does not create a separate manually reported frontend Sentry issue unless it also causes a real frontend runtime error.
 - Staff React source maps are available in Sentry. Static client/public source maps are best-effort and not required to ship MVP.
 
