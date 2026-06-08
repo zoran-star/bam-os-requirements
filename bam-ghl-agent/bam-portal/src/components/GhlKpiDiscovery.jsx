@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // GHL KPI Discovery (beta) — read-only spike. Pulls an academy's GoHighLevel
 // pipeline (stages + opportunity counts) and asks Claude to map it onto a
@@ -35,6 +35,10 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [detail, setDetail] = useState(null);              // drill-down modal
   const [cfgEdit, setCfgEdit] = useState(null);            // per-month forms/calendars editor
   const [board, setBoard] = useState(null);                // per-month journey board
+  const boardBodyRef = useRef(null);                        // columns container (for arrow geometry)
+  const cardRefs = useRef({});                              // `${stage}:${rowIndex}` -> card DOM node
+  const boardRowsRef = useRef([]);                          // rows from the last board render
+  const [arrows, setArrows] = useState([]);                // measured connector lines
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -118,6 +122,40 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     })();
     return () => { alive = false; };
   }, [location]);
+
+  // Measure the journey-board cards and compute connector lines between the same
+  // person across stages. Columns are top-packed independently, so connections
+  // are diagonal — recomputed after render and on resize.
+  useEffect(() => {
+    if (!board || board.loading) { setArrows([]); return; }
+    const compute = () => {
+      const cont = boardBodyRef.current;
+      if (!cont) return;
+      const base = cont.getBoundingClientRect();
+      const rect = (k) => {
+        const el = cardRefs.current[k];
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { left: r.left - base.left, right: r.right - base.left, midY: r.top - base.top + r.height / 2 };
+      };
+      const out = [];
+      boardRowsRef.current.forEach((row, i) => {
+        const link = (a, b, kind) => {
+          const ra = rect(`${a}:${i}`), rb = rect(`${b}:${i}`);
+          if (ra && rb) out.push({ x1: ra.right, y1: ra.midY, x2: rb.left, y2: rb.midY, kind });
+        };
+        if (row.lead && row.trial) link("lead", "trial", "solid");
+        if (row.trial && row.sale) link("trial", "sale", "solid");
+        if (row.lead && row.sale && !row.trial) link("lead", "sale", "skip");
+      });
+      setArrows(out);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    if (boardBodyRef.current) ro.observe(boardBodyRef.current);
+    window.addEventListener("resize", compute);
+    return () => { ro.disconnect(); window.removeEventListener("resize", compute); };
+  }, [board]);
 
   // Drill-down: the records behind a KPI number (to verify by name). `month`
   // (YYYY-MM) scopes to a calendar month; without it, falls back to rangeDays.
@@ -403,13 +441,6 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       </div>
     );
   };
-  // The gutter arrow between two stages. solid = continuous, skip = jumped a stage.
-  const arrowCell = (kind) => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
-      {kind === "solid" ? <span style={{ fontSize: 20, color: t.accent, fontWeight: 700 }}>→</span>
-        : kind === "skip" ? <span style={{ fontSize: 16, color: t.textMute, opacity: 0.6 }}>⇢</span> : null}
-    </div>
-  );
 
   return (
     <div>
@@ -735,32 +766,46 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
               <button onClick={() => setBoard(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
             </div>
             <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
-              Each row = one person, lined up across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> they continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage · gap = didn't reach it. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.
+              Arrows connect the same person across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage. Each column is sorted with the furthest-along on top, so the gaps fall to the bottom. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.
             </div>
             {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
               : board.error ? <div style={{ color: t.red, fontSize: 13 }}>{board.error}</div>
               : (() => {
                   const rows = buildBoardRows(board);
+                  boardRowsRef.current = rows;
                   if (!rows.length) return <div style={{ fontSize: 13, color: t.textSub }}>No records this month.</div>;
                   const colHead = { fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: t.text, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}` };
-                  const g1 = (r) => r.lead && r.trial ? "solid" : (r.lead && !r.trial && r.sale ? "skip" : "none");
-                  const g2 = (r) => r.trial && r.sale ? "solid" : (r.sale && !r.trial && r.lead ? "skip" : "none");
+                  const filledFor = (stage, r) => stage === "lead" ? true : stage === "trial" ? !!r.lead : !!r.trial;
+                  // Each column top-packs its own cards (whitespace falls to the bottom).
+                  const renderCol = (title, stage, count) => (
+                    <div style={{ minWidth: 0 }}>
+                      <div style={colHead}>{title} <span style={{ color: t.textMute, fontWeight: 600 }}>{count}</span></div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+                        {rows.map((r, i) => r[stage]
+                          ? <div key={i} ref={el => { cardRefs.current[`${stage}:${i}`] = el; }}>{boardCell(r[stage], filledFor(stage, r))}</div>
+                          : null)}
+                      </div>
+                    </div>
+                  );
                   return (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 1fr 44px 1fr", rowGap: 10, columnGap: 0, alignItems: "stretch" }}>
-                      <div style={colHead}>LEADS <span style={{ color: t.textMute, fontWeight: 600 }}>{board.leads.length}</span></div>
-                      <div />
-                      <div style={colHead}>TRIALS <span style={{ color: t.textMute, fontWeight: 600 }}>{board.trials.length}</span></div>
-                      <div />
-                      <div style={colHead}>SALES <span style={{ color: t.textMute, fontWeight: 600 }}>{board.sales.length}</span></div>
-                      {rows.map((r, i) => (
-                        <Fragment key={i}>
-                          {boardCell(r.lead, true)}
-                          {arrowCell(g1(r))}
-                          {boardCell(r.trial, !!r.lead)}
-                          {arrowCell(g2(r))}
-                          {boardCell(r.sale, !!r.trial)}
-                        </Fragment>
-                      ))}
+                    <div ref={boardBodyRef} style={{ position: "relative" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", columnGap: 64, alignItems: "start" }}>
+                        {renderCol("LEADS", "lead", board.leads.length)}
+                        {renderCol("TRIALS", "trial", board.trials.length)}
+                        {renderCol("SALES", "sale", board.sales.length)}
+                      </div>
+                      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
+                        <defs>
+                          <marker id="jb-ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.accent} /></marker>
+                          <marker id="jb-ahs" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.textMute} /></marker>
+                        </defs>
+                        {arrows.map((a, idx) => (
+                          <line key={idx} x1={a.x1} y1={a.y1} x2={a.x2 - 3} y2={a.y2}
+                            stroke={a.kind === "solid" ? t.accent : t.textMute} strokeWidth={a.kind === "solid" ? 2 : 1.5}
+                            strokeDasharray={a.kind === "skip" ? "4 3" : "none"} opacity={a.kind === "skip" ? 0.6 : 1}
+                            markerEnd={a.kind === "solid" ? "url(#jb-ah)" : "url(#jb-ahs)"} />
+                        ))}
+                      </svg>
                     </div>
                   );
                 })()}
