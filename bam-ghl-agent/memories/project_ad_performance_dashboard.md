@@ -60,10 +60,12 @@ Simplified to 3 KPIs. Sources + definitions:
     Stripe `starting_after` loop (subs + charges). Calendars stay range-based.
     Month buckets are **UTC** — near month boundaries a client tz could shift a row;
     revisit with `clients.time_zone` if it matters.
-- **Effective-dated forms/calendars per month (2026-06-07):** forms/calendars that feed
-  Leads/Trials can change over time. `ghl_kpi_config.effective_configs[]` = `{from:'YYYY-MM',
-  lead_form_ids/names, booking_calendar_ids/names}`. A month uses the latest override with
-  `from<=month`, else the top-level **default** (string compare on YYYY-MM = chronological).
+- **Per-month forms/calendars (2026-06-07; was effective-dated, Zoran changed to month-only):**
+  forms/calendars that feed Leads/Trials can change over time. `ghl_kpi_config.effective_configs[]`
+  = `{from:'YYYY-MM', lead_form_ids/names, booking_calendar_ids/names}`. A month uses its **EXACT**
+  override (`from === month`, via an `overrideMap`), else the top-level **default**. (Originally
+  "from month onward"; switched to exact-month-only per Zoran — the modal says "Applies to {month}
+  only" and the button is "Apply to {month}". Save logic was already keyed by exact month.)
   - `ghl-kpis-monthly` resolves per-month forms/cals, filters `lead` events by `raw.formId`
     and `trial` events by `raw.calendarId` (empty set = no filter / count all). Stripe
     (new/existing) events are unaffected. Returns per-month `forms/calendars/override_from`

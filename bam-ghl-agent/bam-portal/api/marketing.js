@@ -1853,16 +1853,16 @@ async function handleGhlKpisMonthly(req, res) {
     cfg = rows?.[0]?.ghl_kpi_config || {};
   } catch { /* columns may not exist */ }
 
-  // Effective-dated forms/calendars: each month uses the latest `effective_configs`
-  // entry with from<=month, else the top-level default selection. An empty set =
-  // "no filter" (count all lead/trial events), so default behaviour is unchanged.
+  // Per-month forms/calendars: a month uses its EXACT `effective_configs` entry
+  // (keyed by `from` = that month) if set, else the top-level default selection.
+  // An empty set = "no filter" (count all lead/trial events).
   const overrides = (Array.isArray(cfg.effective_configs) ? cfg.effective_configs : [])
     .slice().sort((a, b) => String(a.from || "").localeCompare(String(b.from || "")));
+  const overrideMap = new Map(overrides.map(o => [String(o.from || ""), o]));
   const defForms = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
   const defCals = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
   const effectiveFor = (monthKey) => {
-    let chosen = null;
-    for (const o of overrides) { if (String(o.from || "") <= monthKey) chosen = o; else break; }
+    const chosen = overrideMap.get(monthKey);
     return chosen
       ? { from: chosen.from, forms: chosen.lead_form_ids || [], cals: chosen.booking_calendar_ids || [],
           formNames: chosen.lead_form_names || [], calNames: chosen.booking_calendar_names || [] }

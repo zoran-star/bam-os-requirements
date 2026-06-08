@@ -216,9 +216,9 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     } catch (e) { alert("Delete failed: " + e.message); }
   }
 
-  // Per-month forms/calendars (effective-dated). Opening prefills with the
-  // month's currently-effective selection; saving writes an effective_configs
-  // entry { from: <monthKey> } that applies from that month onward.
+  // Per-month forms/calendars. Opening prefills with the month's effective
+  // selection; saving writes an effective_configs entry { from: <monthKey> }
+  // that applies to THAT MONTH ONLY (exact match in the backend resolver).
   function openCfgEdit(month) {
     setCfgEdit({
       monthKey: month.key, monthLabel: month.label,
@@ -447,7 +447,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   // Forms/calendars gear — opens the per-month editor. Accent when a custom
   // override is in effect for this month; muted when using the default.
   const gearBtn = (month) => (
-    <button onClick={() => openCfgEdit(month)} title="Forms & calendars from this month onward"
+    <button onClick={() => openCfgEdit(month)} title="Forms & calendars for this month"
       style={{ flexShrink: 0, height: 26, padding: "0 9px", borderRadius: 8, border: `1px solid ${month.override_from ? t.accent : t.border}`, background: "transparent", color: month.override_from ? t.accent : t.textMute, cursor: "pointer", fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
       ⚙ <span style={{ fontSize: 10 }}>{(month.forms?.ids?.length || 0)}f·{(month.calendars?.ids?.length || 0)}c</span>
     </button>
@@ -787,7 +787,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Forms &amp; calendars</div>
             <div style={{ fontSize: 12.5, color: t.textSub, marginTop: 4, lineHeight: 1.5 }}>
-              Applies to <b style={{ color: t.text }}>{cfgEdit.monthLabel}</b> and every month after — until you set a different mapping on a later month. Leave everything unchecked to fall back to the default selection.
+              Applies to <b style={{ color: t.text }}>{cfgEdit.monthLabel}</b> only. Other months keep the default selection. Leave everything unchecked to remove this month's override.
             </div>
 
             <div style={{ marginTop: 16, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Lead forms → Leads</div>
@@ -812,7 +812,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             <div style={{ marginTop: 18, display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
               <button onClick={clearCfgOverride} style={{ marginRight: "auto", background: "transparent", border: `1px solid ${t.border}`, color: t.textMute, borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontSize: 12 }}>Use default</button>
               <button onClick={() => setCfgEdit(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12 }}>Cancel</button>
-              <button onClick={saveCfgEdit} disabled={cfgEdit.saving} style={{ background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, padding: "8px 16px", cursor: cfgEdit.saving ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}>{cfgEdit.saving ? "Saving…" : `Apply from ${cfgEdit.monthLabel}`}</button>
+              <button onClick={saveCfgEdit} disabled={cfgEdit.saving} style={{ background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, padding: "8px 16px", cursor: cfgEdit.saving ? "wait" : "pointer", fontSize: 12, fontWeight: 700 }}>{cfgEdit.saving ? "Saving…" : `Apply to ${cfgEdit.monthLabel}`}</button>
             </div>
           </div>
         </div>
