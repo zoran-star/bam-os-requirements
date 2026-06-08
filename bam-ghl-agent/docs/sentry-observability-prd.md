@@ -1,6 +1,6 @@
 # PRD: App Errors for BAM Portal
 
-Status: Draft  
+Status: Complete / MVP implemented
 Last updated: 2026-06-08  
 Primary app: `bam-portal`  
 Related app: `bam-portal-app` Capacitor wrapper

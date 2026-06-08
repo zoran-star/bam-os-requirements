@@ -1,6 +1,6 @@
 # App Errors Observability
 
-2026-06-08: Draft PRD added at `docs/sentry-observability-prd.md`.
+2026-06-08: PRD marked complete at `docs/sentry-observability-prd.md`; MVP implemented for production Sentry instrumentation and the admin App Errors tab.
 
 Decision baseline:
 
