@@ -10,9 +10,9 @@ Decision baseline:
 - Shared window control: `Last 24h` default plus `Last 7d`; rows disappear when they have no matching errors in the selected window.
 - Do not write Sentry issues into Supabase for MVP.
 - No "promote to Systems" workflow.
-- Instrument production frontend/mobile/public with Sentry: staff Vite app, public pages/routes, public client portal HTML, mobile WebView via hosted client portal.
+- Instrument production frontend/mobile with Sentry: staff Vite app, public client portal HTML, mobile WebView via hosted client portal.
 - Instrument Vercel API Functions + cron routes with Sentry Node in MVP.
-- Sentry MVP uses one `bam-portal-web` project separated by `surface` tags (`staff-web`, `client-web`, `client-mobile-webview`, `public-web`), not separate staff/client/public projects.
+- Sentry MVP uses one `bam-portal-web` project separated by `surface` tags (`staff-web`, `client-web`, `client-mobile-webview`), not separate staff/client/mobile projects. Staff login/unauthenticated shell errors are pooled into `staff-web`.
 - Sentry backend uses a separate `bam-portal-api` project with `surface=vercel-api` and `surface=vercel-cron`.
 - Sentry org/project IDs: org `full-control`; base URL `https://us.sentry.io`; web project ID `4511527624638464`; API project ID `4511527636828160`. Store DSNs/tokens in Vercel env, not repo docs/code.
 - App Errors shows top 5 combined across web/API for MVP.

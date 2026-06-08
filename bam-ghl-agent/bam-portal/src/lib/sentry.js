@@ -21,7 +21,7 @@ if (sentryEnabled) {
     release: release || undefined,
     initialScope: {
       tags: {
-        surface: "public-web",
+        surface: "staff-web",
         portal: "bam-portal",
       },
     },
@@ -39,6 +39,6 @@ export function configureStaffSentryContext({ me, session } = {}) {
     return;
   }
 
-  Sentry.setTag("surface", "public-web");
+  Sentry.setTag("surface", "staff-web");
   Sentry.setUser(null);
 }
