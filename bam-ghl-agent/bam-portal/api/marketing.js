@@ -1992,6 +1992,8 @@ async function handleGhlKpiDetail(req, res) {
     const item = {
       ids: [e.id],
       key: k,   // identity for matching the same person across funnel stages (board view)
+      contact_id: e.contact_id || null,
+      phone: e.contact_phone || null,
       name: (e.raw && e.raw.name) || e.contact_email || "(unknown)",
       email: e.contact_email || null,
       date: e.occurred_at,

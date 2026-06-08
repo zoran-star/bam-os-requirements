@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 
 // GHL KPI Discovery (beta) — read-only spike. Pulls an academy's GoHighLevel
 // pipeline (stages + opportunity counts) and asks Claude to map it onto a
@@ -35,7 +35,6 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [detail, setDetail] = useState(null);              // drill-down modal
   const [cfgEdit, setCfgEdit] = useState(null);            // per-month forms/calendars editor
   const [board, setBoard] = useState(null);                // per-month journey board
-  const [boardHi, setBoardHi] = useState(null);            // highlighted person (key) across columns
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -231,15 +230,15 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       setBoard({ key: month.key, label: month.label, loading: false, leads, trials, sales });
     } catch (e) { setBoard({ key: month.key, label: month.label, loading: false, leads: [], trials: [], sales: [], error: e.message }); }
   }
-  async function deleteBoardCard(stage, person) {
-    if (!person?.ids?.length) return;
+  async function deleteBoardCard(cell) {
+    if (!cell?.ids?.length || !board) return;
     try {
       const res = await fetch(`/api/marketing?resource=ghl-kpi-delete`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ client_id: client.id, ids: person.ids }),
+        body: JSON.stringify({ client_id: client.id, ids: cell.ids }),
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Delete failed: " + (j.error || res.status)); return; }
-      setBoard(b => ({ ...b, [stage]: b[stage].filter(p => p !== person) }));
+      await openBoard({ key: board.key, label: board.label });   // re-fetch + re-align
       const kr = await fetch(`/api/marketing?resource=ghl-kpis-monthly&client_id=${client.id}&months=6`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       if (kr.ok) setMonthly(await kr.json());
     } catch (e) { alert("Delete failed: " + e.message); }
@@ -349,28 +348,62 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     <button onClick={() => openBoard(month)} title="Journey board — map each person Leads → Trials → Sales"
       style={{ flexShrink: 0, height: 26, padding: "0 10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 13, fontWeight: 600, lineHeight: 1 }}>▦</button>
   );
-  // One person card in the journey board. filled = continued from the prior stage.
-  const boardCard = (person, stage, filled) => {
-    const hi = boardHi && person.key === boardHi;
+  // Align the same person into one ROW across Leads/Trials/Sales. Match by ANY
+  // shared identifier (email / phone / contact_id) via union-find, so a person
+  // tracked differently per stage still lines up. Same-stage duplicates merge
+  // (ids combined, ×N badge). Returns rows ordered most-complete-journey first.
+  const buildBoardRows = (b) => {
+    const all = [];
+    for (const c of b.leads) all.push({ ...c, _stage: "lead" });
+    for (const c of b.trials) all.push({ ...c, _stage: "trial" });
+    for (const c of b.sales) all.push({ ...c, _stage: "sale" });
+    const parent = all.map((_, i) => i);
+    const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const union = (a, c) => { parent[find(a)] = find(c); };
+    const norm = (s) => (s ? String(s).toLowerCase().trim() : "");
+    const seen = new Map();
+    all.forEach((c, i) => {
+      [c.email && "e:" + norm(c.email), c.phone && "p:" + norm(c.phone), c.contact_id && "c:" + c.contact_id]
+        .filter(Boolean).forEach(id => { if (seen.has(id)) union(i, seen.get(id)); else seen.set(id, i); });
+    });
+    const groups = new Map();
+    all.forEach((c, i) => { const r = find(i); (groups.get(r) || groups.set(r, []).get(r)).push(c); });
+    const rows = [];
+    for (const cards of groups.values()) {
+      const row = { lead: null, trial: null, sale: null };
+      for (const stage of ["lead", "trial", "sale"]) {
+        const sc = cards.filter(c => c._stage === stage);
+        if (sc.length) row[stage] = { ...sc[0], ids: sc.flatMap(c => c.ids), dupCount: sc.length };
+      }
+      rows.push(row);
+    }
+    const depth = (r) => (r.lead ? 1 : 0) + (r.trial ? 2 : 0) + (r.sale ? 3 : 0);
+    const firstDate = (r) => [r.lead, r.trial, r.sale].filter(Boolean).map(c => c.date).sort()[0] || "";
+    rows.sort((a, c) => depth(c) - depth(a) || firstDate(a).localeCompare(firstDate(c)));
+    return rows;
+  };
+  // One person's cell within a row. filled = they came from the prior stage.
+  const boardCell = (cell, filled) => {
+    if (!cell) return <div style={{ minHeight: 50 }} />;   // empty slot keeps rows aligned
     return (
-      <div key={stage + ":" + (person.key || person.ids?.[0])}
-        onMouseEnter={() => setBoardHi(person.key)} onMouseLeave={() => setBoardHi(null)}
-        style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, marginBottom: 8,
-          border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : "transparent",
-          boxShadow: hi ? `0 0 0 2px ${t.accent}` : "none", transition: "box-shadow .12s ease" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, minHeight: 50,
+        border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : "transparent" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{person.name}</div>
-          <div style={{ fontSize: 10.5, color: t.textMute, marginTop: 2 }}>{niceDate(person.date)}{person.amount != null ? ` · $${person.amount.toLocaleString()}` : ""}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {cell.name}{cell.dupCount > 1 ? <span style={{ color: t.amber, fontWeight: 700 }}> ×{cell.dupCount}</span> : ""}
+          </div>
+          <div style={{ fontSize: 10.5, color: t.textMute, marginTop: 2 }}>{niceDate(cell.date)}{cell.amount != null ? ` · $${cell.amount.toLocaleString()}` : ""}</div>
         </div>
-        <button onClick={() => deleteBoardCard(stage, person)} title="Delete this record"
+        <button onClick={() => deleteBoardCard(cell)} title="Delete this record"
           style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
       </div>
     );
   };
-  const boardColumn = (title, list, stage, filledFn) => (
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: t.text, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}`, marginBottom: 12 }}>{title} <span style={{ color: t.textMute, fontWeight: 600 }}>{list.length}</span></div>
-      {list.length === 0 ? <div style={{ fontSize: 11, color: t.textMute, textAlign: "center" }}>—</div> : list.map(p => boardCard(p, stage, filledFn(p)))}
+  // The gutter arrow between two stages. solid = continuous, skip = jumped a stage.
+  const arrowCell = (kind) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
+      {kind === "solid" ? <span style={{ fontSize: 20, color: t.accent, fontWeight: 700 }}>→</span>
+        : kind === "skip" ? <span style={{ fontSize: 16, color: t.textMute, opacity: 0.6 }}>⇢</span> : null}
     </div>
   );
 
@@ -691,25 +724,39 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       )}
 
       {board && (
-        <div onClick={() => { setBoard(null); setBoardHi(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
+        <div onClick={() => setBoard(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 1000, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Journey board · {board.label}</div>
-              <button onClick={() => { setBoard(null); setBoardHi(null); }} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+              <button onClick={() => setBoard(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
             </div>
             <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
-              Hover a person to trace them across stages. <span style={{ color: t.accent }}>■</span> filled = came from the previous stage · ▢ outline = joined here. ✕ deletes the record.
+              Each row = one person, lined up across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> they continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage · gap = didn't reach it. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.
             </div>
             {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
               : board.error ? <div style={{ color: t.red, fontSize: 13 }}>{board.error}</div>
               : (() => {
-                  const leadKeys = new Set(board.leads.map(p => p.key));
-                  const trialKeys = new Set(board.trials.map(p => p.key));
+                  const rows = buildBoardRows(board);
+                  if (!rows.length) return <div style={{ fontSize: 13, color: t.textSub }}>No records this month.</div>;
+                  const colHead = { fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: t.text, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}` };
+                  const g1 = (r) => r.lead && r.trial ? "solid" : (r.lead && !r.trial && r.sale ? "skip" : "none");
+                  const g2 = (r) => r.trial && r.sale ? "solid" : (r.sale && !r.trial && r.lead ? "skip" : "none");
                   return (
-                    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-                      {boardColumn("LEADS", board.leads, "leads", () => true)}
-                      {boardColumn("TRIALS", board.trials, "trials", p => leadKeys.has(p.key))}
-                      {boardColumn("SALES", board.sales, "sales", p => trialKeys.has(p.key))}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 1fr 44px 1fr", rowGap: 10, columnGap: 0, alignItems: "stretch" }}>
+                      <div style={colHead}>LEADS <span style={{ color: t.textMute, fontWeight: 600 }}>{board.leads.length}</span></div>
+                      <div />
+                      <div style={colHead}>TRIALS <span style={{ color: t.textMute, fontWeight: 600 }}>{board.trials.length}</span></div>
+                      <div />
+                      <div style={colHead}>SALES <span style={{ color: t.textMute, fontWeight: 600 }}>{board.sales.length}</span></div>
+                      {rows.map((r, i) => (
+                        <Fragment key={i}>
+                          {boardCell(r.lead, true)}
+                          {arrowCell(g1(r))}
+                          {boardCell(r.trial, !!r.lead)}
+                          {arrowCell(g2(r))}
+                          {boardCell(r.sale, !!r.trial)}
+                        </Fragment>
+                      ))}
                     </div>
                   );
                 })()}
