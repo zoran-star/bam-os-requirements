@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Vercel Serverless Function — Members (academy roster + billing)
 //
 // Powers the client-portal "Members" tab. Ported from the BAM GTA
@@ -197,7 +198,7 @@ async function writeAudit({ client_id, member_id, action_type, args, performed_b
 // Main handler
 // ─────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // ── Cron: scheduled-pause lifecycle (run hourly via vercel.json) ──
   // Uses bearer CRON_SECRET, runs BEFORE the user-auth resolver.
   if (req.query.action === "cron-process-scheduled-pauses") {
@@ -1310,3 +1311,5 @@ async function cronProcessScheduledPauses(res) {
     activated, completed, activationErrors, completionErrors, errors,
   });
 }
+
+export default withSentryApiRoute(handler);

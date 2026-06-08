@@ -32,6 +32,7 @@ import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
 import SetPasswordView from './views/SetPasswordView';
 import { supabase } from './lib/supabase';
+import { configureStaffSentryContext } from './lib/sentry';
 import { useIsMobile } from './hooks/useMediaQuery';
 import { useStaffMe } from './hooks/useStaffMe';
 import { IconDashboard, IconClients, IconTasks, IconCalendar, IconKnowledge, IconFinancials, IconMessage, IconSettings, IconAlert, IconSearch, IconTraining } from './components/primitives/Icons';
@@ -144,6 +145,11 @@ export default function BAMPortal() {
   }, [session?.user?.id, session?.user?.email]);
 
   const me = useStaffMe(session);
+
+  useEffect(() => {
+    configureStaffSentryContext({ me, session });
+  }, [me, session]);
+
   const canSeeSystems = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "systems_manager" || me.role === "systems_executor");
   const canSeeMarketing = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");

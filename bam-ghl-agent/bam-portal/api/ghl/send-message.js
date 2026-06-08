@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — GHL: send SMS or Email to an academy parent.
 //
 // POST /api/ghl/send-message
@@ -198,7 +199,7 @@ async function lookupContact({ token, locationId, phone, email }) {
   return contacts[0]?.id || contacts[0]?.contactId || null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   let ctx;
@@ -291,3 +292,5 @@ export default async function handler(req, res) {
     ghl_message_id:      sendResp.messageId      || null,
   });
 }
+
+export default withSentryApiRoute(handler);

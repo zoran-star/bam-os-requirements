@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // ─────────────────────────────────────────────────────────
 // /api/messages — in-portal messaging (Slack replacement)
 // ─────────────────────────────────────────────────────────
@@ -192,7 +193,7 @@ async function loadConversationForUser(conversationId, ctx) {
 }
 
 // ─── Route handler ────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing" });
   }
@@ -479,3 +480,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err?.message || "internal error" });
   }
 }
+
+export default withSentryApiRoute(handler);

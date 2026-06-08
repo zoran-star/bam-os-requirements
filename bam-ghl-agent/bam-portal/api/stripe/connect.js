@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Stripe Connect (Standard OAuth)
 //
 // Connects each academy's existing Stripe account to the BAM platform.
@@ -151,7 +152,7 @@ function redirectBack(res, status, msg) {
 //   GET  = callback (Stripe redirects the browser here with code + state)
 // ─────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === "POST") return handlePrepare(req, res);
   if (req.method === "GET") return handleCallback(req, res);
   return res.status(405).json({ error: "method not allowed" });
@@ -276,3 +277,5 @@ async function handleCallback(req, res) {
 
   return redirectBack(res, "connected");
 }
+
+export default withSentryApiRoute(handler);

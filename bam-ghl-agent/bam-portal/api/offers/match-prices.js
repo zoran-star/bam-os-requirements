@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — AI price matcher (Offer ⇄ Stripe ⇄ CoachIQ)
 //
 // Phase 2 of the offer-price-mapping feature (see
@@ -237,7 +238,7 @@ async function buildOfferTargets(clientId) {
   return targets;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error("Supabase env not configured");
@@ -357,3 +358,5 @@ export default async function handler(req, res) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });
   }
 }
+
+export default withSentryApiRoute(handler);

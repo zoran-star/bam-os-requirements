@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — One-shot backfill of members.stripe_joined_at
 //
 // POST /api/admin/backfill-stripe-joined-at?client_id=<uuid>
@@ -54,7 +55,7 @@ async function resolveStaff(req) {
   return staff[0];
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
   try {
     await resolveStaff(req);
@@ -114,3 +115,5 @@ export default async function handler(req, res) {
     return res.status(e.status || 500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

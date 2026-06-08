@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Members intake (GHL webhook landing)
 //
 // Receives GHL Workflow "form submitted" webhooks and creates a member
@@ -41,7 +42,7 @@ async function sb(path, init = {}) {
   return txt ? JSON.parse(txt) : null;
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
 
   const secret = process.env.GHL_INTAKE_WEBHOOK_SECRET;
@@ -148,3 +149,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ ok: true, member });
 }
+
+export default withSentryApiRoute(handler);

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "./_sentry.js";
 // Merged training API — action-based routing to stay within Hobby plan's 12-function limit
 // POST: { action: "evaluate" | "generate-queue" | "seed-scenarios", ...params }
 
@@ -10,7 +11,7 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABA
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -607,3 +608,5 @@ function shuffle(arr) {
   }
   return result;
 }
+
+export default withSentryApiRoute(handler);

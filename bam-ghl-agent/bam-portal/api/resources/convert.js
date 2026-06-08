@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // ─────────────────────────────────────────────────────────────────────────
 // api/resources/convert.js — turn a legacy PDF resource into content blocks
 // ─────────────────────────────────────────────────────────────────────────
@@ -187,7 +188,7 @@ async function eligibleResources() {
   );
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const action = req.query?.action;
   try {
     const { role, error } = await resolveStaff(req);
@@ -237,3 +238,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+export default withSentryApiRoute(handler);

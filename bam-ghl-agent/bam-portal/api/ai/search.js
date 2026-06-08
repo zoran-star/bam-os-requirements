@@ -1,8 +1,9 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // POST: { query: string, context: string }
 // Uses Anthropic Claude API to answer questions based on SOP content
 // Requires ANTHROPIC_API_KEY env var
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -192,3 +193,5 @@ function fallbackSearch(query, context) {
     sources: matches.map(m => m.title),
   };
 }
+
+export default withSentryApiRoute(handler);

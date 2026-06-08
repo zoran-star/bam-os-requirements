@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Unified Slack API — channels, messages, DMs, OAuth, status, disconnect
 // Routes via ?action= query param for OAuth flows, otherwise standard channel ops
 import { createClient } from "@supabase/supabase-js";
@@ -256,7 +257,7 @@ async function handleFeedbackWebhook(req, res) {
 }
 
 // ─── Main Handler ───
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Prevent browser from caching API responses
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   res.setHeader("Pragma", "no-cache");
@@ -349,3 +350,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);

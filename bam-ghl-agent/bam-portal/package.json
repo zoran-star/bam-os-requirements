@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
+    "@sentry/node": "^10.56.0",
+    "@sentry/react": "^10.56.0",
     "@supabase/supabase-js": "^2.100.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Polling cron: keep BAM members.parent_email / parent_phone / parent_name
 // in sync with GHL contact data. Runs every 10 minutes via vercel.json.
 //
@@ -226,7 +227,7 @@ async function syncContactsForAcademy(client, deadline) {
 }
 
 // ── Handler ──
-export default async function handler(req, res) {
+async function handler(req, res) {
   const got = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const expected = process.env.CRON_SECRET;
   if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
@@ -266,3 +267,5 @@ export default async function handler(req, res) {
   console.log(`[cron-sync-contacts] academies=${results.length} updated=${results.reduce((s, r) => s + (r.totalUpdated || 0), 0)} errors=${results.filter(r => r.error).length}`);
   return res.status(anyError ? 500 : 200).json({ ok: !anyError, academies: results.length, summary: results });
 }
+
+export default withSentryApiRoute(handler);

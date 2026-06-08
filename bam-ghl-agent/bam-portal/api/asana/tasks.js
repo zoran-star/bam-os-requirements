@@ -1,3 +1,4 @@
+import { withSentryApiRoute } from "../_sentry.js";
 // Vercel Serverless Function — Asana Tasks (combined: tasks + import)
 //
 // Default mode (no ?import flag):
@@ -206,7 +207,7 @@ async function loadMapping() {
 // ─────────────────────────────────────────────────────────
 // Main handler — routes on ?import=1
 // ─────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (!process.env.ASANA_ACCESS_TOKEN) {
     return res.status(500).json({ error: "ASANA_ACCESS_TOKEN not configured" });
   }
@@ -483,3 +484,5 @@ async function importHandler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 }
+
+export default withSentryApiRoute(handler);
