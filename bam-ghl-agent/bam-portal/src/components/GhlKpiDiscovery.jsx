@@ -39,6 +39,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const cardRefs = useRef({});                              // `${stage}:${rowIndex}` -> card DOM node
   const boardRowsRef = useRef([]);                          // rows from the last board render
   const [arrows, setArrows] = useState([]);                // measured connector lines
+  const [boardView, setBoardView] = useState("board");     // 'board' | 'timeline'
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -155,7 +156,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     if (boardBodyRef.current) ro.observe(boardBodyRef.current);
     window.addEventListener("resize", compute);
     return () => { ro.disconnect(); window.removeEventListener("resize", compute); };
-  }, [board]);
+  }, [board, boardView]);
 
   // Drill-down: the records behind a KPI number (to verify by name). `month`
   // (YYYY-MM) scopes to a calendar month; without it, falls back to rangeDays.
@@ -760,13 +761,22 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
 
       {board && (
         <div onClick={() => setBoard(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 1000, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>Journey board · {board.label}</div>
-              <button onClick={() => setBoard(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: boardView === "timeline" ? 1240 : 1000, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{boardView === "timeline" ? "Journey timeline" : "Journey board"} · {board.label}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", border: `1px solid ${t.borderMed}`, borderRadius: 8, overflow: "hidden" }}>
+                  {["board", "timeline"].map(v => (
+                    <button key={v} onClick={() => setBoardView(v)} style={{ padding: "6px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", border: 0, cursor: "pointer", background: boardView === v ? t.accent : "transparent", color: boardView === v ? "#0A0A0B" : t.textMute }}>{v}</button>
+                  ))}
+                </div>
+                <button onClick={() => setBoard(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+              </div>
             </div>
             <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
-              Arrows connect the same person across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage. Each column is sorted with the furthest-along on top, so the gaps fall to the bottom. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.
+              {boardView === "timeline"
+                ? <>Time runs top → bottom; the 3 lanes are the stages. A line connects each person's steps. <span style={{ color: t.accent, fontWeight: 700 }}>━</span> continued · <span style={{ color: t.textMute }}>┄</span> skipped a stage. ✕ deletes the record.</>
+                : <>Arrows connect the same person across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage. Each column is sorted with the furthest-along on top, so the gaps fall to the bottom. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.</>}
             </div>
             {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
               : board.error ? <div style={{ color: t.red, fontSize: 13 }}>{board.error}</div>
@@ -776,6 +786,67 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                   if (!rows.length) return <div style={{ fontSize: 13, color: t.textSub }}>No records this month.</div>;
                   const colHead = { fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: t.text, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}` };
                   const filledFor = (stage, r) => stage === "lead" ? true : stage === "trial" ? !!r.lead : !!r.trial;
+                  // Shared SVG connector overlay (measured in the arrows effect).
+                  const svgOverlay = (
+                    <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
+                      <defs>
+                        <marker id="jb-ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.accent} /></marker>
+                        <marker id="jb-ahs" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.textMute} /></marker>
+                      </defs>
+                      {arrows.map((a, idx) => (
+                        <line key={idx} x1={a.x1} y1={a.y1} x2={a.x2 - 3} y2={a.y2}
+                          stroke={a.kind === "solid" ? t.accent : t.textMute} strokeWidth={a.kind === "solid" ? 2 : 1.5}
+                          strokeDasharray={a.kind === "skip" ? "4 3" : "none"} opacity={a.kind === "skip" ? 0.6 : 1}
+                          markerEnd={a.kind === "solid" ? "url(#jb-ah)" : "url(#jb-ahs)"} />
+                      ))}
+                    </svg>
+                  );
+
+                  if (boardView === "timeline") {
+                    // Time runs down; stages are 3 lanes; same person connected by a line.
+                    const evs = [];
+                    rows.forEach((r, i) => { for (const stage of ["lead", "trial", "sale"]) if (r[stage]) evs.push({ i, stage, cell: r[stage] }); });
+                    const dayOf = (c) => (c.date || "").slice(0, 10);
+                    const byDay = new Map();
+                    for (const e of evs) { const d = dayOf(e.cell); if (!d) continue; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(e); }
+                    const days = [...byDay.keys()].sort();
+                    const shortDate = (d) => { const dt = new Date(d + "T00:00:00Z"); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); };
+                    const tlCols = "84px 1fr 1fr 1fr";
+                    const chip = (e) => {
+                      const filled = filledFor(e.stage, rows[e.i]);
+                      return (
+                        <div key={e.stage + ":" + e.i} ref={el => { cardRefs.current[`${e.stage}:${e.i}`] = el; }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 9,
+                            border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : t.surface }}>
+                          <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, whiteSpace: "nowrap" }}>{e.cell.name}{e.cell.dupCount > 1 ? <span style={{ color: t.amber, fontWeight: 700 }}> ×{e.cell.dupCount}</span> : ""}</span>
+                          {e.cell.amount != null && <span style={{ fontSize: 11, color: t.textSub }}>${e.cell.amount.toLocaleString()}</span>}
+                          <button onClick={() => deleteBoardCard(e.cell)} title="Delete this record" style={{ width: 18, height: 18, borderRadius: 5, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 11, lineHeight: 1 }}>✕</button>
+                        </div>
+                      );
+                    };
+                    return (
+                      <div ref={boardBodyRef} style={{ position: "relative" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: tlCols, marginBottom: 2 }}>
+                          <div />
+                          <div style={colHead}>LEADS</div>
+                          <div style={colHead}>TRIALS</div>
+                          <div style={colHead}>SALES</div>
+                        </div>
+                        {days.map(d => (
+                          <div key={d} style={{ display: "grid", gridTemplateColumns: tlCols, borderTop: `1px solid ${t.border}`, padding: "12px 0", alignItems: "center" }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: t.textMute }}>{shortDate(d)}</div>
+                            {["lead", "trial", "sale"].map(stage => (
+                              <div key={stage} style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingRight: 12, alignContent: "center" }}>
+                                {byDay.get(d).filter(e => e.stage === stage).map(chip)}
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        {svgOverlay}
+                      </div>
+                    );
+                  }
+
                   // Each column top-packs its own cards (whitespace falls to the bottom).
                   const renderCol = (title, stage, count) => (
                     <div style={{ minWidth: 0 }}>
@@ -794,18 +865,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                         {renderCol("TRIALS", "trial", board.trials.length)}
                         {renderCol("SALES", "sale", board.sales.length)}
                       </div>
-                      <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", overflow: "visible" }}>
-                        <defs>
-                          <marker id="jb-ah" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.accent} /></marker>
-                          <marker id="jb-ahs" markerWidth="7" markerHeight="7" refX="5.5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill={t.textMute} /></marker>
-                        </defs>
-                        {arrows.map((a, idx) => (
-                          <line key={idx} x1={a.x1} y1={a.y1} x2={a.x2 - 3} y2={a.y2}
-                            stroke={a.kind === "solid" ? t.accent : t.textMute} strokeWidth={a.kind === "solid" ? 2 : 1.5}
-                            strokeDasharray={a.kind === "skip" ? "4 3" : "none"} opacity={a.kind === "skip" ? 0.6 : 1}
-                            markerEnd={a.kind === "solid" ? "url(#jb-ah)" : "url(#jb-ahs)"} />
-                        ))}
-                      </svg>
+                      {svgOverlay}
                     </div>
                   );
                 })()}
