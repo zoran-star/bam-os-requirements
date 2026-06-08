@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 
 // GHL KPI Discovery (beta) — read-only spike. Pulls an academy's GoHighLevel
 // pipeline (stages + opportunity counts) and asks Claude to map it onto a
@@ -775,7 +775,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             </div>
             <div style={{ fontSize: 12, color: t.textSub, marginBottom: 16, lineHeight: 1.5 }}>
               {boardView === "timeline"
-                ? <>Time runs top → bottom; the 3 lanes are the stages. A line connects each person's steps. <span style={{ color: t.accent, fontWeight: 700 }}>━</span> continued · <span style={{ color: t.textMute }}>┄</span> skipped a stage. ✕ deletes the record.</>
+                ? <>One row per person, time runs left → right. The line is their journey — <span style={{ color: t.accent, fontWeight: 700 }}>━</span> continued · <span style={{ color: t.textMute }}>┄</span> skipped a stage. Most-complete journeys on top, so lines never cross. ✕ deletes the record.</>
                 : <>Arrows connect the same person across stages. <span style={{ color: t.accent, fontWeight: 700 }}>→</span> continued · <span style={{ color: t.textMute }}>⇢</span> skipped a stage. Each column is sorted with the furthest-along on top, so the gaps fall to the bottom. <span style={{ color: t.amber, fontWeight: 700 }}>×N</span> = merged duplicates. ✕ deletes the record.</>}
             </div>
             {board.loading ? <div style={{ color: t.textSub, fontSize: 13 }}>Loading…</div>
@@ -803,46 +803,63 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                   );
 
                   if (boardView === "timeline") {
-                    // Time runs down; stages are 3 lanes; same person connected by a line.
-                    const evs = [];
-                    rows.forEach((r, i) => { for (const stage of ["lead", "trial", "sale"]) if (r[stage]) evs.push({ i, stage, cell: r[stage] }); });
-                    const dayOf = (c) => (c.date || "").slice(0, 10);
-                    const byDay = new Map();
-                    for (const e of evs) { const d = dayOf(e.cell); if (!d) continue; if (!byDay.has(d)) byDay.set(d, []); byDay.get(d).push(e); }
-                    const days = [...byDay.keys()].sort();
+                    // One ROW per person, time left→right. A person's journey is a short
+                    // horizontal line in their own row, so lines never cross. Most-complete
+                    // journeys on top. Only date columns that actually have events are shown.
+                    const dayOf = (c) => (c && c.date || "").slice(0, 10);
+                    const dateSet = new Set();
+                    rows.forEach(r => ["lead", "trial", "sale"].forEach(s => { const d = dayOf(r[s]); if (d) dateSet.add(d); }));
+                    const days = [...dateSet].sort();
                     const shortDate = (d) => { const dt = new Date(d + "T00:00:00Z"); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }); };
-                    const tlCols = "84px 1fr 1fr 1fr";
-                    const chip = (e) => {
-                      const filled = filledFor(e.stage, rows[e.i]);
-                      return (
-                        <div key={e.stage + ":" + e.i} ref={el => { cardRefs.current[`${e.stage}:${e.i}`] = el; }}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 9px", borderRadius: 9,
-                            border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : t.surface }}>
-                          <span style={{ fontSize: 12.5, fontWeight: 600, color: t.text, whiteSpace: "nowrap" }}>{e.cell.name}{e.cell.dupCount > 1 ? <span style={{ color: t.amber, fontWeight: 700 }}> ×{e.cell.dupCount}</span> : ""}</span>
-                          {e.cell.amount != null && <span style={{ fontSize: 11, color: t.textSub }}>${e.cell.amount.toLocaleString()}</span>}
-                          <button onClick={() => deleteBoardCard(e.cell)} title="Delete this record" style={{ width: 18, height: 18, borderRadius: 5, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 11, lineHeight: 1 }}>✕</button>
-                        </div>
-                      );
-                    };
+                    const filledN = (r) => (r.lead ? 1 : 0) + (r.trial ? 1 : 0) + (r.sale ? 1 : 0);
+                    const furth = (r) => r.sale ? 3 : r.trial ? 2 : r.lead ? 1 : 0;
+                    const firstD = (r) => ["lead", "trial", "sale"].map(s => dayOf(r[s])).filter(Boolean).sort()[0] || "";
+                    const tlRows = rows.map((r, i) => ({ r, i }))
+                      .filter(({ r }) => ["lead", "trial", "sale"].some(s => dayOf(r[s])))
+                      .sort((a, b) => filledN(b.r) - filledN(a.r) || furth(b.r) - furth(a.r) || firstD(a.r).localeCompare(firstD(b.r)));
+                    const cols = `190px repeat(${days.length}, 80px)`;
+                    const pillStyle = (stage) => stage === "sale"
+                      ? { border: `1.5px solid ${t.accent}`, background: t.accent, color: "#0A0A0B" }
+                      : stage === "trial"
+                        ? { border: `1.5px solid ${t.accent}`, background: "transparent", color: t.accent }
+                        : { border: `1.5px solid ${t.borderMed}`, background: "transparent", color: t.textSub };
+                    const cell = { borderTop: `1px solid ${t.border}`, padding: "9px 0", display: "flex", alignItems: "center", justifyContent: "center" };
+                    if (!days.length) return <div style={{ fontSize: 13, color: t.textSub }}>No dated records this month.</div>;
                     return (
-                      <div ref={boardBodyRef} style={{ position: "relative" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: tlCols, marginBottom: 2 }}>
-                          <div />
-                          <div style={colHead}>LEADS</div>
-                          <div style={colHead}>TRIALS</div>
-                          <div style={colHead}>SALES</div>
-                        </div>
-                        {days.map(d => (
-                          <div key={d} style={{ display: "grid", gridTemplateColumns: tlCols, borderTop: `1px solid ${t.border}`, padding: "12px 0", alignItems: "center" }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: t.textMute }}>{shortDate(d)}</div>
-                            {["lead", "trial", "sale"].map(stage => (
-                              <div key={stage} style={{ display: "flex", flexWrap: "wrap", gap: 8, paddingRight: 12, alignContent: "center" }}>
-                                {byDay.get(d).filter(e => e.stage === stage).map(chip)}
-                              </div>
-                            ))}
+                      <div style={{ overflowX: "auto" }}>
+                        <div ref={boardBodyRef} style={{ position: "relative", width: "max-content", minWidth: "100%" }}>
+                          <div style={{ display: "grid", gridTemplateColumns: cols }}>
+                            <div style={{ ...colHead, textAlign: "left", paddingLeft: 2 }}>PERSON</div>
+                            {days.map(d => <div key={"h" + d} style={{ fontSize: 10, fontWeight: 700, color: t.textMute, textAlign: "center", paddingBottom: 8, borderBottom: `2px solid ${t.text}` }}>{shortDate(d)}</div>)}
+                            {tlRows.map(({ r, i }) => {
+                              const nm = r.lead?.name || r.trial?.name || r.sale?.name;
+                              return (
+                                <Fragment key={i}>
+                                  <div style={{ ...cell, justifyContent: "flex-start", gap: 6, paddingRight: 10, fontSize: 12.5, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{nm}</span>
+                                    {r.sale?.amount != null && <span style={{ fontSize: 11, color: t.textSub, fontWeight: 500 }}>${r.sale.amount.toLocaleString()}</span>}
+                                  </div>
+                                  {days.map(d => {
+                                    const stage = ["lead", "trial", "sale"].find(s => dayOf(r[s]) === d);
+                                    const ev = stage ? r[stage] : null;
+                                    return (
+                                      <div key={i + "-" + d} style={cell}>
+                                        {ev && (
+                                          <div ref={el => { cardRefs.current[`${stage}:${i}`] = el; }}
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 7px", borderRadius: 8, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", ...pillStyle(stage) }}>
+                                            {stage === "lead" ? "Lead" : stage === "trial" ? "Trial" : "Sale"}{ev.dupCount > 1 ? `×${ev.dupCount}` : ""}
+                                            <button onClick={() => deleteBoardCard(ev)} title="Delete this record" style={{ width: 15, height: 15, borderRadius: 4, border: "none", background: "transparent", color: stage === "sale" ? "#0A0A0B" : t.textMute, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.8 }}>✕</button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </Fragment>
+                              );
+                            })}
                           </div>
-                        ))}
-                        {svgOverlay}
+                          {svgOverlay}
+                        </div>
                       </div>
                     );
                   }
