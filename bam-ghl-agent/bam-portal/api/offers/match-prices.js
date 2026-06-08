@@ -77,7 +77,7 @@ async function fetchLiveSubs(stripeAccount) {
   let startingAfter = null;
   for (let page = 0; page < 20; page++) { // safety cap (20×100 = 2000 subs)
     const qs = new URLSearchParams({ status: "all", limit: "100" });
-    qs.append("expand[]", "data.items.data.price.product");
+    qs.append("expand[]", "data.items.data.price"); // .product would be 5 levels (Stripe expand max is 4)
     qs.append("expand[]", "data.customer");
     if (startingAfter) qs.set("starting_after", startingAfter);
     const r = await stripeGet(`/subscriptions?${qs.toString()}`, stripeAccount);
@@ -87,6 +87,23 @@ async function fetchLiveSubs(stripeAccount) {
     startingAfter = data[data.length - 1].id;
   }
   return out;
+}
+
+// Product names can't be expanded inline (depth limit), so fetch them once and
+// map id → name. One or two list calls for a typical academy.
+async function fetchProductNames(stripeAccount) {
+  const map = {};
+  let startingAfter = null;
+  for (let page = 0; page < 10; page++) {
+    const qs = new URLSearchParams({ limit: "100" });
+    if (startingAfter) qs.set("starting_after", startingAfter);
+    const r = await stripeGet(`/products?${qs.toString()}`, stripeAccount);
+    const data = r.data || [];
+    for (const p of data) map[p.id] = p.name;
+    if (!r.has_more || data.length === 0) break;
+    startingAfter = data[data.length - 1].id;
+  }
+  return map;
 }
 
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);
@@ -225,6 +242,10 @@ export default async function handler(req, res) {
     const subs = await fetchLiveSubs(client.stripe_connect_account_id);
     const prices = groupByPrice(subs);
     if (!prices.length) return res.status(200).json({ ok: true, proposals: [], note: "no active subs/prices found" });
+
+    // Fill product names (couldn't expand them inline) from a one-shot product list.
+    const productNames = await fetchProductNames(client.stripe_connect_account_id);
+    for (const p of prices) { if (!p.product_name && p.product_id) p.product_name = productNames[p.product_id] || null; }
 
     // Existing catalog rows → prior tier/plan + so we PATCH the right rows on apply
     const catalog = await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&select=stripe_price_id,canonical_plan,tier,interval,amount_cents`) || [];
