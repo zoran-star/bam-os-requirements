@@ -201,6 +201,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpi-restore") {
       return handleGhlKpiRestore(req, res);
     }
+    if (resource === "ghl-kpi-stripe") {
+      return handleGhlKpiStripe(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -2075,6 +2078,79 @@ async function handleGhlKpiRestore(req, res) {
     return res.status(200).json({ restored: Array.isArray(inserted) ? inserted.length : 0 });
   } catch (e) {
     return res.status(500).json({ error: `restore failed: ${e.message}` });
+  }
+}
+
+// GET ?resource=ghl-kpi-stripe&client_id=&email=
+// A person's Stripe history on the client's connected account, so staff can judge
+// if they're a live paying member. Looks the customer up by email, returns their
+// subscriptions + recent charges + a simple live/not verdict.
+async function handleGhlKpiStripe(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email) return res.status(200).json({ found: false, reason: "no_email" });
+
+  let stripeAcct = null;
+  try {
+    const rows = await sb(`clients?id=eq.${targetClientId}&select=stripe_connect_account_id`);
+    stripeAcct = rows?.[0]?.stripe_connect_account_id || null;
+  } catch { /* ignore */ }
+  const stripeKey = process.env.STRIPE_CONNECT_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!stripeAcct || !stripeKey) return res.status(200).json({ found: false, reason: "no_stripe" });
+
+  const sFetch = async (path) => {
+    const r = await fetch(`https://api.stripe.com/v1${path}`, { headers: { Authorization: `Bearer ${stripeKey}`, "Stripe-Account": stripeAcct } });
+    if (!r.ok) throw new Error(`stripe ${r.status}`);
+    return r.json();
+  };
+
+  try {
+    const custRes = await sFetch(`/customers?email=${encodeURIComponent(email)}&limit=5`);
+    const customers = custRes.data || [];
+    if (!customers.length) return res.status(200).json({ found: false, reason: "no_customer", email });
+    const cust = customers[0];
+
+    const [subRes, chRes] = await Promise.all([
+      sFetch(`/subscriptions?customer=${cust.id}&status=all&limit=20`),
+      sFetch(`/charges?customer=${cust.id}&limit=25`),
+    ]);
+
+    const subscriptions = (subRes.data || []).map(s => ({
+      id: s.id, status: s.status,
+      amount: (s.items?.data?.[0]?.price?.unit_amount || 0) / 100,
+      interval: s.items?.data?.[0]?.price?.recurring?.interval || null,
+      current_period_end: s.current_period_end ? new Date(s.current_period_end * 1000).toISOString() : null,
+      cancel_at_period_end: !!s.cancel_at_period_end,
+      created: s.created ? new Date(s.created * 1000).toISOString() : null,
+    }));
+    const charges = (chRes.data || []).map(c => ({
+      id: c.id, amount: (c.amount || 0) / 100, currency: c.currency,
+      created: c.created ? new Date(c.created * 1000).toISOString() : null,
+      paid: !!c.paid, refunded: !!c.refunded, status: c.status,
+      description: c.description || null,
+    }));
+
+    const activeSub = subscriptions.find(s => s.status === "active" || s.status === "trialing");
+    const pastDue = subscriptions.find(s => s.status === "past_due" || s.status === "unpaid");
+    const totalPaid = charges.filter(c => c.paid && !c.refunded).reduce((a, c) => a + c.amount, 0);
+    const verdict = activeSub ? "live" : pastDue ? "at_risk" : (totalPaid > 0 ? "former" : "none");
+
+    return res.status(200).json({
+      found: true, email,
+      customer: { id: cust.id, name: cust.name || null, email: cust.email || email, created: cust.created ? new Date(cust.created * 1000).toISOString() : null },
+      customers_count: customers.length,
+      subscriptions, charges,
+      verdict, total_paid: Math.round(totalPaid * 100) / 100,
+    });
+  } catch (e) {
+    return res.status(200).json({ found: false, reason: "error", error: e.message, email });
   }
 }
 

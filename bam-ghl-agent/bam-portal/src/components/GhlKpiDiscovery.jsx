@@ -42,6 +42,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const [boardView, setBoardView] = useState("board");     // 'board' | 'timeline'
   const [trash, setTrash] = useState([]);                  // recently deleted (for undo)
   const trashSeq = useRef(0);
+  const [stripeView, setStripeView] = useState(null);      // a person's Stripe history
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -319,6 +320,17 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       refreshMonthlyCounts();
     } catch (e) { alert("Undo failed: " + e.message); }
   }
+  // Click a card → that person's Stripe history (to judge if they're a live member).
+  async function openPersonStripe(cell) {
+    if (!cell) return;
+    setStripeView({ name: cell.name, email: cell.email, loading: true });
+    if (!cell.email) { setStripeView({ name: cell.name, email: null, loading: false, data: { found: false, reason: "no_email" } }); return; }
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-stripe&client_id=${client.id}&email=${encodeURIComponent(cell.email)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const data = await res.json().catch(() => ({ found: false, reason: "error" }));
+      setStripeView({ name: cell.name, email: cell.email, loading: false, data });
+    } catch (e) { setStripeView({ name: cell.name, email: cell.email, loading: false, data: { found: false, reason: "error", error: e.message } }); }
+  }
 
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
@@ -466,7 +478,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const boardCell = (cell, filled) => {
     if (!cell) return <div style={{ minHeight: 50 }} />;   // empty slot keeps rows aligned
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, minHeight: 50,
+      <div onClick={() => openPersonStripe(cell)} title="See Stripe history"
+        style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 11px", borderRadius: 10, minHeight: 50, cursor: "pointer",
         border: `1.5px solid ${filled ? t.accent : t.borderMed}`, background: filled ? `${t.accent}22` : "transparent" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -474,7 +487,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           </div>
           <div style={{ fontSize: 10.5, color: t.textMute, marginTop: 2 }}>{niceDate(cell.date)}{cell.amount != null ? ` · $${cell.amount.toLocaleString()}` : ""}</div>
         </div>
-        <button onClick={() => deleteBoardCard(cell)} title="Delete this record"
+        <button onClick={(e) => { e.stopPropagation(); deleteBoardCard(cell); }} title="Delete this record"
           style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.textMute, cursor: "pointer", fontSize: 12, lineHeight: 1 }}>✕</button>
       </div>
     );
@@ -882,10 +895,10 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                                     return (
                                       <div key={i + "-" + d} style={cell}>
                                         {ev && (
-                                          <div ref={el => { cardRefs.current[`${stage}:${i}`] = el; }}
-                                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 7px", borderRadius: 8, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", ...pillStyle(stage) }}>
+                                          <div ref={el => { cardRefs.current[`${stage}:${i}`] = el; }} onClick={() => openPersonStripe(ev)} title="See Stripe history"
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 7px", borderRadius: 8, fontSize: 10.5, fontWeight: 700, whiteSpace: "nowrap", cursor: "pointer", ...pillStyle(stage) }}>
                                             {stage === "lead" ? "Lead" : stage === "trial" ? "Trial" : "Sale"}{ev.dupCount > 1 ? `×${ev.dupCount}` : ""}
-                                            <button onClick={() => deleteBoardCard(ev)} title="Delete this record" style={{ width: 15, height: 15, borderRadius: 4, border: "none", background: "transparent", color: stage === "sale" ? "#0A0A0B" : t.textMute, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.8 }}>✕</button>
+                                            <button onClick={(e) => { e.stopPropagation(); deleteBoardCard(ev); }} title="Delete this record" style={{ width: 15, height: 15, borderRadius: 4, border: "none", background: "transparent", color: stage === "sale" ? "#0A0A0B" : t.textMute, cursor: "pointer", fontSize: 10, lineHeight: 1, opacity: 0.8 }}>✕</button>
                                           </div>
                                         )}
                                       </div>
@@ -943,6 +956,63 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           )}
         </div>
       )}
+
+      {stripeView && (() => {
+        const d = stripeView.data;
+        const V = {
+          live: { label: "🟢 Active member", color: "#3FB950" },
+          at_risk: { label: "🟡 Past due", color: t.amber },
+          former: { label: "🔵 Former customer", color: t.textSub },
+          none: { label: "⚪ No purchases found", color: t.textMute },
+        };
+        const reasonMsg = { no_email: "This record has no email, so we can't look it up in Stripe.", no_customer: "No Stripe customer found with this email on the connected account.", no_stripe: "This client has no connected Stripe account.", error: "Couldn't reach Stripe." };
+        const subBadge = (s) => s === "active" || s === "trialing" ? "#3FB950" : s === "past_due" || s === "unpaid" ? t.amber : t.textMute;
+        return (
+          <div onClick={() => setStripeView(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1300, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 560, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{stripeView.name}</div>
+                  {stripeView.email && <div style={{ fontSize: 12, color: t.textMute, marginTop: 2 }}>{stripeView.email}</div>}
+                </div>
+                <button onClick={() => setStripeView(null)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Close</button>
+              </div>
+
+              {stripeView.loading ? <div style={{ fontSize: 13, color: t.textSub, marginTop: 16 }}>Loading Stripe history…</div>
+                : !d?.found ? <div style={{ fontSize: 13, color: t.textSub, marginTop: 16, lineHeight: 1.5 }}>{reasonMsg[d?.reason] || "No Stripe history found."}{d?.error ? <div style={{ fontSize: 11, color: t.textMute, marginTop: 4 }}>{d.error}</div> : null}</div>
+                : (
+                  <>
+                    <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: (V[d.verdict] || V.none).color }}>{(V[d.verdict] || V.none).label}</span>
+                      <span style={{ fontSize: 12, color: t.textSub }}>Lifetime paid: <b style={{ color: t.text }}>${d.total_paid.toLocaleString()}</b></span>
+                      {d.customers_count > 1 && <span style={{ fontSize: 11, color: t.amber }}>⚠ {d.customers_count} Stripe customers with this email</span>}
+                    </div>
+
+                    <div style={{ marginTop: 18, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Subscriptions</div>
+                    {d.subscriptions.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>None</div>
+                      : d.subscriptions.map(s => (
+                        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${t.border}` }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: subBadge(s.status) }}>{s.status}{s.cancel_at_period_end ? " · ending" : ""}</span>
+                          <span style={{ flex: 1, fontSize: 12.5, color: t.text }}>${s.amount.toLocaleString()}{s.interval ? `/${s.interval}` : ""}</span>
+                          <span style={{ fontSize: 11, color: t.textMute }}>{s.current_period_end ? `renews ${niceDate(s.current_period_end)}` : ""}</span>
+                        </div>
+                      ))}
+
+                    <div style={{ marginTop: 18, fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: t.textMute, marginBottom: 8 }}>Charges</div>
+                    {d.charges.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>None</div>
+                      : <div style={{ maxHeight: 240, overflowY: "auto" }}>{d.charges.map(c => (
+                          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${t.border}` }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 600, color: c.refunded ? t.textMute : t.text, textDecoration: c.refunded ? "line-through" : "none", minWidth: 70 }}>${c.amount.toLocaleString()}</span>
+                            <span style={{ flex: 1, fontSize: 11, color: t.textMute }}>{niceDate(c.created)}</span>
+                            <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", color: c.refunded ? t.amber : c.paid ? "#3FB950" : t.red }}>{c.refunded ? "refunded" : c.paid ? "paid" : c.status}</span>
+                          </div>
+                        ))}</div>}
+                  </>
+                )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
