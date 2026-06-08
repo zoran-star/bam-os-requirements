@@ -377,9 +377,13 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       }
       rows.push(row);
     }
-    const depth = (r) => (r.lead ? 1 : 0) + (r.trial ? 2 : 0) + (r.sale ? 3 : 0);
+    // Drop-off staircase: sort by furthest stage reached (Sales > Trials > Leads),
+    // then by completeness, so full journeys sit on top and the right edge steps
+    // down — a clean diagonal of where each person dropped off.
+    const furthest = (r) => r.sale ? 3 : r.trial ? 2 : r.lead ? 1 : 0;
+    const filledCount = (r) => (r.lead ? 1 : 0) + (r.trial ? 1 : 0) + (r.sale ? 1 : 0);
     const firstDate = (r) => [r.lead, r.trial, r.sale].filter(Boolean).map(c => c.date).sort()[0] || "";
-    rows.sort((a, c) => depth(c) - depth(a) || firstDate(a).localeCompare(firstDate(c)));
+    rows.sort((a, c) => furthest(c) - furthest(a) || filledCount(c) - filledCount(a) || firstDate(a).localeCompare(firstDate(c)));
     return rows;
   };
   // One person's cell within a row. filled = they came from the prior stage.
