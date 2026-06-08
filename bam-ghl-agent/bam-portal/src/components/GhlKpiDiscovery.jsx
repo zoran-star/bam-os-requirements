@@ -271,7 +271,16 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     try {
       const [leads, trials, sales] = await Promise.all([fetchType("lead"), fetchType("trial"), fetchType("clients_all")]);
       setBoard({ key: month.key, label: month.label, loading: false, leads, trials, sales });
+      loadTrash(month.key);
     } catch (e) { setBoard({ key: month.key, label: month.label, loading: false, leads: [], trials: [], sales: [], error: e.message }); }
+  }
+  // Persistent trash bin — the soft-deleted (excluded) records for this month.
+  async function loadTrash(monthKey) {
+    try {
+      const res = await fetch(`/api/marketing?resource=ghl-kpi-trash&client_id=${client.id}&month=${monthKey}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
+      const j = await res.json().catch(() => ({}));
+      setTrash((j.items || []).map(it => ({ key: ++trashSeq.current, name: it.name, ids: it.ids })));
+    } catch { /* ignore */ }
   }
   // Silent re-fetch of the open board (no loading flash) — keeps scroll position.
   async function refetchBoardSilent() {
@@ -301,18 +310,18 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { alert("Delete failed: " + (j.error || res.status)); refetchBoardSilent(); return; }
-      setTrash(tr => [{ key: ++trashSeq.current, name: cell.name || "record", rows: j.rows || [] }, ...tr].slice(0, 50));
+      setTrash(tr => [{ key: ++trashSeq.current, name: cell.name || "record", ids: cell.ids }, ...tr.filter(e => !e.ids.some(id => idset.has(id)))].slice(0, 100));
       refreshMonthlyCounts();
     } catch (e) { alert("Delete failed: " + e.message); refetchBoardSilent(); }
   }
   // Undo a delete — re-insert the stashed rows, then silently re-sync.
   async function undoDelete(entry) {
     if (!entry) return;
-    if (!entry.rows?.length) { setTrash(tr => tr.filter(x => x !== entry)); return; }
+    if (!entry.ids?.length) { setTrash(tr => tr.filter(x => x !== entry)); return; }
     try {
       const res = await fetch(`/api/marketing?resource=ghl-kpi-restore`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ client_id: client.id, rows: entry.rows }),
+        body: JSON.stringify({ client_id: client.id, ids: entry.ids }),
       });
       if (!res.ok) { const j = await res.json().catch(() => ({})); alert("Undo failed: " + (j.error || res.status)); return; }
       setTrash(tr => tr.filter(x => x !== entry));

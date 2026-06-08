@@ -204,6 +204,9 @@ export default async function handler(req, res) {
     if (resource === "ghl-kpi-stripe") {
       return handleGhlKpiStripe(req, res);
     }
+    if (resource === "ghl-kpi-trash") {
+      return handleGhlKpiTrash(req, res);
+    }
     if (resource === "meta-overview") {
       return handleMetaOverview(req, res);
     }
@@ -1753,7 +1756,7 @@ async function handleGhlKpis(req, res) {
     // Fetch all events for the client and window-filter in JS. (A PostgREST
     // occurred_at=gte filter with a URL-encoded timestamp silently matched
     // nothing — the verify count proved JS filtering is correct.)
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=event_type,contact_id,contact_email,contact_phone,occurred_at&limit=20000`) || [];
   } catch {
     // table may not exist yet (migration not run) — treat as no data.
     return res.status(200).json({ days, since: sinceIso, ready: false, synced_at: syncedAt, leads: 0, trials: 0, clients_new: 0, clients_existing: 0 });
@@ -1873,7 +1876,7 @@ async function handleGhlKpisMonthly(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=event_type,contact_id,contact_email,contact_phone,occurred_at,raw&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=event_type,contact_id,contact_email,contact_phone,occurred_at,raw&limit=20000`) || [];
   } catch {
     return res.status(200).json({ ready: false, synced_at: syncedAt, months: [] });
   }
@@ -1977,7 +1980,7 @@ async function handleGhlKpiDetail(req, res) {
 
   let events = [];
   try {
-    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&select=id,event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
+    events = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.false&select=id,event_type,contact_email,contact_id,contact_phone,occurred_at,value,raw&order=occurred_at.desc&limit=20000`) || [];
   } catch { return res.status(200).json({ type, days, count: 0, items: [] }); }
 
   const wanted = type === "clients_all"
@@ -2034,21 +2037,21 @@ async function handleGhlKpiDelete(req, res) {
   if (!ids.length) return res.status(400).json({ error: "ids required" });
 
   try {
-    const deleted = await sb(
+    // Soft-delete: mark excluded (persists + survives re-pull) instead of removing.
+    const updated = await sb(
       `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
-      { method: "DELETE", headers: { Prefer: "return=representation" } }
+      { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ excluded: true, excluded_at: nowIso() }) }
     );
-    // Return the deleted rows so the client can offer Undo (restore).
-    return res.status(200).json({ deleted: Array.isArray(deleted) ? deleted.length : 0, rows: deleted || [] });
+    return res.status(200).json({ deleted: Array.isArray(updated) ? updated.length : 0, rows: updated || [] });
   } catch (e) {
     return res.status(500).json({ error: `delete failed: ${e.message}` });
   }
 }
 
 // POST ?resource=ghl-kpi-restore  { client_id?, rows: [<deleted ghl_funnel_events rows>] }
-// Undo for the drill-down/board delete: re-inserts the exact rows the delete
-// returned. Strips id (DB assigns a fresh one), forces client_id to the resolved
-// client, and upserts on (event_type, ref) so a re-restore is idempotent.
+// Undo for the board/drill-down delete: clears the `excluded` flag on those rows
+// (POST { client_id?, ids: [...] }). Soft-delete means the rows never left, so
+// undo just un-hides them.
 async function handleGhlKpiRestore(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   const ctx = await resolveUser(req);
@@ -2059,26 +2062,60 @@ async function handleGhlKpiRestore(req, res) {
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required" });
 
-  const rows = Array.isArray(req.body?.rows) ? req.body.rows : [];
-  if (!rows.length) return res.status(400).json({ error: "rows required" });
-
-  const allowed = ["ghl_location", "event_type", "contact_id", "contact_email", "contact_phone", "ref", "value", "occurred_at", "raw"];
-  const clean = rows.map(r => {
-    const o = { client_id: targetClientId };
-    for (const k of allowed) if (r[k] !== undefined) o[k] = r[k];
-    return o;
-  });
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.map(n => parseInt(n, 10)).filter(Number.isInteger)
+    : [];
+  if (!ids.length) return res.status(400).json({ error: "ids required" });
 
   try {
-    const inserted = await sb(`ghl_funnel_events?on_conflict=event_type,ref`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(clean),
-    });
-    return res.status(200).json({ restored: Array.isArray(inserted) ? inserted.length : 0 });
+    const updated = await sb(
+      `ghl_funnel_events?client_id=eq.${targetClientId}&id=in.(${ids.join(",")})`,
+      { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ excluded: false, excluded_at: null }) }
+    );
+    return res.status(200).json({ restored: Array.isArray(updated) ? updated.length : 0 });
   } catch (e) {
     return res.status(500).json({ error: `restore failed: ${e.message}` });
   }
+}
+
+// GET ?resource=ghl-kpi-trash&client_id=&month=YYYY-MM
+// The excluded (soft-deleted) records for a month, grouped by person + stage —
+// powers the persistent trash bin / undo. Survives a page refresh because it
+// reads from the DB, not browser memory.
+async function handleGhlKpiTrash(req, res) {
+  if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const ctx = await resolveUser(req);
+  if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
+  let targetClientId = null;
+  if (ctx.staff && req.query.client_id) targetClientId = String(req.query.client_id);
+  else if (ctx.client) targetClientId = ctx.client.id;
+  if (!targetClientId) return res.status(403).json({ error: "client_id required" });
+
+  let sinceIso = null, untilIso = null;
+  const monthParam = /^\d{4}-\d{2}$/.test(req.query.month || "") ? req.query.month : null;
+  if (monthParam) {
+    const [y, m] = monthParam.split("-").map(Number);
+    sinceIso = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+    untilIso = new Date(Date.UTC(y, m, 1)).toISOString();
+  }
+
+  let rows = [];
+  try {
+    rows = await sb(`ghl_funnel_events?client_id=eq.${targetClientId}&excluded=is.true&select=id,event_type,contact_id,contact_email,contact_phone,occurred_at,raw,excluded_at&order=excluded_at.desc.nullslast&limit=5000`) || [];
+  } catch { return res.status(200).json({ items: [] }); }
+
+  const bucket = (t) => t === "lead" ? "lead" : t === "trial" ? "trial" : "sale"; // client_new/existing → sale
+  const items = [];
+  const byKey = new Map();
+  for (const e of rows) {
+    if (monthParam) { if (!e.occurred_at || e.occurred_at < sinceIso || e.occurred_at >= untilIso) continue; }
+    const k = (e.contact_id || e.contact_email || e.contact_phone || `row:${e.id}`) + "|" + bucket(e.event_type);
+    if (byKey.has(k)) { byKey.get(k).ids.push(e.id); continue; }
+    const item = { ids: [e.id], name: (e.raw && e.raw.name) || e.contact_email || "(unknown)", excluded_at: e.excluded_at || null };
+    byKey.set(k, item);
+    items.push(item);
+  }
+  return res.status(200).json({ items });
 }
 
 // GET ?resource=ghl-kpi-stripe&client_id=&email=

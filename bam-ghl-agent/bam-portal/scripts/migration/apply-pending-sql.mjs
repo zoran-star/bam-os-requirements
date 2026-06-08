@@ -28,6 +28,7 @@ const FILES = [
   "marketing_goals.sql",     // clients.meta_cpl_goal / meta_monthly_budget
   "ghl_kpi_config.sql",      // clients.ghl_kpi_config (which forms = leads, etc.)
   "ghl_funnel_events.sql",   // lead/response/booking/conversion event log
+  "ghl_funnel_excluded.sql", // ghl_funnel_events.excluded soft-delete (KPI cleaning + trash)
 ];
 
 async function runSql(sql) {

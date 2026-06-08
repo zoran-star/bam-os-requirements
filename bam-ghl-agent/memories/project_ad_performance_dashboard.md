@@ -112,6 +112,15 @@ Simplified to 3 KPIs. Sources + definitions:
     new `ghl-kpi-restore` endpoint re-inserts the exact rows (strips id, forces client_id, upsert
     on `event_type,ref`) then `refetchBoardSilent()` (no loading flag) re-syncs. Monthly counts
     refresh in the background on both.
+  - **Soft-delete + persistent trash (2026-06-07):** delete used to HARD-delete, so a re-pull
+    resurrected the rows and a page refresh wiped the in-memory trash → lost cleaning progress.
+    Fixed with a soft-delete column **`ghl_funnel_events.excluded`** (migration
+    `supabase/ghl_funnel_excluded.sql`, in the /apply-sql list). `ghl-kpi-delete` now PATCHes
+    `excluded=true` (not DELETE); `ghl-kpi-restore` PATCHes `excluded=false` by **ids**; all reads
+    (`ghl-kpis`, `-monthly`, `-detail`) filter `excluded=is.false`. **refreshFunnel's merge-duplicates
+    upsert omits `excluded`, so a re-pull RETAINS excluded=true** → deletions survive refresh. New
+    `ghl-kpi-trash?client_id=&month=` returns the excluded rows grouped by person+stage; `openBoard`
+    loads it into the trash bin, so the **trash persists across refresh**. Undo = un-exclude by ids.
   - **Click a card → Stripe history (2026-06-07):** clicking a board cell / timeline pill opens
     a modal (`stripeView`) with that person's Stripe history so staff can judge if they're a live
     member. New `GET ?resource=ghl-kpi-stripe&client_id=&email=` looks the customer up **by email**
