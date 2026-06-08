@@ -14745,8 +14745,8 @@ async function _ibSendReply() {
 }
 
 // ── AI price matcher (Phase 3 UI — additive) ────────────────────────────────
-let _AI_MATCH_PROPOSALS = [];
-const _PC_TIERS = ['canonical', 'legacy_unknown', 'legacy_match', 'lil_sale', 'deprecated'];
+let _AI_DATA = { proposals: [], targets: [] };
+const _AI_TIER_OPTS = [['canonical', 'Canonical'], ['legacy_unknown', 'Legacy'], ['deprecated', 'Deprecated'], ['lil_sale', 'Sale']];
 function _aiTierNormalize(t) {
   return ({ canonical:'canonical', legacy:'legacy_unknown', deprecated:'deprecated', sale:'lil_sale' })[t] || t || 'legacy_unknown';
 }
@@ -14764,8 +14764,9 @@ async function runAiPriceMatch() {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    _AI_MATCH_PROPOSALS = json.proposals || [];
-    _renderAiMatchModal(json);
+    _AI_DATA = { proposals: json.proposals || [], targets: json.targets || [], academy: json.academy };
+    if (!_AI_DATA.targets.length) { alert(json.note || 'No plans found in your Offers → Pricing yet. Add your plans there first, then run this.'); return; }
+    _renderAiMatchModal();
   } catch (e) {
     alert("AI match failed: " + e.message);
   } finally {
@@ -14779,59 +14780,85 @@ function _aiAmt(cents, ival) {
   return '$' + a + (ival ? ' / ' + String(ival).replace(/_/g, ' ') : '');
 }
 
-function _renderAiMatchModal(data) {
+// Plan dropdown — pick which offer-price (plan · term) this Stripe price belongs to.
+function _aiPlanOptions(sel) {
+  const blank = `<option value="" ${!sel ? 'selected' : ''}>— not a plan —</option>`;
+  return blank + (_AI_DATA.targets || []).map(t =>
+    `<option value="${escapeHTML(t.key)}" ${t.key === sel ? 'selected' : ''}>${escapeHTML(t.label || t.key)}</option>`).join('');
+}
+
+// One price row: checkbox + price summary + plan dropdown + tier dropdown.
+function _aiRow(p, checkedDefault) {
+  const tier = _aiTierNormalize(p.proposed_tier);
+  const tierOpts = _AI_TIER_OPTS.map(([v, l]) => `<option value="${v}" ${v === tier ? 'selected' : ''}>${l}</option>`).join('');
+  const conf = p.confidence != null ? Math.round(p.confidence * 100) + '%' : '';
+  const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
+  const ciq = p.coachiq_product_id ? ' · CoachIQ ✓' : '';
+  return `
+    <div class="ai-row" data-pid="${escapeHTML(p.price_id)}" data-ciq="${escapeHTML(p.coachiq_product_id || '')}" data-conf="${p.confidence != null ? p.confidence : ''}"
+      style="display:grid; grid-template-columns:auto 1fr 150px 110px; gap:10px; align-items:center; padding:9px 12px; border:1px solid var(--border,#2a2a31); border-radius:9px; margin-bottom:7px; background:${p.needs_review ? 'rgba(224,169,63,0.06)' : 'transparent'};">
+      <input type="checkbox" class="ai-chk" ${checkedDefault ? 'checked' : ''} />
+      <div style="min-width:0;">
+        <div style="font-weight:700; font-size:13px;">${_aiAmt(p.amount_cents, p.interval)} · ${escapeHTML(p.name || p.price_id)}</div>
+        <div style="font-size:10.5px; color:var(--text-mute,#888); font-family:monospace;">${escapeHTML(p.price_id)} · ${members}${conf ? ' · ' + conf : ''}${ciq}</div>
+        ${p.reason ? `<div style="font-size:10.5px;color:#e0a93f;margin-top:2px;">${escapeHTML(p.reason)}</div>` : ''}
+      </div>
+      <select class="ai-plan" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${_aiPlanOptions(p.proposed_offer_price_key)}</select>
+      <select class="ai-tier" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${tierOpts}</select>
+    </div>`;
+}
+
+function _renderAiMatchModal() {
   const modal = document.getElementById('pc-aimatch-modal');
   const overlay = document.getElementById('pc-aimatch-overlay');
   if (!modal) return;
-  const props = _AI_MATCH_PROPOSALS;
-  const needsReview = (data.counts && data.counts.needs_review) || props.filter(p => p.needs_review).length;
+  const props = _AI_DATA.proposals || [];
+  const byKey = {};
+  props.forEach(p => { const k = p.proposed_offer_price_key || '__none__'; (byKey[k] = byKey[k] || []).push(p); });
 
-  const rows = props.map((p, i) => {
-    const tier = _aiTierNormalize(p.proposed_tier);
-    const tierOpts = _PC_TIERS.map(t => `<option value="${t}" ${t === tier ? 'selected' : ''}>${escapeHTML(t)}</option>`).join('');
-    const conf = p.confidence != null ? Math.round(p.confidence * 100) + '%' : '—';
-    const flag = p.needs_review ? '<span style="color:#e0a93f;font-weight:700">⚠ review</span>' : '<span style="color:#7ad19a">ok</span>';
-    return `
-      <div style="border:1px solid var(--border,#2a2a31); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:${p.needs_review ? 'rgba(224,169,63,0.06)' : 'transparent'};">
-        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
-          <div style="min-width:0;">
-            <div style="font-weight:700; font-size:13.5px;">${escapeHTML(p.name || p.price_id)}</div>
-            <div style="font-size:11px; color:var(--text-mute,#888); font-family:monospace;">${escapeHTML(p.price_id)} · ${_aiAmt(p.amount_cents, p.interval)} · ${p.sub_count} sub${p.sub_count === 1 ? '' : 's'}</div>
-          </div>
-          <label style="display:flex; gap:6px; align-items:center; font-size:12px; white-space:nowrap;">
-            <input type="checkbox" class="ai-approve" data-i="${i}" ${p.needs_review ? '' : 'checked'} /> approve
-          </label>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
-          <label style="font-size:11px; color:var(--text-mute,#888);">Offer-price
-            <input class="ai-key" data-i="${i}" value="${escapeHTML(p.proposed_offer_price_key || '')}" placeholder="e.g. Steady|monthly"
-              style="width:100%; margin-top:3px; padding:6px 8px; border-radius:7px; border:1px solid var(--border,#2a2a31); background:var(--bg,#0d0d10); color:var(--text,#eee); font-size:12px;"/>
-          </label>
-          <label style="font-size:11px; color:var(--text-mute,#888);">Tier
-            <select class="ai-tier" data-i="${i}" style="width:100%; margin-top:3px; padding:6px 8px; border-radius:7px; border:1px solid var(--border,#2a2a31); background:var(--bg,#0d0d10); color:var(--text,#eee); font-size:12px;">${tierOpts}</select>
-          </label>
-          <label style="font-size:11px; color:var(--text-mute,#888); grid-column:1 / -1;">CoachIQ product id ${p.coachiq_product_id ? '<span style=\"color:#7ad19a\">(harvested)</span>' : ''}
-            <input class="ai-ciq" data-i="${i}" value="${escapeHTML(p.coachiq_product_id || '')}" placeholder="paste if not auto-found"
-              style="width:100%; margin-top:3px; padding:6px 8px; border-radius:7px; border:1px solid var(--border,#2a2a31); background:var(--bg,#0d0d10); color:var(--text,#eee); font-size:12px;"/>
-          </label>
-        </div>
-        <div style="font-size:11px; color:var(--text-mute,#888); margin-top:8px;">${flag} · ${conf} confidence${p.reason ? ' · ' + escapeHTML(p.reason) : ''}${p.prior_tier ? ' · was: ' + escapeHTML(p.prior_tier) : ''}</div>
+  // Group targets by offering, preserving order.
+  const offerings = [], offMap = {};
+  (_AI_DATA.targets || []).forEach(t => { if (!offMap[t.offering]) { offMap[t.offering] = []; offerings.push(t.offering); } offMap[t.offering].push(t); });
+
+  let plansHtml = '';
+  offerings.forEach(offering => {
+    let slots = '';
+    offMap[offering].forEach(t => {
+      const matched = byKey[t.key] || [];
+      if (matched.length) {
+        slots += `<div style="font-size:11px;color:var(--text-mute,#888);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px;">${escapeHTML(t.label)}</div>`;
+        slots += matched.map(p => _aiRow(p, true)).join('');
+      } else {
+        slots += `<div style="font-size:11px;color:var(--text-mute,#888);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px;">${escapeHTML(t.label)} <span style="color:#9a3b2f;text-transform:none;">⚠ no Stripe price matched</span></div>`;
+      }
+    });
+    plansHtml += `<div style="margin-bottom:14px;"><div style="font-size:15px;font-weight:800;margin-bottom:2px;">${escapeHTML(offering)}</div>${slots}</div>`;
+  });
+
+  const flagged = (byKey['__none__'] || []).filter(p => p.sub_count > 0);
+  let flaggedHtml = '';
+  if (flagged.length) {
+    flaggedHtml = `
+      <div style="margin-top:8px;padding:14px;border:1px solid #c9871f;border-radius:11px;background:rgba(224,169,63,0.07);">
+        <div style="font-size:14px;font-weight:800;color:#e0a93f;margin-bottom:4px;">🚩 Members here, but no matching plan (${flagged.length})</div>
+        <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:10px;">These prices have paying members but didn't match any plan in your offer. Assign each to a plan with the dropdown (or leave it) — then tick to save.</div>
+        ${flagged.map(p => _aiRow(p, false)).join('')}
       </div>`;
-  }).join('');
+  }
 
   modal.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-      <div style="font-size:18px; font-weight:800;">🤖 AI price match${data.academy ? ' · ' + escapeHTML(data.academy) : ''}</div>
-      <button onclick="closeAiMatch()" style="background:none; border:none; color:var(--text-mute,#888); font-size:22px; cursor:pointer;">×</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div style="font-size:18px;font-weight:800;">🤖 Match prices to your plans${_AI_DATA.academy ? ' · ' + escapeHTML(_AI_DATA.academy) : ''}</div>
+      <button onclick="closeAiMatch()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
     </div>
-    <div style="font-size:12.5px; color:var(--text-mute,#888); margin-bottom:14px;">
-      ${props.length} live price${props.length === 1 ? '' : 's'} · <b style="color:#e0a93f">${needsReview}</b> flagged for review.
-      Approve the ones that look right (edit any field), then save. Legacy = recognizes old subs; only canonical is offered to new signups.
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">
+      Your live Stripe prices, grouped under the plans you offer. ✓ = will be saved. Use the dropdowns to change the plan or tier. <b>Canonical</b> = the price new signups pay; <b>Legacy</b> = older prices (recognised, not offered to new signups).
     </div>
-    ${rows || '<div style="color:var(--text-mute,#888)">No live prices found.</div>'}
-    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px; position:sticky; bottom:0; background:var(--surface,#16161a); padding-top:10px;">
-      <button onclick="closeAiMatch()" style="font-size:13px; padding:9px 16px; border-radius:9px; border:1px solid var(--border,#2a2a31); background:transparent; color:var(--text,#eee); cursor:pointer;">Cancel</button>
-      <button onclick="applyAiMatch()" style="font-size:13px; font-weight:700; padding:9px 18px; border-radius:9px; border:none; background:var(--accent,#E8C547); color:#1a1a1a; cursor:pointer;">Approve &amp; Save</button>
+    ${plansHtml || '<div style="color:var(--text-mute,#888)">No plans in your offer yet — add them in Offers → Pricing first.</div>'}
+    ${flaggedHtml}
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;position:sticky;bottom:0;background:var(--surface,#16161a);padding-top:10px;">
+      <button onclick="closeAiMatch()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+      <button onclick="applyAiMatch()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save</button>
     </div>`;
   if (overlay) overlay.style.display = 'block';
   modal.style.display = 'block';
@@ -14846,17 +14873,24 @@ function closeAiMatch() {
 
 async function applyAiMatch() {
   const approvals = [];
-  document.querySelectorAll('.ai-approve').forEach(cb => {
-    if (!cb.checked) return;
-    const i = cb.getAttribute('data-i');
-    const p = _AI_MATCH_PROPOSALS[i];
-    if (!p) return;
-    const key = (document.querySelector('.ai-key[data-i="' + i + '"]') || {}).value || null;
-    const tier = (document.querySelector('.ai-tier[data-i="' + i + '"]') || {}).value || null;
-    const ciq = (document.querySelector('.ai-ciq[data-i="' + i + '"]') || {}).value || null;
-    approvals.push({ price_id: p.price_id, offer_price_key: key, offer_id: p.offer_id || null, tier, coachiq_product_id: ciq, confidence: p.confidence });
+  const targetByKey = {}; (_AI_DATA.targets || []).forEach(t => targetByKey[t.key] = t);
+  document.querySelectorAll('#pc-aimatch-modal .ai-row').forEach(row => {
+    const chk = row.querySelector('.ai-chk');
+    if (!chk || !chk.checked) return;
+    const key = (row.querySelector('.ai-plan') || {}).value || '';
+    if (!key) return; // ticked but no plan chosen → skip
+    const tier = (row.querySelector('.ai-tier') || {}).value || null;
+    const tgt = targetByKey[key] || {};
+    approvals.push({
+      price_id: row.getAttribute('data-pid'),
+      offer_price_key: key,
+      offer_id: tgt.offer_id || null,
+      tier,
+      coachiq_product_id: row.getAttribute('data-ciq') || null,
+      confidence: parseFloat(row.getAttribute('data-conf')) || null,
+    });
   });
-  if (!approvals.length) { alert('Nothing approved — tick the prices you want to save.'); return; }
+  if (!approvals.length) { alert('Nothing to save — tick the rows (and pick a plan) you want to keep.'); return; }
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/offers/match-prices', {

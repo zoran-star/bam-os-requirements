@@ -338,6 +338,7 @@ export default async function handler(req, res) {
       ok: true,
       academy: client.business_name,
       counts: { live_prices: prices.length, targets: targets.length, needs_review: proposals.filter(p => p.needs_review).length },
+      targets: targets.map(t => ({ key: t.key, offer_id: t.offer_id, offering: t.offering, term: t.term, label: t.label })),
       proposals,
     });
   } catch (e) {
