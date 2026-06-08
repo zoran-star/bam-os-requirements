@@ -680,7 +680,19 @@ export default async function handler(req, res) {
         return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
       }
       const data = await response.json();
-      const forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
+      let forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
+      // ?counts=1 → attach submission count per form + sort most-popular first.
+      if (req.query.counts && v2 && locationId) {
+        const counts = await Promise.all(forms.map(async f => {
+          try {
+            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId, formId: f.id, limit: "1" }), { headers });
+            if (!r.ok) return null;
+            const j = await r.json();
+            return j.meta?.total ?? (j.submissions || j.data || []).length;
+          } catch { return null; }
+        }));
+        forms = forms.map((f, i) => ({ ...f, count: counts[i] })).sort((a, b) => (b.count ?? -1) - (a.count ?? -1));
+      }
       const body = { data: forms, count: forms.length, version: v2 ? 2 : 1, location: locationName };
       cacheSet(ck, 200, body);
       return res.status(200).json(body);
@@ -711,7 +723,20 @@ export default async function handler(req, res) {
         return res.status(200).json({ data: [], count: 0, version: v2 ? 2 : 1, location: locationName, reason: "ghl_error", status: response.status, error: errText.slice(0, 160) });
       }
       const data = await response.json();
-      const cals = (data.calendars || data.data || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
+      let cals = (data.calendars || data.data || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
+      // ?counts=1 → attach booking count (last 180d) per calendar + sort most-popular first.
+      if (req.query.counts && v2 && locationId) {
+        const since = Date.now() - 180 * 86400000;
+        const counts = await Promise.all(cals.map(async c => {
+          try {
+            const r = await fetch(`${base}/calendars/events?` + new URLSearchParams({ locationId, calendarId: c.id, startTime: String(since), endTime: String(Date.now()) }), { headers });
+            if (!r.ok) return null;
+            const j = await r.json();
+            return (j.events || j.data || []).length;
+          } catch { return null; }
+        }));
+        cals = cals.map((c, i) => ({ ...c, count: counts[i] })).sort((a, b) => (b.count ?? -1) - (a.count ?? -1));
+      }
       const body = { data: cals, count: cals.length, version: v2 ? 2 : 1, location: locationName };
       cacheSet(ck, 200, body);
       return res.status(200).json(body);

@@ -99,7 +99,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     setForms(null); setFormsErr(""); setFormsInfo(null);
     (async () => {
       try {
-        const res = await fetch(`/api/ghl?action=forms&location=${encodeURIComponent(location)}`);
+        const res = await fetch(`/api/ghl?action=forms&counts=1&location=${encodeURIComponent(location)}`);
         const j = await res.json();
         if (!alive) return;
         setFormsInfo(j);
@@ -117,7 +117,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     setCals(null); setCalsInfo(null);
     (async () => {
       try {
-        const res = await fetch(`/api/ghl?action=calendars&location=${encodeURIComponent(location)}`);
+        const res = await fetch(`/api/ghl?action=calendars&counts=1&location=${encodeURIComponent(location)}`);
         const j = await res.json();
         if (!alive) return;
         setCalsInfo(j);
@@ -418,6 +418,18 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const conf = (c) => c === "high" ? t.text : c === "med" ? t.textSub : t.textMute;
 
   const money = (n) => n == null ? "—" : "$" + Number(n).toLocaleString();
+  // Toggle pill for the forms/calendars pickers — shows the popularity count
+  // (submissions / bookings) so the most-used ones are obvious. Backend already
+  // sorts highest→lowest.
+  const pickPill = (item, selected, onToggle) => (
+    <button key={item.id} onClick={onToggle} title={item.count != null ? `${item.count} in the last period` : undefined}
+      style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 12px", borderRadius: 999, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
+        border: `1.5px solid ${selected ? t.accent : t.borderMed}`, background: selected ? `${t.accent}22` : "transparent", color: t.text }}>
+      {selected && <span style={{ color: t.accent, fontWeight: 800 }}>✓</span>}
+      {item.name}
+      {item.count != null && <span style={{ fontSize: 11, fontWeight: 700, color: selected ? t.accent : t.textMute }}>· {item.count.toLocaleString()}</span>}
+    </button>
+  );
   // Big stat for the "this month so far" hero card.
   const heroStat = (label, val, onClick) => (
     <div key={label} onClick={onClick} title={onClick ? "Click to see the list" : undefined} style={{ cursor: onClick ? "pointer" : "default" }}>
@@ -626,12 +638,11 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             <div style={{ marginTop: 6 }}>If this location has forms in GHL, the diagnostic above tells us why they're not coming through — send it to Cole.</div>
           </div>
         )}
-        {forms && forms.map(f => (
-          <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", cursor: "pointer", fontSize: 13, color: t.text }}>
-            <input type="checkbox" checked={picked.has(f.id)} onChange={() => toggleForm(f.id)} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
-            {f.name}
-          </label>
-        ))}
+        {forms && forms.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {forms.map(f => pickPill(f, picked.has(f.id), () => toggleForm(f.id)))}
+          </div>
+        )}
 
         {/* Trial calendars */}
         <div style={{ ...lbl, marginTop: 20 }}>Trials booked — which calendar(s)?</div>
@@ -644,12 +655,11 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             No calendars returned.{calsInfo && <span style={{ color: t.textSub }}> (GHL v{calsInfo.version}{calsInfo.status ? ` · HTTP ${calsInfo.status}` : ""}{calsInfo.reason ? ` · ${calsInfo.reason}` : ""})</span>}
           </div>
         )}
-        {cals && cals.map(c => (
-          <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", cursor: "pointer", fontSize: 13, color: t.text }}>
-            <input type="checkbox" checked={pickedCals.has(c.id)} onChange={() => toggleCal(c.id)} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
-            {c.name}
-          </label>
-        ))}
+        {cals && cals.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {cals.map(c => pickPill(c, pickedCals.has(c.id), () => toggleCal(c.id)))}
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
           <button onClick={saveForms} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>
@@ -784,13 +794,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             {!forms ? <div style={{ fontSize: 12, color: t.textMute }}>Loading forms… (open the setup section below once if this stays empty)</div>
               : forms.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>No forms found for this location.</div>
               : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 180, overflowY: "auto" }}>
-                  {forms.map(f => (
-                    <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: t.text, cursor: "pointer" }}>
-                      <input type="checkbox" checked={cfgEdit.formIds.has(f.id)} onChange={() => setCfgEdit(e => { const n = new Set(e.formIds); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return { ...e, formIds: n }; })} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
-                      {f.name}
-                    </label>
-                  ))}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 180, overflowY: "auto" }}>
+                  {forms.map(f => pickPill(f, cfgEdit.formIds.has(f.id), () => setCfgEdit(e => { const n = new Set(e.formIds); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return { ...e, formIds: n }; })))}
                 </div>
               )}
 
@@ -798,13 +803,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
             {!cals ? <div style={{ fontSize: 12, color: t.textMute }}>Loading calendars…</div>
               : cals.length === 0 ? <div style={{ fontSize: 12, color: t.textMute }}>No calendars found for this location.</div>
               : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 7, maxHeight: 160, overflowY: "auto" }}>
-                  {cals.map(c => (
-                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: t.text, cursor: "pointer" }}>
-                      <input type="checkbox" checked={cfgEdit.calIds.has(c.id)} onChange={() => setCfgEdit(e => { const n = new Set(e.calIds); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return { ...e, calIds: n }; })} style={{ width: 16, height: 16, accentColor: t.accent, cursor: "pointer" }} />
-                      {c.name}
-                    </label>
-                  ))}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 160, overflowY: "auto" }}>
+                  {cals.map(c => pickPill(c, cfgEdit.calIds.has(c.id), () => setCfgEdit(e => { const n = new Set(e.calIds); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return { ...e, calIds: n }; })))}
                 </div>
               )}
 

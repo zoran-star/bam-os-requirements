@@ -76,6 +76,13 @@ Simplified to 3 KPIs. Sources + definitions:
     (reverts to default).
   - ⚠️ A form/calendar must be pulled at least once to have data — can't retro-count a
     form that was never selected.
+  - **Popularity-ordered pickers (2026-06-07):** the forms/calendars pickers are now toggle
+    **pills** (`pickPill`) showing a popularity count, sorted highest→lowest. `?action=forms&counts=1`
+    attaches each form's **submission total** (`meta.total` from `/forms/submissions?formId=&limit=1`);
+    `?action=calendars&counts=1` attaches each calendar's **booking count** over the last 180d
+    (`/calendars/events`). Counts are V2-only + best-effort (parallel, null on failure → hidden +
+    unsorted). `counts` is in the GHL cache key so counted/uncounted don't collide. Used in both the
+    main setup picker and the per-month effective-config editor.
 - **Journey board per month (2026-06-07):** a ▦ button on the hero + each month row opens a
   3-column **Leads → Trials → Sales** board for that month (modal). Each person = a card
   (name + date/amount). Built entirely from `ghl-kpi-detail` (fetched 3× per month:
