@@ -742,6 +742,53 @@ export default async function handler(req, res) {
       return res.status(200).json(body);
     }
 
+    // ─── Form activity: submissions per form, broken out by month (diagnostic) ───
+    // "Which form was used in which month?" — lists EVERY form (not just the
+    // selected ones) with a month-by-month submission count, to find an old lead
+    // form that stopped being used.
+    if (action === "form-activity") {
+      if (!v2) return res.status(200).json({ data: [], months: [], reason: "v1_unsupported" });
+      let lid = locationId || await discoverV2LocationId(loc);
+      // List forms.
+      let formsResp = await fetch(`${base}/forms/?${new URLSearchParams(lid ? { limit: "100", locationId: lid } : { limit: "100" })}`, { headers });
+      if (!formsResp.ok) return res.status(200).json({ data: [], months: [], reason: "ghl_error", status: formsResp.status });
+      const forms = ((await formsResp.json()).forms || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
+      const monthsBack = Math.min(Math.max(parseInt(req.query.months || "8", 10) || 8, 1), 24);
+      const sinceMs = Date.now() - (monthsBack + 1) * 31 * 86400000;
+      const now = new Date();
+      const monthCols = [];
+      for (let i = 0; i < monthsBack; i++) {
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+        monthCols.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+      }
+      const mk = (iso) => { const d = new Date(iso); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+      const out = await Promise.all(forms.map(async f => {
+        const byMonth = {}; let total = 0;
+        try {
+          for (let page = 1; page <= 40; page++) {
+            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId: lid || "", formId: f.id, limit: "100", page: String(page) }), { headers });
+            if (!r.ok) break;
+            const j = await r.json();
+            const subs = j.submissions || j.data || [];
+            if (!subs.length) break;
+            let sawInWindow = false;
+            for (const s of subs) {
+              const created = s.createdAt || s.dateAdded || s.date || null;
+              const ts = created ? new Date(created).getTime() : null;
+              if (ts && ts < sinceMs) continue;
+              sawInWindow = true;
+              const k = mk(created);
+              byMonth[k] = (byMonth[k] || 0) + 1; total++;
+            }
+            if (subs.length < 100 || !sawInWindow) break;
+          }
+        } catch { /* best-effort */ }
+        return { id: f.id, name: f.name, total, months: byMonth };
+      }));
+      out.sort((a, b) => b.total - a.total);
+      return res.status(200).json({ data: out, months: monthCols, location: locationName });
+    }
+
     if (action === "conversations") {
       const contactId = req.query.contactId;
       let url;

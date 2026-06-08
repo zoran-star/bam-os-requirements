@@ -85,6 +85,13 @@ Simplified to 3 KPIs. Sources + definitions:
     (`/calendars/events`). Counts are V2-only + best-effort (parallel, null on failure → hidden +
     unsorted). `counts` is in the GHL cache key so counted/uncounted don't collide. Used in both the
     main setup picker and the per-month effective-config editor.
+  - **Form activity diagnostic (2026-06-07):** `?action=form-activity&location=&months=8` lists
+    EVERY form with a **month-by-month submission count** (paginates each form, buckets by month).
+    Powers a "Submissions by month" button + table modal in the forms picker — to find which form
+    was the lead form in a given month. V2-only. **GTA reality (2026-06-07):** lead events only
+    exist **May→onward**; trials (calendars) + sales (Stripe) go back to Nov 2025. So pre-May
+    "0 leads" = the tracked lead forms had no earlier submissions, not a bug — likely an older lead
+    form was used before May.
 - **Journey board per month (2026-06-07):** a ▦ button on the hero + each month row opens a
   3-column **Leads → Trials → Sales** board for that month (modal). Each person = a card
   (name + date/amount). Built entirely from `ghl-kpi-detail` (fetched 3× per month:
