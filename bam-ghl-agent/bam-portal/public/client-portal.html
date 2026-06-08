@@ -14713,6 +14713,14 @@ async function applyAiMatch() {
 async function fetchAndRenderPricing() {
   const container = document.getElementById('pricing-list-container');
   if (!container) return;
+  // Explicitly reveal the AI-match button for V2 (web) clients whenever the
+  // Pricing view loads — belt-and-suspenders over the data-feature toggle.
+  const _aiBtn = document.getElementById('pc-ai-match-btn');
+  if (_aiBtn) {
+    const _v2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
+    const _native = (typeof isNativeApp === 'function' && isNativeApp());
+    _aiBtn.style.display = (_v2 && !_native) ? '' : 'none';
+  }
   try {
     const token = await _mreqAuthToken();
     const qs = (typeof CLIENT_ID !== 'undefined' && CLIENT_ID) ? '?client_id=' + encodeURIComponent(CLIENT_ID) : '';
