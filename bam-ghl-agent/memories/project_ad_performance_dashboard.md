@@ -83,9 +83,16 @@ Simplified to 3 KPIs. Sources + definitions:
   contact_id||email||phone) to detail items for cross-column matching.
   - **Filled** card = the person also has a card in the column to the LEFT (came from the
     prior stage); **outline** = they joined at this stage (no prior card — walk-in / mid-funnel).
-  - **Hover** a card → same `key` highlights across all 3 columns (trace the journey).
   - **✕** deletes that person's record for that stage via `ghl-kpi-delete`, then re-reads
     monthly counts. SALES column = **All purchases** (client_new + client_existing), Zoran's call.
+  - **Row-aligned + arrows (2026-06-07 revision):** dropped the hover-highlight. Now ONE
+    ROW per person across Leads/Trials/Sales (CSS grid `1fr 44px 1fr 44px 1fr`), aligned so
+    you read a journey left→right. Gutter shows **→** (continued) / **⇢** (skipped a stage) /
+    blank (gap). Matching is union-find over **any shared identifier** (email/phone/contact_id,
+    normalized) — robust to a person tracked differently per stage. Detail items now also
+    return `contact_id` + `phone` for this. Same-stage duplicates merge (ids combined, **×N**
+    amber badge) so they're counted + deletable. Rows ordered most-complete-journey first.
+    `deleteBoardCard` re-fetches the board (re-aligns) after a delete.
 - **GOTCHA (2026-06-07):** "pulled — leads 41 …" but KPIs read 0 → inserts were FAILING silently. Two causes fixed: (1) `ghl_funnel_events` unique index was **partial** (`where ref is not null`) — PostgREST `on_conflict=event_type,ref` can't use a partial index → every insert 42P10'd. Made it **non-partial** (re-run `/apply-sql`). (2) `insertEvents` swallowed the error and returned `rows.length` (the attempted count), so the diagnostic looked healthy. It now lets errors propagate into `result.errors`. **Lesson: a "pulled N" count is attempts unless inserts are verified.**
 
 ⚠️ **Hourly snapshot cron (PR #111) is NOT the approach** — Zoran rejected it.
