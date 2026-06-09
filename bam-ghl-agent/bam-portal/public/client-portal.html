@@ -10264,7 +10264,7 @@ function _obtRender() {
       </div>
     </div>
   `;
-  widget.setAttribute('data-visible', 'true');
+  widget.setAttribute('data-visible', 'false'); // onboarding now lives in Action Items — top-right widget retired
   widget.setAttribute('data-open', _obtPanelOpen ? 'true' : 'false');
 }
 
@@ -12671,7 +12671,7 @@ async function switchClient(newId) {
     const ue = document.getElementById('userEmail');
     const av = document.getElementById('userAvatar');
     const on = (row.owner_name || '').trim();
-    const em = (ue && ue.title) || '';   // logged-in email (stored as the title at boot)
+    const em = (row.email || '').trim();   // the selected academy's contact email
     if (un) { un.textContent = on || em; un.title = on || em; }
     if (ue) { ue.textContent = on ? em : ''; ue.style.display = on ? 'block' : 'none'; }
     if (av) av.textContent = (on || em).slice(0, 1).toUpperCase() || '·';
@@ -20381,7 +20381,7 @@ async function boot() {
   // to exactly the caller's clients via my_client_ids(). One auth user can
   // belong to multiple clients — the bottom-left switcher lets them flip.
   const { data: clientRows } = await _sb.from('clients')
-    .select('id, business_name, owner_name, onboarding_completed_at, marketing_included, v2_access')
+    .select('id, business_name, owner_name, email, onboarding_completed_at, marketing_included, v2_access')
     .is('archived_at', null)
     .order('business_name');
   const clientRow = (clientRows && clientRows.length) ? clientRows[0] : null;
@@ -20439,7 +20439,7 @@ async function boot() {
   }
 
   // Populate user-row from authed email + clients.owner_name
-  const email = session.user.email || '';
+  const email = (clientRow?.email || '').trim();   // the ACADEMY's contact email (not the logged-in user)
   const ownerName = clientRow?.owner_name?.trim() || '';
   const userNameEl = document.getElementById('userName');
   const userEmailEl = document.getElementById('userEmail');
