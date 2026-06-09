@@ -15086,10 +15086,19 @@ function _sorterSetNext(html) {
   if (host) host.innerHTML = html;
 }
 
+// Indeterminate progress bar for the Sorter's fetch/AI steps (reuses the
+// existing `assetLoadingSlide` keyframe / `.asset-modal-loading` style).
+function _sorterLoading(label) {
+  return `<div style="padding:30px 0;">
+    <div style="font-size:12.5px;color:var(--text-mute,#888);text-align:center;margin-bottom:13px;">${escapeHTML(label || 'Working…')}</div>
+    <div class="asset-modal-loading" style="max-width:360px;margin:0 auto;border-radius:99px;"></div>
+  </div>`;
+}
+
 // ───────────────────────────── STEP 1 — boxes + arrows ─────────────────────────────
 async function _sorterLoadStep1() {
   const host = document.getElementById('pc-sorter-body');
-  if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Reading your live Stripe prices…</div>`;
+  if (host) host.innerHTML = _sorterLoading('Reading your live Stripe prices…');
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/offers/match-prices', {
@@ -15382,7 +15391,9 @@ async function _sorterOnFile(input) {
     });
     _SORTER.batchId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('b-' + Date.now());
     _SORTER.map = { headers, rows, mapping: headers.map(h => ({ header: h, field: null, confidence: null })) };
-    if (status) status.textContent = 'Asking AI to map ' + headers.length + ' columns…';
+    if (status) status.textContent = '';
+    const body = document.getElementById('pc-sorter-body');
+    if (body) body.innerHTML = _sorterLoading('Asking AI to map ' + headers.length + ' columns…');
     const sampleRows = rows.slice(0, 8).map(r => headers.map(h => r[h]));
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/import', {
@@ -15398,7 +15409,20 @@ async function _sorterOnFile(input) {
     _SORTER.map.mapping = headers.map(h => byHeader[h] || { header: h, field: null, confidence: null });
     _sorterRenderBody();
   } catch (e) {
-    if (status) status.textContent = 'Failed: ' + e.message;
+    // The body was swapped for the progress bar, so the file-status node is gone.
+    const body = document.getElementById('pc-sorter-body');
+    if (_SORTER.map && _SORTER.map.headers && _SORTER.map.headers.length) {
+      // CSV parsed but AI mapping failed — fall back to manual mapping.
+      _sorterRenderBody();
+      if (body) {
+        const note = document.createElement('div');
+        note.style.cssText = 'font-size:11.5px;color:#e0654f;margin-bottom:8px;';
+        note.textContent = 'AI mapping failed (' + e.message + ') — map the columns manually below.';
+        body.prepend(note);
+      }
+    } else if (body) {
+      body.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't read CSV — ${escapeHTML(e.message)}</div>`;
+    }
   }
 }
 
@@ -15470,7 +15494,7 @@ function _sorterRenderStep3(host) {
 
 async function _sorterRunChecks() {
   const host = document.getElementById('pc-sorter-body');
-  if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Cross-checking against Stripe + your catalog…</div>`;
+  if (host) host.innerHTML = _sorterLoading('Cross-checking against Stripe + your catalog…');
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/cleanup?action=check', {

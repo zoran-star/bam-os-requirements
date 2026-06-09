@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+import { claudeJsonArray } from "../_ai.js";
 // Vercel Serverless Function — Pricing Sorter, Step 2 AI column mapping.
 //
 // POST /api/sorter/map-columns
@@ -82,20 +83,7 @@ async function aiMapColumns(headers, sampleRows) {
     allowed_fields: FIELDS,
   };
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: MODEL, max_tokens: 2048, system,
-      messages: [{ role: "user", content: JSON.stringify(payload) }],
-    }),
-  });
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  let text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
-  const start = text.indexOf("["), end = text.lastIndexOf("]");
-  if (start === -1 || end === -1) throw new Error("AI did not return a JSON array");
-  return JSON.parse(text.slice(start, end + 1));
+  return await claudeJsonArray({ apiKey, model: MODEL, system, payload, maxTokens: 4096 });
 }
 
 async function handler(req, res) {

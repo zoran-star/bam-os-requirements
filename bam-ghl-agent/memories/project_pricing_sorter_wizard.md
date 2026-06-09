@@ -77,6 +77,22 @@ STEP 3 — CLEANUP
 - The Onboarding Action Items (where the launch button goes).
 - Stripe connected-account access (platform key + Stripe-Account) for creating prices.
 
+## GTA test fixes — 2026-06-09
+
+- **Bug:** Step 1 (and any Sorter AI call) threw *"AI did not return a JSON array"*
+  whenever Claude's output was fenced, prose-led, or truncated. Hit on GTA with 31
+  live prices (4096 max_tokens truncated mid-array → no closing `]`).
+- **Fix:** new shared helper **`bam-portal/api/_ai.js` → `claudeJsonArray()`** —
+  PREFILLS the assistant turn with `[` (forces a bare JSON array, no fences/prose),
+  bumps max_tokens, repairs a truncated tail (keeps every complete object), and on
+  failure throws the real reason + a snippet. Wired into all 4 callers:
+  `offers/match-prices.js`, `offers/create-price.js`, `sorter/import.js`,
+  `sorter/map-columns.js`. Use `claudeJsonArray` for any future JSON-array AI call.
+- **Progress bar:** added `_sorterLoading(label)` in client-portal.html (reuses the
+  `assetLoadingSlide` / `.asset-modal-loading` style) — shows an indeterminate bar on
+  Step 1 price-read, Step 2 column-mapping, and Step 3 cleanup-check fetches. Step 2
+  also now falls back to manual column mapping if the AI map call fails.
+
 ## RESOLVED — round 2 (Zoran, 2026-06-09)
 
 - Import target = a **STAGING table** (shared, scoped by client_id), SEPARATE from the
