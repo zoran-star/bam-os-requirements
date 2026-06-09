@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 
 // GHL KPI Discovery (beta) — read-only spike. Pulls an academy's GoHighLevel
 // pipeline (stages + opportunity counts) and asks Claude to map it onto a
@@ -39,6 +39,8 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const cardRefs = useRef({});                              // `${stage}:${rowIndex}` -> card DOM node
   const boardRowsRef = useRef([]);                          // rows from the last board render
   const [arrows, setArrows] = useState([]);                // measured connector lines
+  const boardScrollRef = useRef(null);                     // the journey modal's scroll container
+  const pendingScrollRef = useRef(null);                   // scrollTop to restore after a delete re-render
   const [boardView, setBoardView] = useState("board");     // 'board' | 'timeline'
   const [trash, setTrash] = useState([]);                  // recently deleted (for undo)
   const trashSeq = useRef(0);
@@ -161,6 +163,15 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
     window.addEventListener("resize", compute);
     return () => { ro.disconnect(); window.removeEventListener("resize", compute); };
   }, [board, boardView]);
+
+  // After an optimistic delete re-renders the board, restore the scroll position
+  // so the modal doesn't snap to the top.
+  useLayoutEffect(() => {
+    if (pendingScrollRef.current != null && boardScrollRef.current) {
+      boardScrollRef.current.scrollTop = pendingScrollRef.current;
+      pendingScrollRef.current = null;
+    }
+  });
 
   // Drill-down: the records behind a KPI number (to verify by name). `month`
   // (YYYY-MM) scopes to a calendar month; without it, falls back to rangeDays.
@@ -301,6 +312,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   // the background and stash the removed rows in the trash for Undo.
   async function deleteBoardCard(cell) {
     if (!cell?.ids?.length || !board) return;
+    pendingScrollRef.current = boardScrollRef.current ? boardScrollRef.current.scrollTop : null;  // keep scroll
     const idset = new Set(cell.ids);
     const drop = (arr) => (arr || []).filter(it => !it.ids.some(id => idset.has(id)));
     setBoard(b => b ? ({ ...b, leads: drop(b.leads), trials: drop(b.trials), sales: drop(b.sales) }) : b);
@@ -833,7 +845,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       )}
 
       {board && (
-        <div onClick={() => setBoard(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
+        <div ref={boardScrollRef} onClick={() => setBoard(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "32px 16px", overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: boardView === "timeline" ? 1240 : 1000, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{boardView === "timeline" ? "Journey timeline" : "Journey board"} · {board.label}</div>
