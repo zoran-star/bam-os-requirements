@@ -168,6 +168,15 @@ export default function Whiteboard({ onOpen }) {
                 <div className="sp-title">{w.title}</div>
                 <div className="sp-sub">summarize your Slack since a time</div>
               </div>
+            ) : w.type === 'mindmap' ? (
+              <div className="mm-preview">
+                <div className="mmp-art">
+                  <span className="mmp-box a" />
+                  <span className="mmp-box b" />
+                  <span className="mmp-line" />
+                </div>
+                <div className="mmp-title">{w.title}</div>
+              </div>
             ) : (
               <div className="wb-card-title">{w.title}</div>
             )}

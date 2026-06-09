@@ -44,6 +44,17 @@ edge function, which:
 - Limitation: catches threads whose **parent** is in the window; replies to older
   threads aren't surfaced. Caps at 60 channels.
 
+## Mind Map widget (`type: 'mindmap'`)
+FigJam-style canvas. `src/MindMap.jsx` + `src/mm-geometry.js`.
+- Tools (bottom pill): **Select**, **Box**, **Text**, **Arrow**.
+- Boxes: drag to move, drag the blue corner to resize, double-tap to edit text.
+- Text size + box color: contextual bar appears when a node is selected (A− / A+ / swatches).
+- Arrows: pick the Arrow tool, drag from one box to another. Routed at right angles;
+  select an arrow and drag its dot to bend the elbow.
+- Stored as ONE JSON doc in `playground_scenes` (key `mindmap`), autosaved (500ms debounce).
+  Doc shape: `{ nodes:[{id,type,x,y,w,h,text,fontSize,fill,color}], edges:[{id,from,to,axis,split}] }`
+  where an edge endpoint is `{node:id}` or a free `{x,y}` point.
+
 ## Add a new widget type
 1. Insert a row in `playground_widgets` with a new `type`.
 2. Render its card preview in `Whiteboard.jsx` (the `w.type === 'todo' ? … : …` branch).

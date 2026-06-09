@@ -3,6 +3,7 @@ import Gate, { isUnlocked } from './Gate.jsx'
 import Whiteboard from './Whiteboard.jsx'
 import Todos from './Todos.jsx'
 import SlackDigest from './SlackDigest.jsx'
+import MindMap from './MindMap.jsx'
 
 export default function App() {
   const [unlocked, setUnlocked] = useState(isUnlocked())
@@ -22,6 +23,7 @@ export default function App() {
           {openWidget.type === 'slack' && (
             <SlackDigest title={openWidget.title} onClose={() => setOpenWidget(null)} />
           )}
+          {openWidget.type === 'mindmap' && <MindMap onClose={() => setOpenWidget(null)} />}
         </div>
       )}
     </div>
