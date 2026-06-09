@@ -98,6 +98,14 @@ STEP 3 — CLEANUP
   `assetLoadingSlide` / `.asset-modal-loading` style) — shows an indeterminate bar on
   Step 1 price-read, Step 2 column-mapping, and Step 3 cleanup-check fetches. Step 2
   also now falls back to manual column mapping if the AI map call fails.
+- ⚠️ **GOTCHA — function timeout shows as "Failed to fetch".** Once the AI call
+  succeeded, `match-prices` ran long (paginates ALL Stripe subs/products/charges →
+  ~38 sequential calls + the Claude call) and blew past Vercel's short default
+  function timeout → the request was killed → the client showed *"Couldn't load
+  prices — Failed to fetch"* (a network error, NOT an API error). Fix: added
+  `export const maxDuration = 60;` to all 5 Sorter endpoints (match-prices,
+  create-price, sorter/import, sorter/map-columns, sorter/cleanup). Any new
+  Stripe-pagination-or-AI endpoint needs `maxDuration` too — the default is too short.
 
 ## RESOLVED — round 2 (Zoran, 2026-06-09)
 

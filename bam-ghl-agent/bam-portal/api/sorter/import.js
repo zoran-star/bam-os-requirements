@@ -1,6 +1,7 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
 import crypto from "node:crypto";
+export const maxDuration = 60; // AI column mapping + row staging — avoid the short default timeout
 // Vercel Serverless Function — Pricing Sorter CSV importer (Step 2).
 //
 // POST modes:

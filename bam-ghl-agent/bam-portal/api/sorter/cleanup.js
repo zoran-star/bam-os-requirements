@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "../_sentry.js";
+export const maxDuration = 60; // Stripe cross-checks + DB promote — avoid the short default timeout
 // Vercel Serverless Function — The Pricing Sorter, STEP 3: cleanup checks + promote.
 //
 // Final step of the import wizard (see memories/project_pricing_sorter.md). Reads

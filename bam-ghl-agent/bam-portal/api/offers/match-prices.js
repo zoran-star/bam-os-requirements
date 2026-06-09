@@ -1,5 +1,9 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
+// Reads ALL live Stripe subs/products/charges (paginated) + an AI call — the
+// default ~10s function timeout is not enough, which surfaces as "Failed to
+// fetch" on the client. Give it headroom.
+export const maxDuration = 60;
 // Vercel Serverless Function — AI price matcher (Offer ⇄ Stripe ⇄ CoachIQ)
 //
 // Phase 2 of the offer-price-mapping feature (see
