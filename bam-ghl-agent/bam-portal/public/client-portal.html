@@ -6749,6 +6749,15 @@ Then the call to action."]</div>
     <div id="pc-aimatch-modal" role="dialog" aria-modal="true" style="display:none; position:fixed; z-index:121; top:50%; left:50%; transform:translate(-50%,-50%); width:min(820px,94vw); max-height:88vh; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
 
     <!-- ══════════════════════════════
+         THE PRICING SORTER — 3-step onboarding wizard (additive)
+         Step 1 boxes+arrows match · Step 2 CSV import · Step 3 cleanup→promote.
+         Mirrors the #pc-aimatch-modal overlay/modal pattern. All JS is the
+         vanilla _SORTER module appended after applyAiMatch() below.
+    ══════════════════════════════ -->
+    <div id="pc-sorter-overlay" onclick="closePricingSorter()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:130;"></div>
+    <div id="pc-sorter-modal" role="dialog" aria-modal="true" aria-label="The Pricing Sorter" style="display:none; position:fixed; z-index:131; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1100px,96vw); max-height:92vh; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
+
+    <!-- ══════════════════════════════
          CALENDAR VIEW (weekly schedule, V2-gated)
          Layout mirrors the BAM GTA staff app Classes page (Sessions.jsx)
          but read-only and styled with client-portal CSS variables.
@@ -13699,6 +13708,8 @@ const ONB_UI = {
   locations:      { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('locations')" } },
   brand:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('brand')" } },
   offers:         { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('offers')" } },
+  // The Pricing Sorter — gated: locked until the sibling 'offers' step is done.
+  pricing_sorter: { auto: false, cta: { label: 'Open The Pricing Sorter ↗', fn: 'openPricingSorter()' } },
   book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
   book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
@@ -13818,6 +13829,20 @@ function _aiOnbHTML(it) {
         <div class="ai-stop-meta"><span class="ai-chip">🔒 Locked</span><span class="ai-stop-hint">Unlocks once your build is ready for review.</span></div>
       </div>
     </div>`;
+  }
+  // The Pricing Sorter is locked until the sibling 'offers' step is completed —
+  // it needs the owner's plans + prices to exist before it can match/import.
+  if (it.onboarding_key === 'pricing_sorter' && !isDone) {
+    const offersItem = _AI_ITEMS.find(i => i.onboarding_key === 'offers');
+    if (offersItem && !offersItem.completed_at) {
+      return `<div class="ai-stop locked">
+        <div class="ai-stop-rail"><span class="ai-stop-circle">🔒</span><div class="ai-stop-line"></div></div>
+        <div class="ai-stop-body">
+          <div class="ai-stop-title">${escapeHTML(it.title)}</div>
+          <div class="ai-stop-meta"><span class="ai-chip">🔒 Locked</span><span class="ai-stop-hint">Unlocks once your Offers step is done.</span></div>
+        </div>
+      </div>`;
+    }
   }
   // Every step is check/uncheck-able by hand. Auto steps also self-complete
   // from the connection signal until someone overrides them by hand.
@@ -14988,6 +15013,505 @@ async function applyAiMatch() {
   }
 }
 
+// ══════════════════════════════════════════════════════════
+// THE PRICING SORTER — 3-step onboarding wizard (additive, vanilla JS)
+// Step 1: boxes+arrows price match (/api/offers/match-prices + create-price)
+// Step 2: CSV import (/api/sorter/import map → commit, /api/sorter/map-columns)
+// Step 3: cleanup → promote (/api/sorter/cleanup?action=check|promote)
+// Reuses _mreqAuthToken(), _safeJson(), escapeHTML(), _aiClientId(), and the
+// existing applyAiMatch() approvals payload for Step 1's pricing_catalog save.
+// ══════════════════════════════════════════════════════════
+let _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
+
+function openPricingSorter() {
+  _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
+  const overlay = document.getElementById('pc-sorter-overlay');
+  const modal = document.getElementById('pc-sorter-modal');
+  if (overlay) overlay.style.display = 'block';
+  if (modal) modal.style.display = 'block';
+  _sorterRender();
+  _sorterLoadStep1();
+}
+
+function closePricingSorter() {
+  const overlay = document.getElementById('pc-sorter-overlay');
+  const modal = document.getElementById('pc-sorter-modal');
+  if (overlay) overlay.style.display = 'none';
+  if (modal) modal.style.display = 'none';
+  window.removeEventListener('resize', _sorterDrawArrows);
+}
+
+// ── Shell: stepper header + body slot + Back/Next footer ──
+function _sorterRender() {
+  const modal = document.getElementById('pc-sorter-modal');
+  if (!modal) return;
+  const steps = [['1', 'Match'], ['2', 'Import'], ['3', 'Cleanup']];
+  const dots = steps.map(([n, label]) => {
+    const active = Number(n) === _SORTER.step;
+    const done = Number(n) < _SORTER.step;
+    const bg = active ? 'var(--accent,#E8C547)' : (done ? 'rgba(123,196,127,0.25)' : 'rgba(255,255,255,0.06)');
+    const col = active ? '#1a1a1a' : (done ? '#7BC47F' : 'var(--text-mute,#888)');
+    return `<span style="display:inline-flex;align-items:center;gap:7px;">
+      <span style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${bg};color:${col};">${done ? '✓' : n}</span>
+      <span style="font-size:12.5px;font-weight:${active ? '800' : '600'};color:${active ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};">${label}</span>
+    </span>`;
+  }).join('<span style="color:var(--text-mute,#888);margin:0 6px;">·</span>');
+
+  modal.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="font-size:18px;font-weight:800;">🧮 The Pricing Sorter</div>
+      <button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;">${dots}</div>
+    <div id="pc-sorter-body"></div>
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:16px;position:sticky;bottom:0;background:var(--surface,#16161a);padding-top:12px;border-top:1px solid var(--border,#2a2a31);">
+      <button id="pc-sorter-back" onclick="_sorterBack()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;${_SORTER.step === 1 ? 'visibility:hidden;' : ''}">← Back</button>
+      <div id="pc-sorter-next-host"></div>
+    </div>`;
+  _sorterRenderBody();
+}
+
+function _sorterRenderBody() {
+  const host = document.getElementById('pc-sorter-body');
+  if (!host) return;
+  if (_SORTER.step === 1) _sorterRenderStep1(host);
+  else if (_SORTER.step === 2) _sorterRenderStep2(host);
+  else if (_SORTER.step === 3) _sorterRenderStep3(host);
+}
+
+function _sorterBack() { if (_SORTER.step > 1) { _SORTER.step--; _sorterRender(); } }
+
+function _sorterSetNext(html) {
+  const host = document.getElementById('pc-sorter-next-host');
+  if (host) host.innerHTML = html;
+}
+
+// ───────────────────────────── STEP 1 — boxes + arrows ─────────────────────────────
+async function _sorterLoadStep1() {
+  const host = document.getElementById('pc-sorter-body');
+  if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Reading your live Stripe prices…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/match-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId() }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _SORTER.match = { proposals: json.proposals || [], targets: json.targets || [], academy: json.academy };
+    if (_SORTER.step === 1) _sorterRenderBody();
+  } catch (e) {
+    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't load prices — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _sorterAmt(cents, ival) {
+  if (cents == null) return '—';
+  const a = (cents / 100).toFixed(2).replace(/\.00$/, '');
+  return '$' + a + (ival ? ' / ' + String(ival).replace(/_/g, ' ') : '');
+}
+
+function _sorterRenderStep1(host) {
+  const targets = _SORTER.match.targets || [];
+  const props = (_SORTER.match.proposals || []).filter(p => !p.is_one_time);
+  // matched offer keys → their proposal
+  const propByKey = {};
+  props.forEach(p => { if (p.proposed_offer_price_key) propByKey[p.proposed_offer_price_key] = p; });
+
+  // LEFT column: one card per offer-price target.
+  const leftCards = targets.map(t => {
+    const matched = propByKey[t.key];
+    const badge = matched
+      ? `<span style="font-size:10.5px;color:#7BC47F;">→ linked</span>`
+      : `<span style="font-size:10.5px;color:#e0654f;">no Stripe price</span>`;
+    const createBtn = matched ? '' :
+      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:6px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create this price</button>`;
+    return `<div class="pc-sorter-left" data-key="${escapeHTML(t.key)}" style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--bg,#0d0d10);">
+      <div style="font-weight:700;font-size:13px;">${escapeHTML(t.label || t.key)}</div>
+      <div style="font-size:11px;color:var(--text-mute,#888);margin-top:2px;">${badge}</div>
+      <div id="pc-sorter-create-${escapeHTML(t.key).replace(/[^a-zA-Z0-9_-]/g, '_')}"></div>
+      ${createBtn}
+    </div>`;
+  }).join('') || `<div style="color:var(--text-mute,#888);font-size:12.5px;">No plans in your Offers → Pricing yet. Add them first.</div>`;
+
+  // RIGHT column: one card per Stripe price proposal.
+  const rightCards = props.map(p => {
+    const review = p.needs_review;
+    const tierLbl = p.proposed_tier === 'canonical' ? 'Live' : (p.proposed_tier ? 'Legacy' : '');
+    const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
+    return `<div class="pc-sorter-right" data-pid="${escapeHTML(p.price_id)}" data-key="${escapeHTML(p.proposed_offer_price_key || '')}" data-review="${review ? '1' : '0'}" style="border:1px solid ${review ? '#c9871f' : 'var(--border,#2a2a31)'};border-radius:10px;padding:10px 12px;margin-bottom:10px;background:${review ? 'rgba(224,169,63,0.06)' : 'var(--bg,#0d0d10)'};">
+      <div style="font-weight:700;font-size:13px;">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML(p.name || p.price_id)}</div>
+      <div style="font-size:10.5px;color:var(--text-mute,#888);">${members}${tierLbl ? ' · ' + tierLbl : ''}</div>
+    </div>`;
+  }).join('') || `<div style="color:var(--text-mute,#888);font-size:12.5px;">No live Stripe prices found.</div>`;
+
+  host.innerHTML = `
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Your offer plans (left) linked to the live Stripe prices they match (right). A plan with no match can have its price created in Stripe.</div>
+    <div id="pc-sorter-grid" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:60px;">
+      <svg id="pc-sorter-arrows" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></svg>
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Your plans</div>
+        ${leftCards}
+      </div>
+      <div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Live Stripe prices</div>
+        ${rightCards}
+      </div>
+    </div>`;
+
+  _sorterSetNext(`<button onclick="_sorterApproveAndNext()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save matches →</button>`);
+
+  // Draw arrows after layout settles + on resize.
+  requestAnimationFrame(_sorterDrawArrows);
+  window.removeEventListener('resize', _sorterDrawArrows);
+  window.addEventListener('resize', _sorterDrawArrows);
+}
+
+// Draw an SVG path from each matched offer card (left) to its Stripe card (right).
+function _sorterDrawArrows() {
+  const svg = document.getElementById('pc-sorter-arrows');
+  const grid = document.getElementById('pc-sorter-grid');
+  if (!svg || !grid) return;
+  const gb = grid.getBoundingClientRect();
+  const lefts = grid.querySelectorAll('.pc-sorter-left');
+  let paths = '';
+  lefts.forEach(left => {
+    const key = left.getAttribute('data-key');
+    if (!key) return;
+    const right = grid.querySelector('.pc-sorter-right[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+    if (!right) return;
+    const lb = left.getBoundingClientRect();
+    const rb = right.getBoundingClientRect();
+    const x1 = lb.right - gb.left, y1 = lb.top - gb.top + lb.height / 2;
+    const x2 = rb.left - gb.left, y2 = rb.top - gb.top + rb.height / 2;
+    const review = right.getAttribute('data-review') === '1';
+    const color = review ? '#e0a93f' : 'var(--accent,#E8C547)';
+    const dash = review ? 'stroke-dasharray="6 5"' : '';
+    const mx = (x1 + x2) / 2;
+    paths += `<path d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="2" ${dash} />
+      <circle cx="${x2}" cy="${y2}" r="3.5" fill="${color}" />`;
+  });
+  svg.innerHTML = paths;
+}
+
+// ── Create a missing price: propose (explain) then apply (write to Stripe) ──
+async function _sorterProposeMissing(key) {
+  const t = (_SORTER.match.targets || []).find(x => x.key === key);
+  if (!t) return;
+  const slotId = 'pc-sorter-create-' + key.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const slot = document.getElementById(slotId);
+  if (slot) slot.innerHTML = `<div style="font-size:11.5px;color:var(--text-mute,#888);margin-top:6px;">Working out a price…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-price', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose', targets: [{ key: t.key, offering: t.offering, term: t.term, base_cents: t.base_cents, allin_cents: t.allin_cents, label: t.label }] }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const rec = (json.recommendations || [])[0];
+    if (!rec) throw new Error('no recommendation returned');
+    if (slot) {
+      // Stash the creation payload on the slot element; the button reads it back
+      // by element id (avoids embedding JSON in an inline onclick attribute).
+      slot._sorterCreation = { key: t.key, offer_id: t.offer_id, unit_amount_cents: rec.unit_amount_cents, currency: rec.currency, recurring: rec.recurring, product_name: rec.label || t.label };
+      slot.innerHTML = `<div style="margin-top:8px;padding:9px 11px;border:1px solid var(--accent,#E8C547);border-radius:9px;background:rgba(232,197,71,0.06);">
+        <div style="font-size:12px;font-weight:700;">${escapeHTML(rec.plain_explanation || '')}</div>
+        ${rec.offer_impact_note ? `<div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:3px;">${escapeHTML(rec.offer_impact_note)}</div>` : ''}
+        <button onclick="_sorterApplyMissing('${escapeHTML(slotId)}')" style="margin-top:7px;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; create in Stripe</button>
+      </div>`;
+    }
+  } catch (e) {
+    if (slot) slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _sorterApplyMissing(slotId) {
+  const slot = document.getElementById(slotId);
+  const creation = slot && slot._sorterCreation;
+  if (!creation) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-price', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'apply', creations: [creation] }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    // Re-run Step 1 so the freshly created price now draws an arrow.
+    await _sorterLoadStep1();
+  } catch (e) {
+    alert('Create price failed: ' + e.message);
+  }
+}
+
+// Save the matched proposals to pricing_catalog (reuses the match-prices apply payload), then advance.
+async function _sorterApproveAndNext() {
+  const targetByKey = {}; (_SORTER.match.targets || []).forEach(t => targetByKey[t.key] = t);
+  const approvals = [];
+  (_SORTER.match.proposals || []).forEach(p => {
+    if (p.is_one_time) return;
+    const key = p.proposed_offer_price_key;
+    if (!key) return;
+    const tgt = targetByKey[key] || {};
+    approvals.push({
+      price_id: p.price_id,
+      offer_price_key: key,
+      offer_id: tgt.offer_id || p.offer_id || null,
+      tier: p.proposed_tier || 'canonical',
+      coachiq_product_id: p.coachiq_product_id || null,
+      confidence: p.confidence != null ? p.confidence : null,
+    });
+  });
+  try {
+    if (approvals.length) {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/offers/match-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ client_id: _aiClientId(), apply: true, approvals }),
+      });
+      const json = await _safeJson(r);
+      if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    }
+    _SORTER.step = 2;
+    _sorterRender();
+  } catch (e) {
+    alert('Saving matches failed: ' + e.message);
+  }
+}
+
+// ───────────────────────────── STEP 2 — CSV import ─────────────────────────────
+// Tiny CSV parser: handles quoted fields, escaped quotes (""), CRLF, BOM.
+function _sorterParseCSV(text) {
+  const out = [];
+  let row = [], field = '', inQ = false;
+  const s = String(text || '').replace(/^﻿/, '');
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; }
+        else inQ = false;
+      } else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); out.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip — handled by \n */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); out.push(row); }
+  // Drop fully-empty trailing rows.
+  return out.filter(r => r.some(v => String(v).trim() !== ''));
+}
+
+// Dedupe duplicate header names so each becomes a distinct object key.
+function _sorterDedupeHeaders(headers) {
+  const seen = {};
+  return headers.map(h => {
+    let name = String(h == null ? '' : h).trim() || 'column';
+    if (seen[name] == null) { seen[name] = 0; return name; }
+    seen[name]++; return name + ' (' + seen[name] + ')';
+  });
+}
+
+const _SORTER_FIELD_OPTS = [
+  ['', '— ignore —'], ['athlete_name', 'Athlete name'], ['parent_name', 'Parent name'],
+  ['parent_email', 'Parent email'], ['parent_phone', 'Parent phone'], ['plan', 'Plan'],
+  ['status', 'Status'], ['joined_date', 'Joined date'],
+  ['stripe_customer_id', 'Stripe customer id'], ['stripe_subscription_id', 'Stripe subscription id'],
+];
+
+function _sorterRenderStep2(host) {
+  const m = _SORTER.map;
+  if (!m.headers.length) {
+    host.innerHTML = `
+      <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Upload a CSV export of your current members (any layout). We'll suggest which column is which — you confirm before anything is staged.</div>
+      <label style="display:inline-flex;align-items:center;gap:10px;padding:12px 16px;border:1px dashed var(--border,#2a2a31);border-radius:10px;cursor:pointer;color:var(--text,#eee);font-size:13px;font-weight:600;">
+        <span>📄 Choose CSV file</span>
+        <input type="file" accept=".csv,text/csv" onchange="_sorterOnFile(this)" style="display:none;" />
+      </label>
+      <div id="pc-sorter-file-status" style="font-size:12px;color:var(--text-mute,#888);margin-top:10px;"></div>`;
+    _sorterSetNext('');
+    return;
+  }
+  // Mapping confirm table.
+  const rowsHtml = m.headers.map((h, i) => {
+    const suggested = (m.mapping[i] && m.mapping[i].field) || '';
+    const conf = (m.mapping[i] && m.mapping[i].confidence != null) ? Math.round(m.mapping[i].confidence * 100) + '%' : '';
+    const sample = (m.rows[0] && m.rows[0][h] != null) ? String(m.rows[0][h]) : '';
+    const opts = _SORTER_FIELD_OPTS.map(([v, l]) => `<option value="${v}" ${v === suggested ? 'selected' : ''}>${l}</option>`).join('');
+    const useChecked = suggested ? 'checked' : '';
+    return `<div class="pc-sorter-maprow" data-header="${escapeHTML(h)}" style="display:grid;grid-template-columns:1fr 180px auto;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--border,#2a2a31);border-radius:9px;margin-bottom:7px;">
+      <div style="min-width:0;">
+        <div style="font-weight:700;font-size:13px;">${escapeHTML(h)}</div>
+        <div style="font-size:10.5px;color:var(--text-mute,#888);">${sample ? 'e.g. ' + escapeHTML(sample.slice(0, 40)) : ''}${conf ? ' · ' + conf : ''}</div>
+      </div>
+      <select class="pc-sorter-mapsel" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${opts}</select>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-mute,#888);cursor:pointer;"><input type="checkbox" class="pc-sorter-mapuse" ${useChecked} /> use</label>
+    </div>`;
+  }).join('');
+
+  host.innerHTML = `
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">Found <b>${m.rows.length}</b> rows. Confirm each column's field (or untick "use" to send it to leftover data).</div>
+    ${rowsHtml}`;
+  _sorterSetNext(`<button onclick="_sorterCommitImport()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Confirm &amp; import →</button>`);
+}
+
+async function _sorterOnFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const status = document.getElementById('pc-sorter-file-status');
+  if (file.size > 5 * 1024 * 1024) { if (status) status.textContent = 'File too large (max 5 MB).'; return; }
+  if (status) status.textContent = 'Reading ' + file.name + '…';
+  try {
+    const text = await file.text();
+    const grid = _sorterParseCSV(text);
+    if (!grid.length) throw new Error('empty CSV');
+    if (grid.length > 5001) throw new Error('too many rows (max 5000)');
+    const headers = _sorterDedupeHeaders(grid[0]);
+    const rows = grid.slice(1).map((cells, ri) => {
+      const obj = { __row: ri + 1 };
+      headers.forEach((h, ci) => { obj[h] = cells[ci] != null ? cells[ci] : ''; });
+      return obj;
+    });
+    _SORTER.batchId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('b-' + Date.now());
+    _SORTER.map = { headers, rows, mapping: headers.map(h => ({ header: h, field: null, confidence: null })) };
+    if (status) status.textContent = 'Asking AI to map ' + headers.length + ' columns…';
+    const sampleRows = rows.slice(0, 8).map(r => headers.map(h => r[h]));
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'map', header: headers, sample_rows: sampleRows }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (json.batch_id) _SORTER.batchId = json.batch_id;
+    const byHeader = {};
+    (json.mapping || []).forEach(mm => { byHeader[mm.header || mm.column] = mm; });
+    _SORTER.map.mapping = headers.map(h => byHeader[h] || { header: h, field: null, confidence: null });
+    _sorterRenderBody();
+  } catch (e) {
+    if (status) status.textContent = 'Failed: ' + e.message;
+  }
+}
+
+async function _sorterCommitImport() {
+  // Read the confirmed mapping back out of the table.
+  const mapping = [];
+  document.querySelectorAll('.pc-sorter-maprow').forEach(row => {
+    const header = row.getAttribute('data-header');
+    const use = row.querySelector('.pc-sorter-mapuse');
+    const sel = row.querySelector('.pc-sorter-mapsel');
+    const field = (use && use.checked && sel && sel.value) ? sel.value : null;
+    mapping.push({ column: header, header, field });
+  });
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'commit', batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, mapping, rows: _SORTER.map.rows }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _SORTER.staging = [];
+    _SORTER.importedCount = json.inserted || 0;
+    _SORTER.step = 3;
+    _sorterRender();
+  } catch (e) {
+    alert('Import failed: ' + e.message);
+  }
+}
+
+// ───────────────────────────── STEP 3 — cleanup → promote ─────────────────────────────
+function _sorterRenderStep3(host) {
+  if (!_SORTER.checks) {
+    host.innerHTML = `<div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Imported <b>${_SORTER.importedCount || 0}</b> rows into staging. Run the cleanup checks before promoting anyone to your live roster.</div>
+      <button onclick="_sorterRunChecks()" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Run cleanup checks</button>`;
+    _sorterSetNext('');
+    return;
+  }
+  const c = _SORTER.checks;
+  const counts = c.counts || {};
+  const card = (icon, title, count, inner) => `
+    <details ${count ? 'open' : ''} style="border:1px solid var(--border,#2a2a31);border-radius:10px;margin-bottom:10px;padding:0 12px;">
+      <summary style="cursor:pointer;padding:11px 0;font-weight:700;font-size:13.5px;list-style:none;">${icon} ${title} <span style="color:${count ? '#e0a93f' : '#7BC47F'};font-weight:800;">(${count})</span></summary>
+      <div style="padding:0 0 12px;font-size:12px;color:var(--text-mute,#888);">${inner || 'Nothing here — all good.'}</div>
+    </details>`;
+
+  const list = (arr, fmt) => (arr && arr.length) ? arr.slice(0, 50).map(fmt).join('') : '';
+  const links = (c.checks && c.checks.links) || {};
+  const linksInner = `
+    ${list(links.staged_no_stripe, x => `<div>• Staged, no Stripe match: ${escapeHTML(x.athlete_name || '')} (${escapeHTML(x.parent_email || '')})</div>`)}
+    ${list(links.stripe_no_member, x => `<div>• Stripe sub, no staged member: ${escapeHTML(x.email || '')}</div>`)}`;
+  const dupInner = list((c.checks && c.checks.duplicates) || [], x => `<div>• ${escapeHTML(x.kind || 'dup')}: ${escapeHTML(String(x.value || ''))} — ${escapeHTML((x.names || []).join(', '))}</div>`);
+  const noOfferInner = list((c.checks && c.checks.no_offer) || [], x => `<div>• ${escapeHTML(x.athlete_name || '')} — ${escapeHTML(x.reason || '')}</div>`);
+  const tierInner = list((c.checks && c.checks.tier_issues) || [], x => `<div>• ${escapeHTML(x.offer_price_key || '')} — ${escapeHTML(x.issue || '')}</div>`);
+
+  const stagedNo = counts.staged_no_stripe || 0;
+  const stripeNo = counts.stripe_no_member || 0;
+  host.innerHTML = `
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">${counts.clean || 0} of ${counts.staged || 0} staged members look clean and ready to promote.</div>
+    ${card('🔗', 'Stripe links', stagedNo + stripeNo, linksInner)}
+    ${card('👯', 'Duplicates', counts.duplicates || 0, dupInner)}
+    ${card('🏷', 'On a price with no offer', counts.no_offer || 0, noOfferInner)}
+    ${card('⚖️', 'Live/Legacy sanity', counts.tier_issues || 0, tierInner)}`;
+
+  const canPromote = (counts.clean || 0) > 0;
+  _sorterSetNext(`<button onclick="_sorterPromote()" ${canPromote ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${canPromote ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${canPromote ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${canPromote ? 'pointer' : 'not-allowed'};">✅ Promote ${counts.clean || 0} clean members</button>`);
+}
+
+async function _sorterRunChecks() {
+  const host = document.getElementById('pc-sorter-body');
+  if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Cross-checking against Stripe + your catalog…</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _SORTER.checks = json;
+    _sorterRenderBody();
+  } catch (e) {
+    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Checks failed — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function _sorterPromote() {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=promote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const n = (json.counts && json.counts.promoted) != null ? json.counts.promoted : (json.promoted ? json.promoted.length : 0);
+    // Mark the onboarding step done if it's seeded as an action item.
+    const sorterItem = (typeof _AI_ITEMS !== 'undefined') ? _AI_ITEMS.find(i => i.onboarding_key === 'pricing_sorter') : null;
+    if (sorterItem && !sorterItem.completed_at && typeof toggleActionItem === 'function') {
+      try { await toggleActionItem(sorterItem.id, true); } catch (_) { /* non-fatal */ }
+    }
+    alert('Promoted ' + n + ' member' + (n === 1 ? '' : 's') + ' to your live roster.');
+    closePricingSorter();
+    if (typeof fetchAndRenderPricing === 'function') fetchAndRenderPricing();
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+  } catch (e) {
+    alert('Promote failed: ' + e.message);
+  }
+}
+
 async function fetchAndRenderPricing() {
   const container = document.getElementById('pricing-list-container');
   if (!container) return;
@@ -14998,6 +15522,20 @@ async function fetchAndRenderPricing() {
     const _v2 = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS);
     const _native = (typeof isNativeApp === 'function' && isNativeApp());
     _aiBtn.style.display = (_v2 && !_native) ? '' : 'none';
+    // Temporary fallback launch point for The Pricing Sorter, next to the AI-match
+    // button — until the action_items 'pricing_sorter' onboarding row is seeded
+    // (then the gold Onboarding subway stop becomes the primary entry point).
+    if (_aiBtn.style.display !== 'none' && !document.getElementById('pc-sorter-launch-btn')) {
+      const sb = document.createElement('button');
+      sb.id = 'pc-sorter-launch-btn';
+      sb.type = 'button';
+      sb.textContent = '🧮 The Pricing Sorter';
+      sb.setAttribute('onclick', 'openPricingSorter()');
+      sb.style.cssText = 'margin-left:10px; align-self:center; font-size:13px; font-weight:700; padding:9px 15px; border-radius:9px; border:1px solid var(--accent); background:rgba(232,197,71,0.12); color:var(--accent); cursor:pointer;';
+      _aiBtn.insertAdjacentElement('afterend', sb);
+    }
+    const _sBtn = document.getElementById('pc-sorter-launch-btn');
+    if (_sBtn) _sBtn.style.display = (_v2 && !_native) ? '' : 'none';
   }
   try {
     const token = await _mreqAuthToken();
