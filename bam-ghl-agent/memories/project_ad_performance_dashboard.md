@@ -94,6 +94,12 @@ Simplified to 3 KPIs. Sources + definitions:
     exist **May→onward**; trials (calendars) + sales (Stripe) go back to Nov 2025. So pre-May
     "0 leads" = the tracked lead forms had no earlier submissions, not a bug — likely an older lead
     form was used before May.
+  - ⚠️ **GHL forms/submissions GOTCHA (2026-06-09):** without explicit `startAt`/`endAt` (YYYY-MM-DD)
+    the endpoint returns only **RECENT** submissions, so old forms looked empty & pre-May leads never
+    backfilled (calendars worked because they always passed startTime/endTime). Fixed: all three
+    forms/submissions pulls (refreshFunnel leads, `forms&counts=1`, `form-activity`) now pass a date
+    range (3yr diagnostics, the 200d window for refreshFunnel). If GTA's numbers DON'T grow after
+    this, then pre-May leads genuinely weren't captured in a GHL form (came via Meta/CoachIQ/etc).
 - **Journey board per month (2026-06-07):** a ▦ button on the hero + each month row opens a
   3-column **Leads → Trials → Sales** board for that month (modal). Each person = a card
   (name + date/amount). Built entirely from `ghl-kpi-detail` (fetched 3× per month:
