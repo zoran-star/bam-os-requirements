@@ -76,3 +76,15 @@ STEP 3 — CLEANUP
 - `pricing_catalog` (+ offer_id/offer_price_key/coachiq_product_id/match_* columns).
 - The Onboarding Action Items (where the launch button goes).
 - Stripe connected-account access (platform key + Stripe-Account) for creating prices.
+
+## RESOLVED — round 2 (Zoran, 2026-06-09)
+
+- Import target = a **STAGING table** (shared, scoped by client_id), SEPARATE from the
+  live `members` table. CSV lands here → cleaned in Step 3 → PROMOTED into `members`.
+  So Q1 = option (b)/staging.
+- Step 3 cleanup checks: (1) member ↔ Stripe link (member with no Stripe customer/sub,
+  and subs with no member — match by email), (2) duplicates (same email/athlete),
+  (3) members on a price with no offer (matcher's 'add it?' flag), (4) verify all
+  LEGACY prices are organized properly. **IGNORE CoachIQ for this wizard.**
+- GTA test CSV: exported the 54 members → `~/Downloads/gta-members.csv` (Athlete Name,
+  Parent Name, Email, Phone, Plan, Status, Joined Date, Stripe Customer, Stripe Sub).
