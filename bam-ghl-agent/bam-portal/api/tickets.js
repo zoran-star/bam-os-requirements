@@ -386,6 +386,7 @@ async function handler(req, res) {
               files: body.files || [],
               author_id: me.id,
               created_at: now,
+              is_action_request: true,   // distinguishes "asked for a reply" from a free reply
             },
           ];
           break;

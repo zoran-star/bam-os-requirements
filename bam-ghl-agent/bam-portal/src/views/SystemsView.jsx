@@ -825,8 +825,8 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                         : (dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"),
                       border: `1px solid ${m.direction === "client_to_staff" ? "rgba(120,200,140,0.25)" : t.border}`,
                     }}>
-                      <div style={{ fontSize: 11, color: t.textMute, fontWeight: 600, marginBottom: 4 }}>
-                        {m.direction === "client_to_staff" ? "CLIENT REPLIED" : "STAFF ASKED"}
+                      <div style={{ fontSize: 11, color: m.is_action_request ? t.accent : t.textMute, fontWeight: 600, marginBottom: 4 }}>
+                        {m.direction === "client_to_staff" ? "CLIENT REPLIED" : (m.is_action_request ? "STAFF ASKED · awaiting reply" : "STAFF REPLIED")}
                         {m.system && " · system"}
                         {" · "}{new Date(m.created_at).toLocaleString()}
                       </div>
@@ -865,7 +865,13 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     rows={2}
                     style={{ width: "100%", padding: "8px 10px", background: t.bg, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
                   />
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 8 }}>
+                    <span style={{ fontSize: 11, color: t.textMute, lineHeight: 1.4 }}>
+                      Just a note — it won't ask the client for a response.{" "}
+                      {canClientComm && !["done", "approved", "in_review"].includes(ticket.status) && (
+                        <button onClick={() => setShowRequest(true)} style={{ background: "none", border: "none", color: t.accent, cursor: "pointer", fontSize: 11, fontWeight: 700, padding: 0, textDecoration: "underline" }}>Request a reply instead →</button>
+                      )}
+                    </span>
                     <button
                       disabled={!clientReply.trim() || busy}
                       onMouseDown={e => e.preventDefault()}
