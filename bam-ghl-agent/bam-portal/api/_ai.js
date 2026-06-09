@@ -1,35 +1,40 @@
 // Shared Claude (Anthropic) helper for the portal's serverless functions.
 //
 // One job: call the Messages API and reliably get back a JSON ARRAY, even when
-// the response gets truncated (the old code threw a blind "AI did not return a
-// JSON array" the moment output was fenced, prose-led, or cut off at max_tokens).
+// the response is fenced, prose-led, or cut off at max_tokens (the old code threw
+// a blind "AI did not return a JSON array" in all three cases).
 //
-// The trick: we PREFILL the assistant turn with "[" so the model is forced to
-// emit a bare JSON array immediately — no fences, no preamble. We then reattach
-// that "[", repair a truncated tail (keep every complete object that arrived),
-// and parse. If it still can't, the error carries the real reason + a snippet
-// so we can debug. extractJsonArray assumes the prefilled-"[" shape.
+// NOTE: we do NOT prefill the assistant turn with "[" — claude-sonnet-4-6 (the
+// model these endpoints use) rejects assistant-message prefill with a 400 ("This
+// model does not support assistant message prefill"). Instead we instruct the
+// model (in each caller's system prompt) to return only a JSON array, then parse
+// robustly: locate the array, repair a truncated tail (keep every complete object
+// that arrived), and surface the real reason + a snippet if it still can't parse.
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
-// Extract a JSON array from a (prefilled / fenced / truncated) Claude response.
+// Extract a JSON array from a (possibly fenced / prose-led / truncated) response.
 export function extractJsonArray(data) {
   let text = (data?.content || []).filter(b => b.type === "text").map(b => b.text).join("");
   text = text.replace(/```(?:json)?/gi, "").trim();
-  if (!text.startsWith("[")) text = "[" + text; // reattach the prefilled opening bracket
+  const start = text.indexOf("[");
+  if (start === -1) {
+    const why = data?.stop_reason ? ` (stop_reason=${data.stop_reason})` : "";
+    throw new Error(`AI did not return a JSON array${why}: ${text.slice(0, 160)}`);
+  }
   let end = text.lastIndexOf("]");
-  if (end === -1) {
+  if (end < start) {
     // Truncated mid-array (often stop_reason="max_tokens"): close after the last
     // COMPLETE object so we keep everything that did come through.
     const lastObj = text.lastIndexOf("}");
-    if (lastObj === -1) {
+    if (lastObj < start) {
       const why = data?.stop_reason ? ` (stop_reason=${data.stop_reason})` : "";
-      throw new Error(`AI did not return a JSON array${why}: ${text.slice(0, 160)}`);
+      throw new Error(`AI returned a truncated/empty array${why}: ${text.slice(start, start + 160)}`);
     }
     text = text.slice(0, lastObj + 1) + "]";
     end = text.length - 1;
   }
-  const slice = text.slice(0, end + 1);
+  const slice = text.slice(start, end + 1);
   try {
     return JSON.parse(slice);
   } catch (e) {
@@ -37,7 +42,7 @@ export function extractJsonArray(data) {
   }
 }
 
-// Call Claude and return a parsed JSON array. Prefills "[" to force array output.
+// Call Claude and return a parsed JSON array.
 export async function claudeJsonArray({ apiKey, model, system, payload, maxTokens = 8192 }) {
   if (!apiKey) throw Object.assign(new Error("ANTHROPIC_API_KEY not configured"), { status: 500 });
   const res = await fetch(ANTHROPIC_URL, {
@@ -49,7 +54,6 @@ export async function claudeJsonArray({ apiKey, model, system, payload, maxToken
       system,
       messages: [
         { role: "user", content: typeof payload === "string" ? payload : JSON.stringify(payload) },
-        { role: "assistant", content: "[" }, // prefill → forces a bare JSON array
       ],
     }),
   });
