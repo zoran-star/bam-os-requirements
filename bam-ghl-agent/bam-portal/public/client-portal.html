@@ -16272,6 +16272,12 @@ function _renderMemberModalBody(m, stripe, history) {
 
     ${divider}
 
+    <!-- Documents (waivers, media releases, etc) — private per-member files -->
+    <div style="${labelCss};margin-bottom:12px">Documents</div>
+    <div id="member-docs-section"><div style="font-size:12px;color:var(--text-mute)">Loading documents…</div></div>
+
+    ${divider}
+
     <!-- Actions -->
     <div style="${labelCss};margin-bottom:12px">Actions</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -16284,6 +16290,94 @@ function _renderMemberModalBody(m, stripe, history) {
       ${stripeBtn}
     </div>
   `;
+  _loadMemberDocs(m.id, m.client_id || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null));
+}
+
+// ─── Per-member documents (private member-files bucket + member_files table) ──
+let _memberDocsCache = [];
+const _MEMBER_DOC_KINDS = { waiver: 'Waiver', media: 'Media release', medical: 'Medical', intake: 'Intake', document: 'Other' };
+
+async function _loadMemberDocs(memberId, clientId) {
+  const sec = document.getElementById('member-docs-section');
+  if (!sec || !_sb || !memberId) return;
+  const { data, error } = await _sb.from('member_files')
+    .select('*').eq('member_id', memberId).order('created_at', { ascending: false });
+  if (error) { sec.innerHTML = `<div style="font-size:12px;color:var(--text-mute)">Couldn't load documents.</div>`; return; }
+  _memberDocsCache = data || [];
+  await _renderMemberDocs(memberId, clientId);
+}
+
+async function _renderMemberDocs(memberId, clientId) {
+  const sec = document.getElementById('member-docs-section');
+  if (!sec) return;
+  let listHtml;
+  if (_memberDocsCache.length) {
+    const items = await Promise.all(_memberDocsCache.map(async f => {
+      let url = '#';
+      try { const { data } = await _sb.storage.from('member-files').createSignedUrl(f.storage_path, 3600); url = data?.signedUrl || '#'; } catch (e) {}
+      const kindLabel = _MEMBER_DOC_KINDS[f.kind] || f.kind;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+          <span style="font-size:14px">📄</span>
+          <div style="flex:1;min-width:0">
+            <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="font-size:13px;color:var(--gold,#E8C547);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(f.filename)}</a>
+            <div style="font-size:11px;color:var(--text-mute)">${escapeHTML(kindLabel)}${f.signed_at ? ' · signed ' + f.signed_at.slice(0,10) : ''} · ${f.created_at ? f.created_at.slice(0,10) : ''}</div>
+          </div>
+          <button onclick="_deleteMemberDoc('${f.id}','${memberId}','${clientId || ''}')" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:12px">Remove</button>
+        </div>`;
+    }));
+    listHtml = `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">${items.join('')}</div>`;
+  } else {
+    listHtml = `<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">No documents yet.</div>`;
+  }
+  sec.innerHTML = `${listHtml}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="member-doc-kind" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 9px;font:inherit;font-size:12px;cursor:pointer">
+        ${Object.entries(_MEMBER_DOC_KINDS).map(([k,l]) => `<option value="${k}">${l}</option>`).join('')}
+      </select>
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-sub);font-size:12px;cursor:pointer">
+        <span>📎 Upload document</span>
+        <input type="file" style="display:none" onchange="_uploadMemberDoc('${memberId}','${clientId || ''}', this)">
+      </label>
+    </div>`;
+}
+
+async function _uploadMemberDoc(memberId, clientId, inputEl) {
+  if (!_sb || !memberId) return;
+  const file = (inputEl.files || [])[0];
+  if (!file) return;
+  const cid = clientId || (typeof CLIENT_ID !== 'undefined' ? CLIENT_ID : null);
+  if (!cid) { alert("Couldn't determine the client for this member."); return; }
+  const kind = (document.getElementById('member-doc-kind') || {}).value || 'document';
+  inputEl.disabled = true;
+  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  const path = `${cid}/${memberId}/${kind}/${stamp}-${cleanName}`;
+  const { error: upErr } = await _sb.storage.from('member-files').upload(path, file, {
+    cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream'
+  });
+  if (upErr) { alert("Couldn't upload " + file.name + " — " + upErr.message); inputEl.disabled = false; return; }
+  const { error: insErr } = await _sb.from('member_files').insert({
+    member_id: memberId, client_id: cid, kind,
+    filename: file.name, storage_path: path,
+    mime_type: file.type || null, size_bytes: file.size,
+  });
+  if (insErr) {
+    alert("Uploaded but couldn't save: " + insErr.message);
+    _sb.storage.from('member-files').remove([path]).catch(() => {});
+    inputEl.disabled = false; return;
+  }
+  inputEl.disabled = false;
+  await _loadMemberDocs(memberId, cid);
+}
+
+async function _deleteMemberDoc(fileId, memberId, clientId) {
+  if (!_sb) return;
+  if (!confirm('Remove this document?')) return;
+  const f = _memberDocsCache.find(x => x.id === fileId);
+  if (f) await _sb.storage.from('member-files').remove([f.storage_path]).catch(() => {});
+  const { error } = await _sb.from('member_files').delete().eq('id', fileId);
+  if (error) { alert("Couldn't remove: " + error.message); return; }
+  await _loadMemberDocs(memberId, clientId);
 }
 
 // Inline-edit handler — saves a single field, then re-renders the drawer
