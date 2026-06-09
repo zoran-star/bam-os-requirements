@@ -15123,7 +15123,22 @@ function _sorterAmt(cents, ival) {
 
 function _sorterRenderStep1(host) {
   const targets = _SORTER.match.targets || [];
-  const props = (_SORTER.match.proposals || []).filter(p => !p.is_one_time);
+  // Order the right column to MIRROR the left so connector lines run parallel
+  // (never cross): group each Stripe price under the offer plan it links to, in
+  // the same order as the left plans; unmatched prices fall to the bottom.
+  const targetPos = {};
+  targets.forEach((t, i) => { targetPos[t.key] = i; });
+  const props = (_SORTER.match.proposals || [])
+    .filter(p => !p.is_one_time)
+    .map((p, i) => [p, i])
+    .sort((a, b) => {
+      const pa = targetPos[a[0].proposed_offer_price_key];
+      const pb = targetPos[b[0].proposed_offer_price_key];
+      const ra = pa == null ? Infinity : pa;
+      const rb = pb == null ? Infinity : pb;
+      return ra - rb || a[1] - b[1]; // group by matched plan, keep input order within a group
+    })
+    .map(x => x[0]);
   // matched offer keys → their proposal
   const propByKey = {};
   props.forEach(p => { if (p.proposed_offer_price_key) propByKey[p.proposed_offer_price_key] = p; });
@@ -15188,18 +15203,23 @@ function _sorterDrawArrows() {
   lefts.forEach(left => {
     const key = left.getAttribute('data-key');
     if (!key) return;
-    const right = grid.querySelector('.pc-sorter-right[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
-    if (!right) return;
+    // Connect to EVERY Stripe price that matched this plan (the live one + any
+    // legacy variants), not just the first — they sit in a contiguous block
+    // beside this plan, so the lines fan out without crossing other plans'.
+    const rights = grid.querySelectorAll('.pc-sorter-right[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+    if (!rights.length) return;
     const lb = left.getBoundingClientRect();
-    const rb = right.getBoundingClientRect();
     const x1 = lb.right - gb.left, y1 = lb.top - gb.top + lb.height / 2;
-    const x2 = rb.left - gb.left, y2 = rb.top - gb.top + rb.height / 2;
-    const review = right.getAttribute('data-review') === '1';
-    const color = review ? '#e0a93f' : 'var(--accent,#E8C547)';
-    const dash = review ? 'stroke-dasharray="6 5"' : '';
-    const mx = (x1 + x2) / 2;
-    paths += `<path d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="2" ${dash} />
-      <circle cx="${x2}" cy="${y2}" r="3.5" fill="${color}" />`;
+    rights.forEach(right => {
+      const rb = right.getBoundingClientRect();
+      const x2 = rb.left - gb.left, y2 = rb.top - gb.top + rb.height / 2;
+      const review = right.getAttribute('data-review') === '1';
+      const color = review ? '#e0a93f' : 'var(--accent,#E8C547)';
+      const dash = review ? 'stroke-dasharray="6 5"' : '';
+      const mx = (x1 + x2) / 2;
+      paths += `<path d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="2" ${dash} />
+        <circle cx="${x2}" cy="${y2}" r="3.5" fill="${color}" />`;
+    });
   });
   svg.innerHTML = paths;
 }
