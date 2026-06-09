@@ -6418,7 +6418,6 @@ Then the call to action."]</div>
           <div class="req-empty" style="padding:20px 0">Loading members…</div>
         </div>
         <div id="member-modal-host"></div>
-        <div id="stripe-modal-host"></div>
       </div>
     </div>
 
@@ -20627,6 +20626,12 @@ function toggleTheme() {
     </div>
   </div>
 </div>
+
+<!-- Stripe/GHL connect modal host — TOP-LEVEL (outside all .view containers) so
+     the fixed-position modal is visible no matter which view triggered it.
+     Was previously inside #view-members, which hid the modal when opened from
+     the onboarding/Action Items tab or for non-V2 clients. -->
+<div id="stripe-modal-host"></div>
 
 <!-- ── Action item create / edit modal ── -->
 <div id="actionItemModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)closeActionItemModal()">
