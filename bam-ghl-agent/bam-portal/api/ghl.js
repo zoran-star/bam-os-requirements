@@ -359,12 +359,16 @@ async function refreshFunnel(req, res) {
   };
 
   // ── Leads: submissions of the configured lead forms (paginated, newest-first) ──
+  // Explicit startAt/endAt — without a date range GHL only returns RECENT
+  // submissions, so older months never backfilled.
+  const formStartAt = new Date(sinceMs).toISOString().slice(0, 10);
+  const formEndAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const leadFormIds = unionIds("lead_form_ids", "lead_form_ids");
   for (const formId of leadFormIds) {
     try {
       let page = 1;
       for (; page <= 40; page++) {            // 40 pages × 100 = 4000 subs cap
-        const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100", page: String(page) });
+        const url = `${base}/forms/submissions?` + new URLSearchParams({ locationId, formId, limit: "100", page: String(page), startAt: formStartAt, endAt: formEndAt });
         const r = await fetch(url, { headers });
         if (!r.ok) { result.errors.push(`forms ${r.status}`); break; }
         const j = await r.json();
@@ -683,10 +687,13 @@ async function handler(req, res) {
       const data = await response.json();
       let forms = (data.forms || data.data || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
       // ?counts=1 → attach submission count per form + sort most-popular first.
+      // Explicit 3-year range so meta.total reflects full history, not just recent.
       if (req.query.counts && v2 && locationId) {
+        const cStartAt = new Date(Date.now() - 36 * 31 * 86400000).toISOString().slice(0, 10);
+        const cEndAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
         const counts = await Promise.all(forms.map(async f => {
           try {
-            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId, formId: f.id, limit: "1" }), { headers });
+            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId, formId: f.id, limit: "1", startAt: cStartAt, endAt: cEndAt }), { headers });
             if (!r.ok) return null;
             const j = await r.json();
             return j.meta?.total ?? (j.submissions || j.data || []).length;
@@ -754,11 +761,15 @@ async function handler(req, res) {
       if (!formsResp.ok) return res.status(200).json({ data: [], reason: "ghl_error", status: formsResp.status });
       const forms = ((await formsResp.json()).forms || []).map(f => ({ id: f.id, name: f.name || f.formName || "(unnamed form)" }));
       const sinceMs = Date.now() - 36 * 31 * 86400000;   // ~3-year lookback
+      // Without startAt/endAt, GHL only returns RECENT submissions — so old
+      // forms looked empty. Pass an explicit 3-year range to get the full history.
+      const startAt = new Date(sinceMs).toISOString().slice(0, 10);
+      const endAt = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
       const out = await Promise.all(forms.map(async f => {
         let total = 0, first = null, last = null;
         try {
           for (let page = 1; page <= 60; page++) {
-            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId: lid || "", formId: f.id, limit: "100", page: String(page) }), { headers });
+            const r = await fetch(`${base}/forms/submissions?` + new URLSearchParams({ locationId: lid || "", formId: f.id, limit: "100", page: String(page), startAt, endAt }), { headers });
             if (!r.ok) break;
             const j = await r.json();
             const subs = j.submissions || j.data || [];
