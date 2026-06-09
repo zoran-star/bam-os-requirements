@@ -15121,107 +15121,148 @@ function _sorterAmt(cents, ival) {
   return '$' + a + (ival ? ' / ' + String(ival).replace(/_/g, ' ') : '');
 }
 
+// STEP 1 — assign each plan its live Stripe price(s) via drag-and-drop or a
+// dropdown (no more crossing arrows). Each plan card is a drop target that holds
+// its assigned prices as chips; the right column is the pool of still-unassigned
+// Stripe prices (draggable). Assignment mutates proposal.proposed_offer_price_key
+// in place, which is exactly what _sorterApproveAndNext() reads on save.
 function _sorterRenderStep1(host) {
   const targets = _SORTER.match.targets || [];
-  // Order the right column to MIRROR the left so connector lines run parallel
-  // (never cross): group each Stripe price under the offer plan it links to, in
-  // the same order as the left plans; unmatched prices fall to the bottom.
-  const targetPos = {};
-  targets.forEach((t, i) => { targetPos[t.key] = i; });
-  const props = (_SORTER.match.proposals || [])
-    .filter(p => !p.is_one_time)
-    .map((p, i) => [p, i])
-    .sort((a, b) => {
-      const pa = targetPos[a[0].proposed_offer_price_key];
-      const pb = targetPos[b[0].proposed_offer_price_key];
-      const ra = pa == null ? Infinity : pa;
-      const rb = pb == null ? Infinity : pb;
-      return ra - rb || a[1] - b[1]; // group by matched plan, keep input order within a group
-    })
-    .map(x => x[0]);
-  // matched offer keys → their proposal
-  const propByKey = {};
-  props.forEach(p => { if (p.proposed_offer_price_key) propByKey[p.proposed_offer_price_key] = p; });
+  const props = (_SORTER.match.proposals || []).filter(p => !p.is_one_time);
 
-  // LEFT column: one card per offer-price target.
+  const byKey = {};
+  props.forEach(p => { const k = p.proposed_offer_price_key; if (k) (byKey[k] = byKey[k] || []).push(p); });
+  const unassigned = props.filter(p => !p.proposed_offer_price_key);
+
+  // A chip = one Stripe price assigned to a plan, with a Live/Legacy toggle + remove.
+  const priceChip = (p) => {
+    const live = p.proposed_tier === 'canonical';
+    const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
+    const tierPill = `<span onclick="event.stopPropagation();_sorterToggleTier('${escapeHTML(p.price_id)}')" title="Switch Live / Legacy" style="cursor:pointer;flex:none;font-size:9px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:6px;border:1px solid ${live ? '#7BC47F' : '#c9871f'};color:${live ? '#7BC47F' : '#e0a93f'};">${live ? 'LIVE' : 'LEGACY'}</span>`;
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:7px 9px;margin-top:7px;background:var(--surface,#16161a);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;">${_sorterAmt(p.amount_cents, p.interval)}</div>
+        <div style="font-size:10px;color:var(--text-mute,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(p.name || p.price_id)} · ${members}</div>
+      </div>
+      ${tierPill}
+      <button onclick="_sorterUnassign('${escapeHTML(p.price_id)}')" title="Unassign" style="flex:none;border:none;background:transparent;color:var(--text-mute,#888);cursor:pointer;font-size:16px;line-height:1;">×</button>
+    </div>`;
+  };
+
+  // LEFT: one drop-zone card per plan + a "create a new plan" tile at the bottom.
   const leftCards = targets.map(t => {
-    const matched = propByKey[t.key];
-    const badge = matched
-      ? `<span style="font-size:10.5px;color:#7BC47F;">→ linked</span>`
-      : `<span style="font-size:10.5px;color:#e0654f;">no Stripe price</span>`;
-    const createBtn = matched ? '' :
-      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:6px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create this price</button>`;
-    return `<div class="pc-sorter-left" data-key="${escapeHTML(t.key)}" style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:10px 12px;margin-bottom:10px;background:var(--bg,#0d0d10);">
+    const mine = byKey[t.key] || [];
+    const slot = escapeHTML(t.key).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const opts = unassigned.map(p => `<option value="${escapeHTML(p.price_id)}">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML((p.name || p.price_id)).slice(0, 42)}</option>`).join('');
+    const dropdown = unassigned.length
+      ? `<select onchange="if(this.value)_sorterAssign(this.value,'${escapeHTML(t.key)}')" style="margin-top:8px;width:100%;padding:7px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;cursor:pointer;"><option value="">+ Assign a Stripe price…</option>${opts}</select>`
+      : '';
+    const createBtn = mine.length ? '' :
+      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:8px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create this price in Stripe</button>`;
+    const emptyHint = mine.length ? '' : `<div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:3px;">Drag a price here, pick one below, or create it.</div>`;
+    return `<div class="pc-sorter-left" data-key="${escapeHTML(t.key)}"
+        ondragover="_sorterDragOver(event)" ondragleave="_sorterDragLeave(event)" ondrop="_sorterDrop(event,'${escapeHTML(t.key)}')"
+        style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:var(--bg,#0d0d10);transition:border-color .12s,background .12s;">
       <div style="font-weight:700;font-size:13px;">${escapeHTML(t.label || t.key)}</div>
-      <div style="font-size:11px;color:var(--text-mute,#888);margin-top:2px;">${badge}</div>
-      <div id="pc-sorter-create-${escapeHTML(t.key).replace(/[^a-zA-Z0-9_-]/g, '_')}"></div>
+      ${emptyHint}
+      ${mine.map(priceChip).join('')}
+      <div id="pc-sorter-create-${slot}"></div>
+      ${dropdown}
       ${createBtn}
     </div>`;
-  }).join('') || `<div style="color:var(--text-mute,#888);font-size:12.5px;">No plans in your Offers → Pricing yet. Add them first.</div>`;
+  }).join('') || `<div style="color:var(--text-mute,#888);font-size:12.5px;">No plans in your Offers → Pricing yet.</div>`;
 
-  // RIGHT column: one card per Stripe price proposal.
-  const rightCards = props.map(p => {
+  const createPlan = `<div onclick="_sorterGotoOffers()" title="Go to Offers to add a plan" style="border:1px dashed var(--accent,#E8C547);border-radius:10px;padding:12px;margin-top:2px;text-align:center;color:var(--accent,#E8C547);font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(232,197,71,0.05);">+ Create a new plan in Offers ↗</div>`;
+
+  // RIGHT: the pool of still-unassigned Stripe prices (draggable).
+  const rightCards = unassigned.length ? unassigned.map(p => {
     const review = p.needs_review;
-    const tierLbl = p.proposed_tier === 'canonical' ? 'Live' : (p.proposed_tier ? 'Legacy' : '');
     const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
-    return `<div class="pc-sorter-right" data-pid="${escapeHTML(p.price_id)}" data-key="${escapeHTML(p.proposed_offer_price_key || '')}" data-review="${review ? '1' : '0'}" style="border:1px solid ${review ? '#c9871f' : 'var(--border,#2a2a31)'};border-radius:10px;padding:10px 12px;margin-bottom:10px;background:${review ? 'rgba(224,169,63,0.06)' : 'var(--bg,#0d0d10)'};">
+    return `<div class="pc-sorter-right" draggable="true" ondragstart="_sorterDragStart(event,'${escapeHTML(p.price_id)}')" data-pid="${escapeHTML(p.price_id)}"
+        style="border:1px solid ${review ? '#c9871f' : 'var(--border,#2a2a31)'};border-radius:10px;padding:10px 12px;margin-bottom:10px;background:${review ? 'rgba(224,169,63,0.06)' : 'var(--bg,#0d0d10)'};cursor:grab;">
       <div style="font-weight:700;font-size:13px;">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML(p.name || p.price_id)}</div>
-      <div style="font-size:10.5px;color:var(--text-mute,#888);">${members}${tierLbl ? ' · ' + tierLbl : ''}</div>
+      <div style="font-size:10.5px;color:var(--text-mute,#888);">${members} · drag onto a plan →</div>
     </div>`;
-  }).join('') || `<div style="color:var(--text-mute,#888);font-size:12.5px;">No live Stripe prices found.</div>`;
+  }).join('') : `<div style="color:#7BC47F;font-size:12.5px;padding:8px 0;">✓ Every Stripe price is assigned.</div>`;
 
   host.innerHTML = `
-    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Your offer plans (left) linked to the live Stripe prices they match (right). A plan with no match can have its price created in Stripe.</div>
-    <div id="pc-sorter-grid" style="position:relative;display:grid;grid-template-columns:1fr 1fr;gap:60px;">
-      <svg id="pc-sorter-arrows" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;"></svg>
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Match each plan to its live Stripe price(s): drag a price from the right onto a plan, or use the plan's dropdown. A plan with no Stripe price can have one created.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">
       <div>
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Your plans</div>
         ${leftCards}
+        ${createPlan}
       </div>
       <div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Live Stripe prices</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Live Stripe prices${unassigned.length ? ' · drag these' : ''}</div>
         ${rightCards}
       </div>
     </div>`;
 
   _sorterSetNext(`<button onclick="_sorterApproveAndNext()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save matches →</button>`);
-
-  // Draw arrows after layout settles + on resize.
-  requestAnimationFrame(_sorterDrawArrows);
-  window.removeEventListener('resize', _sorterDrawArrows);
-  window.addEventListener('resize', _sorterDrawArrows);
 }
 
-// Draw an SVG path from each matched offer card (left) to its Stripe card (right).
-function _sorterDrawArrows() {
-  const svg = document.getElementById('pc-sorter-arrows');
-  const grid = document.getElementById('pc-sorter-grid');
-  if (!svg || !grid) return;
-  const gb = grid.getBoundingClientRect();
-  const lefts = grid.querySelectorAll('.pc-sorter-left');
-  let paths = '';
-  lefts.forEach(left => {
-    const key = left.getAttribute('data-key');
-    if (!key) return;
-    // Connect to EVERY Stripe price that matched this plan (the live one + any
-    // legacy variants), not just the first — they sit in a contiguous block
-    // beside this plan, so the lines fan out without crossing other plans'.
-    const rights = grid.querySelectorAll('.pc-sorter-right[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
-    if (!rights.length) return;
-    const lb = left.getBoundingClientRect();
-    const x1 = lb.right - gb.left, y1 = lb.top - gb.top + lb.height / 2;
-    rights.forEach(right => {
-      const rb = right.getBoundingClientRect();
-      const x2 = rb.left - gb.left, y2 = rb.top - gb.top + rb.height / 2;
-      const review = right.getAttribute('data-review') === '1';
-      const color = review ? '#e0a93f' : 'var(--accent,#E8C547)';
-      const dash = review ? 'stroke-dasharray="6 5"' : '';
-      const mx = (x1 + x2) / 2;
-      paths += `<path d="M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}" fill="none" stroke="${color}" stroke-width="2" ${dash} />
-        <circle cx="${x2}" cy="${y2}" r="3.5" fill="${color}" />`;
+// Kept as a no-op so closePricingSorter()'s resize-listener removal stays valid
+// (Step 1 no longer draws SVG arrows — it uses drag-and-drop + dropdowns).
+function _sorterDrawArrows() {}
+
+function _sorterPropById(pid) { return (_SORTER.match.proposals || []).find(p => p.price_id === pid); }
+
+// Assign a Stripe price to a plan. First price on a plan becomes Live, the rest Legacy.
+function _sorterAssign(priceId, key) {
+  const p = _sorterPropById(priceId); if (!p) return;
+  p.proposed_offer_price_key = key;
+  const hasLive = (_SORTER.match.proposals || []).some(x => x !== p && !x.is_one_time && x.proposed_offer_price_key === key && x.proposed_tier === 'canonical');
+  p.proposed_tier = hasLive ? 'legacy' : 'canonical';
+  _sorterRenderBody();
+}
+
+function _sorterUnassign(priceId) {
+  const p = _sorterPropById(priceId); if (!p) return;
+  p.proposed_offer_price_key = null;
+  _sorterRenderBody();
+}
+
+// Flip a price between Live and Legacy. Promoting to Live demotes any other Live on the same plan.
+function _sorterToggleTier(priceId) {
+  const p = _sorterPropById(priceId); if (!p || !p.proposed_offer_price_key) return;
+  if (p.proposed_tier === 'canonical') { p.proposed_tier = 'legacy'; }
+  else {
+    (_SORTER.match.proposals || []).forEach(x => {
+      if (x !== p && x.proposed_offer_price_key === p.proposed_offer_price_key && x.proposed_tier === 'canonical') x.proposed_tier = 'legacy';
     });
-  });
-  svg.innerHTML = paths;
+    p.proposed_tier = 'canonical';
+  }
+  _sorterRenderBody();
+}
+
+// Drag-and-drop: drag a Stripe price card (right) onto a plan card (left).
+function _sorterDragStart(e, priceId) {
+  if (e.dataTransfer) { e.dataTransfer.setData('text/plain', priceId); e.dataTransfer.effectAllowed = 'move'; }
+}
+function _sorterDragOver(e) {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  const el = e.currentTarget;
+  el.style.borderColor = 'var(--accent,#E8C547)';
+  el.style.background = 'rgba(232,197,71,0.08)';
+}
+function _sorterDragLeave(e) {
+  const el = e.currentTarget;
+  el.style.borderColor = 'var(--border,#2a2a31)';
+  el.style.background = 'var(--bg,#0d0d10)';
+}
+function _sorterDrop(e, key) {
+  e.preventDefault();
+  const pid = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+  if (pid) _sorterAssign(pid, key); // re-renders
+}
+
+// "+ Create a new plan" → close the wizard and jump to the Offers page.
+function _sorterGotoOffers() {
+  if (typeof closePricingSorter === 'function') closePricingSorter();
+  try { if (typeof switchView === 'function') switchView('blueprint'); } catch (_) {}
+  try { if (typeof _bbNavigate === 'function') _bbNavigate('offers'); } catch (_) {}
 }
 
 // ── Create a missing price: propose (explain) then apply (write to Stripe) ──
