@@ -29,6 +29,7 @@ const FILES = [
   "ghl_kpi_config.sql",      // clients.ghl_kpi_config (which forms = leads, etc.)
   "ghl_funnel_events.sql",   // lead/response/booking/conversion event log
   "ghl_funnel_excluded.sql", // ghl_funnel_events.excluded soft-delete (KPI cleaning + trash)
+  "member_files.sql",        // per-member documents (signed waivers etc) + private bucket
 ];
 
 async function runSql(sql) {
