@@ -83,11 +83,17 @@ STEP 3 — CLEANUP
   whenever Claude's output was fenced, prose-led, or truncated. Hit on GTA with 31
   live prices (4096 max_tokens truncated mid-array → no closing `]`).
 - **Fix:** new shared helper **`bam-portal/api/_ai.js` → `claudeJsonArray()`** —
-  PREFILLS the assistant turn with `[` (forces a bare JSON array, no fences/prose),
-  bumps max_tokens, repairs a truncated tail (keeps every complete object), and on
-  failure throws the real reason + a snippet. Wired into all 4 callers:
-  `offers/match-prices.js`, `offers/create-price.js`, `sorter/import.js`,
-  `sorter/map-columns.js`. Use `claudeJsonArray` for any future JSON-array AI call.
+  bumps max_tokens, parses robustly (locates the array, repairs a truncated tail
+  keeping every complete object), and on failure throws the real reason + a snippet
+  (incl. `stop_reason`). Wired into all 4 callers: `offers/match-prices.js`,
+  `offers/create-price.js`, `sorter/import.js`, `sorter/map-columns.js`. Use
+  `claudeJsonArray` for any future JSON-array AI call.
+- ⚠️ **GOTCHA — no assistant prefill on `claude-sonnet-4-6`.** First attempt forced
+  array output by prefilling the assistant turn with `[`; the model 400s with *"This
+  model does not support assistant message prefill. The conversation must end with a
+  user message."* (the Claude 4.6/4.7/4.8 family removed prefill). Don't prefill —
+  instruct via the system prompt + parse robustly. (Structured outputs via
+  `output_config.format` is the documented alternative if we ever need a hard guarantee.)
 - **Progress bar:** added `_sorterLoading(label)` in client-portal.html (reuses the
   `assetLoadingSlide` / `.asset-modal-loading` style) — shows an indeterminate bar on
   Step 1 price-read, Step 2 column-mapping, and Step 3 cleanup-check fetches. Step 2
