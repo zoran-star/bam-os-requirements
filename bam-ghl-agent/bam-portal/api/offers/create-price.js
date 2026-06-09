@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
+export const maxDuration = 60; // AI call + Stripe write — avoid the short default timeout
 // Vercel Serverless Function — The Pricing Sorter, STEP 1 "create a missing price".
 //
 // When an offer-price slot (plan × term the academy typed into Offers → Pricing)

@@ -1,5 +1,6 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { claudeJsonArray } from "../_ai.js";
+export const maxDuration = 60; // AI call — avoid the short default timeout
 // Vercel Serverless Function — Pricing Sorter, Step 2 AI column mapping.
 //
 // POST /api/sorter/map-columns
