@@ -1,170 +1,78 @@
 ---
-name: Next Session Pickup — 2026-05-30 (after GHL connected)
-description: Hand-off note. GHL OAuth is LIVE end-to-end for BAM GTA. Kun Liu/Ryan + John Fu are backfilled. Next: test the 6 PATCH actions end-to-end starting with clicking Cancel on Ryan. Delete this file once Sergio's 4 tickets are cleared.
-type: project
+name: Next-session pickup — READ FIRST
+description: Current state + what to do next. Last updated 2026-06-08 after a big build session (parent payment funnel, CoachIQ model, offer⇄Stripe⇄CoachIQ price mapping + AI matcher, and The Pricing Sorter wizard — all merged to main/production).
+metadata:
+  type: project
 ---
 
-## TL;DR — state at end of session
+# Next-session pickup (2026-06-08)
 
-```
-✅  GHL Marketplace App created · BAM GTA OAuth'd · token in DB
-✅  Kun Liu/Ryan + John Fu inserted into members (via GHL contacts API)
-⏳  6 PATCH actions (pause/unpause/change/refund/cancel/referred + payment-link) NOT yet tested in production
-⏳  Sergio has 6 pending tickets — 1 of them (Cancel Ryan) is what tests Cancel
-```
+Everything below is **MERGED TO main / live on production** (portal.byanymeansbusiness.com),
+mostly **V2/GTA-gated** so it only affects BAM GTA. Read the linked notes for detail.
 
-## What to do FIRST in the new session
+## What got built this session
 
-```
-1. Pull latest:  cd /Users/zoransavic/bam-os-requirements && git pull
-2. Ask Zoran which button he wants to test first.
-3. The order he picked: Cancel Ryan FIRST (clears Sergio's ticket #4).
-4. Walk him through:
-     Members tab → search "Ryan" → click card → Cancel button → confirm
-5. Verify:
-     - Stripe sub_1TWoQ0RxInSEtAh8Mt8zPgC9 deleted in Stripe
-     - cancellations row inserted (SELECT * FROM cancellations WHERE athlete_name='Ryan Liu')
-     - members row 9ab25134-3f08-4353-a3ba-27d270b50d97 deleted
-     - member_audit_log entry with action_type='cancel'
-6. Then Pause Lucrecia → Tristan Pierre (#1), Amy → Nathan (#2), Christ (#3)
-7. Then update each task status as you go.
-```
+1. **Parent payment funnel** ([[project_parent_payment_funnel]]) — Vercel-hosted
+   (`bam-portal/public/funnel/`), input → choose offer → sign+pay. Creates a
+   PORTAL-OWNED Stripe sub via `api/onboarding/checkout.js`. **SANDBOX-TESTED end to
+   end** (real test card → "You're in" success, $854.28 = $756+HST). Demo by default;
+   `?live=1` = real mode. `api/onboarding/activations.js` fires GHL + CoachIQ on first
+   paid invoice (wired into `api/stripe/webhook.js`, gated).
 
-## Sergio's pending tickets (as of 2026-05-30)
+2. **CoachIQ model SETTLED** ([[project_coachiq_integration]]) — CoachIQ is an OPTIONAL
+   per-academy add-on. Signup = portal auto-creates user (Zapier) + allocates product
+   ("Add a Product Purchase" automation, one per product, store automation IDs).
+   Renewals = systems-team TICKET for now. GHL = portal fires the EXISTING inbound
+   webhook `{details:{user:{email},product:{id}}}` (Zoran's workflow does contact +
+   plan + tag + WON + emails); portal is the ONLY trigger (turn CoachIQ's own
+   send-to-GHL step OFF). GHL webhook URL is in Vercel env (`GHL_ONBOARDING_WEBHOOK_URL`).
 
-```
-1.  emily pelleja — Pause                         (newest)
-2.  Jamie — Other                                 (??? unclear, ask Zoran)
-3.  Christ's mom — Pause                          ← task #3
-4.  Kun Liu — Ryan's dad — Cancel                 ← task #4 (Ryan now in roster)
-5.  Amy (Nathan's mom) — Pause                    ← task #2
-6.  Lucrecia — Pause                              ← task #1
-```
+3. **Offer ⇄ Stripe ⇄ CoachIQ price mapping + AI matcher** ([[project_offer_price_mapping]])
+   — `/api/offers/match-prices` reads ALL live subs, groups by price, matches each to
+   the academy's OWN offer prices (offers.data.pricing.pricing_offerings, base OR all-in),
+   harvests CoachIQ product id from sub metadata. Tiers = **Live + Legacy only** (one
+   Live per plan slot, enforced AI/UI/DB). Has RECENCY signal + ONE-TIME/prepaid scan.
+   UI = "🤖 Match with AI" button in the Pricing Catalog view (client portal, V2/GTA-gated),
+   offer-centric modal with dropdowns. `pricing_catalog` extended (offer_id,
+   offer_price_key, coachiq_product_id, match_*).
 
-## Key state pointers
+4. **The Pricing Sorter wizard** ([[project_pricing_sorter_wizard]]) — built via a
+   multi-agent workflow, MERGED. 3-step onboarding wizard (client portal, V2/GTA-gated,
+   launch button next to Match-with-AI for now): Step1 boxes+arrows price match +
+   `api/offers/create-price.js` (writes a Stripe price on approval); Step2 CSV →
+   `api/sorter/map-columns.js` (AI mapping) → `api/sorter/import.js` → `members_staging`
+   table (APPLIED); Step3 `api/sorter/cleanup.js` (check + promote into live members).
 
-```
-BAM GTA client_id        39875f07-0a4b-4429-a201-2249bc1f24df
-BAM GTA Stripe acct      acct_1P7kUCRxInSEtAh8
-BAM GTA GHL locationId   Le9phlhqKyjLyd0JTECv
-GHL Marketplace App      "FC"  (Zoran renamed from "BAM Business Portal")
-GHL OAuth client_id      6a1b6d4148da57158ac6a510-mpsz61td
+Portal fixes: point-of-contact name+email now per-academy on switch; top-right
+onboarding widget retired (it's in Action Items); pricing names fixed ("Steady — 3 Months").
 
-Kun Liu / Ryan
-  members.id             9ab25134-3f08-4353-a3ba-27d270b50d97
-  Stripe sub             sub_1TWoQ0RxInSEtAh8Mt8zPgC9 (active, Accelerated $316)
-  GHL contact id         U8DTfeKzDBLuQicSGSv0
-  Parent: Kun Liu, lkun121@yahoo.com, +16475272083
-  Athlete: Ryan Liu (from GHL custom field RqNojS2YaVGQNjMAo4HB)
+## ⚠️ Risks to remember
+- The Pricing Sorter **Step 1 writes to LIVE Stripe** on approval (no dry-run); **promote
+  copies into the live `members` table** — test carefully on GTA first.
+- Funnel `/funnel/` is demo unless `?live=1`.
 
-John Fu
-  members.id             ae431da8-9cb7-442f-99c6-3fd578e3268e
-  Stripe sub             sub_1TXkQORxInSEtAh8QtnpZKpq (active, Accelerated $316)
-  GHL contact id         vtaIgKM5Rs9K445VihDV
-  Parent: John Fu, johnfu041810121021@gmail.com, (no phone)
-  Athlete: John Fu (NO separate athlete field in his GHL — flag for follow-up)
+## Open / next
+- **TEST The Pricing Sorter on GTA** (test CSV at `~/Downloads/gta-members.csv`, 54
+  members) — Zoran was about to. Tune boxes+arrows + AI column mapping from feedback.
+- Pricing Sorter **staff-portal (React) port** — not built (backend is shared).
+- Pricing Sorter proper launch = seed a `pricing_sorter` onboarding action_item
+  (currently a temp button).
+- CoachIQ go-live: build per-product automations + Zapier + rotate key + product map.
+- Track B migration of ~50 legacy subs to portal-owned (do last).
 
-Buttons guide doc (Zoran's reference)
-  /Users/zoransavic/bam-os-requirements/bam-ghl-agent/docs/member-buttons-guide.html
-```
-
-## Things that were tricky — DO NOT redo
-
-```
-1. The OAuth redirect URI path can't contain "ghl"
-   → We moved api/ghl/connect.js → api/messaging/connect.js
-   → If future-you sees /api/ghl/connect referenced anywhere, that's stale.
-
-2. Bash `echo "..." | vercel env add` adds trailing \n
-   → All GHL OAuth code paths read env vars via (process.env.X || "").trim()
-   → Don't remove that pattern.
-
-3. 4 scopes are Agency-only (not Sub-Account):
-     snapshots.readonly
-     socialplanner/medialibrary.readonly
-     blogs.readonly · blogs.write
-   → These are commented out in api/messaging/connect.js SCOPES list.
-   → If GHL ever exposes them to Sub-Account apps, uncomment + tick in
-     the Marketplace app config.
-
-4. GHL "Submit for review" ≠ "Publish version"
-   → Private apps only need Publish (skip Submit for Review).
-   → Even Private apps need at least 1 published version for OAuth to work.
-
-5. GHL has THREE different "secrets" with similar names:
-     - Client Secret              ← OAuth (GHL_OAUTH_CLIENT_SECRET)
-     - Webhook Shared Secret      ← for future webhook signature verify
-     - App Shared Secret          ← yet another thing, not used yet
-   Zoran pasted the "shared secret key" first by mistake — it's the
-   webhook one. Make sure you're getting the OAuth Client Secret.
-
-6. App type MUST be "Sub-Account" (not "Agency")
-   → location-scoped tokens; tokens for one location work for that location only
-
-7. The persistent GHL banner uses isNativeApp() (NOT _isNativeApp)
-   → typeof guarded; if you add another boot ping, use the same guard.
-
-8. URL structure:
-   /                        → React app's index.html (SPA fallback rewrite)
-   /client-portal.html      → standalone HTML file (the client portal)
-   /api/*                   → serverless functions
-   staff.byanymeansbusiness.com   → React staff portal
-   portal.byanymeansbusiness.com  → /client-portal.html is the canonical client URL
-```
-
-## Files Zoran touched but YOU may not know about
-
-```
-docs/member-buttons-guide.html         Zoran's explainer of the 8 PATCH actions.
-                                       If he asks to "see the doc" — that's the one.
-                                       Open with: open <path>
-```
-
-## Env vars currently set in Vercel for this work
-
-```
-GHL_OAUTH_CLIENT_ID         …61td
-GHL_OAUTH_CLIENT_SECRET     …e5a6
-GHL_OAUTH_STATE_SECRET      …b3fb  (auto-generated this session)
-GHL_LOCATIONS_JSON          (legacy — still set, used as fallback)
-GHL_INTAKE_WEBHOOK_SECRET   (older — used by intake form webhook)
-STRIPE_CONNECT_SECRET_KEY   (the platform key for Connect)
-STRIPE_WEBHOOK_SECRET       (Stripe webhook signature)
-SUPABASE_SERVICE_ROLE_KEY
-```
-
-## After the 6 PATCH actions are verified
-
-```
-1. Mark Sergio's tickets cleared in his queue.
-2. UNPARK the onboarding wizard:
-     - Update [[project_onboarding_wizard_parked]]
-     - Kick off Phase 1 build (~half day for wizard component +
-       Stripe-to-members auto-import).
-3. Refactor task #10 + #11 + #13 (catalog refactor — separate thread,
-   independent of GHL).
-4. Delete this file.
-```
-
-## Quick health checks if anything looks wrong
-
-```sql
--- BAM GTA's GHL OAuth state
-SELECT business_name, ghl_connect_status, ghl_location_id,
-       (ghl_access_token IS NOT NULL) AS has_token,
-       ghl_token_expires_at
-FROM clients WHERE id = '39875f07-0a4b-4429-a201-2249bc1f24df';
-
--- Ryan + John Fu rows
-SELECT id, athlete_name, parent_name, status::text, stripe_subscription_id
-FROM members
-WHERE id IN ('9ab25134-3f08-4353-a3ba-27d270b50d97',
-             'ae431da8-9cb7-442f-99c6-3fd578e3268e');
-
--- Recent audit trail
-SELECT created_at, athlete_name, action_type, performed_by_name
-FROM member_audit_log mal
-LEFT JOIN members m ON m.id = mal.member_id
-WHERE mal.client_id = '39875f07-0a4b-4429-a201-2249bc1f24df'
-ORDER BY mal.created_at DESC LIMIT 20;
-```
+## Gotchas / how to work here
+- Repo root = `/Users/zoransavic` (home dir). The session branch `feat/playground`
+  LACKS the bam-portal recent work → **always work in a git worktree off `origin/main`**
+  (`git worktree add -b <branch> /tmp/wt origin/main`), edit, `node --check`, commit,
+  push, `gh pr create` + `gh pr merge --merge` (main is PROTECTED). Use `-b` when adding
+  the worktree or push fails (detached-HEAD glitch hit twice).
+- `vercel env pull` values carry a literal trailing `\n` — strip with `tr -d '\r\n"'`
+  THEN `${V%\\n}` or the key is rejected. `vercel env add NAME preview <branch> --value X --yes`.
+- API endpoints: ESM, raw fetch. Stripe = `STRIPE_CONNECT_SECRET_KEY` + `Stripe-Account`
+  header on `clients.stripe_connect_account_id`. Anthropic = raw fetch x-api-key,
+  `claude-sonnet-4-6` (matcher). Auth = resolveUser() Supabase-JWT (staff or client_users).
+  client-portal.html is one huge static file — additive vanilla JS, V2-gate via
+  `data-feature="members"` / `V2_ACCESS`. Validate by extracting new fns + `node --check`.
+- BAM GTA client_id = `39875f07-0a4b-4429-a201-2249bc1f24df`. Plans: Steady 1×/$200,
+  Accelerated 2×/$280, Elevate 3×/$335, Dominate unltd/$565 (+HST; +3mo/6mo). Connected
+  acct `acct_1P7kUCRxInSEtAh8`.
