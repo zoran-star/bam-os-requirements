@@ -14842,7 +14842,7 @@ function _aiRow(p, checkedDefault) {
       <input type="checkbox" class="ai-chk" ${checkedDefault ? 'checked' : ''} />
       <div style="min-width:0;">
         <div style="font-weight:700; font-size:13px;">${_aiAmt(p.amount_cents, p.interval)} · ${escapeHTML(p.name || p.price_id)}</div>
-        <div style="font-size:10.5px; color:var(--text-mute,#888); font-family:monospace;">${escapeHTML(p.price_id)} · ${members}${conf ? ' · ' + conf : ''}${ciq}</div>
+        <div style="font-size:10.5px; color:var(--text-mute,#888); font-family:monospace;">${escapeHTML(p.price_id)} · ${members}${conf ? ' · ' + conf : ''}${p.newest_signup ? ' · newest ' + escapeHTML(p.newest_signup) : ''}${p.recent_90d ? ' · ' + p.recent_90d + ' recent' : ''}${ciq}</div>
         ${p.reason ? `<div style="font-size:10.5px;color:#e0a93f;margin-top:2px;">${escapeHTML(p.reason)}</div>` : ''}
       </div>
       <select class="ai-plan" onchange="_aiRowChanged(this)" style="padding:6px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;">${_aiPlanOptions(p.proposed_offer_price_key)}</select>
@@ -14870,7 +14870,9 @@ function _renderAiMatchModal() {
   const modal = document.getElementById('pc-aimatch-modal');
   const overlay = document.getElementById('pc-aimatch-overlay');
   if (!modal) return;
-  const props = _AI_DATA.proposals || [];
+  const allProps = _AI_DATA.proposals || [];
+  const oneTimeProps = allProps.filter(p => p.is_one_time);
+  const props = allProps.filter(p => !p.is_one_time);   // recurring → the plan grouping
   const byKey = {};
   props.forEach(p => { const k = p.proposed_offer_price_key || '__none__'; (byKey[k] = byKey[k] || []).push(p); });
 
@@ -14904,6 +14906,25 @@ function _renderAiMatchModal() {
       </div>`;
   }
 
+  // Prepaid / one-time purchases — informational only (no recurring price to save).
+  let prepaidHtml = '';
+  if (oneTimeProps.length) {
+    const rows = oneTimeProps.map(p => {
+      const tgt = (_AI_DATA.targets || []).find(t => t.key === p.proposed_offer_price_key);
+      const planLbl = tgt ? tgt.label : 'no plan match';
+      return `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--border,#2a2a31);border-radius:8px;margin-bottom:6px;">
+        <div><div style="font-weight:700;font-size:13px;">${_aiAmt(p.amount_cents, '')} · ${escapeHTML(planLbl)}</div>
+        <div style="font-size:10.5px;color:var(--text-mute,#888);">${p.sub_count} member${p.sub_count === 1 ? '' : 's'}${p.newest_signup ? ' · newest ' + escapeHTML(p.newest_signup) : ''}</div></div>
+      </div>`;
+    }).join('');
+    prepaidHtml = `
+      <div style="margin-top:8px;padding:14px;border:1px dashed var(--border,#2a2a31);border-radius:11px;">
+        <div style="font-size:14px;font-weight:800;margin-bottom:4px;">💳 Prepaid / one-time (${oneTimeProps.length})</div>
+        <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:10px;">Members who paid up front via a one-time charge (no recurring subscription). Shown for awareness — these aren't saved as plan prices.</div>
+        ${rows}
+      </div>`;
+  }
+
   modal.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
       <div style="font-size:18px;font-weight:800;">🤖 Match prices to your plans${_AI_DATA.academy ? ' · ' + escapeHTML(_AI_DATA.academy) : ''}</div>
@@ -14914,6 +14935,7 @@ function _renderAiMatchModal() {
     </div>
     ${plansHtml || '<div style="color:var(--text-mute,#888)">No plans in your offer yet — add them in Offers → Pricing first.</div>'}
     ${flaggedHtml}
+    ${prepaidHtml}
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;position:sticky;bottom:0;background:var(--surface,#16161a);padding-top:10px;">
       <button onclick="closeAiMatch()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
       <button onclick="applyAiMatch()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save</button>
