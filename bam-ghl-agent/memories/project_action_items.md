@@ -4,30 +4,36 @@ Shipped 2026-06-01. A shared per-client to-do list. Same rows shown on both
 sides: the academy team in the client portal and BAM staff on the client's
 staff-portal page. Any field on any row is editable by anyone who can see it.
 
-> ## 📍 ONBOARDING STATE — read first (2026-06-05)
+> ## 📍 ONBOARDING STATE — read first (updated 2026-06-09)
 >
-> **The client onboarding flow IS the Action Items "Onboarding" checklist — 17 fixed steps** (table below). Everything ships to `main` (auto-deploys to portal.byanymeansbusiness.com). Full end-to-end flow:
+> **The client onboarding flow IS the Action Items "Onboarding" checklist — 17 fixed steps.** Everything ships to `main` (auto-deploys). Live step order (authoritative = `action_items.sort_order`):
 >
 > ```
-> New client → first login → 2-step welcome points to ACTION ITEMS
->   → work the 17-step Onboarding checklist (rendered as a SUBWAY MAP:
->     circles + connecting line, in a collapsible gold "🚀 Onboarding" card
->     that DISAPPEARS once all steps are done)
->   → 3 booking steps resolve dynamic links: SM (per-client scaling_manager),
->     Cam (marketing_manager ✅ link set), Ximena (marketing_executor ⏳ link pending)
->   → staff-only steps (hidden from clients): trigger_buildout (creates the
->     systems ticket, due +7d) + ready_for_review (gate that UNLOCKS the
->     client's "Book review call" step)
->   → systems ticket has 📋 Copy-for-Claude + per-field "mark incorrect" + Send-corrections
+> 1 slack · 2 connect_stripe* · 3 create_ghl · 4 connect_ghl*
+> 5 general_info · 6 staff · 7 locations · 8 brand · 9 kpis · 10 offers
+> 11 book_call(SM) · 12 book_call_cam · 13 submit_content
+> 14 trigger_buildout🔒 · 15 ready_for_review🔒 · 16 book_review_call · 17 book_call_ximena
+>   (*auto from a connect signal · 🔒 = staff-only, hidden from clients)
 > ```
 >
-> **Key code:** steps = `ONBOARDING_STEPS` in `api/action-items.js`; client UI = `ONB_UI` + `_aiOnbHTML` + `_renderActionItems` (subway + collapsible panels) in `client-portal.html`; staff = `onbRow` + `_AI_ONB_NOTES` in `ClientsCombinedView.jsx`. Booking links = `staff.booking_url` (data-driven). Systems ticket builder = `createSystemsOnboardingTicket()` (the old auto DB trigger was dropped).
+> **UX:** first login → 2-step welcome → ACTION ITEMS. Onboarding renders as a **subway map** (circle nodes + line) inside a **collapsible gold "🚀 Onboarding" card that DISAPPEARS once all steps done**; ad-hoc to-dos are a separate collapsible "Tasks" panel. `book_review_call` is **locked/greyed until staff flip `ready_for_review`**.
+>
+> **Booking steps (data-driven via `staff.booking_url`):** SM = per-client `scaling_manager` ✅ · Cam = `marketing_manager` ✅ link set · **Ximena = `marketing_executor` ⏳ link still pending** (Slack fallback). GET returns `sm`/`mktg`/`ads`/`review_ready`. Helper `_aiBookingCta`.
+>
+> **Systems ticket (staff side):** `trigger_buildout` → `createSystemsOnboardingTicket()` builds it (due +7d; old auto DB trigger dropped). Ticket modal has 📋 **Copy-for-Claude** + per-field **"mark incorrect"** + **Send-corrections** (via requestClientAction). Lobby=unassigned/Ongoing=assigned. Admins are in the delegation pool. Assigned executor can Mark complete.
+>
+> **Two-way ticket notes (2026-06-08):** clients add notes anytime (`client_note`) + staff reply anytime (`staff_reply`) on every support ticket — see [[project_client_action_thread]].
+>
+> **Key code:** `ONBOARDING_STEPS` in `api/action-items.js`; client UI = `ONB_UI`+`_aiOnbHTML`+`_renderActionItems` in `client-portal.html`; staff = `onbRow`+`_AI_ONB_NOTES` in `ClientsCombinedView.jsx`.
+>
+> **All-academy client-switcher access** granted to `info@byanymeanstoronto.ca` (as "Zoran Savic") AND `admin@byanymeansbusiness.com` (Rosano) — `client_users` rows for every academy → switcher in the CLIENT portal. (Staff already see all clients in the staff portal via `is_staff()` RLS.)
 >
 > **⏳ OPEN ITEMS / next session:**
-> 1. **Ximena's booking link** — set `staff.booking_url` for the marketing_executor (id `24109bce-…`) when Zoran sends it (step 17 shows Slack fallback until then).
-> 2. **SM scheduling page** — decided GHL calendar (it 2-way-syncs Google) over custom Google build. Pending: confirm SMs have GHL users w/ Google connected + a BAM GHL location; then build a live free-slots booking page. (Currently we just deep-link to each SM's `booking_url`.)
-> 3. **New build-team onboarding fields** — convo never finished: whether to collect goals / current tools / hours / lead sources / A2P-SMS for the systems team.
+> 1. **Ximena's booking link** — set `staff.booking_url` for marketing_executor `24109bce-3f74-447e-a2cd-1714995331d7` when Zoran sends it (step 17 = Slack fallback until then).
+> 2. **SM scheduling page** — decided GHL calendar (2-way Google sync) over custom build. Pending: confirm SMs have GHL users w/ Google connected + a BAM GHL location; then build a live free-slots page. (Today we just deep-link `booking_url`.)
+> 3. **New build-team onboarding fields** convo — goals / current tools / hours / lead sources / A2P-SMS — never finished.
 > 4. **A2P/SMS compliance block** in General — deferred.
+> 5. **Recent gotcha (fixed PR #154):** modal hosts (`#stripe-modal-host`) must be TOP-LEVEL, not inside a `.view` — a `display:none` ancestor hides even `position:fixed` modals. Watch for this pattern on any new modal.
 
 ## Where it lives
 
