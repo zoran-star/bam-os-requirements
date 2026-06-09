@@ -107,10 +107,50 @@ async function fetchProductNames(stripeAccount) {
   return map;
 }
 
+// One-time / prepaid purchases — succeeded charges NOT tied to a subscription
+// invoice. Grouped by amount → pseudo-price entries so prepaid members (e.g. a
+// 6-month paid up front via one charge) surface in the matcher too.
+async function fetchOneTimeGroups(stripeAccount) {
+  const NOW = Math.floor(Date.now() / 1000);
+  const D90 = NOW - 90 * 86400;
+  const since = NOW - 400 * 86400; // ~13 months back
+  const groups = new Map();
+  let startingAfter = null;
+  for (let page = 0; page < 8; page++) { // cap 800 charges
+    const qs = new URLSearchParams({ limit: "100" });
+    qs.set("created[gte]", String(since));
+    if (startingAfter) qs.set("starting_after", startingAfter);
+    const r = await stripeGet(`/charges?${qs.toString()}`, stripeAccount);
+    const data = r.data || [];
+    for (const ch of data) {
+      if (ch.status !== "succeeded" || ch.refunded || ch.invoice) continue; // skip refunds + subscription charges
+      const key = `onetime-${ch.amount}-${ch.currency}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          price_id: key, is_one_time: true,
+          product_id: null, product_name: "One-time / prepaid", nickname: ch.description || null,
+          unit_amount: ch.amount, currency: ch.currency, interval: "one_time", interval_count: null,
+          application: ch.application || null, sub_count: 0, newest_created: 0, recent_90d: 0,
+          coachiq_product_id: null,
+        });
+      }
+      const g = groups.get(key);
+      g.sub_count++;
+      if (ch.created > g.newest_created) g.newest_created = ch.created;
+      if (ch.created >= D90) g.recent_90d++;
+    }
+    if (!r.has_more || data.length === 0) break;
+    startingAfter = data[data.length - 1].id;
+  }
+  return [...groups.values()];
+}
+
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);
 
 // Group subs by their (first item's) price; collect signals per price.
 function groupByPrice(subs) {
+  const NOW = Math.floor(Date.now() / 1000);
+  const D90 = NOW - 90 * 86400;
   const groups = new Map();
   for (const sub of subs) {
     if (!ACTIVEISH.has(sub.status)) continue;
@@ -131,12 +171,16 @@ function groupByPrice(subs) {
         interval_count: price.recurring && price.recurring.interval_count,
         application: sub.application || null, // creator: CoachIQ / GHL / null=manual
         sub_count: 0,
+        newest_created: 0,         // recency signal
+        recent_90d: 0,
         coachiq_product_ids: {},   // metadata.productId → count
         sample_emails: [],
       });
     }
     const g = groups.get(key);
     g.sub_count++;
+    if (sub.created && sub.created > g.newest_created) g.newest_created = sub.created;
+    if (sub.created && sub.created >= D90) g.recent_90d++;
     const md = sub.metadata || {};
     if (md.productId) g.coachiq_product_ids[md.productId] = (g.coachiq_product_ids[md.productId] || 0) + 1;
     const email = sub.customer && typeof sub.customer === "object" ? sub.customer.email : null;
@@ -166,10 +210,14 @@ async function aiMatch(targets, prices) {
     "  live   = the current standard price for that plan+term (amount matches the target closely)\n" +
     "  legacy = any older/grandfathered/odd-amount/promo variant of that plan+term (recognize old subs only)\n" +
     "RULE: for each offer_price_key, mark AT MOST ONE price as 'live' (the closest match); every other " +
-    "price for that same key MUST be 'legacy'. If a live price matches NO target BUT has members on it " +
-    "(sub_count>0), set offer_price_key=null, needs_review=true, and note in reason it may be a plan " +
-    "missing from the offer. Amounts are cents. Respond with ONLY a JSON array, one object per input " +
-    "price, no prose:\n" +
+    "price for that same key MUST be 'legacy'. RECENCY: prefer the price with RECENT signups " +
+    "(higher recent_signups_90d / newer newest_signup) as the 'live' one when amounts are close — recent " +
+    "activity means it's the current price; a price with only old signups is 'legacy'. ONE-TIME: a price " +
+    "with is_one_time=true is a prepaid/up-front payment (not a recurring sub) — still match it to the " +
+    "offer_price_key by amount, but ALWAYS set tier='legacy' and needs_review=true (these are prepaid " +
+    "members to be aware of). If a price matches NO target BUT has members on it (sub_count>0), set " +
+    "offer_price_key=null, needs_review=true, and note in reason it may be a plan missing from the offer. " +
+    "Amounts are cents. Respond with ONLY a JSON array, one object per input price, no prose:\n" +
     '[{"price_id","offer_price_key"(or null),"tier":"live"|"legacy","confidence"(0-1),"needs_review"(bool),"reason"(<=18 words)}]';
 
   const payload = {
@@ -178,7 +226,11 @@ async function aiMatch(targets, prices) {
       price_id: p.price_id, amount_cents: p.unit_amount, currency: p.currency,
       interval: p.interval, interval_count: p.interval_count,
       name: p.product_name || p.nickname, application: p.application,
-      sub_count: p.sub_count, prior_tier: p.prior_tier || null, prior_plan: p.prior_plan || null,
+      sub_count: p.sub_count,
+      recent_signups_90d: p.recent_90d || 0,
+      newest_signup: p.newest_created ? new Date(p.newest_created * 1000).toISOString().slice(0, 10) : null,
+      is_one_time: p.is_one_time === true,
+      prior_tier: p.prior_tier || null, prior_plan: p.prior_plan || null,
     })),
   };
 
@@ -255,6 +307,7 @@ async function handler(req, res) {
       const results = [];
       for (const a of approvals) {
         if (!a.price_id) continue;
+        if (String(a.price_id).startsWith("onetime-")) continue; // prepaid one-time groups aren't catalog rows
         const patch = {
           offer_id: a.offer_id || body.offer_id || null,
           offer_price_key: a.offer_price_key || null,
@@ -297,6 +350,10 @@ async function handler(req, res) {
     // Live subs → grouped prices
     const subs = await fetchLiveSubs(client.stripe_connect_account_id);
     const prices = groupByPrice(subs);
+    // Also pull one-time / prepaid purchases (not subscriptions) so prepaid members surface.
+    let oneTime = [];
+    try { oneTime = await fetchOneTimeGroups(client.stripe_connect_account_id); } catch (_) { oneTime = []; }
+    prices.push(...oneTime);
     if (!prices.length) return res.status(200).json({ ok: true, proposals: [], note: "no active subs/prices found" });
 
     // Fill product names (couldn't expand them inline) from a one-shot product list.
@@ -335,6 +392,9 @@ async function handler(req, res) {
         currency: p.currency,
         interval: p.interval,
         sub_count: p.sub_count,
+        recent_90d: p.recent_90d || 0,
+        newest_signup: p.newest_created ? new Date(p.newest_created * 1000).toISOString().slice(0, 10) : null,
+        is_one_time: p.is_one_time === true,
         application: p.application,
         coachiq_product_id: p.coachiq_product_id,   // harvested from metadata
         prior_tier: p.prior_tier || null,
