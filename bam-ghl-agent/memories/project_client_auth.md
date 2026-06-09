@@ -154,6 +154,20 @@ Button fires `_sb.auth.resetPasswordForEmail(email, { redirectTo: '<origin>/clie
 
 **Open follow-up:** Basketball+'s `clients.slack_channel_id` = `C0AA9RFL87J` is invalid (bot returns `channel_not_found` on both `conversations.info` and `conversations.list`). Bot was likely removed from that channel, or ID is stale. Until corrected: no Slack post will land for that client, and the BAM-side "Reset password" trigger for Jake silently fails on Slack notification (the email still sends). Worth a one-time DB cleanup pass for invalid channel IDs across all clients.
 
+### ⚠️ Gotcha — "asks me to reset my password EVERY login" loop (found + fixed 2026-06-09)
+
+`boot()` forces the password-set form whenever `session.user.user_metadata.needs_password === true` (client-portal.html ~line 21073). That flag is stamped `true` on every invite/signup/reset-link generation and was cleared in **only one** place: `submitNewPassword()` succeeding with a brand-new password.
+
+The trap: a user who already has a working password (logs in fine) but whose `needs_password` flag is still `true` gets forced onto the reset form on every login. If they re-enter their **existing** password, Supabase rejects it (`same_password` / "New password should be different from the old"), `submitNewPassword()` returned on that error **before** clearing the flag → flag stays true → reset form reappears next login. Infinite loop.
+
+Reported by **Josh Mercado (2026-06-09)** — "the portal asks me to reset my password every time I log on."
+
+Fix (2 layers, both in `client-portal.html`):
+1. **`signIn()`** — after a successful `signInWithPassword`, clear `needs_password` (`updateUser({ data: { needs_password: false } })`) before `boot()`. A successful password login proves the password exists, so the flag is stale → user never sees the reset form. Root fix.
+2. **`submitNewPassword()`** — if `updateUser` errors with a same-password message (`should be different` / `different from the old` / `same_password` / `same as the old`), clear the flag and reload into the portal instead of dead-ending. Safety net for restored-session users already stuck in the loop.
+
+Immediate unblock for an already-stuck user: clear their `needs_password` in Supabase, OR have them set a genuinely **different** new password once.
+
 ### ⚠️ Gotcha — owner needs a `client_users` row (found + fixed 2026-05-22)
 
 The multi-user portal resolves access ONLY from `client_users` (via the

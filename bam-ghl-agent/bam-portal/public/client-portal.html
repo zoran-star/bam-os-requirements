@@ -19721,6 +19721,11 @@ async function signIn() {
   const { error } = await _sb.auth.signInWithPassword({ email, password });
   btn.disabled = false; btn.textContent = 'Sign in →';
   if (error) { errEl.textContent = error.message; return; }
+  // A successful email+password sign-in proves this user already HAS a working
+  // password, so any leftover needs_password flag is stale. Clear it before
+  // boot() so boot()'s needs_password check can't force the reset form on a
+  // user who just typed their real password (the loop Josh Mercado hit).
+  try { await _sb.auth.updateUser({ data: { needs_password: false } }); } catch (_) { /* best-effort */ }
   await boot();
 }
 
@@ -19896,6 +19901,20 @@ async function submitNewPassword() {
     const isSessionMissing = msg.includes('session missing') || msg.includes('auth session') || msg.includes('not authenticated') || msg.includes('jwt expired');
     if (isSessionMissing) {
       _showFreshLinkRecovery(err);
+      return;
+    }
+    // "Same password" rejection — the user already has a working password and
+    // just re-entered it. They were only forced onto this screen by a stale
+    // needs_password flag (boot() line ~21073). Re-using their existing
+    // password used to dead-end here, leaving the flag set, so the reset form
+    // reappeared on EVERY login (reported by Josh Mercado, 2026-06-09). Treat
+    // it as "already has a password": clear the flag and let them in instead
+    // of trapping them in the loop.
+    const isSamePassword = msg.includes('should be different') || msg.includes('different from the old') || msg.includes('same_password') || msg.includes('same as the old');
+    if (isSamePassword) {
+      try { await _sb.auth.updateUser({ data: { needs_password: false } }); } catch (_) { /* best-effort */ }
+      history.replaceState(null, '', window.location.pathname);
+      location.reload();
       return;
     }
     err.textContent = error.message;
