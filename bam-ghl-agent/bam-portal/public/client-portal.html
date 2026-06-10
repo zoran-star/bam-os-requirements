@@ -15153,6 +15153,7 @@ function _sorterRenderStep1(host) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;font-weight:700;">${_sorterAmt(p.amount_cents, p.interval)}</div>
         <div style="font-size:10px;color:var(--text-mute,#888);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(p.name || p.price_id)} · ${members}</div>
+        ${p.stripe_url ? `<a href="${escapeHTML(p.stripe_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="font-size:10px;color:var(--accent,#E8C547);text-decoration:none;">View in Stripe ↗</a>` : ''}
       </div>
       ${tierPill}
       <button onclick="_sorterUnassign('${escapeHTML(p.price_id)}')" title="Unassign" style="flex:none;border:none;background:transparent;color:var(--text-mute,#888);cursor:pointer;font-size:16px;line-height:1;">×</button>
@@ -15343,6 +15344,13 @@ async function _sorterApplyMissing(slotId) {
       const rc = creation.recurring || {};
       let ivLabel = rc.interval || 'week';
       if (rc.interval_count && rc.interval_count > 1) ivLabel = rc.interval_count + ' ' + rc.interval + 's';
+      // Deep link to the new product in the (account-scoped) Stripe dashboard,
+      // respecting test vs live mode.
+      const acct = created.account ? created.account + '/' : '';
+      const mode = created.livemode ? '' : 'test/';
+      const stripeUrl = created.stripe_product_id
+        ? `https://dashboard.stripe.com/${acct}${mode}products/${created.stripe_product_id}`
+        : null;
       _SORTER.match.proposals = _SORTER.match.proposals || [];
       let p = _SORTER.match.proposals.find(x => x.price_id === newId);
       if (!p) {
@@ -15352,6 +15360,7 @@ async function _sorterApplyMissing(slotId) {
       }
       p.proposed_offer_price_key = creation.key;
       p.proposed_tier = 'canonical';
+      p.stripe_url = stripeUrl;
     }
     // Re-render in place — the new LIVE chip on this plan IS the confirmation.
     _sorterRenderBody();

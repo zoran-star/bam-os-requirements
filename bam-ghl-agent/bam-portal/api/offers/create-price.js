@@ -280,7 +280,7 @@ async function runApply(req, res, ctx, body, clientId) {
       ).catch(() => {});
     }
 
-    created.push({ key, stripe_price_id: price.id, stripe_product_id: price.product || null });
+    created.push({ key, stripe_price_id: price.id, stripe_product_id: price.product || null, livemode: price.livemode === true, account: stripeAccount || null });
   }
 
   return res.status(200).json({ ok: true, mode: "apply", created });
