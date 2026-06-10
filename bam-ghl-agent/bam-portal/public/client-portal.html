@@ -5425,16 +5425,8 @@
         Members
       </div>
 
-      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('pricing', this)">
-        <span class="nav-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="1" x2="12" y2="23"/>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-        </span>
-        Pricing
-      </div>
-
+      <!-- Pricing nav removed 2026-06-10 — price matching now lives in
+           Business Blueprint → Offers (view-pricing markup retired below). -->
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('inbox', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8041,7 +8033,7 @@ function switchView(name, el) {
 
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
-  if (name === 'pricing') fetchAndRenderPricing();
+  // 'pricing' view retired 2026-06-10 — price matching lives in BB → Offers.
   if (name === 'inbox')   fetchAndRenderInbox();
   if (name === 'pipelines') fetchAndRenderPipelines();
 
@@ -9099,7 +9091,8 @@ const _bbCards = [
   { id:'locations', label:'Locations', desc:'Every place you operate from' },
   { id:'brand',     label:'Brand',     desc:'Logos, colors, fonts, website spec, photos' },
   { id:'kpis',      label:'KPIs',      desc:'Your baseline numbers — revenue, clients, sales, expenses' },
-  { id:'offers',    label:'Offers',    desc:'Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals' }
+  { id:'offers',    label:'Offers',    desc:'Every offer you sell — training, teams, camps, leagues, tournaments, gym rentals' },
+  { id:'member_onboarding', label:'Member Onboarding', desc:'Bring your existing members in — import your roster, link GHL contacts, go live' }
 ];
 
 let _bbState = {
@@ -9161,12 +9154,14 @@ function _bbRenderFromHash() {
   if (card === 'offers' && id === 'new') return _bbStartNewOffer(query && query.type);
   if (card === 'offers' && id) return _bbRenderOfferWizard(panel, id);
   if (card === 'offers') return _bbRenderOffersList(panel);
+  if (card === 'member_onboarding') return _bbRenderMemberOnboarding(panel);
   return _bbRenderCardPlaceholder(panel, card);
 }
 
 // Distinct icon per BB card (lucide-style strokes). Centralised so the
 // landing + any future "you're inside section X" breadcrumb can reuse.
 const _bbCardIcons = {
+  member_onboarding: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
   offers:    '<path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.103 6.034h17.794L20 18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>',
   general:   '<path d="M3 21V7l9-4 9 4v14"/><path d="M9 21V12h6v9"/><path d="M3 21h18"/>',
   staff:     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -9849,6 +9844,7 @@ async function _bbRenderOffersList(panel) {
       <button class="btn-primary-bb" onclick="_bbOpenTypePicker()">+ Add offer</button>
     </div>
     <div id="bb-offers-list"><div class="bb-empty">Loading offers…</div></div>
+    <div id="bb-offers-pricing"></div>
     ${_bbMarkDoneCta('offers', 'Offers')}
   `;
 
@@ -9856,6 +9852,7 @@ async function _bbRenderOffersList(panel) {
     document.getElementById('bb-offers-list').innerHTML = '<div class="bb-empty">Sign-in required.</div>';
     return;
   }
+  _bbRenderOffersPricing(); // async — fills #bb-offers-pricing (Stripe gate + price match)
 
   const { data, error } = await _sb.from('offers')
     .select('id, type, title, status, updated_at')
@@ -9887,6 +9884,202 @@ async function _bbRenderOffersList(panel) {
       </div>
     `;
   }).join('')}</div>`;
+}
+
+// ── BB → Offers → Pricing: Stripe connect gate + price match launcher ──
+// Replaces the retired Pricing nav page. Connection state comes from the same
+// /api/members payload the Members tab uses (also caches _STRIPE_CONNECT_STATE
+// so openStripeConnectModal works from here).
+async function _bbRenderOffersPricing() {
+  const host = document.getElementById('bb-offers-pricing');
+  if (!host || (typeof V2_ACCESS !== 'undefined' && !V2_ACCESS)) return;
+  host.innerHTML = `<div class="bb-empty" style="padding:14px 0">Checking your Stripe connection…</div>`;
+  let stripe = { status: 'not_connected' };
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (r.ok) {
+      stripe = json.stripe || stripe;
+      if (typeof renderStripeConnectButton === 'function') renderStripeConnectButton(stripe); // caches state for the modal
+      if (json.ghl && typeof renderGhlConnectButton === 'function') renderGhlConnectButton(json.ghl);
+    }
+  } catch (_) { /* render the gate with unknown status */ }
+  const connected = stripe.status === 'connected';
+  const pill = connected
+    ? `<span style="font-size:11px;font-weight:700;color:#2e9e54;border:1px solid #1f7a3d;border-radius:999px;padding:4px 10px;">● Stripe connected</span>`
+    : `<button onclick="openStripeConnectModal()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;border:none;background:var(--gold,#E8C547);color:#0B0B0D;cursor:pointer;">Connect Stripe →</button>`;
+  const matchBtn = connected
+    ? `<button onclick="openPricingSorter(1)" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">🧮 Match prices to Stripe →</button>`
+    : `<button disabled title="Connect Stripe first" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:not-allowed;">🔒 Match prices to Stripe</button>`;
+  host.innerHTML = `
+    <div style="margin-top:22px;border:1px solid var(--border,#2a2a31);border-radius:12px;padding:16px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800;font-size:14px;">Pricing</div>
+          <div style="font-size:12px;color:var(--text-mute,#888);margin-top:3px;">Link each plan above to the Stripe price it bills — new signups use the Live price; old prices are recognized as Legacy.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">${pill}${matchBtn}</div>
+      </div>
+    </div>`;
+}
+
+// ── BB → Member Onboarding: GHL gate + import / cleanup / GHL-link steps ──
+// Locked until the Offers section is marked done (prices must exist + be
+// matched before a roster import can map plans). Steps 2/3 reuse the Pricing
+// Sorter engine; the GHL-link step fixes the sync-cron gap for imported
+// members (they arrive with no ghl_contact_id).
+async function _bbRenderMemberOnboarding(panel) {
+  const back = `
+    <button class="bb-back" onclick="_bbNavigate(null)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Business Blueprint
+    </button>
+    <div class="bb-page-head">
+      <div>
+        <div class="bb-page-title">Member Onboarding</div>
+        <div class="bb-page-sub">Bring your existing members into FullControl — import, link, go live.</div>
+      </div>
+    </div>`;
+
+  if (_obtProgress == null && typeof _obtLoadProgress === 'function') {
+    try { await _obtLoadProgress(); } catch (_) {}
+  }
+  const offersDone = !!(_obtProgress && _obtProgress.offers_done);
+  if (!offersDone) {
+    panel.innerHTML = `${back}
+      <div style="border:1px dashed var(--border,#2a2a31);border-radius:12px;padding:28px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:8px;">🔒</div>
+        <div style="font-weight:800;font-size:15px;margin-bottom:6px;">Unlocks once Offers is done</div>
+        <div style="font-size:12.5px;color:var(--text-mute,#888);max-width:420px;margin:0 auto 14px;">Member import maps each member to one of your plans — so your Offers (and their Stripe prices) need to be set up first.</div>
+        <button class="btn-primary-bb" onclick="_bbNavigate('offers')">Go to Offers →</button>
+      </div>`;
+    return;
+  }
+
+  panel.innerHTML = `${back}<div id="bb-mo-steps"><div class="bb-empty">Checking your connections…</div></div>`;
+
+  // Connection state + live roster count from the same payload the Members tab uses.
+  let ghl = { status: 'not_connected' }, memberCount = null;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (r.ok) {
+      ghl = json.ghl || ghl;
+      memberCount = Array.isArray(json.members) ? json.members.length : null;
+      if (typeof renderGhlConnectButton === 'function') renderGhlConnectButton(ghl);
+      if (json.stripe && typeof renderStripeConnectButton === 'function') renderStripeConnectButton(json.stripe);
+    }
+  } catch (_) {}
+  const ghlOk = ghl.status === 'connected';
+
+  const stepRow = (n, title, sub, cta, doneBadge) => `
+    <div style="display:flex;gap:14px;align-items:flex-start;border:1px solid var(--border,#2a2a31);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
+      <span style="flex:none;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:rgba(232,197,71,0.15);color:var(--accent,#E8C547);">${n}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13.5px;">${title} ${doneBadge || ''}</div>
+        <div style="font-size:12px;color:var(--text-mute,#888);margin-top:3px;">${sub}</div>
+      </div>
+      <div style="flex:none;align-self:center;">${cta}</div>
+    </div>`;
+  const cta = (label, fn, enabled, lockHint) => enabled
+    ? `<button onclick="${fn}" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">${label}</button>`
+    : `<button disabled title="${lockHint || ''}" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:not-allowed;">🔒 ${label}</button>`;
+
+  const ghlBadge = ghlOk ? `<span style="font-size:10.5px;color:#7BC47F;font-weight:700;">✓ connected</span>` : '';
+  const steps =
+    stepRow(1, 'Connect GoHighLevel', 'Your CRM connection — powers texts, emails and contact sync.',
+      ghlOk ? `<span style="font-size:11px;font-weight:700;color:#2e9e54;border:1px solid #1f7a3d;border-radius:999px;padding:4px 10px;">● Connected</span>`
+            : `<button onclick="openGhlConnectModal()" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:9px;border:none;background:var(--gold,#E8C547);color:#0B0B0D;cursor:pointer;">Connect GHL →</button>`,
+      ghlBadge)
+    + stepRow(2, 'Import your members', 'Upload your member spreadsheet (any layout) — we map the columns, you confirm.',
+      cta('Import members →', 'openPricingSorter(2)', true))
+    + stepRow(3, 'Clean up &amp; go live', 'Cross-check imported members against Stripe, fix duplicates, then promote to your live roster.' + (memberCount != null ? ` <b>${memberCount}</b> live now.` : ''),
+      cta('Run cleanup →', 'openPricingSorter(3)', true))
+    + stepRow(4, 'Link GHL contacts', 'Match each member to their GHL contact (by email/phone) so texts, emails and the 10-minute sync work.',
+      cta('Link contacts →', '_moRunGhlLink()', ghlOk, 'Connect GHL first'));
+
+  document.getElementById('bb-mo-steps').innerHTML = steps
+    + `<div id="bb-mo-ghl-link-host"></div>`;
+}
+
+// Step 4 — propose member ↔ GHL contact links (email/phone match), review, apply.
+async function _moRunGhlLink() {
+  const host = document.getElementById('bb-mo-ghl-link-host');
+  if (!host) return;
+  host.innerHTML = `<div style="padding:18px 0;">
+    <div style="font-size:11.5px;color:var(--text-mute,#888);text-align:center;margin-bottom:8px;">Reading your GHL contacts &amp; matching members…</div>
+    <div class="asset-modal-loading" style="max-width:360px;margin:0 auto;border-radius:99px;"></div>
+  </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'propose' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const props = json.proposals || [], missed = json.unmatched || [];
+    if (!props.length && !missed.length) {
+      host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ ${escapeHTML(json.note || 'Every member is already linked to a GHL contact.')}</div>`;
+      return;
+    }
+    window._MO_LINKS = props; // stash for apply
+    const rows = props.map((p, i) => `
+      <label style="display:flex;align-items:center;gap:10px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;">
+        <input type="checkbox" class="mo-link-cb" data-i="${i}" checked />
+        <div style="flex:1;min-width:0;font-size:12px;">
+          <b>${escapeHTML(p.athlete_name || p.parent_name || '')}</b>
+          <span style="color:var(--text-mute,#888)"> → ${escapeHTML(p.contact_name || p.ghl_contact_id)}${p.contact_email ? ' · ' + escapeHTML(p.contact_email) : ''}</span>
+        </div>
+        <span style="flex:none;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">${p.matched_by === 'email' ? '✉ EMAIL' : '☎ PHONE'}</span>
+      </label>`).join('');
+    const missedHtml = missed.length ? `
+      <div style="font-size:11px;color:#e0a93f;margin:10px 0 4px;font-weight:700;">No GHL contact found for ${missed.length}:</div>
+      ${missed.map(m => `<div style="font-size:11.5px;color:var(--text-mute,#888);padding:2px 0;">• ${escapeHTML(m.athlete_name || '')} ${m.parent_email ? '(' + escapeHTML(m.parent_email) + ')' : ''}</div>`).join('')}
+      <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:4px;">Add them as contacts in GHL, then run this again.</div>` : '';
+    host.innerHTML = `
+      <div style="border:1px solid var(--accent,#E8C547);border-radius:12px;padding:14px 16px;margin-top:4px;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(checked ${json.total_contacts} GHL contacts)</span></div>
+        ${rows || '<div style="font-size:12px;color:var(--text-mute,#888)">No automatic matches.</div>'}
+        ${missedHtml}
+        ${props.length ? `<button onclick="_moApplyGhlLinks(this)" style="margin-top:10px;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Link selected →</button>` : ''}
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="border:1px solid #9a3b2f;border-radius:10px;padding:12px 14px;color:#e0654f;font-size:12.5px;">Matching failed — ${escapeHTML(_sorterErr(e))} <button onclick="_moRunGhlLink()" style="margin-left:8px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Try again</button></div>`;
+  }
+}
+
+async function _moApplyGhlLinks(btn) {
+  const props = window._MO_LINKS || [];
+  const picked = Array.from(document.querySelectorAll('.mo-link-cb'))
+    .filter(cb => cb.checked)
+    .map(cb => props[Number(cb.getAttribute('data-i'))])
+    .filter(Boolean)
+    .map(p => ({ member_id: p.member_id, ghl_contact_id: p.ghl_contact_id }));
+  if (!picked.length) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Linking…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'apply', links: picked }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const host = document.getElementById('bb-mo-ghl-link-host');
+    if (host) host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ Linked ${json.linked} member${json.linked === 1 ? '' : 's'} to their GHL contact. The 10-minute sync now covers them.</div>`;
+  } catch (e) {
+    alert('Linking failed: ' + _sorterErr(e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Link selected →'; }
+  }
 }
 
 function _bbOpenTypePicker() {
@@ -15084,14 +15277,17 @@ async function applyAiMatch() {
 // ══════════════════════════════════════════════════════════
 let _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
 
-function openPricingSorter() {
-  _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
+function openPricingSorter(step) {
+  // step: 1 = price match (BB → Offers), 2 = member CSV import, 3 = cleanup &
+  // promote (2/3 launched from BB → Member Onboarding). Defaults to 1.
+  const startStep = (step === 2 || step === 3) ? step : 1;
+  _SORTER = { step: startStep, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'block';
   if (modal) modal.style.display = 'flex';
   _sorterRender();
-  _sorterLoadStep1();
+  if (startStep === 1) _sorterLoadStep1();
 }
 
 function closePricingSorter() {
