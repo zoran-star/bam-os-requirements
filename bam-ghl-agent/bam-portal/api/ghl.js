@@ -803,7 +803,10 @@ async function handler(req, res) {
       let calsResp = await fetch(`${base}/calendars/?${new URLSearchParams(lid ? { locationId: lid } : {})}`, { headers });
       if (!calsResp.ok) return res.status(200).json({ data: [], reason: "ghl_error", status: calsResp.status });
       const cals = ((await calsResp.json()).calendars || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
-      const sinceMs = Date.now() - 36 * 31 * 86400000;   // ~3-year lookback
+      // 12-month window — calendar events over 3yr were too heavy and timed out
+      // the function (forms paginate light; calendar/events return everything in
+      // range). 12mo is plenty to spot the active trial calendar(s).
+      const sinceMs = Date.now() - 370 * 86400000;
       const out = await Promise.all(cals.map(async c => {
         let total = 0, first = null, last = null;
         try {
