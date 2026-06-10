@@ -5425,16 +5425,8 @@
         Members
       </div>
 
-      <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('pricing', this)">
-        <span class="nav-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="1" x2="12" y2="23"/>
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-          </svg>
-        </span>
-        Pricing
-      </div>
-
+      <!-- Pricing nav removed 2026-06-10 — price matching now lives in
+           Business Blueprint → Offers (view-pricing markup retired below). -->
       <div class="nav-item" data-feature="members" style="display:none" onclick="switchView('inbox', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8041,7 +8033,7 @@ function switchView(name, el) {
 
   // When entering Members, load the roster
   if (name === 'members') fetchAndRenderMembers();
-  if (name === 'pricing') fetchAndRenderPricing();
+  // 'pricing' view retired 2026-06-10 — price matching lives in BB → Offers.
   if (name === 'inbox')   fetchAndRenderInbox();
   if (name === 'pipelines') fetchAndRenderPipelines();
 
@@ -9849,6 +9841,7 @@ async function _bbRenderOffersList(panel) {
       <button class="btn-primary-bb" onclick="_bbOpenTypePicker()">+ Add offer</button>
     </div>
     <div id="bb-offers-list"><div class="bb-empty">Loading offers…</div></div>
+    <div id="bb-offers-pricing"></div>
     ${_bbMarkDoneCta('offers', 'Offers')}
   `;
 
@@ -9856,6 +9849,7 @@ async function _bbRenderOffersList(panel) {
     document.getElementById('bb-offers-list').innerHTML = '<div class="bb-empty">Sign-in required.</div>';
     return;
   }
+  _bbRenderOffersPricing(); // async — fills #bb-offers-pricing (Stripe gate + price match)
 
   const { data, error } = await _sb.from('offers')
     .select('id, type, title, status, updated_at')
@@ -9887,6 +9881,46 @@ async function _bbRenderOffersList(panel) {
       </div>
     `;
   }).join('')}</div>`;
+}
+
+// ── BB → Offers → Pricing: Stripe connect gate + price match launcher ──
+// Replaces the retired Pricing nav page. Connection state comes from the same
+// /api/members payload the Members tab uses (also caches _STRIPE_CONNECT_STATE
+// so openStripeConnectModal works from here).
+async function _bbRenderOffersPricing() {
+  const host = document.getElementById('bb-offers-pricing');
+  if (!host || (typeof V2_ACCESS !== 'undefined' && !V2_ACCESS)) return;
+  host.innerHTML = `<div class="bb-empty" style="padding:14px 0">Checking your Stripe connection…</div>`;
+  let stripe = { status: 'not_connected' };
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (r.ok) {
+      stripe = json.stripe || stripe;
+      if (typeof renderStripeConnectButton === 'function') renderStripeConnectButton(stripe); // caches state for the modal
+      if (json.ghl && typeof renderGhlConnectButton === 'function') renderGhlConnectButton(json.ghl);
+    }
+  } catch (_) { /* render the gate with unknown status */ }
+  const connected = stripe.status === 'connected';
+  const pill = connected
+    ? `<span style="font-size:11px;font-weight:700;color:#2e9e54;border:1px solid #1f7a3d;border-radius:999px;padding:4px 10px;">● Stripe connected</span>`
+    : `<button onclick="openStripeConnectModal()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;border:none;background:var(--gold,#E8C547);color:#0B0B0D;cursor:pointer;">Connect Stripe →</button>`;
+  const matchBtn = connected
+    ? `<button onclick="openPricingSorter(1)" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">🧮 Match prices to Stripe →</button>`
+    : `<button disabled title="Connect Stripe first" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:not-allowed;">🔒 Match prices to Stripe</button>`;
+  host.innerHTML = `
+    <div style="margin-top:22px;border:1px solid var(--border,#2a2a31);border-radius:12px;padding:16px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800;font-size:14px;">Pricing</div>
+          <div style="font-size:12px;color:var(--text-mute,#888);margin-top:3px;">Link each plan above to the Stripe price it bills — new signups use the Live price; old prices are recognized as Legacy.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">${pill}${matchBtn}</div>
+      </div>
+    </div>`;
 }
 
 function _bbOpenTypePicker() {
@@ -15084,14 +15118,17 @@ async function applyAiMatch() {
 // ══════════════════════════════════════════════════════════
 let _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
 
-function openPricingSorter() {
-  _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
+function openPricingSorter(step) {
+  // step: 1 = price match (BB → Offers), 2 = member CSV import, 3 = cleanup &
+  // promote (2/3 launched from BB → Member Onboarding). Defaults to 1.
+  const startStep = (step === 2 || step === 3) ? step : 1;
+  _SORTER = { step: startStep, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'block';
   if (modal) modal.style.display = 'flex';
   _sorterRender();
-  _sorterLoadStep1();
+  if (startStep === 1) _sorterLoadStep1();
 }
 
 function closePricingSorter() {
