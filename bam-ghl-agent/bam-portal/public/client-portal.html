@@ -13677,6 +13677,11 @@ async function fetchAndRenderActionItems() {
     _AI_REVIEW_READY = !!json.review_ready;
     _renderActionItems();
     _updateActionItemsBadge();
+    // Ticket-derived action items need the tickets list; hydrate it if the
+    // Systems tab hasn't been opened yet this session, then re-render.
+    if (typeof loadTickets === 'function' && (typeof tickets === 'undefined' || !Array.isArray(tickets) || tickets.length === 0)) {
+      try { await loadTickets(); _renderActionItems(); _updateActionItemsBadge(); } catch (_) {}
+    }
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load action items — ${escapeHTML(e.message)}</div>`;
   }
@@ -13748,6 +13753,12 @@ function _aiOpenBB(card) {
   _bbNavigate(card);
 }
 
+// Jump from an Action Items ticket row straight to that ticket's detail page.
+function _aiOpenTicket(id) {
+  switchView('systems');
+  if (typeof openTicket === 'function') openTicket(id);
+}
+
 // Collapse state for the two Action Items sections (persists across re-renders).
 let _aiOnbCollapsed = false;
 let _aiTasksCollapsed = false;
@@ -13769,7 +13780,33 @@ function _renderActionItems() {
   const done = rest.filter(i => i.completed_at);
   const hasTasks = open.length > 0 || done.length > 0;
 
-  let html = '';
+  // ── Tickets that need the client's reply (status awaiting_client) — each row
+  //    links straight to that ticket's detail page. ──
+  const actionTickets = (typeof tickets !== 'undefined' && Array.isArray(tickets))
+    ? tickets.filter(t => t.rawStatus === 'awaiting_client')
+    : [];
+  let ticketHtml = '';
+  if (actionTickets.length) {
+    const rows = actionTickets.map(t => {
+      const ask = t.teamNote ? `<div style="font-size:12px;color:var(--text-mute);margin-top:4px;white-space:pre-wrap">${escapeHTML(t.teamNote)}</div>` : '';
+      return `<div onclick="_aiOpenTicket('${escapeHTML(t.id)}')" style="cursor:pointer;border:1px solid rgba(232,191,96,0.35);background:rgba(232,191,96,0.08);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="font-weight:700;font-size:13px;">⏳ ${escapeHTML(t.title)}</div>
+          <span style="font-size:11.5px;font-weight:700;color:var(--accent);white-space:nowrap;">Open ticket →</span>
+        </div>
+        ${ask}
+      </div>`;
+    }).join('');
+    ticketHtml = `<div class="ai-section">
+      <button class="ai-section-head" style="cursor:default" onclick="return false">
+        <span class="ai-sh-title">⏳ Needs your reply</span>
+        <span class="ai-sh-count">${actionTickets.length}</span>
+      </button>
+      <div class="ai-section-bd">${rows}</div>
+    </div>`;
+  }
+
+  let html = ticketHtml;
 
   // ── Onboarding panel (its own gold-tinted card) ──
   if (showOnb) {
@@ -13987,7 +14024,8 @@ async function deleteActionItem(id) {
 }
 
 function _updateActionItemsBadge() {
-  const open = _AI_ITEMS.filter(i => !i.completed_at).length;
+  const tix = (typeof tickets !== 'undefined' && Array.isArray(tickets)) ? tickets.filter(t => t.rawStatus === 'awaiting_client').length : 0;
+  const open = _AI_ITEMS.filter(i => !i.completed_at).length + tix;
   const badge = document.getElementById('action-items-badge');
   if (!badge) return;
   if (open > 0) { badge.textContent = open; badge.style.display = ''; }
