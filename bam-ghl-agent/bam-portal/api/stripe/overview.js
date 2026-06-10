@@ -4,6 +4,28 @@ import { withSentryApiRoute } from "../_sentry.js";
 
 const STRIPE_API = "https://api.stripe.com/v1";
 
+// Staff-only gate. This returns company financials (MRR, revenue, customer
+// list, invoices) and the service-role key bypasses RLS, so an ungated handler
+// = full financials to anonymous callers. Require a real staff row.
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+async function requireStaff(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token || !SB_URL || !SB_KEY) return null;
+  try {
+    const ur = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` } });
+    if (!ur.ok) return null;
+    const user = await ur.json();
+    if (!user?.email) return null;
+    const sr = await fetch(`${SB_URL}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=role`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    if (!sr.ok) return null;
+    const rows = await sr.json();
+    return rows?.[0]?.role ? { user, role: rows[0].role } : null;
+  } catch { return null; }
+}
+
 // Stripe API 2025-03-31 moved `current_period_end` onto the subscription_item.
 // Read both locations defensively so we work across versions.
 function subCurrentPeriodEnd(sub) {
@@ -43,6 +65,8 @@ async function handler(req, res) {
   const section = req.query.section || (req.method === "GET" ? "summary" : null);
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
+  const staff = await requireStaff(req);
+  if (!staff) return res.status(401).json({ error: "staff auth required" });
   if (!process.env.STRIPE_SECRET_KEY) return res.status(500).json({ error: "STRIPE_SECRET_KEY not configured" });
 
   try {

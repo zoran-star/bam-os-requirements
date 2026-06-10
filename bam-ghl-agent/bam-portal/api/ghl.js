@@ -229,8 +229,11 @@ function mapConvo(c) {
 // only count for forms in the client's ghl_kpi_config.lead_form_ids.
 async function ghlWebhook(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+  // Fail CLOSED: with no secret configured, reject — otherwise anyone could
+  // POST arbitrary funnel events. With a secret set, the query key must match.
   const secret = process.env.GHL_WEBHOOK_SECRET;
-  if (secret && (req.query.key || "") !== secret) return res.status(401).json({ error: "unauthorized" });
+  if (!secret) return res.status(503).json({ error: "webhook secret not configured" });
+  if ((req.query.key || "") !== secret) return res.status(401).json({ error: "unauthorized" });
   if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
 
   const b = req.body || {};
@@ -296,6 +299,18 @@ async function requireUser(req) {
     if (!r.ok) return null;
     const u = await r.json();
     return u?.id ? u : null;
+  } catch { return null; }
+}
+
+// Staff-only gate for the GHL data proxies. requireUser only proves a valid
+// login (a client has one too), but these endpoints expose CRM data across ANY
+// location — so require an actual staff row before serving them.
+async function requireStaff(req) {
+  const user = await requireUser(req);
+  if (!user?.email) return null;
+  try {
+    const rows = await sbReq(`staff?email=eq.${encodeURIComponent(user.email)}&select=role`);
+    return rows?.[0]?.role ? { user, role: rows[0].role } : null;
   } catch { return null; }
 }
 
@@ -566,7 +581,14 @@ async function handler(req, res) {
   // Everything below is GET.
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  // --- Locations (no auth needed, not cached) ---
+  // GATE: every action below proxies live GHL CRM data (locations, contacts,
+  // conversations, pipelines, forms, calendars) and the service-role key
+  // bypasses RLS — so require a STAFF login. The client portal uses the
+  // separately-gated /api/ghl/inbox + /api/ghl/pipelines endpoints, not these.
+  const staff = await requireStaff(req);
+  if (!staff) return res.status(401).json({ error: "staff auth required" });
+
+  // --- Locations (not cached) ---
   if (action === "locations") {
     return res.status(200).json({
       data: loadLocations().map(l => ({

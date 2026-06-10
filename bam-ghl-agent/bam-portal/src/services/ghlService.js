@@ -1,8 +1,17 @@
 // GHL Service — always tries live API, no feature flag gate
+import { supabase } from "../lib/supabase";
+
+// The /api/ghl proxy is now staff-gated — send the logged-in staff token.
+async function authHeaders() {
+  const { data } = await supabase.auth.getSession();
+  const tok = data?.session?.access_token;
+  return tok ? { Authorization: `Bearer ${tok}` } : {};
+}
 
 async function fetchWithRetry(url, retries = 2, delay = 2000) {
+  const headers = await authHeaders();
   for (let i = 0; i <= retries; i++) {
-    const res = await fetch(url);
+    const res = await fetch(url, { headers });
     if (res.status === 429 && i < retries) {
       await new Promise(r => setTimeout(r, delay * (i + 1)));
       continue;

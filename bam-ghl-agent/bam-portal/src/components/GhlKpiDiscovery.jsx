@@ -85,7 +85,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     let alive = true;
     (async () => {
       try {
-        const res = await fetch("/api/ghl?action=locations");
+        const res = await fetch("/api/ghl?action=locations", { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const j = await res.json();
         if (!alive) return;
         const names = (j.data || []).map(l => l.name);
@@ -105,7 +105,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     setForms(null); setFormsErr(""); setFormsInfo(null);
     (async () => {
       try {
-        const res = await fetch(`/api/ghl?action=forms&counts=1&location=${encodeURIComponent(location)}`);
+        const res = await fetch(`/api/ghl?action=forms&counts=1&location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const j = await res.json();
         if (!alive) return;
         setFormsInfo(j);
@@ -123,7 +123,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     setCals(null); setCalsInfo(null);
     (async () => {
       try {
-        const res = await fetch(`/api/ghl?action=calendars&counts=1&location=${encodeURIComponent(location)}`);
+        const res = await fetch(`/api/ghl?action=calendars&counts=1&location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
         const j = await res.json();
         if (!alive) return;
         setCalsInfo(j);
@@ -361,7 +361,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     if (!location) return;
     setFormActivity({ loading: true });
     try {
-      const res = await fetch(`/api/ghl?action=form-activity&location=${encodeURIComponent(location)}`);
+      const res = await fetch(`/api/ghl?action=form-activity&location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const j = await res.json().catch(() => ({}));
       setFormActivity({ loading: false, data: j.data || [], error: j.reason });
     } catch (e) { setFormActivity({ loading: false, data: [], error: e.message }); }
@@ -371,7 +371,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     if (!location) return;
     setCalActivity({ loading: true });
     try {
-      const res = await fetch(`/api/ghl?action=calendar-activity&location=${encodeURIComponent(location)}`);
+      const res = await fetch(`/api/ghl?action=calendar-activity&location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const j = await res.json().catch(() => ({}));
       setCalActivity({ loading: false, data: j.data || [], error: j.reason });
     } catch (e) { setCalActivity({ loading: false, data: [], error: e.message }); }
@@ -434,7 +434,7 @@ export default function GhlKpiDiscovery({ client, tokens, session, salesMode = f
     if (!location) { setErr("Pick a GHL location first."); return; }
     setBusy(true); setErr(""); setResult(null); setPipelines(null);
     try {
-      const pRes = await fetch(`/api/ghl?action=pipelines&location=${encodeURIComponent(location)}`);
+      const pRes = await fetch(`/api/ghl?action=pipelines&location=${encodeURIComponent(location)}`, { headers: { Authorization: `Bearer ${session?.access_token}` } });
       const pData = await pRes.json();
       if (!pRes.ok) throw new Error(pData.error || `GHL pipelines HTTP ${pRes.status}`);
       const pls = pData.data?.pipelines || pData.pipelines || [];

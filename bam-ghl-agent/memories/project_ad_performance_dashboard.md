@@ -254,7 +254,8 @@ GHL automations move leads between these on response/ghosting/no-show.
 **What GHL already exposes (api/ghl.js, per location via `GHL_LOCATIONS_JSON`):**
 `pipelines`+opportunities (the funnel, stage names + counts), `contacts`,
 `conversations`. Show rate needs the calendar/appointments endpoint (not wired).
-api/ghl.js has **no auth gate** (keyed by location name) — pre-existing footgun.
+api/ghl.js was previously **ungated** (keyed by location name) — **FIXED 2026-06-10**, now
+staff-gated (`requireStaff`). See [[project_api_auth_hardening]].
 
 **Event-based wiring (2026-06-06) — replaces the snapshot cron (removed).** The
 KPIs are sourced from live events, not stage occupancy:
