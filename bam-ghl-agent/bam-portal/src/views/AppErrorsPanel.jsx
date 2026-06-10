@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const WINDOWS = [
   { value: "24h", label: "Last 24h" },
-  { value: "7d", label: "Last 7d" },
+  { value: "14d", label: "Last 14d" },
 ];
 
 const SENTRY_PURPLE = "#A78BFA";

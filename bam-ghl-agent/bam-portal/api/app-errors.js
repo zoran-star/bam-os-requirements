@@ -9,7 +9,7 @@ const SUPABASE_SERVICE_KEY =
 const DEFAULT_SENTRY_BASE_URL = "https://us.sentry.io";
 const DEFAULT_SENTRY_ORG = "full-control";
 const DEFAULT_PROJECT_IDS = "4511527624638464,4511527636828160";
-const VALID_WINDOWS = new Set(["24h", "7d"]);
+const VALID_WINDOWS = new Set(["24h", "14d"]);
 
 async function sb(path, init = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -193,6 +193,7 @@ async function listSentryIssues(req, res) {
   url.searchParams.set("query", "is:unresolved");
   url.searchParams.set("sort", "freq");
   url.searchParams.set("statsPeriod", statsPeriod);
+  url.searchParams.set("groupStatsPeriod", statsPeriod);
   url.searchParams.set("limit", "25");
   url.searchParams.append("environment", config.environment);
   for (const projectId of config.projectIds) url.searchParams.append("project", projectId);
