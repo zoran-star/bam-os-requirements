@@ -545,6 +545,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   const [cancelReason, setCancelReason] = useState("");
   const [fieldEdits, setFieldEdits] = useState({});
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState("");
   const [questionMap, setQuestionMap] = useState({});
   const [flags, setFlags] = useState({});   // { fieldKey: { incorrect: bool, note: string } }
   const [copied, setCopied] = useState(false);
@@ -601,16 +602,19 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
   // assignee/manager gated.
   const canClientComm = !!me;
 
-  const wrap = async (fn) => {
+  const wrap = async (fn, opts) => {
     setBusy(true);
     const res = await fn();
     setBusy(false);
     if (res?.data) {
       setTicket(res.data);
       await onAction();
+      if (opts?.then) opts.then();
+      if (opts?.toast) { setToast(opts.toast); setTimeout(() => setToast(""), 2800); }
     } else if (res?.error) {
       alert(res.error);
     }
+    return res;
   };
 
   return (
@@ -626,6 +630,14 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
         border: `1px solid ${t.borderMed}`,
         display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
+        {/* Success toast — confirms a client-facing action went through */}
+        {toast && (
+          <div style={{
+            position: "fixed", left: "50%", bottom: 28, transform: "translateX(-50%)", zIndex: 1100,
+            background: t.accent, color: "#1a1a1a", padding: "10px 16px", borderRadius: 10,
+            fontSize: 13, fontWeight: 700, maxWidth: "90vw", boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
+          }}>✓ {toast}</div>
+        )}
         {/* Header */}
         <div style={{ padding: "24px 28px", borderBottom: `1px solid ${t.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -875,7 +887,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
                     <button
                       disabled={!clientReply.trim() || busy}
                       onMouseDown={e => e.preventDefault()}
-                      onClick={async () => { await wrap(() => staffReply(ticket.id, clientReply.trim())); setClientReply(""); }}
+                      onClick={async () => { await wrap(() => staffReply(ticket.id, clientReply.trim()), { toast: "Reply sent to the client." }); setClientReply(""); }}
                       style={btn(t, "primary")}
                     >{busy ? "Sending…" : "Send reply"}</button>
                   </div>
@@ -933,7 +945,7 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
               />
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <button onClick={() => setShowRequest(false)} style={btn(t, "ghost")}>Cancel</button>
-                <button disabled={!clientRequest.trim() || busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => requestClientAction(ticket.id, clientRequest))} style={btn(t, "primary")}>Send to client</button>
+                <button disabled={!clientRequest.trim() || busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => requestClientAction(ticket.id, clientRequest), { toast: "Sent — the client now sees “Action needed.”", then: () => { setShowRequest(false); setClientRequest(""); } })} style={btn(t, "primary")}>{busy ? "Sending…" : "Send to client"}</button>
               </div>
             </Section>
           )}
