@@ -800,7 +800,14 @@ async function handler(req, res) {
     if (action === "calendar-activity") {
       if (!v2) return res.status(200).json({ data: [], reason: "v1_unsupported" });
       let lid = locationId || await discoverV2LocationId(loc);
-      let calsResp = await fetch(`${base}/calendars/?${new URLSearchParams(lid ? { locationId: lid } : {})}`, { headers });
+      const calsUrl = `${base}/calendars/?${new URLSearchParams(lid ? { locationId: lid } : {})}`;
+      let calsResp = await fetch(calsUrl, { headers });
+      // Loading forms then calendars back-to-back can trip GHL's burst rate
+      // limit — retry the list call a couple of times before giving up.
+      for (let attempt = 0; !calsResp.ok && (calsResp.status === 429 || calsResp.status >= 500) && attempt < 3; attempt++) {
+        await new Promise(r => setTimeout(r, 1200));
+        calsResp = await fetch(calsUrl, { headers });
+      }
       if (!calsResp.ok) return res.status(200).json({ data: [], reason: "ghl_error", status: calsResp.status });
       const cals = ((await calsResp.json()).calendars || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
       // 12-month window — calendar events over 3yr were too heavy and timed out
@@ -810,7 +817,12 @@ async function handler(req, res) {
       const out = await Promise.all(cals.map(async c => {
         let total = 0, first = null, last = null;
         try {
-          const r = await fetch(`${base}/calendars/events?` + new URLSearchParams({ locationId: lid || "", calendarId: c.id, startTime: String(sinceMs), endTime: String(Date.now()) }), { headers });
+          const evUrl = `${base}/calendars/events?` + new URLSearchParams({ locationId: lid || "", calendarId: c.id, startTime: String(sinceMs), endTime: String(Date.now()) });
+          let r = await fetch(evUrl, { headers });
+          for (let a = 0; !r.ok && (r.status === 429 || r.status >= 500) && a < 2; a++) {
+            await new Promise(res => setTimeout(res, 1000));
+            r = await fetch(evUrl, { headers });
+          }
           if (r.ok) {
             const events = (await r.json()).events || [];
             for (const ev of events) {
