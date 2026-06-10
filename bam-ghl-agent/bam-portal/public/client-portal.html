@@ -21851,6 +21851,10 @@ function toggleTheme() {
       var sc = scroller();
       if (!sc || onChat()) return;
       if (sc.scrollTop > 0) return;                 // only from the very top
+      // Don't hijack drags that begin on a form control — e.g. dragging a
+      // textarea's resize handle down would otherwise arm pull-to-refresh and
+      // reload the page, dropping the user out of an in-memory view (a ticket).
+      if (e.target && e.target.closest && e.target.closest('textarea, input, select, [contenteditable]')) return;
       startY = e.touches[0].clientY;
       pulling = true; armed = false;
     }, { passive: true });
