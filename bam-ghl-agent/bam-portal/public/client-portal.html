@@ -9265,13 +9265,28 @@ async function _bbSaveClientBasics(patch) {
   return true;
 }
 let _bbBasicsSaveTimer = null;
+let _bbBasicsPendingGetter = null;
 function _bbBasicsScheduleSave(getter) {
   if (_bbBasicsSaveTimer) clearTimeout(_bbBasicsSaveTimer);
+  _bbBasicsPendingGetter = getter;
   _bbBasicsSaveTimer = setTimeout(async () => {
-    const patch = getter();
+    const patch = _bbBasicsPendingGetter && _bbBasicsPendingGetter();
+    _bbBasicsPendingGetter = null;
+    _bbBasicsSaveTimer = null;
     if (!patch) return;
     await _bbSaveClientBasics(patch);
   }, 600);
+}
+// Flush any in-flight debounced save immediately. Call before any reload.
+async function _bbFlushPendingSave() {
+  if (!_bbBasicsSaveTimer && !_bbBasicsPendingGetter) return;
+  clearTimeout(_bbBasicsSaveTimer);
+  _bbBasicsSaveTimer = null;
+  const getter = _bbBasicsPendingGetter;
+  _bbBasicsPendingGetter = null;
+  if (!getter) return;
+  const patch = getter();
+  if (patch) await _bbSaveClientBasics(patch);
 }
 
 // ─── BB GENERAL CARD ────────────────────────────────────────────────────
@@ -10469,8 +10484,9 @@ function _vbDismiss() {
   _vbDismissedAt = Date.now();
 }
 
-function _vbRefresh() {
-  // Hard reload — bypass cache to guarantee the new HTML.
+async function _vbRefresh() {
+  // Flush any pending auto-save before reloading so in-progress edits aren't lost.
+  await _bbFlushPendingSave();
   window.location.reload();
 }
 
@@ -21865,7 +21881,7 @@ function toggleTheme() {
         ind.classList.add('ptr-refreshing');
         ind.querySelector('.ptr-label').textContent = 'Refreshing…';
         ind.style.height = '44px';
-        setTimeout(function () { location.reload(); }, 180);
+        _bbFlushPendingSave().then(function () { location.reload(); });
         pulling = false; armed = false;
         return;
       }
