@@ -6755,7 +6755,7 @@ Then the call to action."]</div>
          vanilla _SORTER module appended after applyAiMatch() below.
     ══════════════════════════════ -->
     <div id="pc-sorter-overlay" onclick="closePricingSorter()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:130;"></div>
-    <div id="pc-sorter-modal" role="dialog" aria-modal="true" aria-label="The Pricing Sorter" style="display:none; position:fixed; z-index:131; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1100px,96vw); max-height:92vh; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
+    <div id="pc-sorter-modal" role="dialog" aria-modal="true" aria-label="The Pricing Sorter" style="display:none; flex-direction:column; position:fixed; z-index:131; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1100px,96vw); max-height:92vh; overflow:hidden; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
 
     <!-- ══════════════════════════════
          CALENDAR VIEW (weekly schedule, V2-gated)
@@ -15028,7 +15028,7 @@ function openPricingSorter() {
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'block';
-  if (modal) modal.style.display = 'block';
+  if (modal) modal.style.display = 'flex';
   _sorterRender();
   _sorterLoadStep1();
 }
@@ -15062,9 +15062,9 @@ function _sorterRender() {
       <div style="font-size:18px;font-weight:800;">🧮 The Pricing Sorter</div>
       <button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
     </div>
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;">${dots}</div>
-    <div id="pc-sorter-body"></div>
-    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:16px;position:sticky;bottom:0;background:var(--surface,#16161a);padding-top:12px;border-top:1px solid var(--border,#2a2a31);">
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;flex:none;">${dots}</div>
+    <div id="pc-sorter-body" style="overflow-y:auto;flex:1 1 auto;min-height:0;"></div>
+    <div style="display:flex;gap:10px;justify-content:space-between;margin-top:14px;flex:none;background:var(--surface,#16161a);padding-top:12px;border-top:1px solid var(--border,#2a2a31);">
       <button id="pc-sorter-back" onclick="_sorterBack()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;${_SORTER.step === 1 ? 'visibility:hidden;' : ''}">← Back</button>
       <div id="pc-sorter-next-host"></div>
     </div>`;
@@ -15162,6 +15162,14 @@ function _sorterRenderStep1(host) {
   // LEFT: one drop-zone card per plan + a "create a new plan" tile at the bottom.
   const leftCards = targets.map(t => {
     const mine = byKey[t.key] || [];
+    // Live (canonical) pinned to the top and set apart from the legacy variants.
+    const liveChips = mine.filter(p => p.proposed_tier === 'canonical');
+    const legacyChips = mine.filter(p => p.proposed_tier !== 'canonical');
+    const chipsHtml = liveChips.map(priceChip).join('')
+      + (liveChips.length && legacyChips.length
+          ? `<div style="display:flex;align-items:center;gap:8px;margin:13px 2px 4px;"><div style="flex:1;height:1px;background:var(--border,#2a2a31);"></div><span style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">Legacy</span><div style="flex:1;height:1px;background:var(--border,#2a2a31);"></div></div>`
+          : '')
+      + legacyChips.map(priceChip).join('');
     const slot = escapeHTML(t.key).replace(/[^a-zA-Z0-9_-]/g, '_');
     const opts = unassigned.map(p => `<option value="${escapeHTML(p.price_id)}">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML((p.name || p.price_id)).slice(0, 42)}</option>`).join('');
     const dropdown = unassigned.length
@@ -15175,7 +15183,7 @@ function _sorterRenderStep1(host) {
         style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:11px 12px;margin-bottom:10px;background:var(--bg,#0d0d10);transition:border-color .12s,background .12s;">
       <div style="font-weight:700;font-size:13px;">${escapeHTML(t.label || t.key)}</div>
       ${emptyHint}
-      ${mine.map(priceChip).join('')}
+      ${chipsHtml}
       <div id="pc-sorter-create-${slot}"></div>
       ${dropdown}
       ${createBtn}
