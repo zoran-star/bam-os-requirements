@@ -18824,6 +18824,19 @@ function renderDetail() {
       </div>`;
   }).join('');
 
+  // Some tickets (esp. staff-created ones like "Review Call Notes") store their
+  // content under keys the fixed schema doesn't know — most often `description`.
+  // Render any present, non-schema field so the info is never hidden.
+  const _schemaKeys = new Set(schema.map(f => f.key));
+  const _humanize = (k) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const extraFieldsHTML = Object.entries(t.data || {})
+    .filter(([k, v]) => !_schemaKeys.has(k) && k !== 'item' && v != null && String(v).trim() !== '')
+    .map(([k, v]) => `
+      <div class="detail-field">
+        <div class="detail-field-label">${escapeHTML(k === 'describe' ? 'Details' : _humanize(k))}</div>
+        <div class="detail-field-value" style="white-space:pre-wrap">${escapeHTML(String(v))}</div>
+      </div>`).join('');
+
   // Conversation thread
   const threadHTML = (t.messages && t.messages.length > 0) ? `
     <div style="margin-top:24px">
@@ -18905,6 +18918,7 @@ function renderDetail() {
     ${guideHTML}
     ${finalReviewHTML}
     ${fieldsHTML}
+    ${extraFieldsHTML}
     ${threadHTML}
     ${noteFormHTML}
   `;
