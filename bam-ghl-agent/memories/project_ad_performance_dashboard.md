@@ -4,6 +4,33 @@ description: Automates Ximena's by-hand Meta→spreadsheet KPI reporting. Per-ca
 type: project
 ---
 
+## ⚠️ Empty campaign filter = cross-academy blend/leak — FIXED (2026-06-10)
+
+**Symptom (Ximena):** BTG's staff Marketing tab showed **$2,169** spend for May; real BTG spend ≈ **$246**.
+
+**Root cause:** the BAM staff Meta token spans **one shared ad account holding every
+academy's campaigns** (PBT, OEV, SD, DAHOOPS, SUPREME HOOPS, MAJOR HOOPS, …). A client's
+`clients.meta_campaign_ids` filter scopes the report to that client's campaigns — but the
+code treated an **empty filter as "show ALL active campaigns"** (`allow = null` → no skip).
+So any client without a filter showed the **blended all-academy total** — and since
+`meta-report`/`meta-campaigns` power the **client-facing** portal too, a logged-in academy
+owner could see **other academies' campaign names + spend** (a cross-client leak, not just a
+wrong number). It was NOT a Meta-connection issue (the "Meta not connected" banner is the
+per-client ad-account picker, separate) and NOT a math/double-count bug.
+
+**Fix:** empty filter now returns a clean **`reason: "no_campaigns_selected"`** empty state
+instead of blending. Applied to all four spend surfaces in `api/marketing.js`:
+`handleMetaReport`, `handleMetaOverview` (rollup excludes `needs_campaigns` rows),
+`handleMetaCampaigns` (client Active Campaigns list), `handleMetaKpis` (lead-flow widget —
+also switched from account-level to `level=campaign` + filter). `staff_picker=1` still lists
+ALL campaigns so staff can pick. Frontends show "pick this client's campaigns" (staff:
+MarketingDashboard, MarketingOverview roster + CSV, MarketingKpis) / "once they're set up"
+(client portal).
+
+**Migration need (action):** every `marketing_included` client must have its campaigns
+**picked** (staff portal → client → Marketing → Campaigns → Pick campaigns) or their Marketing
+tab now reads "pick campaigns" instead of (wrongly) showing the blended total. Bulk-set these.
+
 ## GHL KPI discovery spike (2026-06-06) — bottom-of-funnel groundwork
 
 Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's

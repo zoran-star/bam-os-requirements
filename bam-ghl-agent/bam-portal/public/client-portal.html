@@ -17163,6 +17163,10 @@ async function _renderMarketingCampaigns() {
       containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Your campaigns will appear here once your ad account is connected.</div>`;
       return;
     }
+    if (json.reason === 'no_campaigns_selected') {
+      containerEl.innerHTML = `<div class="req-empty" style="padding:18px 0">Your campaigns will appear here once they're set up.</div>`;
+      return;
+    }
     const campaigns = json.campaigns || [];
     if (!campaigns.length) {
       containerEl.innerHTML = `
@@ -17637,9 +17641,11 @@ async function _loadAdReport() {
     if (json.reason || !(Array.isArray(json.periods) && json.periods.length)) {
       // Connected clients (and everyone) see a clean state — never sample data.
       if (controls) controls.style.display = 'none';
-      const msg = json.reason
-        ? 'Your ad performance will show here once your ad account is connected.'
-        : "No campaign data yet — it'll appear once your ads have been running a little while.";
+      const msg = json.reason === 'no_campaigns_selected'
+        ? 'Your ad performance will show here once your campaigns are set up.'
+        : json.reason
+          ? 'Your ad performance will show here once your ad account is connected.'
+          : "No campaign data yet — it'll appear once your ads have been running a little while.";
       el.innerHTML = `<div class="req-empty" style="padding:20px 0">${msg}</div>`;
       _reportMonthly = null;
       return;

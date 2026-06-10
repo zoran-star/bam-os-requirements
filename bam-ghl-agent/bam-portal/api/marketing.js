@@ -1235,11 +1235,17 @@ async function handleMetaCampaigns(req, res) {
     };
   });
 
-  // Filter: if meta_campaign_ids is set on the client, only return those.
-  // staff_picker=1 mode bypasses this filter so staff can pick from all.
-  let filtered = campaigns;
+  // Filter: outside staff-picker mode, ONLY return the client's associated
+  // campaigns. The shared ad account holds every academy's campaigns, so an
+  // empty filter must return nothing (not "all") — otherwise this client sees
+  // every other academy's campaigns. staff_picker=1 bypasses this so staff can
+  // pick from the full list.
   const associated = Array.isArray(clientFull.meta_campaign_ids) ? clientFull.meta_campaign_ids : null;
-  if (!isStaffPicker && associated && associated.length) {
+  let filtered = campaigns;
+  if (!isStaffPicker) {
+    if (!associated || !associated.length) {
+      return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+    }
     const allow = new Set(associated);
     filtered = campaigns.filter(c => allow.has(c.id));
   }
@@ -1290,13 +1296,20 @@ async function handleMetaKpis(req, res) {
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
-  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
+  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
   const clientFull = clientRows?.[0];
   if (!clientFull?.meta_ad_account_id) {
     return res.status(200).json({ reason: "no_ad_account" });
   }
   const staffToken = await getAnyStaffMetaToken();
   if (!staffToken) return res.status(200).json({ reason: "no_staff_token" });
+
+  // Scope to this client's own campaigns. The shared ad account holds every
+  // academy's campaigns, so without a filter this would blend all of them into
+  // one client's lead-flow numbers. No filter = clean empty state, not a blend.
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? new Set(clientFull.meta_campaign_ids) : null;
+  if (!allow) return res.status(200).json({ reason: "no_campaigns_selected" });
 
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id
@@ -1317,10 +1330,12 @@ async function handleMetaKpis(req, res) {
   const rangeSince = fmt(prevMonday);
   const rangeUntil = fmt(yesterday) >= fmt(lastSunday) ? fmt(yesterday) : fmt(lastSunday);
   const insUrl = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
-    fields: "spend,actions",
+    level: "campaign",
+    fields: "campaign_id,spend,actions",
     time_range: JSON.stringify({ since: rangeSince, until: rangeUntil }),
     time_increment: "1",
     access_token: staffToken,
+    limit: "500",
   });
   const insRes = await fetch(insUrl);
   const insJson = await insRes.json();
@@ -1337,6 +1352,7 @@ async function handleMetaKpis(req, res) {
     weekBefore: { leads: 0, spend: 0 },
   };
   for (const row of (insJson.data || [])) {
+    if (allow && !allow.has(row.campaign_id)) continue;
     const d = row.date_start;
     const leads = countLeads(row.actions);
     const spend = parseFloat(row.spend || "0") || 0;
@@ -1489,9 +1505,15 @@ async function handleMetaReport(req, res) {
     ? clientFull.meta_ad_account_id
     : `act_${clientFull.meta_ad_account_id}`;
 
-  // Optional per-client campaign filter (so clients don't see staff experiments).
+  // Per-client campaign filter. The BAM staff Meta token spans EVERY academy's
+  // campaigns inside one shared ad account, so an empty filter must NOT fall back
+  // to "show every active campaign" — that blends (and, for a logged-in client,
+  // leaks) every other academy's spend into this client's report. Require an
+  // explicit selection; until staff pick this client's campaigns, return a clean
+  // empty state instead of an all-academy total.
   const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
     ? new Set(clientFull.meta_campaign_ids) : null;
+  if (!allow) return res.status(200).json({ reason: "no_campaigns_selected", ...base });
 
   const fmt = (d) => d.toISOString().slice(0, 10);
   const FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
@@ -2229,7 +2251,10 @@ async function handleMetaOverview(req, res) {
     if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
     try {
       const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+      // No campaign filter on a shared ad account = would blend every academy's
+      // spend. Don't pull/blend — flag it so staff know to pick campaigns.
       const allow = Array.isArray(c.meta_campaign_ids) && c.meta_campaign_ids.length ? new Set(c.meta_campaign_ids) : null;
+      if (!allow) return { ...baseRow, connected: true, needs_campaigns: true };
       const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
         level: "campaign", fields: META_CAMPAIGN_FIELDS,
         time_range: JSON.stringify({ since, until }), time_increment: "monthly",
@@ -2266,7 +2291,7 @@ async function handleMetaOverview(req, res) {
   }));
 
   // Roll-up across connected clients.
-  const live = rows.filter(r => r.connected && !r.error);
+  const live = rows.filter(r => r.connected && !r.error && !r.needs_campaigns);
   const sum = (k) => live.reduce((a, r) => a + (r[k] || 0), 0);
   const prevSpend = live.reduce((a, r) => a + (r._prev?.spend || 0), 0);
   const prevLeads = live.reduce((a, r) => a + (r._prev?.leads || 0), 0);

@@ -1598,6 +1598,9 @@ function MarketingKpis({ client, tokens, session }) {
   if (data?.reason === "no_staff_token") {
     return <div style={{ color: t.amber, padding: 16, fontSize: 13 }}>Meta isn't connected. Reconnect Meta in the staff portal.</div>;
   }
+  if (data?.reason === "no_campaigns_selected") {
+    return <div style={{ color: t.textMute, padding: 16, fontSize: 13, fontStyle: "italic" }}>No campaigns selected — pick this client's campaigns in the Campaigns sub-tab.</div>;
+  }
 
   const money = (n) => n == null ? "—" : `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const mdShort = (iso) => {

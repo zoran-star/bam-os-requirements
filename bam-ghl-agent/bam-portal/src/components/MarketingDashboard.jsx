@@ -264,7 +264,10 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
   if (loading) return <div style={{ padding: 18, color: t.textSub }}>Loading performance…</div>;
   if (err) return <div style={{ padding: 18, color: t.red }}>Couldn't load report: {err}</div>;
   if (!data || !period) {
-    return <div style={{ padding: 18, color: t.textSub }}>No performance data for this range yet{data?.reason === "no_ad_account" ? " — no ad account connected." : "."}</div>;
+    const why = data?.reason === "no_ad_account" ? " — no ad account connected."
+      : data?.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab."
+      : ".";
+    return <div style={{ padding: 18, color: t.textSub }}>No performance data for this range yet{why}</div>;
   }
 
   const bm = data.benchmarks || DEFAULT_BM;
@@ -305,7 +308,7 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
       </div>
 
       {data.empty ? (
-        <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : "."}</div>
+        <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : data.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab." : "."}</div>
       ) : (
         <>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start", border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: "18px 20px", marginBottom: 16 }}>
