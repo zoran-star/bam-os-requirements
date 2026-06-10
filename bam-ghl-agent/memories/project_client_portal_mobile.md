@@ -57,6 +57,17 @@ mobile. `_positionSpotlight()` now detects a zero-size target and falls
 back to the matching `.mobile-nav-item[data-view="…"]`. The
 `verify-client-portal-ui.mjs` selectors are untouched (still passes).
 
+## Account / sign out (added 2026-06-10)
+
+The sidebar (and its footer Sign out + Change password) is `display:none`
+on mobile, which made the PWA impossible to log out of. Fix: an
+**Account section at the bottom of the Home view** (`#home-account`) with
+Change password + Sign out rows. Mobile-only — hidden on desktop, which
+keeps using the sidebar footer. `signOut()` also now drops this device's
+push token (via `window.__bamPushDeleteToken`, exposed from the push IIFE)
+**before** `auth.signOut()` so the delete runs while RLS access is still
+alive, with a 2s timeout so sign-out never hangs.
+
 ## Gotchas
 
 - Desktop layout is unchanged — every rule is inside the `≤768px` query
