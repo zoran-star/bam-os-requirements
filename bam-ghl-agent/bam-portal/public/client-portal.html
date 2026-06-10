@@ -15095,7 +15095,17 @@ function _sorterLoading(label) {
   </div>`;
 }
 
-// ───────────────────────────── STEP 1 — boxes + arrows ─────────────────────────────
+// Coerce any error shape (string | Error | {error|message} | object) to a
+// readable string so we never render a useless "[object Object]".
+function _sorterErr(x) {
+  if (x == null) return '';
+  if (typeof x === 'string') return x;
+  if (x instanceof Error) return x.message || String(x);
+  if (typeof x === 'object') { try { return x.message || x.error || JSON.stringify(x); } catch (_) { return String(x); } }
+  return String(x);
+}
+
+// ───────────────────────────── STEP 1 — match (drag-and-drop) ─────────────────────────────
 async function _sorterLoadStep1() {
   const host = document.getElementById('pc-sorter-body');
   if (host) host.innerHTML = _sorterLoading('Reading your live Stripe prices…');
@@ -15107,11 +15117,11 @@ async function _sorterLoadStep1() {
       body: JSON.stringify({ client_id: _aiClientId() }),
     });
     const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _SORTER.match = { proposals: json.proposals || [], targets: json.targets || [], academy: json.academy };
     if (_SORTER.step === 1) _sorterRenderBody();
   } catch (e) {
-    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't load prices — ${escapeHTML(e.message)}</div>`;
+    if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't load prices — ${escapeHTML(_sorterErr(e) || 'unknown error')}</div>`;
   }
 }
 
