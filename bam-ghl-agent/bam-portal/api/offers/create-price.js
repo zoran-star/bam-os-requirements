@@ -243,9 +243,14 @@ async function runApply(req, res, ctx, body, clientId) {
     });
 
     // Upsert the pricing_catalog row — tier canonical, routable.
+    // stripe_product_id is NOT NULL: Stripe auto-creates a product from
+    // product_data and returns its id on price.product — store it.
     const row = {
       client_id: clientId,
       stripe_price_id: price.id,
+      stripe_product_id: price.product || null,
+      stripe_account_id: stripeAccount || null,
+      display_name: priceName,
       offer_id: c.offer_id || null,
       offer_price_key: key,
       tier: "canonical",
