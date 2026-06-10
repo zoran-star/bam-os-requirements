@@ -57,6 +57,20 @@ mobile. `_positionSpotlight()` now detects a zero-size target and falls
 back to the matching `.mobile-nav-item[data-view="…"]`. The
 `verify-client-portal-ui.mjs` selectors are untouched (still passes).
 
+## Account section on Home (phone/PWA only) — added 2026-06-10
+
+The sidebar footer (theme toggle / Change password / Take the tour /
+**Sign out**) is hidden `≤768px`, so on the PWA/phone there was **no way to
+sign out**. Fix: an **Account** block at the bottom of the Home view
+(`#view-home .home-account-block`), shown only `≤768px`. Reuses the existing
+handlers — `openChangePassword()`, `toggleTheme()`, `startOnboardingTour()`,
+`signOut()` — styled as `.home-action` rows. A `#home-account-email` line
+shows "Signed in as <auth email>" (populated in `boot()` from
+`session.user.email`, right after the `userEmail` sidebar populate). Desktop
+is unaffected (block is `display:none` outside the media query). Sign out is
+on the **Home** tab specifically because Home is the first mobile bottom-nav
+item and already shows the user's profile.
+
 ## Gotchas
 
 - Desktop layout is unchanged — every rule is inside the `≤768px` query

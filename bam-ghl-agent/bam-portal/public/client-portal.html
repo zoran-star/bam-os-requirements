@@ -5616,6 +5616,14 @@
       #view-home .home-action-ic svg { width: 18px; height: 18px; display: block; }
       #view-home .home-action-chev { margin-left: auto; color: var(--text-mute); display: flex; transition: transform .15s; }   /* #9 */
       #view-home .home-action:hover .home-action-chev { transform: translateX(3px); }
+      /* Account section — phone only. On desktop these controls live in the sidebar
+         footer (theme toggle / Change password / Sign out), which is hidden ≤768px,
+         so the PWA / phone needs them surfaced here on the Home tab. */
+      #view-home .home-account-block { display: none; }
+      @media (max-width: 768px) { #view-home .home-account-block { display: block; } }
+      #view-home .home-action-signout { color: var(--text-sub); }
+      #view-home .home-action-signout .home-action-ic { color: var(--text-mute); }
+      #view-home .home-account-email { font-size: 13px; color: var(--text-mute); margin: 0 2px 10px; word-break: break-all; }
     </style>
     <div class="view" id="view-home">
       <div class="topbar">
@@ -5669,6 +5677,34 @@
               Browse resources
               <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
             </button>
+          </div>
+
+          <!-- Account — phone/PWA only (desktop uses the sidebar footer) -->
+          <div class="home-account-block">
+            <div class="home-sec"><span class="home-sec-label">Account</span></div>
+            <div class="home-account-email" id="home-account-email"></div>
+            <div class="home-actions">
+              <button class="home-action" onclick="openChangePassword()">
+                <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                Change password
+                <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+              </button>
+              <button class="home-action" onclick="toggleTheme()">
+                <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span>
+                Light / dark mode
+                <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+              </button>
+              <button class="home-action" onclick="startOnboardingTour()">
+                <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><line x1="3" y1="3" x2="3" y2="8"/><line x1="3" y1="8" x2="8" y2="8"/></svg></span>
+                Take the tour
+                <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+              </button>
+              <button class="home-action home-action-signout" onclick="signOut()">
+                <span class="home-action-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></span>
+                Sign out
+                <span class="home-action-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -21304,6 +21340,13 @@ async function boot() {
   userEmailEl.title = email;
   userEmailEl.style.display = ownerName ? 'block' : 'none';
   document.getElementById('userAvatar').textContent = (ownerName || email).slice(0, 1).toUpperCase() || '·';
+
+  // Mobile/PWA Account section — show the logged-in auth email (which login you'll sign out of)
+  const homeAcctEmail = document.getElementById('home-account-email');
+  if (homeAcctEmail) {
+    const authEmail = (session.user?.email || '').trim();
+    homeAcctEmail.textContent = authEmail ? 'Signed in as ' + authEmail : '';
+  }
 
   await loadAcademyName();
   await loadTickets();
