@@ -86,7 +86,7 @@ function getLocation(name) {
 // If loc has both apiKey (V1) and apiKeyV2, we can pick the right one per action
 function getLocForAction(loc, action) {
   // Actions that need V2 (conversations, contacts, messages)
-  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars", "form-activity"];
+  const v2Actions = ["conversations", "contacts", "contact", "messages", "forms", "calendars", "form-activity", "calendar-activity"];
   // Actions that need V1 (pipelines/opportunities when V1 key is available)
   const v1Actions = ["pipelines"];
 
@@ -789,6 +789,38 @@ async function handler(req, res) {
           }
         } catch { /* best-effort */ }
         return { id: f.id, name: f.name, total, first, last };
+      }));
+      out.sort((a, b) => b.total - a.total);
+      return res.status(200).json({ data: out, location: locationName });
+    }
+
+    // ─── Calendar activity: each calendar's booking window (first, last, total) ──
+    // Mirror of form-activity for the trial-calendar picker. Counts appointments
+    // over a ~3yr range so you can see which calendar was used over which period.
+    if (action === "calendar-activity") {
+      if (!v2) return res.status(200).json({ data: [], reason: "v1_unsupported" });
+      let lid = locationId || await discoverV2LocationId(loc);
+      let calsResp = await fetch(`${base}/calendars/?${new URLSearchParams(lid ? { locationId: lid } : {})}`, { headers });
+      if (!calsResp.ok) return res.status(200).json({ data: [], reason: "ghl_error", status: calsResp.status });
+      const cals = ((await calsResp.json()).calendars || []).map(c => ({ id: c.id, name: c.name || c.calendarName || "(unnamed calendar)" }));
+      const sinceMs = Date.now() - 36 * 31 * 86400000;   // ~3-year lookback
+      const out = await Promise.all(cals.map(async c => {
+        let total = 0, first = null, last = null;
+        try {
+          const r = await fetch(`${base}/calendars/events?` + new URLSearchParams({ locationId: lid || "", calendarId: c.id, startTime: String(sinceMs), endTime: String(Date.now()) }), { headers });
+          if (r.ok) {
+            const events = (await r.json()).events || [];
+            for (const ev of events) {
+              const when = ev.startTime || ev.dateAdded || null;
+              if (!when) continue;
+              total++;
+              const iso = new Date(when).toISOString();
+              if (!first || iso < first) first = iso;
+              if (!last || iso > last) last = iso;
+            }
+          }
+        } catch { /* best-effort */ }
+        return { id: c.id, name: c.name, total, first, last };
       }));
       out.sort((a, b) => b.total - a.total);
       return res.status(200).json({ data: out, location: locationName });
