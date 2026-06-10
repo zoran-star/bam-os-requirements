@@ -44,7 +44,11 @@ export default function BAMPortal() {
   const [accessChecking, setAccessChecking] = useState(false);
   const [dark, setDark] = useState(true);
   // Dashboard is hidden for all staff right now — land on Inbox instead.
-  const [nav, setNav] = useState("inbox");
+  // Restore the last-viewed tab so a reload (mobile tab-discard, PWA update,
+  // auth re-boot) doesn't drop staff back on Inbox and lose their place.
+  const [nav, setNav] = useState(() => {
+    try { return localStorage.getItem("bam_nav") || "inbox"; } catch { return "inbox"; }
+  });
   // Dashboard click-to-detail: parent stashes the client id, ClientsCombinedView
   // consumes it once via initialClientId then clears it so reopening the tab
   // fresh doesn't keep re-jumping.
@@ -168,6 +172,27 @@ export default function BAMPortal() {
       setNav("systems");
     }
   }, [me, nav]);
+
+  // Persist the active tab so it survives a full reload (see the useState
+  // initializer above). Plain key — one tab per browser is the right model here.
+  useEffect(() => {
+    try { localStorage.setItem("bam_nav", nav); } catch { /* storage blocked — non-fatal */ }
+  }, [nav]);
+
+  // A restored tab might be one this role can't see, or the hidden dashboard —
+  // fall back to Inbox so we never land on a blank, gated tab. (Systems team is
+  // handled by the redirect above.)
+  useEffect(() => {
+    if (!me || me.role === "systems_manager" || me.role === "systems_executor") return;
+    const gated = {
+      systems: canSeeSystems, marketing: canSeeMarketing, content: canSeeContent,
+      team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
+      financials: canSeeFinancials,
+    };
+    if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
+      setNav("inbox");
+    }
+  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials]);
 
   // Deep-link support: ?nav=inbox jumps the user straight to that nav
   // tab on page load. Used by mention notifications (Slack DM / future
