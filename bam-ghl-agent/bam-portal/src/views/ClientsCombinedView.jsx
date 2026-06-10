@@ -476,17 +476,60 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
   );
 }
 
+// Onboarding completion from the client row — the same 8 sections the
+// Onboarding tab checklists (ghl, slack, general, staff, locations, brand,
+// offers, meta). Returns { done, total }.
+function onboardingProgress(client) {
+  const generalAutoOk = !!(client.business_name && client.owner_name && client.email);
+  const flags = [
+    !!client.ghl_signup_done_at,
+    !!client.slack_join_done_at,
+    generalAutoOk || !!client.general_marked_done_at,
+    !!client.staff_marked_done_at,
+    !!client.locations_marked_done_at,
+    !!client.brand_marked_done_at,
+    !!client.offers_marked_done_at,
+    !!client.meta_ads_marked_done_at,
+  ];
+  return { done: flags.filter(Boolean).length, total: flags.length };
+}
+
 function StatusPill({ client, tokens }) {
   const t = tokens;
   const derived = deriveClientStatus(client, t);
-  if (!derived) return null;
-  const { label, color } = derived;
+  const isLive = client.status === "active" || (derived && derived.label === "Live");
+
+  // "Good" → full green bar.
+  if (isLive) {
+    return (
+      <div style={{ minWidth: 120, maxWidth: 140 }}>
+        <div style={{ height: 8, borderRadius: 999, background: `${t.green}22`, overflow: "hidden" }}>
+          <div style={{ width: "100%", height: "100%", background: t.green }} />
+        </div>
+        <div style={{ fontSize: 10, color: t.green, fontWeight: 700, letterSpacing: "0.06em", marginTop: 4 }}>LIVE</div>
+      </div>
+    );
+  }
+
+  // Paused / churned → keep the labelled pill.
+  if (client.status === "paused" || client.status === "churned") {
+    if (!derived) return null;
+    const { label, color } = derived;
+    return (
+      <span style={{ fontSize: 12, padding: "5px 12px", borderRadius: 999, background: `${color}22`, color, fontWeight: 600, whiteSpace: "nowrap" }}>{label}</span>
+    );
+  }
+
+  // Onboarding → bar filled to how far along the action items they are.
+  const { done, total } = onboardingProgress(client);
+  const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <span style={{
-      fontSize: 12, padding: "5px 12px", borderRadius: 999,
-      background: `${color}22`, color, fontWeight: 600,
-      whiteSpace: "nowrap",
-    }}>{label}</span>
+    <div style={{ minWidth: 120, maxWidth: 140 }} title={`${done}/${total} onboarding steps done${derived ? ` · ${derived.label}` : ""}`}>
+      <div style={{ height: 8, borderRadius: 999, background: `${t.amber}22`, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: t.amber, transition: "width .3s ease" }} />
+      </div>
+      <div style={{ fontSize: 10, color: t.textMute, fontWeight: 600, marginTop: 4 }}>{done}/{total}{derived ? ` · ${derived.label}` : " · Onboarding"}</div>
+    </div>
   );
 }
 

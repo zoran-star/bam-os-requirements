@@ -665,10 +665,12 @@ export default function BAMPortal() {
                 </svg>
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexShrink: 0 }}>
-              <span style={{ fontSize: 16, fontWeight: 700, color: tk.text, letterSpacing: "-0.02em" }}>{pageTitle}</span>
-              {!isMobile && <span style={{ fontSize: 13, color: tk.textMute }}>{pageDesc}</span>}
-            </div>
+            {nav !== "clients" && (
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexShrink: 0 }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: tk.text, letterSpacing: "-0.02em" }}>{pageTitle}</span>
+                {!isMobile && <span style={{ fontSize: 13, color: tk.textMute }}>{pageDesc}</span>}
+              </div>
+            )}
             {!isMobile && (
             <div style={{ flex: 1, display: "flex", justifyContent: "center", padding: "0 24px" }}>
               <div onClick={() => setShowCmd(true)} style={{
