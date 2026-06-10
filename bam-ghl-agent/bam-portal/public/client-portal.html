@@ -5998,10 +5998,6 @@
                 <button type="button" class="report-seg-btn" data-rv="history" onclick="setReportView('history')">History</button>
               </div>
               <select id="report-month" class="report-month-select" style="display:none" onchange="_onReportMonthChange()" aria-label="Report month"></select>
-              <div class="report-toggle" role="group" aria-label="Detail level">
-                <button type="button" id="report-simple-btn" class="report-toggle-btn active" onclick="setReportMode('simple')">Simple</button>
-                <button type="button" id="report-adv-btn" class="report-toggle-btn" onclick="setReportMode('advanced')">Advanced</button>
-              </div>
             </div>
           </div>
           <div id="ad-report-container">
@@ -17289,18 +17285,22 @@ function _localInsight(period, goals, bm) {
   const best = withLeads.slice().sort((a, b) => a.cpl - b.cpl)[0];
   const worst = list.slice().sort((a, b) => (b.cpl == null ? 1e9 : b.cpl) - (a.cpl == null ? 1e9 : a.cpl))[0];
   const win = best ? `${best.name} is your most efficient — ${_fmtMoney(best.cpl)} per lead.` : `Leads are still coming in — give your campaigns a few more days of data.`;
-  let fix = `Everything's tracking near target — keep it running.`;
-  if (worst) {
-    if (worst.ctr != null && worst.ctr < bm.ctr_min) fix = `${worst.name}'s click rate is low — a fresh photo or opening line would help more people click.`;
-    else if (worst.frequency != null && worst.frequency > bm.freq_max) fix = `${worst.name} is being shown to the same people too often — time to refresh the ad or widen the audience.`;
-    else if (worst.cpl != null && worst.cpl > target) fix = `${worst.name}'s cost per lead is above your target — tightening the audience or improving the page would help.`;
-  }
+  // Results-first (client view): lead with cost-per-lead vs target. Click rate
+  // and frequency are supporting context, never the headline when CPL is on target.
+  const resultsStrong = t.cpl != null && t.cpl <= target && t.leads > 0;
+  const overTarget = list.filter(c => c.cpl != null && c.cpl > target).sort((a, b) => b.cpl - a.cpl)[0];
+  let fix;
+  if (overTarget) fix = `${overTarget.name}'s cost per lead is above your ${_fmtMoney(target)} target — tightening the audience or improving the page would help.`;
+  else if (resultsStrong) fix = best ? `Your cost per lead is beating target — the move now is to put more behind ${best.name} and pull in more leads.` : `Cost per lead is on target — keep it running and let the leads build.`;
+  else if (worst && worst.ctr != null && worst.ctr < bm.ctr_min) fix = `Results are tracking — one thing to watch: ${worst.name}'s click rate is a little low, so a fresh photo or opening line could make leads even cheaper.`;
+  else if (worst && worst.frequency != null && worst.frequency > bm.freq_max) fix = `Results are tracking — one thing to watch: ${worst.name} is being shown to the same people a lot, so refreshing the ad would help.`;
+  else fix = `Everything's tracking near target — keep it running.`;
   const campaigns = {};
   for (const c of list) {
     if (c.cpl == null) campaigns[c.id] = `Spent ${_fmtMoney(c.spend)} with no leads yet.`;
-    else if (c.ctr != null && c.ctr < bm.ctr_min) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead. Not many people are clicking — a fresh hook would help.`;
-    else if (c.frequency != null && c.frequency > bm.freq_max) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead. People have seen this a lot — worth refreshing.`;
-    else if (c.cpl > target) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead, a little over your ${_fmtMoney(target)} target.`;
+    else if (c.cpl > target) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead, a little over your ${_fmtMoney(target)} target — worth a tweak.`;
+    else if (c.ctr != null && c.ctr < bm.ctr_min) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead — under target. Click rate's a little low, so there's room to make it even cheaper.`;
+    else if (c.frequency != null && c.frequency > bm.freq_max) campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead — under target. People have seen this a lot, so a refresh keeps it working.`;
     else campaigns[c.id] = `${_fmtMoney(c.cpl)} per lead — at or under your ${_fmtMoney(target)} target.`;
   }
   return { verdict, verdict_label, headline, win, fix, campaigns, source: 'rule' };
@@ -17511,7 +17511,7 @@ async function _fetchInsight(period, goals, bm) {
     const res = await fetch('/api/marketing?resource=meta-insight', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals, benchmarks: bm }),
+      body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals, benchmarks: bm, audience: 'client' }),
     });
     if (!res.ok) return null;
     return await res.json();

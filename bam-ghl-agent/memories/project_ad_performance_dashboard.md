@@ -31,6 +31,33 @@ MarketingDashboard, MarketingOverview roster + CSV, MarketingKpis) / "once they'
 **picked** (staff portal → client → Marketing → Campaigns → Pick campaigns) or their Marketing
 tab now reads "pick campaigns" instead of (wrongly) showing the blended total. Bulk-set these.
 
+## Client vs internal report split + results-first weighting (2026-06-10)
+
+Ximena feedback: (a) client reports should weight **results** (leads, CPL, conversions) over
+supporting metrics (CTR/frequency/reach — useful for *diagnosing*, not the headline); (b)
+separate **client** vs **internal** views — clients want results-only, marketing/content want
+the technical diagnostics.
+
+**Audience split (#3):**
+- **Client portal** (`client-portal.html`) = **results-only**. Removed the Simple/Advanced
+  toggle entirely; `_reportMode` stays `simple` so the funnel + CTR/frequency/reach grid never
+  render. (Advanced helpers `_funnelHTML`/`_metricCell`/`setReportMode` are now dormant, not
+  deleted.)
+- **Staff portal** (`MarketingDashboard.jsx`) = keeps the toggle; **"Advanced" renamed
+  "Diagnostics"** = funnel + CTR/frequency/reach/benchmarks. This is where staff/content get the
+  technical layer.
+
+**Results-first weighting (#2) is AUDIENCE-AWARE** via a new `audience: 'client'|'staff'` field
+on `POST ?resource=meta-insight` (default `client`):
+- `ruleInsight(totals, campaigns, goals, bm, audience)` + the Claude system prompt branch on it.
+- **client:** the "What to look at" (`fix`) + per-campaign notes lead with CPL-vs-target;
+  click rate / frequency only surface when CPL is OVER target, else as a secondary "one thing to
+  watch". (Previously CTR/frequency led even when CPL beat target — exactly her complaint.)
+- **staff:** unchanged diagnostic-led order (CTR/frequency first) — that's the diagnostic value.
+- Client portal sends `audience:'client'`; staff `MarketingDashboard` sends `audience:'staff'`.
+  The client JS fallback `_localInsight` is inherently client (results-first); the staff JS
+  fallback `localInsight` stays diagnostic.
+
 ## GHL KPI discovery spike (2026-06-06) — bottom-of-funnel groundwork
 
 Goal: pull funnel KPIs from each academy's GoHighLevel. Problem: every academy's

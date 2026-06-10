@@ -251,7 +251,7 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
         const res = await fetch(`/api/marketing?resource=meta-insight&client_id=${clientId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals: data.goals, benchmarks: data.benchmarks || DEFAULT_BM }),
+          body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals: data.goals, benchmarks: data.benchmarks || DEFAULT_BM, audience: "staff" }),
         });
         if (!res.ok) return;
         const ai = await res.json();
@@ -302,7 +302,7 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
             </select>
           )}
           <div style={{ display: "inline-flex", background: t.surfaceEl, border: `1px solid ${t.borderMed}`, borderRadius: 999, padding: 3 }}>
-            {tog("simple", "Simple")}{tog("advanced", "Advanced")}
+            {tog("simple", "Simple")}{tog("advanced", "Diagnostics")}
           </div>
         </div>
       </div>
