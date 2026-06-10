@@ -15328,11 +15328,29 @@ async function _sorterApplyMissing(slotId) {
       body: JSON.stringify({ client_id: _aiClientId(), mode: 'apply', creations: [creation] }),
     });
     const json = await _safeJson(r);
-    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
-    // Re-run Step 1 so the freshly created price now draws an arrow.
-    await _sorterLoadStep1();
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const created = (json.created && json.created[0]) || {};
+    if (created.error) throw new Error(created.error);
+    const newId = created.stripe_price_id;
+    // Drop the freshly created price straight into this plan as a LIVE chip —
+    // no full re-fetch / loading bar. Mutate _SORTER.match and re-render in place.
+    if (newId) {
+      const rc = creation.recurring || {};
+      let ivLabel = rc.interval || 'week';
+      if (rc.interval_count && rc.interval_count > 1) ivLabel = rc.interval_count + ' ' + rc.interval + 's';
+      _SORTER.match.proposals = _SORTER.match.proposals || [];
+      let p = _SORTER.match.proposals.find(x => x.price_id === newId);
+      if (!p) {
+        p = { price_id: newId, amount_cents: creation.unit_amount_cents, interval: ivLabel,
+          name: creation.product_name || '', sub_count: 0, needs_review: false, is_one_time: false };
+        _SORTER.match.proposals.push(p);
+      }
+      p.proposed_offer_price_key = creation.key;
+      p.proposed_tier = 'canonical';
+    }
+    _sorterRenderBody();
   } catch (e) {
-    alert('Create price failed: ' + e.message);
+    alert('Create price failed: ' + _sorterErr(e));
   }
 }
 
