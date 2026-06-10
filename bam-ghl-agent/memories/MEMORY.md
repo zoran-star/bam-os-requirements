@@ -2,6 +2,8 @@
 
 Project notes for the BAM GHL Agent / portal work. Read the relevant file when its topic comes up.
 
+- [Session pickup — KPI + Sales (2026-06-10)](project_session_pickup_kpi_sales.md) — **READ FIRST when resuming.** What's live (KPI dashboard, journey board, Sales tab wizard, member docs, clients status bar) + open follow-ups.
+
 - [Per-member documents (waivers etc)](project_member_documents.md) — signed waivers/media/medical stored per member in a PRIVATE `member-files` bucket + `member_files` table (signed URLs), shown in the Members popup → Documents. Mirrors `offer_files` but private. Vercel intake-form auto-drop is the follow-up.
 - [bam-portal deploy (how to actually ship)](project_bam_portal_deploy.md) — ⚠️ `vercel redeploy` rebuilds OLD source (env-only changes ship, code changes don't). To ship code: clean `vercel deploy --prod` from the REPO ROOT with `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` env vars (Root Directory doubles the path otherwise). Verify by crawling the deployed JS chunks for a unique string.
 
