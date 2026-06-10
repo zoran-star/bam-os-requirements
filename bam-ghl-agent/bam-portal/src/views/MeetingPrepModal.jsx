@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { authFetch } from "../lib/authFetch";
 import { fetchActionItems, fetchClientProfile } from "../services/notionService";
 import { fetchAlerts } from "../services/stripeService";
 import { fetchTasks } from "../services/asanaService";
@@ -269,7 +270,7 @@ export default function MeetingPrepModal({ event, tokens, dark, onClose, onOpenC
 
     callsToSummarize.forEach(async (call) => {
       try {
-        const res = await fetch("/api/ai/search?action=summarize-call", {
+        const res = await authFetch("/api/ai/search?action=summarize-call", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ notes: call.fullNotes, title: call.title || "" }),

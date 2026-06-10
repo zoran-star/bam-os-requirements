@@ -3,10 +3,33 @@ import { withSentryApiRoute } from "../_sentry.js";
 // Uses Anthropic Claude API to answer questions based on SOP content
 // Requires ANTHROPIC_API_KEY env var
 
+// Staff gate — this spends Anthropic credits; don't let anonymous callers hit it.
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+async function requireStaff(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token || !SB_URL || !SB_KEY) return null;
+  try {
+    const ur = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${token}` } });
+    if (!ur.ok) return null;
+    const user = await ur.json();
+    if (!user?.email) return null;
+    const sr = await fetch(`${SB_URL}/rest/v1/staff?email=eq.${encodeURIComponent(user.email)}&select=role`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    if (!sr.ok) return null;
+    const rows = await sr.json();
+    return rows?.[0]?.role ? { user, role: rows[0].role } : null;
+  } catch { return null; }
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const staff = await requireStaff(req);
+  if (!staff) return res.status(401).json({ error: "staff auth required" });
 
   const action = req.query.action;
   if (action === "summarize-call") {

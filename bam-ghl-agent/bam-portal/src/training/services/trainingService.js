@@ -1,4 +1,5 @@
 import { supabase } from "../../lib/supabase";
+import { authFetch } from "../../lib/authFetch";
 
 // ─── Sessions ───
 
@@ -205,7 +206,7 @@ export async function getStreak(userId) {
 // ─── AI Evaluation ───
 
 export async function evaluateResponse(scenarioId, responseText, conversationHistory = null) {
-  const res = await fetch("/api/training", {
+  const res = await authFetch("/api/training", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "evaluate", scenarioId, responseText, conversationHistory }),
@@ -222,7 +223,7 @@ export async function evaluateResponse(scenarioId, responseText, conversationHis
 // ─── Queue Generation ───
 
 export async function generateDailyQueue(userId) {
-  const res = await fetch("/api/training", {
+  const res = await authFetch("/api/training", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "generate-queue", userId }),

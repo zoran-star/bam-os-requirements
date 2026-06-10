@@ -28,15 +28,18 @@ data-exposure leaks + a fail-open webhook.
   `GHL_WEBHOOK_SECRET` unset, anyone could POST funnel events. Now **fail-closed** (503 if no
   secret configured).
 
-## Still DEFERRED (documented, not yet done)
+## Fixed — round 2 (2026-06-10, same day)
 
-- **`api/ai/search.js`** — no auth (unauth Anthropic spend; data exposure low — context is
-  caller-supplied). Gating needs token added to ~5 callers: `SearchOverlay`, `KnowledgeBaseView`
-  (x3), `MeetingPrepModal`.
-- **`api/training.js`** — no auth; anonymous can trigger Claude + Notion/Supabase **writes**
-  (`seed-scenarios`, `sync-notion`) via the service key. Callers (no token today):
-  `training/services/trainingService.js` (x2), `training/views/CalibrationMode.jsx`,
-  `training/views/AddScenario.jsx`. SM-training sub-app.
+- **`api/ai/search.js`** + **`api/training.js`** — now **staff-gated** (`requireStaff`). Closes
+  unauth Anthropic spend (search) and anonymous Claude + Notion/Supabase **writes**
+  (`seed-scenarios`, `sync-notion`) via the service key.
+- New shared client helper **`src/lib/authFetch.js`** — `fetch()` that attaches the Supabase
+  token from the browser client (no need to thread a session prop). All 9 callers switched to it:
+  `SearchOverlay`, `KnowledgeBaseView` (x3), `MeetingPrepModal`,
+  `training/services/trainingService.js` (x2), `CalibrationMode`, `AddScenario`.
+
+## Still DEFERRED
+
 - **OAuth state secrets fall back to the Supabase service key** when unset
   (`messaging/connect.js`, `stripe/connect.js`). Left the code as-is to avoid breaking prod
   OAuth — **config fix**: set `META_OAUTH_STATE_SECRET` / `GHL_OAUTH_STATE_SECRET` /

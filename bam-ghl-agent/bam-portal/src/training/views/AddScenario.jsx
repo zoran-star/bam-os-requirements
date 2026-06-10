@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { authFetch } from "../../lib/authFetch";
 import { T } from '../../tokens/tokens'
 import { supabase } from '../../lib/supabase'
 import { useMobile } from '../hooks/useMobile'
@@ -95,7 +96,7 @@ export default function AddScenario({ role, userId }) {
       setSavedCount(prev => prev + 1)
       setStep('saved')
       // Sync to Notion in background
-      fetch('/api/training', {
+      authFetch('/api/training', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync-notion', scenarioId: scenario.id }),

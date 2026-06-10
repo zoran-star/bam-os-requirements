@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { authFetch } from "../../lib/authFetch";
 import { T } from '../../tokens/tokens'
 import { supabase } from '../../lib/supabase'
 import VoiceMicButton from '../components/VoiceMicButton'
@@ -19,7 +20,7 @@ function useSyncNotion() {
   async function sync() {
     setSyncing(true); setSyncResult(null)
     try {
-      const res = await fetch('/api/training', {
+      const res = await authFetch('/api/training', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'sync-notion' }),
       })

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { authFetch } from "../../lib/authFetch";
 import { statusColor } from "../../tokens/tokens";
 import Avatar from "../primitives/Avatar";
 
@@ -140,7 +141,7 @@ export default function SearchOverlay({ tokens, dark, onClose, allClients, onNav
 
         const context = `${sopContext}\n\n## Active Clients\n${clientContext}\n\n## Action Items\n${taskContext}`;
 
-        const res = await fetch("/api/ai/search", {
+        const res = await authFetch("/api/ai/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query, context }),

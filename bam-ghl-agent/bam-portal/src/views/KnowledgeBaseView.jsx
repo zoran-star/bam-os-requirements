@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { authFetch } from "../lib/authFetch";
 import { fetchSOPTree, fetchSOPContent, fetchSolutionWarehouses } from "../services/notionService";
 import { useIsMobile } from '../hooks/useMediaQuery';
 
@@ -429,7 +430,7 @@ export default function KnowledgeBaseView({ tokens }) {
     }
 
     try {
-      const res = await fetch("/api/ai/search", {
+      const res = await authFetch("/api/ai/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, context: contextParts.length > 0 ? contextParts.join("\n\n---\n\n") : "" }),
@@ -470,7 +471,7 @@ export default function KnowledgeBaseView({ tokens }) {
         }
       }
 
-      fetch("/api/ai/search", {
+      authFetch("/api/ai/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: question, context: contextParts.length > 0 ? contextParts.join("\n\n---\n\n") : undefined }),
@@ -547,7 +548,7 @@ export default function KnowledgeBaseView({ tokens }) {
     if (!newSolProblem.trim()) return;
     setNewSolAutoDetect(true);
     try {
-      const res = await fetch("/api/ai/search", {
+      const res = await authFetch("/api/ai/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
