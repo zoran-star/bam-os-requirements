@@ -11,10 +11,26 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABA
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Staff gate — these actions spend Anthropic credits and WRITE to Supabase/Notion
+// via the service-role key, so they must not be reachable anonymously.
+async function requireStaff(req) {
+  const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  try {
+    const { data: { user } = {} } = await supabase.auth.getUser(token);
+    if (!user?.email) return null;
+    const { data: rows } = await supabase.from("staff").select("role").eq("email", user.email).limit(1);
+    return rows?.[0]?.role ? { user, role: rows[0].role } : null;
+  } catch { return null; }
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
+
+  const staff = await requireStaff(req);
+  if (!staff) return res.status(401).json({ error: "staff auth required" });
 
   const { action, ...params } = req.body || {};
 
