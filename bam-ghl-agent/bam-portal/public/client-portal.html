@@ -9857,6 +9857,7 @@ async function _bbRenderOffersList(panel) {
   const { data, error } = await _sb.from('offers')
     .select('id, type, title, status, updated_at')
     .eq('client_id', CLIENT_ID)
+    .neq('status', 'archived')   // deleted offers are archived rows — hidden here
     .order('sort_order')
     .order('created_at', { ascending: false });
 
@@ -9875,7 +9876,8 @@ async function _bbRenderOffersList(panel) {
     const typeMeta = _bbOfferTypes.find(t => t.id === o.type);
     const color = _bbTypeColors[o.type] || '#888';
     return `
-      <div class="bb-offer-tile" onclick="_bbNavigate('offers','${o.id}')">
+      <div class="bb-offer-tile" onclick="_bbNavigate('offers','${o.id}')" style="position:relative;">
+        <button onclick="event.stopPropagation();_bbDeleteOffer('${o.id}', '${_bbEscapeAttr(o.title || '(untitled)')}')" title="Delete offer" aria-label="Delete offer" style="position:absolute;top:8px;right:8px;border:none;background:transparent;color:var(--text-mute,#888);cursor:pointer;font-size:14px;line-height:1;padding:4px;">🗑</button>
         <div class="bb-offer-tile-title">${_bbEscapeHtml(o.title || '(untitled)')}</div>
         <div class="bb-offer-tile-meta">
           <span class="bb-type-pill" style="background:${color}1a;color:${color};border:1px solid ${color}55">${_bbEscapeHtml(typeMeta?.label || o.type)}</span>
@@ -9884,6 +9886,20 @@ async function _bbRenderOffersList(panel) {
       </div>
     `;
   }).join('')}</div>`;
+}
+
+// Delete an offer = archive it (status flip, recoverable by staff; archived
+// offers are already excluded everywhere — list, offer_select dropdowns, the
+// price matcher's targets). No rows are ever hard-deleted from the client side.
+async function _bbDeleteOffer(id, title) {
+  if (!confirm(`Delete "${title}"?\n\nIt disappears from your Offers and from pricing — BAM staff can restore it if needed.`)) return;
+  try {
+    const { error } = await _sb.from('offers').update({ status: 'archived' }).eq('id', id).eq('client_id', CLIENT_ID);
+    if (error) throw new Error(error.message);
+    _bbRenderFromHash(); // re-render the list without it
+  } catch (e) {
+    alert('Delete failed: ' + (e.message || e));
+  }
 }
 
 // ── BB → Offers → Pricing: Stripe connect gate + price match launcher ──

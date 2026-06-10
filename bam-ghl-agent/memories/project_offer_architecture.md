@@ -129,3 +129,12 @@ Both support: `text`, `textarea`, `link`, `phone`, `email`, `currency`, `number`
 - Schema change to offers / offer_teams / offer_files → update the Schema block
 - New known gap or gotcha discovered → add to the gotchas or gaps list
 - Field-renderer refactor → update the engine section
+
+## Deleting offers (2026-06-10)
+
+Clients can delete an offer from the BB Offers list (🗑 on each tile,
+`_bbDeleteOffer`). **Delete = `status: 'archived'`** — a recoverable flip, never
+a hard DELETE. Archived offers are excluded from: the offers list
+(`neq('status','archived')`), the `offer_select` dropdowns, and the price
+matcher's targets (`status=neq.archived`). Staff can restore by flipping the
+status back in Supabase.
