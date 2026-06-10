@@ -251,7 +251,7 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
         const res = await fetch(`/api/marketing?resource=meta-insight&client_id=${clientId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals: data.goals, benchmarks: data.benchmarks || DEFAULT_BM }),
+          body: JSON.stringify({ label: period.label, totals: period.totals, campaigns: period.campaigns, goals: data.goals, benchmarks: data.benchmarks || DEFAULT_BM, audience: "staff" }),
         });
         if (!res.ok) return;
         const ai = await res.json();
@@ -264,7 +264,10 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
   if (loading) return <div style={{ padding: 18, color: t.textSub }}>Loading performance…</div>;
   if (err) return <div style={{ padding: 18, color: t.red }}>Couldn't load report: {err}</div>;
   if (!data || !period) {
-    return <div style={{ padding: 18, color: t.textSub }}>No performance data for this range yet{data?.reason === "no_ad_account" ? " — no ad account connected." : "."}</div>;
+    const why = data?.reason === "no_ad_account" ? " — no ad account connected."
+      : data?.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab."
+      : ".";
+    return <div style={{ padding: 18, color: t.textSub }}>No performance data for this range yet{why}</div>;
   }
 
   const bm = data.benchmarks || DEFAULT_BM;
@@ -299,13 +302,13 @@ export default function MarketingDashboard({ clientId, tokens, session, compact 
             </select>
           )}
           <div style={{ display: "inline-flex", background: t.surfaceEl, border: `1px solid ${t.borderMed}`, borderRadius: 999, padding: 3 }}>
-            {tog("simple", "Simple")}{tog("advanced", "Advanced")}
+            {tog("simple", "Simple")}{tog("advanced", "Diagnostics")}
           </div>
         </div>
       </div>
 
       {data.empty ? (
-        <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : "."}</div>
+        <div style={{ padding: 18, color: t.textSub }}>No campaign data yet{data.reason === "no_ad_account" ? " — connect this client's ad account in Setup." : data.reason === "no_campaigns_selected" ? " — pick this client's campaigns in the Campaigns tab." : "."}</div>
       ) : (
         <>
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start", border: `1px solid ${t.border}`, background: t.surface, borderRadius: 12, padding: "18px 20px", marginBottom: 16 }}>

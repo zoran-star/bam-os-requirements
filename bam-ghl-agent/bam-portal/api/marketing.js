@@ -1235,11 +1235,17 @@ async function handleMetaCampaigns(req, res) {
     };
   });
 
-  // Filter: if meta_campaign_ids is set on the client, only return those.
-  // staff_picker=1 mode bypasses this filter so staff can pick from all.
-  let filtered = campaigns;
+  // Filter: outside staff-picker mode, ONLY return the client's associated
+  // campaigns. The shared ad account holds every academy's campaigns, so an
+  // empty filter must return nothing (not "all") — otherwise this client sees
+  // every other academy's campaigns. staff_picker=1 bypasses this so staff can
+  // pick from the full list.
   const associated = Array.isArray(clientFull.meta_campaign_ids) ? clientFull.meta_campaign_ids : null;
-  if (!isStaffPicker && associated && associated.length) {
+  let filtered = campaigns;
+  if (!isStaffPicker) {
+    if (!associated || !associated.length) {
+      return res.status(200).json({ campaigns: [], reason: "no_campaigns_selected" });
+    }
     const allow = new Set(associated);
     filtered = campaigns.filter(c => allow.has(c.id));
   }
@@ -1290,13 +1296,20 @@ async function handleMetaKpis(req, res) {
   else if (ctx.client) targetClientId = ctx.client.id;
   if (!targetClientId) return res.status(403).json({ error: "client_id required (client login or staff with ?client_id)" });
 
-  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id`);
+  const clientRows = await sb(`clients?id=eq.${targetClientId}&select=id,meta_ad_account_id,meta_campaign_ids`);
   const clientFull = clientRows?.[0];
   if (!clientFull?.meta_ad_account_id) {
     return res.status(200).json({ reason: "no_ad_account" });
   }
   const staffToken = await getAnyStaffMetaToken();
   if (!staffToken) return res.status(200).json({ reason: "no_staff_token" });
+
+  // Scope to this client's own campaigns. The shared ad account holds every
+  // academy's campaigns, so without a filter this would blend all of them into
+  // one client's lead-flow numbers. No filter = clean empty state, not a blend.
+  const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
+    ? new Set(clientFull.meta_campaign_ids) : null;
+  if (!allow) return res.status(200).json({ reason: "no_campaigns_selected" });
 
   const adAcct = clientFull.meta_ad_account_id.startsWith("act_")
     ? clientFull.meta_ad_account_id
@@ -1317,10 +1330,12 @@ async function handleMetaKpis(req, res) {
   const rangeSince = fmt(prevMonday);
   const rangeUntil = fmt(yesterday) >= fmt(lastSunday) ? fmt(yesterday) : fmt(lastSunday);
   const insUrl = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
-    fields: "spend,actions",
+    level: "campaign",
+    fields: "campaign_id,spend,actions",
     time_range: JSON.stringify({ since: rangeSince, until: rangeUntil }),
     time_increment: "1",
     access_token: staffToken,
+    limit: "500",
   });
   const insRes = await fetch(insUrl);
   const insJson = await insRes.json();
@@ -1337,6 +1352,7 @@ async function handleMetaKpis(req, res) {
     weekBefore: { leads: 0, spend: 0 },
   };
   for (const row of (insJson.data || [])) {
+    if (allow && !allow.has(row.campaign_id)) continue;
     const d = row.date_start;
     const leads = countLeads(row.actions);
     const spend = parseFloat(row.spend || "0") || 0;
@@ -1489,9 +1505,15 @@ async function handleMetaReport(req, res) {
     ? clientFull.meta_ad_account_id
     : `act_${clientFull.meta_ad_account_id}`;
 
-  // Optional per-client campaign filter (so clients don't see staff experiments).
+  // Per-client campaign filter. The BAM staff Meta token spans EVERY academy's
+  // campaigns inside one shared ad account, so an empty filter must NOT fall back
+  // to "show every active campaign" — that blends (and, for a logged-in client,
+  // leaks) every other academy's spend into this client's report. Require an
+  // explicit selection; until staff pick this client's campaigns, return a clean
+  // empty state instead of an all-academy total.
   const allow = Array.isArray(clientFull.meta_campaign_ids) && clientFull.meta_campaign_ids.length
     ? new Set(clientFull.meta_campaign_ids) : null;
+  if (!allow) return res.status(200).json({ reason: "no_campaigns_selected", ...base });
 
   const fmt = (d) => d.toISOString().slice(0, 10);
   const FIELDS = "campaign_id,campaign_name,spend,impressions,reach,frequency,inline_link_clicks,actions";
@@ -1572,7 +1594,7 @@ async function handleMetaReport(req, res) {
 
 // Deterministic fallback insight (no Claude key / API error). Mirrors the
 // wording tiers Zoran approved — never says "bad", always constructive.
-function ruleInsight(totals, campaigns, goals, bm) {
+function ruleInsight(totals, campaigns, goals, bm, audience = "client") {
   const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
   const t = totals || {};
   const money = (n) => "$" + (Math.round((Number(n) || 0) * 100) / 100).toLocaleString("en-US");
@@ -1592,20 +1614,44 @@ function ruleInsight(totals, campaigns, goals, bm) {
   const best = withLeads.slice().sort((a, b) => a.cpl - b.cpl)[0];
   const worst = list.slice().sort((a, b) => (b.cpl == null ? 1e9 : b.cpl) - (a.cpl == null ? 1e9 : a.cpl))[0];
   const win = best ? `${best.name} is your most efficient — ${money(best.cpl)} per lead.` : `Leads are still coming in — give campaigns a few more days of data.`;
-  let fix = `Everything's tracking near target — keep it running.`;
-  if (worst) {
-    if (worst.ctr != null && worst.ctr < bm.ctr_min) fix = `${worst.name}'s click rate is low — refresh the creative so more people click.`;
-    else if (worst.frequency != null && worst.frequency > bm.freq_max) fix = `${worst.name} is being shown too often to the same people — widen the audience or refresh the ad.`;
-    else if (worst.cpl != null && worst.cpl > target) fix = `${worst.name}'s cost per lead is above target — tighten targeting or improve the landing page.`;
+
+  // Results-first vs diagnostic framing depends on the audience.
+  //  - client: lead with results (leads, CPL vs target). Click rate / frequency
+  //    / reach are SUPPORTING CONTEXT, never the headline when CPL is on target.
+  //  - staff: lead with the diagnostic signal — that's what staff act on.
+  const resultsStrong = t.cpl != null && t.cpl <= target && t.leads > 0;
+  const overTarget = list.filter(c => c.cpl != null && c.cpl > target).sort((a, b) => b.cpl - a.cpl)[0];
+  let fix;
+  if (audience === "client") {
+    if (overTarget) fix = `${overTarget.name}'s cost per lead is above your ${money(target)} target — tighten the audience or improve the landing page to bring it down.`;
+    else if (resultsStrong) fix = best ? `Your cost per lead is beating target — the move now is to put more behind ${best.name} and pull in more leads.` : `Cost per lead is on target — keep it running and let the leads build.`;
+    else if (worst && worst.ctr != null && worst.ctr < bm.ctr_min) fix = `Results are tracking — one thing to watch: ${worst.name}'s click rate is a little low, so a fresh hook could make leads even cheaper.`;
+    else if (worst && worst.frequency != null && worst.frequency > bm.freq_max) fix = `Results are tracking — one thing to watch: ${worst.name} is being shown to the same people a lot, so refreshing the ad would help.`;
+    else fix = `Everything's tracking near target — keep it running.`;
+  } else {
+    fix = `Everything's tracking near target — keep it running.`;
+    if (worst) {
+      if (worst.ctr != null && worst.ctr < bm.ctr_min) fix = `${worst.name}'s click rate is low — refresh the creative so more people click.`;
+      else if (worst.frequency != null && worst.frequency > bm.freq_max) fix = `${worst.name} is being shown too often to the same people — widen the audience or refresh the ad.`;
+      else if (worst.cpl != null && worst.cpl > target) fix = `${worst.name}'s cost per lead is above target — tighten targeting or improve the landing page.`;
+    }
   }
 
   const perCampaign = {};
   for (const c of list) {
-    if (c.cpl == null) perCampaign[c.id] = `Spent ${money(c.spend)} with no leads yet.`;
-    else if (c.ctr != null && c.ctr < bm.ctr_min) perCampaign[c.id] = `${money(c.cpl)} per lead. Few people are clicking — a fresh hook would help.`;
-    else if (c.frequency != null && c.frequency > bm.freq_max) perCampaign[c.id] = `${money(c.cpl)} per lead. People have seen this a lot — time to refresh.`;
-    else if (c.cpl > target) perCampaign[c.id] = `${money(c.cpl)} per lead, a bit over your ${money(target)} target.`;
-    else perCampaign[c.id] = `${money(c.cpl)} per lead — at or under your ${money(target)} target.`;
+    if (c.cpl == null) { perCampaign[c.id] = `Spent ${money(c.spend)} with no leads yet.`; continue; }
+    if (audience === "client") {
+      // Results lead: CPL-vs-target first; click rate / frequency are secondary.
+      if (c.cpl > target) perCampaign[c.id] = `${money(c.cpl)} per lead, a bit over your ${money(target)} target — worth a tweak.`;
+      else if (c.ctr != null && c.ctr < bm.ctr_min) perCampaign[c.id] = `${money(c.cpl)} per lead — under target. Click rate's a little low, so there's room to make it even cheaper.`;
+      else if (c.frequency != null && c.frequency > bm.freq_max) perCampaign[c.id] = `${money(c.cpl)} per lead — under target. People have seen this a lot, so a refresh keeps it working.`;
+      else perCampaign[c.id] = `${money(c.cpl)} per lead — at or under your ${money(target)} target.`;
+    } else {
+      if (c.ctr != null && c.ctr < bm.ctr_min) perCampaign[c.id] = `${money(c.cpl)} per lead. Few people are clicking — a fresh hook would help.`;
+      else if (c.frequency != null && c.frequency > bm.freq_max) perCampaign[c.id] = `${money(c.cpl)} per lead. People have seen this a lot — time to refresh.`;
+      else if (c.cpl > target) perCampaign[c.id] = `${money(c.cpl)} per lead, a bit over your ${money(target)} target.`;
+      else perCampaign[c.id] = `${money(c.cpl)} per lead — at or under your ${money(target)} target.`;
+    }
   }
   return { verdict, verdict_label, headline, win, fix, campaigns: perCampaign, source: "rule" };
 }
@@ -1627,17 +1673,23 @@ async function handleMetaInsight(req, res) {
   const totals = body.totals || {};
   const campaigns = Array.isArray(body.campaigns) ? body.campaigns : [];
   const label = String(body.label || "this period").slice(0, 60);
+  const audience = body.audience === "staff" ? "staff" : "client";
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+  if (!apiKey) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm, audience));
 
   const target = (goals && goals.cpl_goal != null) ? goals.cpl_goal : bm.cpl;
   const data = JSON.stringify({ period: label, target_cpl: target, monthly_budget: goals.monthly_budget,
     benchmarks: bm, totals, campaigns }, null, 0);
 
+  const audienceRule = audience === "client"
+    ? "AUDIENCE = the academy owner (a client). Put the MOST weight on results: leads, cost per lead vs target, and conversions. Treat click rate, frequency and reach as SUPPORTING CONTEXT only — never make them the headline or the main 'fix' when cost per lead is at or under target. Only raise them when results are off target, and even then frame them as a secondary 'one thing to watch'."
+    : "AUDIENCE = internal marketing staff who use click rate, frequency and reach to DIAGNOSE campaigns. It's fine to surface those technical signals directly in the fix and per-campaign notes when relevant.";
+
   const system = [
     "You are a friendly, plain-spoken marketing coach writing for a sports-academy owner who does NOT understand advertising jargon.",
     "Read the Meta ad metrics and explain what they MEAN and what to DO — never just restate numbers.",
+    audienceRule,
     "Rules: No emojis. No jargon (say 'click rate' not 'CTR', 'how often people saw it' not 'frequency'). Frame in plain money where useful.",
     "Tone: constructive and encouraging. NEVER say performance is 'bad' or 'poor'. For weak results say 'worth revisiting' or 'room to improve'.",
     "verdict must be exactly one of: strong, steady, attention.",
@@ -1657,19 +1709,19 @@ async function handleMetaInsight(req, res) {
         messages: [{ role: "user", content: `Here is the ad data as JSON:\n\n${data}\n\nWrite the coaching JSON now.` }],
       }),
     });
-    if (!r.ok) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    if (!r.ok) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm, audience));
     const j = await r.json();
     const text = j.content?.[0]?.text || "";
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    if (!match) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm, audience));
     const parsed = JSON.parse(match[0]);
     // Guard the required shape; fall back if Claude drifted.
-    if (!parsed.verdict || !parsed.headline) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    if (!parsed.verdict || !parsed.headline) return res.status(200).json(ruleInsight(totals, campaigns, goals, bm, audience));
     if (!parsed.campaigns || typeof parsed.campaigns !== "object") parsed.campaigns = {};
     parsed.source = "ai";
     return res.status(200).json(parsed);
   } catch {
-    return res.status(200).json(ruleInsight(totals, campaigns, goals, bm));
+    return res.status(200).json(ruleInsight(totals, campaigns, goals, bm, audience));
   }
 }
 
@@ -2229,7 +2281,10 @@ async function handleMetaOverview(req, res) {
     if (!c.meta_ad_account_id || !staffToken) return { ...baseRow, connected: false };
     try {
       const adAcct = c.meta_ad_account_id.startsWith("act_") ? c.meta_ad_account_id : `act_${c.meta_ad_account_id}`;
+      // No campaign filter on a shared ad account = would blend every academy's
+      // spend. Don't pull/blend — flag it so staff know to pick campaigns.
       const allow = Array.isArray(c.meta_campaign_ids) && c.meta_campaign_ids.length ? new Set(c.meta_campaign_ids) : null;
+      if (!allow) return { ...baseRow, connected: true, needs_campaigns: true };
       const url = `${META_GRAPH}/${adAcct}/insights?` + new URLSearchParams({
         level: "campaign", fields: META_CAMPAIGN_FIELDS,
         time_range: JSON.stringify({ since, until }), time_increment: "monthly",
@@ -2266,7 +2321,7 @@ async function handleMetaOverview(req, res) {
   }));
 
   // Roll-up across connected clients.
-  const live = rows.filter(r => r.connected && !r.error);
+  const live = rows.filter(r => r.connected && !r.error && !r.needs_campaigns);
   const sum = (k) => live.reduce((a, r) => a + (r[k] || 0), 0);
   const prevSpend = live.reduce((a, r) => a + (r._prev?.spend || 0), 0);
   const prevLeads = live.reduce((a, r) => a + (r._prev?.leads || 0), 0);

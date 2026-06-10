@@ -16,6 +16,7 @@ function fmtMoney(n) {
 function reasonFor(c, bm) {
   const target = c.goal_cpl != null ? c.goal_cpl : bm.cpl;
   if (!c.connected) return "ad account not connected";
+  if (c.needs_campaigns) return "no campaigns selected — pick them in this client's Campaigns tab";
   if (c.cpl == null && c.spend > 5) return `spent ${fmtMoney(c.spend)} with no leads yet`;
   if (c.pacing && c.pacing.spent_pct != null && c.pacing.spent_pct > c.pacing.month_pct + 15) return `spending fast — ${c.pacing.spent_pct}% of budget, ${c.pacing.month_pct}% through the month`;
   if (c.cpl != null && c.cpl > target) return `cost per lead ${fmtMoney(c.cpl)} vs ${fmtMoney(target)} target`;
@@ -65,8 +66,8 @@ export default function MarketingOverview({ tokens, session }) {
   function exportCSV() {
     const head = ["Client", "Verdict", "Spend", "Leads", "CPL", "Goal CPL", "Budget", "Leads vs last %", "CPL vs last %", "Spent % of budget"];
     const lines = rows.map(r => [
-      r.business_name, r.connected ? (r.verdict_label || "") : "Not connected",
-      r.spend ?? "", r.leads ?? "", r.cpl ?? "", r.goal_cpl ?? "", r.monthly_budget ?? "",
+      r.business_name, r.needs_campaigns ? "Needs campaigns" : r.connected ? (r.verdict_label || "") : "Not connected",
+      r.needs_campaigns ? "" : (r.spend ?? ""), r.needs_campaigns ? "" : (r.leads ?? ""), r.needs_campaigns ? "" : (r.cpl ?? ""), r.goal_cpl ?? "", r.monthly_budget ?? "",
       r.trend?.leads_pct ?? "", r.trend?.cpl_pct ?? "", r.pacing?.spent_pct ?? "",
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
     const csv = [head.join(","), ...lines].join("\n");
@@ -147,19 +148,22 @@ export default function MarketingOverview({ tokens, session }) {
           <tbody>
             {rows.map(r => {
               const target = r.goal_cpl != null ? r.goal_cpl : bm.cpl;
+              const showNums = r.connected && !r.needs_campaigns;
               return (
                 <tr key={r.id} onClick={() => setOpen(r)} style={{ cursor: "pointer", background: r.attention ? t.amberSoft : "transparent" }}>
                   <td style={{ ...td, fontWeight: 600 }}>{r.business_name}</td>
                   <td style={td}>
-                    {r.connected ? (
+                    {r.needs_campaigns ? (
+                      <span style={{ fontSize: 12, color: t.textMute }}>Pick campaigns</span>
+                    ) : r.connected ? (
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                         <span style={{ width: 9, height: 9, borderRadius: "50%", background: verdictColor(r.verdict) }} />
                         <span style={{ fontSize: 12, color: t.textSub }}>{r.verdict_label}</span>
                       </span>
                     ) : <span style={{ fontSize: 12, color: t.textMute }}>Not connected</span>}
                   </td>
-                  <td style={{ ...td, textAlign: "right" }}>{r.connected ? fmtMoney(r.spend) : "—"}</td>
-                  <td style={{ ...td, textAlign: "right" }}>{r.connected ? fmtNum(r.leads) : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtMoney(r.spend) : "—"}</td>
+                  <td style={{ ...td, textAlign: "right" }}>{showNums ? fmtNum(r.leads) : "—"}</td>
                   <td style={{ ...td, textAlign: "right", color: r.cpl == null ? t.textMute : (r.cpl <= target ? t.green : t.amber) }}>{r.cpl != null ? fmtMoney(r.cpl) : "—"}</td>
                   <td style={td}>{r.trend?.leads_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.trend.leads_pct >= 0 ? t.green : t.amber }}>{r.trend.leads_pct > 0 ? "▲" : r.trend.leads_pct < 0 ? "▼" : "■"} {Math.abs(r.trend.leads_pct)}% leads</span>}</td>
                   <td style={td}>{r.pacing?.spent_pct == null ? <span style={{ color: t.textMute }}>—</span> : <span style={{ fontSize: 12, color: r.pacing.spent_pct > r.pacing.month_pct + 15 ? t.amber : t.textSub }}>{r.pacing.spent_pct}% of budget</span>}</td>
