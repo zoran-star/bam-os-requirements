@@ -15173,7 +15173,7 @@ function _sorterRenderStep1(host) {
     const slot = escapeHTML(t.key).replace(/[^a-zA-Z0-9_-]/g, '_');
     const opts = unassigned.map(p => `<option value="${escapeHTML(p.price_id)}">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML((p.name || p.price_id)).slice(0, 42)}</option>`).join('');
     const dropdown = unassigned.length
-      ? `<select onchange="if(this.value)_sorterAssign(this.value,'${escapeHTML(t.key)}')" style="margin-top:8px;width:100%;padding:7px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;cursor:pointer;"><option value="">+ Assign a Stripe price…</option>${opts}</select>`
+      ? `<select onchange="if(this.value)_sorterAssign(this.value,'${escapeHTML(t.key)}')" style="margin-top:8px;width:100%;padding:7px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;cursor:pointer;"><option value="">+ Input lost price…</option>${opts}</select>`
       : '';
     const createBtn = mine.length ? '' :
       `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:8px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create this price in Stripe</button>`;
