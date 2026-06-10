@@ -87,6 +87,28 @@ Tracker has 8 sections total. Layout is a 4×2 grid (380px panel). The 2 externa
 
 > ⚠ **More second-writers (2026-06-02):** the BB form steps now also exist as Action Items onboarding steps that write the same `*_marked_done_at` columns this tracker uses — `general_marked_done_at` · `staff_marked_done_at` · `locations_marked_done_at` · `brand_marked_done_at`. Two-way synced with the BB "I'm done with X" buttons. See [[project_action_items]].
 
+## BB restructure (2026-06-10): Pricing → Offers · new "Member Onboarding" card
+
+- **Pricing nav page RETIRED.** Nav item + `switchView('pricing')` hook removed
+  (view-pricing markup left dead in the file, unreachable — cleanup later). The
+  old "Match with AI" + temp Sorter launch buttons died with it.
+- **BB → Offers** gained a **Pricing section** under the offers list
+  (`_bbRenderOffersPricing`): Stripe connect gate (pill/CTA → existing modal;
+  state from `/api/members?scope=client`, which also caches `_STRIPE_CONNECT_STATE`)
+  + "🧮 Match prices to Stripe" → `openPricingSorter(1)` (the wizard now takes a
+  start step: 1 match · 2 import · 3 cleanup).
+- **Seventh BB card: "Member Onboarding"** (`#bb=member_onboarding`,
+  `_bbRenderMemberOnboarding`). **Locked until `_obtProgress.offers_done`.**
+  4 steps: ① Connect GHL (gate, existing modal) ② Import members →
+  `openPricingSorter(2)` ③ Cleanup & promote → `openPricingSorter(3)`
+  ④ **Link GHL contacts** → `_moRunGhlLink()` — new `api/sorter/link-ghl.js`
+  (propose = members with null `ghl_contact_id` matched ↔ GHL contacts by
+  email→phone; apply = fill `ghl_contact_id`, NULL-only, idempotent). Closes
+  the gap where CSV-imported members were invisible to the 10-min contact-sync
+  cron. No mark-done flag / tracker section for this card (yet).
+- Action Items Stripe/GHL connect steps KEPT — they auto-✓ on connection and
+  open the same modals (one checklist, two homes).
+
 ## New "KPIs" BB card (2026-06-02)
 
 Sixth BB card: **KPIs** (`#bb=kpis`). Baseline metrics (revenue / clients / sales / expenses), all optional. Stored in **`clients.kpi_data` jsonb** (same auto-save pattern as `brand_data`); mark-done flag **`clients.kpi_marked_done_at`** via `mark_onboarding_section('kpis')`; `get_onboarding_progress()` now returns `kpis_done`. Renderer `_bbRenderKpisCard`/`_bbKpisChanged`; field list = `_BB_KPI_GROUPS` + `_BB_KPI_IDS`. Also a `kpis` Action Items onboarding step (#9). **General card** gained **Time Zone** (`clients.time_zone`, `_BB_TZ_OPTS`). Website NOT added to General — already in `brand_data.website_url`/`domain`.

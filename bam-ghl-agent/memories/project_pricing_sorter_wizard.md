@@ -7,6 +7,15 @@ metadata:
 
 # The Pricing Sorter (onboarding wizard)
 
+> **2026-06-10 — NEW HOMES.** The Pricing nav page + temp launch button are GONE.
+> `openPricingSorter(step)` now takes a start step, launched from Business
+> Blueprint: **Step 1 (match)** from BB → Offers → Pricing section (with a
+> Stripe-connect gate); **Steps 2/3 (import / cleanup-promote)** from the new
+> BB → **Member Onboarding** card (locked until Offers ✓, GHL-connect gate),
+> which also adds **Step 4: Link GHL contacts** (`api/sorter/link-ghl.js` —
+> match members ↔ GHL contacts by email/phone, fill `ghl_contact_id`).
+> See [[project_v2_onboarding_model]] for the full BB card layout.
+
 Extends the AI price matcher ([[project_offer_price_mapping]]) into a full guided
 wizard for onboarding an academy. Launched from the **Onboarding Action Items →
 after the Offers step is done → a "🔀 The Pricing Sorter" button**. Lives on BOTH
