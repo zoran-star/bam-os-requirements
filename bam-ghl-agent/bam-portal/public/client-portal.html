@@ -10008,6 +10008,80 @@ async function _bbRenderMemberOnboarding(panel) {
     + `<div id="bb-mo-ghl-link-host"></div>`;
 }
 
+// Step 4 — propose member ↔ GHL contact links (email/phone match), review, apply.
+async function _moRunGhlLink() {
+  const host = document.getElementById('bb-mo-ghl-link-host');
+  if (!host) return;
+  host.innerHTML = `<div style="padding:18px 0;">
+    <div style="font-size:11.5px;color:var(--text-mute,#888);text-align:center;margin-bottom:8px;">Reading your GHL contacts &amp; matching members…</div>
+    <div class="asset-modal-loading" style="max-width:360px;margin:0 auto;border-radius:99px;"></div>
+  </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'propose' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const props = json.proposals || [], missed = json.unmatched || [];
+    if (!props.length && !missed.length) {
+      host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ ${escapeHTML(json.note || 'Every member is already linked to a GHL contact.')}</div>`;
+      return;
+    }
+    window._MO_LINKS = props; // stash for apply
+    const rows = props.map((p, i) => `
+      <label style="display:flex;align-items:center;gap:10px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;">
+        <input type="checkbox" class="mo-link-cb" data-i="${i}" checked />
+        <div style="flex:1;min-width:0;font-size:12px;">
+          <b>${escapeHTML(p.athlete_name || p.parent_name || '')}</b>
+          <span style="color:var(--text-mute,#888)"> → ${escapeHTML(p.contact_name || p.ghl_contact_id)}${p.contact_email ? ' · ' + escapeHTML(p.contact_email) : ''}</span>
+        </div>
+        <span style="flex:none;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">${p.matched_by === 'email' ? '✉ EMAIL' : '☎ PHONE'}</span>
+      </label>`).join('');
+    const missedHtml = missed.length ? `
+      <div style="font-size:11px;color:#e0a93f;margin:10px 0 4px;font-weight:700;">No GHL contact found for ${missed.length}:</div>
+      ${missed.map(m => `<div style="font-size:11.5px;color:var(--text-mute,#888);padding:2px 0;">• ${escapeHTML(m.athlete_name || '')} ${m.parent_email ? '(' + escapeHTML(m.parent_email) + ')' : ''}</div>`).join('')}
+      <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:4px;">Add them as contacts in GHL, then run this again.</div>` : '';
+    host.innerHTML = `
+      <div style="border:1px solid var(--accent,#E8C547);border-radius:12px;padding:14px 16px;margin-top:4px;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(checked ${json.total_contacts} GHL contacts)</span></div>
+        ${rows || '<div style="font-size:12px;color:var(--text-mute,#888)">No automatic matches.</div>'}
+        ${missedHtml}
+        ${props.length ? `<button onclick="_moApplyGhlLinks(this)" style="margin-top:10px;font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Link selected →</button>` : ''}
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="border:1px solid #9a3b2f;border-radius:10px;padding:12px 14px;color:#e0654f;font-size:12.5px;">Matching failed — ${escapeHTML(_sorterErr(e))} <button onclick="_moRunGhlLink()" style="margin-left:8px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Try again</button></div>`;
+  }
+}
+
+async function _moApplyGhlLinks(btn) {
+  const props = window._MO_LINKS || [];
+  const picked = Array.from(document.querySelectorAll('.mo-link-cb'))
+    .filter(cb => cb.checked)
+    .map(cb => props[Number(cb.getAttribute('data-i'))])
+    .filter(Boolean)
+    .map(p => ({ member_id: p.member_id, ghl_contact_id: p.ghl_contact_id }));
+  if (!picked.length) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Linking…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: CLIENT_ID, mode: 'apply', links: picked }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const host = document.getElementById('bb-mo-ghl-link-host');
+    if (host) host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ Linked ${json.linked} member${json.linked === 1 ? '' : 's'} to their GHL contact. The 10-minute sync now covers them.</div>`;
+  } catch (e) {
+    alert('Linking failed: ' + _sorterErr(e));
+    if (btn) { btn.disabled = false; btn.textContent = 'Link selected →'; }
+  }
+}
+
 function _bbOpenTypePicker() {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = `
