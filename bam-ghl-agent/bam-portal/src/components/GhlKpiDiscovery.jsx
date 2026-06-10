@@ -6,7 +6,7 @@ import { useState, useEffect, useLayoutEffect, useRef, Fragment } from "react";
 // Staff review the suggestion here; nothing is saved yet (next step = an editor
 // that persists the mapping to clients.ghl_kpi_config + a learning loop).
 
-export default function GhlKpiDiscovery({ client, tokens, session }) {
+export default function GhlKpiDiscovery({ client, tokens, session, salesMode = false }) {
   const t = tokens;
   const [locations, setLocations] = useState([]);
   const [location, setLocation] = useState("");
@@ -46,6 +46,9 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
   const trashSeq = useRef(0);
   const [stripeView, setStripeView] = useState(null);      // a person's Stripe history
   const [formActivity, setFormActivity] = useState(null);  // submissions per form by month
+  const [calActivity, setCalActivity] = useState(null);    // bookings per calendar (first/last/total)
+  const [salesType, setSalesType] = useState("old");       // sales wizard: 'new' | 'old'
+  const [wizStep, setWizStep] = useState(1);               // sales wizard step: 1 forms · 2 cals · 3 KPIs
   const rangeDays = rangeKey === "month" ? new Date().getDate() : parseInt(rangeKey, 10);
 
   // Live funnel KPIs — stale-while-revalidate: show what's stored instantly, then
@@ -353,16 +356,32 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       setStripeView({ name: cell.name, email: cell.email, loading: false, data });
     } catch (e) { setStripeView({ name: cell.name, email: cell.email, loading: false, data: { found: false, reason: "error", error: e.message } }); }
   }
-  // Diagnostic: submissions per form, by month — to find which form was used when.
+  // Diagnostic: each form's first/last submission + total — which form was used when.
   async function loadFormActivity() {
     if (!location) return;
     setFormActivity({ loading: true });
     try {
-      const res = await fetch(`/api/ghl?action=form-activity&months=8&location=${encodeURIComponent(location)}`);
+      const res = await fetch(`/api/ghl?action=form-activity&location=${encodeURIComponent(location)}`);
       const j = await res.json().catch(() => ({}));
-      setFormActivity({ loading: false, data: j.data || [], months: j.months || [], error: j.reason });
-    } catch (e) { setFormActivity({ loading: false, data: [], months: [], error: e.message }); }
+      setFormActivity({ loading: false, data: j.data || [], error: j.reason });
+    } catch (e) { setFormActivity({ loading: false, data: [], error: e.message }); }
   }
+  // Same, for calendars (bookings per calendar).
+  async function loadCalActivity() {
+    if (!location) return;
+    setCalActivity({ loading: true });
+    try {
+      const res = await fetch(`/api/ghl?action=calendar-activity&location=${encodeURIComponent(location)}`);
+      const j = await res.json().catch(() => ({}));
+      setCalActivity({ loading: false, data: j.data || [], error: j.reason });
+    } catch (e) { setCalActivity({ loading: false, data: [], error: e.message }); }
+  }
+  // Sales wizard: auto-load the usage lists when entering steps 1 / 2.
+  useEffect(() => {
+    if (!salesMode || salesType !== "old" || !location) return;
+    if (wizStep === 1 && !formActivity) loadFormActivity();
+    if (wizStep === 2 && !calActivity) loadCalActivity();
+  }, [salesMode, salesType, wizStep, location]);
 
   // Manual refresh — always pulls (ignores the stale gate) and surfaces the
   // pull result (per-source counts + errors) so we can diagnose empties.
@@ -453,6 +472,36 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
       {item.count != null && <span style={{ fontSize: 11, fontWeight: 700, color: selected ? t.accent : t.textMute }}>· {item.count.toLocaleString()}</span>}
     </button>
   );
+  // Selectable "first → last · total" list — used by the form/calendar usage
+  // views (the diagnostic modal + the sales wizard steps).
+  const usageList = (items, isPicked, onToggle) => {
+    const fmt = (iso) => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("en-US", { month: "short", year: "numeric" }); };
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {items.map(f => {
+          const sel = isPicked(f.id);
+          return (
+            <div key={f.id} onClick={() => onToggle(f.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 10px", borderRadius: 9, cursor: "pointer", border: `1.5px solid ${sel ? t.accent : "transparent"}`, background: sel ? `${t.accent}14` : "transparent" }}>
+              <span style={{ width: 16, flexShrink: 0, color: t.accent, fontWeight: 800 }}>{sel ? "✓" : ""}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: t.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</div>
+                <div style={{ fontSize: 11, color: t.textMute, marginTop: 2 }}>{f.total > 0 ? `${fmt(f.first)} → ${fmt(f.last)}` : "no activity"}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: f.total ? t.text : t.textMute }}>{f.total}</div>
+                <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute }}>total</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+  // Single "Adjust" button for a month (sales wizard) — opens the journey board.
+  const adjustBtn = (month) => (
+    <button onClick={() => openBoard(month)} title="Open the journey board (people, delete, undo, Stripe)"
+      style={{ flexShrink: 0, height: 28, padding: "0 14px", borderRadius: 8, border: `1px solid ${t.borderMed}`, background: "transparent", color: t.text, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Adjust</button>
+  );
   // Big stat for the "this month so far" hero card.
   const heroStat = (label, val, onClick) => (
     <div key={label} onClick={onClick} title={onClick ? "Click to see the list" : undefined} style={{ cursor: onClick ? "pointer" : "default" }}>
@@ -539,21 +588,87 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
 
   return (
     <div>
-      {monthly && (
+      {salesMode && (
+        <div style={card}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["new", "old"].map(v => (
+              <button key={v} onClick={() => setSalesType(v)} style={{
+                border: `1px solid ${salesType === v ? t.accent : t.borderMed}`,
+                background: salesType === v ? t.accent : "transparent",
+                color: salesType === v ? "#0A0A0B" : t.textMute,
+                fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
+                padding: "7px 14px", borderRadius: 999, cursor: "pointer",
+              }}>{v === "new" ? "New client" : "Old client"}</button>
+            ))}
+          </div>
+
+          {salesType === "new" && (
+            <div style={{ marginTop: 22, fontSize: 13, color: t.textSub, lineHeight: 1.6 }}>New-client sales — coming soon. (Nothing to show here yet.)</div>
+          )}
+
+          {salesType === "old" && (
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: "flex", gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 16 }}>
+                {[[1, "Forms"], [2, "Calendars"], [3, "KPIs"]].map(([n, l]) => (
+                  <span key={n} style={{ color: wizStep === n ? t.accent : t.textMute }}>{n}. {l}{n < 3 ? "  →" : ""}</span>
+                ))}
+              </div>
+
+              {wizStep === 1 && (
+                <>
+                  <div style={{ ...lbl, marginBottom: 4 }}>Which forms are used? (leads in)</div>
+                  <div style={{ fontSize: 12, color: t.textSub, marginBottom: 12, lineHeight: 1.5 }}>Tick the forms whose submissions count as a lead — first → last submission + total, most-popular first.</div>
+                  {!formActivity || formActivity.loading ? <div style={{ fontSize: 13, color: t.textSub }}>Studying form submissions…</div>
+                    : formActivity.error ? <div style={{ fontSize: 13, color: t.textSub }}>Couldn't load ({formActivity.error}).</div>
+                    : usageList(formActivity.data || [], id => picked.has(id), toggleForm)}
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
+                    <button onClick={() => setWizStep(2)} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Next: Calendars →</button>
+                  </div>
+                </>
+              )}
+
+              {wizStep === 2 && (
+                <>
+                  <div style={{ ...lbl, marginBottom: 4 }}>Which calendars are used? (trials booked)</div>
+                  <div style={{ fontSize: 12, color: t.textSub, marginBottom: 12, lineHeight: 1.5 }}>Tick the calendar(s) where trials get booked — first → last booking + total.</div>
+                  {!calActivity || calActivity.loading ? <div style={{ fontSize: 13, color: t.textSub }}>Studying calendar bookings…</div>
+                    : calActivity.error ? <div style={{ fontSize: 13, color: t.textSub }}>Couldn't load ({calActivity.error}).</div>
+                    : usageList(calActivity.data || [], id => pickedCals.has(id), toggleCal)}
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+                    <button onClick={() => setWizStep(1)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>← Back</button>
+                    <button onClick={async () => { await saveForms(); setWizStep(3); }} disabled={savingForms} style={{ padding: "9px 16px", background: t.accent, color: "#0A0A0B", border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: savingForms ? "wait" : "pointer" }}>{savingForms ? "Saving…" : "Save & view KPIs →"}</button>
+                  </div>
+                </>
+              )}
+
+              {wizStep === 3 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ fontSize: 12, color: t.textSub }}>Showing <b style={{ color: t.text }}>All purchases</b>. Tap <b style={{ color: t.text }}>Adjust</b> on a month to clean records.</div>
+                  <button onClick={() => setWizStep(1)} style={{ background: "transparent", border: `1px solid ${t.borderMed}`, color: t.text, borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}>← Re-pick forms &amp; calendars</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {(!salesMode || (salesType === "old" && wizStep === 3)) && monthly && (
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <div style={lbl}>Monthly KPIs{refreshing ? " · refreshing…" : ""}</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {["new", "all"].map(f => (
-                <button key={f} onClick={() => setClientFilter(f)} style={{
-                  border: `1px solid ${clientFilter === f ? t.accent : t.borderMed}`,
-                  background: clientFilter === f ? t.accent : "transparent",
-                  color: clientFilter === f ? "#0A0A0B" : t.textMute,
-                  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
-                  padding: "5px 11px", borderRadius: 999, cursor: "pointer",
-                }}>{f === "new" ? "New clients" : "All purchases"}</button>
-              ))}
-            </div>
+            {!salesMode && (
+              <div style={{ display: "flex", gap: 6 }}>
+                {["new", "all"].map(f => (
+                  <button key={f} onClick={() => setClientFilter(f)} style={{
+                    border: `1px solid ${clientFilter === f ? t.accent : t.borderMed}`,
+                    background: clientFilter === f ? t.accent : "transparent",
+                    color: clientFilter === f ? "#0A0A0B" : t.textMute,
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+                    padding: "5px 11px", borderRadius: 999, cursor: "pointer",
+                  }}>{f === "new" ? "New clients" : "All purchases"}</button>
+                ))}
+              </div>
+            )}
           </div>
           {!monthly.ready ? (
             <div style={{ fontSize: 12, color: t.textSub, lineHeight: 1.5 }}>
@@ -562,16 +677,17 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           ) : (() => {
             const cur = monthly.months.find(m => m.is_current) || monthly.months[0];
             const past = monthly.months.filter(m => m !== cur);
-            const cVal = (m) => clientFilter === "new" ? m.clients_new : m.clients_all;
-            const cType = clientFilter === "new" ? "client_new" : "clients_all";
-            const cLabel = clientFilter === "new" ? "New clients" : "All purchases";
+            const cf = salesMode ? "all" : clientFilter;   // sales view = All purchases
+            const cVal = (m) => cf === "new" ? m.clients_new : m.clients_all;
+            const cType = cf === "new" ? "client_new" : "clients_all";
+            const cLabel = cf === "new" ? "New clients" : "All purchases";
             return (
               <>
                 {cur && (
                   <div style={{ border: `1px solid ${t.borderMed}`, borderRadius: 12, background: t.surfaceEl, padding: 16, marginTop: 8 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 14 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.accent }}>{cur.label} · so far</div>
-                      <div style={{ display: "flex", gap: 6 }}>{boardBtn(cur)}{gearBtn(cur)}</div>
+                      <div style={{ display: "flex", gap: 6 }}>{salesMode ? adjustBtn(cur) : <>{boardBtn(cur)}{gearBtn(cur)}</>}</div>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 34px", alignItems: "flex-start" }}>
                       {heroStat("Leads in", cur.leads, () => openDetail("lead", `Leads in · ${cur.label}`, cur.key))}
@@ -580,7 +696,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                       {heroStat("CAC", cur.cac?.per_new_client != null ? money(cur.cac.per_new_client) : "—", null)}
                     </div>
                     <div style={{ fontSize: 11, color: t.textMute, marginTop: 10 }}>
-                      {clientFilter === "all" ? `${cur.clients_new} new · ${cur.clients_existing} existing · ` : ""}spend {money(cur.spend)}
+                      {cf === "all" ? `${cur.clients_new} new · ${cur.clients_existing} existing · ` : ""}spend {money(cur.spend)}
                     </div>
                   </div>
                 )}
@@ -592,13 +708,12 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
                         <div style={{ flex: 1, minWidth: 90, fontSize: 13, fontWeight: 600, color: t.text }}>{m.label}</div>
                         {monthMetric("Leads", m.leads, () => openDetail("lead", `Leads in · ${m.label}`, m.key))}
                         {monthMetric("Trials", m.trials, () => openDetail("trial", `Trials booked · ${m.label}`, m.key))}
-                        {monthMetric(clientFilter === "new" ? "New" : "All", cVal(m), () => openDetail(cType, `${cLabel} · ${m.label}`, m.key))}
+                        {monthMetric(cf === "new" ? "New" : "All", cVal(m), () => openDetail(cType, `${cLabel} · ${m.label}`, m.key))}
                         <div style={{ minWidth: 64, textAlign: "right" }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: t.textSub }}>{m.cac?.per_new_client != null ? money(m.cac.per_new_client) : "—"}</div>
                           <div style={{ fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase", color: t.textMute, marginTop: 3 }}>CAC</div>
                         </div>
-                        {boardBtn(m)}
-                        {gearBtn(m)}
+                        {salesMode ? adjustBtn(m) : <>{boardBtn(m)}{gearBtn(m)}</>}
                       </div>
                     ))}
                   </div>
@@ -630,6 +745,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         </div>
       )}
 
+      {!salesMode && (<>
       <div style={{ ...card, display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
         <div>
           <div style={lbl}>GHL location</div>
@@ -768,6 +884,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
           </div>
         </>
       )}
+      </>)}
 
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
@@ -1049,7 +1166,7 @@ export default function GhlKpiDiscovery({ client, tokens, session }) {
         );
       })()}
 
-      {formActivity && (
+      {!salesMode && formActivity && (
         <div onClick={() => setFormActivity(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1300, display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "40px 16px", overflowY: "auto" }}>
           <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 620, background: t.bg, border: `1px solid ${t.borderMed}`, borderRadius: 14, padding: 22 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>

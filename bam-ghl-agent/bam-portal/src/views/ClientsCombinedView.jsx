@@ -415,6 +415,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
     { id: "setup",        label: "Setup" },
     { id: "team",         label: "Team" },
     { id: "marketing",    label: "Marketing" },
+    { id: "sales",        label: "Sales" },
     { id: "systems",      label: "Systems" },
     { id: "actionItems",  label: "Action Items" },
     { id: "notes",        label: "Notes" },
@@ -467,6 +468,7 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
       {tab === "setup" && <SetupTab client={client} staff={staff} tokens={t} role={role} session={session} onChanged={onChanged} onBack={onBack} />}
       {tab === "team" && <TeamTab client={client} tokens={t} session={session} />}
       {tab === "marketing" && <MarketingTab client={client} tokens={t} role={role} session={session} onChanged={onChanged} />}
+      {tab === "sales" && <div style={{ marginTop: 8 }}><GhlKpiDiscovery client={client} tokens={t} session={session} salesMode /></div>}
       {tab === "systems" && <SystemsTab client={client} tokens={t} dark={dark} me={me} />}
       {tab === "actionItems" && <ActionItemsTab client={client} tokens={t} session={session} />}
       {tab === "notes" && <NotesTab client={client} tokens={t} me={me} session={session} staffMap={staffMap} />}

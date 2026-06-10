@@ -364,6 +364,24 @@ the Meta API and presents it in the **client portal Marketing tab**.
   are owner-set config) and a Marketing **MKT-** Notion requirement — Notion side
   still TODO (see Open Loops / next session).
 
+## Sales tab (staff portal — academy profile, 2026-06-09)
+
+A **"Sales" top-level tab** in each academy's profile (`ClientsCombinedView` tabs, beside Marketing)
+renders `<GhlKpiDiscovery ... salesMode />`. `salesMode` turns the component into a guided wizard
+(same engine, different chrome):
+- Top toggle **New client / Old client**. New = blank placeholder (TODO). Old = the flow.
+- **Step 1 — Which forms?** (`form-activity` list, selectable, first→last+total). **Step 2 — Which
+  calendars?** (new `?action=calendar-activity` endpoint = bookings first/last/total per calendar,
+  mirrors form-activity). Step 2 "Save & view KPIs" calls `saveForms()` (persists lead_form_ids +
+  booking_calendar_ids) → Step 3.
+- **Step 3 — Monthly KPIs**, forced to **All purchases** (`cf='all'`), each month/hero shows ONE
+  **Adjust** button (`adjustBtn` → opens the journey board: people/delete/trash/undo/Stripe/timeline)
+  instead of the board+gear icons. A "← Re-pick forms & calendars" link jumps back to Step 1.
+- Shared helper `usageList(items, isPicked, onToggle)` renders the first/last/total selectable list
+  (used by the diagnostic modal AND the wizard steps). The classic form-activity modal is gated
+  `!salesMode` so it doesn't pop over the wizard. New/All toggle hidden in salesMode.
+- After changing forms/calendars, hit **Refresh now** so refreshFunnel re-pulls with the new config.
+
 ## Frontend (`bam-portal/public/client-portal.html`)
 
 Marketing tab, above "Active Campaigns". Plain HTML/JS (no build step).
