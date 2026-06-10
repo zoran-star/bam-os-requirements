@@ -73,16 +73,22 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
   const [integrationStatus, setIntegrationStatus] = useState({});
 
   useEffect(() => {
-    INTEGRATIONS.forEach(({ key, endpoint }) => {
-      setIntegrationStatus(prev => ({ ...prev, [key]: "checking" }));
-      fetch(endpoint)
-        .then(r => {
-          setIntegrationStatus(prev => ({ ...prev, [key]: r.ok ? "connected" : "disconnected" }));
-        })
-        .catch(() => {
-          setIntegrationStatus(prev => ({ ...prev, [key]: "disconnected" }));
-        });
-    });
+    (async () => {
+      // The connection-test endpoints are now staff-gated — send the token.
+      const { data } = await supabase.auth.getSession();
+      const tok = data?.session?.access_token;
+      const headers = tok ? { Authorization: `Bearer ${tok}` } : {};
+      INTEGRATIONS.forEach(({ key, endpoint }) => {
+        setIntegrationStatus(prev => ({ ...prev, [key]: "checking" }));
+        fetch(endpoint, { headers })
+          .then(r => {
+            setIntegrationStatus(prev => ({ ...prev, [key]: r.ok ? "connected" : "disconnected" }));
+          })
+          .catch(() => {
+            setIntegrationStatus(prev => ({ ...prev, [key]: "disconnected" }));
+          });
+      });
+    })();
   }, []);
 
   // ─── Slack OAuth status ───
