@@ -407,7 +407,12 @@ async function handler(req, res) {
       proposals,
     });
   } catch (e) {
-    return res.status(e.status || 500).json({ error: e.message || String(e) });
+    // Always return a readable string — a thrown plain object would otherwise
+    // serialize to "[object Object]" on the client.
+    let msg = e && e.message;
+    if (!msg) { try { msg = typeof e === "string" ? e : JSON.stringify(e); } catch (_) { msg = String(e); } }
+    console.error("match-prices error:", msg, e && e.stack);
+    return res.status((e && e.status) || 500).json({ error: msg || "unknown error" });
   }
 }
 
