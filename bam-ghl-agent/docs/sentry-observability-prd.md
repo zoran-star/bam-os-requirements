@@ -74,7 +74,7 @@ Admins should be able to answer:
 - Add an admin-only page in the staff portal called "App Errors".
 - Keep Feedback unchanged.
 - Display one combined Sentry issue list.
-- Add a shared time-window control with `Last 24h` and `Last 7d`.
+- Add a shared time-window control with `Last 24h` and `Last 14d`.
 - Default time window: `Last 24h`.
 - Production only.
 - Empty state: "No production errors in this window."
@@ -84,7 +84,7 @@ Admins should be able to answer:
 
 - Show at most 5 unresolved Sentry issues sorted by frequency.
 - Query production only.
-- Query the selected window: `Last 24h` or `Last 7d`.
+- Query the selected window: `Last 24h` or `Last 14d`.
 - Include both Sentry projects: `bam-portal-web` and `bam-portal-api`.
 - Rows with no matching events in the selected window should not appear.
 - Sort by count descending, then last seen descending if needed.
@@ -162,7 +162,8 @@ Call Sentry's organization issues endpoint:
 - `environment=production`
 - `query=is:unresolved`
 - `sort=freq`
-- `statsPeriod=24h` or `statsPeriod=7d`, based on the selected window
+- `statsPeriod=24h` or `statsPeriod=14d`, based on the selected window
+- `groupStatsPeriod=24h` or `groupStatsPeriod=14d`, matching the selected window
 - `limit=5`
 - `project=<web_project_id>&project=<api_project_id>`
 
@@ -343,7 +344,7 @@ Risk: one noisy client-side loop, backend exception loop, or bad deploy can gene
 
 - Admin users can open an App Errors page in the staff portal.
 - Non-admin users cannot see the page and receive 403 from provider proxy APIs.
-- The page supports `Last 24h` and `Last 7d`, and rows disappear from a view when they have no matching errors in that selected window.
+- The page supports `Last 24h` and `Last 14d`, and rows disappear from a view when they have no matching errors in that selected window.
 - The App Errors list shows at most 5 unresolved production Sentry issues sorted by frequency across `bam-portal-web` and `bam-portal-api`.
 - Rows show project and surface chips so admins can tell staff app/client/mobile/API/cron apart.
 - Sentry provider tokens are never exposed to browser code.
