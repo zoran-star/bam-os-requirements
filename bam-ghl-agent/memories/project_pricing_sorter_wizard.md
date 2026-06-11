@@ -28,6 +28,10 @@ metadata:
 > pool from the catalog (sub-only pool used to hide them); apply
 > INSERT-on-miss (was PATCH-only → fresh academies silently saved
 > nothing — client now sends product id/name/amount/currency/interval).
+> ⚠️ GOTCHA (PR #224): `pricing_catalog.tier` has a CHECK constraint
+> (canonical|lil_sale|legacy_match|legacy_unknown|deprecated) — the UI's
+> Live/Legacy toggle value "legacy" is NOT valid; apply normalizes
+> legacy→legacy_match. Any new tier writer must use the constraint vocab.
 
 > **2026-06-10 — NEW HOMES.** The Pricing nav page + temp launch button are GONE.
 > `openPricingSorter(step)` now takes a start step, launched from Business
