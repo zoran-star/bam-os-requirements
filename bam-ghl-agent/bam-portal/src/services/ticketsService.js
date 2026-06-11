@@ -52,3 +52,4 @@ export const cancelTicket         = (id, reason)               => patch(id, "can
 export const saveTicketFields     = (id, fields)               => patch(id, "update_fields", { fields });
 export const setTicketDueDate     = (id, due_date)             => patch(id, "set_due_date", { due_date: due_date || "" });
 export const sendForFinalReview   = (id)                       => patch(id, "send_for_final_review");
+export const goodToFinalize       = (id)                       => patch(id, "good_to_finalize");

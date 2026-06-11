@@ -17,6 +17,7 @@ import {
   saveTicketFields,
   setTicketDueDate,
   sendForFinalReview,
+  goodToFinalize,
 } from "../services/ticketsService";
 import { supabase } from "../lib/supabase";
 
@@ -1021,10 +1022,11 @@ export function TicketModal({ ticket: initial, me, isManager, pool, tokens: t, d
             >Submit for review</button>
           )}
 
-          {/* Manager: approve / deny / send-for-final-review on in_review */}
+          {/* Manager: approve / good-to-finalize / deny / send-for-final-review on in_review */}
           {isManager && ticket.status === "in_review" && (
             <>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => approveTicket(ticket.id))} style={btn(t, "primary")}>Approve</button>
+              <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => goodToFinalize(ticket.id))} style={btn(t, "ghost")} title="Work looks good — back to the executor for final touches, then Mark complete">Good to finalize</button>
               <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => wrap(() => sendForFinalReview(ticket.id))} style={btn(t, "primary")} title="Send to client for final sign-off">Mark complete for review</button>
               {!showDeny && <button disabled={busy} onMouseDown={e => e.preventDefault()} onClick={() => setShowDeny(true)} style={btn(t, "danger-ghost")}>Deny</button>}
             </>
