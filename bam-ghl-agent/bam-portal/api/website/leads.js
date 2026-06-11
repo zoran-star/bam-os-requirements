@@ -167,7 +167,24 @@ async function handler(req, res) {
   } catch (e) { return res.status(500).json({ error: e.message }); }
   if (!client) return res.status(404).json({ error: "client not found" });
 
-  let leadId;
+  const ghlLocName = client.ghl_kpi_config?.ghl_location;
+  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
+  const message = fields?.message || null;
+
+  // GHL first — primary path. No Supabase write on success.
+  if (ghlLocName && client.ghl_location_id) {
+    try {
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
+      if (ghlContactId) {
+        return res.status(200).json({ ok: true, source: "ghl", id: ghlContactId });
+      }
+    } catch (e) {
+      console.error("GHL push failed — falling back to Supabase:", e.message);
+    }
+  }
+
+  // Supabase fallback — only reached when GHL is not configured or push failed.
+  // Ensures no lead is ever silently dropped.
   try {
     const rows = await sbReq("website_leads", {
       method: "POST",
@@ -182,30 +199,10 @@ async function handler(req, res) {
         source_url: source_url || null,
       }),
     });
-    leadId = rows?.[0]?.id;
-  } catch (e) { return res.status(500).json({ error: `save failed: ${e.message}` }); }
-
-  // GHL push — non-blocking. Requires ghl_kpi_config.ghl_location to be set.
-  let ghlContactId = null;
-  const ghlLocName = client.ghl_kpi_config?.ghl_location;
-  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
-  const message = fields?.message || null;
-  if (ghlLocName && client.ghl_location_id) {
-    try {
-      ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
-      if (leadId && ghlContactId) {
-        await sbReq(`website_leads?id=eq.${leadId}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString() }),
-        });
-      }
-    } catch (e) {
-      console.error("GHL push failed (non-fatal):", e.message);
-    }
+    return res.status(200).json({ ok: true, source: "backup", id: rows?.[0]?.id });
+  } catch (e) {
+    return res.status(500).json({ error: `submission failed: ${e.message}` });
   }
-
-  return res.status(200).json({ ok: true, id: leadId, ghl: !!ghlContactId });
 }
 
 export default withSentryApiRoute(handler);
