@@ -9,10 +9,33 @@ our DB is the source of truth, GHL is a mirror we can unplug per client.
 client site form
   → POST /api/website/leads  { client_id, form_type, name, email, phone, fields, source_url }
   → 1. SAVE    website_leads row (always — every submission, no dedupe; rows = form fills)
-  → 2. DELIVER GHL upsert contact (tag: website-inquiry, source: website-form)
-               + message posted as inbound conversation (fires GHL notifications)
+  → 2. DELIVER GHL upsert contact
+               tags: website-inquiry + "<form type> form filled" + entry_points row tags
+               + NOTE on the contact with the message text
+               + conversation entry (inbox presence; thread text needs a
+                 conversation provider — not registered yet, so notes carry the message)
+               + open opportunity in the pipeline/stage from the entry_points row
+                 (names resolved to GHL IDs at runtime, 5-min cache; skipped if the
+                 contact already has an open opportunity in that pipeline)
   → 3. RECEIPT stamp row: ghl_contact_id + ghl_synced_at, or ghl_error
 ```
+
+## Entry Points (lead routing layer, Jun 2026)
+- **`entry_points` table**: one row per place leads enter an academy —
+  type ∈ website-form | ghl-form | calendar | funnel, key (form_type or GHL id),
+  label, tags[], pipeline_name, stage_name. "Connected" = pipeline+stage set.
+- **API**: GET/PATCH `/api/website/entry-points?client_id=` (staff or
+  client_users JWT auth, same pattern as ghl/pipelines.js).
+- **UI**: client portal → Pipelines view → Entry Points rail (left of the
+  board). Green card = connected (shows pipeline → stage), dashed = not
+  connected; click opens the **Entry Point Set Up** wizard (pipeline/stage
+  dropdowns from live GHL data, tag chips, save/disconnect).
+- Only **website-form** rows are enforced by the leads API; ghl-form/calendar
+  rows are standardized reference config (enforce via GHL workflows for now).
+- BAM GTA seeded with 6: website contact, website free-trial, 2 GHL forms,
+  2 booking calendars.
+- This is the onboarding primitive for V2: new academy = seed entry points,
+  owner maps them in the wizard; off-GHL migration = repoint destinations.
 
 ## Key decisions (Jun 2026)
 - **Save-first, not GHL-first.** Lead history must live in our system so
