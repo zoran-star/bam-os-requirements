@@ -32,6 +32,16 @@ client site form
 - GTA free-trial page: grade question routes Grade 5 to 8 → Group 1
   (`Cmw4bCVBhexgi0Oi0Dkf`), Grade 9 to 12 → Group 2 (`G5y4QI0MsFq3159IhFU7`).
 
+## Booking Calendars panel (portal-managed availability, Jun 2026)
+- Client portal → Calendar tab → "Booking Calendars" section (above the
+  weekly schedule): per-calendar editor for weekly hours, spots per session
+  (appoinmentPerSlot), and blocked dates (GHL date overrides w/ empty hours),
+  plus upcoming bookings (14 days) and "+ New calendar" (creates the GHL
+  event calendar AND its entry_points row).
+- API: GET/PATCH/POST /api/website/calendars?client_id= (staff or
+  client_users auth; academy OAuth token w/ auto-refresh). Only calendars
+  exposed as entry_points are listable/editable.
+
 ## Entry Points (lead routing layer, Jun 2026)
 - **`entry_points` table**: one row per place leads enter an academy —
   type ∈ website-form | ghl-form | calendar | funnel, key (form_type or GHL id),
