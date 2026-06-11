@@ -64,7 +64,7 @@
       radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/28px 28px,
       var(--ink);
   }
-  #canvas{position:relative; width:1560px; height:880px}
+  #canvas{position:relative; width:1800px; height:920px}
   #wires{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
 
   /* ── Nodes ───────────────────────────────────────── */
@@ -212,15 +212,15 @@
 {
   "nodes": [
     { "id": "submit",          "label": "Client submits ticket", "sub": "Error · Change · Build — from the client portal", "who": "CLIENT", "x": 40,   "y": 80,  "kind": "entry" },
-    { "id": "open",            "label": "Open",                  "sub": "Delegation pool — waiting for a manager",         "who": "POOL",   "x": 40,   "y": 252, "kind": "normal" },
-    { "id": "delegated",       "label": "Delegated",             "sub": "Assigned to an executor",                          "who": "",       "x": 318,  "y": 252, "kind": "normal" },
-    { "id": "in_progress",     "label": "In Progress",           "sub": "Executor is building / fixing",                    "who": "",       "x": 596,  "y": 252, "kind": "normal" },
-    { "id": "awaiting_client", "label": "Awaiting Client",       "sub": "Blocked on info or assets from the client",        "who": "",       "x": 596,  "y": 470, "kind": "normal" },
-    { "id": "in_review",       "label": "In Review",             "sub": "Manager checks the work + user guide",             "who": "",       "x": 902,  "y": 252, "kind": "normal" },
-    { "id": "needs_rework",    "label": "Needs Rework",          "sub": "Denied with notes — back to the executor",         "who": "",       "x": 902,  "y": 470, "kind": "normal" },
-    { "id": "final_review",    "label": "Final Review",          "sub": "Client sign-off on the finished work",             "who": "",       "x": 1190, "y": 90,  "kind": "normal" },
-    { "id": "done",            "label": "Done ✓",                "sub": "Resolved — guide saved, loop closed",              "who": "",       "x": 1190, "y": 252, "kind": "done" },
-    { "id": "cancelled",       "label": "Cancelled ✕",           "sub": "Hard-cancelled from any non-final stage",          "who": "",       "x": 318,  "y": 610, "kind": "dead" }
+    { "id": "open",            "label": "Open",                  "sub": "Delegation pool — waiting for a manager",         "who": "POOL",   "x": 37,   "y": 275, "kind": "normal" },
+    { "id": "delegated",       "label": "Delegated",             "sub": "Assigned to an executor",                          "who": "",       "x": 432,  "y": 285, "kind": "normal" },
+    { "id": "in_progress",     "label": "In Progress",           "sub": "Executor is building / fixing",                    "who": "",       "x": 734,  "y": 295, "kind": "normal" },
+    { "id": "awaiting_client", "label": "Awaiting Client",       "sub": "Blocked on info or assets from the client",        "who": "",       "x": 776,  "y": 539, "kind": "normal" },
+    { "id": "in_review",       "label": "In Review",             "sub": "Manager checks the work + user guide",             "who": "",       "x": 1136, "y": 263, "kind": "normal" },
+    { "id": "needs_rework",    "label": "Needs Rework",          "sub": "Denied with notes — back to the executor",         "who": "",       "x": 1085, "y": 541, "kind": "normal" },
+    { "id": "final_review",    "label": "Final Review",          "sub": "Client sign-off on the finished work",             "who": "",       "x": 1251, "y": 52,  "kind": "normal" },
+    { "id": "done",            "label": "Done ✓",                "sub": "Resolved — guide saved, loop closed",              "who": "",       "x": 1524, "y": 258, "kind": "done" },
+    { "id": "cancelled",       "label": "Cancelled ✕",           "sub": "Hard-cancelled from any non-final stage",          "who": "",       "x": 286,  "y": 702, "kind": "dead" }
   ],
   "edges": [
     { "from": "submit",          "to": "open",            "label": "Submit ticket",          "who": "client",   "dashed": false },
@@ -236,7 +236,9 @@
     { "from": "in_review",       "to": "final_review",    "label": "Send for final review",  "who": "manager",  "dashed": false },
     { "from": "final_review",    "to": "done",            "label": "Client approves",        "who": "client",   "dashed": false },
     { "from": "final_review",    "to": "in_progress",     "label": "Client feedback",        "who": "client",   "dashed": false },
-    { "from": "in_progress",     "to": "cancelled",       "label": "Cancel ticket",          "who": "staff",    "dashed": true }
+    { "from": "in_progress",     "to": "cancelled",       "label": "Cancel ticket",          "who": "staff",    "dashed": true },
+    { "from": "in_review",       "to": "in_progress",     "label": "Good to finalize",       "who": "staff",    "dashed": false },
+    { "from": "in_progress",     "to": "done",            "label": "Mark complete",          "who": "staff",    "dashed": false }
   ]
 }
 </script>
