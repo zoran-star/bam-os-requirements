@@ -118,33 +118,15 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
     Accept: "application/json",
   };
 
-  let contactId = null;
-
-  // Check for existing contact by email to avoid duplicates.
-  if (email) {
-    const searchRes = await fetch(
-      `${GHL_V2}/contacts/?${new URLSearchParams({ locationId: ghlLocationId, email })}`,
-      { headers }
-    );
-    if (searchRes.ok) {
-      const existing = ((await searchRes.json()).contacts || [])[0];
-      if (existing?.id) {
-        await fetch(`${GHL_V2}/contacts/${existing.id}`, {
-          method: "PUT", headers, body: JSON.stringify(payload),
-        });
-        contactId = existing.id;
-      }
-    }
-  }
-
-  if (!contactId) {
-    const createRes = await fetch(`${GHL_V2}/contacts/`, {
-      method: "POST", headers, body: JSON.stringify(payload),
-    });
-    if (!createRes.ok) throw new Error(`GHL ${createRes.status}: ${(await createRes.text()).slice(0, 120)}`);
-    const created = await createRes.json();
-    contactId = (created.contact || created).id || null;
-  }
+  // Upsert: GHL matches on email/phone and creates or updates in one call.
+  // (Search-then-create raced with GHL's duplicate prevention and failed on
+  // repeat submissions from the same email.)
+  const upsertRes = await fetch(`${GHL_V2}/contacts/upsert`, {
+    method: "POST", headers, body: JSON.stringify(payload),
+  });
+  if (!upsertRes.ok) throw new Error(`GHL ${upsertRes.status}: ${(await upsertRes.text()).slice(0, 120)}`);
+  const upserted = await upsertRes.json();
+  const contactId = (upserted.contact || upserted).id || null;
 
   // Post message as inbound conversation so it appears in GHL inbox + fires notifications.
   if (contactId && message) {
