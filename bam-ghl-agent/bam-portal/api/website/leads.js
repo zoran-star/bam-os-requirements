@@ -128,7 +128,10 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   const upserted = await upsertRes.json();
   const contactId = (upserted.contact || upserted).id || null;
 
-  // Post message as inbound conversation so it appears in GHL inbox + fires notifications.
+  // Post the message into the GHL inbox so the team sees WHAT the lead wrote
+  // and can reply in-thread. Must use the add-inbound endpoint with type SMS —
+  // POSTing to /conversations/messages (the outbound send endpoint) with
+  // type Custom renders an empty thread labeled "Call".
   if (contactId && message) {
     try {
       const convoRes = await fetch(`${GHL_V2}/conversations/`, {
@@ -138,18 +141,19 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
       });
       const convoId = convoRes.ok ? ((await convoRes.json()).conversation?.id || null) : null;
       if (convoId) {
-        await fetch(`${GHL_V2}/conversations/messages`, {
+        const msgRes = await fetch(`${GHL_V2}/conversations/messages/inbound`, {
           method: "POST",
           headers,
           body: JSON.stringify({
-            type: "Custom",
+            type: "SMS",
             message,
             conversationId: convoId,
             direction: "inbound",
           }),
         });
+        if (!msgRes.ok) console.error("GHL inbound message failed:", msgRes.status, (await msgRes.text()).slice(0, 200));
       }
-    } catch { /* non-fatal — contact already saved */ }
+    } catch (e) { console.error("GHL conversation post failed (non-fatal):", e.message); }
   }
 
   return contactId;
