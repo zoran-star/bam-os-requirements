@@ -300,11 +300,15 @@ async function handler(req, res) {
       for (const a of approvals) {
         if (!a.price_id) continue;
         if (String(a.price_id).startsWith("onetime-")) continue; // prepaid one-time groups aren't catalog rows
+        // The UI's tier vocabulary is just Live/Legacy; the catalog's CHECK
+        // constraint only allows canonical|lil_sale|legacy_match|legacy_unknown|
+        // deprecated — a confirmed non-Live match is a legacy_match.
+        const tier = a.tier === "legacy" ? "legacy_match" : a.tier;
         const patch = {
           offer_id: a.offer_id || body.offer_id || null,
           offer_price_key: a.offer_price_key || null,
           coachiq_product_id: a.coachiq_product_id || null,
-          tier: a.tier || undefined,
+          tier: tier || undefined,
           match_status: "confirmed",
           match_source: "ai",
           match_confidence: a.confidence != null ? a.confidence : null,
@@ -332,11 +336,11 @@ async function handler(req, res) {
               amount_cents: a.amount_cents,
               currency: a.currency || "cad",
               interval: a.interval || null,
-              is_routable: (a.tier || "canonical") === "canonical",
+              is_routable: (tier || "canonical") === "canonical",
               offer_id: a.offer_id || body.offer_id || null,
               offer_price_key: a.offer_price_key || null,
               coachiq_product_id: a.coachiq_product_id || null,
-              tier: a.tier || "canonical",
+              tier: tier || "canonical",
               match_status: "confirmed",
               match_source: "ai",
               match_confidence: a.confidence != null ? a.confidence : null,
