@@ -28,6 +28,15 @@ metadata:
 > pool from the catalog (sub-only pool used to hide them); apply
 > INSERT-on-miss (was PATCH-only → fresh academies silently saved
 > nothing — client now sends product id/name/amount/currency/interval).
+> **Cleanup rework (PR #230, 2026-06-11):** Step 3 is an ACTION INBOX, not a
+> report. Phase A rules: only ACTIVE-ish subs count as "paying, not on sheet"
+> (canceled subs → collapsed "Past members" card); dupes = same parent_email
+> AND same athlete (siblings unflagged); typo'd emails get a Levenshtein≤2
+> suggestion; payment_method_required = "no card yet, expected". Phase B 1-tap
+> fixes (new cleanup.js actions): `fix-link` (accept suggestion), 
+> `add-from-stripe` (stage a paying member the sheet missed), `remove-staged`
+> (delete dup copy, survivor un-flagged); no-offer/tier rows deep-link to
+> Match. Fix actions return flag-derived counts (no Stripe re-pull).
 > ⚠️ GOTCHA (PR #224): `pricing_catalog.tier` has a CHECK constraint
 > (canonical|lil_sale|legacy_match|legacy_unknown|deprecated) — the UI's
 > Live/Legacy toggle value "legacy" is NOT valid; apply normalizes
