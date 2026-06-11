@@ -13937,7 +13937,7 @@ function _aiFmtDate(d) {
 const ONB_UI = {
   slack:          { auto: false, cta: { label: 'Open invite ↗', fn: "window.open(ONB_SLACK_INVITE_URL,'_blank')" } },
   connect_stripe: { auto: true,  cta: { label: 'Connect Stripe', fn: 'openStripeConnectModal()' } },
-  create_ghl:     { auto: false, cta: null },
+  create_ghl:     { auto: false, cta: { label: 'Create sub-account ↗', fn: "window.open(ONB_GHL_SIGNUP_URL,'_blank')" } },
   connect_ghl:    { auto: true,  cta: { label: 'Connect GHL', fn: 'openGhlConnectModal()' } },
   // Off-call form steps — CTA jumps to the matching Business Blueprint section.
   general_info:   { auto: false, cta: { label: 'Open form ↗', fn: "_aiOpenBB('general')" } },
