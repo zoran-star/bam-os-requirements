@@ -72,6 +72,30 @@ account were **Express or Custom** (controller = the platform/application), i.e.
 BAM controls the academy's Stripe instead of the academy owning its own
 dashboard. Not worth it — would mean re-onboarding their entire Stripe under BAM.
 
+## Doc verification (2026-06-11) — what's confirmed vs not
+
+Checked against Stripe's official docs:
+
+- ✅ **CONFIRMED — sub writes.** [docs.stripe.com/connect/subscriptions](https://docs.stripe.com/connect/subscriptions)
+  → Restrictions: *"Your platform can't update or cancel a subscription that it didn't
+  create."* So pause / unpause / cancel / change / referred-discount on foreign subs are
+  hard-blocked, exactly as observed with Knowl.
+- ✅ **CONFIRMED — the manual workaround is by-design.** Same page: Standard accounts with
+  full Dashboard access manage their own customers' subscriptions — the academy can always
+  edit any sub by hand in their dashboard.
+- ⚠️ **UNVERIFIED — refunds.** No documented "created by your application" restriction on
+  refunding direct charges on a Standard account. The portal's `POST /refunds` (as the
+  connected account) on a CoachIQ/GHL charge MAY work — needs a live test before assuming
+  it's blocked.
+- ⚠️ **UNVERIFIED — billing-portal link.** Platforms creating billing-portal sessions for
+  connected accounts is documented/supported ([API ref](https://docs.stripe.com/api/customer_portal/sessions/create)).
+  No documented created-by restriction; the portal session acts as the account, so it may
+  even allow managing foreign subs. Needs a live test.
+
+So of the 6 PATCH actions: 4 are doc-confirmed blocked on foreign subs (pause, unpause,
+cancel, change — anything that writes the sub object); refund + payment-link are
+test-before-you-trust.
+
 ## The accepted model (no fix needed)
 
 ```
