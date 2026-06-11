@@ -128,32 +128,29 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   const upserted = await upsertRes.json();
   const contactId = (upserted.contact || upserted).id || null;
 
-  // Post the message into the GHL inbox so the team sees WHAT the lead wrote
-  // and can reply in-thread. Must use the add-inbound endpoint with type SMS —
-  // POSTing to /conversations/messages (the outbound send endpoint) with
-  // type Custom renders an empty thread labeled "Call".
+  // Make the message readable in GHL. The inbox thread can't carry it without
+  // a registered conversation provider (/conversations/messages/inbound
+  // requires conversationProviderId), so the contract is:
+  //   1. NOTE on the contact — always works, holds the full message text
+  //   2. conversation entry — puts the contact in the team inbox unread,
+  //      which fires the normal GHL notification
   if (contactId && message) {
     try {
-      const convoRes = await fetch(`${GHL_V2}/conversations/`, {
+      const noteRes = await fetch(`${GHL_V2}/contacts/${contactId}/notes`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ body: `Website form message:\n\n${message}` }),
+      });
+      if (!noteRes.ok) console.error("GHL note failed:", noteRes.status, (await noteRes.text()).slice(0, 200));
+    } catch (e) { console.error("GHL note post failed (non-fatal):", e.message); }
+
+    try {
+      await fetch(`${GHL_V2}/conversations/`, {
         method: "POST",
         headers,
         body: JSON.stringify({ locationId: ghlLocationId, contactId }),
       });
-      const convoId = convoRes.ok ? ((await convoRes.json()).conversation?.id || null) : null;
-      if (convoId) {
-        const msgRes = await fetch(`${GHL_V2}/conversations/messages/inbound`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            type: "SMS",
-            message,
-            conversationId: convoId,
-            direction: "inbound",
-          }),
-        });
-        if (!msgRes.ok) console.error("GHL inbound message failed:", msgRes.status, (await msgRes.text()).slice(0, 200));
-      }
-    } catch (e) { console.error("GHL conversation post failed (non-fatal):", e.message); }
+    } catch (e) { console.error("GHL conversation create failed (non-fatal):", e.message); }
   }
 
   return contactId;
