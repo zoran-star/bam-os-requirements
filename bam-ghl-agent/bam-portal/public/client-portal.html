@@ -10029,7 +10029,10 @@ function _bbMatcherStrip(connected, sorter) {
     return `<span style="display:inline-flex;align-items:center;gap:6px;">${dot}<span style="font-size:11.5px;font-weight:${current ? '800' : '600'};color:${done ? '#7BC47F' : (current ? 'var(--text,#eee)' : 'var(--text-mute,#888)')};">${label}</span></span>${arrow}`;
   }).join('');
   const doneCount = steps.filter(([, d]) => d).length;
-  const onclick = connected ? 'openPricingSorter(1)' : 'openStripeConnectModal()';
+  // Open at the step you're on: strip index 1/2/3 = sorter step 1/2/3
+  // (index 0 = Stripe connect; all-done reopens at step 1 for review).
+  const sorterStep = currentIdx >= 1 ? currentIdx : 1;
+  const onclick = connected ? `openPricingSorter(${sorterStep})` : 'openStripeConnectModal()';
   return `
     <div class="bb-matcher-strip" role="button" tabindex="0" onclick="${onclick}"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${onclick}}"
@@ -15562,9 +15565,11 @@ function _sorterRender() {
     const done = Number(n) < _SORTER.step;
     const bg = active ? 'var(--accent,#E8C547)' : (done ? 'rgba(123,196,127,0.25)' : 'rgba(255,255,255,0.06)');
     const col = active ? '#1a1a1a' : (done ? '#7BC47F' : 'var(--text-mute,#888)');
-    return `<span style="display:inline-flex;align-items:center;gap:7px;">
+    // Earlier steps are clickable — you can always go back.
+    const back = done ? ` onclick="_sorterGoto(${n})" title="Go back to ${label}"` : '';
+    return `<span${back} style="display:inline-flex;align-items:center;gap:7px;${done ? 'cursor:pointer;' : ''}">
       <span style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;background:${bg};color:${col};">${done ? '✓' : n}</span>
-      <span style="font-size:12.5px;font-weight:${active ? '800' : '600'};color:${active ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};">${label}</span>
+      <span style="font-size:12.5px;font-weight:${active ? '800' : '600'};color:${active ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};${done ? 'text-decoration:underline;text-underline-offset:3px;' : ''}">${label}</span>
     </span>`;
   }).join('<span style="color:var(--text-mute,#888);margin:0 6px;">·</span>');
 
@@ -15590,7 +15595,18 @@ function _sorterRenderBody() {
   else if (_SORTER.step === 3) _sorterRenderStep3(host);
 }
 
-function _sorterBack() { if (_SORTER.step > 1) { _SORTER.step--; _sorterRender(); } }
+// Navigate to a step (backwards from the stepper dots or the Back button).
+// Step 1's price data is lazy — if the modal was opened directly at step 2/3
+// (e.g. from the Pricing strip or Member Onboarding), going back to Match
+// needs the Stripe read it skipped on open.
+function _sorterGoto(n) {
+  if (n === _SORTER.step) return;
+  _SORTER.step = n;
+  _sorterRender();
+  if (n === 1 && !(_SORTER.match.targets || []).length) _sorterLoadStep1();
+}
+
+function _sorterBack() { if (_SORTER.step > 1) _sorterGoto(_SORTER.step - 1); }
 
 function _sorterSetNext(html) {
   const host = document.getElementById('pc-sorter-next-host');
