@@ -1,0 +1,208 @@
+// Public endpoint — receives form submissions from client websites.
+// Saves to Supabase website_leads and (if configured) pushes to GHL as a contact.
+//
+// POST body: { client_id, form_type?, name, email, phone?, fields?, source_url? }
+// fields is a free-form object for any extra form data (e.g. { message: "..." })
+//
+// GHL push activates automatically when the client has ghl_kpi_config.ghl_location
+// set and that location is present in GHL_LOCATIONS_JSON.
+
+import { withSentryApiRoute } from "../_sentry.js";
+
+const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+const GHL_V2 = "https://services.leadconnectorhq.com";
+const V2_VERSION = "2021-07-28";
+
+const ALLOWED_ORIGINS = new Set([
+  "https://byanymeansbball.com",
+  "https://www.byanymeansbball.com",
+  "https://by-any-means-lac.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5500",
+]);
+
+function setCors(req, res) {
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+async function sbReq(path, init = {}) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...init,
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+function loadLocations() {
+  try {
+    return process.env.GHL_LOCATIONS_JSON ? JSON.parse(process.env.GHL_LOCATIONS_JSON) : [];
+  } catch { return []; }
+}
+
+async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId }) {
+  const loc = loadLocations().find(l => l.name === locName);
+  if (!loc) return null;
+
+  const apiKey = loc.apiKeyV2 || loc.apiKey;
+  if (!apiKey) return null;
+
+  const [firstName, ...rest] = (name || "").trim().split(" ");
+  const lastName = rest.join(" ") || undefined;
+
+  const customFields = messageFieldId && message
+    ? [{ id: messageFieldId, field_value: message }]
+    : [];
+
+  const payload = {
+    locationId: ghlLocationId,
+    firstName,
+    ...(lastName ? { lastName } : {}),
+    ...(email ? { email: email.toLowerCase() } : {}),
+    ...(phone ? { phone } : {}),
+    source: "website-form",
+    tags: ["website-inquiry"],
+    ...(customFields.length ? { customFields } : {}),
+  };
+
+  const headers = {
+    Authorization: `Bearer ${apiKey}`,
+    Version: V2_VERSION,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  let contactId = null;
+
+  // Check for existing contact by email to avoid duplicates.
+  if (email) {
+    const searchRes = await fetch(
+      `${GHL_V2}/contacts/?${new URLSearchParams({ locationId: ghlLocationId, email })}`,
+      { headers }
+    );
+    if (searchRes.ok) {
+      const existing = ((await searchRes.json()).contacts || [])[0];
+      if (existing?.id) {
+        await fetch(`${GHL_V2}/contacts/${existing.id}`, {
+          method: "PUT", headers, body: JSON.stringify(payload),
+        });
+        contactId = existing.id;
+      }
+    }
+  }
+
+  if (!contactId) {
+    const createRes = await fetch(`${GHL_V2}/contacts/`, {
+      method: "POST", headers, body: JSON.stringify(payload),
+    });
+    if (!createRes.ok) throw new Error(`GHL ${createRes.status}: ${(await createRes.text()).slice(0, 120)}`);
+    const created = await createRes.json();
+    contactId = (created.contact || created).id || null;
+  }
+
+  // Post message as inbound conversation so it appears in GHL inbox + fires notifications.
+  if (contactId && message) {
+    try {
+      const convoRes = await fetch(`${GHL_V2}/conversations/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ locationId: ghlLocationId, contactId }),
+      });
+      const convoId = convoRes.ok ? ((await convoRes.json()).conversation?.id || null) : null;
+      if (convoId) {
+        await fetch(`${GHL_V2}/conversations/messages`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            type: "Custom",
+            message,
+            conversationId: convoId,
+            direction: "inbound",
+          }),
+        });
+      }
+    } catch { /* non-fatal — contact already saved */ }
+  }
+
+  return contactId;
+}
+
+async function handler(req, res) {
+  setCors(req, res);
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
+
+  const origin = req.headers.origin || "";
+  if (!ALLOWED_ORIGINS.has(origin)) return res.status(403).json({ error: "Forbidden" });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  const b = req.body || {};
+  const { client_id, form_type = "contact", name, email, phone, fields = {}, source_url } = b;
+
+  if (!client_id) return res.status(400).json({ error: "client_id required" });
+  if (!name && !email) return res.status(400).json({ error: "name or email required" });
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: "invalid email" });
+  }
+
+  let client;
+  try {
+    const rows = await sbReq(`clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config&limit=1`);
+    client = rows?.[0];
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+  if (!client) return res.status(404).json({ error: "client not found" });
+
+  const ghlLocName = client.ghl_kpi_config?.ghl_location;
+  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
+  const message = fields?.message || null;
+
+  // GHL first — primary path. No Supabase write on success.
+  if (ghlLocName && client.ghl_location_id) {
+    try {
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
+      if (ghlContactId) {
+        return res.status(200).json({ ok: true, source: "ghl", id: ghlContactId });
+      }
+    } catch (e) {
+      console.error("GHL push failed — falling back to Supabase:", e.message);
+    }
+  }
+
+  // Supabase fallback — only reached when GHL is not configured or push failed.
+  // Ensures no lead is ever silently dropped.
+  try {
+    const rows = await sbReq("website_leads", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        client_id: client.id,
+        form_type,
+        name: name || null,
+        email: email?.toLowerCase() || null,
+        phone: phone || null,
+        fields,
+        source_url: source_url || null,
+      }),
+    });
+    return res.status(200).json({ ok: true, source: "backup", id: rows?.[0]?.id });
+  } catch (e) {
+    return res.status(500).json({ error: `submission failed: ${e.message}` });
+  }
+}
+
+export default withSentryApiRoute(handler);
