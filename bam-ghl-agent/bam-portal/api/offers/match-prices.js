@@ -316,7 +316,37 @@ async function handler(req, res) {
           `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(a.price_id)}`,
           { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) }
         );
-        results.push({ price_id: a.price_id, updated: Array.isArray(r) ? r.length : 0 });
+        let updated = Array.isArray(r) ? r.length : 0;
+        // No catalog row for this price yet (fresh academy / sub-derived price) —
+        // a PATCH alone would silently save nothing, so INSERT it. Needs the
+        // price facts the client sends along (stripe_product_id NOT NULL).
+        if (!updated && a.stripe_product_id && a.amount_cents != null) {
+          await sb(`pricing_catalog`, {
+            method: "POST",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({
+              client_id: clientId,
+              stripe_price_id: a.price_id,
+              stripe_product_id: a.stripe_product_id,
+              display_name: a.name || null,
+              amount_cents: a.amount_cents,
+              currency: a.currency || "cad",
+              interval: a.interval || null,
+              is_routable: (a.tier || "canonical") === "canonical",
+              offer_id: a.offer_id || body.offer_id || null,
+              offer_price_key: a.offer_price_key || null,
+              coachiq_product_id: a.coachiq_product_id || null,
+              tier: a.tier || "canonical",
+              match_status: "confirmed",
+              match_source: "ai",
+              match_confidence: a.confidence != null ? a.confidence : null,
+              matched_at: nowIso(),
+              updated_at: nowIso(),
+            }),
+          });
+          updated = 1;
+        }
+        results.push({ price_id: a.price_id, updated });
       }
       // ENFORCE one LIVE (canonical) price per offer-price: for every key we just
       // set to canonical, demote any OTHER canonical row on that key to legacy.
@@ -352,12 +382,39 @@ async function handler(req, res) {
     const productNames = await fetchProductNames(client.stripe_connect_account_id);
     for (const p of prices) { if (!p.product_name && p.product_id) p.product_name = productNames[p.product_id] || null; }
 
-    // Existing catalog rows → prior tier/plan + so we PATCH the right rows on apply
-    const catalog = await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&select=stripe_price_id,canonical_plan,tier,interval,amount_cents`) || [];
+    // Existing catalog rows → prior tier/plan, SAVED matches (restored below so
+    // approved work survives reopening), + so we PATCH the right rows on apply
+    const catalog = await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&select=stripe_price_id,stripe_product_id,display_name,canonical_plan,tier,interval,amount_cents,currency,offer_id,offer_price_key,coachiq_product_id,match_status`) || [];
     const byPrice = Object.fromEntries(catalog.map(c => [c.stripe_price_id, c]));
     for (const p of prices) {
       const c = byPrice[p.price_id];
       if (c) { p.prior_tier = c.tier; p.prior_plan = c.canonical_plan; }
+    }
+
+    // Saved/created prices with NO live sub yet (e.g. minted via "Create this
+    // price in Stripe" before anyone subscribed) would vanish from a pool built
+    // only from subs — synthesize a zero-member entry so reopening the matcher
+    // still shows them on their plan.
+    const inPool = new Set(prices.map(p => p.price_id));
+    for (const c of catalog) {
+      if (inPool.has(c.stripe_price_id)) continue;
+      if (c.match_status !== "confirmed" || !c.offer_price_key) continue;
+      prices.push({
+        price_id: c.stripe_price_id,
+        product_id: c.stripe_product_id,
+        product_name: c.display_name || null,
+        unit_amount: c.amount_cents,
+        currency: c.currency,
+        interval: c.interval,
+        sub_count: 0,
+        recent_90d: 0,
+        newest_created: null,
+        is_one_time: false,
+        application: null,
+        coachiq_product_id: c.coachiq_product_id || null,
+        prior_tier: c.tier,
+        prior_plan: c.canonical_plan,
+      });
     }
 
     // Targets = what the academy filled out in their Offers → Pricing section.
@@ -367,10 +424,44 @@ async function handler(req, res) {
     }
     const targetByKey = Object.fromEntries(targets.map(t => [t.key, t]));
 
-    const matches = await aiMatch(targets, prices);
+    // A price whose catalog row is already CONFIRMED on a still-existing plan is
+    // SAVED state — restore it verbatim and don't re-ask the AI about it. The AI
+    // only sees genuinely undecided prices (and is skipped entirely when none).
+    const isSaved = (p) => {
+      const c = byPrice[p.price_id];
+      return !!(c && c.match_status === "confirmed" && c.offer_price_key && targetByKey[c.offer_price_key]);
+    };
+    const undecided = prices.filter(p => !isSaved(p));
+    const matches = undecided.length ? await aiMatch(targets, undecided) : [];
     const byId = Object.fromEntries(matches.map(m => [m.price_id, m]));
 
     const proposals = prices.map(p => {
+      const c = byPrice[p.price_id];
+      if (isSaved(p)) {
+        const tgt = targetByKey[c.offer_price_key];
+        return {
+          price_id: p.price_id,
+          product_id: p.product_id,
+          name: p.product_name || p.nickname,
+          amount_cents: p.unit_amount,
+          currency: p.currency,
+          interval: p.interval,
+          sub_count: p.sub_count,
+          recent_90d: p.recent_90d || 0,
+          newest_signup: p.newest_created ? new Date(p.newest_created * 1000).toISOString().slice(0, 10) : null,
+          is_one_time: p.is_one_time === true,
+          application: p.application,
+          coachiq_product_id: p.coachiq_product_id || c.coachiq_product_id || null,
+          prior_tier: c.tier,
+          proposed_offer_price_key: c.offer_price_key,
+          offer_id: c.offer_id || tgt.offer_id,
+          proposed_tier: c.tier === "canonical" ? "canonical" : "legacy",
+          confidence: 1,
+          needs_review: false,
+          saved: true,
+          reason: "saved match",
+        };
+      }
       const m = byId[p.price_id] || {};
       const key = m.offer_price_key || null;
       const tgt = key ? targetByKey[key] : null;
