@@ -494,14 +494,13 @@ function StatusPill({ client, tokens }) {
   const derived = deriveClientStatus(client, t);
   const isLive = client.status === "active" || (derived && derived.label === "Live");
 
-  // "Good" → full green bar.
+  // "Good" → full green bar. Just the bar — detail lives in the hover tooltip.
   if (isLive) {
     return (
-      <div style={{ minWidth: 120, maxWidth: 140 }}>
+      <div style={{ minWidth: 120, maxWidth: 140 }} title="Live">
         <div style={{ height: 8, borderRadius: 999, background: `${t.green}22`, overflow: "hidden" }}>
           <div style={{ width: "100%", height: "100%", background: t.green }} />
         </div>
-        <div style={{ fontSize: 10, color: t.green, fontWeight: 700, letterSpacing: "0.06em", marginTop: 4 }}>LIVE</div>
       </div>
     );
   }
@@ -523,7 +522,6 @@ function StatusPill({ client, tokens }) {
       <div style={{ height: 8, borderRadius: 999, background: `${t.amber}22`, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: t.amber, transition: "width .3s ease" }} />
       </div>
-      <div style={{ fontSize: 10, color: t.textMute, fontWeight: 600, marginTop: 4 }}>{done}/{total}{derived ? ` · ${derived.label}` : " · Onboarding"}</div>
     </div>
   );
 }
