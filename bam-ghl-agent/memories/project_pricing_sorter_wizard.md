@@ -7,6 +7,16 @@ metadata:
 
 # The Pricing Sorter (onboarding wizard)
 
+> **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
+> action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
+> Offers → Pricing card now ends with a **clickable progress strip** ("🧮 Stripe
+> Matcher", hover glow, whole strip opens the matcher — or the Stripe connect
+> modal when not connected): left→right step checkboxes **Stripe → Match →
+> Import → Cleanup**. Done-flags ride the existing `/api/members?scope=client`
+> payload as a new `sorter: {matched, imported, promoted}` object — three
+> limit-1 exists-checks (pricing_catalog `match_status=confirmed` / any
+> `members_staging` row / any `promoted=true` staging row). PR #216.
+
 > **2026-06-10 — NEW HOMES.** The Pricing nav page + temp launch button are GONE.
 > `openPricingSorter(step)` now takes a start step, launched from Business
 > Blueprint: **Step 1 (match)** from BB → Offers → Pricing section (with a
