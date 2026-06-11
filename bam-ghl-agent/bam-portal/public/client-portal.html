@@ -6770,7 +6770,7 @@ Then the call to action."]</div>
          vanilla _SORTER module appended after applyAiMatch() below.
     ══════════════════════════════ -->
     <div id="pc-sorter-overlay" onclick="closePricingSorter()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:130;"></div>
-    <div id="pc-sorter-modal" role="dialog" aria-modal="true" aria-label="The Pricing Sorter" style="display:none; flex-direction:column; position:fixed; z-index:131; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1100px,96vw); max-height:92vh; overflow:hidden; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
+    <div id="pc-sorter-modal" role="dialog" aria-modal="true" aria-label="Stripe Matcher" style="display:none; flex-direction:column; position:fixed; z-index:131; top:50%; left:50%; transform:translate(-50%,-50%); width:min(1100px,96vw); max-height:92vh; overflow:hidden; background:var(--surface,#16161a); border:1px solid var(--border,#2a2a31); border-radius:14px; padding:20px 22px;"></div>
 
     <!-- ══════════════════════════════
          CALENDAR VIEW (weekly schedule, V2-gated)
@@ -7363,6 +7363,21 @@ Then the call to action."]</div>
       #view-blueprint .bb-offer-tile:hover {
         transform: translateY(-2px);
         border-color: var(--border-str);
+      }
+      /* Stripe Matcher progress strip (bottom of the BB Pricing card) —
+         the whole strip is one click target that re-opens the matcher. */
+      #view-blueprint .bb-matcher-strip {
+        margin-top:14px;
+        border:1px solid var(--border, #2a2a31);
+        border-radius:10px;
+        padding:12px 14px;
+        cursor:pointer;
+        transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
+      }
+      #view-blueprint .bb-matcher-strip:hover {
+        border-color: var(--accent, #E8C547);
+        background: rgba(232,197,71,0.06);
+        transform: translateY(-1px);
       }
       #view-blueprint .bb-offer-tile-title {
         font-size:15px; font-weight:600; color:var(--text);
@@ -9911,6 +9926,7 @@ async function _bbRenderOffersPricing() {
   if (!host || (typeof V2_ACCESS !== 'undefined' && !V2_ACCESS)) return;
   host.innerHTML = `<div class="bb-empty" style="padding:14px 0">Checking your Stripe connection…</div>`;
   let stripe = { status: 'not_connected' };
+  let sorterProgress = null;
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/members?scope=client&client_id=' + encodeURIComponent(CLIENT_ID), {
@@ -9919,6 +9935,7 @@ async function _bbRenderOffersPricing() {
     const json = await _safeJson(r);
     if (r.ok) {
       stripe = json.stripe || stripe;
+      sorterProgress = json.sorter || null;
       if (typeof renderStripeConnectButton === 'function') renderStripeConnectButton(stripe); // caches state for the modal
       if (json.ghl && typeof renderGhlConnectButton === 'function') renderGhlConnectButton(json.ghl);
     }
@@ -9927,9 +9944,6 @@ async function _bbRenderOffersPricing() {
   const pill = connected
     ? `<span style="font-size:11px;font-weight:700;color:#2e9e54;border:1px solid #1f7a3d;border-radius:999px;padding:4px 10px;">● Stripe connected</span>`
     : `<button onclick="openStripeConnectModal()" style="font-size:12px;font-weight:700;padding:7px 14px;border-radius:999px;border:none;background:var(--gold,#E8C547);color:#0B0B0D;cursor:pointer;">Connect Stripe →</button>`;
-  const matchBtn = connected
-    ? `<button onclick="openPricingSorter(1)" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">🧮 Match prices to Stripe →</button>`
-    : `<button disabled title="Connect Stripe first" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:not-allowed;">🔒 Match prices to Stripe</button>`;
   host.innerHTML = `
     <div style="margin-top:22px;border:1px solid var(--border,#2a2a31);border-radius:12px;padding:16px 18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
@@ -9937,8 +9951,45 @@ async function _bbRenderOffersPricing() {
           <div style="font-weight:800;font-size:14px;">Pricing</div>
           <div style="font-size:12px;color:var(--text-mute,#888);margin-top:3px;">Link each plan above to the Stripe price it bills — new signups use the Live price; old prices are recognized as Legacy.</div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">${pill}${matchBtn}</div>
+        <div style="display:flex;align-items:center;gap:10px;">${pill}</div>
       </div>
+      ${_bbMatcherStrip(connected, sorterProgress)}
+    </div>`;
+}
+
+// The "Stripe Matcher" progress strip at the bottom of the BB Pricing card.
+// Left→right step checkboxes (Stripe → Match → Import → Cleanup); the whole
+// strip is one click target that re-opens the matcher (or the Stripe connect
+// modal when not yet connected). Done-flags come from /api/members `sorter`.
+function _bbMatcherStrip(connected, sorter) {
+  const steps = [
+    ['Stripe',  connected],
+    ['Match',   !!(sorter && sorter.matched)],
+    ['Import',  !!(sorter && sorter.imported)],
+    ['Cleanup', !!(sorter && sorter.promoted)],
+  ];
+  const currentIdx = steps.findIndex(([, done]) => !done); // -1 = all done
+  const cells = steps.map(([label, done], i) => {
+    const current = i === currentIdx;
+    const dot = done
+      ? `<span style="flex:none;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;background:rgba(123,196,127,0.18);color:#7BC47F;border:1px solid #1f7a3d;">✓</span>`
+      : `<span style="flex:none;width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;background:${current ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.06)'};color:${current ? '#1a1a1a' : 'var(--text-mute,#888)'};">${i + 1}</span>`;
+    const arrow = i < steps.length - 1
+      ? `<span style="flex:1 0 12px;min-width:12px;max-width:34px;height:1px;background:${done ? '#1f7a3d' : 'var(--border,#2a2a31)'};"></span>`
+      : '';
+    return `<span style="display:inline-flex;align-items:center;gap:6px;">${dot}<span style="font-size:11.5px;font-weight:${current ? '800' : '600'};color:${done ? '#7BC47F' : (current ? 'var(--text,#eee)' : 'var(--text-mute,#888)')};">${label}</span></span>${arrow}`;
+  }).join('');
+  const doneCount = steps.filter(([, d]) => d).length;
+  const onclick = connected ? 'openPricingSorter(1)' : 'openStripeConnectModal()';
+  return `
+    <div class="bb-matcher-strip" role="button" tabindex="0" onclick="${onclick}"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${onclick}}"
+         aria-label="Open the Stripe Matcher">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <span style="font-size:12.5px;font-weight:800;">🧮 Stripe Matcher</span>
+        <span style="font-size:11px;font-weight:700;color:var(--text-mute,#888);">${doneCount === steps.length ? '✓ all done' : doneCount + '/' + steps.length} · Open →</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">${cells}</div>
     </div>`;
 }
 
@@ -13946,7 +13997,7 @@ const ONB_UI = {
   brand:          { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('brand')" } },
   offers:         { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('offers')" } },
   // The Pricing Sorter — gated: locked until the sibling 'offers' step is done.
-  pricing_sorter: { auto: false, cta: { label: 'Open The Pricing Sorter ↗', fn: 'openPricingSorter()' } },
+  pricing_sorter: { auto: false, cta: { label: 'Open Stripe Matcher ↗', fn: 'openPricingSorter()' } },
   book_call:      { auto: false, cta: null },   // CTA is dynamic — see _aiBookCallCta()
   kpis:           { auto: false, cta: { label: 'Open ↗',      fn: "_aiOpenBB('kpis')" } },
   book_call_cam:  { auto: false, cta: null },   // CTA is dynamic — see _aiCamCallCta()
@@ -15332,7 +15383,7 @@ function _sorterRender() {
 
   modal.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="font-size:18px;font-weight:800;">🧮 The Pricing Sorter</div>
+      <div style="font-size:18px;font-weight:800;">🧮 Stripe Matcher</div>
       <button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
     </div>
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;flex:none;">${dots}</div>
@@ -15945,7 +15996,7 @@ async function fetchAndRenderPricing() {
       const sb = document.createElement('button');
       sb.id = 'pc-sorter-launch-btn';
       sb.type = 'button';
-      sb.textContent = '🧮 The Pricing Sorter';
+      sb.textContent = '🧮 Stripe Matcher';
       sb.setAttribute('onclick', 'openPricingSorter()');
       sb.style.cssText = 'margin-left:10px; align-self:center; font-size:13px; font-weight:700; padding:9px 15px; border-radius:9px; border:1px solid var(--accent); background:rgba(232,197,71,0.12); color:var(--accent); cursor:pointer;';
       _aiBtn.insertAdjacentElement('afterend', sb);
