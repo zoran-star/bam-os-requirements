@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Systems Ticket Flow — BAM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E0F0D; --ink-2:#151613; --ink-3:#1D1E1A;
+    --line:#2A2B26; --line-2:#3A3B34;
+    --text:#EDEBE3; --text-sub:#A6A498; --text-mute:#6E6C61;
+    --gold:#E8C547; --gold-dim:#8a7a35;
+    --ok:#9DB87A; --bad:#B8786E;
+    --r:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--ink); color:var(--text);
+    font-family:'Inter',sans-serif; font-size:14px;
+    overflow:hidden;
+  }
+
+  /* ── Top bar ─────────────────────────────────────── */
+  header{
+    height:58px; display:flex; align-items:center; gap:18px;
+    padding:0 20px; border-bottom:1px solid var(--line);
+    background:var(--ink);
+    position:relative; z-index:30;
+  }
+  header h1{
+    font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700;
+    letter-spacing:.01em; white-space:nowrap;
+  }
+  header h1 span{color:var(--gold)}
+  .legend{display:flex; gap:14px; margin-left:8px}
+  .legend b{
+    font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500;
+    letter-spacing:.12em; color:var(--text-mute);
+  }
+  .legend b i{font-style:normal; margin-right:5px}
+  .spacer{flex:1}
+  button{
+    font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500;
+    letter-spacing:.06em; cursor:pointer; border-radius:var(--r);
+    border:1px solid var(--line-2); background:var(--ink-3); color:var(--text-sub);
+    padding:8px 14px; transition:border-color .15s,color .15s,background .15s;
+    white-space:nowrap;
+  }
+  button:hover{border-color:var(--text-mute); color:var(--text)}
+  button.primary{
+    background:var(--gold); border-color:var(--gold); color:#171204; font-weight:700;
+  }
+  button.primary:hover{background:#f0d05e; border-color:#f0d05e}
+  button.danger:hover{border-color:var(--bad); color:var(--bad)}
+
+  /* ── Canvas ──────────────────────────────────────── */
+  #viewport{
+    position:absolute; inset:58px 0 0 0; overflow:auto;
+    background:
+      radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0) 0 0/28px 28px,
+      var(--ink);
+  }
+  #canvas{position:relative; width:1560px; height:880px}
+  #wires{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+
+  /* ── Nodes ───────────────────────────────────────── */
+  .node{
+    position:absolute; width:188px; min-height:64px;
+    background:var(--ink-2); border:1px solid var(--line-2); border-radius:var(--r);
+    padding:10px 12px 9px; cursor:grab; user-select:none;
+    transition:border-color .15s;
+  }
+  .node:hover{border-color:var(--text-mute)}
+  .node.selected{border-color:var(--gold)}
+  .node.dragging{cursor:grabbing}
+  .node .key{
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.14em;
+    color:var(--text-mute); text-transform:uppercase; margin-bottom:4px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .node .key em{font-style:normal}
+  .node h3{
+    font-family:'Space Grotesk',sans-serif; font-size:14.5px; font-weight:600;
+    letter-spacing:.005em; line-height:1.2;
+  }
+  .node p{font-size:11px; color:var(--text-sub); margin-top:3px; line-height:1.35}
+  .node.terminal-done{border-color:var(--gold-dim)}
+  .node.terminal-done h3{color:var(--gold)}
+  .node.terminal-dead{border-style:dashed}
+  .node.terminal-dead h3{color:var(--text-mute)}
+  .node.entry{background:transparent; border-style:dashed}
+
+  /* ── Edge labels ─────────────────────────────────── */
+  .elabel{
+    position:absolute; transform:translate(-50%,-50%);
+    background:var(--ink-3); border:1px solid var(--line-2); border-radius:var(--r);
+    padding:3px 8px 4px; cursor:pointer; user-select:none; text-align:center;
+    transition:border-color .15s; max-width:175px; z-index:5;
+  }
+  .elabel:hover{border-color:var(--text-mute)}
+  .elabel.selected{border-color:var(--gold)}
+  .elabel .btn-name{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:500;
+    color:var(--text); letter-spacing:.02em; line-height:1.3; display:block;
+  }
+  .elabel .who{
+    font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--text-mute); display:block; margin-top:1px;
+  }
+  .who-manager{color:var(--gold-dim)!important}
+  .who-client{color:var(--ok)!important}
+
+  /* ── Edit panel ──────────────────────────────────── */
+  #panel{
+    position:absolute; top:78px; right:20px; width:268px; z-index:40;
+    background:var(--ink-2); border:1px solid var(--line-2); border-radius:var(--r);
+    padding:16px; display:none;
+  }
+  #panel.show{display:block}
+  #panel h4{
+    font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500;
+    letter-spacing:.14em; color:var(--gold); text-transform:uppercase; margin-bottom:12px;
+  }
+  #panel label{
+    display:block; font-family:'JetBrains Mono',monospace; font-size:9px;
+    letter-spacing:.12em; color:var(--text-mute); text-transform:uppercase;
+    margin:10px 0 4px;
+  }
+  #panel input[type=text], #panel select, #panel textarea{
+    width:100%; background:var(--ink); border:1px solid var(--line-2);
+    border-radius:var(--r); color:var(--text); padding:7px 9px;
+    font-family:'Inter',sans-serif; font-size:13px; outline:none;
+  }
+  #panel textarea{resize:vertical; min-height:48px; font-size:12px}
+  #panel input:focus, #panel select:focus, #panel textarea:focus{border-color:var(--gold)}
+  #panel .row{display:flex; gap:8px; margin-top:14px}
+  #panel .row button{flex:1; padding:7px 0}
+  #panel .check{display:flex; align-items:center; gap:8px; margin-top:10px}
+  #panel .check label{margin:0}
+  #panel .check input{accent-color:var(--gold)}
+
+  /* ── Hint banner / toast ─────────────────────────── */
+  #hint{
+    position:absolute; left:50%; top:74px; transform:translateX(-50%);
+    background:var(--ink-3); border:1px solid var(--gold-dim); border-radius:var(--r);
+    color:var(--gold); padding:8px 16px; z-index:50; display:none;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.05em;
+  }
+  #toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(8px);
+    background:var(--gold); color:#171204; border-radius:var(--r);
+    padding:10px 18px; font-family:'JetBrains Mono',monospace; font-size:11.5px;
+    font-weight:700; letter-spacing:.04em; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; z-index:60;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  footer{
+    position:fixed; left:20px; bottom:16px; z-index:30;
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.1em;
+    color:var(--text-mute); text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SYSTEMS · <span>TICKET FLOW</span></h1>
+  <div class="legend">
+    <b><i style="color:var(--ok)">●</i>CLIENT</b>
+    <b><i style="color:var(--text-sub)">●</i>EXECUTOR</b>
+    <b><i style="color:var(--gold)">●</i>MANAGER</b>
+    <b><i style="color:var(--text-mute)">●</i>ANY STAFF</b>
+  </div>
+  <div class="spacer"></div>
+  <button id="btnAddNode">+ STAGE</button>
+  <button id="btnAddEdge">+ ARROW</button>
+  <button id="btnReset" class="danger">RESET</button>
+  <button id="btnCopy" class="primary">⧉ COPY PROMPT FOR CLAUDE</button>
+</header>
+
+<div id="hint"></div>
+
+<div id="viewport"><div id="canvas">
+  <svg id="wires">
+    <defs>
+      <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#6E6C61"></path>
+      </marker>
+      <marker id="arr-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#E8C547"></path>
+      </marker>
+    </defs>
+    <g id="wireG"></g>
+  </svg>
+</div></div>
+
+<div id="panel"></div>
+<div id="toast"></div>
+<footer>drag boxes · click a box or arrow label to edit · double-click empty space = new stage</footer>
+
+<!-- ════════════════════════════════════════════════════════════════
+     FLOW DATA — Claude edits this block when you paste the prompt back.
+     nodes: id, label, sub, who(badge top-right), x, y, kind(normal|entry|done|dead)
+     edges: from, to, label(the button), who(client|executor|manager|staff), dashed
+     ════════════════════════════════════════════════════════════════ -->
+<script type="application/json" id="flow-data">
+{
+  "nodes": [
+    { "id": "submit",          "label": "Client submits ticket", "sub": "Error · Change · Build — from the client portal", "who": "CLIENT", "x": 40,   "y": 80,  "kind": "entry" },
+    { "id": "open",            "label": "Open",                  "sub": "Delegation pool — waiting for a manager",         "who": "POOL",   "x": 40,   "y": 252, "kind": "normal" },
+    { "id": "delegated",       "label": "Delegated",             "sub": "Assigned to an executor",                          "who": "",       "x": 318,  "y": 252, "kind": "normal" },
+    { "id": "in_progress",     "label": "In Progress",           "sub": "Executor is building / fixing",                    "who": "",       "x": 596,  "y": 252, "kind": "normal" },
+    { "id": "awaiting_client", "label": "Awaiting Client",       "sub": "Blocked on info or assets from the client",        "who": "",       "x": 596,  "y": 470, "kind": "normal" },
+    { "id": "in_review",       "label": "In Review",             "sub": "Manager checks the work + user guide",             "who": "",       "x": 902,  "y": 252, "kind": "normal" },
+    { "id": "needs_rework",    "label": "Needs Rework",          "sub": "Denied with notes — back to the executor",         "who": "",       "x": 902,  "y": 470, "kind": "normal" },
+    { "id": "final_review",    "label": "Final Review",          "sub": "Client sign-off on the finished work",             "who": "",       "x": 1190, "y": 90,  "kind": "normal" },
+    { "id": "done",            "label": "Done ✓",                "sub": "Resolved — guide saved, loop closed",              "who": "",       "x": 1190, "y": 252, "kind": "done" },
+    { "id": "cancelled",       "label": "Cancelled ✕",           "sub": "Hard-cancelled from any non-final stage",          "who": "",       "x": 318,  "y": 610, "kind": "dead" }
+  ],
+  "edges": [
+    { "from": "submit",          "to": "open",            "label": "Submit ticket",          "who": "client",   "dashed": false },
+    { "from": "open",            "to": "delegated",       "label": "Delegate → pick person", "who": "manager",  "dashed": false },
+    { "from": "delegated",       "to": "in_progress",     "label": "Start",                  "who": "executor", "dashed": false },
+    { "from": "in_progress",     "to": "awaiting_client", "label": "Request client action",  "who": "staff",    "dashed": false },
+    { "from": "awaiting_client", "to": "in_progress",     "label": "Client responds",        "who": "client",   "dashed": false },
+    { "from": "awaiting_client", "to": "in_progress",     "label": "Cancel request",         "who": "staff",    "dashed": true },
+    { "from": "in_progress",     "to": "in_review",       "label": "Submit for review",      "who": "executor", "dashed": false },
+    { "from": "in_review",       "to": "needs_rework",    "label": "Deny + notes",           "who": "manager",  "dashed": false },
+    { "from": "needs_rework",    "to": "in_review",       "label": "Resubmit for review",    "who": "executor", "dashed": false },
+    { "from": "in_review",       "to": "done",            "label": "Mark complete",          "who": "manager",  "dashed": false },
+    { "from": "in_review",       "to": "final_review",    "label": "Send for final review",  "who": "manager",  "dashed": false },
+    { "from": "final_review",    "to": "done",            "label": "Client approves",        "who": "client",   "dashed": false },
+    { "from": "final_review",    "to": "in_progress",     "label": "Client feedback",        "who": "client",   "dashed": false },
+    { "from": "in_progress",     "to": "cancelled",       "label": "Cancel ticket",          "who": "staff",    "dashed": true }
+  ]
+}
+</script>
+
+<script>
+/* ════════════════ state ════════════════ */
+const DEFAULT_FLOW = JSON.parse(document.getElementById("flow-data").textContent);
+const LS_KEY = "bam-systems-ticket-flow-v1";
+let flow = loadFlow();
+let selected = null;            // {type:'node'|'edge', i:index}
+let edgeMode = null;            // null | 'pick-from' | {from:nodeId}
+
+function loadFlow(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(LS_KEY));
+    if (saved && saved.nodes && saved.edges) return saved;
+  }catch(e){}
+  return structuredClone(DEFAULT_FLOW);
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(flow)); }
+
+/* ════════════════ rendering ════════════════ */
+const canvas = document.getElementById("canvas");
+const wireG  = document.getElementById("wireG");
+const NODE_W = 188;
+
+function nodeEl(id){ return canvas.querySelector(`.node[data-id="${CSS.escape(id)}"]`); }
+function nodeRect(n){
+  const el = nodeEl(n.id);
+  const h = el ? el.offsetHeight : 64;
+  return { x:n.x, y:n.y, w:NODE_W, h };
+}
+// point on rect border along the line toward (tx,ty)
+function borderPoint(r, tx, ty){
+  const cx = r.x + r.w/2, cy = r.y + r.h/2;
+  const dx = tx - cx, dy = ty - cy;
+  if (!dx && !dy) return {x:cx, y:cy};
+  const sx = dx ? (r.w/2) / Math.abs(dx) : Infinity;
+  const sy = dy ? (r.h/2) / Math.abs(dy) : Infinity;
+  const s = Math.min(sx, sy);
+  return { x: cx + dx*s, y: cy + dy*s };
+}
+
+function render(){
+  // nodes
+  canvas.querySelectorAll(".node").forEach(e=>e.remove());
+  flow.nodes.forEach((n,i)=>{
+    const d = document.createElement("div");
+    d.className = "node" + (n.kind==="entry"?" entry":"") + (n.kind==="done"?" terminal-done":"") + (n.kind==="dead"?" terminal-dead":"");
+    if (selected?.type==="node" && selected.i===i) d.classList.add("selected");
+    d.dataset.id = n.id;
+    d.style.left = n.x+"px"; d.style.top = n.y+"px";
+    d.innerHTML = `<div class="key"><em>${esc(n.id)}</em><em>${esc(n.who||"")}</em></div>
+                   <h3>${esc(n.label)}</h3>${n.sub?`<p>${esc(n.sub)}</p>`:""}`;
+    attachNodeEvents(d, i);
+    canvas.appendChild(d);
+  });
+  drawEdges();
+  renderPanel();
+}
+
+function drawEdges(){
+  wireG.innerHTML = "";
+  canvas.querySelectorAll(".elabel").forEach(e=>e.remove());
+  // group parallel/opposite edges so curves fan out instead of overlapping
+  const pairCount = {};
+  flow.edges.forEach((e,i)=>{
+    const a = flow.nodes.find(n=>n.id===e.from), b = flow.nodes.find(n=>n.id===e.to);
+    if (!a || !b) return;
+    const ra = nodeRect(a), rb = nodeRect(b);
+    const key = [e.from,e.to].sort().join("→");
+    const k = (pairCount[key] = (pairCount[key]||0)+1) - 1;     // 0,1,2…
+    const offset = k===0 ? 0 : (k%2 ? 1 : -1) * Math.ceil(k/2) * 46;
+
+    const p1 = borderPoint(ra, rb.x+rb.w/2, rb.y+rb.h/2);
+    const p2 = borderPoint(rb, ra.x+ra.w/2, ra.y+ra.h/2);
+    const mx = (p1.x+p2.x)/2, my = (p1.y+p2.y)/2;
+    const len = Math.hypot(p2.x-p1.x, p2.y-p1.y) || 1;
+    const nx = -(p2.y-p1.y)/len, ny = (p2.x-p1.x)/len;          // unit normal
+    const cx = mx + nx*offset, cy = my + ny*offset;
+
+    const sel = selected?.type==="edge" && selected.i===i;
+    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("d", `M ${p1.x} ${p1.y} Q ${cx} ${cy} ${p2.x} ${p2.y}`);
+    path.setAttribute("fill","none");
+    path.setAttribute("stroke", sel ? "#E8C547" : "#6E6C61");
+    path.setAttribute("stroke-width", sel ? 1.8 : 1.4);
+    if (e.dashed) path.setAttribute("stroke-dasharray","5 5");
+    path.setAttribute("marker-end", sel ? "url(#arr-sel)" : "url(#arr)");
+    wireG.appendChild(path);
+
+    // label at curve midpoint (t=.5 on the quadratic)
+    const lx = .25*p1.x + .5*cx + .25*p2.x;
+    const ly = .25*p1.y + .5*cy + .25*p2.y;
+    const lab = document.createElement("div");
+    lab.className = "elabel" + (sel?" selected":"");
+    lab.style.left = lx+"px"; lab.style.top = ly+"px";
+    lab.innerHTML = `<span class="btn-name">${esc(e.label)}</span>
+                     <span class="who who-${esc(e.who)}">${esc(e.who)}</span>`;
+    lab.addEventListener("mousedown", ev=>ev.stopPropagation());
+    lab.addEventListener("click", ev=>{ ev.stopPropagation(); select("edge", i); });
+    canvas.appendChild(lab);
+  });
+}
+
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+/* ════════════════ node drag + select ════════════════ */
+function attachNodeEvents(el, i){
+  el.addEventListener("mousedown", ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    if (edgeMode){ handleEdgePick(flow.nodes[i].id); return; }
+    const n = flow.nodes[i];
+    const startX = ev.clientX, startY = ev.clientY, ox = n.x, oy = n.y;
+    let moved = false;
+    el.classList.add("dragging");
+    const mm = e=>{
+      const dx = e.clientX-startX, dy = e.clientY-startY;
+      if (Math.abs(dx)+Math.abs(dy) > 3) moved = true;
+      n.x = Math.max(0, ox+dx); n.y = Math.max(0, oy+dy);
+      el.style.left = n.x+"px"; el.style.top = n.y+"px";
+      drawEdges();
+    };
+    const mu = ()=>{
+      document.removeEventListener("mousemove",mm);
+      document.removeEventListener("mouseup",mu);
+      el.classList.remove("dragging");
+      if (moved){ save(); render(); } else select("node", i);
+    };
+    document.addEventListener("mousemove",mm);
+    document.addEventListener("mouseup",mu);
+  });
+}
+
+function select(type, i){ selected = {type, i}; render(); }
+function deselect(){ selected = null; render(); }
+
+document.getElementById("viewport").addEventListener("mousedown", ev=>{
+  if (ev.target.closest(".node,.elabel,#panel")) return;
+  if (edgeMode){ setEdgeMode(null); return; }
+  deselect();
+});
+canvas.addEventListener("dblclick", ev=>{
+  if (ev.target.closest(".node,.elabel")) return;
+  const r = canvas.getBoundingClientRect();
+  addNode(ev.clientX-r.x-NODE_W/2, ev.clientY-r.y-30);
+});
+
+/* ════════════════ edit panel ════════════════ */
+const panel = document.getElementById("panel");
+function renderPanel(){
+  if (!selected){ panel.className=""; panel.innerHTML=""; return; }
+  panel.className = "show";
+  if (selected.type==="node"){
+    const n = flow.nodes[selected.i];
+    panel.innerHTML = `
+      <h4>EDIT STAGE</h4>
+      <label>Title</label><input type="text" id="f-label" value="${esc(n.label)}">
+      <label>Description</label><textarea id="f-sub">${esc(n.sub||"")}</textarea>
+      <label>Badge (top-right)</label><input type="text" id="f-who" value="${esc(n.who||"")}">
+      <label>Style</label>
+      <select id="f-kind">
+        <option value="normal"${n.kind==="normal"?" selected":""}>Normal</option>
+        <option value="entry"${n.kind==="entry"?" selected":""}>Entry (dashed)</option>
+        <option value="done"${n.kind==="done"?" selected":""}>Terminal — done (gold)</option>
+        <option value="dead"${n.kind==="dead"?" selected":""}>Terminal — dead end</option>
+      </select>
+      <div class="row">
+        <button id="f-apply" class="primary">APPLY</button>
+        <button id="f-del" class="danger">DELETE</button>
+      </div>`;
+    panel.querySelector("#f-apply").onclick = ()=>{
+      n.label = v("f-label"); n.sub = v("f-sub"); n.who = v("f-who"); n.kind = v("f-kind");
+      save(); render();
+    };
+    panel.querySelector("#f-del").onclick = ()=>{
+      flow.edges = flow.edges.filter(e=>e.from!==n.id && e.to!==n.id);
+      flow.nodes.splice(selected.i,1);
+      selected = null; save(); render();
+    };
+  } else {
+    const e = flow.edges[selected.i];
+    panel.innerHTML = `
+      <h4>EDIT ARROW</h4>
+      <label>Button / action label</label><input type="text" id="f-label" value="${esc(e.label)}">
+      <label>Who presses it</label>
+      <select id="f-who">
+        ${["client","executor","manager","staff"].map(w=>`<option value="${w}"${e.who===w?" selected":""}>${w}</option>`).join("")}
+      </select>
+      <div class="check"><input type="checkbox" id="f-dash"${e.dashed?" checked":""}><label for="f-dash">Dashed line</label></div>
+      <div class="check"><button id="f-flip" style="width:100%">⇄ FLIP DIRECTION</button></div>
+      <div class="row">
+        <button id="f-apply" class="primary">APPLY</button>
+        <button id="f-del" class="danger">DELETE</button>
+      </div>`;
+    panel.querySelector("#f-apply").onclick = ()=>{
+      e.label = v("f-label"); e.who = v("f-who");
+      e.dashed = panel.querySelector("#f-dash").checked;
+      save(); render();
+    };
+    panel.querySelector("#f-flip").onclick = ()=>{ [e.from,e.to]=[e.to,e.from]; save(); render(); };
+    panel.querySelector("#f-del").onclick = ()=>{ flow.edges.splice(selected.i,1); selected=null; save(); render(); };
+  }
+}
+function v(id){ return panel.querySelector("#"+id).value.trim(); }
+
+/* ════════════════ add stage / add arrow ════════════════ */
+function addNode(x,y){
+  let i=1; while (flow.nodes.some(n=>n.id==="stage_"+i)) i++;
+  flow.nodes.push({ id:"stage_"+i, label:"New stage", sub:"", who:"", x:Math.max(0,x), y:Math.max(0,y), kind:"normal" });
+  save(); render(); select("node", flow.nodes.length-1);
+}
+document.getElementById("btnAddNode").onclick = ()=>{
+  const vp = document.getElementById("viewport");
+  addNode(vp.scrollLeft+vp.clientWidth/2-NODE_W/2, vp.scrollTop+vp.clientHeight/2-40);
+};
+
+const hint = document.getElementById("hint");
+function setEdgeMode(m){
+  edgeMode = m;
+  hint.style.display = m ? "block" : "none";
+  hint.textContent = m==="pick-from" ? "ADD ARROW — click the FROM stage (esc to cancel)"
+                   : m ? "now click the TO stage" : "";
+}
+document.getElementById("btnAddEdge").onclick = ()=> setEdgeMode("pick-from");
+document.addEventListener("keydown", e=>{ if (e.key==="Escape") setEdgeMode(null); });
+function handleEdgePick(id){
+  if (edgeMode==="pick-from"){ setEdgeMode({from:id}); return; }
+  if (edgeMode && edgeMode.from){
+    if (edgeMode.from!==id){
+      flow.edges.push({ from:edgeMode.from, to:id, label:"New action", who:"staff", dashed:false });
+      save(); render(); select("edge", flow.edges.length-1);
+    }
+    setEdgeMode(null);
+  }
+}
+
+/* ════════════════ reset ════════════════ */
+document.getElementById("btnReset").onclick = ()=>{
+  if (!confirm("Throw away your browser edits and go back to the saved file version?")) return;
+  localStorage.removeItem(LS_KEY);
+  flow = structuredClone(DEFAULT_FLOW);
+  selected = null; render();
+};
+
+/* ════════════════ copy prompt ════════════════ */
+function diffSummary(){
+  const out = [];
+  const dn = new Map(DEFAULT_FLOW.nodes.map(n=>[n.id,n]));
+  const cn = new Map(flow.nodes.map(n=>[n.id,n]));
+  for (const [id,n] of cn){
+    const o = dn.get(id);
+    if (!o) out.push(`+ added stage "${n.label}" (${id})`);
+    else if (o.label!==n.label || o.sub!==n.sub) out.push(`~ edited stage ${id}: "${o.label}" → "${n.label}"`);
+  }
+  for (const [id,o] of dn) if (!cn.has(id)) out.push(`- removed stage "${o.label}" (${id})`);
+  const ekey = e=>`${e.from}→${e.to}:${e.label}`;
+  const de = new Set(DEFAULT_FLOW.edges.map(ekey)), ce = new Set(flow.edges.map(ekey));
+  for (const e of flow.edges) if (!de.has(ekey(e))) out.push(`+ arrow ${e.from} → ${e.to} ("${e.label}")`);
+  for (const e of DEFAULT_FLOW.edges) if (!ce.has(ekey(e))) out.push(`- arrow ${e.from} → ${e.to} ("${e.label}")`);
+  return out.length ? out.join("\n") : "(positions/layout only)";
+}
+document.getElementById("btnCopy").onclick = async ()=>{
+  const prompt =
+`Update the systems ticket flow diagram.
+
+File: bam-ghl-agent/docs/systems-ticket-flow.html
+Replace the JSON inside <script type="application/json" id="flow-data"> with exactly this, keeping everything else in the file the same:
+
+${JSON.stringify(flow, null, 2)}
+
+What I changed in the browser:
+${diffSummary()}
+
+If anything in the new layout overlaps or arrows collide, nudge positions to keep it clean. If the flow now disagrees with how tickets actually work in bam-portal/api/tickets.js, tell me instead of silently changing it.`;
+  try{ await navigator.clipboard.writeText(prompt); }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = prompt; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+  }
+  const t = document.getElementById("toast");
+  t.textContent = "PROMPT COPIED — PASTE IT INTO CLAUDE CODE";
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2600);
+};
+
+render();
+</script>
+</body>
+</html>
