@@ -1,0 +1,48 @@
+# Website Leads — client-site forms → portal → GHL
+
+## What it is
+Public endpoint `bam-portal/api/website/leads.js` receives form submissions
+from client websites (bam-client-sites repo). **Save-first architecture**:
+our DB is the source of truth, GHL is a mirror we can unplug per client.
+
+```
+client site form
+  → POST /api/website/leads  { client_id, form_type, name, email, phone, fields, source_url }
+  → 1. SAVE    website_leads row (always — every submission, no dedupe; rows = form fills)
+  → 2. DELIVER GHL upsert contact (tag: website-inquiry, source: website-form)
+               + message posted as inbound conversation (fires GHL notifications)
+  → 3. RECEIPT stamp row: ghl_contact_id + ghl_synced_at, or ghl_error
+```
+
+## Key decisions (Jun 2026)
+- **Save-first, not GHL-first.** Lead history must live in our system so
+  migrating an academy off GHL is per-client "stop syncing", and lead counting
+  comes from `website_leads` across all client sites (one dashboard).
+- **CORS allow-list lives in `clients.allowed_domains`** (text[] of bare
+  domains, e.g. `{byanymeansbball.com, bam-gta.vercel.app}`). Onboarding a new
+  client site = update that row, no code change. 60s in-memory cache.
+  Localhost dev origins stay hardcoded in the file.
+- **GHL contact via `POST /contacts/upsert`**, NOT search-then-create — GHL's
+  duplicate prevention rejects the create when the email search misses
+  ("This location does not allow duplicated contacts"). Upsert matches on
+  email/phone server-side.
+- These website leads do NOT appear in GHL's Form Submissions page — GHL
+  automations must trigger on **tag added: website-inquiry**, not "form
+  submitted".
+
+## Requirements per client
+- `clients.allowed_domains` contains the site's domain(s)
+- `clients.ghl_kpi_config.ghl_location` = location name present in
+  `GHL_LOCATIONS_JSON` env, and `clients.ghl_location_id` set
+- Without GHL config the lead still saves (`ghl: "not-configured"`)
+
+## Wired sites (bam-client-sites repo)
+- by-any-means → client `aad50450-…` (contact.html inline script)
+- bam-gta → client `39875f07-…` (`gta/shared.jsx` submitLead(); contact +
+  free-trial forms; free-trial sends requested_date/requested_time in fields)
+
+## When to update this note
+- Endpoint moves or response shape changes
+- A new client site is wired (add to the list above)
+- The GHL sync behavior changes (tags, conversation posting, upsert)
+- A retry mechanism for `ghl_error` rows is added (doesn't exist yet)
