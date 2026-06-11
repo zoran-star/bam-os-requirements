@@ -109,7 +109,7 @@ async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageN
   return { pipelineId: pipeline.id, stageId: stage.id };
 }
 
-async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags }) {
+async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags, fields, fieldMap }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -119,9 +119,21 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   const [firstName, ...rest] = (name || "").trim().split(" ");
   const lastName = rest.join(" ") || undefined;
 
-  const customFields = messageFieldId && message
-    ? [{ id: messageFieldId, field_value: message }]
-    : [];
+  // Custom fields: the entry point's field_map says which submission fields
+  // copy into which GHL contact fields ({ fieldsKey: ghlFieldId }).
+  // message_field_id from ghl_kpi_config is the legacy single-field variant.
+  const customFields = [];
+  const mappedIds = new Set();
+  for (const [key, ghlFieldId] of Object.entries(fieldMap || {})) {
+    const val = fields?.[key];
+    if (ghlFieldId && val !== undefined && val !== null && String(val).trim() !== "") {
+      customFields.push({ id: ghlFieldId, field_value: String(val) });
+      mappedIds.add(ghlFieldId);
+    }
+  }
+  if (messageFieldId && message && !mappedIds.has(messageFieldId)) {
+    customFields.push({ id: messageFieldId, field_value: message });
+  }
 
   // e.g. form_type "contact" → "contact form filled", "free-trial" → "free trial form filled"
   const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
@@ -276,13 +288,15 @@ async function handler(req, res) {
   // configured in the portal's Entry Point Set Up wizard.
   let pipelineConfig = null;
   let extraTags = [];
+  let fieldMap = null;
   try {
     const eps = await sbReq(
-      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name&limit=1`
+      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name,field_map&limit=1`
     );
     const ep = eps?.[0];
     if (ep) {
       extraTags = ep.tags || [];
+      fieldMap = ep.field_map || null;
       if (ep.pipeline_name && ep.stage_name) {
         pipelineConfig = { pipeline: ep.pipeline_name, stage: ep.stage_name };
       }
@@ -293,7 +307,7 @@ async function handler(req, res) {
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags });
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
       if (ghlContactId) {
         ghlStatus = "synced";
         receipt = { ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null };
