@@ -401,6 +401,38 @@
     color: var(--text-mute);
     margin-bottom: 4px;
   }
+  /* Collapsible header for the switcher — click toggles the list */
+  .client-switcher-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 2px 0 4px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+  }
+  .client-switcher-head:hover .client-switcher-label { color: var(--text); }
+  .client-switcher-head .acct-active-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--gold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 130px;
+    margin-left: auto;
+  }
+  .client-switcher-chev {
+    color: var(--text-mute);
+    flex: none;
+    display: inline-flex;
+    transition: transform 0.15s ease;
+  }
+  .client-switcher.collapsed .client-switcher-chev { transform: rotate(-90deg); }
   .client-switcher-item {
     display: flex;
     align-items: center;
@@ -8710,16 +8742,22 @@ function renderClientSwitcher() {
     </button>`;
   }).join('');
 
-  // Replace everything after the label
-  const label = root.querySelector('.client-switcher-label');
-  root.innerHTML = '';
-  if (label) root.appendChild(label);
-  else {
-    const l = document.createElement('div');
-    l.className = 'client-switcher-label';
-    l.textContent = 'Your accounts';
-    root.appendChild(l);
-  }
+  // Collapsible header: label + (collapsed → active academy name, expanded →
+  // count) + chevron. Clicking anywhere on it toggles the list.
+  const collapsed = _clientSwitcherIsCollapsed();
+  root.classList.toggle('collapsed', collapsed);
+  const activeRow = CLIENT_ROWS.find(c => c.id === CLIENT_ID);
+  const activeName = ((activeRow && activeRow.business_name) || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  root.innerHTML = `<button type="button" class="client-switcher-head" onclick="_clientSwitcherToggle()"
+      aria-expanded="${!collapsed}" title="${collapsed ? 'Show accounts' : 'Hide accounts'}">
+    <span class="client-switcher-label" style="margin-bottom:0;">Your accounts</span>
+    ${collapsed
+      ? `<span class="acct-active-name">${activeName}</span>`
+      : `<span style="font-size:10px;color:var(--text-mute);font-family:var(--mono);">${CLIENT_ROWS.length}</span>`}
+    <span class="client-switcher-chev"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+  </button>`;
+  if (collapsed) return;
 
   // Search input when the user has lots of clients (e.g. BAM staff).
   if (CLIENT_ROWS.length > 5) {
@@ -8732,6 +8770,24 @@ function renderClientSwitcher() {
 
   root.insertAdjacentHTML('beforeend',
     rows.length ? buttons : `<div style="font-size:12px;color:var(--text-mute);padding:8px 4px;text-align:center">No matches</div>`);
+}
+
+// Collapsed-state for the switcher. Default: collapsed for power users with
+// many accounts (BAM staff), open for a typical 1-3 account owner; the user's
+// explicit choice persists in localStorage.
+let _CLIENT_SWITCHER_COLLAPSED = null;
+function _clientSwitcherIsCollapsed() {
+  if (_CLIENT_SWITCHER_COLLAPSED == null) {
+    let stored = null;
+    try { stored = localStorage.getItem('bam_acct_collapsed'); } catch (_) {}
+    _CLIENT_SWITCHER_COLLAPSED = stored != null ? stored === '1' : CLIENT_ROWS.length > 5;
+  }
+  return _CLIENT_SWITCHER_COLLAPSED;
+}
+function _clientSwitcherToggle() {
+  _CLIENT_SWITCHER_COLLAPSED = !_clientSwitcherIsCollapsed();
+  try { localStorage.setItem('bam_acct_collapsed', _CLIENT_SWITCHER_COLLAPSED ? '1' : '0'); } catch (_) {}
+  renderClientSwitcher();
 }
 
 function _clientSwitcherSetFilter(v) {
