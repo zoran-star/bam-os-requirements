@@ -15934,6 +15934,13 @@ async function _sorterApproveAndNext() {
       tier: p.proposed_tier || 'canonical',
       coachiq_product_id: p.coachiq_product_id || null,
       confidence: p.confidence != null ? p.confidence : null,
+      // Price facts so the API can INSERT a catalog row when none exists yet
+      // (otherwise a fresh academy's matches would silently not persist).
+      stripe_product_id: p.product_id || null,
+      name: p.name || null,
+      amount_cents: p.amount_cents != null ? p.amount_cents : null,
+      currency: p.currency || null,
+      interval: p.interval || null,
     });
   });
   try {
