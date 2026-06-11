@@ -16,6 +16,7 @@
 // that location is present in GHL_LOCATIONS_JSON.
 
 import { withSentryApiRoute } from "../_sentry.js";
+import { getClientGhlToken } from "./availability.js";
 
 const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
@@ -228,7 +229,7 @@ async function handler(req, res) {
   if (!allowed) return res.status(403).json({ error: "Forbidden" });
 
   const b = req.body || {};
-  const { client_id, form_type = "contact", name, email, phone, fields = {}, source_url } = b;
+  const { client_id, form_type = "contact", name, email, phone, fields = {}, source_url, booking } = b;
 
   if (!client_id) return res.status(400).json({ error: "client_id required" });
   if (!name && !email) return res.status(400).json({ error: "name or email required" });
@@ -238,7 +239,9 @@ async function handler(req, res) {
 
   let client;
   try {
-    const rows = await sbReq(`clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config&limit=1`);
+    const rows = await sbReq(
+      `clients?id=eq.${client_id}&select=id,ghl_location_id,ghl_kpi_config,ghl_access_token,ghl_refresh_token,ghl_token_expires_at&limit=1`
+    );
     client = rows?.[0];
   } catch (e) { return res.status(500).json({ error: e.message }); }
   if (!client) return res.status(404).json({ error: "client not found" });
@@ -304,6 +307,48 @@ async function handler(req, res) {
       receipt = { ghl_error: e.message.slice(0, 500) };
     }
 
+    // 2b. Booking — when the form carried a chosen slot, create the GHL
+    // appointment. The calendar must be one of the client's calendar entry
+    // points. Failure degrades gracefully: the lead is saved + synced, the
+    // site tells the parent "we'll confirm by email", and the receipt shows
+    // what happened.
+    let appointmentStatus;
+    if (booking?.calendar_id && booking?.start && receipt?.ghl_contact_id) {
+      appointmentStatus = "failed";
+      try {
+        const eps = await sbReq(
+          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id&limit=1`
+        );
+        if (!eps?.[0]) throw new Error("calendar not available");
+        const oauthToken = await getClientGhlToken(client);
+        const apptRes = await fetch(`${GHL_V2}/calendars/events/appointments`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${oauthToken}`,
+            Version: V2_VERSION,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            calendarId: booking.calendar_id,
+            locationId: client.ghl_location_id,
+            contactId: receipt.ghl_contact_id,
+            startTime: booking.start,
+          }),
+        });
+        const apptJson = await apptRes.json().catch(() => ({}));
+        if (!apptRes.ok) throw new Error(apptJson.message || apptJson.error || `GHL ${apptRes.status}`);
+        appointmentStatus = "booked";
+        fields.appointment_id = (apptJson.appointment || apptJson).id || null;
+        fields.booked_slot = booking.start;
+        receipt.fields = fields;
+      } catch (e) {
+        console.error("GHL appointment failed (lead saved):", e.message);
+        fields.appointment_error = String(e.message).slice(0, 300);
+        receipt.fields = fields;
+      }
+    }
+
     // 3. Receipt — stamp the lead row; never fail the request over it.
     try {
       await sbReq(`website_leads?id=eq.${leadId}`, {
@@ -312,6 +357,10 @@ async function handler(req, res) {
       });
     } catch (e) {
       console.error("Failed to stamp GHL receipt on lead", leadId, e.message);
+    }
+
+    if (appointmentStatus) {
+      return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus, appointment: appointmentStatus });
     }
   }
 
