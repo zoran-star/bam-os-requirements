@@ -6708,13 +6708,25 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-stale .pl-card-age { color:#c47424; font-weight:600; }
       #view-pipelines .pl-empty { font-size:12px; color:var(--text-mute); text-align:center; padding:14px 8px; }
 
-      /* ── Entry Points rail (left of the board) ── */
-      #view-pipelines .pl-layout { display:flex; gap:14px; align-items:flex-start; }
-      #view-pipelines .pl-layout > #pl-board-container { flex:1; min-width:0; }
-      #view-pipelines .pl-rail { flex:0 0 232px; display:flex; flex-direction:column; gap:8px; }
+      /* ── Entry Points rail: its own panel, divided from the board ── */
+      #view-pipelines .pl-layout { display:flex; gap:0; align-items:stretch; }
+      #view-pipelines .pl-layout > #pl-board-container {
+        flex:1; min-width:0;
+        border-left:1px solid var(--border);
+        padding-left:22px; margin-left:22px;
+      }
+      #view-pipelines .pl-rail {
+        flex:0 0 248px; display:flex; flex-direction:column; gap:8px;
+        background:rgba(255,255,255,0.02);
+        border:1px solid var(--border); border-radius:14px;
+        padding:14px; align-self:flex-start;
+      }
       #view-pipelines .pl-rail-head {
-        font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
-        color:var(--text-mute); padding:2px 2px 4px;
+        font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em;
+        color:var(--text); padding:0 2px;
+      }
+      #view-pipelines .pl-rail-sub {
+        font-size:11px; color:var(--text-mute); padding:0 2px 6px;
       }
       #view-pipelines .pl-ep {
         background:var(--surface); border:1px solid var(--border); border-radius:10px;
@@ -6733,8 +6745,12 @@ Then the call to action."]</div>
       #view-pipelines .pl-ep.blocked .pl-ep-dot { background:var(--text-mute); }
       @media (max-width: 900px) {
         #view-pipelines .pl-layout { flex-direction:column; }
-        #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); }
-        #view-pipelines .pl-rail-head { grid-column:1/-1; }
+        #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; }
+        #view-pipelines .pl-rail-head, #view-pipelines .pl-rail-sub { grid-column:1/-1; }
+        #view-pipelines .pl-layout > #pl-board-container {
+          border-left:none; padding-left:0; margin-left:0;
+          border-top:1px solid var(--border); padding-top:18px; margin-top:18px;
+        }
       }
 
       /* Entry Point Set Up wizard (rendered inside #pl-drawer) */
@@ -6789,6 +6805,7 @@ Then the call to action."]</div>
         <div class="pl-layout">
           <aside class="pl-rail" id="pl-entry-rail">
             <div class="pl-rail-head">Entry Points</div>
+            <div class="pl-rail-sub">Where leads come from. Separate from the pipeline board.</div>
             <div id="pl-entry-list"><div class="pl-empty">Loading…</div></div>
           </aside>
           <div id="pl-board-container">
