@@ -477,6 +477,16 @@ async function handler(req, res) {
           ];
           break;
 
+        case "good_to_finalize":
+          // Manager reviewed the work and clears the executor to finalize —
+          // the ticket returns to in_progress for final touches, then the
+          // executor presses Mark complete. Internal transition: no client
+          // message, no Slack notification.
+          if (!isManager(me)) return res.status(403).json({ error: "manager only" });
+          if (t.status !== "in_review") return res.status(400).json({ error: "ticket must be in_review" });
+          update.status = "in_progress";
+          break;
+
         case "set_due_date":
           // Admin-only override of the auto-calc'd due_date. Accepts ISO
           // YYYY-MM-DD or empty string to clear back to NULL.
