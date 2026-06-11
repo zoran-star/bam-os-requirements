@@ -135,7 +135,7 @@ async function handler(req, res) {
         `entry_points?client_id=eq.${clientId}&type=eq.calendar&enabled=eq.true&select=id,key,label,pipeline_name,stage_name&order=label.asc`
       );
       const now = Date.now();
-      const horizon = now + 14 * 24 * 3600 * 1000;
+      const horizon = now + 28 * 24 * 3600 * 1000;
       const out = [];
       for (const ep of eps || []) {
         let ghlCal = null, upcoming = [];

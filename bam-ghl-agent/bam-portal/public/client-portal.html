@@ -6861,6 +6861,27 @@ Then the call to action."]</div>
     <style>
       /* ── Booking calendars availability panel ── */
       #view-calendar .bk-section { margin-bottom:26px; }
+      #view-calendar .bk-bar {
+        width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
+        background:var(--surface); border:1px solid var(--border); border-radius:12px;
+        padding:14px 18px; cursor:pointer; font-family:inherit; color:var(--text);
+      }
+      #view-calendar .bk-bar:hover { border-color:rgba(232,197,71,0.45); }
+      #view-calendar .bk-bar-title { font-size:14px; font-weight:700; letter-spacing:0.02em; }
+      #view-calendar .bk-bar-right { display:flex; align-items:center; gap:10px; }
+      #view-calendar .bk-bar-hint { font-size:12px; color:var(--text-mute); }
+      #view-calendar .bk-bar-chev { color:var(--text-mute); transition:transform 180ms; display:inline-block; }
+      #view-calendar .bk-bar.open .bk-bar-chev { transform:rotate(180deg); }
+      #view-calendar #bk-setup-body { margin-top:12px; }
+      #view-calendar .bk-acc-head {
+        width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px;
+        background:none; border:none; padding:0; cursor:pointer; font-family:inherit; color:var(--text); text-align:left;
+      }
+      #view-calendar .bk-acc-chev { color:var(--text-mute); transition:transform 180ms; }
+      #view-calendar .bk-card.open .bk-acc-chev { transform:rotate(180deg); }
+      #view-calendar .bk-acc-body { display:none; }
+      #view-calendar .bk-card.open .bk-acc-body { display:block; }
+      #view-calendar .bk-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:8px; flex:0 0 auto; }
       #view-calendar .bk-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; }
       #view-calendar .bk-title { font-size:16px; font-weight:700; }
       #view-calendar .bk-sub { font-size:12px; color:var(--text-mute); margin-top:2px; }
@@ -7040,16 +7061,19 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
-        <!-- ── Booking calendars: live GHL availability management ── -->
+        <!-- ── Calendar Setup: collapsible GHL availability management ── -->
         <div class="bk-section">
-          <div class="bk-head">
-            <div>
-              <div class="bk-title">Booking Calendars</div>
-              <div class="bk-sub">Free trial availability. Changes go live on the website instantly.</div>
+          <button class="bk-bar" onclick="bkToggleSetup()">
+            <span class="bk-bar-title">Calendar Setup</span>
+            <span class="bk-bar-right"><span class="bk-bar-hint" id="bk-bar-hint"></span><span class="bk-bar-chev" id="bk-bar-chev">&#9662;</span></span>
+          </button>
+          <div id="bk-setup-body" style="display:none">
+            <div class="bk-head">
+              <div class="bk-sub">Booking availability per calendar. Changes go live on the website instantly.</div>
+              <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
             </div>
-            <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
+            <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0">Loading booking calendars…</div></div>
           </div>
-          <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0">Loading booking calendars…</div></div>
         </div>
 
         <div class="cal-toolbar">
@@ -8742,6 +8766,8 @@ async function bkFetchAndRender() {
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _BK_DATA = json.calendars || [];
     bkRenderList();
+    bkBuildEvents();
+    renderCalendar();
   } catch (e) {
     host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load booking calendars — ${escapeHTML(e.message)}</div>`;
   }
@@ -8750,14 +8776,17 @@ async function bkFetchAndRender() {
 function bkRenderList() {
   const host = document.getElementById('bk-cal-list');
   if (!host || !_BK_DATA) return;
+  const hint = document.getElementById('bk-bar-hint');
+  if (hint) hint.textContent = _BK_DATA.length ? `${_BK_DATA.length} calendar${_BK_DATA.length === 1 ? '' : 's'}` : '';
   if (!_BK_DATA.length) {
     host.innerHTML = '<div class="req-empty" style="padding:14px 0">No booking calendars yet. Create one to take free trial bookings.</div>';
     return;
   }
-  host.innerHTML = _BK_DATA.map(c => {
+  host.innerHTML = _BK_DATA.map((c, idx) => {
     const id = c.calendar_id;
+    const color = bkColor(idx);
     if (c.ghl?.error) {
-      return `<div class="bk-card"><div class="bk-card-name">${escapeHTML(c.label)}</div>
+      return `<div class="bk-card"><div class="bk-card-name"><span class="bk-dot" style="background:${color.text}"></span>${escapeHTML(c.label)}</div>
         <div class="bk-err">Couldn't read this calendar from GHL — ${escapeHTML(c.ghl.error)}</div></div>`;
     }
     const rows = bkHoursToRows(c.ghl.openHours);
@@ -8772,41 +8801,93 @@ function bkRenderList() {
     const blocked = (c.ghl.blockedDates || []).map(b =>
       `<span class="bk-chip">${escapeHTML(b.date)} <button title="Unblock" onclick="bkUnblock('${id}','${escapeHTML(b.date)}')">×</button></span>`
     ).join('') || '<span style="font-size:12px;color:var(--text-mute)">None</span>';
-    const upcoming = (c.upcoming || []).slice(0, 8).map(u =>
-      `<div class="bk-up-row"><span class="bk-up-when">${bkFmtWhen(u.start)}</span><span>${escapeHTML(u.contactName || u.title || 'Booked')}</span></div>`
-    ).join('') || '<div style="font-size:12px;color:var(--text-mute)">No upcoming bookings in the next 2 weeks.</div>';
-    return `<div class="bk-card">
-      <div class="bk-card-head">
+    const wasOpen = _BK_OPEN_CARDS.has(id);
+    return `<div class="bk-card ${wasOpen ? 'open' : ''}" id="bk-card-${id}">
+      <button class="bk-acc-head" onclick="bkToggleCard('${id}')">
         <div>
-          <div class="bk-card-name">${escapeHTML(c.ghl.name || c.label)}</div>
-          <div class="bk-card-meta">${c.ghl.slotDuration} ${escapeHTML(c.ghl.slotDurationUnit || '')} sessions${c.pipeline_name ? ' · leads → ' + escapeHTML(c.pipeline_name) + ' / ' + escapeHTML(c.stage_name) : ''}</div>
+          <div class="bk-card-name"><span class="bk-dot" style="background:${color.text}"></span>${escapeHTML(c.ghl.name || c.label)}</div>
+          <div class="bk-card-meta">${c.ghl.slotDuration} ${escapeHTML(c.ghl.slotDurationUnit || '')} sessions · ${c.ghl.capacity ?? '?'} spots${c.pipeline_name ? ' · leads → ' + escapeHTML(c.pipeline_name) + ' / ' + escapeHTML(c.stage_name) : ''}</div>
         </div>
-        <button class="bk-save" id="bk-${id}-save" onclick="bkSave('${id}')">Save changes</button>
-      </div>
-      <div class="bk-grid">
-        <div>
-          <div class="bk-lbl">Weekly hours</div>
-          ${dayRows}
-        </div>
-        <div>
-          <div class="bk-lbl">Spots per session</div>
-          <div class="bk-cap"><input type="number" min="1" id="bk-${id}-cap" value="${c.ghl.capacity ?? 1}"> <span style="font-size:12px;color:var(--text-mute)">players can book each slot</span></div>
-          <div class="bk-lbl">Blocked dates</div>
-          <div class="bk-chips">${blocked}</div>
-          <div class="bk-addblock">
-            <input type="date" id="bk-${id}-blockdate">
-            <button class="bk-ghost" onclick="bkBlock('${id}')">Block date</button>
+        <span class="bk-acc-chev">&#9662;</span>
+      </button>
+      <div class="bk-acc-body">
+        <div class="bk-grid">
+          <div>
+            <div class="bk-lbl">Weekly hours</div>
+            ${dayRows}
+          </div>
+          <div>
+            <div class="bk-lbl">Spots per session</div>
+            <div class="bk-cap"><input type="number" min="1" id="bk-${id}-cap" value="${c.ghl.capacity ?? 1}"> <span style="font-size:12px;color:var(--text-mute)">players can book each slot</span></div>
+            <div class="bk-lbl">Blocked dates</div>
+            <div class="bk-chips">${blocked}</div>
+            <div class="bk-addblock">
+              <input type="date" id="bk-${id}-blockdate">
+              <button class="bk-ghost" onclick="bkBlock('${id}')">Block date</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="bk-err" id="bk-${id}-err" style="display:none"></div>
-      <div class="bk-ok" id="bk-${id}-ok" style="display:none"></div>
-      <div class="bk-up">
-        <div class="bk-lbl">Upcoming bookings (14 days)</div>
-        ${upcoming}
+        <div class="bk-err" id="bk-${id}-err" style="display:none"></div>
+        <div class="bk-ok" id="bk-${id}-ok" style="display:none"></div>
+        <div style="margin-top:14px"><button class="bk-save" id="bk-${id}-save" onclick="bkSave('${id}')">Save changes</button></div>
       </div>
     </div>`;
   }).join('');
+}
+
+const _BK_OPEN_CARDS = new Set();
+function bkToggleCard(id) {
+  const card = document.getElementById('bk-card-' + id);
+  if (!card) return;
+  const open = card.classList.toggle('open');
+  if (open) _BK_OPEN_CARDS.add(id); else _BK_OPEN_CARDS.delete(id);
+}
+function bkToggleSetup() {
+  const body = document.getElementById('bk-setup-body');
+  const bar = document.querySelector('#view-calendar .bk-bar');
+  if (!body) return;
+  const show = body.style.display === 'none';
+  body.style.display = show ? 'block' : 'none';
+  if (bar) bar.classList.toggle('open', show);
+}
+
+// Distinct colors for booking calendars on the weekly grid (separate from venue colors)
+const BK_COLORS = [
+  { bg:'rgba(94,210,190,0.16)',  border:'rgba(94,210,190,0.55)',  text:'#5ED2BE' },  // teal
+  { bg:'rgba(240,150,90,0.16)',  border:'rgba(240,150,90,0.55)',  text:'#F0965A' },  // orange
+  { bg:'rgba(236,116,166,0.16)', border:'rgba(236,116,166,0.55)', text:'#EC74A6' },  // pink
+  { bg:'rgba(150,170,255,0.16)', border:'rgba(150,170,255,0.55)', text:'#96AAFF' },  // periwinkle
+];
+function bkColor(i) { return BK_COLORS[i % BK_COLORS.length]; }
+
+// GHL bookings → weekly grid events, grouped per calendar + slot
+let BK_EVENTS = [];
+function bkBuildEvents() {
+  BK_EVENTS = [];
+  (_BK_DATA || []).forEach((c, idx) => {
+    const durH = c.ghl && c.ghl.slotDuration
+      ? (c.ghl.slotDurationUnit === 'hours' ? c.ghl.slotDuration : c.ghl.slotDuration / 60)
+      : 1;
+    const bySlot = {};
+    for (const u of c.upcoming || []) {
+      const d = new Date(u.start);
+      if (isNaN(d.getTime())) continue;
+      const key = u.start;
+      if (!bySlot[key]) bySlot[key] = { d, names: [] };
+      if (u.contactName) bySlot[key].names.push(u.contactName);
+      else bySlot[key].names.push(u.title || 'Booked');
+    }
+    for (const slot of Object.values(bySlot)) {
+      BK_EVENTS.push({
+        date: calDateKey(slot.d),
+        startHour: slot.d.getHours() + slot.d.getMinutes() / 60,
+        endHour: slot.d.getHours() + slot.d.getMinutes() / 60 + durH,
+        label: c.ghl?.name || c.label,
+        names: slot.names,
+        color: bkColor(idx),
+      });
+    }
+  });
 }
 
 async function bkPatch(calId, body, okMsg) {
@@ -8887,13 +8968,20 @@ function renderCalendar() {
 
   // Legend — one chip per venue currently scheduled
   const venuesInUse = Array.from(new Set(CAL_SESSIONS.map(s => s.venue).filter(Boolean)));
+  const bkLegend = (typeof _BK_DATA !== 'undefined' && _BK_DATA ? _BK_DATA : []).map((c, idx) => {
+    const col = bkColor(idx);
+    return `<div class="cal-legend-item">
+      <span class="cal-legend-dot" style="background:${col.text}"></span>
+      <span style="color:var(--text-mute);font-weight:500">${escapeHTML(c.ghl?.name || c.label)} (bookings)</span>
+    </div>`;
+  }).join('');
   document.getElementById('cal-legend').innerHTML = venuesInUse.map(v => {
     const c = calVenueColor(v);
     return `<div class="cal-legend-item">
       <span class="cal-legend-dot" style="background:${c.text}"></span>
       <span style="color:var(--text-mute);font-weight:500">${v}</span>
     </div>`;
-  }).join('');
+  }).join('') + bkLegend;
 
   // Day headers
   const headers = document.getElementById('cal-day-headers');
@@ -8927,7 +9015,17 @@ function renderCalendar() {
         <span class="cal-capacity-badge" style="background:${c.border}">${s.booked}/${s.capacity}</span>
       </div>`;
     }).join('');
-    return `<div class="cal-day-col" style="height:${totalHeight}px">${hourLines}${sessions}</div>`;
+    const bookings = (typeof BK_EVENTS !== 'undefined' ? BK_EVENTS : []).filter(e => e.date === key).map(e => {
+      const top = (e.startHour - CAL_HOUR_START) * CAL_HOUR_HEIGHT;
+      const height = Math.max(26, (e.endHour - e.startHour) * CAL_HOUR_HEIGHT - 2);
+      const who = e.names.slice(0, 6).join(', ') + (e.names.length > 6 ? ` +${e.names.length - 6} more` : '');
+      return `<div class="cal-session" style="top:${top}px;height:${height}px;background:${e.color.bg};border:1px solid ${e.color.border}" title="${escapeHTML(e.label)}: ${escapeHTML(who)}">
+        <div class="cal-session-name" style="color:${e.color.text}">${escapeHTML(e.label)}</div>
+        <div class="cal-session-time">${escapeHTML(who)}</div>
+        <span class="cal-capacity-badge" style="background:${e.color.border}">${e.names.length} booked</span>
+      </div>`;
+    }).join('');
+    return `<div class="cal-day-col" style="height:${totalHeight}px">${hourLines}${sessions}${bookings}</div>`;
   }).join('');
 
   document.getElementById('cal-body').innerHTML =
