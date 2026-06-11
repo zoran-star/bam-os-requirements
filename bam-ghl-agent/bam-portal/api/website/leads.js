@@ -55,7 +55,7 @@ function loadLocations() {
   } catch { return []; }
 }
 
-async function pushToGhl(locName, ghlLocationId, { name, email, phone }) {
+async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -65,6 +65,10 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone }) {
   const [firstName, ...rest] = (name || "").trim().split(" ");
   const lastName = rest.join(" ") || undefined;
 
+  const customFields = messageFieldId && message
+    ? [{ id: messageFieldId, field_value: message }]
+    : [];
+
   const payload = {
     locationId: ghlLocationId,
     firstName,
@@ -72,6 +76,8 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone }) {
     ...(email ? { email: email.toLowerCase() } : {}),
     ...(phone ? { phone } : {}),
     source: "website-form",
+    tags: ["website-inquiry"],
+    ...(customFields.length ? { customFields } : {}),
   };
 
   const headers = {
@@ -80,6 +86,8 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone }) {
     "Content-Type": "application/json",
     Accept: "application/json",
   };
+
+  let contactId = null;
 
   // Check for existing contact by email to avoid duplicates.
   if (email) {
@@ -90,20 +98,48 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone }) {
     if (searchRes.ok) {
       const existing = ((await searchRes.json()).contacts || [])[0];
       if (existing?.id) {
-        const updateRes = await fetch(`${GHL_V2}/contacts/${existing.id}`, {
+        await fetch(`${GHL_V2}/contacts/${existing.id}`, {
           method: "PUT", headers, body: JSON.stringify(payload),
         });
-        if (updateRes.ok) return existing.id;
+        contactId = existing.id;
       }
     }
   }
 
-  const createRes = await fetch(`${GHL_V2}/contacts/`, {
-    method: "POST", headers, body: JSON.stringify(payload),
-  });
-  if (!createRes.ok) throw new Error(`GHL ${createRes.status}: ${(await createRes.text()).slice(0, 120)}`);
-  const created = await createRes.json();
-  return (created.contact || created).id || null;
+  if (!contactId) {
+    const createRes = await fetch(`${GHL_V2}/contacts/`, {
+      method: "POST", headers, body: JSON.stringify(payload),
+    });
+    if (!createRes.ok) throw new Error(`GHL ${createRes.status}: ${(await createRes.text()).slice(0, 120)}`);
+    const created = await createRes.json();
+    contactId = (created.contact || created).id || null;
+  }
+
+  // Post message as inbound conversation so it appears in GHL inbox + fires notifications.
+  if (contactId && message) {
+    try {
+      const convoRes = await fetch(`${GHL_V2}/conversations/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ locationId: ghlLocationId, contactId }),
+      });
+      const convoId = convoRes.ok ? ((await convoRes.json()).conversation?.id || null) : null;
+      if (convoId) {
+        await fetch(`${GHL_V2}/conversations/messages`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            type: "Custom",
+            message,
+            conversationId: convoId,
+            direction: "inbound",
+          }),
+        });
+      }
+    } catch { /* non-fatal — contact already saved */ }
+  }
+
+  return contactId;
 }
 
 async function handler(req, res) {
@@ -152,9 +188,11 @@ async function handler(req, res) {
   // GHL push — non-blocking. Requires ghl_kpi_config.ghl_location to be set.
   let ghlContactId = null;
   const ghlLocName = client.ghl_kpi_config?.ghl_location;
+  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
+  const message = fields?.message || null;
   if (ghlLocName && client.ghl_location_id) {
     try {
-      ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone });
+      ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
       if (leadId && ghlContactId) {
         await sbReq(`website_leads?id=eq.${leadId}`, {
           method: "PATCH",
