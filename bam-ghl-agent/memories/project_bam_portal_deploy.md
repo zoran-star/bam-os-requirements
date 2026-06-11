@@ -1,16 +1,26 @@
 ---
 name: bam-portal deploy (how to actually ship)
-description: How to deploy the bam-portal Vercel project. It is NOT git-auto-deployed, and `vercel redeploy` does NOT pick up new code — use a clean `vercel deploy --prod` from the repo root with the project env vars.
+description: How to deploy the bam-portal Vercel project. Git auto-deploy on push to main WORKS as of 2026-06-11. `vercel redeploy` still does NOT pick up new code — if a manual deploy is ever needed, use a clean `vercel deploy --prod` from the repo root with the project env vars.
 type: project
 ---
 
-## TL;DR (verified 2026-06-07)
+## TL;DR (re-verified 2026-06-11 — AUTO-DEPLOY NOW WORKS)
 
 The `bam-portal` Vercel project (staff + client portal, custom domain
-`portal.byanymeansbusiness.com`, alias `bam-portal-tawny.vercel.app`) does **NOT
-reliably auto-deploy on push to main** — its deployments carry no GitHub commit
-metadata (`vercel inspect --json` → `meta.githubCommitSha` is absent). So a git
-merge alone may not ship.
+`portal.byanymeansbusiness.com`, alias `bam-portal-tawny.vercel.app`) **DOES
+auto-deploy on push/merge to main** — verified 2026-06-11: PRs #197–#200 each
+produced a production deployment carrying `meta.githubCommitSha`. Project is
+linked to `zoran-star/bam-os-requirements`, production branch `main`, Root
+Directory `bam-ghl-agent/bam-portal`, auto-deployments enabled.
+
+So the normal ship path is just: **merge to main → Vercel deploys.** This also
+means edits from Claude Code mobile / claude.ai/code go live on merge with no
+laptop involved.
+
+The manual-deploy instructions below are kept for when a deploy needs to be
+forced (e.g. Vercel webhook hiccup). The earlier "no auto-deploy" finding
+(2026-06-07) predated the git connection working; deployments back then had no
+GitHub commit metadata.
 
 **`vercel redeploy <url>` is a TRAP here:** it rebuilds the *original uploaded
 source* of that deployment with current env vars — it does NOT pull the new merged
