@@ -86,7 +86,29 @@ function loadLocations() {
   } catch { return []; }
 }
 
-async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId }) {
+// Resolve a pipeline + stage by NAME (case-insensitive) so per-client config
+// stays human-readable. Cached per location on warm instances.
+let pipelinesCache = {};
+const PIPELINES_TTL_MS = 5 * 60_000;
+
+async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageName) {
+  const cached = pipelinesCache[ghlLocationId];
+  let pipelines = cached && Date.now() - cached.at < PIPELINES_TTL_MS ? cached.list : null;
+  if (!pipelines) {
+    const r = await fetch(`${GHL_V2}/opportunities/pipelines?locationId=${ghlLocationId}`, { headers });
+    if (!r.ok) throw new Error(`GHL pipelines ${r.status}: ${(await r.text()).slice(0, 120)}`);
+    pipelines = (await r.json()).pipelines || [];
+    pipelinesCache[ghlLocationId] = { list: pipelines, at: Date.now() };
+  }
+  const norm = (s) => (s || "").trim().toLowerCase();
+  const pipeline = pipelines.find(p => norm(p.name) === norm(pipelineName));
+  if (!pipeline) throw new Error(`pipeline "${pipelineName}" not found`);
+  const stage = (pipeline.stages || []).find(s => norm(s.name) === norm(stageName));
+  if (!stage) throw new Error(`stage "${stageName}" not found in pipeline "${pipelineName}"`);
+  return { pipelineId: pipeline.id, stageId: stage.id };
+}
+
+async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -100,6 +122,9 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
     ? [{ id: messageFieldId, field_value: message }]
     : [];
 
+  // e.g. form_type "contact" → "contact form filled", "free-trial" → "free trial form filled"
+  const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
+
   const payload = {
     locationId: ghlLocationId,
     firstName,
@@ -107,7 +132,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
     ...(email ? { email: email.toLowerCase() } : {}),
     ...(phone ? { phone } : {}),
     source: "website-form",
-    tags: ["website-inquiry"],
+    tags: ["website-inquiry", formTag],
     ...(customFields.length ? { customFields } : {}),
   };
 
@@ -151,6 +176,43 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
         body: JSON.stringify({ locationId: ghlLocationId, contactId }),
       });
     } catch (e) { console.error("GHL conversation create failed (non-fatal):", e.message); }
+  }
+
+  // Drop the lead into a pipeline when the client config maps this form type
+  // to a pipeline + stage (by name). Skipped if the contact already has an
+  // open opportunity in that pipeline (repeat submission ≠ second card).
+  if (contactId && pipelineConfig?.pipeline && pipelineConfig?.stage) {
+    try {
+      const { pipelineId, stageId } = await resolvePipelineStage(
+        headers, ghlLocationId, pipelineConfig.pipeline, pipelineConfig.stage
+      );
+
+      let exists = false;
+      const searchRes = await fetch(
+        `${GHL_V2}/opportunities/search?${new URLSearchParams({ location_id: ghlLocationId, contact_id: contactId, status: "open" })}`,
+        { headers }
+      );
+      if (searchRes.ok) {
+        const found = (await searchRes.json()).opportunities || [];
+        exists = found.some(o => (o.pipelineId || o.pipeline_id) === pipelineId);
+      }
+
+      if (!exists) {
+        const oppRes = await fetch(`${GHL_V2}/opportunities/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            locationId: ghlLocationId,
+            pipelineId,
+            pipelineStageId: stageId,
+            contactId,
+            name: `${name || email} - website ${formType || "contact"}`,
+            status: "open",
+          }),
+        });
+        if (!oppRes.ok) console.error("GHL opportunity create failed:", oppRes.status, (await oppRes.text()).slice(0, 200));
+      }
+    } catch (e) { console.error("GHL pipeline step failed (non-fatal):", e.message); }
   }
 
   return contactId;
@@ -205,12 +267,16 @@ async function handler(req, res) {
   const ghlLocName = client.ghl_kpi_config?.ghl_location;
   const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
   const message = fields?.message || null;
+  // Per-form pipeline mapping, by name. Shape in ghl_kpi_config:
+  //   website_lead_pipelines: { "contact": { pipeline: "...", stage: "..." },
+  //                             "free-trial": { pipeline: "...", stage: "..." } }
+  const pipelineConfig = client.ghl_kpi_config?.website_lead_pipelines?.[form_type] || null;
 
   let ghlStatus = "not-configured";
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig });
       if (ghlContactId) {
         ghlStatus = "synced";
         receipt = { ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null };
