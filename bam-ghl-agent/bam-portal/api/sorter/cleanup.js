@@ -124,12 +124,48 @@ function buildEmailMap(subs) {
       price_id: (price && price.id) || null,
       status: sub.status,
       amount_cents: price ? price.unit_amount : null,
+      name: (cust && cust.name) || null,
     };
     const prev = map.get(email);
     // keep the first active-ish sub; otherwise keep whatever we already have.
     if (!prev || (!ACTIVEISH.has(prev.status) && ACTIVEISH.has(sub.status))) map.set(email, entry);
   }
   return map;
+}
+
+// Small bounded Levenshtein for typo'd-email suggestions ("mguirges" vs
+// "mguirgrs"). Bails early when the distance clearly exceeds `max`.
+function editDistance(a, b, max = 2) {
+  a = String(a); b = String(b);
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < rowMin) rowMin = cur[j];
+    }
+    if (rowMin > max) return max + 1;
+    for (let j = 0; j <= b.length; j++) prev[j] = cur[j];
+  }
+  return prev[b.length];
+}
+
+// Flag-derived counts (no Stripe call) — used by the 1-tap fix actions so the
+// Promote button stays honest without re-running the full check.
+async function flagCounts(clientId, batchId) {
+  const rows = await sb(
+    `members_staging?client_id=eq.${encodeURIComponent(clientId)}` +
+    `&import_batch_id=eq.${encodeURIComponent(batchId)}` +
+    `&select=id,is_duplicate,match_status,athlete_name,parent_email`
+  ) || [];
+  const clean = rows.filter(r =>
+    !r.is_duplicate && r.match_status !== "no_offer" &&
+    (r.athlete_name || "").toString().trim() && normEmail(r.parent_email)
+  ).length;
+  return { staged: rows.length, clean };
 }
 
 async function handler(req, res) {
@@ -242,6 +278,99 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, promoted, skipped, member_ids: memberIds, counts: { promoted: promoted.length, skipped: skipped.length } });
     }
 
+    // ═══════════════════ 1-TAP FIX ACTIONS (Phase B) ═══════════════════
+    // Each mutates staging flags directly + returns flag-derived counts, so
+    // the UI updates without re-running the (slow) full Stripe check.
+
+    // Resolve a price id → no_offer verdict via the catalog (shared by fixes).
+    async function priceVerdict(priceId) {
+      if (!priceId) return "needs_fix";
+      const rows = await sb(
+        `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&stripe_price_id=eq.${encodeURIComponent(priceId)}&select=offer_price_key&limit=1`
+      );
+      const key = Array.isArray(rows) && rows[0] && rows[0].offer_price_key;
+      return key ? "ok" : "no_offer";
+    }
+
+    // fix-link: accept a suggested Stripe match for a staged row (typo'd email).
+    if (action === "fix-link") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const status = s.is_duplicate ? "duplicate" : await priceVerdict(body.price_id || s.stripe_price_id);
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          stripe_customer_id: body.customer_id || s.stripe_customer_id || null,
+          stripe_subscription_id: body.sub_id || s.stripe_subscription_id || null,
+          stripe_price_id: body.price_id || s.stripe_price_id || null,
+          stripe_linked: true,
+          match_status: status,
+          cleanup_notes: `linked to Stripe ${body.matched_email || ""} (email typo fix)`.trim(),
+          updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ ok: true, match_status: status, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // add-from-stripe: create a staged member from a live sub the sheet missed.
+    if (action === "add-from-stripe") {
+      const email = normEmail(body.email);
+      if (!email) return res.status(400).json({ error: "email required" });
+      const status = await priceVerdict(body.price_id);
+      // plan from the catalog row when it knows one
+      let plan = null;
+      if (body.price_id) {
+        const rows = await sb(`pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(body.price_id)}&select=canonical_plan&limit=1`);
+        plan = (Array.isArray(rows) && rows[0] && rows[0].canonical_plan) || null;
+      }
+      const inserted = await sb(`members_staging?select=id`, {
+        method: "POST", headers: { Prefer: "return=representation" },
+        body: JSON.stringify([{
+          client_id: clientId,
+          import_batch_id: batchId,
+          athlete_name: body.name || email.split("@")[0],
+          parent_name: body.name || null,
+          parent_email: email,
+          plan,
+          status: "live",
+          stripe_customer_id: body.customer_id || null,
+          stripe_subscription_id: body.sub_id || null,
+          stripe_price_id: body.price_id || null,
+          stripe_linked: true,
+          is_duplicate: false,
+          match_status: status,
+          cleanup_notes: "added from Stripe sub (was missing from the sheet) — check the athlete name",
+          created_at: nowIso(), updated_at: nowIso(),
+        }]),
+      });
+      const id = Array.isArray(inserted) && inserted[0] ? inserted[0].id : null;
+      return res.status(200).json({ ok: true, staging_id: id, match_status: status, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // remove-staged: delete a duplicate row; un-flag the survivor(s).
+    if (action === "remove-staged") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      await sb(`members_staging?id=eq.${s.id}&client_id=eq.${encodeURIComponent(clientId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      // If the dup group is down to one row, clear its duplicate flag and
+      // recompute its verdict from the notes it already carries.
+      const email = normEmail(s.parent_email);
+      const athlete = normName(s.athlete_name);
+      const rest = staging.filter(x => String(x.id) !== String(s.id) &&
+        normEmail(x.parent_email) === email && normName(x.athlete_name) === athlete);
+      if (rest.length === 1) {
+        const r = rest[0];
+        const notes = (r.cleanup_notes || "");
+        const status = notes.includes("no offer") ? "no_offer" : (r.stripe_linked ? "ok" : "needs_fix");
+        await sb(`members_staging?id=eq.${r.id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ is_duplicate: false, match_status: status, updated_at: nowIso() }),
+        });
+      }
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+
     // ════════════════════════════ CHECK ════════════════════════════
     const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
     const client = Array.isArray(clientRows) && clientRows[0];
@@ -265,43 +394,64 @@ async function handler(req, res) {
     const offerKeys = new Set(catalog.map(c => c.offer_price_key).filter(Boolean));
 
     // ── (a) member ⇄ Stripe link, both ways ──
+    // Signal vs noise: only ACTIVE-ish subs mean "paying but not on your sheet";
+    // canceled subs are churned families → a collapsed FYI list, not issues.
     const stagedNoStripe = [];
     const stagedEmails = new Set();
     for (const s of staging) {
       const email = normEmail(s.parent_email);
       if (email) stagedEmails.add(email);
+    }
+    const unstagedEmails = [...emailMap.keys()].filter(e => !stagedEmails.has(e));
+    for (const s of staging) {
+      const email = normEmail(s.parent_email);
       const link = email ? emailMap.get(email) : null;
-      if (!link) {
-        stagedNoStripe.push({ id: s.id, source_row: s.source_row, athlete_name: s.athlete_name, parent_email: s.parent_email });
+      if (link) continue;
+      // A member whose sheet says they haven't got billing yet is EXPECTED to
+      // have no Stripe match — label it, don't alarm.
+      const rawStatus = (s.status || "").toString().trim().toLowerCase();
+      const expected = rawStatus.includes("payment_method_required") || rawStatus.includes("pending");
+      // Typo radar: a near-miss email among the unstaged Stripe subs (≤2 edits).
+      let suggestion = null;
+      if (email && !expected) {
+        let best = null, bestD = 3;
+        for (const cand of unstagedEmails) {
+          const d = editDistance(email, cand, 2);
+          if (d < bestD) { bestD = d; best = cand; }
+        }
+        if (best) {
+          const l = emailMap.get(best);
+          suggestion = { email: best, customer_id: l.customer_id, sub_id: l.sub_id, price_id: l.price_id, status: l.status, name: l.name };
+        }
       }
+      stagedNoStripe.push({ id: s.id, source_row: s.source_row, athlete_name: s.athlete_name, parent_email: s.parent_email, expected, suggestion });
     }
     const stripeNoMember = [];
+    const churned = [];
     for (const [email, link] of emailMap.entries()) {
-      if (!stagedEmails.has(email)) {
-        stripeNoMember.push({ email, customer_id: link.customer_id, sub_id: link.sub_id, price_id: link.price_id, status: link.status });
-      }
+      if (stagedEmails.has(email)) continue;
+      const item = { email, name: link.name, customer_id: link.customer_id, sub_id: link.sub_id, price_id: link.price_id, status: link.status, amount_cents: link.amount_cents };
+      if (ACTIVEISH.has(link.status)) stripeNoMember.push(item);
+      else churned.push(item);
     }
 
-    // ── (b) duplicates within the batch (same parent_email OR same athlete_name) ──
-    const byEmail = new Map();
-    const byAthlete = new Map();
+    // ── (b) duplicates within the batch — SIBLING-AWARE: only the same
+    // parent_email AND the same athlete name is a duplicate. Same email with
+    // different kids = a family, not a problem. ──
+    const byKidKey = new Map();
     for (const s of staging) {
       const email = normEmail(s.parent_email);
       const athlete = normName(s.athlete_name);
-      if (email) { if (!byEmail.has(email)) byEmail.set(email, []); byEmail.get(email).push(s); }
-      if (athlete) { if (!byAthlete.has(athlete)) byAthlete.set(athlete, []); byAthlete.get(athlete).push(s); }
+      if (!email || !athlete) continue;
+      const k = email + "|" + athlete;
+      if (!byKidKey.has(k)) byKidKey.set(k, []);
+      byKidKey.get(k).push(s);
     }
     const dupIds = new Set();
     const duplicates = [];
-    for (const [email, rows] of byEmail.entries()) {
+    for (const [k, rows] of byKidKey.entries()) {
       if (rows.length > 1) {
-        duplicates.push({ kind: "parent_email", value: email, ids: rows.map(r => r.id), names: rows.map(r => r.athlete_name) });
-        rows.forEach(r => dupIds.add(r.id));
-      }
-    }
-    for (const [athlete, rows] of byAthlete.entries()) {
-      if (rows.length > 1) {
-        duplicates.push({ kind: "athlete_name", value: athlete, ids: rows.map(r => r.id), names: rows.map(r => r.athlete_name) });
+        duplicates.push({ kind: "same athlete + email", value: k.split("|")[1], email: k.split("|")[0], ids: rows.map(r => r.id), names: rows.map(r => r.athlete_name) });
         rows.forEach(r => dupIds.add(r.id));
       }
     }
@@ -382,13 +532,14 @@ async function handler(req, res) {
         staged: staging.length,
         staged_no_stripe: stagedNoStripe.length,
         stripe_no_member: stripeNoMember.length,
+        churned: churned.length,
         duplicates: duplicates.length,
         no_offer: noOffer.length,
         tier_issues: tierIssues.length,
         clean: cleanCount,
       },
       checks: {
-        links: { staged_no_stripe: stagedNoStripe, stripe_no_member: stripeNoMember },
+        links: { staged_no_stripe: stagedNoStripe, stripe_no_member: stripeNoMember, churned },
         duplicates,
         no_offer: noOffer,
         tier_issues: tierIssues,
