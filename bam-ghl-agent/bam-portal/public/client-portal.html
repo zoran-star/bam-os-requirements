@@ -6859,6 +6859,64 @@ Then the call to action."]</div>
          but read-only and styled with client-portal CSS variables.
     ══════════════════════════════ -->
     <style>
+      /* ── Booking calendars availability panel ── */
+      #view-calendar .bk-section { margin-bottom:26px; }
+      #view-calendar .bk-head { display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; }
+      #view-calendar .bk-title { font-size:16px; font-weight:700; }
+      #view-calendar .bk-sub { font-size:12px; color:var(--text-mute); margin-top:2px; }
+      #view-calendar .bk-new {
+        background:rgba(232,197,71,0.12); border:1px solid var(--accent); color:var(--accent);
+        border-radius:9px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+      }
+      #view-calendar .bk-card {
+        background:var(--surface); border:1px solid var(--border); border-radius:12px;
+        padding:16px 18px; margin-bottom:12px;
+      }
+      #view-calendar .bk-card-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+      #view-calendar .bk-card-name { font-size:14px; font-weight:700; }
+      #view-calendar .bk-card-meta { font-size:11px; color:var(--text-mute); margin-top:2px; }
+      #view-calendar .bk-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:14px; }
+      @media (max-width: 860px) { #view-calendar .bk-grid { grid-template-columns:1fr; } }
+      #view-calendar .bk-lbl { font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-bottom:7px; }
+      #view-calendar .bk-day { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:13px; }
+      #view-calendar .bk-day input[type="checkbox"] { accent-color:var(--accent); }
+      #view-calendar .bk-day-name { width:38px; color:var(--text-mute); font-weight:600; font-size:12px; }
+      #view-calendar .bk-day input[type="time"] {
+        background:var(--surface-el); color:var(--text); border:1px solid var(--border);
+        border-radius:7px; padding:4px 7px; font-size:12px; font-family:inherit;
+      }
+      #view-calendar .bk-day.off input[type="time"] { opacity:0.35; pointer-events:none; }
+      #view-calendar .bk-cap { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+      #view-calendar .bk-cap input {
+        width:70px; background:var(--surface-el); color:var(--text); border:1px solid var(--border);
+        border-radius:7px; padding:6px 9px; font-size:13px; font-family:inherit;
+      }
+      #view-calendar .bk-chips { display:flex; flex-wrap:wrap; gap:6px; }
+      #view-calendar .bk-chip {
+        font-size:11px; padding:4px 10px; border-radius:999px; border:1px solid var(--border);
+        color:var(--text); background:var(--surface-el); display:flex; align-items:center; gap:6px;
+      }
+      #view-calendar .bk-chip button { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:13px; padding:0; }
+      #view-calendar .bk-addblock { display:flex; gap:8px; margin-top:8px; }
+      #view-calendar .bk-addblock input[type="date"] {
+        background:var(--surface-el); color:var(--text); border:1px solid var(--border);
+        border-radius:7px; padding:5px 8px; font-size:12px; font-family:inherit;
+      }
+      #view-calendar .bk-save {
+        background:var(--accent); color:#0B0B0D; border:1px solid var(--accent); border-radius:9px;
+        padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit;
+      }
+      #view-calendar .bk-save:disabled { opacity:0.5; cursor:not-allowed; }
+      #view-calendar .bk-ghost {
+        background:transparent; color:var(--text); border:1px solid var(--border); border-radius:9px;
+        padding:8px 14px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+      }
+      #view-calendar .bk-up { margin-top:14px; border-top:1px solid var(--border); padding-top:12px; }
+      #view-calendar .bk-up-row { display:flex; gap:10px; font-size:12px; padding:3px 0; }
+      #view-calendar .bk-up-when { color:var(--accent); width:170px; flex:0 0 auto; font-weight:600; }
+      #view-calendar .bk-err { color:#e07070; font-size:12px; margin-top:8px; }
+      #view-calendar .bk-ok { color:var(--green); font-size:12px; margin-top:8px; }
+
       #view-calendar .cal-toolbar {
         display:flex; justify-content:space-between; align-items:center;
         gap:14px; flex-wrap:wrap; margin-bottom:18px;
@@ -6982,6 +7040,18 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
+        <!-- ── Booking calendars: live GHL availability management ── -->
+        <div class="bk-section">
+          <div class="bk-head">
+            <div>
+              <div class="bk-title">Booking Calendars</div>
+              <div class="bk-sub">Free trial availability. Changes go live on the website instantly.</div>
+            </div>
+            <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
+          </div>
+          <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0">Loading booking calendars…</div></div>
+        </div>
+
         <div class="cal-toolbar">
           <div class="cal-nav">
             <button class="cal-arrow" onclick="calShiftWeek(-1)" aria-label="Previous week">
@@ -8134,7 +8204,7 @@ function switchView(name, el) {
   if (name === 'pipelines') fetchAndRenderPipelines();
 
   // When entering Calendar, render the weekly grid (mock data for now)
-  if (name === 'calendar') renderCalendar();
+  if (name === 'calendar') { renderCalendar(); bkFetchAndRender(); }
 
   // Team view removed 2026-05-26 — its surface now lives at
   // Business Blueprint > Staff. Old #view-team gone, no on-enter loader.
@@ -8618,6 +8688,199 @@ function calShiftWeek(delta) {
   CAL_WEEK_OFFSET = (delta === 0) ? 0 : CAL_WEEK_OFFSET + delta;
   renderCalendar();
 }
+/* ── Booking Calendars: GHL availability management ── */
+let _BK_DATA = null; // [{calendar_id,label,ghl:{...},upcoming:[...]}]
+const BK_DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function bkPad(n) { return String(n).padStart(2, '0'); }
+function bkHoursToRows(openHours) {
+  // GHL openHours → per-day { on, open:'HH:MM', close:'HH:MM' }
+  const rows = BK_DAYS.map(() => ({ on: false, open: '17:00', close: '20:00' }));
+  for (const block of openHours || []) {
+    const h = (block.hours || [])[0];
+    if (!h) continue;
+    for (const d of block.daysOfTheWeek || []) {
+      if (rows[d]) rows[d] = {
+        on: true,
+        open: bkPad(h.openHour) + ':' + bkPad(h.openMinute),
+        close: bkPad(h.closeHour) + ':' + bkPad(h.closeMinute),
+      };
+    }
+  }
+  return rows;
+}
+function bkRowsToHours(calId) {
+  const out = [];
+  for (let d = 0; d < 7; d++) {
+    const on = document.getElementById(`bk-${calId}-on-${d}`)?.checked;
+    if (!on) continue;
+    const open = (document.getElementById(`bk-${calId}-open-${d}`)?.value || '').split(':');
+    const close = (document.getElementById(`bk-${calId}-close-${d}`)?.value || '').split(':');
+    if (open.length < 2 || close.length < 2) continue;
+    out.push({
+      daysOfTheWeek: [d],
+      hours: [{ openHour: +open[0], openMinute: +open[1], closeHour: +close[0], closeMinute: +close[1] }],
+    });
+  }
+  return out;
+}
+function bkFmtWhen(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+async function bkFetchAndRender() {
+  const host = document.getElementById('bk-cal-list');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _BK_DATA = json.calendars || [];
+    bkRenderList();
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:14px 0">Couldn't load booking calendars — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function bkRenderList() {
+  const host = document.getElementById('bk-cal-list');
+  if (!host || !_BK_DATA) return;
+  if (!_BK_DATA.length) {
+    host.innerHTML = '<div class="req-empty" style="padding:14px 0">No booking calendars yet. Create one to take free trial bookings.</div>';
+    return;
+  }
+  host.innerHTML = _BK_DATA.map(c => {
+    const id = c.calendar_id;
+    if (c.ghl?.error) {
+      return `<div class="bk-card"><div class="bk-card-name">${escapeHTML(c.label)}</div>
+        <div class="bk-err">Couldn't read this calendar from GHL — ${escapeHTML(c.ghl.error)}</div></div>`;
+    }
+    const rows = bkHoursToRows(c.ghl.openHours);
+    const dayRows = rows.map((row, d) => `
+      <div class="bk-day ${row.on ? '' : 'off'}" id="bk-${id}-row-${d}">
+        <input type="checkbox" id="bk-${id}-on-${d}" ${row.on ? 'checked' : ''} onchange="document.getElementById('bk-${id}-row-${d}').classList.toggle('off', !this.checked)">
+        <span class="bk-day-name">${BK_DAYS[d]}</span>
+        <input type="time" id="bk-${id}-open-${d}" value="${row.open}">
+        <span style="color:var(--text-mute)">to</span>
+        <input type="time" id="bk-${id}-close-${d}" value="${row.close}">
+      </div>`).join('');
+    const blocked = (c.ghl.blockedDates || []).map(b =>
+      `<span class="bk-chip">${escapeHTML(b.date)} <button title="Unblock" onclick="bkUnblock('${id}','${escapeHTML(b.date)}')">×</button></span>`
+    ).join('') || '<span style="font-size:12px;color:var(--text-mute)">None</span>';
+    const upcoming = (c.upcoming || []).slice(0, 8).map(u =>
+      `<div class="bk-up-row"><span class="bk-up-when">${bkFmtWhen(u.start)}</span><span>${escapeHTML(u.contactName || u.title || 'Booked')}</span></div>`
+    ).join('') || '<div style="font-size:12px;color:var(--text-mute)">No upcoming bookings in the next 2 weeks.</div>';
+    return `<div class="bk-card">
+      <div class="bk-card-head">
+        <div>
+          <div class="bk-card-name">${escapeHTML(c.ghl.name || c.label)}</div>
+          <div class="bk-card-meta">${c.ghl.slotDuration} ${escapeHTML(c.ghl.slotDurationUnit || '')} sessions${c.pipeline_name ? ' · leads → ' + escapeHTML(c.pipeline_name) + ' / ' + escapeHTML(c.stage_name) : ''}</div>
+        </div>
+        <button class="bk-save" id="bk-${id}-save" onclick="bkSave('${id}')">Save changes</button>
+      </div>
+      <div class="bk-grid">
+        <div>
+          <div class="bk-lbl">Weekly hours</div>
+          ${dayRows}
+        </div>
+        <div>
+          <div class="bk-lbl">Spots per session</div>
+          <div class="bk-cap"><input type="number" min="1" id="bk-${id}-cap" value="${c.ghl.capacity ?? 1}"> <span style="font-size:12px;color:var(--text-mute)">players can book each slot</span></div>
+          <div class="bk-lbl">Blocked dates</div>
+          <div class="bk-chips">${blocked}</div>
+          <div class="bk-addblock">
+            <input type="date" id="bk-${id}-blockdate">
+            <button class="bk-ghost" onclick="bkBlock('${id}')">Block date</button>
+          </div>
+        </div>
+      </div>
+      <div class="bk-err" id="bk-${id}-err" style="display:none"></div>
+      <div class="bk-ok" id="bk-${id}-ok" style="display:none"></div>
+      <div class="bk-up">
+        <div class="bk-lbl">Upcoming bookings (14 days)</div>
+        ${upcoming}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function bkPatch(calId, body, okMsg) {
+  const err = document.getElementById(`bk-${calId}-err`);
+  const ok = document.getElementById(`bk-${calId}-ok`);
+  if (err) err.style.display = 'none';
+  if (ok) ok.style.display = 'none';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/website/calendars?client_id=${encodeURIComponent(CLIENT_ID)}&calendar=${encodeURIComponent(calId)}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    const cal = (_BK_DATA || []).find(x => x.calendar_id === calId);
+    if (cal && json.calendar) cal.ghl = json.calendar;
+    bkRenderList();
+    const ok2 = document.getElementById(`bk-${calId}-ok`);
+    if (ok2) { ok2.textContent = okMsg; ok2.style.display = 'block'; }
+    return true;
+  } catch (e) {
+    const err2 = document.getElementById(`bk-${calId}-err`);
+    if (err2) { err2.textContent = e.message; err2.style.display = 'block'; }
+    return false;
+  }
+}
+
+async function bkSave(calId) {
+  const btn = document.getElementById(`bk-${calId}-save`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const openHours = bkRowsToHours(calId);
+  const capacity = document.getElementById(`bk-${calId}-cap`)?.value;
+  await bkPatch(calId, { openHours, capacity }, 'Saved. The website shows the new availability now.');
+  if (btn) { btn.disabled = false; btn.textContent = 'Save changes'; }
+}
+
+async function bkBlock(calId) {
+  const date = document.getElementById(`bk-${calId}-blockdate`)?.value;
+  if (!date) return;
+  await bkPatch(calId, { blockDate: date }, `Blocked ${date}.`);
+}
+
+async function bkUnblock(calId, date) {
+  await bkPatch(calId, { unblockDate: date }, `Unblocked ${date}.`);
+}
+
+function bkOpenCreate() {
+  const name = prompt('Name of the new booking calendar (e.g. "ADAPT Tryouts"):');
+  if (!name || !name.trim()) return;
+  const capacity = parseInt(prompt('Spots per session (how many players can book the same slot)?', '10'), 10) || 10;
+  const duration = parseInt(prompt('Session length in minutes?', '60'), 10) || 60;
+  bkCreate(name.trim(), capacity, duration);
+}
+
+async function bkCreate(name, capacity, slotDurationMinutes) {
+  const host = document.getElementById('bk-cal-list');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/calendars?client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, capacity, slotDurationMinutes, openHours: [] }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    bkFetchAndRender();
+    if (typeof _epFetchAndRender === 'function') _epFetchAndRender(); // new entry point appears on Pipelines rail
+  } catch (e) {
+    if (host) host.insertAdjacentHTML('afterbegin', `<div class="bk-err">Couldn't create calendar — ${escapeHTML(e.message)}</div>`);
+  }
+}
+
 function renderCalendar() {
   const start = calStartOfWeek(CAL_WEEK_OFFSET);
   document.getElementById('cal-range-label').textContent = calFormatRange(start);
