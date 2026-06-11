@@ -193,43 +193,60 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   }
 
   // Drop the lead into a pipeline when the client config maps this form type
-  // to a pipeline + stage (by name). Skipped if the contact already has an
-  // open opportunity in that pipeline (repeat submission ≠ second card).
+  // to a pipeline + stage (by name). A repeat submission never creates a
+  // second card; advance=true moves the existing card to the target stage
+  // (used when a booking upgrades a form-stage lead).
   if (contactId && pipelineConfig?.pipeline && pipelineConfig?.stage) {
     try {
-      const { pipelineId, stageId } = await resolvePipelineStage(
-        headers, ghlLocationId, pipelineConfig.pipeline, pipelineConfig.stage
-      );
-
-      let exists = false;
-      const searchRes = await fetch(
-        `${GHL_V2}/opportunities/search?${new URLSearchParams({ location_id: ghlLocationId, contact_id: contactId, status: "open" })}`,
-        { headers }
-      );
-      if (searchRes.ok) {
-        const found = (await searchRes.json()).opportunities || [];
-        exists = found.some(o => (o.pipelineId || o.pipeline_id) === pipelineId);
-      }
-
-      if (!exists) {
-        const oppRes = await fetch(`${GHL_V2}/opportunities/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            locationId: ghlLocationId,
-            pipelineId,
-            pipelineStageId: stageId,
-            contactId,
-            name: `${name || email} - website ${formType || "contact"}`,
-            status: "open",
-          }),
-        });
-        if (!oppRes.ok) console.error("GHL opportunity create failed:", oppRes.status, (await oppRes.text()).slice(0, 200));
-      }
+      await placeOpportunity(headers, ghlLocationId, contactId, pipelineConfig, `${name || email} - website ${formType || "contact"}`, false);
     } catch (e) { console.error("GHL pipeline step failed (non-fatal):", e.message); }
   }
 
   return contactId;
+}
+
+// Move-or-create the contact's open opportunity in the named pipeline/stage.
+// advance=false: create only if the contact has no open card in the pipeline.
+// advance=true:  also MOVE an existing open card to the target stage.
+async function placeOpportunity(headers, ghlLocationId, contactId, { pipeline, stage }, oppName, advance) {
+  const { pipelineId, stageId } = await resolvePipelineStage(headers, ghlLocationId, pipeline, stage);
+
+  let existing = null;
+  const searchRes = await fetch(
+    `${GHL_V2}/opportunities/search?${new URLSearchParams({ location_id: ghlLocationId, contact_id: contactId, status: "open" })}`,
+    { headers }
+  );
+  if (searchRes.ok) {
+    const found = (await searchRes.json()).opportunities || [];
+    existing = found.find(o => (o.pipelineId || o.pipeline_id) === pipelineId) || null;
+  }
+
+  if (existing && advance) {
+    const moveRes = await fetch(`${GHL_V2}/opportunities/${existing.id}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({ pipelineId, pipelineStageId: stageId }),
+    });
+    if (!moveRes.ok) console.error("GHL opportunity move failed:", moveRes.status, (await moveRes.text()).slice(0, 200));
+    return existing.id;
+  }
+  if (!existing) {
+    const oppRes = await fetch(`${GHL_V2}/opportunities/`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        locationId: ghlLocationId,
+        pipelineId,
+        pipelineStageId: stageId,
+        contactId,
+        name: oppName,
+        status: "open",
+      }),
+    });
+    if (!oppRes.ok) console.error("GHL opportunity create failed:", oppRes.status, (await oppRes.text()).slice(0, 200));
+    else return ((await oppRes.json()).opportunity || {}).id || null;
+  }
+  return existing?.id || null;
 }
 
 async function handler(req, res) {
@@ -331,18 +348,20 @@ async function handler(req, res) {
       appointmentStatus = "failed";
       try {
         const eps = await sbReq(
-          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id&limit=1`
+          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,pipeline_name,stage_name&limit=1`
         );
         if (!eps?.[0]) throw new Error("calendar not available");
+        const calEp = eps[0];
         const oauthToken = await getClientGhlToken(client);
+        const oauthHeaders = {
+          Authorization: `Bearer ${oauthToken}`,
+          Version: V2_VERSION,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        };
         const apptRes = await fetch(`${GHL_V2}/calendars/events/appointments`, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${oauthToken}`,
-            Version: V2_VERSION,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
+          headers: oauthHeaders,
           body: JSON.stringify({
             calendarId: booking.calendar_id,
             locationId: client.ghl_location_id,
@@ -356,6 +375,19 @@ async function handler(req, res) {
         fields.appointment_id = (apptJson.appointment || apptJson).id || null;
         fields.booked_slot = booking.start;
         receipt.fields = fields;
+
+        // Booking advances the pipeline card to the CALENDAR entry point's
+        // stage (e.g. form fill lands at "interested", a real booking moves
+        // the card to "scheduled trial"). Non-fatal.
+        if (calEp.pipeline_name && calEp.stage_name) {
+          try {
+            await placeOpportunity(
+              oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
+              { pipeline: calEp.pipeline_name, stage: calEp.stage_name },
+              `${name || email} - website ${form_type}`, true
+            );
+          } catch (e) { console.error("Booking stage advance failed (non-fatal):", e.message); }
+        }
       } catch (e) {
         console.error("GHL appointment failed (lead saved):", e.message);
         fields.appointment_error = String(e.message).slice(0, 300);
