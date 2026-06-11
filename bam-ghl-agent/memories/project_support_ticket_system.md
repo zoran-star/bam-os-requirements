@@ -25,7 +25,7 @@ open → delegated → in_progress → awaiting_client ──┐
                                ← needs_rework ←──── ┘
 ```
 
-Visual map (editable, with the button + role on every arrow): `bam-ghl-agent/docs/systems-ticket-flow.html` — its "Copy prompt for Claude" button round-trips browser edits back into the file.
+Visual map (editable, with the button + role on every arrow): `bam-ghl-agent/bam-portal/public/systems-ticket-flow.html` (live at https://portal.byanymeansbusiness.com/systems-ticket-flow.html) — its "Copy prompt for Claude" button round-trips browser edits back into the file.
 
 **2026-06-11:** new manager action **`good_to_finalize`** (in_review → in_progress): manager clears the executor to finalize, executor then presses "✓ Mark complete" (the `approve` action — executors could already complete their own in_progress tickets). Internal transition — no client message/Slack. Button sits between Approve and "Mark complete for review" on the in_review manager row in `SystemsView.jsx`.
 
