@@ -20,6 +20,18 @@ client site form
   → 3. RECEIPT stamp row: ghl_contact_id + ghl_synced_at, or ghl_error
 ```
 
+## Booking (free-trial calendars, Jun 2026)
+- `GET /api/website/availability?client_id&calendar&days` — public free-slots
+  proxy (same CORS as leads). Only calendars exposed as `entry_points` rows
+  (type calendar) are readable. Uses the academy OAuth token w/ auto-refresh
+  (static location keys lack calendar scopes); 60s edge cache.
+- `POST /api/website/leads` accepts optional `booking { calendar_id, start }`
+  → creates the real GHL appointment after contact upsert (GHL handles
+  confirmations/reminders). Failure degrades: lead saved, response carries
+  `appointment: booked|failed`, site shows "we'll confirm by email".
+- GTA free-trial page: grade question routes Grade 5 to 8 → Group 1
+  (`Cmw4bCVBhexgi0Oi0Dkf`), Grade 9 to 12 → Group 2 (`G5y4QI0MsFq3159IhFU7`).
+
 ## Entry Points (lead routing layer, Jun 2026)
 - **`entry_points` table**: one row per place leads enter an academy —
   type ∈ website-form | ghl-form | calendar | funnel, key (form_type or GHL id),
