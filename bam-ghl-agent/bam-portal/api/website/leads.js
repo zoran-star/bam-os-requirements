@@ -108,7 +108,7 @@ async function resolvePipelineStage(headers, ghlLocationId, pipelineName, stageN
   return { pipelineId: pipeline.id, stageId: stage.id };
 }
 
-async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig }) {
+async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, messageFieldId, formType, pipelineConfig, extraTags }) {
   const loc = loadLocations().find(l => l.name === locName);
   if (!loc) return null;
 
@@ -124,6 +124,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
 
   // e.g. form_type "contact" → "contact form filled", "free-trial" → "free trial form filled"
   const formTag = `${(formType || "contact").replace(/-/g, " ")} form filled`;
+  const tags = [...new Set(["website-inquiry", formTag, ...(extraTags || [])])];
 
   const payload = {
     locationId: ghlLocationId,
@@ -132,7 +133,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
     ...(email ? { email: email.toLowerCase() } : {}),
     ...(phone ? { phone } : {}),
     source: "website-form",
-    tags: ["website-inquiry", formTag],
+    tags,
     ...(customFields.length ? { customFields } : {}),
   };
 
@@ -267,16 +268,29 @@ async function handler(req, res) {
   const ghlLocName = client.ghl_kpi_config?.ghl_location;
   const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
   const message = fields?.message || null;
-  // Per-form pipeline mapping, by name. Shape in ghl_kpi_config:
-  //   website_lead_pipelines: { "contact": { pipeline: "...", stage: "..." },
-  //                             "free-trial": { pipeline: "...", stage: "..." } }
-  const pipelineConfig = client.ghl_kpi_config?.website_lead_pipelines?.[form_type] || null;
+  // Routing comes from the entry_points table — the row for this client's
+  // website form of this form_type carries the tags + pipeline/stage names
+  // configured in the portal's Entry Point Set Up wizard.
+  let pipelineConfig = null;
+  let extraTags = [];
+  try {
+    const eps = await sbReq(
+      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name&limit=1`
+    );
+    const ep = eps?.[0];
+    if (ep) {
+      extraTags = ep.tags || [];
+      if (ep.pipeline_name && ep.stage_name) {
+        pipelineConfig = { pipeline: ep.pipeline_name, stage: ep.stage_name };
+      }
+    }
+  } catch (e) { console.error("entry_points lookup failed (non-fatal):", e.message); }
 
   let ghlStatus = "not-configured";
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig });
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags });
       if (ghlContactId) {
         ghlStatus = "synced";
         receipt = { ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null };

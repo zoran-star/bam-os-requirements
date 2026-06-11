@@ -6676,6 +6676,49 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-stale .pl-card-age { color:#c47424; font-weight:600; }
       #view-pipelines .pl-empty { font-size:12px; color:var(--text-mute); text-align:center; padding:14px 8px; }
 
+      /* ── Entry Points rail (left of the board) ── */
+      #view-pipelines .pl-layout { display:flex; gap:14px; align-items:flex-start; }
+      #view-pipelines .pl-layout > #pl-board-container { flex:1; min-width:0; }
+      #view-pipelines .pl-rail { flex:0 0 232px; display:flex; flex-direction:column; gap:8px; }
+      #view-pipelines .pl-rail-head {
+        font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+        color:var(--text-mute); padding:2px 2px 4px;
+      }
+      #view-pipelines .pl-ep {
+        background:var(--surface); border:1px solid var(--border); border-radius:10px;
+        padding:10px 12px; cursor:pointer; transition:border-color 150ms;
+      }
+      #view-pipelines .pl-ep:hover { border-color:rgba(232,197,71,0.45); }
+      #view-pipelines .pl-ep-type { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); }
+      #view-pipelines .pl-ep-name { font-size:13px; font-weight:600; margin-top:2px; }
+      #view-pipelines .pl-ep-status { font-size:11px; margin-top:6px; display:flex; align-items:center; gap:5px; }
+      #view-pipelines .pl-ep.connected { border-color:rgba(76,199,106,0.55); }
+      #view-pipelines .pl-ep.connected .pl-ep-status { color:var(--green); }
+      #view-pipelines .pl-ep.blocked { border-style:dashed; opacity:0.8; }
+      #view-pipelines .pl-ep.blocked .pl-ep-status { color:var(--text-mute); }
+      #view-pipelines .pl-ep-dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+      #view-pipelines .pl-ep.connected .pl-ep-dot { background:var(--green); }
+      #view-pipelines .pl-ep.blocked .pl-ep-dot { background:var(--text-mute); }
+      @media (max-width: 900px) {
+        #view-pipelines .pl-layout { flex-direction:column; }
+        #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); }
+        #view-pipelines .pl-rail-head { grid-column:1/-1; }
+      }
+
+      /* Entry Point Set Up wizard (rendered inside #pl-drawer) */
+      #pl-drawer .ep-field { margin-top:10px; }
+      #pl-drawer .ep-field label { display:block; font-size:11px; color:var(--text-mute); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px; }
+      #pl-drawer .ep-field select {
+        width:100%; background:var(--surface-el); color:var(--text); border:1px solid var(--border);
+        border-radius:8px; padding:9px 10px; font-size:13px; font-family:inherit;
+      }
+      #pl-drawer .ep-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+      #pl-drawer .ep-tag {
+        font-size:11px; padding:3px 9px; border-radius:999px;
+        border:1px solid var(--border); color:var(--text-mute); background:var(--surface-el);
+      }
+      #pl-drawer .ep-err { font-size:12px; color:#e07070; margin-top:10px; display:none; }
+
       /* Drawer */
       #pl-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity 250ms; z-index:60; }
       #pl-drawer-overlay.open { opacity:1; pointer-events:auto; }
@@ -6711,8 +6754,14 @@ Then the call to action."]</div>
       </div>
       <div class="content">
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
-        <div id="pl-board-container">
-          <div class="req-empty" style="padding:20px 0">Loading pipelines…</div>
+        <div class="pl-layout">
+          <aside class="pl-rail" id="pl-entry-rail">
+            <div class="pl-rail-head">Entry Points</div>
+            <div id="pl-entry-list"><div class="pl-empty">Loading…</div></div>
+          </aside>
+          <div id="pl-board-container">
+            <div class="req-empty" style="padding:20px 0">Loading pipelines…</div>
+          </div>
         </div>
       </div>
     </div>
@@ -14628,8 +14677,146 @@ async function fetchAndRenderPipelines() {
     }
     _renderPipelineTabs();
     _renderPipelineBoard();
+    _renderEntryRail(); // wizard needs _PL_DATA for pipeline/stage dropdowns
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines — ${escapeHTML(e.message)}</div>`;
+  }
+  _epFetchAndRender();
+}
+
+/* ── Entry Points rail + Entry Point Set Up wizard ── */
+let _EP_DATA = null;   // [{id,type,key,label,tags,pipeline_name,stage_name}]
+let _EP_OPEN = null;   // id of the entry point open in the wizard
+
+const _EP_TYPE_LABELS = { 'website-form': 'Website', 'ghl-form': 'GHL Form', 'calendar': 'Calendar', 'funnel': 'Funnel' };
+
+async function _epFetchAndRender() {
+  const host = document.getElementById('pl-entry-list');
+  if (!host) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/entry-points?client_id=' + encodeURIComponent(CLIENT_ID), {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _EP_DATA = json.entry_points || [];
+    _renderEntryRail();
+  } catch (e) {
+    host.innerHTML = `<div class="pl-empty">Couldn't load entry points — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _renderEntryRail() {
+  const host = document.getElementById('pl-entry-list');
+  if (!host || !_EP_DATA) return;
+  if (!_EP_DATA.length) {
+    host.innerHTML = '<div class="pl-empty">No entry points yet.</div>';
+    return;
+  }
+  host.innerHTML = _EP_DATA.map(ep => {
+    const connected = !!(ep.pipeline_name && ep.stage_name);
+    const status = connected
+      ? `<span class="pl-ep-dot"></span> ${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}`
+      : `<span class="pl-ep-dot"></span> Not connected — set up`;
+    return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" onclick="_epOpenWizard('${escapeHTML(ep.id)}')">
+      <div class="pl-ep-type">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)}</div>
+      <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
+      <div class="pl-ep-status">${status}</div>
+    </div>`;
+  }).join('');
+}
+
+function _epOpenWizard(id) {
+  const ep = (_EP_DATA || []).find(x => x.id === id);
+  if (!ep) return;
+  _EP_OPEN = id;
+  const pipelines = (_PL_DATA && _PL_DATA.pipelines) || [];
+  const selPipeline = ep.pipeline_name || '';
+  const pipelineOpts = ['<option value="">Choose a pipeline…</option>']
+    .concat(pipelines.map(p => `<option value="${escapeHTML(p.name)}" ${p.name === selPipeline ? 'selected' : ''}>${escapeHTML(p.name)}</option>`))
+    .join('');
+  const tagChips = (ep.tags || []).map(t => `<span class="ep-tag">${escapeHTML(t)}</span>`).join('') || '<span class="ep-tag">none</span>';
+  const enforcedNote = ep.type === 'website-form'
+    ? 'Leads from this form are routed automatically.'
+    : 'Reference config — enforce it with a GHL workflow for now.';
+
+  const drawer = document.getElementById('pl-drawer');
+  drawer.innerHTML = `
+    <div class="pl-d-header">
+      <div>
+        <div class="pl-d-title">Entry Point Set Up</div>
+        <div class="pl-d-sub">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)} · ${escapeHTML(ep.label)}</div>
+      </div>
+      <button class="pc-d-close" onclick="closePipelineDrawer()" aria-label="Close" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:22px;padding:4px 10px">×</button>
+    </div>
+    <div class="pl-d-section">
+      <div class="lbl">Routing</div>
+      <div class="ep-field">
+        <label for="ep-wiz-pipeline">Pipeline</label>
+        <select id="ep-wiz-pipeline" onchange="_epWizPipelineChanged()">${pipelineOpts}</select>
+      </div>
+      <div class="ep-field">
+        <label for="ep-wiz-stage">Stage</label>
+        <select id="ep-wiz-stage"><option value="">Choose a pipeline first</option></select>
+      </div>
+      <div class="ep-err" id="ep-wiz-err"></div>
+    </div>
+    <div class="pl-d-section">
+      <div class="lbl">Tags applied to these leads</div>
+      <div class="ep-tags">${tagChips}</div>
+    </div>
+    <div class="pl-d-section" style="border-bottom:none">
+      <div style="font-size:12px;color:var(--text-mute)">${enforcedNote}</div>
+    </div>
+    <div class="pl-d-actions">
+      <button class="pl-d-btn primary" id="ep-wiz-save" onclick="_epWizSave()">Save</button>
+      ${ep.pipeline_name ? '<button class="pl-d-btn" onclick="_epWizSave(true)">Disconnect</button>' : ''}
+    </div>`;
+  _epWizPipelineChanged(ep.stage_name || '');
+  document.getElementById('pl-drawer-overlay')?.classList.add('open');
+  drawer.classList.add('open');
+}
+
+function _epWizPipelineChanged(preselectStage) {
+  const pipelineName = document.getElementById('ep-wiz-pipeline')?.value || '';
+  const stageSel = document.getElementById('ep-wiz-stage');
+  if (!stageSel) return;
+  const p = ((_PL_DATA && _PL_DATA.pipelines) || []).find(x => x.name === pipelineName);
+  if (!p) { stageSel.innerHTML = '<option value="">Choose a pipeline first</option>'; return; }
+  stageSel.innerHTML = ['<option value="">Choose a stage…</option>']
+    .concat(p.stages.map(s => `<option value="${escapeHTML(s.name)}" ${s.name === preselectStage ? 'selected' : ''}>${escapeHTML(s.name)}</option>`))
+    .join('');
+}
+
+async function _epWizSave(disconnect) {
+  const ep = (_EP_DATA || []).find(x => x.id === _EP_OPEN);
+  if (!ep) return;
+  const err = document.getElementById('ep-wiz-err');
+  const btn = document.getElementById('ep-wiz-save');
+  const pipeline_name = disconnect ? null : (document.getElementById('ep-wiz-pipeline')?.value || null);
+  const stage_name = disconnect ? null : (document.getElementById('ep-wiz-stage')?.value || null);
+  if (!disconnect && (!pipeline_name || !stage_name)) {
+    if (err) { err.textContent = 'Pick both a pipeline and a stage.'; err.style.display = 'block'; }
+    return;
+  }
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/website/entry-points?client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(ep.id)}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pipeline_name, stage_name }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    Object.assign(ep, { pipeline_name, stage_name });
+    _renderEntryRail();
+    closePipelineDrawer();
+  } catch (e) {
+    if (err) { err.textContent = e.message; err.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
   }
 }
 
