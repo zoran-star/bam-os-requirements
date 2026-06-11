@@ -18,6 +18,7 @@ import {
   setTicketDueDate,
   sendForFinalReview,
   goodToFinalize,
+  nudgeClientSlack,
 } from "../services/ticketsService";
 import { supabase } from "../lib/supabase";
 
@@ -261,8 +262,16 @@ export default function SystemsView({ tokens: t, dark, me, session }) {
 // Overview tab — managers/admins only. Three stat tiles at top, then
 // CLIENT ACTIONS (awaiting_client status, grouped by client, newest at
 // top), then TIMELINE SENSITIVE (urgent OR overdue OR due within 2
-// business days, sorted most overdue → nearest due).
+// calendar days, sorted most overdue → nearest due).
 function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpToTab }) {
+  // Per-row "Ping Slack" nudge state: undefined | sending | done | error.
+  const [pingState, setPingState] = useState({});
+  const pingClient = async (x) => {
+    if (pingState[x.id] === "sending" || pingState[x.id] === "done") return;
+    setPingState(p => ({ ...p, [x.id]: "sending" }));
+    try { await nudgeClientSlack(x.id); setPingState(p => ({ ...p, [x.id]: "done" })); }
+    catch { setPingState(p => ({ ...p, [x.id]: "error" })); }
+  };
   // "Completed in the last 5 days" — done/approved/cancelled tickets whose
   // resolved_at lands within the trailing 5-day window. Clicking jumps to
   // the Completed tab (which shows the full archive).
@@ -283,13 +292,15 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
   // section AND to flag client-action rows that also qualify, so we can
   // surface a "TIMELINE SENSITIVE" pill on them instead of duplicating.
   const today = new Date(); today.setHours(0,0,0,0);
-  const twoBizDaysOut = addBusinessDays(today, 2);
+  // Calendar days, not business days — "in 4d" over a weekend was still
+  // landing in Timeline Sensitive, which read as a bug (Zoran 2026-06-11).
+  const twoDaysOut = new Date(today); twoDaysOut.setDate(twoDaysOut.getDate() + 2);
   const isTimelineSensitive = (x) => {
     if (["done","approved","cancelled"].includes(x.status)) return false;
     if (x.priority === "urgent") return true;
     if (!x.due_date) return false;
     const due = new Date(x.due_date + "T00:00:00");
-    return due.getTime() <= twoBizDaysOut.getTime();
+    return due.getTime() <= twoDaysOut.getTime();
   };
 
   // Both states mean the ball is in the client's court: awaiting_client (we
@@ -378,6 +389,8 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
                       key={x.id} ticket={x} tokens={t} dark={dark} variant="action"
                       onClick={() => onOpenTicket(x)}
                       timelineSensitive={isTimelineSensitive(x)}
+                      onPing={() => pingClient(x)}
+                      pingState={pingState[x.id]}
                     />
                   ))}
                 </div>
@@ -393,7 +406,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
           <h2 style={{ fontSize: 16, fontWeight: 800, color: t.text, textTransform: "uppercase", letterSpacing: 0.5, margin: 0 }}>
             Timeline Sensitive
           </h2>
-          <span style={{ fontSize: 12, color: t.textMute }}>urgent · overdue · due within 2 business days</span>
+          <span style={{ fontSize: 12, color: t.textMute }}>urgent · overdue · due within 2 days</span>
         </div>
         {!loading && timelineTickets.length === 0 && (
           <div style={{ color: t.textMute, fontSize: 13, padding: "20px 0", fontStyle: "italic" }}>
@@ -418,7 +431,7 @@ function OverviewTab({ tickets, loading, tokens: t, dark, onOpenTicket, onJumpTo
 // timelineSensitive (only set on 'action' variant) renders a small red
 // "Timeline sensitive" pill next to the title so we can dedup the row
 // from the Timeline Sensitive section while keeping the urgency visible.
-function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensitive }) {
+function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensitive, onPing, pingState }) {
   const title = ticket.menu_item
     || (ticket.type === "error" ? "Error report" : ticket.type === "change" ? "Change request" : "Build request");
   const clientName = ticket.client?.business_name || "Unknown";
@@ -454,7 +467,7 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
       onClick={onClick}
       style={{
         display: "grid",
-        gridTemplateColumns: "180px 1fr 160px",
+        gridTemplateColumns: onPing ? "180px 1fr 160px auto" : "180px 1fr 160px",
         gap: 16,
         alignItems: "center",
         padding: "14px 16px",
@@ -486,6 +499,31 @@ function OverviewRow({ ticket, tokens: t, dark, onClick, variant, timelineSensit
         )}
       </div>
       <div style={{ fontSize: 13, fontWeight: 600, color: dateColor, textAlign: "right" }}>{dateLabel}</div>
+      {onPing && (
+        // span, not <button> — the whole row is already a <button> and
+        // nesting buttons is invalid HTML (breaks click handling).
+        <span
+          role="button"
+          title="Post a reminder in the client's Slack channel"
+          onClick={e => { e.stopPropagation(); onPing(); }}
+          style={{
+            fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+            textTransform: "uppercase", letterSpacing: 0.5,
+            padding: "5px 10px", borderRadius: 6,
+            border: `1px solid ${pingState === "done" ? (t.green || "#9DB87A") : t.border}`,
+            color: pingState === "done" ? (t.green || "#9DB87A")
+                 : pingState === "error" ? (t.red || "#ED7969")
+                 : t.textSub,
+            opacity: pingState === "sending" ? 0.6 : 1,
+            cursor: pingState === "done" ? "default" : "pointer",
+          }}
+        >
+          {pingState === "sending" ? "Pinging…"
+           : pingState === "done" ? "✓ Pinged"
+           : pingState === "error" ? "⚠ Retry"
+           : "🔔 Ping Slack"}
+        </span>
+      )}
     </button>
   );
 }

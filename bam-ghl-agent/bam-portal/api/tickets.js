@@ -477,6 +477,15 @@ async function handler(req, res) {
           ];
           break;
 
+        case "nudge_client":
+          // Slack-only reminder on the client's channel that this ticket is
+          // waiting on them. No status change, no message appended — the
+          // notification block below posts the nudge.
+          if (!["awaiting_client", "final_review"].includes(t.status)) {
+            return res.status(400).json({ error: "ticket is not waiting on the client" });
+          }
+          break;
+
         case "good_to_finalize":
           // Manager reviewed the work and clears the executor to finalize —
           // the ticket returns to in_progress for final touches, then the
@@ -551,6 +560,12 @@ async function handler(req, res) {
         postClientSlackNotification(t.client_id,
           `💬 Message from BAM — Systems [${code}]${msg ? `\n_${msg}_` : ""}`, req);
         pushClient("New message from BAM", msg || "Open the portal to read it.");
+      } else if (action === "nudge_client") {
+        const ask = t.status === "final_review"
+          ? "your final sign-off"
+          : "a reply from you";
+        postClientSlackNotification(t.client_id,
+          `⏰ Reminder — ${ticketTitle} [${code}] is waiting on ${ask}`, req);
       } else if (action === "approve") {
         postClientSlackNotification(t.client_id,
           `✅ Completed — Systems [${code}]`, req);
