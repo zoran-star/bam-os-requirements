@@ -15088,11 +15088,14 @@ function _renderEntryRail() {
     return;
   }
   host.innerHTML = _EP_DATA.map(ep => {
-    const connected = !!(ep.pipeline_name && ep.stage_name);
-    const status = connected
-      ? `<span class="pl-ep-dot"></span> ${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}`
-      : `<span class="pl-ep-dot"></span> Not connected — set up`;
-    return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" onclick="_epOpenWizard('${escapeHTML(ep.id)}')">
+    const off = ep.enabled === false;
+    const connected = !off && !!(ep.pipeline_name && ep.stage_name);
+    const status = off
+      ? `<span class="pl-ep-dot"></span> Off — not selected`
+      : connected
+        ? `<span class="pl-ep-dot"></span> ${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}`
+        : `<span class="pl-ep-dot"></span> Not connected — set up`;
+    return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" style="${off ? 'opacity:0.5' : ''}" onclick="_epOpenWizard('${escapeHTML(ep.id)}')">
       <div class="pl-ep-type">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)}</div>
       <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
       <div class="pl-ep-status">${status}</div>
@@ -15135,6 +15138,15 @@ function _epOpenWizard(id) {
       </div>
       <div class="ep-err" id="ep-wiz-err"></div>
     </div>
+    ${ep.type === 'calendar' ? `
+    <div class="pl-d-section">
+      <div class="lbl">Calendar</div>
+      <label style="display:flex;align-items:center;gap:9px;font-size:13px;cursor:pointer;padding:4px 0">
+        <input type="checkbox" id="ep-wiz-selected" ${ep.enabled !== false ? 'checked' : ''} style="accent-color:var(--accent)">
+        <span>Selected — shows on the Calendars page and takes website bookings</span>
+      </label>
+      ${ep.enabled !== false ? `<button class="pl-d-btn" style="margin-top:8px" onclick="_epGoEditCalendar()">Edit calendar →</button>` : ''}
+    </div>` : ''}
     <div class="pl-d-section">
       <div class="lbl">Tags applied to these leads</div>
       <div class="ep-tags">${tagChips}</div>
@@ -15162,6 +15174,18 @@ function _epWizPipelineChanged(preselectStage) {
     .join('');
 }
 
+function _epGoEditCalendar() {
+  const ep = (_EP_DATA || []).find(x => x.id === _EP_OPEN);
+  closePipelineDrawer();
+  const navEl = document.querySelector('.nav-item[data-feature="calendar"]');
+  switchView('calendar', navEl);
+  // Highlight the matching calendar card once the panel loads
+  if (ep) setTimeout(() => {
+    const card = document.getElementById(`bk-${ep.key}-save`)?.closest('.bk-card');
+    if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); card.style.borderColor = 'var(--accent)'; }
+  }, 1200);
+}
+
 async function _epWizSave(disconnect) {
   const ep = (_EP_DATA || []).find(x => x.id === _EP_OPEN);
   if (!ep) return;
@@ -15169,22 +15193,30 @@ async function _epWizSave(disconnect) {
   const btn = document.getElementById('ep-wiz-save');
   const pipeline_name = disconnect ? null : (document.getElementById('ep-wiz-pipeline')?.value || null);
   const stage_name = disconnect ? null : (document.getElementById('ep-wiz-stage')?.value || null);
-  if (!disconnect && (!pipeline_name || !stage_name)) {
+  const selectedEl = document.getElementById('ep-wiz-selected');
+  const enabled = selectedEl ? selectedEl.checked : undefined;
+  // Calendar entry points may save with just the Selected toggle; pipeline
+  // mapping stays optional for them.
+  const needsRouting = ep.type !== 'calendar';
+  if (!disconnect && needsRouting && (!pipeline_name || !stage_name)) {
     if (err) { err.textContent = 'Pick both a pipeline and a stage.'; err.style.display = 'block'; }
     return;
   }
   if (err) err.style.display = 'none';
   if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
+    const body = { pipeline_name, stage_name };
+    if (enabled !== undefined) body.enabled = enabled;
     const token = await _mreqAuthToken();
     const r = await fetch(`/api/website/entry-points?client_id=${encodeURIComponent(CLIENT_ID)}&id=${encodeURIComponent(ep.id)}`, {
       method: 'PATCH',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pipeline_name, stage_name }),
+      body: JSON.stringify(body),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     Object.assign(ep, { pipeline_name, stage_name });
+    if (enabled !== undefined) ep.enabled = enabled;
     _renderEntryRail();
     closePipelineDrawer();
   } catch (e) {

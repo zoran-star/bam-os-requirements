@@ -74,8 +74,8 @@ async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const rows = await sb(
-        `entry_points?client_id=eq.${clientId}&enabled=eq.true` +
-        `&select=id,type,key,label,tags,pipeline_name,stage_name,updated_at&order=type.asc,label.asc`
+        `entry_points?client_id=eq.${clientId}` +
+        `&select=id,type,key,label,tags,pipeline_name,stage_name,enabled,updated_at&order=type.asc,label.asc`
       );
       return res.status(200).json({ entry_points: rows || [] });
     } catch (e) { return res.status(500).json({ error: e.message }); }
@@ -89,6 +89,7 @@ async function handler(req, res) {
     if ("pipeline_name" in b) patch.pipeline_name = b.pipeline_name || null;
     if ("stage_name" in b) patch.stage_name = b.stage_name || null;
     if (Array.isArray(b.tags)) patch.tags = b.tags;
+    if ("enabled" in b) patch.enabled = !!b.enabled;
     try {
       const rows = await sb(`entry_points?id=eq.${id}&client_id=eq.${clientId}`, {
         method: "PATCH",
