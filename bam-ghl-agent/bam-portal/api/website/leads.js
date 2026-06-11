@@ -1,11 +1,19 @@
 // Public endpoint — receives form submissions from client websites.
-// Saves to Supabase website_leads and (if configured) pushes to GHL as a contact.
+// Lead data lives in OUR database first: every submission writes a
+// website_leads row, then syncs to the client's GHL (contact + inbox
+// message) when configured. The row is stamped with the sync receipt
+// (ghl_contact_id / ghl_synced_at / ghl_error) so failed syncs are
+// visible and retryable, and migrating a client off GHL is just
+// "stop syncing" — their lead history is already home.
 //
 // POST body: { client_id, form_type?, name, email, phone?, fields?, source_url? }
 // fields is a free-form object for any extra form data (e.g. { message: "..." })
 //
-// GHL push activates automatically when the client has ghl_kpi_config.ghl_location
-// set and that location is present in GHL_LOCATIONS_JSON.
+// Allowed origins come from clients.allowed_domains (text[] of bare domains,
+// e.g. {"byanymeansbball.com","bam-gta.vercel.app"}) — onboarding a new
+// client site is a DB row update, not a code change. GHL push activates
+// automatically when the client has ghl_kpi_config.ghl_location set and
+// that location is present in GHL_LOCATIONS_JSON.
 
 import { withSentryApiRoute } from "../_sentry.js";
 
@@ -15,23 +23,46 @@ const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SER
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 
-const ALLOWED_ORIGINS = new Set([
-  "https://byanymeansbball.com",
-  "https://www.byanymeansbball.com",
-  "https://by-any-means-lac.vercel.app",
+const DEV_ORIGINS = new Set([
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:5500",
 ]);
 
-function setCors(req, res) {
+// Module-level cache so warm serverless instances don't hit the DB on
+// every preflight. 60s is fine — domain changes are rare.
+let originsCache = { set: null, at: 0 };
+const ORIGINS_TTL_MS = 60_000;
+
+async function getAllowedOrigins() {
+  if (originsCache.set && Date.now() - originsCache.at < ORIGINS_TTL_MS) {
+    return originsCache.set;
+  }
+  const set = new Set(DEV_ORIGINS);
+  const rows = await sbReq("clients?select=allowed_domains&allowed_domains=not.is.null");
+  for (const row of rows || []) {
+    for (const domain of row.allowed_domains || []) {
+      set.add(`https://${domain}`);
+      set.add(`https://www.${domain}`);
+    }
+  }
+  originsCache = { set, at: Date.now() };
+  return set;
+}
+
+async function setCors(req, res) {
   const origin = req.headers.origin || "";
-  if (ALLOWED_ORIGINS.has(origin)) {
+  let allowed = false;
+  try {
+    allowed = (await getAllowedOrigins()).has(origin);
+  } catch { /* DB hiccup — treat as not allowed; POST will 403 */ }
+  if (allowed) {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  return allowed;
 }
 
 async function sbReq(path, init = {}) {
@@ -143,13 +174,12 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
 }
 
 async function handler(req, res) {
-  setCors(req, res);
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+
+  const allowed = await setCors(req, res);
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
-
-  const origin = req.headers.origin || "";
-  if (!ALLOWED_ORIGINS.has(origin)) return res.status(403).json({ error: "Forbidden" });
-  if (!SB_URL || !SB_KEY) return res.status(500).json({ error: "Supabase not configured" });
+  if (!allowed) return res.status(403).json({ error: "Forbidden" });
 
   const b = req.body || {};
   const { client_id, form_type = "contact", name, email, phone, fields = {}, source_url } = b;
@@ -167,24 +197,8 @@ async function handler(req, res) {
   } catch (e) { return res.status(500).json({ error: e.message }); }
   if (!client) return res.status(404).json({ error: "client not found" });
 
-  const ghlLocName = client.ghl_kpi_config?.ghl_location;
-  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
-  const message = fields?.message || null;
-
-  // GHL first — primary path. No Supabase write on success.
-  if (ghlLocName && client.ghl_location_id) {
-    try {
-      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
-      if (ghlContactId) {
-        return res.status(200).json({ ok: true, source: "ghl", id: ghlContactId });
-      }
-    } catch (e) {
-      console.error("GHL push failed — falling back to Supabase:", e.message);
-    }
-  }
-
-  // Supabase fallback — only reached when GHL is not configured or push failed.
-  // Ensures no lead is ever silently dropped.
+  // 1. Save — our database is the source of truth for every lead.
+  let leadId;
   try {
     const rows = await sbReq("website_leads", {
       method: "POST",
@@ -199,10 +213,46 @@ async function handler(req, res) {
         source_url: source_url || null,
       }),
     });
-    return res.status(200).json({ ok: true, source: "backup", id: rows?.[0]?.id });
+    leadId = rows?.[0]?.id;
   } catch (e) {
     return res.status(500).json({ error: `submission failed: ${e.message}` });
   }
+
+  // 2. Deliver — sync to the client's GHL when configured.
+  const ghlLocName = client.ghl_kpi_config?.ghl_location;
+  const messageFieldId = client.ghl_kpi_config?.message_field_id || null;
+  const message = fields?.message || null;
+
+  let ghlStatus = "not-configured";
+  if (ghlLocName && client.ghl_location_id) {
+    let receipt;
+    try {
+      const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId });
+      if (ghlContactId) {
+        ghlStatus = "synced";
+        receipt = { ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null };
+      } else {
+        ghlStatus = "failed";
+        receipt = { ghl_error: "location not found in GHL_LOCATIONS_JSON or no API key" };
+      }
+    } catch (e) {
+      console.error("GHL sync failed — lead is saved, stamping error:", e.message);
+      ghlStatus = "failed";
+      receipt = { ghl_error: e.message.slice(0, 500) };
+    }
+
+    // 3. Receipt — stamp the lead row; never fail the request over it.
+    try {
+      await sbReq(`website_leads?id=eq.${leadId}`, {
+        method: "PATCH",
+        body: JSON.stringify(receipt),
+      });
+    } catch (e) {
+      console.error("Failed to stamp GHL receipt on lead", leadId, e.message);
+    }
+  }
+
+  return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus });
 }
 
 export default withSentryApiRoute(handler);
