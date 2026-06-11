@@ -16456,15 +16456,38 @@ function _sorterRenderStep3(host) {
       <summary style="cursor:pointer;padding:11px 0;font-weight:700;font-size:13.5px;list-style:none;">${icon} ${title} <span style="color:${count ? '#e0a93f' : '#7BC47F'};font-weight:800;">(${count})</span></summary>
       <div style="padding:0 0 12px;font-size:12px;color:var(--text-mute,#888);">${inner || 'Nothing here — all good.'}</div>
     </details>`;
+  const fixBtn = (label, fn) => `<button onclick="${fn}" style="margin-left:8px;font-size:11px;font-weight:700;padding:3px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">${label}</button>`;
+  const row = (inner) => `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:3px 0;">${inner}</div>`;
 
-  const list = (arr, fmt) => (arr && arr.length) ? arr.slice(0, 50).map(fmt).join('') : '';
+  const list = (arr, fmt) => (arr && arr.length) ? arr.slice(0, 60).map(fmt).join('') : '';
   const links = (c.checks && c.checks.links) || {};
+
+  // Staged member without a Stripe match: expected (no card yet) is informational;
+  // a typo suggestion gets a 1-tap Link; otherwise it promotes fine without billing.
   const linksInner = `
-    ${list(links.staged_no_stripe, x => `<div>• Staged, no Stripe match: ${escapeHTML(x.athlete_name || '')} (${escapeHTML(x.parent_email || '')})</div>`)}
-    ${list(links.stripe_no_member, x => `<div>• Stripe sub, no staged member: ${escapeHTML(x.email || '')}</div>`)}`;
-  const dupInner = list((c.checks && c.checks.duplicates) || [], x => `<div>• ${escapeHTML(x.kind || 'dup')}: ${escapeHTML(String(x.value || ''))} — ${escapeHTML((x.names || []).join(', '))}</div>`);
-  const noOfferInner = list((c.checks && c.checks.no_offer) || [], x => `<div>• ${escapeHTML(x.athlete_name || '')} — ${escapeHTML(x.reason || '')}</div>`);
-  const tierInner = list((c.checks && c.checks.tier_issues) || [], x => `<div>• ${escapeHTML(x.offer_price_key || '')} — ${escapeHTML(x.issue || '')}</div>`);
+    ${list(links.staged_no_stripe, x => {
+      const who = `<b>${escapeHTML(x.athlete_name || '')}</b>&nbsp;(${escapeHTML(x.parent_email || '')})`;
+      if (x.expected) return row(`💳 ${who} — no card yet, expected. Payment link comes after import.`);
+      if (x.suggestion) return row(`✉️ ${who} — did you mean <b>${escapeHTML(x.suggestion.email)}</b>?` +
+        fixBtn('Link ✓', `_sorterFixLink('${escapeHTML(String(x.id))}','${escapeHTML(x.suggestion.email)}','${escapeHTML(x.suggestion.customer_id || '')}','${escapeHTML(x.suggestion.sub_id || '')}','${escapeHTML(x.suggestion.price_id || '')}')`));
+      return row(`• ${who} — no Stripe match (promotes without billing; link later)`);
+    })}
+    ${list(links.stripe_no_member, x => row(
+      `💸 <b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')}) is PAYING but not on your sheet` +
+      fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)
+    ))}`;
+
+  // Churned subs are history, not problems — one collapsed line.
+  const churnedArr = links.churned || [];
+  const churnedInner = list(churnedArr, x => `<div>• ${escapeHTML(x.name || '')} (${escapeHTML(x.email || '')}) — sub ${escapeHTML(x.status || 'canceled')}</div>`);
+
+  const dupInner = list((c.checks && c.checks.duplicates) || [], x =>
+    row(`• <b>${escapeHTML(String(x.value || ''))}</b> appears ${x.ids.length}× (${escapeHTML(x.email || '')})` +
+      x.ids.slice(1).map((id, i) => fixBtn(`Remove copy ${i + 1}`, `_sorterRemoveStaged('${escapeHTML(String(id))}')`)).join('')));
+  const noOfferInner = list((c.checks && c.checks.no_offer) || [], x =>
+    row(`• <b>${escapeHTML(x.athlete_name || '')}</b> — ${escapeHTML(x.reason || '')}` + fixBtn('Fix in Match →', '_sorterGoto(1)')));
+  const tierInner = list((c.checks && c.checks.tier_issues) || [], x =>
+    row(`• <b>${escapeHTML(x.offer_price_key || '')}</b> — ${escapeHTML(x.issue || '')}` + fixBtn('Fix in Match →', '_sorterGoto(1)')));
 
   const stagedNo = counts.staged_no_stripe || 0;
   const stripeNo = counts.stripe_no_member || 0;
@@ -16473,10 +16496,70 @@ function _sorterRenderStep3(host) {
     ${card('🔗', 'Stripe links', stagedNo + stripeNo, linksInner)}
     ${card('👯', 'Duplicates', counts.duplicates || 0, dupInner)}
     ${card('🏷', 'On a price with no offer', counts.no_offer || 0, noOfferInner)}
-    ${card('⚖️', 'Live/Legacy sanity', counts.tier_issues || 0, tierInner)}`;
+    ${card('⚖️', 'Live/Legacy sanity', counts.tier_issues || 0, tierInner)}
+    ${churnedArr.length ? `
+    <details style="border:1px dashed var(--border,#2a2a31);border-radius:10px;margin-bottom:10px;padding:0 12px;opacity:.75;">
+      <summary style="cursor:pointer;padding:11px 0;font-weight:700;font-size:12.5px;list-style:none;color:var(--text-mute,#888);">🕰 Past members — ${churnedArr.length} canceled subs · nothing to do ✓</summary>
+      <div style="padding:0 0 12px;font-size:11.5px;color:var(--text-mute,#888);">${churnedInner}</div>
+    </details>` : ''}`;
 
   const canPromote = (counts.clean || 0) > 0;
   _sorterSetNext(`<button onclick="_sorterPromote()" ${canPromote ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${canPromote ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${canPromote ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${canPromote ? 'pointer' : 'not-allowed'};">✅ Promote ${counts.clean || 0} clean members</button>`);
+}
+
+// ── Step 3 one-tap fixes — mutate staging server-side, update local state, re-render ──
+async function _sorterFixAction(action, payload, prune) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, ...payload }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    if (json.counts && _SORTER.checks && _SORTER.checks.counts) {
+      _SORTER.checks.counts.staged = json.counts.staged;
+      _SORTER.checks.counts.clean = json.counts.clean;
+    }
+    if (prune) prune(json);
+    // keep the derived counts in sync with the pruned lists
+    const ch = _SORTER.checks.checks || {};
+    const cs = _SORTER.checks.counts || {};
+    cs.staged_no_stripe = ((ch.links || {}).staged_no_stripe || []).length;
+    cs.stripe_no_member = ((ch.links || {}).stripe_no_member || []).length;
+    cs.duplicates = (ch.duplicates || []).length;
+    _sorterRenderBody();
+  } catch (e) {
+    alert('Fix failed: ' + _sorterErr(e));
+  }
+}
+
+function _sorterFixLink(stagingId, email, customerId, subId, priceId) {
+  _sorterFixAction('fix-link',
+    { staging_id: stagingId, matched_email: email, customer_id: customerId, sub_id: subId, price_id: priceId },
+    () => {
+      const l = (_SORTER.checks.checks || {}).links || {};
+      l.staged_no_stripe = (l.staged_no_stripe || []).filter(x => String(x.id) !== String(stagingId));
+    });
+}
+
+function _sorterAddFromStripe(email, name, customerId, subId, priceId) {
+  _sorterFixAction('add-from-stripe',
+    { email, name, customer_id: customerId, sub_id: subId, price_id: priceId },
+    () => {
+      const l = (_SORTER.checks.checks || {}).links || {};
+      l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
+    });
+}
+
+function _sorterRemoveStaged(stagingId) {
+  _sorterFixAction('remove-staged', { staging_id: stagingId }, () => {
+    const c = _SORTER.checks.checks || {};
+    c.duplicates = (c.duplicates || [])
+      .map(g => ({ ...g, ids: g.ids.filter(id => String(id) !== String(stagingId)) }))
+      .filter(g => g.ids.length > 1);
+  });
 }
 
 async function _sorterRunChecks() {
