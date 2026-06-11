@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Competition Consolidation — League × Tournament</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:#0B0B0D; --panel:#131316; --card:#18181C; --card-hover:#1E1E23;
+    --line:#26262C; --line-str:#34343C;
+    --text:#EDEDEF; --mute:#8A8A93; --faint:#5A5A63;
+    --gold:#E8C547; --gold-dim:rgba(232,197,71,0.12);
+    --league:#A78BFA; --tourn:#F59E0B; --both:#7BC47F; --new:#E8C547;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { background:var(--ink); color:var(--text); font-family:'Inter',sans-serif; font-size:14px; }
+  body { min-height:100vh; display:flex; flex-direction:column; }
+
+  /* ── Top bar ── */
+  header {
+    display:flex; align-items:center; gap:18px; padding:14px 22px;
+    border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--ink); z-index:50;
+  }
+  header h1 { font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; letter-spacing:.2px; }
+  header .kicker { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1.5px; color:var(--mute); text-transform:uppercase; }
+  header .spacer { flex:1; }
+  .btn { font-family:'Inter',sans-serif; font-size:12.5px; font-weight:700; padding:9px 16px; border-radius:6px; cursor:pointer; border:1px solid var(--line-str); background:transparent; color:var(--text); }
+  .btn:hover { border-color:var(--mute); }
+  .btn.gold { background:var(--gold); border-color:var(--gold); color:#111; }
+  .btn.gold:hover { filter:brightness(1.07); }
+  #copied-flash { font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--both); display:none; }
+
+  /* ── Legend ── */
+  .legend { display:flex; gap:14px; align-items:center; padding:10px 22px; border-bottom:1px solid var(--line); }
+  .legend .lg { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.8px; color:var(--mute); display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:8px; height:8px; border-radius:2px; display:inline-block; }
+  .legend .hint { margin-left:auto; font-size:11.5px; color:var(--faint); }
+
+  /* ── Board ── */
+  #board { display:grid; grid-template-columns:1fr 1.15fr 1fr; gap:16px; padding:18px 22px 60px; align-items:start; flex:1; }
+  .col { background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .col.mid { border-top:2px solid var(--gold); }
+  .col-head { padding:13px 15px 11px; border-bottom:1px solid var(--line); display:flex; align-items:baseline; gap:9px; }
+  .col-head .name { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; letter-spacing:.4px; }
+  .col-head .tag { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:1px; color:var(--mute); text-transform:uppercase; }
+  .col-head .count { margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--faint); }
+  .col-body { padding:10px 10px 12px; display:flex; flex-direction:column; gap:10px; min-height:120px; }
+
+  /* ── Sections ── */
+  .sec { border:1px solid var(--line); border-radius:6px; background:var(--ink); }
+  .sec.dragover { border:1px dashed var(--gold); background:var(--gold-dim); }
+  .sec-head { display:flex; align-items:center; gap:8px; padding:8px 10px 7px; }
+  .sec-title { font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--mute); outline:none; flex:1; min-width:0; padding:2px 3px; border-radius:4px; }
+  .sec-title:focus { background:var(--card); color:var(--text); }
+  .sec-x { border:none; background:none; color:var(--faint); cursor:pointer; font-size:13px; padding:2px 4px; visibility:hidden; }
+  .sec:hover .sec-x { visibility:visible; }
+  .sec-x:hover { color:#E0654F; }
+  .sec-cards { display:flex; flex-direction:column; gap:6px; padding:0 8px; min-height:8px; }
+  .sec-add { display:block; width:100%; text-align:left; border:none; background:none; color:var(--faint); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.8px; padding:8px 11px 9px; cursor:pointer; }
+  .sec-add:hover { color:var(--gold); }
+
+  /* ── Cards ── */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:6px; padding:8px 10px 8px 9px; cursor:grab; position:relative; border-left-width:3px; }
+  .card:hover { background:var(--card-hover); border-color:var(--line-str); }
+  .card.dragging { opacity:.35; }
+  .card[data-origin="league"] { border-left-color:var(--league); }
+  .card[data-origin="tournament"] { border-left-color:var(--tourn); }
+  .card[data-origin="both"] { border-left-color:var(--both); }
+  .card[data-origin="new"] { border-left-color:var(--new); }
+  .card-top { display:flex; align-items:flex-start; gap:7px; }
+  .card-title { font-size:13px; font-weight:600; line-height:1.35; outline:none; flex:1; min-width:0; padding:1px 2px; border-radius:3px; }
+  .card-title:focus { background:var(--ink); }
+  .req { color:var(--gold); font-weight:700; }
+  .card-meta { display:flex; align-items:center; gap:7px; margin-top:5px; flex-wrap:wrap; }
+  .pill { font-family:'JetBrains Mono',monospace; font-size:8.5px; letter-spacing:.8px; padding:2px 6px; border-radius:3px; text-transform:uppercase; }
+  .pill.league { color:var(--league); border:1px solid var(--league); }
+  .pill.tournament { color:var(--tourn); border:1px solid var(--tourn); }
+  .pill.both { color:var(--both); border:1px solid var(--both); }
+  .pill.new { color:var(--new); border:1px solid var(--new); }
+  .ftype { font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--faint); }
+  .card-actions { display:flex; gap:2px; visibility:hidden; }
+  .card:hover .card-actions { visibility:visible; }
+  .ic { border:none; background:none; color:var(--faint); cursor:pointer; font-size:12px; padding:1px 4px; border-radius:3px; }
+  .ic:hover { color:var(--text); background:var(--ink); }
+  .ic.del:hover { color:#E0654F; }
+  .card-note { margin-top:6px; }
+  .card-note textarea {
+    width:100%; background:var(--ink); border:1px solid var(--line); border-radius:4px;
+    color:var(--text); font-family:'Inter',sans-serif; font-size:11.5px; padding:6px 8px; resize:vertical; min-height:34px; outline:none;
+  }
+  .card-note textarea:focus { border-color:var(--line-str); }
+  .has-note .ic.note { color:var(--gold); visibility:visible; }
+
+  .col-add-sec { margin:0 10px 12px; width:calc(100% - 20px); border:1px dashed var(--line-str); background:none; color:var(--mute); font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:1px; padding:9px; border-radius:6px; cursor:pointer; text-transform:uppercase; }
+  .col-add-sec:hover { color:var(--gold); border-color:var(--gold); }
+
+  @media (max-width:1100px){ #board{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="kicker">SES-036 · Offers consolidation</div>
+    <h1>League&nbsp;×&nbsp;Tournament&nbsp;→&nbsp;Competition</h1>
+  </div>
+  <div class="spacer"></div>
+  <span id="copied-flash">✓ copied — paste into Claude</span>
+  <button class="btn" onclick="resetBoard()">Reset</button>
+  <button class="btn gold" onclick="copyForAI()">⧉ Copy for AI</button>
+</header>
+
+<div class="legend">
+  <span class="lg"><span class="dot" style="background:var(--league)"></span>League-only</span>
+  <span class="lg"><span class="dot" style="background:var(--tourn)"></span>Tournament-only</span>
+  <span class="lg"><span class="dot" style="background:var(--both)"></span>In both today</span>
+  <span class="lg"><span class="dot" style="background:var(--new)"></span>New</span>
+  <span class="hint">drag cards anywhere · click a title to edit · 📝 adds a note · everything autosaves</span>
+</div>
+
+<div id="board"></div>
+
+<script>
+// ───────────────────────── seed data (the REAL schemas from client-portal.html) ─────────────────────────
+const STORE_KEY = 'competition-board-v1';
+let uid = 0; const nid = () => 'n' + (++uid) + '_' + Math.random().toString(36).slice(2,7);
+const C = (title, origin, ftype, req) => ({ id:nid(), title, origin, ftype:ftype||'', req:!!req, note:'' });
+
+function seed() {
+  return { cols: [
+    { id:'league', name:'LEAGUE', tag:'today', mid:false, sections: [
+      { id:nid(), title:'General Info', cards:[
+        C('Title','league','text',true), C('Short description','league','textarea'),
+        C('Age range','league','text',true), C('Skill level / division  ⚠ key: skill_level','league','check_many'),
+        C('Gender','league','check_many',true), C('Location','league','location',true) ]},
+      { id:nid(), title:'Schedule', cards:[
+        C('Season start / end','league','text',true), C('Game day(s) + time window','league','text',true),
+        C('Number of weeks','league','number'), C('Registration open / close','league','text'),
+        C('Playoff week(s)','league','text'), C('Awards / banquet date','league','text') ]},
+      { id:nid(), title:'Value', cards:[
+        C('Program structure','league','textarea'), C('What makes it different','league','textarea') ]},
+      { id:nid(), title:'Pricing', cards:[
+        C('Registration unit (Team / Individual / Both)','league','check_one',true),
+        C('Per-team fee','league','currency'), C('Per-individual fee','league','currency'),
+        C('Add-ons builder','league','blocks'), C('Discounts','league','textarea') ]},
+      { id:nid(), title:'Sales', cards:[
+        C('Team registration form fields','league','check_many'),
+        C('Individual registration form fields','league','check_many'),
+        C('Roster min / max','league','text'), C('Free-agent matching?','league','check_one'),
+        C('How matching works','league','textarea'), C('Notify on new lead','league','staff'),
+        C('Upsells','league','blocks') ]},
+      { id:nid(), title:'Onboarding', cards:[
+        C('Agreement / waiver','league','file',true), C('Rulebook','league','file'),
+        C('Onboarding messaging','league','text+files',true), C('Standings page link','league','link'),
+        C('Notify on new sign-up','league','staff'), C('Assets','league','files') ]}
+    ]},
+    { id:'combined', name:'COMPETITION', tag:'proposed merge', mid:true, sections: [
+      { id:nid(), title:'⚡ Format (first question)', cards:[
+        C('Format — League (season) or Tournament (event)','new','check_one',true) ]},
+      { id:nid(), title:'General Info — shared', cards:[
+        C('Title','both','text',true), C('Short description','both','textarea'),
+        C('Age range','both','text',true), C('Skill / division — ONE key (fixes drift)','both','check_many'),
+        C('Gender','both','check_many',true), C('Location','both','location',true),
+        C('Brackets? + describe each','tournament','check_one'),
+        C('Individual signups? + how placed','tournament','check_one') ]},
+      { id:nid(), title:'Schedule — League format', cards:[
+        C('Season start / end','league','text',true), C('Game day(s) + time window','league','text',true),
+        C('Number of weeks','league','number'), C('Registration open / close','league','text'),
+        C('Playoff week(s)','league','text'), C('Awards / banquet date','league','text') ]},
+      { id:nid(), title:'Schedule — Tournament format', cards:[
+        C('Event date(s)','tournament','text',true), C('Check-in / first game / end time','tournament','time'),
+        C('Schedule generation (pre-set / after reg closes)','tournament','check_one'),
+        C('Awards / closing time','tournament','time'), C('Registration deadline','tournament','text') ]},
+      { id:nid(), title:'Value — shared', cards:[
+        C('Selling points / what makes it different','both','textarea',true),
+        C('Structure / format (elim · round robin · pool)','both','check_one'),
+        C('Awards / trophies','tournament','textarea'), C('Special activities','tournament','textarea') ]},
+      { id:nid(), title:'Pricing — shared', cards:[
+        C('Registration unit (Team / Individual / Both)','both','check_one',true),
+        C('Per-team fee','both','currency'), C('Per-individual fee','both','currency'),
+        C('Add-ons builder','both','blocks'), C('Discounts','both','textarea') ]},
+      { id:nid(), title:'Sales — shared', cards:[
+        C('Registration form builder (team + individual)','both','check_many',true),
+        C('Caps — roster min/max · bracket cap · min teams','both','number'),
+        C('Free-agent matching (league only)','league','check_one'),
+        C('Notify on new lead','both','staff'), C('Upsells','both','blocks') ]},
+      { id:nid(), title:'Onboarding — shared', cards:[
+        C('Agreement / waiver','both','file',true), C('Rulebook / rules doc','both','file'),
+        C('Onboarding messaging','both','text+files',true),
+        C('Standings link (league) · bracket release (tourn)','both','link'),
+        C('Notify on new sign-up','both','staff'), C('Assets','both','files') ]},
+      { id:nid(), title:'🆕 Build setup (from Build-menu Qs)', cards:[
+        C('Sales path — book a call / buy direct / inquiry','new','check_one',true),
+        C('Discovery-call calendar owner','new','staff'),
+        C('Confirmation messaging (text + files)','new','text+files') ]}
+    ]},
+    { id:'tournament', name:'TOURNAMENT', tag:'today', mid:false, sections: [
+      { id:nid(), title:'General Info', cards:[
+        C('Title','tournament','text',true), C('Short description','tournament','textarea'),
+        C('Age range','tournament','text',true), C('Level / division  ⚠ key: level','tournament','check_many'),
+        C('Gender','tournament','check_many',true), C('Location','tournament','location',true),
+        C('Brackets / divisions?','tournament','check_one'), C('Describe each bracket','tournament','textarea'),
+        C('Individual signups allowed?','tournament','check_one'), C('How individuals get placed','tournament','textarea') ]},
+      { id:nid(), title:'Schedule', cards:[
+        C('Event date(s)','tournament','text',true), C('Check-in time','tournament','time'),
+        C('First game time','tournament','time'), C('Estimated end time','tournament','time'),
+        C('Schedule generation','tournament','check_one'), C('Awards / closing time','tournament','time'),
+        C('Registration deadline','tournament','text') ]},
+      { id:nid(), title:'Value', cards:[
+        C('Selling points','tournament','textarea',true),
+        C('Format — single elim / double elim / round robin / pool','tournament','check_one'),
+        C('Awards / trophies','tournament','textarea'), C('Special activities','tournament','textarea') ]},
+      { id:nid(), title:'Pricing', cards:[
+        C('Per-team fee','tournament','currency',true), C('Per-individual fee','tournament','currency'),
+        C('Add-ons builder','tournament','blocks'), C('Discounts','tournament','textarea') ]},
+      { id:nid(), title:'Sales', cards:[
+        C('Registration form fields','tournament','check_many',true),
+        C('Bracket cap (max teams per division)','tournament','number'),
+        C('Minimum teams threshold (cancel + refund)','tournament','number'),
+        C('Notify on new lead','tournament','staff'), C('Upsells','tournament','blocks') ]},
+      { id:nid(), title:'Onboarding', cards:[
+        C('Agreement / waiver','tournament','file',true), C('Rules document','tournament','file'),
+        C('Onboarding messaging','tournament','text+files',true), C('Bracket release timing','tournament','check_one'),
+        C('Notify on new sign-up','tournament','staff'), C('Assets','tournament','files') ]}
+    ]}
+  ]};
+}
+
+// ───────────────────────── state ─────────────────────────
+let state;
+try { state = JSON.parse(localStorage.getItem(STORE_KEY)) || seed(); } catch(e) { state = seed(); }
+const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(state));
+function resetBoard(){ if(confirm('Reset the board to the original schemas + proposal? Your edits will be lost.')){ state = seed(); save(); render(); } }
+
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const findCard = id => { for(const col of state.cols) for(const sec of col.sections){ const i = sec.cards.findIndex(c=>c.id===id); if(i>-1) return {col,sec,i,card:sec.cards[i]}; } return null; };
+const findSec  = id => { for(const col of state.cols){ const s = col.sections.find(s=>s.id===id); if(s) return {col,sec:s}; } return null; };
+
+// ───────────────────────── render ─────────────────────────
+function render(){
+  const board = document.getElementById('board');
+  board.innerHTML = state.cols.map(col => `
+    <div class="col ${col.mid?'mid':''}">
+      <div class="col-head">
+        <span class="name" ${col.mid?'style="color:var(--gold)"':''}>${esc(col.name)}</span>
+        <span class="tag">${esc(col.tag)}</span>
+        <span class="count">${col.sections.reduce((n,s)=>n+s.cards.length,0)} fields</span>
+      </div>
+      <div class="col-body">
+        ${col.sections.map(sec => `
+          <div class="sec" data-sec="${sec.id}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event,'${sec.id}')">
+            <div class="sec-head">
+              <div class="sec-title" contenteditable="true" spellcheck="false" data-sec-title="${sec.id}">${esc(sec.title)}</div>
+              <button class="sec-x" title="Delete section" onclick="delSec('${sec.id}')">✕</button>
+            </div>
+            <div class="sec-cards">
+              ${sec.cards.map(card => `
+                <div class="card ${card.note?'has-note':''}" draggable="true" data-card="${card.id}" data-origin="${card.origin}"
+                     ondragstart="dragStart(event,'${card.id}')" ondragend="dragEnd(event)">
+                  <div class="card-top">
+                    <div class="card-title" contenteditable="true" spellcheck="false" data-card-title="${card.id}">${esc(card.title)}${card.req?' <span class="req">*</span>':''}</div>
+                    <div class="card-actions">
+                      <button class="ic note" title="Note" onclick="toggleNote('${card.id}')">📝</button>
+                      <button class="ic del" title="Delete" onclick="delCard('${card.id}')">✕</button>
+                    </div>
+                  </div>
+                  <div class="card-meta">
+                    <span class="pill ${card.origin}">${card.origin==='both'?'L+T':card.origin==='league'?'L':card.origin==='tournament'?'T':'NEW'}</span>
+                    ${card.ftype?`<span class="ftype">${esc(card.ftype)}</span>`:''}
+                  </div>
+                  <div class="card-note" style="display:${card.note?'block':'none'}" data-note-wrap="${card.id}">
+                    <textarea placeholder="note…" oninput="setNote('${card.id}', this.value)">${esc(card.note)}</textarea>
+                  </div>
+                </div>`).join('')}
+            </div>
+            <button class="sec-add" onclick="addCard('${sec.id}')">+ add card</button>
+          </div>`).join('')}
+        <button class="col-add-sec" onclick="addSec('${col.id}')">+ add section</button>
+      </div>
+    </div>`).join('');
+
+  // contenteditable save hooks
+  board.querySelectorAll('[data-card-title]').forEach(el => {
+    el.addEventListener('blur', () => { const f = findCard(el.dataset.cardTitle); if(f){ f.card.title = el.innerText.replace(/\*\s*$/,'').trim(); save(); render(); } });
+    el.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); el.blur(); } });
+  });
+  board.querySelectorAll('[data-sec-title]').forEach(el => {
+    el.addEventListener('blur', () => { const f = findSec(el.dataset.secTitle); if(f){ f.sec.title = el.innerText.trim(); save(); } });
+    el.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); el.blur(); } });
+  });
+}
+
+// ───────────────────────── interactions ─────────────────────────
+let draggingId = null;
+function dragStart(e, id){ draggingId = id; e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain', id); e.target.classList.add('dragging'); }
+function dragEnd(e){ e.target.classList.remove('dragging'); document.querySelectorAll('.sec.dragover').forEach(s=>s.classList.remove('dragover')); }
+function dragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; e.currentTarget.classList.add('dragover'); }
+function dragLeave(e){ e.currentTarget.classList.remove('dragover'); }
+function drop(e, secId){
+  e.preventDefault(); e.currentTarget.classList.remove('dragover');
+  const id = draggingId || e.dataTransfer.getData('text/plain'); if(!id) return;
+  const from = findCard(id), to = findSec(secId); if(!from || !to) return;
+  from.sec.cards.splice(from.i, 1);
+  to.sec.cards.push(from.card);
+  draggingId = null; save(); render();
+}
+function toggleNote(id){
+  const wrap = document.querySelector(`[data-note-wrap="${id}"]`); if(!wrap) return;
+  const show = wrap.style.display === 'none';
+  wrap.style.display = show ? 'block' : 'none';
+  if(show) wrap.querySelector('textarea').focus();
+}
+function setNote(id, v){ const f = findCard(id); if(f){ f.card.note = v; save();
+  const el = document.querySelector(`[data-card="${id}"]`); if(el) el.classList.toggle('has-note', !!v.trim()); } }
+function delCard(id){ const f = findCard(id); if(f && confirm(`Delete "${f.card.title}"?`)){ f.sec.cards.splice(f.i,1); save(); render(); } }
+function addCard(secId){ const f = findSec(secId); if(!f) return; f.sec.cards.push(C('New field','new','',false)); save(); render();
+  const cards = f.sec.cards; const el = document.querySelector(`[data-card-title="${cards[cards.length-1].id}"]`); if(el){ el.focus(); document.getSelection().selectAllChildren(el); } }
+function addSec(colId){ const col = state.cols.find(c=>c.id===colId); if(!col) return; col.sections.push({ id:nid(), title:'New section', cards:[] }); save(); render(); }
+function delSec(id){ const f = findSec(id); if(!f) return;
+  if(f.sec.cards.length && !confirm(`Delete section "${f.sec.title}" and its ${f.sec.cards.length} card(s)?`)) return;
+  f.col.sections = f.col.sections.filter(s=>s.id!==id); save(); render(); }
+
+// ───────────────────────── export ─────────────────────────
+function copyForAI(){
+  const tag = o => o==='both' ? 'L+T' : o==='league' ? 'L' : o==='tournament' ? 'T' : 'NEW';
+  let md = `# Competition consolidation — board export\n`;
+  md += `_From competition-consolidation.html (SES-036). Middle column = my decided merge; side columns = whatever I left out._\n`;
+  for(const col of state.cols){
+    md += `\n## ${col.name} (${col.tag}) — ${col.sections.reduce((n,s)=>n+s.cards.length,0)} fields\n`;
+    for(const sec of col.sections){
+      md += `\n### ${sec.title}\n`;
+      if(!sec.cards.length){ md += `- (empty)\n`; continue; }
+      for(const c of sec.cards){
+        md += `- [${tag(c.origin)}] ${c.title}${c.req?' **(required)**':''}${c.ftype?` · _${c.ftype}_`:''}`;
+        if(c.note && c.note.trim()) md += `\n  - 📝 NOTE: ${c.note.trim().replace(/\n/g,'\n    ')}`;
+        md += `\n`;
+      }
+    }
+  }
+  md += `\n_Legend: L = league-only · T = tournament-only · L+T = in both today · NEW = added on this board._\n`;
+  const done = () => { const f = document.getElementById('copied-flash'); f.style.display='inline'; setTimeout(()=>f.style.display='none', 2600); };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(md).then(done).catch(()=>fallbackCopy(md, done)); }
+  else fallbackCopy(md, done);
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+  ta.select(); try{ document.execCommand('copy'); done(); } catch(e){ alert('Copy failed — select + copy manually:\n\n' + text.slice(0,500)); }
+  document.body.removeChild(ta);
+}
+
+render();
+</script>
+</body>
+</html>
