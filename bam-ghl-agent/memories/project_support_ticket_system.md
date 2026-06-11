@@ -88,6 +88,16 @@ Real magic-link auth is the next planned step.
 - **Payload:** business fields + entity_type + ein + time_zone + website/domain + marketing_included + slack_channel_id + ghl{…} + stripe{…} + brand + kpis + staff[] + locations[] + offers[] + marked_done_at.
 - **Ticket modal (SystemsView) extras (2026-06-05):** **📋 Copy for Claude** button (`buildClaudeText` → labeled text of all `fields` to clipboard); per-field **"⚠ Mark incorrect"** checkbox + note; **"Send corrections to client"** button bundles flagged fields + notes (`buildCorrectionsMsg`) and fires `requestClientAction`. Complex values render read-only (`ComplexValue`); simple fields stay editable.
 
+## Overview tab — 2026-06-11 updates
+
+- **Timeline Sensitive window = 2 CALENDAR days** (was 2 business days — weekend gaps made "in 4d" tickets qualify, read as a bug). `isTimelineSensitive` in `SystemsView.jsx`.
+- **Client Actions rows have a "🔔 Ping Slack" button** → `nudge_client` PATCH action in `tickets.js` (awaiting_client/final_review only, no status change) posts "⏰ Reminder — [ticket] is waiting on …" to the client's Slack channel. Button states: Pinging…/✓ Pinged/⚠ Retry; rendered as a span (row itself is a <button>).
+
+## Deploy gotchas
+
+- **main is protected** — all changes go through PRs (`gh pr create` + `gh pr merge` works).
+- **Vercel production deploys occasionally hang in "Initializing"** while the preview of the same commit builds fine → `vercel redeploy <stuck-deployment-url> --scope zoran-stars-projects` un-sticks it (seen 2026-06-11).
+
 ## Next steps (priority order)
 
 1. **Slack notifications** — ping staff Slack channel when new ticket submitted (small, high impact, Slack already wired in bam-portal)
