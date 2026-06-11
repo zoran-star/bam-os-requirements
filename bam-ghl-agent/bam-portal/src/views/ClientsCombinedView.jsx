@@ -355,7 +355,6 @@ function SegmentedControl({ value, onChange, options, tokens }) {
 function ClientRow({ client, staff, tokens, isOnline, onClick }) {
   const [hov, setHov] = useState(false);
   const t = tokens;
-  const derived = deriveClientStatus(client, t);
 
   return (
     <div
@@ -390,13 +389,9 @@ function ClientRow({ client, staff, tokens, isOnline, onClick }) {
       <div style={{ fontSize: 13, color: t.textSub }}>{client.owner_name || <span style={{ color: t.textMute, fontStyle: "italic" }}>none</span>}</div>
       <div style={{ fontSize: 13, color: t.textSub }}>{staff?.name || <span style={{ color: t.textMute, fontStyle: "italic" }}>unassigned</span>}</div>
       <div>
-        {derived && (
-          <span style={{
-            fontSize: 11, padding: "3px 9px", borderRadius: 999,
-            background: `${derived.color}22`, color: derived.color, fontWeight: 600,
-            whiteSpace: "nowrap",
-          }}>{derived.label}</span>
-        )}
+        {/* Onboarding progress bar (same renderer as the cards) — replaces the
+            old status pill so staff see how far along each client actually is. */}
+        <StatusPill client={client} tokens={t} />
       </div>
     </div>
   );
