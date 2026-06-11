@@ -16,6 +16,18 @@ metadata:
 > payload as a new `sorter: {matched, imported, promoted}` object — three
 > limit-1 exists-checks (pricing_catalog `match_status=confirmed` / any
 > `members_staging` row / any `promoted=true` staging row). PR #216.
+> Strip opens at the FIRST UNFINISHED step; inside the modal, completed
+> stepper dots are clickable to go backwards (`_sorterGoto`, lazy step-1
+> load). PR #219. Step 1 layout: left plans column scrolls independently;
+> right pool is a docked "platform" tray (count pill + drag hint). PR #221.
+>
+> **Persistence (PR #222):** match-prices propose now RESTORES confirmed
+> pricing_catalog rows verbatim (`saved:true`, AI only sees undecided
+> prices — skipped entirely when none, so an all-saved reopen makes no AI
+> call); created-in-Stripe prices with 0 subs are synthesized into the
+> pool from the catalog (sub-only pool used to hide them); apply
+> INSERT-on-miss (was PATCH-only → fresh academies silently saved
+> nothing — client now sends product id/name/amount/currency/interval).
 
 > **2026-06-10 — NEW HOMES.** The Pricing nav page + temp launch button are GONE.
 > `openPricingSorter(step)` now takes a start step, launched from Business
