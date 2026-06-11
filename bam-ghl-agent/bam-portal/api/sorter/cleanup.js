@@ -178,8 +178,18 @@ async function handler(req, res) {
     if (!clientId) return res.status(400).json({ error: "client_id required" });
     if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
 
-    const batchId = body.batch_id || body.import_batch_id;
-    if (!batchId) return res.status(400).json({ error: "batch_id required" });
+    // batch_id is only known in-session right after an Import — when the modal
+    // is opened straight at Cleanup (from the Pricing strip or Member
+    // Onboarding), fall back to the client's LATEST imported batch.
+    let batchId = body.batch_id || body.import_batch_id;
+    if (!batchId) {
+      const last = await sb(
+        `members_staging?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&select=import_batch_id&order=created_at.desc&limit=1`
+      );
+      batchId = Array.isArray(last) && last[0] ? last[0].import_batch_id : null;
+    }
+    if (!batchId) return res.status(400).json({ error: "no imported members found — run the Import step first" });
 
     const action = (req.query && req.query.action) || (body.apply === true ? "promote" : "check");
 
@@ -528,6 +538,7 @@ async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       academy: client.business_name,
+      batch_id: batchId,
       counts: {
         staged: staging.length,
         staged_no_stripe: stagedNoStripe.length,

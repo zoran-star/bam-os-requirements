@@ -16705,6 +16705,9 @@ async function _sorterRunChecks() {
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     _SORTER.checks = json;
+    // Fresh-open at Cleanup has no in-session batch — adopt the one the API
+    // resolved (latest import) so promote + fix actions hit the same batch.
+    if (json.batch_id) _SORTER.batchId = json.batch_id;
     _sorterRenderBody();
   } catch (e) {
     if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Checks failed — ${escapeHTML(e.message)}</div>`;
