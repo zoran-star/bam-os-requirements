@@ -370,13 +370,41 @@ async function handler(req, res) {
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;
 
       // Sorter progress for the Price Match dot (BB → Offers) + the Members
-      // tab's import strip — exists-checks (limit 1 each), non-fatal: a
-      // failure just renders the step as not-done.
+      // tab's import strip — non-fatal: a failure just renders not-done.
+      // `matched` = FULL coverage: every plan×term in the offers has a LIVE
+      // (canonical, confirmed) Stripe price — one partial match isn't green.
       let sorter = null;
       if (targetClientId) {
         const exists = (q) => sb(q).then(r => Array.isArray(r) && r.length > 0).catch(() => false);
+        const matchedAll = (async () => {
+          try {
+            const offers = await sb(`offers?client_id=eq.${targetClientId}&status=neq.archived&select=data`);
+            const keys = [];
+            for (const o of (offers || [])) {
+              for (const off of ((o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [])) {
+                if (String(off.type || "").toLowerCase() !== "membership") continue;
+                const title = String(off.title || "").trim();
+                if (!title) continue;
+                if (!isNaN(parseFloat(off.price))) keys.push(`${title}|monthly`);
+                for (const c of (off.commitments || [])) {
+                  const t = String(c.length || "").toLowerCase();
+                  const term = (/3\s*month/.test(t) || /\b12\s*week/.test(t)) ? "3_months"
+                    : ((/6\s*month/.test(t) || /\b24\s*week/.test(t)) ? "6_months" : null);
+                  if (term && !isNaN(parseFloat(c.price))) keys.push(`${title}|${term}`);
+                }
+              }
+            }
+            if (!keys.length) return false;
+            const rows = await sb(
+              `pricing_catalog?client_id=eq.${targetClientId}&tier=eq.canonical&match_status=eq.confirmed` +
+              `&offer_price_key=not.is.null&select=offer_price_key`
+            );
+            const live = new Set((rows || []).map(r => r.offer_price_key));
+            return keys.every(k => live.has(k));
+          } catch (_) { return false; }
+        })();
         const [matched, imported, promoted, unlinked] = await Promise.all([
-          exists(`pricing_catalog?client_id=eq.${targetClientId}&match_status=eq.confirmed&select=stripe_price_id&limit=1`),
+          matchedAll,
           exists(`members_staging?client_id=eq.${targetClientId}&select=id&limit=1`),
           exists(`members_staging?client_id=eq.${targetClientId}&promoted=is.true&select=id&limit=1`),
           exists(`members?client_id=eq.${targetClientId}&ghl_contact_id=is.null&select=id&limit=1`),
