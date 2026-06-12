@@ -6745,10 +6745,13 @@ Then the call to action."]</div>
       #view-pipelines #pl-entry-more { display:none; flex-direction:column; gap:8px; }
       #view-pipelines #pl-entry-more.open { display:flex; }
       #view-pipelines .pl-rail {
-        flex:0 0 248px; display:flex; flex-direction:column; gap:8px;
-        background:rgba(255,255,255,0.02);
-        border:1px solid var(--border); border-radius:14px;
-        padding:12px; align-self:flex-start;
+        flex:0 0 264px; display:flex; flex-direction:column; gap:8px;
+        background:rgba(255,255,255,0.045);
+        border:none; border-radius:0;
+        padding:14px 40px 14px 14px; align-self:flex-start;
+        /* the whole platform is an arrow pointing into the pipeline */
+        clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%);
+        filter: drop-shadow(0 0 1px rgba(125, 203, 148, 0.45));
       }
       #view-pipelines .pl-rail-head {
         font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em;
@@ -6775,7 +6778,7 @@ Then the call to action."]</div>
       @media (max-width: 900px) {
         #view-pipelines .pl-layout { flex-direction:column; }
         #view-pipelines .pl-divider { display:none; }
-        #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; }
+        #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; clip-path:none; filter:none; border:1px solid var(--border); border-radius:14px; padding:12px; }
         #view-pipelines .pl-rail-head, #view-pipelines .pl-rail-sub { grid-column:1/-1; }
         #view-pipelines .pl-layout > #pl-board-container {
           border-left:none; padding-left:0; margin-left:0;
