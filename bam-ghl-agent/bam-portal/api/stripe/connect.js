@@ -46,14 +46,16 @@ function nowIso() {
 }
 
 function getOrigin(req) {
-  // Pinned to canonical staff URL — Stripe Connect's registered redirect
-  // URI must match exactly, and we don't want *.vercel.app preview
-  // hostnames sneaking into the URI. The canonical
-  // staff.byanymeansbusiness.com is the one registered in Stripe.
-  if (process.env.STAFF_PORTAL_URL) return process.env.STAFF_PORTAL_URL.replace(/\/+$/, "");
+  // Pinned to the canonical CLIENT portal domain — Stripe Connect's
+  // registered redirect URI must match exactly, and we don't want
+  // *.vercel.app preview hostnames sneaking into the URI. CLIENTS run this
+  // flow (Connect Stripe lives in the client portal), and clients must
+  // never touch staff.byanymeansbusiness.com — the 2026-05 sweep pinned
+  // this to STAFF_PORTAL_URL by mistake and Stripe rejected the staff URI
+  // as unregistered (Nathan, 2026-06-11). Mirrors api/messaging/connect.js.
   const origin = req.headers.origin || `https://${req.headers.host || ""}`;
   if (/localhost|127\.0\.0\.1/.test(origin)) return origin.replace(/\/+$/, "");
-  return "https://staff.byanymeansbusiness.com";
+  return "https://portal.byanymeansbusiness.com";
 }
 
 // The redirect URI registered in the Stripe Connect dashboard must match this.

@@ -16,6 +16,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+  // Clients must NEVER be on the staff domain — same Vercel app, wrong host.
+  // OAuth redirects (Stripe Connect) + Supabase auth fallbacks are registered
+  // against portal.byanymeansbusiness.com only, so bounce immediately,
+  // keeping the path/query/hash (invite + recovery tokens survive).
+  if (window.location.hostname === 'staff.byanymeansbusiness.com') {
+    window.location.replace('https://portal.byanymeansbusiness.com'
+      + window.location.pathname + window.location.search + window.location.hash);
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   window.sentryOnLoad = function () {
