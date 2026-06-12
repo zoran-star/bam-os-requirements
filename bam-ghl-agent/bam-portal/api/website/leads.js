@@ -306,14 +306,16 @@ async function handler(req, res) {
   let pipelineConfig = null;
   let extraTags = [];
   let fieldMap = null;
+  let formWorkflowId = null;
   try {
     const eps = await sbReq(
-      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name,field_map&limit=1`
+      `entry_points?client_id=eq.${client.id}&type=eq.website-form&key=eq.${encodeURIComponent(form_type)}&enabled=eq.true&select=tags,pipeline_name,stage_name,field_map,ghl_workflow_id&limit=1`
     );
     const ep = eps?.[0];
     if (ep) {
       extraTags = ep.tags || [];
       fieldMap = ep.field_map || null;
+      formWorkflowId = ep.ghl_workflow_id || null;
       if (ep.pipeline_name && ep.stage_name) {
         pipelineConfig = { pipeline: ep.pipeline_name, stage: ep.stage_name };
       }
@@ -350,7 +352,7 @@ async function handler(req, res) {
       appointmentStatus = "failed";
       try {
         const eps = await sbReq(
-          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,pipeline_name,stage_name&limit=1`
+          `entry_points?client_id=eq.${client.id}&type=eq.calendar&key=eq.${encodeURIComponent(booking.calendar_id)}&enabled=eq.true&select=id,pipeline_name,stage_name,ghl_workflow_id&limit=1`
         );
         if (!eps?.[0]) throw new Error("calendar not available");
         const calEp = eps[0];
@@ -377,6 +379,10 @@ async function handler(req, res) {
         fields.appointment_id = (apptJson.appointment || apptJson).id || null;
         fields.booked_slot = booking.start;
         receipt.fields = fields;
+
+        if (calEp.ghl_workflow_id) {
+          await enrollInWorkflow(client, receipt.ghl_contact_id, calEp.ghl_workflow_id);
+        }
 
         // Booking advances the pipeline card to the CALENDAR entry point's
         // stage (e.g. form fill lands at "interested", a real booking moves
@@ -411,10 +417,31 @@ async function handler(req, res) {
       await recordKpiLeadEvent(client.id, leadId, form_type, fields, { name, email, phone, contactId: kpiContactId });
       return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus, appointment: appointmentStatus });
     }
+
+    // Form-step submission (no booking): enroll in the form's workflow.
+    if (kpiContactId && formWorkflowId && fields?.step !== "booking") {
+      await enrollInWorkflow(client, kpiContactId, formWorkflowId);
+    }
   }
 
   await recordKpiLeadEvent(client.id, leadId, form_type, fields, { name, email, phone, contactId: kpiContactId });
   return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus });
+}
+
+// V1 automations: enroll the GHL contact into an existing GHL workflow
+// (the entry point's ghl_workflow_id). The portal is the trigger now —
+// the workflow's own steps (texts, emails, waits) keep running in GHL.
+async function enrollInWorkflow(client, contactId, workflowId) {
+  if (!contactId || !workflowId) return;
+  try {
+    const token = await getClientGhlToken(client);
+    const r = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ eventStartTime: new Date().toISOString() }),
+    });
+    if (!r.ok) console.error("GHL workflow enroll failed:", r.status, (await r.text()).slice(0, 150));
+  } catch (e) { console.error("GHL workflow enroll failed (non-fatal):", e.message); }
 }
 
 // KPI continuity: website leads land in ghl_funnel_events (raw.websiteForm)
