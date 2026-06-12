@@ -18,6 +18,11 @@ metadata:
 >   advances into it); `/api/members` sorter payload has `ghl_linked`.
 > The BB Member Onboarding card still launches steps 2/3 — fold/retire it in
 > the upcoming offer-centric reorg (deferred by Zoran).
+> **LIVE pills (PR #256):** offer tiles + each Edit-Offer Pricing row show a
+> health pill (● LIVE on Stripe / ● x/y live / ● no live Stripe price) —
+> only canonical+confirmed counts. Light `GET /api/offers/match-prices`
+> returns catalog offer-linkage rows; client mirrors buildOfferTargets key
+> construction (`_bbPlanKeys` — keep in sync if key format ever changes).
 
 > **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
 > action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
