@@ -270,6 +270,46 @@ async function handler(req, res) {
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
     }
 
+    // stripe-detail: read-only "everything Stripe knows about this person" —
+    // for the click-the-email inspector modal in Cleanup.
+    if (action === "stripe-detail") {
+      const custId = (body.customer_id || "").toString();
+      if (!custId) return res.status(400).json({ error: "customer_id required" });
+      if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });
+      let customer = null, subsOut = [], chargesOut = [];
+      try {
+        const cust = await stripeGet(`/customers/${encodeURIComponent(custId)}`, client.stripe_connect_account_id);
+        customer = {
+          id: cust.id, email: cust.email || null, name: cust.name || null, phone: cust.phone || null,
+          created: cust.created ? new Date(cust.created * 1000).toISOString().slice(0, 10) : null,
+        };
+      } catch (e2) { return res.status(404).json({ error: `Stripe customer not found — ${e2.message}` }); }
+      try {
+        const subsR = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=10&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
+        subsOut = (subsR.data || []).map(sub => {
+          const item = sub.items && sub.items.data && sub.items.data[0];
+          const price = item && item.price;
+          return {
+            sub_id: sub.id, status: sub.status,
+            product_name: (price && price.product && price.product.name) || null,
+            amount_cents: price ? price.unit_amount : null,
+            interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
+            started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
+            canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
+          };
+        });
+      } catch (_) {}
+      try {
+        const ch = await stripeGet(`/charges?customer=${encodeURIComponent(custId)}&limit=15`, client.stripe_connect_account_id);
+        chargesOut = (ch.data || []).map(c2 => ({
+          amount_cents: c2.amount, status: c2.status, refunded: !!c2.refunded, one_time: !c2.invoice,
+          date: c2.created ? new Date(c2.created * 1000).toISOString().slice(0, 10) : null,
+          description: c2.description || null,
+        }));
+      } catch (_) {}
+      return res.status(200).json({ ok: true, customer, subs: subsOut, charges: chargesOut, stripe_account_id: client.stripe_connect_account_id });
+    }
+
     // member-detail: everything the "connect to an offer" popup needs — the
     // staged member, their Stripe sub + recent payments, the offer-price
     // targets, and a closest-by-amount recommendation.
@@ -670,8 +710,21 @@ async function handler(req, res) {
     }
 
     // ── (a2) possible PREPAID members — a big one-time charge recently, from
-    // an email that isn't on the sheet (e.g. paid 3 months up front, still in
-    // the paid window). Deniable per email. ──
+    // someone who isn't on the sheet (e.g. paid 3 months up front, still in
+    // the paid window). Deniable per email. NOT a prepay: charges whose
+    // description is a subscription payment (CoachIQ/GHL bill subs via
+    // invoice-less PaymentIntents — "Subscription update/creation"), or whose
+    // Stripe CUSTOMER already belongs to a staged member. ──
+    const stagedCustomerIds = new Set();
+    for (const s of staging) {
+      if (s.stripe_customer_id) stagedCustomerIds.add(s.stripe_customer_id);
+      if (s.__link && s.__link.customer_id) stagedCustomerIds.add(s.__link.customer_id);
+    }
+    // Names on the sheet (parent + athlete) for "might be on your sheet" hints.
+    const stagedNames = staging.map(s => ({
+      id: s.id, athlete_name: s.athlete_name,
+      norms: [normName(s.parent_name), normName(s.athlete_name)].filter(Boolean),
+    }));
     const prepaid = [];
     if (client.stripe_connect_account_id) {
       try {
@@ -688,17 +741,30 @@ async function handler(req, res) {
           for (const ch of data) {
             if (ch.status !== "succeeded" || ch.refunded || ch.invoice) continue; // one-time only
             if (ch.amount < 20000) continue; // < $200 → not a prepay
+            if (/^subscription\b/i.test(ch.description || "")) continue; // a sub payment, not a prepay
+            const custId = typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id) || null;
+            if (custId && stagedCustomerIds.has(custId)) continue; // already a sheet member's customer
             const email = normEmail((ch.billing_details && ch.billing_details.email) || ch.receipt_email);
             if (!email || stagedEmails.has(email) || claimedEmails.has(email)) continue;
             if (dismissed.has(`prepaid:${email}`)) continue;
+            // Same person under a different email? Fuzzy-compare the payer's
+            // name against the sheet's parent/athlete names.
+            const payerName = normName((ch.billing_details && ch.billing_details.name) || "");
+            let maybeStaged = null;
+            if (payerName) {
+              for (const sn of stagedNames) {
+                if (sn.norms.some(n => n === payerName || editDistance(n, payerName, 2) <= 2)) { maybeStaged = { id: sn.id, athlete_name: sn.athlete_name }; break; }
+              }
+            }
             const prev = byEmail.get(email);
             if (!prev || ch.amount > prev.amount_cents) byEmail.set(email, {
               email,
               name: (ch.billing_details && ch.billing_details.name) || null,
-              customer_id: typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id) || null,
+              customer_id: custId,
               amount_cents: ch.amount,
               date: ch.created ? new Date(ch.created * 1000).toISOString().slice(0, 10) : null,
               description: ch.description || null,
+              maybe_staged: maybeStaged,
             });
           }
           if (!r.has_more || data.length === 0) break;
