@@ -7604,6 +7604,16 @@ Then the call to action."]</div>
         background: rgba(232,197,71,0.06);
         transform: translateY(-1px);
       }
+      /* Plan card pulse when deep-linked from a LIVE-on-Stripe pill */
+      .pc-sorter-glow {
+        outline: 2px solid rgba(232,197,71,0.9);
+        outline-offset: 2px;
+        animation: pcSorterGlow 1.4s ease-in-out 3;
+      }
+      @keyframes pcSorterGlow {
+        0%, 100% { outline-color: rgba(232,197,71,0.15); }
+        50%      { outline-color: rgba(232,197,71,0.95); }
+      }
       #view-blueprint .bb-offer-tile-title {
         font-size:15px; font-weight:600; color:var(--text);
       }
@@ -10507,11 +10517,27 @@ function _bbOfferPlanKeys(offer) {
 }
 
 // Placeholder pill carrying its keys; fills in via _bbApplyLivePills().
+// Clicking a pill deep-links into Price Match with the missing plans glowing.
 function _bbLivePill(keys) {
   if (!keys || !keys.length) return '';
   // Fill in right after this render settles (idempotent; fetches once).
   setTimeout(_bbApplyLivePills, 0);
-  return `<span data-bb-live-pill="${_bbEscapeAttr(keys.join(','))}" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;">Stripe…</span>`;
+  return `<span data-bb-live-pill="${_bbEscapeAttr(keys.join(','))}" onclick="event.stopPropagation();_bbPillFix(this)" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
+}
+
+// Pill click → open Price Match and spotlight the plans that aren't live yet.
+function _bbPillFix(el) {
+  const keys = (el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean);
+  let missing = keys;
+  if (_BB_MATCH_HEALTH) {
+    const liveSet = new Set(_BB_MATCH_HEALTH
+      .filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && r.offer_price_key)
+      .map(r => r.offer_price_key));
+    const m = keys.filter(k => !liveSet.has(k));
+    if (m.length) missing = m;
+  }
+  openPricingSorter(1);
+  _SORTER.highlightKeys = missing;
 }
 
 function _bbApplyLivePills() {
@@ -10531,7 +10557,7 @@ function _bbApplyLivePills() {
     el.style.color = color;
     el.style.borderColor = color;
     el.title = live === keys.length ? 'Every price here has a Live Stripe price matched'
-      : 'Run Price Match (Offers → Pricing) to link or create the Live Stripe price';
+      : 'Click to fix in Price Match — link or create the Live Stripe price';
   });
 }
 
@@ -16177,7 +16203,26 @@ function openPricingSorter(step) {
   if (startStep === 1) _sorterLoadStep1();
 }
 
+// Fingerprint of the current price-match assignments — compared against the
+// snapshot taken at load/save time to detect unsaved drags.
+function _sorterSnapshot() {
+  return ((_SORTER && _SORTER.match && _SORTER.match.proposals) || [])
+    .filter(p => !p.is_one_time)
+    .map(p => p.price_id + ':' + (p.proposed_offer_price_key || '') + ':' + (p.proposed_tier || ''))
+    .sort().join('|');
+}
+
 function closePricingSorter() {
+  // Unsaved-matches guard (Price Match only): dragging assignments around
+  // does nothing until Approve & Save — closing would silently lose them.
+  if (_SORTER && _SORTER.mode === 'match' && _SORTER.savedSnapshot != null
+      && _sorterSnapshot() !== _SORTER.savedSnapshot) {
+    if (confirm('You have unsaved price matches.\n\nOK = save them now · Cancel = close without saving')) {
+      _sorterApproveAndNext(); // saves, refreshes the snapshot, then closes
+      return;
+    }
+    _SORTER.savedSnapshot = null; // user chose to discard — don't re-ask
+  }
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'none';
@@ -16288,6 +16333,7 @@ async function _sorterLoadStep1() {
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
     _SORTER.match = { proposals: json.proposals || [], targets: json.targets || [], academy: json.academy };
+    _SORTER.savedSnapshot = _sorterSnapshot(); // baseline for the unsaved-matches guard
     if (_SORTER.step === 1) _sorterRenderBody();
   } catch (e) {
     if (host) host.innerHTML = `<div class="req-empty" style="padding:24px 0">Couldn't load prices — ${escapeHTML(_sorterErr(e) || 'unknown error')}</div>`;
@@ -16403,6 +16449,23 @@ function _sorterRenderStep1(host) {
     </div>`;
 
   _sorterSetNext(`<button onclick="_sorterApproveAndNext()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save matches →</button>`);
+
+  // Deep-linked from a LIVE pill? Spotlight the plans that need fixing.
+  // (Only once the plan cards actually exist — the first render happens
+  // before the Stripe read finishes, and we must not consume the keys then.)
+  if (_SORTER.highlightKeys && _SORTER.highlightKeys.length && targets.length) {
+    const keys = _SORTER.highlightKeys;
+    _SORTER.highlightKeys = null;
+    setTimeout(() => {
+      let first = null;
+      keys.forEach(k => {
+        let el = null;
+        try { el = document.querySelector(`.pc-sorter-left[data-key="${CSS.escape(k)}"]`); } catch (_) {}
+        if (el) { el.classList.add('pc-sorter-glow'); if (!first) first = el; }
+      });
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  }
 }
 
 // Kept as a no-op so closePricingSorter()'s resize-listener removal stays valid
@@ -16598,6 +16661,7 @@ async function _sorterApproveAndNext() {
     }
     // Price Match is its own flow now — saving finishes it. Member import
     // lives in the Members section, not behind this save.
+    _SORTER.savedSnapshot = _sorterSnapshot(); // saved — guard stands down
     closePricingSorter();
     _BB_MATCH_HEALTH = null; // matches changed → LIVE pills refetch
     if (typeof _bbRenderOffersPricing === 'function') _bbRenderOffersPricing(); // refresh the dot
