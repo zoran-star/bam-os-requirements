@@ -6709,11 +6709,12 @@ Then the call to action."]</div>
       #view-pipelines .pl-empty { font-size:12px; color:var(--text-mute); text-align:center; padding:14px 8px; }
 
       /* ── Entry Points rail: its own panel, divided from the board ── */
-      #view-pipelines .pl-layout { display:flex; gap:0; align-items:stretch; }
+      #view-pipelines .pl-layout { display:flex; gap:0; align-items:flex-start; }
       #view-pipelines .pl-layout > #pl-board-container { flex:1; min-width:0; padding-left:16px; }
       #view-pipelines .pl-divider {
-        flex:0 0 18px; margin:0 2px 0 14px; cursor:pointer; position:relative;
+        flex:0 0 18px; margin:0 2px 0 12px; cursor:pointer; position:relative;
         border-left:2px dotted var(--green); display:flex; align-items:center; justify-content:center;
+        align-self:stretch; min-height:320px;
       }
       #view-pipelines .pl-divider:hover { border-left-color:#7DE99C; }
       #view-pipelines .pl-divider-chev {
@@ -6737,28 +6738,28 @@ Then the call to action."]</div>
         flex:0 0 248px; display:flex; flex-direction:column; gap:8px;
         background:rgba(255,255,255,0.02);
         border:1px solid var(--border); border-radius:14px;
-        padding:14px; align-self:flex-start;
+        padding:12px; align-self:flex-start;
       }
       #view-pipelines .pl-rail-head {
         font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em;
         color:var(--text); padding:0 2px;
       }
       #view-pipelines .pl-rail-sub {
-        font-size:11px; color:var(--text-mute); padding:0 2px 6px;
+        font-size:11px; color:var(--text-mute); padding:0 2px 2px; line-height:1.4;
       }
       #view-pipelines .pl-ep {
         background:var(--surface); border:1px solid var(--border); border-radius:10px;
-        padding:10px 12px; cursor:pointer; transition:border-color 150ms;
+        padding:9px 11px; cursor:pointer; transition:border-color 150ms;
       }
       #view-pipelines .pl-ep:hover { border-color:rgba(232,197,71,0.45); }
       #view-pipelines .pl-ep-type { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); }
-      #view-pipelines .pl-ep-name { font-size:13px; font-weight:600; margin-top:2px; }
-      #view-pipelines .pl-ep-status { font-size:11px; margin-top:6px; display:flex; align-items:center; gap:5px; }
+      #view-pipelines .pl-ep-name { font-size:13px; font-weight:600; margin-top:2px; line-height:1.35; }
+      #view-pipelines .pl-ep-status { font-size:11px; margin-top:7px; display:flex; align-items:flex-start; gap:6px; line-height:1.45; }
       #view-pipelines .pl-ep.connected { border-color:rgba(76,199,106,0.55); }
       #view-pipelines .pl-ep.connected .pl-ep-status { color:var(--green); }
       #view-pipelines .pl-ep.blocked { border-style:dashed; opacity:0.8; }
       #view-pipelines .pl-ep.blocked .pl-ep-status { color:var(--text-mute); }
-      #view-pipelines .pl-ep-dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; }
+      #view-pipelines .pl-ep-dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; margin-top:4px; }
       #view-pipelines .pl-ep.connected .pl-ep-dot { background:var(--green); }
       #view-pipelines .pl-ep.blocked .pl-ep-dot { background:var(--text-mute); }
       @media (max-width: 900px) {
@@ -15228,10 +15229,10 @@ function _renderEntryRail() {
     const off = ep.enabled === false;
     const connected = !off && !!(ep.pipeline_name && ep.stage_name);
     const status = off
-      ? `<span class="pl-ep-dot"></span> Off — not selected`
+      ? `<span class="pl-ep-dot"></span><span>Off — not selected</span>`
       : connected
-        ? `<span class="pl-ep-dot"></span> ${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}`
-        : `<span class="pl-ep-dot"></span> Not connected — set up`;
+        ? `<span class="pl-ep-dot"></span><span>${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}</span>`
+        : `<span class="pl-ep-dot"></span><span>Not connected — set up</span>`;
     return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" style="${off ? 'opacity:0.5' : ''}" onclick="_epOpenWizard('${escapeHTML(ep.id)}')">
       <div class="pl-ep-type">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)}</div>
       <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
