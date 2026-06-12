@@ -182,3 +182,20 @@ all three create paths — idempotently inserts/reactivates the owner's
 - Branded email templates (verify, password-reset) — Supabase defaults are plain
 - SMTP for prod deliverability — Supabase's built-in is fine for testing, switch to Postmark/Resend before scaling
 - Per-client storage isolation — currently any authed client could upload anywhere in `ticket-files`. URL paths are random UUIDs so practical risk is low. Tighten with a path-prefix RLS check if it becomes a concern.
+
+## 2026-06-11 — clients must NEVER touch staff.byanymeansbusiness.com
+
+Nathan (client) hit Stripe's "Invalid redirect URI …staff.byanymeansbusiness.com/api/stripe/connect"
+— he was using the client portal on the STAFF domain (Supabase Site-URL fallback
+lands people there; see above). Two guards now exist (PR #246):
+
+1. `api/stripe/connect.js` redirect is pinned to **portal.**byanymeansbusiness.com
+   (the URI registered in Stripe; mirrors `api/messaging/connect.js`). It no
+   longer consults STAFF_PORTAL_URL — that env is for staff-side integrations
+   (Slack/Google/Meta) only.
+2. `client-portal.html` first-script guard: loading it on
+   `staff.byanymeansbusiness.com` hard-redirects to the portal domain,
+   preserving path/query/hash (invite + recovery tokens survive).
+
+Still open: consider pointing the Supabase **Site URL** at the portal domain so
+auth fallbacks stop landing anyone on staff (check impact on staff app first).
