@@ -7,6 +7,7 @@ Project notes for the BAM GHL Agent / portal work. Read the relevant file when i
 - [Per-member documents (waivers etc)](project_member_documents.md) — signed waivers/media/medical stored per member in a PRIVATE `member-files` bucket + `member_files` table (signed URLs), shown in the Members popup → Documents. Mirrors `offer_files` but private. Vercel intake-form auto-drop is the follow-up.
 - [bam-portal deploy (how to actually ship)](project_bam_portal_deploy.md) — ✅ merge to main → Vercel auto-deploys (re-verified 2026-06-11). ⚠️ `vercel redeploy` still rebuilds OLD source — if forcing a manual deploy, clean `vercel deploy --prod` from the REPO ROOT with `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` env vars.
 
+- [Prod schema dump](project_prod_schema_dump.md) — `node bam-portal/scripts/migration/dump-prod-schema.mjs <sbp_token>` snapshots prod tables/RLS/policies to `bam-portal/supabase/snapshots/prod-schema.sql`; re-run + git diff = see prod drift. Read-only.
 - [BAM GHL North Star](project_bam_ghl_north_star.md) — dual client+staff portal (chat, ad spend, tickets), not just an autonomous agent
 - [BAM GHL Agent Files](project_bam_ghl_agent_files.md) — local + git + Vercel file locations and workflow
 - [Client Portal Flow](project_client_portal_flow.md) — onboarding.html → client row, client-portal.html shows tickets, live on Vercel
