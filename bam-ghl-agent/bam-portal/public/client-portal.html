@@ -10413,6 +10413,7 @@ async function _bbRenderOffersList(panel) {
         <div class="bb-offer-tile-meta">
           <span class="bb-type-pill" style="background:${color}1a;color:${color};border:1px solid ${color}55">${_bbEscapeHtml(typeMeta?.label || o.type)}</span>
           <span class="bb-status-pill ${o.status === 'published' ? 'published' : ''}">${_bbEscapeHtml(o.status)}</span>
+          ${_bbLivePill(_bbOfferPlanKeys(o))}
         </div>
       </div>
     `;
@@ -10471,6 +10472,83 @@ async function _bbRenderOffersPricing() {
       </div>
       ${_bbMatcherStrip(connected, sorterProgress)}
     </div>`;
+}
+
+// ── LIVE-on-Stripe pills ──────────────────────────────────────────────
+// Every offer price should have a LIVE (canonical, confirmed) Stripe price.
+// Pills render as placeholders carrying their plan keys, then fill in once
+// the match-health rows load (one light GET, cached per session).
+let _BB_MATCH_HEALTH = null;        // [{offer_id, offer_price_key, tier, match_status}]
+let _BB_MATCH_HEALTH_LOADING = null;
+
+// Mirrors _termFromLength + buildOfferTargets key construction server-side
+// (offers/match-prices.js) — keys MUST match or pills lie.
+function _bbTermFromLength(s) {
+  const t = String(s || '').toLowerCase();
+  if (/3\s*month/.test(t) || /\b12\s*week/.test(t)) return '3_months';
+  if (/6\s*month/.test(t) || /\b24\s*week/.test(t)) return '6_months';
+  return null;
+}
+function _bbPlanKeys(offering) {
+  if (!offering || String(offering.type || '').toLowerCase() !== 'membership') return [];
+  const title = String(offering.title || '').trim();
+  if (!title) return [];
+  const keys = [];
+  if (!isNaN(parseFloat(offering.price))) keys.push(`${title}|monthly`);
+  for (const c of (offering.commitments || [])) {
+    const term = _bbTermFromLength(c.length);
+    if (term && !isNaN(parseFloat(c.price))) keys.push(`${title}|${term}`);
+  }
+  return keys;
+}
+function _bbOfferPlanKeys(offer) {
+  const offerings = (offer && offer.data && offer.data.pricing && offer.data.pricing.pricing_offerings) || [];
+  return offerings.flatMap(_bbPlanKeys);
+}
+
+// Placeholder pill carrying its keys; fills in via _bbApplyLivePills().
+function _bbLivePill(keys) {
+  if (!keys || !keys.length) return '';
+  // Fill in right after this render settles (idempotent; fetches once).
+  setTimeout(_bbApplyLivePills, 0);
+  return `<span data-bb-live-pill="${_bbEscapeAttr(keys.join(','))}" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;">Stripe…</span>`;
+}
+
+function _bbApplyLivePills() {
+  if (!_BB_MATCH_HEALTH) { _bbLoadMatchHealth(); return; }
+  const liveSet = new Set(_BB_MATCH_HEALTH
+    .filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && r.offer_price_key)
+    .map(r => r.offer_price_key));
+  document.querySelectorAll('[data-bb-live-pill]').forEach(el => {
+    const keys = (el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean);
+    if (!keys.length) return;
+    const live = keys.filter(k => liveSet.has(k)).length;
+    let label, color;
+    if (live === keys.length) { label = '● LIVE on Stripe'; color = '#7BC47F'; }
+    else if (live === 0)      { label = '● no live Stripe price'; color = '#e0654f'; }
+    else                      { label = `● ${live}/${keys.length} live on Stripe`; color = '#e0a93f'; }
+    el.textContent = label;
+    el.style.color = color;
+    el.style.borderColor = color;
+    el.title = live === keys.length ? 'Every price here has a Live Stripe price matched'
+      : 'Run Price Match (Offers → Pricing) to link or create the Live Stripe price';
+  });
+}
+
+async function _bbLoadMatchHealth(force) {
+  if (_BB_MATCH_HEALTH && !force) { _bbApplyLivePills(); return; }
+  if (_BB_MATCH_HEALTH_LOADING) return;
+  _BB_MATCH_HEALTH_LOADING = (async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/offers/match-prices?client_id=' + encodeURIComponent(_aiClientId()), {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const json = await _safeJson(r);
+      if (r.ok) { _BB_MATCH_HEALTH = json.rows || []; _bbApplyLivePills(); }
+    } catch (_) { /* pills stay as placeholders */ }
+    finally { _BB_MATCH_HEALTH_LOADING = null; }
+  })();
 }
 
 // Shared strip renderer — left→right step checkboxes, whole strip is one
@@ -12007,12 +12085,14 @@ function _bbRenderField(field, sectionId) {
             if (field.collapsible) {
               const expanded = _bbBlockIsExpanded(sectionId, field.key, i);
               const summary = _bbBlockSummaryHtml(row, field.subFields, field.summaryKeys);
+              // Pricing rows carry a LIVE-on-Stripe health pill (per plan×term).
+              const livePill = field.key === 'pricing_offerings' ? _bbLivePill(_bbPlanKeys(row)) : '';
               return `
                 <div class="bb-block-row">
                   <div class="bb-block-row-head">
                     <button class="bb-block-toggle" onclick="_bbBlockToggleExpand('${sectionId}','${field.key}',${i})" title="${expanded ? 'Collapse' : 'Expand'}">${expanded ? '▾' : '▸'}</button>
                     <div class="bb-block-row-info">
-                      <div class="bb-block-row-title">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}</div>
+                      <div class="bb-block-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}${livePill}</div>
                       <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
                     </div>
                     <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
@@ -16519,7 +16599,9 @@ async function _sorterApproveAndNext() {
     // Price Match is its own flow now — saving finishes it. Member import
     // lives in the Members section, not behind this save.
     closePricingSorter();
+    _BB_MATCH_HEALTH = null; // matches changed → LIVE pills refetch
     if (typeof _bbRenderOffersPricing === 'function') _bbRenderOffersPricing(); // refresh the dot
+    _bbApplyLivePills();
   } catch (e) {
     alert('Saving matches failed: ' + e.message);
   }
