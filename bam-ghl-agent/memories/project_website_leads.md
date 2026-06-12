@@ -42,6 +42,18 @@ client site form
   client_users auth; academy OAuth token w/ auto-refresh). Only calendars
   exposed as entry_points are listable/editable.
 
+## Offer scoping (decided 2026-06-12)
+- **The OFFER is the organizing unit**: each offer (training, team/ADAPT, …)
+  gets its own pipeline, website funnel, entry points, calendars, agents,
+  member management, and KPIs. `entry_points.offer_id` → `offers(id)`;
+  GTA's 6 entry points belong to the Training offer (`52a6285c-…`).
+- Client portal "Pipelines" page renamed **Sales** — currently the Training
+  offer's sales page; offer switcher comes when offer #2 goes live.
+- NEXT (discussed, not built): KPI strip on the Sales page — Leads → Trials
+  booked → Showed → Joined with step conversions, + speed-to-book and
+  in-nudges count. Open Qs for Zoran: exact stages, time window, and where
+  showed/no-show truth lives (GHL appointment status?).
+
 ## Entry Points (lead routing layer, Jun 2026)
 - **`entry_points` table**: one row per place leads enter an academy —
   type ∈ website-form | ghl-form | calendar | funnel, key (form_type or GHL id),
