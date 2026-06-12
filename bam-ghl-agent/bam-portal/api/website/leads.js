@@ -438,7 +438,8 @@ async function enrollInWorkflow(client, contactId, workflowId) {
     const r = await fetch(`${GHL_V2}/contacts/${contactId}/workflow/${workflowId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ eventStartTime: new Date().toISOString() }),
+      // GHL rejects the 'Z' suffix — it demands an explicit timezone offset.
+      body: JSON.stringify({ eventStartTime: new Date().toISOString().replace(/\.\d{3}Z$/, "+00:00") }),
     });
     if (!r.ok) console.error("GHL workflow enroll failed:", r.status, (await r.text()).slice(0, 150));
   } catch (e) { console.error("GHL workflow enroll failed (non-fatal):", e.message); }
