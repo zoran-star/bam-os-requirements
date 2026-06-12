@@ -9,8 +9,8 @@
 
 import { withSentryApiRoute } from "../_sentry.js";
 
-const SB_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const SB_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
+const SB_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 
 const DEV_ORIGINS = new Set([
   "http://localhost:3000",
