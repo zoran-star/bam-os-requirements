@@ -33,7 +33,9 @@ All of them: deny-all RLS (no policies, service-role only). Don't add policies t
 | `clients` | Every parent table FKs `tenant_id → clients(id)` | change PK, archive/merge rows, rename table |
 | `members` | Read-only; `member_links` FKs `members(id)`; matching uses `email_norm` + parent phone/email columns | rename/drop table or those columns, change `email_norm` semantics, re-import with new ids |
 | `members_staging` → promote | Registration matching waits on Sorter Steps 3–4 promote | change what promote writes into `members` |
-| `pricing_catalog` | `membership_plans` will be seeded from rows with `match_status='confirmed'` | change `match_status` values/semantics |
+| `offers` | `membership_plans` and schedule templates read Offer identity + `data.pricing.pricing_offerings` / schedule classes as source lineage | reshape `data.pricing.pricing_offerings`, change archive semantics, regenerate ids, remove pricing/schedule sections |
+| `offer_teams` | Future Team offers may link schedule/templates to specific team rows via soft lineage | reshape team row identity/data semantics, regenerate ids |
+| `pricing_catalog` | `membership_plans` will be seeded from confirmed Offer-price mappings | change `match_status` values/semantics, remove `offer_id` / `offer_price_key`, change canonical price tier semantics |
 | `locations` | Will be **additively extended** (new nullable columns) toward core `Location` | drop/rename existing columns |
 | `device_tokens` | Reused as-is for parent push | schema change |
 | **Auth (whole project)** | Parents will register as Supabase auth users; `app_metadata.role='parent'` stamped at registration | logic assuming every auth user is staff/client |
@@ -55,10 +57,22 @@ swapped to `is_staff()` — migration `20260612012656`. Staff behavior unchanged
 
 ## ✅ Always fine — no sync needed
 
-- New columns on PM-owned tables not listed above (tickets, marketing, content, training, offers…)
+- New columns on PM-owned tables not listed above (tickets, marketing, content, training…)
 - New tables with non-reserved names + proper staff RLS predicates
-- Data changes (rows) anywhere outside Luka's tables
+- Routine data changes outside Luka's tables that do not alter the shared-table semantics above
 - Keep applying changes via MCP `apply_migration` as usual — Luka's tooling picks them up
+
+## Offer fields needed before parent booking
+
+Before `membership_plans` are generated from Business Blueprint Offers, each Offer pricing option needs structured fields that define what the parent can book.
+
+Examples:
+- 1x/week plan → 1 credit per week
+- 2x/week plan → 2 credits per week
+- Unlimited plan → unlimited bookings
+- Session pack → fixed number of credits, with optional expiry
+
+Marketing copy is not enough. The booking system needs exact values for credits, periods, unlimited access, and eligibility rules.
 
 ---
 
