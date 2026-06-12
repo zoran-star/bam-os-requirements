@@ -176,6 +176,9 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
       list = [...list].sort((a, b) => (a.business_name || "").localeCompare(b.business_name || ""));
     } else if (sortKey === "recent") {
       list = [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    } else if (sortKey === "statusDesc" || sortKey === "statusAsc") {
+      const dir = sortKey === "statusDesc" ? -1 : 1;
+      list = [...list].sort((a, b) => dir * (clientStatusPct(a) - clientStatusPct(b)));
     }
     return list;
   }, [clients, statusFilter, search, sortKey]);
@@ -292,7 +295,16 @@ export default function ClientsCombinedView({ tokens, dark, me, session, initial
             <div>Business</div>
             <div>Point of contact</div>
             <div>Scaling Manager</div>
-            <div>Status</div>
+            <div
+              onClick={() => setSortKey(k => (k === "statusDesc" ? "statusAsc" : "statusDesc"))}
+              title="Sort by onboarding progress"
+              style={{ cursor: "pointer", userSelect: "none", display: "flex", alignItems: "center", gap: 5 }}
+            >
+              <span>Status</span>
+              <span style={{ opacity: sortKey.startsWith("status") ? 1 : 0.35, fontSize: 10 }}>
+                {sortKey === "statusAsc" ? "\u25B4" : "\u25BE"}
+              </span>
+            </div>
           </div>
           {filtered.map((c) => (
             <ClientRow
@@ -474,6 +486,17 @@ function ClientDetail({ client, staff, staffMap, tokens, dark, me, session, onBa
 // Onboarding completion from the client row — the same 8 sections the
 // Onboarding tab checklists (ghl, slack, general, staff, locations, brand,
 // offers, meta). Returns { done, total }.
+// Numeric progress for the Status-column sort: Live counts as 100,
+// onboarding clients use their step percentage, paused/churned sink to
+// the bottom regardless of direction-flip context.
+function clientStatusPct(client) {
+  if (client.status === "paused" || client.status === "churned") return -1;
+  const derived = deriveClientStatus(client, { green: "", red: "", amber: "", textMute: "" });
+  if (client.status === "active" || (derived && derived.label === "Live")) return 100;
+  const { done, total } = onboardingProgress(client);
+  return total ? Math.round((done / total) * 100) : 0;
+}
+
 function onboardingProgress(client) {
   const generalAutoOk = !!(client.business_name && client.owner_name && client.email);
   const flags = [
