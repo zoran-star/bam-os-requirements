@@ -16677,7 +16677,7 @@ function _sorterRenderStep3(host) {
       return row(`• ${who} — no Stripe match` + altBtn);
     })}
     ${list(links.stripe_no_member, x => row(
-      `💸 <b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')}) is PAYING but not on your sheet` +
+      `💸 ${_sorterWho(x)} is PAYING but not on your sheet` +
       fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`) +
       denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || '')}')`, 'Not a member — dismiss')
     ))}`;
@@ -16685,7 +16685,11 @@ function _sorterRenderStep3(host) {
   // Possible prepaid members — big recent one-time charges from unknown emails.
   const prepaidArr = (c.checks && c.checks.prepaid) || [];
   const prepaidInner = list(prepaidArr, x => row(
-    `💰 <b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')}) paid <b>$${((x.amount_cents || 0) / 100).toFixed(0)}</b> one-time on ${escapeHTML(x.date || '')}${x.description ? ' · ' + escapeHTML(x.description) : ''}` +
+    `💰 ${_sorterWho(x)} paid <b>$${((x.amount_cents || 0) / 100).toFixed(0)}</b> one-time on ${escapeHTML(x.date || '')}${x.description ? ' · ' + escapeHTML(x.description) : ''}` +
+    (x.maybe_staged
+      ? `<span style="color:#e0a93f;font-weight:700;">&nbsp;⚠ might be ${escapeHTML(x.maybe_staged.athlete_name || '')} from your sheet</span>` +
+        fixBtn(`Link to ${escapeHTML(x.maybe_staged.athlete_name || 'them')} ✓`, `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`)
+      : '') +
     fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','','')`) +
     denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || '')}')`, 'Not a member — dismiss')
   ));
@@ -16777,6 +16781,78 @@ function _sorterRemoveStaged(stagingId) {
       .map(g => ({ ...g, ids: g.ids.filter(id => String(id) !== String(stagingId)) }))
       .filter(g => g.ids.length > 1);
   });
+}
+
+// Clickable identity for Stripe-side rows — name (email), underlined; click
+// opens the read-only "everything Stripe knows about them" inspector.
+function _sorterWho(x) {
+  const label = `<b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')})`;
+  if (!x.customer_id) return label;
+  return `<span onclick="_sorterStripeInfo('${escapeHTML(x.customer_id)}')" title="See their full Stripe info" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;">${label}</span>`;
+}
+
+// Link a prepaid charge's Stripe customer onto a staged member (same person,
+// different email on the sheet).
+function _sorterLinkPrepaid(stagingId, email, customerId) {
+  _sorterFixAction('fix-link',
+    { staging_id: stagingId, matched_email: email, customer_id: customerId },
+    () => {
+      const ch = _SORTER.checks.checks || {};
+      ch.prepaid = (ch.prepaid || []).filter(x => x.email !== email);
+      if (_SORTER.checks.counts) _SORTER.checks.counts.prepaid = (ch.prepaid || []).length;
+      const l = ch.links || {};
+      l.staged_no_stripe = (l.staged_no_stripe || []).filter(x => String(x.id) !== String(stagingId));
+    });
+}
+
+// ── Stripe inspector modal — read-only: customer, all subs, recent charges ──
+async function _sorterStripeInfo(customerId) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:84vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">${_sorterLoading('Pulling their Stripe record…')}</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=stripe-detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, customer_id: customerId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const cu = json.customer || {};
+    const fact = (label, val) => val ? `<div style="display:flex;gap:8px;font-size:12px;padding:2px 0;"><span style="color:var(--text-mute,#888);flex:none;width:78px;">${label}</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(String(val))}</span></div>` : '';
+    const subs = (json.subs || []).map(s2 => `
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border,#2a2a31);">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(s2.product_name || s2.sub_id)}<span style="color:var(--text-mute,#888);"> · since ${escapeHTML(s2.started || '?')}${s2.canceled_at ? ' · ended ' + escapeHTML(s2.canceled_at) : ''}</span></span>
+        <span style="flex:none;"><b>${s2.amount_cents != null ? '$' + (s2.amount_cents / 100).toFixed(2) : '—'}</b>${s2.interval ? ' / ' + escapeHTML(s2.interval) : ''} <span style="font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:1px 6px;border-radius:6px;border:1px solid ${['active','trialing','paused','past_due'].includes(s2.status) ? '#1f7a3d;color:#7BC47F' : 'var(--border,#2a2a31);color:var(--text-mute,#888)'};">${escapeHTML((s2.status || '').toUpperCase())}</span></span>
+      </div>`).join('') || `<div style="font-size:12px;color:var(--text-mute,#888);">No subscriptions.</div>`;
+    const charges = (json.charges || []).map(c2 => `
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : 'var(--text,#eee)'};">
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : ''}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
+        <span style="flex:none;font-weight:700;">$${((c2.amount_cents || 0) / 100).toFixed(2)}</span>
+      </div>`).join('') || `<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>`;
+    const stripeUrl = json.stripe_account_id ? `https://dashboard.stripe.com/${encodeURIComponent(json.stripe_account_id)}/customers/${encodeURIComponent(cu.id || customerId)}` : null;
+    host.innerHTML = `
+      <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+      <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(640px,94vw);max-height:84vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex:none;">
+          <div style="font-size:15px;font-weight:800;">💳 ${escapeHTML(cu.name || cu.email || 'Stripe customer')}</div>
+          <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;">
+          ${fact('Email', cu.email)}${fact('Phone', cu.phone)}${fact('Customer', cu.id)}${fact('Since', cu.created)}
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Subscriptions</div>
+          ${subs}
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
+          ${charges}
+        </div>
+        ${stripeUrl ? `<div style="flex:none;margin-top:12px;padding-top:10px;border-top:1px solid var(--border,#2a2a31);text-align:right;"><a href="${escapeHTML(stripeUrl)}" target="_blank" rel="noopener" style="font-size:12px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">View in Stripe ↗</a></div>` : ''}
+      </div>`;
+  } catch (e) {
+    _sorterCloseConnect();
+    alert("Couldn't load Stripe info: " + _sorterErr(e));
+  }
 }
 
 // ── Deny buttons — "this finding is wrong"; persists per client via dismiss ──
