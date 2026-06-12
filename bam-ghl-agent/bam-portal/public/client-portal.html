@@ -16609,20 +16609,35 @@ function _sorterRenderStep3(host) {
   const list = (arr, fmt) => (arr && arr.length) ? arr.slice(0, 60).map(fmt).join('') : '';
   const links = (c.checks && c.checks.links) || {};
 
-  // Staged member without a Stripe match: expected (no card yet) is informational;
-  // a typo suggestion gets a 1-tap Link; otherwise it promotes fine without billing.
+  const denyBtn = (fn, label) => `<button onclick="${fn}" title="${label || 'Not right — dismiss'}" style="margin-left:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">✕ No</button>`;
+
+  // Staged member without a Stripe match: expected states are informational;
+  // a typo suggestion gets Link/Deny; everything else gets Alternate payment.
   const linksInner = `
     ${list(links.staged_no_stripe, x => {
       const who = `<b>${escapeHTML(x.athlete_name || '')}</b>&nbsp;(${escapeHTML(x.parent_email || '')})`;
+      const sid = escapeHTML(String(x.id));
+      if (x.alt_payment) return row(`💵 ${who} — alternate payment method ✓`);
       if (x.expected) return row(`💳 ${who} — no card yet, expected. Payment link comes after import.`);
+      const altBtn = fixBtn('💵 Alternate payment', `_sorterAltPay('${sid}')`);
       if (x.suggestion) return row(`✉️ ${who} — did you mean <b>${escapeHTML(x.suggestion.email)}</b>?` +
-        fixBtn('Link ✓', `_sorterFixLink('${escapeHTML(String(x.id))}','${escapeHTML(x.suggestion.email)}','${escapeHTML(x.suggestion.customer_id || '')}','${escapeHTML(x.suggestion.sub_id || '')}','${escapeHTML(x.suggestion.price_id || '')}')`));
-      return row(`• ${who} — no Stripe match (promotes without billing; link later)`);
+        fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(x.suggestion.email)}','${escapeHTML(x.suggestion.customer_id || '')}','${escapeHTML(x.suggestion.sub_id || '')}','${escapeHTML(x.suggestion.price_id || '')}')`) +
+        denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss this suggestion') + altBtn);
+      return row(`• ${who} — no Stripe match` + altBtn);
     })}
     ${list(links.stripe_no_member, x => row(
       `💸 <b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')}) is PAYING but not on your sheet` +
-      fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)
+      fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`) +
+      denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || '')}')`, 'Not a member — dismiss')
     ))}`;
+
+  // Possible prepaid members — big recent one-time charges from unknown emails.
+  const prepaidArr = (c.checks && c.checks.prepaid) || [];
+  const prepaidInner = list(prepaidArr, x => row(
+    `💰 <b>${escapeHTML(x.name || x.email || '')}</b>&nbsp;(${escapeHTML(x.email || '')}) paid <b>$${((x.amount_cents || 0) / 100).toFixed(0)}</b> one-time on ${escapeHTML(x.date || '')}${x.description ? ' · ' + escapeHTML(x.description) : ''}` +
+    fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','','')`) +
+    denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || '')}')`, 'Not a member — dismiss')
+  ));
 
   // Churned subs are history, not problems — one collapsed line.
   const churnedArr = links.churned || [];
@@ -16630,25 +16645,29 @@ function _sorterRenderStep3(host) {
 
   const dupInner = list((c.checks && c.checks.duplicates) || [], x =>
     row(`• <b>${escapeHTML(String(x.value || ''))}</b> appears ${x.ids.length}× (${escapeHTML(x.email || '')})` +
-      x.ids.slice(1).map((id, i) => fixBtn(`Remove copy ${i + 1}`, `_sorterRemoveStaged('${escapeHTML(String(id))}')`)).join('')));
+      x.ids.slice(1).map((id, i) => fixBtn(`Remove copy ${i + 1}`, `_sorterRemoveStaged('${escapeHTML(String(id))}')`)).join('') +
+      denyBtn(`_sorterDenyDup('${escapeHTML(String(x.key || ''))}')`, 'These are different people — not duplicates')));
+  // "On a price with no offer" → the Connect popup (member on the left,
+  // offer/price selector + recommendation on the right). No more Fix-in-Match.
   const noOfferInner = list((c.checks && c.checks.no_offer) || [], x =>
-    row(`• <b>${escapeHTML(x.athlete_name || '')}</b> — ${escapeHTML(x.reason || '')}` + fixBtn('Fix in Match →', '_sorterGoto(1)')));
-  const tierInner = list((c.checks && c.checks.tier_issues) || [], x =>
-    row(`• <b>${escapeHTML(x.offer_price_key || '')}</b> — ${escapeHTML(x.issue || '')}` + fixBtn('Fix in Match →', '_sorterGoto(1)')));
+    row(`• <b>${escapeHTML(x.athlete_name || '')}</b> — ${escapeHTML(x.reason || '')}` +
+      fixBtn('Connect →', `_sorterOpenConnect('${escapeHTML(String(x.id))}')`) +
+      fixBtn('💵 Alternate payment', `_sorterAltPay('${escapeHTML(String(x.id))}')`)));
 
   const stagedNo = counts.staged_no_stripe || 0;
   const stripeNo = counts.stripe_no_member || 0;
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">${counts.clean || 0} of ${counts.staged || 0} staged members look clean and ready to promote.</div>
     ${card('🔗', 'Stripe links', stagedNo + stripeNo, linksInner)}
+    ${prepaidArr.length ? card('💰', 'Possible prepaid members', prepaidArr.length, prepaidInner) : ''}
     ${card('👯', 'Duplicates', counts.duplicates || 0, dupInner)}
     ${card('🏷', 'On a price with no offer', counts.no_offer || 0, noOfferInner)}
-    ${card('⚖️', 'Live/Legacy sanity', counts.tier_issues || 0, tierInner)}
     ${churnedArr.length ? `
     <details style="border:1px dashed var(--border,#2a2a31);border-radius:10px;margin-bottom:10px;padding:0 12px;opacity:.75;">
       <summary style="cursor:pointer;padding:11px 0;font-weight:700;font-size:12.5px;list-style:none;color:var(--text-mute,#888);">🕰 Past members — ${churnedArr.length} canceled subs · nothing to do ✓</summary>
       <div style="padding:0 0 12px;font-size:11.5px;color:var(--text-mute,#888);">${churnedInner}</div>
-    </details>` : ''}`;
+    </details>` : ''}
+    <div id="pc-sorter-connect-host"></div>`;
 
   const canPromote = (counts.clean || 0) > 0;
   _sorterSetNext(`<button onclick="_sorterPromote()" ${canPromote ? '' : 'disabled'} style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:${canPromote ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${canPromote ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${canPromote ? 'pointer' : 'not-allowed'};">✅ Promote ${counts.clean || 0} clean members</button>`);
@@ -16707,6 +16726,151 @@ function _sorterRemoveStaged(stagingId) {
       .map(g => ({ ...g, ids: g.ids.filter(id => String(id) !== String(stagingId)) }))
       .filter(g => g.ids.length > 1);
   });
+}
+
+// ── Deny buttons — "this finding is wrong"; persists per client via dismiss ──
+function _sorterDenySuggestion(stagingId) {
+  _sorterFixAction('dismiss', { key: 'suggestion:' + stagingId }, () => {
+    const l = (_SORTER.checks.checks || {}).links || {};
+    (l.staged_no_stripe || []).forEach(x => { if (String(x.id) === String(stagingId)) x.suggestion = null; });
+  });
+}
+function _sorterDenyStripe(email) {
+  _sorterFixAction('dismiss', { key: 'stripe:' + email }, () => {
+    const l = (_SORTER.checks.checks || {}).links || {};
+    l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
+  });
+}
+function _sorterDenyPrepaid(email) {
+  _sorterFixAction('dismiss', { key: 'prepaid:' + email }, () => {
+    const c = _SORTER.checks.checks || {};
+    c.prepaid = (c.prepaid || []).filter(x => x.email !== email);
+    if (_SORTER.checks.counts) _SORTER.checks.counts.prepaid = c.prepaid.length;
+  });
+}
+function _sorterDenyDup(key) {
+  _sorterFixAction('dismiss', { key: 'dup:' + key }, () => {
+    const c = _SORTER.checks.checks || {};
+    c.duplicates = (c.duplicates || []).filter(g => g.key !== key);
+  });
+}
+
+// ── Alternate payment: member pays outside Stripe (cash / e-transfer) ──
+function _sorterAltPay(stagingId) {
+  _sorterFixAction('alt-payment', { staging_id: stagingId }, () => {
+    const ch = _SORTER.checks.checks || {};
+    const l = ch.links || {};
+    (l.staged_no_stripe || []).forEach(x => { if (String(x.id) === String(stagingId)) { x.alt_payment = true; x.expected = true; x.suggestion = null; } });
+    ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(stagingId));
+    if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
+  });
+}
+
+// ── Connect popup: member detail on the left, offer/price selector + AI-style
+// recommendation on the right. Replaces "Fix in Match" for no-offer members. ──
+let _SORTER_CONNECT = null;
+async function _sorterOpenConnect(stagingId) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(860px,94vw);max-height:84vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">${_sorterLoading('Pulling their Stripe history…')}</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=member-detail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_id: stagingId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _SORTER_CONNECT = { stagingId, detail: json, chosen: json.recommendation ? json.recommendation.key : null };
+    _sorterRenderConnect();
+  } catch (e) {
+    _sorterCloseConnect();
+    alert("Couldn't load member detail: " + _sorterErr(e));
+  }
+}
+
+function _sorterRenderConnect() {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host || !_SORTER_CONNECT) return;
+  const d = _SORTER_CONNECT.detail;
+  const m = d.member || {};
+  const st = d.stripe;
+  const fact = (label, val) => val ? `<div style="display:flex;gap:8px;font-size:12px;padding:2px 0;"><span style="color:var(--text-mute,#888);flex:none;width:86px;">${label}</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(String(val))}</span></div>` : '';
+  const charges = (d.charges || []).slice(0, 6).map(ch2 =>
+    `<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${ch2.refunded ? 'var(--text-mute,#888)' : 'var(--text,#eee)'};">
+      <span>${escapeHTML(ch2.date || '')}${ch2.one_time ? ' · one-time' : ''}${ch2.refunded ? ' · refunded' : ''}</span>
+      <span style="font-weight:700;">$${((ch2.amount_cents || 0) / 100).toFixed(2)}</span>
+    </div>`).join('') || `<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>`;
+  const recKey = d.recommendation && d.recommendation.key;
+  const targets = (d.targets || []).map(t => {
+    const chosen = _SORTER_CONNECT.chosen === t.key;
+    const rec = recKey === t.key;
+    return `<div onclick="_sorterConnectChoose('${escapeHTML(t.key)}')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid ${chosen ? 'var(--accent,#E8C547)' : 'var(--border,#2a2a31)'};border-radius:9px;padding:9px 11px;margin-bottom:7px;cursor:pointer;background:${chosen ? 'rgba(232,197,71,0.08)' : 'transparent'};">
+      <div style="min-width:0;">
+        <div style="font-size:12.5px;font-weight:700;">${escapeHTML(t.label)} ${rec ? '<span style="font-size:9.5px;font-weight:800;color:#7BC47F;border:1px solid #1f7a3d;border-radius:6px;padding:1px 6px;margin-left:5px;">⭐ RECOMMENDED</span>' : ''}</div>
+        <div style="font-size:10.5px;color:var(--text-mute,#888);">$${((t.base_cents || 0) / 100).toFixed(0)} base · $${((t.allin_cents || 0) / 100).toFixed(2)} all-in</div>
+      </div>
+      <span style="flex:none;width:18px;height:18px;border-radius:50%;border:2px solid ${chosen ? 'var(--accent,#E8C547)' : 'var(--border,#2a2a31)'};display:inline-flex;align-items:center;justify-content:center;">${chosen ? '<span style="width:9px;height:9px;border-radius:50%;background:var(--accent,#E8C547);"></span>' : ''}</span>
+    </div>`;
+  }).join('') || `<div style="font-size:12px;color:var(--text-mute,#888);">No plans found in Offers → Pricing yet. <button onclick="_sorterCloseConnect();_sorterGotoOffers()" style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">+ Create one in Offers ↗</button></div>`;
+  host.innerHTML = `
+    <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(860px,94vw);max-height:84vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex:none;">
+        <div style="font-size:15px;font-weight:800;">Connect ${escapeHTML(m.athlete_name || 'member')} to a plan</div>
+        <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div>
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Member</div>
+          ${fact('Athlete', m.athlete_name)}
+          ${fact('Parent', m.parent_name)}
+          ${fact('Email', m.parent_email)}
+          ${fact('Phone', m.parent_phone)}
+          ${fact('Sheet plan', m.plan)}
+          ${fact('Status', m.status)}
+          ${fact('Joined', m.joined_date)}
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Stripe</div>
+          ${st ? `${fact('Sub', st.status)}${fact('Product', st.product_name)}${fact('Pays', st.amount_cents != null ? '$' + (st.amount_cents / 100).toFixed(2) + (st.interval ? ' / ' + st.interval : '') : null)}${fact('Since', st.started)}` : `<div style="font-size:12px;color:var(--text-mute,#888);">No subscription.</div>`}
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Recent payments</div>
+          ${charges}
+        </div>
+        <div>
+          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Pick the plan they're on</div>
+          ${targets}
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a31);flex:none;">
+        <button onclick="_sorterCloseConnect()" style="font-size:12.5px;padding:8px 15px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Cancel</button>
+        <button onclick="_sorterConnectApply()" ${_SORTER_CONNECT.chosen ? '' : 'disabled'} style="font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:${_SORTER_CONNECT.chosen ? 'var(--accent,#E8C547)' : 'rgba(255,255,255,0.08)'};color:${_SORTER_CONNECT.chosen ? '#1a1a1a' : 'var(--text-mute,#888)'};cursor:${_SORTER_CONNECT.chosen ? 'pointer' : 'not-allowed'};">Connect ✓</button>
+      </div>
+    </div>`;
+}
+
+function _sorterConnectChoose(key) {
+  if (_SORTER_CONNECT) { _SORTER_CONNECT.chosen = key; _sorterRenderConnect(); }
+}
+
+function _sorterCloseConnect() {
+  _SORTER_CONNECT = null;
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (host) host.innerHTML = '';
+}
+
+function _sorterConnectApply() {
+  if (!_SORTER_CONNECT || !_SORTER_CONNECT.chosen) return;
+  const sid = _SORTER_CONNECT.stagingId;
+  const tgt = (_SORTER_CONNECT.detail.targets || []).find(t => t.key === _SORTER_CONNECT.chosen);
+  _sorterFixAction('connect-offer',
+    { staging_id: sid, offer_price_key: _SORTER_CONNECT.chosen, offer_id: tgt ? tgt.offer_id : null },
+    () => {
+      const ch = _SORTER.checks.checks || {};
+      ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(sid));
+      if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
+      _sorterCloseConnect();
+    });
 }
 
 async function _sorterRunChecks() {
@@ -17408,6 +17572,11 @@ function _renderMemberModalBody(m, stripe, history) {
     billingRows = [['Stripe', escapeHTML(stripe.error)]];
   } else if (m.stripe_subscription_id) {
     billingRows = [['Status', 'Loading Stripe…']];
+  } else if (m.billing_mode === 'alternate') {
+    billingRows = [
+      ['Status', '💵 Alternate payment method — not billed via Stripe.'],
+      ...(joinedIso ? [['Joined', joinedLabel]] : []),
+    ];
   } else if (joinedIso) {
     billingRows = [
       ['Status', 'No Stripe subscription on file.'],
@@ -17507,6 +17676,9 @@ function _renderMemberModalBody(m, stripe, history) {
       ${btn('Cancel',      `mCancel('${m.id}','${escapeHTML((m.athlete_name||'').replace(/'/g, ''))}')`)}
       ${btn('Payment link',`mPaymentLink('${m.id}')`)}
       ${btn('Referred',    `mReferred('${m.id}')`)}
+      ${m.billing_mode === 'alternate'
+        ? btn('Switch to Stripe billing', `_memberUpdateField('${m.id}','billing_mode','')`)
+        : btn('💵 Alternate payment', `_memberUpdateField('${m.id}','billing_mode','alternate')`)}
       ${stripeBtn}
     </div>
   `;

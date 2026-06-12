@@ -153,6 +153,38 @@ function editDistance(a, b, max = 2) {
   return prev[b.length];
 }
 
+// Offer-price targets (plan × term) from the academy's Offers — mirrors
+// buildOfferTargets() in offers/match-prices.js (kept lite: label + price only).
+function _termFromLength(len) {
+  const s = String(len || "").toLowerCase();
+  if (s.includes("3")) return "3_months";
+  if (s.includes("6")) return "6_months";
+  if (s.includes("12") || s.includes("year")) return "12_months";
+  return null;
+}
+async function buildTargetsLite(clientId) {
+  const offers = await sb(`offers?client_id=eq.${encodeURIComponent(clientId)}&status=neq.archived&select=id,title,type,data`) || [];
+  const HST = 1.13;
+  const cents = n => Math.round(n * 100);
+  const targets = [];
+  for (const o of offers) {
+    const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
+    for (const off of offerings) {
+      if (String(off.type || "").toLowerCase() !== "membership") continue;
+      const title = String(off.title || "").trim();
+      if (!title) continue;
+      const base = parseFloat(off.price);
+      if (!isNaN(base)) targets.push({ key: `${title}|monthly`, offer_id: o.id, label: `${title} · Monthly`, base_cents: cents(base), allin_cents: cents(base * HST) });
+      for (const c of (off.commitments || [])) {
+        const term = _termFromLength(c.length);
+        const cb = parseFloat(c.price);
+        if (term && !isNaN(cb)) targets.push({ key: `${title}|${term}`, offer_id: o.id, label: `${title} · ${term.replace("_", " ")}`, base_cents: cents(cb), allin_cents: cents(cb * HST) });
+      }
+    }
+  }
+  return targets;
+}
+
 // Flag-derived counts (no Stripe call) — used by the 1-tap fix actions so the
 // Promote button stays honest without re-running the full check.
 async function flagCounts(clientId, batchId) {
@@ -200,6 +232,168 @@ async function handler(req, res) {
       `&select=*&order=source_row.asc`
     ) || [];
 
+    // Client row (Stripe account + persisted dismissals) — used by most actions.
+    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id,sorter_dismissals&limit=1`);
+    const client = Array.isArray(clientRows) && clientRows[0];
+    if (!client) return res.status(404).json({ error: "academy not found" });
+    const dismissed = new Set(Array.isArray(client.sorter_dismissals) ? client.sorter_dismissals : []);
+
+    // dismiss: "this finding is wrong / not relevant" — persists per client so
+    // it never resurfaces on future checks.
+    if (action === "dismiss") {
+      const key = (body.key || "").toString().slice(0, 300);
+      if (!key) return res.status(400).json({ error: "key required" });
+      if (!dismissed.has(key)) {
+        dismissed.add(key);
+        await sb(`clients?id=eq.${encodeURIComponent(clientId)}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ sorter_dismissals: [...dismissed] }),
+        });
+      }
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // alt-payment: member pays outside Stripe (cash / e-transfer / other).
+    // Clears the no-Stripe and no-offer concerns; promote carries the flag.
+    if (action === "alt-payment") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          billing_mode: "alternate",
+          match_status: s.is_duplicate ? "duplicate" : "ok",
+          cleanup_notes: "alternate payment method (not billed via Stripe)",
+          updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // member-detail: everything the "connect to an offer" popup needs — the
+    // staged member, their Stripe sub + recent payments, the offer-price
+    // targets, and a closest-by-amount recommendation.
+    if (action === "member-detail") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const targets = await buildTargetsLite(clientId);
+      let stripe = null;
+      let charges = [];
+      if (client.stripe_connect_account_id) {
+        if (s.stripe_subscription_id) {
+          try {
+            const sub = await stripeGet(`/subscriptions/${s.stripe_subscription_id}?expand[]=items.data.price.product`, client.stripe_connect_account_id);
+            const item = sub.items && sub.items.data && sub.items.data[0];
+            const price = item && item.price;
+            stripe = {
+              sub_id: sub.id,
+              status: sub.status,
+              price_id: price ? price.id : null,
+              product_name: price && price.product && price.product.name || null,
+              amount_cents: price ? price.unit_amount : null,
+              interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
+              started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
+            };
+          } catch (_) {}
+        }
+        const cust = s.stripe_customer_id;
+        if (cust) {
+          try {
+            const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cust)}&limit=10`, client.stripe_connect_account_id);
+            charges = (ch.data || []).map(c2 => ({
+              amount_cents: c2.amount, currency: c2.currency, status: c2.status,
+              refunded: !!c2.refunded, one_time: !c2.invoice,
+              date: c2.created ? new Date(c2.created * 1000).toISOString().slice(0, 10) : null,
+              description: c2.description || null,
+            }));
+          } catch (_) {}
+        }
+      }
+      // Recommend the target closest to what they actually pay.
+      const amt = (stripe && stripe.amount_cents) || (charges[0] && charges[0].amount_cents) || null;
+      let recommendation = null;
+      if (amt && targets.length) {
+        let best = null, bestD = Infinity;
+        for (const t of targets) {
+          const d = Math.min(Math.abs((t.base_cents || 0) - amt), Math.abs((t.allin_cents || 0) - amt));
+          if (d < bestD) { bestD = d; best = t; }
+        }
+        if (best) recommendation = { key: best.key, label: best.label, diff_cents: bestD };
+      }
+      return res.status(200).json({
+        ok: true,
+        member: {
+          id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name,
+          parent_email: s.parent_email, parent_phone: s.parent_phone,
+          plan: s.plan, status: s.status, joined_date: s.joined_date,
+          stripe_customer_id: s.stripe_customer_id, stripe_subscription_id: s.stripe_subscription_id,
+          stripe_price_id: s.stripe_price_id, billing_mode: s.billing_mode || null,
+        },
+        stripe, charges, targets, recommendation,
+      });
+    }
+
+    // connect-offer: tie a staged member's price to an offer-price slot. With a
+    // price id this also writes the pricing_catalog mapping (Match-step apply
+    // semantics, legacy unless the slot has no Live price yet).
+    if (action === "connect-offer") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const key = (body.offer_price_key || "").toString();
+      if (!key) return res.status(400).json({ error: "offer_price_key required" });
+      const offerId = body.offer_id || null;
+      const priceId = s.stripe_price_id || null;
+      if (priceId) {
+        const slotCanon = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+          `&offer_price_key=eq.${encodeURIComponent(key)}&tier=eq.canonical` +
+          `&stripe_price_id=neq.${encodeURIComponent(priceId)}&select=stripe_price_id&limit=1`
+        );
+        const tier = (Array.isArray(slotCanon) && slotCanon[0]) ? "legacy_match" : "canonical";
+        const patch = {
+          offer_id: offerId, offer_price_key: key, tier,
+          is_routable: tier === "canonical",
+          match_status: "confirmed", match_source: "cleanup-connect",
+          matched_at: nowIso(), updated_at: nowIso(),
+        };
+        const r = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&stripe_price_id=eq.${encodeURIComponent(priceId)}`,
+          { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) }
+        );
+        if (!Array.isArray(r) || !r.length) {
+          // No catalog row yet — pull the price facts from Stripe and insert.
+          try {
+            const price = await stripeGet(`/prices/${encodeURIComponent(priceId)}`, client.stripe_connect_account_id);
+            await sb(`pricing_catalog`, {
+              method: "POST", headers: { Prefer: "return=minimal" },
+              body: JSON.stringify([{
+                client_id: clientId,
+                stripe_price_id: priceId,
+                stripe_product_id: typeof price.product === "string" ? price.product : (price.product && price.product.id),
+                display_name: price.nickname || null,
+                amount_cents: price.unit_amount,
+                currency: price.currency || "cad",
+                interval: price.recurring ? price.recurring.interval : null,
+                ...patch,
+              }]),
+            });
+          } catch (e2) {
+            return res.status(502).json({ error: `couldn't read the Stripe price to catalog it — ${e2.message}` });
+          }
+        }
+      }
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          offer_price_key: key,
+          match_status: s.is_duplicate ? "duplicate" : (s.stripe_linked || priceId ? "ok" : "needs_fix"),
+          cleanup_notes: `connected to ${key}`,
+          updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+
     // ════════════════════════════ PROMOTE ════════════════════════════
     if (action === "promote") {
       const onlyIds = Array.isArray(body.staging_ids) && body.staging_ids.length
@@ -228,6 +422,7 @@ async function handler(req, res) {
           stripe_customer_id:     s.stripe_customer_id || null,
           stripe_subscription_id: s.stripe_subscription_id || null,
           stripe_price_id:        s.stripe_price_id || null,
+          billing_mode:           s.billing_mode || null,
           joined_date:            s.joined_date || null,
           updated_at:             nowIso(),
         };
@@ -382,16 +577,35 @@ async function handler(req, res) {
     }
 
     // ════════════════════════════ CHECK ════════════════════════════
-    const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,business_name,stripe_connect_account_id&limit=1`);
-    const client = Array.isArray(clientRows) && clientRows[0];
-    if (!client) return res.status(404).json({ error: "academy not found" });
-
-    // Live Stripe linkage by email (skip gracefully if not connected).
+    // Live Stripe linkage (skip gracefully if not connected). Three lookups:
+    // by email, by customer id, by sub id — the sheet's OWN Stripe ids beat
+    // email matching (emails drift between the sheet and Stripe; ids don't).
     let emailMap = new Map();
+    const byCustomerId = new Map();
+    const bySubId = new Map();
     if (client.stripe_connect_account_id) {
       try {
         const subs = await fetchLiveSubs(client.stripe_connect_account_id);
         emailMap = buildEmailMap(subs);
+        for (const sub of subs) {
+          const cust = sub.customer && typeof sub.customer === "object" ? sub.customer : null;
+          const item = sub.items && sub.items.data && sub.items.data[0];
+          const price = item && item.price;
+          const entry = {
+            customer_id: typeof sub.customer === "string" ? sub.customer : (cust && cust.id) || null,
+            sub_id: sub.id,
+            price_id: (price && price.id) || null,
+            status: sub.status,
+            amount_cents: price ? price.unit_amount : null,
+            name: (cust && cust.name) || null,
+            email: normEmail(cust && cust.email) || null,
+          };
+          bySubId.set(sub.id, entry);
+          if (entry.customer_id) {
+            const prev = byCustomerId.get(entry.customer_id);
+            if (!prev || (!ACTIVEISH.has(prev.status) && ACTIVEISH.has(sub.status))) byCustomerId.set(entry.customer_id, entry);
+          }
+        }
       } catch (_) { emailMap = new Map(); }
     }
 
@@ -404,26 +618,35 @@ async function handler(req, res) {
     const offerKeys = new Set(catalog.map(c => c.offer_price_key).filter(Boolean));
 
     // ── (a) member ⇄ Stripe link, both ways ──
-    // Signal vs noise: only ACTIVE-ish subs mean "paying but not on your sheet";
-    // canceled subs are churned families → a collapsed FYI list, not issues.
-    const stagedNoStripe = [];
+    // Sheet ids FIRST (a sheet that carries stripe_customer_id/sub_id is the
+    // strongest signal — emails drift, e.g. Alain pays under a different
+    // address), then email. Only ACTIVE-ish subs mean "paying but not on your
+    // sheet"; canceled subs are churned families → a collapsed FYI list.
     const stagedEmails = new Set();
+    const claimedEmails = new Set();
     for (const s of staging) {
       const email = normEmail(s.parent_email);
       if (email) stagedEmails.add(email);
+      const link = (s.stripe_subscription_id && bySubId.get(s.stripe_subscription_id))
+        || (s.stripe_customer_id && byCustomerId.get(s.stripe_customer_id))
+        || (email ? emailMap.get(email) : null) || null;
+      s.__link = link;
+      if (link && link.email) claimedEmails.add(link.email);
     }
-    const unstagedEmails = [...emailMap.keys()].filter(e => !stagedEmails.has(e));
+    const unstagedEmails = [...emailMap.keys()].filter(e => !stagedEmails.has(e) && !claimedEmails.has(e));
+    const stagedNoStripe = [];
     for (const s of staging) {
+      if (s.__link) continue;
       const email = normEmail(s.parent_email);
-      const link = email ? emailMap.get(email) : null;
-      if (link) continue;
-      // A member whose sheet says they haven't got billing yet is EXPECTED to
-      // have no Stripe match — label it, don't alarm.
+      // EXPECTED no-Stripe cases — label, don't alarm: sheet says billing isn't
+      // set up yet, or the member is marked as paying outside Stripe.
       const rawStatus = (s.status || "").toString().trim().toLowerCase();
-      const expected = rawStatus.includes("payment_method_required") || rawStatus.includes("pending");
+      const altPay = s.billing_mode === "alternate";
+      const expected = altPay || rawStatus.includes("payment_method_required") || rawStatus.includes("pending");
       // Typo radar: a near-miss email among the unstaged Stripe subs (≤2 edits).
+      // Deniable — a dismissed suggestion never comes back.
       let suggestion = null;
-      if (email && !expected) {
+      if (email && !expected && !dismissed.has(`suggestion:${s.id}`)) {
         let best = null, bestD = 3;
         for (const cand of unstagedEmails) {
           const d = editDistance(email, cand, 2);
@@ -434,15 +657,55 @@ async function handler(req, res) {
           suggestion = { email: best, customer_id: l.customer_id, sub_id: l.sub_id, price_id: l.price_id, status: l.status, name: l.name };
         }
       }
-      stagedNoStripe.push({ id: s.id, source_row: s.source_row, athlete_name: s.athlete_name, parent_email: s.parent_email, expected, suggestion });
+      stagedNoStripe.push({ id: s.id, source_row: s.source_row, athlete_name: s.athlete_name, parent_email: s.parent_email, expected, alt_payment: altPay, suggestion });
     }
     const stripeNoMember = [];
     const churned = [];
     for (const [email, link] of emailMap.entries()) {
-      if (stagedEmails.has(email)) continue;
+      if (stagedEmails.has(email) || claimedEmails.has(email)) continue;
+      if (dismissed.has(`stripe:${email}`)) continue;
       const item = { email, name: link.name, customer_id: link.customer_id, sub_id: link.sub_id, price_id: link.price_id, status: link.status, amount_cents: link.amount_cents };
       if (ACTIVEISH.has(link.status)) stripeNoMember.push(item);
       else churned.push(item);
+    }
+
+    // ── (a2) possible PREPAID members — a big one-time charge recently, from
+    // an email that isn't on the sheet (e.g. paid 3 months up front, still in
+    // the paid window). Deniable per email. ──
+    const prepaid = [];
+    if (client.stripe_connect_account_id) {
+      try {
+        const NOW = Math.floor(Date.now() / 1000);
+        const since = NOW - 120 * 86400;
+        const byEmail = new Map();
+        let startingAfter = null;
+        for (let page = 0; page < 4; page++) {
+          const qs = new URLSearchParams({ limit: "100" });
+          qs.set("created[gte]", String(since));
+          if (startingAfter) qs.set("starting_after", startingAfter);
+          const r = await stripeGet(`/charges?${qs.toString()}`, client.stripe_connect_account_id);
+          const data = r.data || [];
+          for (const ch of data) {
+            if (ch.status !== "succeeded" || ch.refunded || ch.invoice) continue; // one-time only
+            if (ch.amount < 20000) continue; // < $200 → not a prepay
+            const email = normEmail((ch.billing_details && ch.billing_details.email) || ch.receipt_email);
+            if (!email || stagedEmails.has(email) || claimedEmails.has(email)) continue;
+            if (dismissed.has(`prepaid:${email}`)) continue;
+            const prev = byEmail.get(email);
+            if (!prev || ch.amount > prev.amount_cents) byEmail.set(email, {
+              email,
+              name: (ch.billing_details && ch.billing_details.name) || null,
+              customer_id: typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id) || null,
+              amount_cents: ch.amount,
+              date: ch.created ? new Date(ch.created * 1000).toISOString().slice(0, 10) : null,
+              description: ch.description || null,
+            });
+          }
+          if (!r.has_more || data.length === 0) break;
+          startingAfter = data[data.length - 1].id;
+        }
+        prepaid.push(...byEmail.values());
+      } catch (_) { /* non-fatal */ }
     }
 
     // ── (b) duplicates within the batch — SIBLING-AWARE: only the same
@@ -461,7 +724,8 @@ async function handler(req, res) {
     const duplicates = [];
     for (const [k, rows] of byKidKey.entries()) {
       if (rows.length > 1) {
-        duplicates.push({ kind: "same athlete + email", value: k.split("|")[1], email: k.split("|")[0], ids: rows.map(r => r.id), names: rows.map(r => r.athlete_name) });
+        if (dismissed.has(`dup:${k}`)) continue; // owner said "not duplicates"
+        duplicates.push({ kind: "same athlete + email", key: k, value: k.split("|")[1], email: k.split("|")[0], ids: rows.map(r => r.id), names: rows.map(r => r.athlete_name) });
         rows.forEach(r => dupIds.add(r.id));
       }
     }
@@ -470,8 +734,8 @@ async function handler(req, res) {
     const noOfferIds = new Set();
     const noOffer = [];
     for (const s of staging) {
-      const email = normEmail(s.parent_email);
-      const link = email ? emailMap.get(email) : null;
+      if (s.billing_mode === "alternate") continue; // not billed via Stripe — no offer needed
+      const link = s.__link;
       const priceId = s.stripe_price_id || (link && link.price_id) || null;
       const cat = priceId ? catalogByPrice[priceId] : null;
       const keyFromCat = cat && cat.offer_price_key;
@@ -503,17 +767,18 @@ async function handler(req, res) {
 
     // ── Write the verdict back to each staging row ──
     for (const s of staging) {
-      const email = normEmail(s.parent_email);
-      const link = email ? emailMap.get(email) : null;
+      const link = s.__link;
       const linked = !!link;
       const isDup = dupIds.has(s.id);
       const noOff = noOfferIds.has(s.id);
+      const altPay = s.billing_mode === "alternate";
       let match_status = "ok";
       if (isDup) match_status = "duplicate";
       else if (noOff) match_status = "no_offer";
-      else if (!linked) match_status = "needs_fix";
+      else if (!linked && !altPay) match_status = "needs_fix";
       const notes = [];
-      if (!linked) notes.push("no Stripe match by email");
+      if (altPay) notes.push("alternate payment method (not billed via Stripe)");
+      else if (!linked) notes.push("no Stripe match");
       if (isDup) notes.push("duplicate within batch");
       if (noOff) notes.push("on a price with no offer");
       const patch = {
@@ -544,6 +809,7 @@ async function handler(req, res) {
         staged_no_stripe: stagedNoStripe.length,
         stripe_no_member: stripeNoMember.length,
         churned: churned.length,
+        prepaid: prepaid.length,
         duplicates: duplicates.length,
         no_offer: noOffer.length,
         tier_issues: tierIssues.length,
@@ -551,6 +817,7 @@ async function handler(req, res) {
       },
       checks: {
         links: { staged_no_stripe: stagedNoStripe, stripe_no_member: stripeNoMember, churned },
+        prepaid,
         duplicates,
         no_offer: noOffer,
         tier_issues: tierIssues,
