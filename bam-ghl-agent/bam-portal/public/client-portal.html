@@ -7620,6 +7620,26 @@ Then the call to action."]</div>
         0%, 100% { box-shadow: 0 0 0 0 rgba(224,169,63,0); }
         50%      { box-shadow: 0 0 0 3px rgba(224,169,63,0.25); }
       }
+      /* Tier toggle pill on price chips — hover reveals the action */
+      .pc-tier-toggle {
+        cursor: pointer;
+        flex: none;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: .3px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        border: 1px solid;
+        transition: background 0.12s ease;
+        white-space: nowrap;
+      }
+      .pc-tier-toggle.is-live   { border-color: #7BC47F; color: #7BC47F; }
+      .pc-tier-toggle.is-legacy { border-color: #c9871f; color: #e0a93f; }
+      .pc-tier-toggle .tt-hover { display: none; }
+      .pc-tier-toggle:hover .tt-now { display: none; }
+      .pc-tier-toggle:hover .tt-hover { display: inline; }
+      .pc-tier-toggle.is-legacy:hover { border-color: #7BC47F; color: #7BC47F; background: rgba(123,196,127,0.12); }
+      .pc-tier-toggle.is-live:hover   { border-color: #c9871f; color: #e0a93f; background: rgba(224,169,63,0.10); }
       /* Plan card pulse when deep-linked from a LIVE-on-Stripe pill */
       .pc-sorter-glow {
         outline: 2px solid rgba(232,197,71,0.9);
@@ -16383,7 +16403,10 @@ function _sorterRenderStep1(host) {
   const priceChip = (p) => {
     const live = p.proposed_tier === 'canonical';
     const members = p.sub_count ? `${p.sub_count} member${p.sub_count === 1 ? '' : 's'}` : 'no members';
-    const tierPill = `<span onclick="event.stopPropagation();_sorterToggleTier('${escapeHTML(p.price_id)}')" title="Switch Live / Legacy" style="cursor:pointer;flex:none;font-size:9px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:6px;border:1px solid ${live ? '#7BC47F' : '#c9871f'};color:${live ? '#7BC47F' : '#e0a93f'};">${live ? 'LIVE' : 'LEGACY'}</span>`;
+    // The tier pill IS the toggle — hovering reveals what a click does.
+    const tierPill = `<span class="pc-tier-toggle ${live ? 'is-live' : 'is-legacy'}" onclick="event.stopPropagation();_sorterToggleTier('${escapeHTML(p.price_id)}')" title="${live ? 'Click to demote to Legacy' : 'Click to make this the LIVE price new signups use'}">
+      <span class="tt-now">${live ? 'LIVE' : 'LEGACY'}</span><span class="tt-hover">${live ? '→ MAKE LEGACY' : '→ MAKE LIVE'}</span>
+    </span>`;
     return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:7px 9px;margin-top:7px;background:var(--surface,#16161a);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:12px;font-weight:700;">${_sorterAmt(p.amount_cents, p.interval)}</div>
