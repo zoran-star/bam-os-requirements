@@ -21,8 +21,8 @@
 import { withSentryApiRoute } from "../_sentry.js";
 import { getClientGhlToken } from "./availability.js";
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_URL = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
+const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 const GHL_V2 = "https://services.leadconnectorhq.com";
 const V2_VERSION = "2021-07-28";
 
