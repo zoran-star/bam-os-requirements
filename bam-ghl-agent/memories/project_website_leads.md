@@ -29,8 +29,14 @@ client site form
   → creates the real GHL appointment after contact upsert (GHL handles
   confirmations/reminders). Failure degrades: lead saved, response carries
   `appointment: booked|failed`, site shows "we'll confirm by email".
-- GTA free-trial page: grade question routes Grade 5 to 8 → Group 1
-  (`Cmw4bCVBhexgi0Oi0Dkf`), Grade 9 to 12 → Group 2 (`G5y4QI0MsFq3159IhFU7`).
+- GTA free-trial page: AGE question (5 to 19) routes the calendar — 13 and
+  under → Group 1 (`Cmw4bCVBhexgi0Oi0Dkf`), 14+ → Group 2
+  (`G5y4QI0MsFq3159IhFU7`). Sends athlete_age (→ GHL "Athlete's Age"
+  numeric field) + group label. Grade was dropped 2026-06-12 (GHL grade
+  field only had options 5-9).
+- Opportunity names are PLAIN contact names (GHL-native convention) so the
+  workflows' create/update-opportunity card-search matches our card —
+  Zoran kept stage-move actions inside the GHL workflows on purpose.
 
 ## Booking Calendars panel (portal-managed availability, Jun 2026)
 - Client portal → Calendar tab → "Booking Calendars" section (above the
