@@ -11489,6 +11489,8 @@ const _bbStdOnboarding = (intakeFieldDefaults, intakeFieldAddons) => ([
     hint:'PDF + checkbox confirming what it covers (waiver, media release, refund, cancellation, etc.)' },
   { key:'onboarding_messaging', type:'text_files', label:'Onboarding messaging', required:true,
     hint:'Welcome message + prep info. Attach PDFs / videos / images.' },
+  { key:'welcome_video', type:'file', label:'Welcome video', 
+    hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
   { key:'intake_form_fields', type:'check_many_defaults', label:'Intake form fields', required:true,
     defaultOptions: intakeFieldDefaults,
     addonOptions: intakeFieldAddons },
