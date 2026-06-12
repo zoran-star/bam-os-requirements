@@ -7,6 +7,18 @@ metadata:
 
 # The Pricing Sorter (onboarding wizard)
 
+> **2026-06-12 — OFFER-CENTRIC SPLIT (PR #252).** ⭐ Everything (sales,
+> members, funnels, agents, KPIs…) is structured AROUND EACH OFFER — Training
+> offer first (Zoran, also in [[project_website_leads]]). The wizard split
+> into two homes sharing one engine (`openPricingSorter(step)` is mode-aware):
+> - **Price Match** (steps Stripe→Match) = BB → Offers → Pricing strip, with a
+>   🟢/🔴 health dot (green = prices matched). Approve & Save FINISHES the flow.
+> - **Member Import** (Import→Cleanup→Link GHL) = a strip on the MEMBERS tab,
+>   opens at the first unfinished step; Link GHL is modal step 4 (promote
+>   advances into it); `/api/members` sorter payload has `ghl_linked`.
+> The BB Member Onboarding card still launches steps 2/3 — fold/retire it in
+> the upcoming offer-centric reorg (deferred by Zoran).
+
 > **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
 > action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
 > Offers → Pricing card now ends with a **clickable progress strip** ("🧮 Stripe
