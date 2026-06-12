@@ -369,18 +369,20 @@ async function handler(req, res) {
 
       const targetClient = targetClientId ? await loadClientRow(targetClientId) : null;
 
-      // Sorter progress for the BB Pricing "Stripe Matcher" strip — three
-      // exists-checks (limit 1 each), non-fatal: a failure just renders the
-      // step as not-done.
+      // Sorter progress for the Price Match dot (BB → Offers) + the Members
+      // tab's import strip — exists-checks (limit 1 each), non-fatal: a
+      // failure just renders the step as not-done.
       let sorter = null;
       if (targetClientId) {
         const exists = (q) => sb(q).then(r => Array.isArray(r) && r.length > 0).catch(() => false);
-        const [matched, imported, promoted] = await Promise.all([
+        const [matched, imported, promoted, unlinked] = await Promise.all([
           exists(`pricing_catalog?client_id=eq.${targetClientId}&match_status=eq.confirmed&select=stripe_price_id&limit=1`),
           exists(`members_staging?client_id=eq.${targetClientId}&select=id&limit=1`),
           exists(`members_staging?client_id=eq.${targetClientId}&promoted=is.true&select=id&limit=1`),
+          exists(`members?client_id=eq.${targetClientId}&ghl_contact_id=is.null&select=id&limit=1`),
         ]);
-        sorter = { matched, imported, promoted };
+        // ghl_linked = the roster exists and every member has a GHL contact.
+        sorter = { matched, imported, promoted, ghl_linked: memberList.length > 0 && !unlinked };
       }
 
       return res.status(200).json({

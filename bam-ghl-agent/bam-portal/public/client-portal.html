@@ -7591,7 +7591,7 @@ Then the call to action."]</div>
       }
       /* Stripe Matcher progress strip (bottom of the BB Pricing card) —
          the whole strip is one click target that re-opens the matcher. */
-      #view-blueprint .bb-matcher-strip {
+      .bb-matcher-strip {
         margin-top:14px;
         border:1px solid var(--border, #2a2a31);
         border-radius:10px;
@@ -7599,7 +7599,7 @@ Then the call to action."]</div>
         cursor:pointer;
         transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
       }
-      #view-blueprint .bb-matcher-strip:hover {
+      .bb-matcher-strip:hover {
         border-color: var(--accent, #E8C547);
         background: rgba(232,197,71,0.06);
         transform: translateY(-1px);
@@ -10473,17 +10473,9 @@ async function _bbRenderOffersPricing() {
     </div>`;
 }
 
-// The "Stripe Matcher" progress strip at the bottom of the BB Pricing card.
-// Left→right step checkboxes (Stripe → Match → Import → Cleanup); the whole
-// strip is one click target that re-opens the matcher (or the Stripe connect
-// modal when not yet connected). Done-flags come from /api/members `sorter`.
-function _bbMatcherStrip(connected, sorter) {
-  const steps = [
-    ['Stripe',  connected],
-    ['Match',   !!(sorter && sorter.matched)],
-    ['Import',  !!(sorter && sorter.imported)],
-    ['Cleanup', !!(sorter && sorter.promoted)],
-  ];
+// Shared strip renderer — left→right step checkboxes, whole strip is one
+// click target. Used by Price Match (BB → Offers) and Member Import (Members).
+function _sorterStrip({ title, steps, onclick, ariaLabel, statusDot }) {
   const currentIdx = steps.findIndex(([, done]) => !done); // -1 = all done
   const cells = steps.map(([label, done], i) => {
     const current = i === currentIdx;
@@ -10496,20 +10488,39 @@ function _bbMatcherStrip(connected, sorter) {
     return `<span style="display:inline-flex;align-items:center;gap:6px;">${dot}<span style="font-size:11.5px;font-weight:${current ? '800' : '600'};color:${done ? '#7BC47F' : (current ? 'var(--text,#eee)' : 'var(--text-mute,#888)')};">${label}</span></span>${arrow}`;
   }).join('');
   const doneCount = steps.filter(([, d]) => d).length;
-  // Open at the step you're on: strip index 1/2/3 = sorter step 1/2/3
-  // (index 0 = Stripe connect; all-done reopens at step 1 for review).
-  const sorterStep = currentIdx >= 1 ? currentIdx : 1;
-  const onclick = connected ? `openPricingSorter(${sorterStep})` : 'openStripeConnectModal()';
   return `
     <div class="bb-matcher-strip" role="button" tabindex="0" onclick="${onclick}"
          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();${onclick}}"
-         aria-label="Open the Stripe Matcher">
+         aria-label="${ariaLabel}">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <span style="font-size:12.5px;font-weight:800;">🧮 Stripe Matcher</span>
+        <span style="font-size:12.5px;font-weight:800;">${statusDot || ''}${title}</span>
         <span style="font-size:11px;font-weight:700;color:var(--text-mute,#888);">${doneCount === steps.length ? '✓ all done' : doneCount + '/' + steps.length} · Open →</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">${cells}</div>
     </div>`;
+}
+
+// Price Match strip (BB → Offers → Pricing): Stripe connect + price matching
+// ONLY — member import lives in the Members section now. The green/red dot is
+// the offer's match health (green = Stripe prices matched, red = still to do).
+function _bbMatcherStrip(connected, sorter) {
+  const matched = !!(sorter && sorter.matched);
+  const steps = [['Stripe', connected], ['Match prices', matched]];
+  const onclick = connected ? 'openPricingSorter(1)' : 'openStripeConnectModal()';
+  const statusDot = `<span title="${matched ? 'Stripe prices matched' : 'Stripe prices still need matching'}" style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;background:${matched ? '#2e9e54' : '#c0392b'};"></span>`;
+  return _sorterStrip({ title: '🧮 Price Match', steps, onclick, ariaLabel: 'Open Price Match', statusDot });
+}
+
+// Member Import strip (Members tab): Import → Cleanup → Link GHL.
+function _membersImportStrip(sorter) {
+  const steps = [
+    ['Import',   !!(sorter && sorter.imported)],
+    ['Cleanup',  !!(sorter && sorter.promoted)],
+    ['Link GHL', !!(sorter && sorter.ghl_linked)],
+  ];
+  const currentIdx = steps.findIndex(([, done]) => !done);
+  const startStep = currentIdx === -1 ? 2 : currentIdx + 2; // strip index 0/1/2 = sorter step 2/3/4
+  return _sorterStrip({ title: '👥 Member Import', steps, onclick: `openPricingSorter(${startStep})`, ariaLabel: 'Open Member Import' });
 }
 
 // ── BB → Member Onboarding: GHL gate + import / cleanup / GHL-link steps ──
@@ -14447,6 +14458,7 @@ async function _safeJson(res) {
 // Members tab — list view state (module-scope so search/filter survive
 // re-renders without re-fetching).
 let _MEMBERS_ALL = [];
+let _MEMBERS_SORTER = null; // import-strip done-flags from /api/members `sorter`
 let _MEMBERS_FILTER = { q: '', status: 'all', trainer: 'all', engagement: 'all', sort: 'name' };
 let _MEMBERS_FILTER_OPEN = false;
 
@@ -14861,6 +14873,7 @@ async function fetchAndRenderMembers() {
     renderStripeConnectButton(json.stripe || { status: 'not_connected' });
     renderGhlConnectButton(json.ghl || { status: 'not_connected' });
     _MEMBERS_ALL = Array.isArray(json.members) ? json.members : [];
+    _MEMBERS_SORTER = json.sorter || null;
     _renderMembersView();
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load members — ${escapeHTML(e.message)}</div>`;
@@ -15139,12 +15152,18 @@ function _renderMembersView() {
     </div>
   `;
 
+  // Member Import strip — the members half of the old wizard (Import →
+  // Cleanup → Link GHL) lives HERE now; Price Match stays in BB → Offers.
+  // V2/web only (the import flow is a desktop onboarding tool).
+  const importStrip = (typeof V2_ACCESS !== 'undefined' && V2_ACCESS && !(typeof isNativeApp === 'function' && isNativeApp()))
+    ? _membersImportStrip(_MEMBERS_SORTER) : '';
+
   if (!all.length) {
-    container.innerHTML = '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
+    container.innerHTML = importStrip + '<div class="req-empty" style="padding:20px 0">No members yet.</div>';
     return;
   }
   if (!filtered.length) {
-    container.innerHTML = toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
+    container.innerHTML = importStrip + toolbar + '<div class="req-empty" style="padding:20px 0">No members match this filter.</div>';
     if (wasFocused) _membersRestoreSearchFocus(cursorPos);
     return;
   }
@@ -15161,7 +15180,7 @@ function _renderMembersView() {
       <div class="member-card-pills">${_memberStatusPill(m.status, m)}${_memberEngagementChip(m.engagement)}${_memberPricingPill(m.pricing)}</div>
     </div>`).join('');
 
-  container.innerHTML = toolbar + cards;
+  container.innerHTML = importStrip + toolbar + cards;
   if (wasFocused) _membersRestoreSearchFocus(cursorPos);
 }
 
@@ -16062,10 +16081,14 @@ async function applyAiMatch() {
 let _SORTER = { step: 1, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
 
 function openPricingSorter(step) {
-  // step: 1 = price match (BB → Offers), 2 = member CSV import, 3 = cleanup &
-  // promote (2/3 launched from BB → Member Onboarding). Defaults to 1.
-  const startStep = (step === 2 || step === 3) ? step : 1;
-  _SORTER = { step: startStep, batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
+  // Everything is organized AROUND THE OFFER (see memories — offer-centric
+  // structure, currently the Training offer). The engine is shared but the
+  // flows are split by home:
+  //   mode 'match'   (step 1)      → "Price Match", lives in BB → Offers
+  //   mode 'members' (steps 2/3/4) → Import / Cleanup / Link GHL, lives in
+  //                                  the Members section
+  const startStep = (step === 2 || step === 3 || step === 4) ? step : 1;
+  _SORTER = { step: startStep, mode: startStep === 1 ? 'match' : 'members', batchId: null, match: { proposals: [], targets: [] }, map: { headers: [], rows: [], mapping: [] }, staging: [], checks: null };
   const overlay = document.getElementById('pc-sorter-overlay');
   const modal = document.getElementById('pc-sorter-modal');
   if (overlay) overlay.style.display = 'block';
@@ -16083,10 +16106,17 @@ function closePricingSorter() {
 }
 
 // ── Shell: stepper header + body slot + Back/Next footer ──
+// Steps + title depend on the mode: Price Match is a one-step flow in
+// Offers; the Members flow is Import → Cleanup → Link GHL.
 function _sorterRender() {
   const modal = document.getElementById('pc-sorter-modal');
   if (!modal) return;
-  const steps = [['1', 'Match'], ['2', 'Import'], ['3', 'Cleanup']];
+  const members = _SORTER.mode === 'members';
+  const title = members ? '👥 Member Import' : '🧮 Price Match';
+  const steps = members
+    ? [['2', 'Import'], ['3', 'Cleanup'], ['4', 'Link GHL']]
+    : [['1', 'Match']];
+  const minStep = members ? 2 : 1;
   const dots = steps.map(([n, label]) => {
     const active = Number(n) === _SORTER.step;
     const done = Number(n) < _SORTER.step;
@@ -16102,13 +16132,13 @@ function _sorterRender() {
 
   modal.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="font-size:18px;font-weight:800;">🧮 Stripe Matcher</div>
+      <div style="font-size:18px;font-weight:800;">${title}</div>
       <button onclick="closePricingSorter()" style="background:none;border:none;color:var(--text-mute,#888);font-size:22px;cursor:pointer;">×</button>
     </div>
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;flex:none;">${dots}</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;flex:none;${steps.length === 1 ? 'display:none;' : ''}">${dots}</div>
     <div id="pc-sorter-body" style="overflow-y:auto;flex:1 1 auto;min-height:0;"></div>
     <div style="display:flex;gap:10px;justify-content:space-between;margin-top:14px;flex:none;background:var(--surface,#16161a);padding-top:12px;border-top:1px solid var(--border,#2a2a31);">
-      <button id="pc-sorter-back" onclick="_sorterBack()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;${_SORTER.step === 1 ? 'visibility:hidden;' : ''}">← Back</button>
+      <button id="pc-sorter-back" onclick="_sorterBack()" style="font-size:13px;padding:9px 16px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;${_SORTER.step <= minStep ? 'visibility:hidden;' : ''}">← Back</button>
       <div id="pc-sorter-next-host"></div>
     </div>`;
   _sorterRenderBody();
@@ -16120,20 +16150,25 @@ function _sorterRenderBody() {
   if (_SORTER.step === 1) _sorterRenderStep1(host);
   else if (_SORTER.step === 2) _sorterRenderStep2(host);
   else if (_SORTER.step === 3) _sorterRenderStep3(host);
+  else if (_SORTER.step === 4) _sorterRenderStep4(host);
 }
 
-// Navigate to a step (backwards from the stepper dots or the Back button).
-// Step 1's price data is lazy — if the modal was opened directly at step 2/3
-// (e.g. from the Pricing strip or Member Onboarding), going back to Match
-// needs the Stripe read it skipped on open.
+// Navigate to a step (backwards from the stepper dots or the Back button),
+// clamped to the current mode's steps. Step 1's price data is lazy — going
+// back to Match needs the Stripe read it skipped on open.
 function _sorterGoto(n) {
   if (n === _SORTER.step) return;
+  const minStep = _SORTER.mode === 'members' ? 2 : 1;
+  if (n < minStep) return;
   _SORTER.step = n;
   _sorterRender();
   if (n === 1 && !(_SORTER.match.targets || []).length) _sorterLoadStep1();
 }
 
-function _sorterBack() { if (_SORTER.step > 1) _sorterGoto(_SORTER.step - 1); }
+function _sorterBack() {
+  const minStep = _SORTER.mode === 'members' ? 2 : 1;
+  if (_SORTER.step > minStep) _sorterGoto(_SORTER.step - 1);
+}
 
 function _sorterSetNext(html) {
   const host = document.getElementById('pc-sorter-next-host');
@@ -16481,8 +16516,10 @@ async function _sorterApproveAndNext() {
       const json = await _safeJson(r);
       if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
     }
-    _SORTER.step = 2;
-    _sorterRender();
+    // Price Match is its own flow now — saving finishes it. Member import
+    // lives in the Members section, not behind this save.
+    closePricingSorter();
+    if (typeof _bbRenderOffersPricing === 'function') _bbRenderOffersPricing(); // refresh the dot
   } catch (e) {
     alert('Saving matches failed: ' + e.message);
   }
@@ -17049,11 +17086,94 @@ async function _sorterPromote() {
       try { await toggleActionItem(sorterItem.id, true); } catch (_) { /* non-fatal */ }
     }
     alert('Promoted ' + n + ' member' + (n === 1 ? '' : 's') + ' to your live roster.');
-    closePricingSorter();
     if (typeof fetchAndRenderPricing === 'function') fetchAndRenderPricing();
     if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+    // Last leg of the Members flow: link the new roster to GHL contacts.
+    _sorterGoto(4);
   } catch (e) {
     alert('Promote failed: ' + e.message);
+  }
+}
+
+// ───────────────────────────── STEP 4 — link GHL contacts ─────────────────────────────
+// Same engine as the Member Onboarding card's link step (api/sorter/link-ghl),
+// rendered inside the modal: propose by email/phone → review checkboxes → apply.
+function _sorterRenderStep4(host) {
+  host.innerHTML = `
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">Match each member to their GoHighLevel contact (by email/phone) so texts, emails and the contact sync work.</div>
+    <div id="pc-sorter-ghl-host">
+      <button onclick="_sorterRunGhlLink()" style="font-size:13px;font-weight:700;padding:9px 16px;border-radius:9px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Find GHL matches</button>
+    </div>`;
+  _sorterSetNext(`<button onclick="closePricingSorter();if(typeof fetchAndRenderMembers==='function')fetchAndRenderMembers();" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Done ✓</button>`);
+}
+
+async function _sorterRunGhlLink() {
+  const host = document.getElementById('pc-sorter-ghl-host');
+  if (!host) return;
+  host.innerHTML = _sorterLoading('Reading your GHL contacts & matching members…');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'propose' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const props = json.proposals || [], missed = json.unmatched || [];
+    if (!props.length && !missed.length) {
+      host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ ${escapeHTML(json.note || 'Every member is already linked to a GHL contact.')}</div>`;
+      return;
+    }
+    window._MO_LINKS = props; // same stash the apply path reads
+    const rows = props.map((p, i) => `
+      <label style="display:flex;align-items:center;gap:10px;border:1px solid var(--border,#2a2a31);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;">
+        <input type="checkbox" class="mo-link-cb" data-i="${i}" checked />
+        <div style="flex:1;min-width:0;font-size:12px;">
+          <b>${escapeHTML(p.athlete_name || p.parent_name || '')}</b>
+          <span style="color:var(--text-mute,#888)"> → ${escapeHTML(p.contact_name || p.ghl_contact_id)}${p.contact_email ? ' · ' + escapeHTML(p.contact_email) : ''}</span>
+        </div>
+        <span style="flex:none;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 6px;border-radius:6px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">${p.matched_by === 'email' ? '✉ EMAIL' : '☎ PHONE'}</span>
+      </label>`).join('');
+    const missedHtml = missed.length ? `
+      <div style="font-size:11px;color:#e0a93f;margin:10px 0 4px;font-weight:700;">No GHL contact found for ${missed.length}:</div>
+      ${missed.map(m => `<div style="font-size:11.5px;color:var(--text-mute,#888);padding:2px 0;">• ${escapeHTML(m.athlete_name || '')} ${m.parent_email ? '(' + escapeHTML(m.parent_email) + ')' : ''}</div>`).join('')}
+      <div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:4px;">Add them as contacts in GHL, then run this again.</div>` : '';
+    host.innerHTML = `
+      <div style="border:1px solid var(--accent,#E8C547);border-radius:12px;padding:14px 16px;">
+        <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Found ${props.length} match${props.length === 1 ? '' : 'es'} <span style="font-weight:400;color:var(--text-mute,#888);">(checked ${json.total_contacts} GHL contacts)</span></div>
+        ${rows}
+        ${props.length ? `<button onclick="_sorterApplyGhlLinks()" style="margin-top:8px;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Link checked ✓</button>` : ''}
+        ${missedHtml}
+      </div>`;
+  } catch (e) {
+    host.innerHTML = `<div style="border:1px solid #9a3b2f;border-radius:10px;padding:12px 14px;color:#e0654f;font-size:12.5px;">Matching failed — ${escapeHTML(_sorterErr(e))} <button onclick="_sorterRunGhlLink()" style="margin-left:8px;font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">Try again</button></div>`;
+  }
+}
+
+async function _sorterApplyGhlLinks() {
+  const host = document.getElementById('pc-sorter-ghl-host');
+  const chosen = [];
+  document.querySelectorAll('#pc-sorter-ghl-host .mo-link-cb').forEach(cb => {
+    if (cb.checked && window._MO_LINKS) {
+      const p = window._MO_LINKS[Number(cb.getAttribute('data-i'))];
+      if (p) chosen.push({ member_id: p.member_id, ghl_contact_id: p.ghl_contact_id });
+    }
+  });
+  if (!chosen.length) { alert('Nothing checked.'); return; }
+  if (host) host.innerHTML = _sorterLoading('Linking ' + chosen.length + ' member' + (chosen.length === 1 ? '' : 's') + '…');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/link-ghl', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'apply', links: chosen }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    if (host) host.innerHTML = `<div style="border:1px solid #1f7a3d;border-radius:10px;padding:12px 14px;color:#7BC47F;font-size:12.5px;">✓ Linked ${chosen.length} member${chosen.length === 1 ? '' : 's'} to their GHL contacts.</div>`;
+  } catch (e) {
+    if (host) host.innerHTML = `<div style="border:1px solid #9a3b2f;border-radius:10px;padding:12px 14px;color:#e0654f;font-size:12.5px;">Linking failed — ${escapeHTML(_sorterErr(e))}</div>`;
   }
 }
 
