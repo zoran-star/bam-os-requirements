@@ -1119,6 +1119,9 @@ const PROFILE_EDITABLE_FIELDS = new Set([
   "archetype", "trainer", "engagement", "skill_notes",
   "parent_email", "parent_phone", "parent_archetype", "group_num",
   "avatar_url",
+  // 'alternate' = pays outside Stripe (cash/e-transfer) — set from the member
+  // popup or the Sorter cleanup step; null/'stripe' = normal Stripe billing.
+  "billing_mode",
 ]);
 
 async function actionUpdateProfile(res, member, ctx, body) {
