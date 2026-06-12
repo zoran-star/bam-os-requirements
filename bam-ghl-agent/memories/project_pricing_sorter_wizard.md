@@ -37,6 +37,20 @@ metadata:
 > `add-from-stripe` (stage a paying member the sheet missed), `remove-staged`
 > (delete dup copy, survivor un-flagged); no-offer/tier rows deep-link to
 > Match. Fix actions return flag-derived counts (no Stripe re-pull).
+> **Cleanup round 2 (PR #237):** staged↔Stripe matching is ID-FIRST (sheet's
+> sub/customer ids beat email — fixes diff-email payers like Alain + parents
+> whose Stripe email differs). Deny system = `clients.sorter_dismissals` jsonb
+> (keys `suggestion:<staging_id>`, `stripe:<email>`, `prepaid:<email>`,
+> `dup:<email|athlete>`) — dismissed findings never resurface. New
+> `billing_mode` column on members + members_staging ('alternate' = pays
+> outside Stripe; cleanup treats as expected, member-popup has a toggle
+> button, promote carries it). Prepaid radar: one-time charges ≥$200 last
+> 120d from unknown emails → "Possible prepaid members" add/deny. No-offer
+> rows open a CONNECT POPUP (member+payments left / offer selector +
+> closest-by-amount ⭐ rec right; writes pricing_catalog mapping via
+> `connect-offer` action). Live/Legacy card removed from Cleanup (Match owns
+> it). New cleanup.js actions: dismiss, alt-payment, member-detail,
+> connect-offer.
 > ⚠️ GOTCHA (PR #224): `pricing_catalog.tier` has a CHECK constraint
 > (canonical|lil_sale|legacy_match|legacy_unknown|deprecated) — the UI's
 > Live/Legacy toggle value "legacy" is NOT valid; apply normalizes
