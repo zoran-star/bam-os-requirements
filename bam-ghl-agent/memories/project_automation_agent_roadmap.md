@@ -3,6 +3,27 @@
 Goal: replace GHL-native automations with portal-native ones; an AI sales
 agent handles replies. GHL shrinks to the messaging pipe + inbox.
 
+## V1 — SHIPPED 2026-06-12: portal enrolls into EXISTING GHL workflows
+`entry_points.ghl_workflow_id/_name`: website-form rows enroll the contact on
+form submission (booking-step skipped); calendar rows enroll on successful
+booking. GTA mapping: contact → "contact form filled in", free-trial →
+"trial form filled in", calendars → "free trial booked" (published; a draft
+duplicate exists in GHL). The GHL workflow steps (texts/waits) keep running;
+only the trigger moved to the portal. The native engine (phases below)
+replaces them later.
+
+## Per-academy setup process (repeat for every academy)
+1. Site from template → wire submitLead() with their client_id
+2. `clients.allowed_domains` += their domain(s)
+3. Seed `entry_points` rows (website forms / calendars / GHL forms) with offer_id
+4. Map pipeline + stage per entry point (portal wizard, Sales page)
+5. Optional: field_map (GHL custom field ids per form field)
+6. Set ghl_workflow_id per entry point (list via GET /workflows/?locationId)
+7. Academy edits availability in Calendar Setup (Calendar tab)
+8. THEIR GHL workflows: re-point triggers to tags, REMOVE stage-move steps
+   (the portal moves the pipeline card now — duplicate moves otherwise)
+9. KPI era flip at domain-live (website_lead_forms in ghl_kpi_config)
+
 ## Build phases
 1. **Spine** — GHL inbound-message webhook → portal (instant reply events).
    Shared by nudges + agent. No blockers.
