@@ -198,7 +198,7 @@ async function pushToGhl(locName, ghlLocationId, { name, email, phone, message, 
   // (used when a booking upgrades a form-stage lead).
   if (contactId && pipelineConfig?.pipeline && pipelineConfig?.stage) {
     try {
-      await placeOpportunity(headers, ghlLocationId, contactId, pipelineConfig, `${name || email} - website ${formType || "contact"}`, false);
+      await placeOpportunity(headers, ghlLocationId, contactId, pipelineConfig, `${name || email}`, false);
     } catch (e) { console.error("GHL pipeline step failed (non-fatal):", e.message); }
   }
 
@@ -392,7 +392,7 @@ async function handler(req, res) {
             await placeOpportunity(
               oauthHeaders, client.ghl_location_id, receipt.ghl_contact_id,
               { pipeline: calEp.pipeline_name, stage: calEp.stage_name },
-              `${name || email} - website ${form_type}`, true
+              `${name || email}`, true
             );
           } catch (e) { console.error("Booking stage advance failed (non-fatal):", e.message); }
         }
