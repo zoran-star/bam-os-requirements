@@ -283,6 +283,24 @@ async function buildOfferTargets(clientId) {
 }
 
 async function handler(req, res) {
+  // GET = light match-health read (no Stripe, no AI): the catalog's offer
+  // linkage rows, used by the Offers UI to paint LIVE-on-Stripe pills.
+  if (req.method === "GET") {
+    try {
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error("Supabase env not configured");
+      const ctx = await resolveUser(req);
+      const clientId = (req.query && req.query.client_id) || ctx.clientIds[0];
+      if (!clientId) return res.status(400).json({ error: "client_id required" });
+      if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
+      const rows = await sb(
+        `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
+        `&offer_price_key=not.is.null&select=offer_id,offer_price_key,tier,match_status`
+      ) || [];
+      return res.status(200).json({ ok: true, rows });
+    } catch (e) {
+      return res.status((e && e.status) || 500).json({ error: (e && e.message) || String(e) });
+    }
+  }
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error("Supabase env not configured");
