@@ -1914,17 +1914,22 @@ async function handleGhlKpisMonthly(req, res) {
   const overrideMap = new Map(overrides.map(o => [String(o.from || ""), o]));
   const defForms = Array.isArray(cfg.lead_form_ids) ? cfg.lead_form_ids : [];
   const defCals = Array.isArray(cfg.booking_calendar_ids) ? cfg.booking_calendar_ids : [];
+  // website_lead_forms: form_type keys of website forms (entry_points) whose
+  // submissions count as leads for the month — the post-GHL-forms era.
+  const defWebForms = Array.isArray(cfg.website_lead_forms) ? cfg.website_lead_forms : [];
   const effectiveFor = (monthKey) => {
     const chosen = overrideMap.get(monthKey);
     return chosen
       ? { from: chosen.from, forms: chosen.lead_form_ids || [], cals: chosen.booking_calendar_ids || [],
+          webForms: chosen.website_lead_forms || [],
           formNames: chosen.lead_form_names || [], calNames: chosen.booking_calendar_names || [] }
-      : { from: null, forms: defForms, cals: defCals, formNames: cfg.lead_form_names || [], calNames: cfg.booking_calendar_names || [] };
+      : { from: null, forms: defForms, cals: defCals, webForms: defWebForms, formNames: cfg.lead_form_names || [], calNames: cfg.booking_calendar_names || [] };
   };
   for (const b of buckets) {
     b._eff = effectiveFor(b.key);
     b._formSet = new Set(b._eff.forms);
     b._calSet = new Set(b._eff.cals);
+    b._webFormSet = new Set(b._eff.webForms);
   }
 
   let events = [];
@@ -1942,8 +1947,14 @@ async function handleGhlKpisMonthly(req, res) {
     if (!b) continue;
     const k = key(e);
     if (e.event_type === "lead") {
-      // Count only forms tied to this month (empty set = count all).
-      if (b._formSet.size === 0 || (e.raw && b._formSet.has(e.raw.formId))) b._sets.lead.add(k);
+      // Website-form leads (raw.websiteForm) count only when the month's era
+      // selects them; GHL-form leads keep the existing formId filter. This is
+      // what keeps KPIs continuous across the GHL-forms → website cutover.
+      if (e.raw && e.raw.websiteForm) {
+        if (b._webFormSet.has(e.raw.websiteForm)) b._sets.lead.add(k);
+      } else if (b._formSet.size === 0 || (e.raw && b._formSet.has(e.raw.formId))) {
+        b._sets.lead.add(k);
+      }
     } else if (e.event_type === "trial") {
       if (b._calSet.size === 0 || (e.raw && b._calSet.has(e.raw.calendarId))) b._sets.trial.add(k);
     } else if (e.event_type === "client_new") { b._sets.client_new.add(k); b._sets.all.add(k); }

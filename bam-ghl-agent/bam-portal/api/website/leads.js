@@ -321,12 +321,14 @@ async function handler(req, res) {
   } catch (e) { console.error("entry_points lookup failed (non-fatal):", e.message); }
 
   let ghlStatus = "not-configured";
+  let kpiContactId = null;
   if (ghlLocName && client.ghl_location_id) {
     let receipt;
     try {
       const ghlContactId = await pushToGhl(ghlLocName, client.ghl_location_id, { name, email, phone, message, messageFieldId, formType: form_type, pipelineConfig, extraTags, fields, fieldMap });
       if (ghlContactId) {
         ghlStatus = "synced";
+        kpiContactId = ghlContactId;
         receipt = { ghl_contact_id: ghlContactId, ghl_synced_at: new Date().toISOString(), ghl_error: null };
       } else {
         ghlStatus = "failed";
@@ -406,11 +408,37 @@ async function handler(req, res) {
     }
 
     if (appointmentStatus) {
+      await recordKpiLeadEvent(client.id, leadId, form_type, fields, { name, email, phone, contactId: kpiContactId });
       return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus, appointment: appointmentStatus });
     }
   }
 
+  await recordKpiLeadEvent(client.id, leadId, form_type, fields, { name, email, phone, contactId: kpiContactId });
   return res.status(200).json({ ok: true, id: leadId, ghl: ghlStatus });
+}
+
+// KPI continuity: website leads land in ghl_funnel_events (raw.websiteForm)
+// so the monthly KPI reader can count them once an era selects website forms
+// (the post-GHL-native-forms world). Booking-step submissions are skipped —
+// the form-step row already counted that person.
+async function recordKpiLeadEvent(clientId, leadId, formType, fields, { name, email, phone, contactId }) {
+  if (fields?.step === "booking") return;
+  try {
+    await sbReq("ghl_funnel_events?on_conflict=event_type,ref", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({
+        client_id: clientId,
+        event_type: "lead",
+        contact_id: contactId || null,
+        contact_email: email ? email.toLowerCase() : null,
+        contact_phone: phone || null,
+        ref: `weblead:${leadId}`,
+        occurred_at: new Date().toISOString(),
+        raw: { websiteForm: formType, leadId, name: name || null },
+      }),
+    });
+  } catch (e) { console.error("KPI lead event insert failed (non-fatal):", e.message); }
 }
 
 export default withSentryApiRoute(handler);

@@ -6710,11 +6710,29 @@ Then the call to action."]</div>
 
       /* ── Entry Points rail: its own panel, divided from the board ── */
       #view-pipelines .pl-layout { display:flex; gap:0; align-items:stretch; }
-      #view-pipelines .pl-layout > #pl-board-container {
-        flex:1; min-width:0;
-        border-left:1px solid var(--border);
-        padding-left:22px; margin-left:22px;
+      #view-pipelines .pl-layout > #pl-board-container { flex:1; min-width:0; padding-left:16px; }
+      #view-pipelines .pl-divider {
+        flex:0 0 18px; margin:0 2px 0 14px; cursor:pointer; position:relative;
+        border-left:2px dotted var(--green); display:flex; align-items:center; justify-content:center;
       }
+      #view-pipelines .pl-divider:hover { border-left-color:#7DE99C; }
+      #view-pipelines .pl-divider-chev {
+        position:sticky; top:200px; background:var(--surface); border:1px solid var(--green);
+        color:var(--green); border-radius:50%; width:22px; height:22px; font-size:10px;
+        display:flex; align-items:center; justify-content:center; margin-left:-12px;
+      }
+      #view-pipelines .pl-layout.rail-collapsed .pl-rail { display:none; }
+      #view-pipelines .pl-layout.rail-collapsed .pl-divider { margin-left:0; }
+      #view-pipelines .pl-ep-more {
+        background:none; border:1px dashed var(--border); border-radius:10px; color:var(--text-mute);
+        padding:9px 12px; font-size:12px; font-weight:600; cursor:pointer; text-align:left; font-family:inherit;
+        display:flex; justify-content:space-between; align-items:center; gap:8px;
+      }
+      #view-pipelines .pl-ep-more:hover { color:var(--text); border-color:var(--text-mute); }
+      #view-pipelines .pl-ep-more-chev { transition:transform 160ms; display:inline-block; }
+      #view-pipelines .pl-ep-more.open .pl-ep-more-chev { transform:rotate(180deg); }
+      #view-pipelines #pl-entry-more { display:none; flex-direction:column; gap:8px; }
+      #view-pipelines #pl-entry-more.open { display:flex; }
       #view-pipelines .pl-rail {
         flex:0 0 248px; display:flex; flex-direction:column; gap:8px;
         background:rgba(255,255,255,0.02);
@@ -6745,6 +6763,7 @@ Then the call to action."]</div>
       #view-pipelines .pl-ep.blocked .pl-ep-dot { background:var(--text-mute); }
       @media (max-width: 900px) {
         #view-pipelines .pl-layout { flex-direction:column; }
+        #view-pipelines .pl-divider { display:none; }
         #view-pipelines .pl-rail { flex:1 1 auto; width:100%; display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; }
         #view-pipelines .pl-rail-head, #view-pipelines .pl-rail-sub { grid-column:1/-1; }
         #view-pipelines .pl-layout > #pl-board-container {
@@ -6808,6 +6827,9 @@ Then the call to action."]</div>
             <div class="pl-rail-sub">Where leads come from. Separate from the pipeline board.</div>
             <div id="pl-entry-list"><div class="pl-empty">Loading…</div></div>
           </aside>
+          <div class="pl-divider" onclick="plToggleRail()" title="Collapse entry points">
+            <span class="pl-divider-chev" id="pl-divider-chev">&#10094;</span>
+          </div>
           <div id="pl-board-container">
             <div class="req-empty" style="padding:20px 0">Loading pipelines…</div>
           </div>
@@ -15202,7 +15224,7 @@ function _renderEntryRail() {
     host.innerHTML = '<div class="pl-empty">No entry points yet.</div>';
     return;
   }
-  host.innerHTML = _EP_DATA.map(ep => {
+  const card = (ep) => {
     const off = ep.enabled === false;
     const connected = !off && !!(ep.pipeline_name && ep.stage_name);
     const status = off
@@ -15215,7 +15237,35 @@ function _renderEntryRail() {
       <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
       <div class="pl-ep-status">${status}</div>
     </div>`;
-  }).join('');
+  };
+  const isSetUp = (ep) => ep.enabled !== false && !!(ep.pipeline_name && ep.stage_name);
+  const top = _EP_DATA.filter(isSetUp);
+  const rest = _EP_DATA.filter(ep => !isSetUp(ep));
+  let html = top.map(card).join('');
+  if (rest.length) {
+    html += `<button class="pl-ep-more ${_EP_MORE_OPEN ? 'open' : ''}" onclick="_epToggleMore()">
+      <span>Not set up (${rest.length})</span><span class="pl-ep-more-chev">&#9662;</span>
+    </button>
+    <div id="pl-entry-more" class="${_EP_MORE_OPEN ? 'open' : ''}">${rest.map(card).join('')}</div>`;
+  }
+  host.innerHTML = html;
+}
+
+let _EP_MORE_OPEN = false;
+function _epToggleMore() {
+  _EP_MORE_OPEN = !_EP_MORE_OPEN;
+  document.querySelector('#view-pipelines .pl-ep-more')?.classList.toggle('open', _EP_MORE_OPEN);
+  document.getElementById('pl-entry-more')?.classList.toggle('open', _EP_MORE_OPEN);
+}
+
+function plToggleRail() {
+  const layout = document.querySelector('#view-pipelines .pl-layout');
+  if (!layout) return;
+  const collapsed = layout.classList.toggle('rail-collapsed');
+  const chev = document.getElementById('pl-divider-chev');
+  if (chev) chev.innerHTML = collapsed ? '&#10095;' : '&#10094;';
+  const div = document.querySelector('#view-pipelines .pl-divider');
+  if (div) div.title = collapsed ? 'Expand entry points' : 'Collapse entry points';
 }
 
 function _epOpenWizard(id) {
