@@ -379,28 +379,38 @@ async function handler(req, res) {
         const matchedAll = (async () => {
           try {
             const offers = await sb(`offers?client_id=eq.${targetClientId}&status=neq.archived&select=data`);
-            const keys = [];
+            const HST = 1.13;
+            const cents = (n) => Math.round(n * 100);
+            const keys = []; // { key, base_cents, allin_cents }
             for (const o of (offers || [])) {
               for (const off of ((o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [])) {
                 if (String(off.type || "").toLowerCase() !== "membership") continue;
                 const title = String(off.title || "").trim();
                 if (!title) continue;
-                if (!isNaN(parseFloat(off.price))) keys.push(`${title}|monthly`);
+                const base = parseFloat(off.price);
+                if (!isNaN(base)) keys.push({ key: `${title}|monthly`, base_cents: cents(base), allin_cents: cents(base * HST) });
                 for (const c of (off.commitments || [])) {
                   const t = String(c.length || "").toLowerCase();
                   const term = (/3\s*month/.test(t) || /\b12\s*week/.test(t)) ? "3_months"
                     : ((/6\s*month/.test(t) || /\b24\s*week/.test(t)) ? "6_months" : null);
-                  if (term && !isNaN(parseFloat(c.price))) keys.push(`${title}|${term}`);
+                  const cb = parseFloat(c.price);
+                  if (term && !isNaN(cb)) keys.push({ key: `${title}|${term}`, base_cents: cents(cb), allin_cents: cents(cb * HST) });
                 }
               }
             }
             if (!keys.length) return false;
             const rows = await sb(
               `pricing_catalog?client_id=eq.${targetClientId}&tier=eq.canonical&match_status=eq.confirmed` +
-              `&offer_price_key=not.is.null&select=offer_price_key`
+              `&offer_price_key=not.is.null&select=offer_price_key,amount_cents`
             );
-            const live = new Set((rows || []).map(r => r.offer_price_key));
-            return keys.every(k => live.has(k));
+            const liveAmt = new Map((rows || []).map(r => [r.offer_price_key, r.amount_cents]));
+            // Covered AND not drifted: a live price exists whose amount still
+            // matches the offer (base or HST all-in).
+            return keys.every(k => {
+              if (!liveAmt.has(k.key)) return false;
+              const amt = liveAmt.get(k.key);
+              return amt == null || amt === k.base_cents || amt === k.allin_cents;
+            });
           } catch (_) { return false; }
         })();
         const [matched, imported, promoted, unlinked] = await Promise.all([
