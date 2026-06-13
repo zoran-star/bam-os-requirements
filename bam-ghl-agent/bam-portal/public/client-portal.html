@@ -10539,11 +10539,15 @@ function _bbPlanKeys(offering) {
   if (!offering || String(offering.type || '').toLowerCase() !== 'membership') return [];
   const title = String(offering.title || '').trim();
   if (!title) return [];
-  const keys = [];
-  if (!isNaN(parseFloat(offering.price))) keys.push(`${title}|monthly`);
+  const HST = 1.13;
+  const cents = (n) => Math.round(n * 100);
+  const keys = []; // { key, base_cents, allin_cents } — amounts power drift detection
+  const base = parseFloat(offering.price);
+  if (!isNaN(base)) keys.push({ key: `${title}|monthly`, base_cents: cents(base), allin_cents: cents(base * HST) });
   for (const c of (offering.commitments || [])) {
     const term = _bbTermFromLength(c.length);
-    if (term && !isNaN(parseFloat(c.price))) keys.push(`${title}|${term}`);
+    const cb = parseFloat(c.price);
+    if (term && !isNaN(cb)) keys.push({ key: `${title}|${term}`, base_cents: cents(cb), allin_cents: cents(cb * HST) });
   }
   return keys;
 }
@@ -10552,50 +10556,64 @@ function _bbOfferPlanKeys(offer) {
   return offerings.flatMap(_bbPlanKeys);
 }
 
-// Placeholder pill carrying its keys; fills in via _bbApplyLivePills().
-// Clicking a pill deep-links into Price Match with the missing plans glowing.
+// Placeholder pill carrying its keys + expected amounts; fills in via
+// _bbApplyLivePills(). Clicking deep-links into Price Match with the
+// missing/drifted plans glowing.
 function _bbLivePill(keys) {
   if (!keys || !keys.length) return '';
   // Fill in right after this render settles (idempotent; fetches once).
   setTimeout(_bbApplyLivePills, 0);
-  return `<span class="bb-live-pill" data-bb-live-pill="${_bbEscapeAttr(keys.join(','))}" onclick="event.stopPropagation();_bbPillFix(this)" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
+  const ks = keys.map(k => k.key).join(',');
+  const amts = keys.map(k => `${k.base_cents}:${k.allin_cents}`).join(',');
+  return `<span class="bb-live-pill" data-bb-live-pill="${_bbEscapeAttr(ks)}" data-bb-live-amts="${_bbEscapeAttr(amts)}" onclick="event.stopPropagation();_bbPillFix(this)" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
 }
 
-// Pill click → open Price Match and spotlight the plans that aren't live yet.
-function _bbPillFix(el) {
+// Per-pill verdict: which keys are MISSING a live price, which have DRIFTED
+// (live amount no longer matches the offer's base or HST all-in price).
+function _bbPillVerdict(el) {
   const keys = (el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean);
-  let missing = keys;
-  if (_BB_MATCH_HEALTH) {
-    const liveSet = new Set(_BB_MATCH_HEALTH
-      .filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && r.offer_price_key)
-      .map(r => r.offer_price_key));
-    const m = keys.filter(k => !liveSet.has(k));
-    if (m.length) missing = m;
-  }
+  const amts = (el.getAttribute('data-bb-live-amts') || '').split(',');
+  const liveAmt = new Map((_BB_MATCH_HEALTH || [])
+    .filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && r.offer_price_key)
+    .map(r => [r.offer_price_key, r.amount_cents]));
+  const missing = [], drifted = [];
+  keys.forEach((k, i) => {
+    if (!liveAmt.has(k)) { missing.push(k); return; }
+    const amt = liveAmt.get(k);
+    const pair = (amts[i] || '').split(':');
+    const base = Number(pair[0]), allin = Number(pair[1]);
+    if (amt != null && base && allin && amt !== base && amt !== allin) drifted.push(k);
+  });
+  return { keys, missing, drifted };
+}
+
+// Pill click → open Price Match and spotlight the plans needing attention.
+function _bbPillFix(el) {
+  const v = _BB_MATCH_HEALTH ? _bbPillVerdict(el) : null;
+  const focus = v && (v.missing.length || v.drifted.length) ? v.missing.concat(v.drifted) : ((el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean));
   openPricingSorter(1);
-  _SORTER.highlightKeys = missing;
+  _SORTER.highlightKeys = focus;
 }
 
 function _bbApplyLivePills() {
   if (!_BB_MATCH_HEALTH) { _bbLoadMatchHealth(); return; }
-  const liveSet = new Set(_BB_MATCH_HEALTH
-    .filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && r.offer_price_key)
-    .map(r => r.offer_price_key));
   document.querySelectorAll('[data-bb-live-pill]').forEach(el => {
-    const keys = (el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean);
+    const { keys, missing, drifted } = _bbPillVerdict(el);
     if (!keys.length) return;
-    const live = keys.filter(k => liveSet.has(k)).length;
-    // Broken pills wear their own call-to-action — "fix →" makes the click obvious.
-    let label, color;
-    if (live === keys.length) { label = '● LIVE on Stripe'; color = '#7BC47F'; }
-    else if (live === 0)      { label = '● no live Stripe price · fix →'; color = '#e0654f'; }
-    else                      { label = `● ${live}/${keys.length} live · fix →`; color = '#e0a93f'; }
+    const live = keys.length - missing.length;
+    // Broken pills wear their own call-to-action — the click is the fix.
+    let label, color, title;
+    if (missing.length === keys.length) { label = '● no live Stripe price · fix →'; color = '#e0654f'; }
+    else if (missing.length)            { label = `● ${live}/${keys.length} live · fix →`; color = '#e0a93f'; }
+    else if (drifted.length)            { label = '● price changed · update →'; color = '#e0a93f'; title = 'The offer price changed — the LIVE Stripe price still bills the old amount. Click to create the updated price.'; }
+    else                                { label = '● LIVE on Stripe'; color = '#7BC47F'; }
     el.textContent = label;
     el.style.color = color;
     el.style.borderColor = color;
-    el.classList.toggle('needs-fix', live !== keys.length);
-    el.title = live === keys.length ? 'Every price here has a Live Stripe price matched'
-      : 'Click to fix in Price Match — link or create the Live Stripe price';
+    el.classList.toggle('needs-fix', !!(missing.length || drifted.length));
+    el.title = title || (!missing.length && !drifted.length
+      ? 'Every price here has a Live Stripe price matched'
+      : 'Click to fix in Price Match — link or create the Live Stripe price');
   });
 }
 
@@ -16434,12 +16452,20 @@ function _sorterRenderStep1(host) {
     const dropdown = unassigned.length
       ? `<select onchange="if(this.value)_sorterAssign(this.value,'${escapeHTML(t.key)}')" style="margin-top:8px;width:100%;padding:7px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12px;cursor:pointer;"><option value="">+ Input lost price…</option>${opts}</select>`
       : '';
-    // No LIVE price on this plan (even if legacy ones are attached) → it
-    // can't sell. Offer the create path whenever the canonical slot is empty.
-    const createBtn = liveChips.length ? '' :
-      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:8px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create ${mine.length ? 'a LIVE price' : 'this price'} in Stripe</button>`;
+    // Price drift: the LIVE price no longer bills what the offer says
+    // (matches neither pre-tax nor HST all-in) — the offer price was edited.
+    const liveAmtChip = liveChips.length ? liveChips[0] : null;
+    const drifted = !!(liveAmtChip && liveAmtChip.amount_cents != null && t.base_cents && t.allin_cents
+      && liveAmtChip.amount_cents !== t.base_cents && liveAmtChip.amount_cents !== t.allin_cents);
+    // No LIVE price (even with legacy attached) OR a drifted one → offer the
+    // create path. Creating a new price auto-demotes the old LIVE to legacy.
+    const createBtn = (liveChips.length && !drifted) ? '' :
+      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:8px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create ${drifted ? 'the updated price' : (mine.length ? 'a LIVE price' : 'this price')} in Stripe</button>`;
+    const driftHint = drifted
+      ? `<div style="font-size:10.5px;color:#e0a93f;margin-top:3px;">⚠ Price changed: LIVE bills <b>${_sorterAmt(liveAmtChip.amount_cents, liveAmtChip.interval)}</b> but the offer now says <b>$${(t.base_cents / 100).toFixed(0)}</b> ($${(t.allin_cents / 100).toFixed(2)} w/ HST). Create the updated price — members on the old one are grandfathered.</div>`
+      : '';
     const emptyHint = mine.length
-      ? (liveChips.length ? '' : `<div style="font-size:10.5px;color:#e0a93f;margin-top:3px;">⚠ Only legacy prices here — no LIVE price for new signups yet.</div>`)
+      ? (liveChips.length ? driftHint : `<div style="font-size:10.5px;color:#e0a93f;margin-top:3px;">⚠ Only legacy prices here — no LIVE price for new signups yet.</div>`)
       : `<div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:3px;">Drag a price here, pick one below, or create it.</div>`;
     return `<div class="pc-sorter-left" data-key="${escapeHTML(t.key)}"
         ondragover="_sorterDragOver(event)" ondragleave="_sorterDragLeave(event)" ondrop="_sorterDrop(event,'${escapeHTML(t.key)}')"
@@ -16455,10 +16481,18 @@ function _sorterRenderStep1(host) {
 
   const createPlan = `<div onclick="_sorterGotoOffers()" title="Go to Offers to add a plan" style="border:1px dashed var(--accent,#E8C547);border-radius:10px;padding:12px;margin-top:2px;text-align:center;color:var(--accent,#E8C547);font-size:12.5px;font-weight:700;cursor:pointer;background:rgba(232,197,71,0.05);">+ Create a new plan in Offers ↗</div>`;
 
-  // Done ≠ "the pool is empty" — done = EVERY plan has a LIVE price. Plans
-  // with only legacy (or nothing) still need a canonical price created.
-  const liveKeys = new Set(props.filter(p => p.proposed_offer_price_key && p.proposed_tier === 'canonical').map(p => p.proposed_offer_price_key));
-  const missingLive = targets.filter(t => !liveKeys.has(t.key));
+  // Done ≠ "the pool is empty" — done = EVERY plan has a LIVE price AT the
+  // offer's current amount. Missing = no canonical at all; drifted = the
+  // canonical bills an amount the offer no longer says.
+  const liveByKey2 = new Map();
+  props.forEach(p => { if (p.proposed_offer_price_key && p.proposed_tier === 'canonical' && !liveByKey2.has(p.proposed_offer_price_key)) liveByKey2.set(p.proposed_offer_price_key, p); });
+  const missingLive = targets.filter(t => !liveByKey2.has(t.key));
+  const driftedLive = targets.filter(t => {
+    const lc = liveByKey2.get(t.key);
+    return !!(lc && lc.amount_cents != null && t.base_cents && t.allin_cents
+      && lc.amount_cents !== t.base_cents && lc.amount_cents !== t.allin_cents);
+  });
+  const needsAttention = missingLive.concat(driftedLive);
 
   // RIGHT: the pool of still-unassigned Stripe prices (draggable).
   const rightCards = unassigned.length ? unassigned.map(p => {
@@ -16469,13 +16503,16 @@ function _sorterRenderStep1(host) {
       <div style="font-weight:700;font-size:13px;">${_sorterAmt(p.amount_cents, p.interval)} · ${escapeHTML(p.name || p.price_id)}</div>
       <div style="font-size:10.5px;color:var(--text-mute,#888);">${members} · drag onto a plan →</div>
     </div>`;
-  }).join('') : (missingLive.length
-    ? `<div style="font-size:12.5px;padding:8px 0;color:#e0a93f;">Every Stripe price is placed — but <b>${missingLive.length} plan${missingLive.length === 1 ? '' : 's'} still ${missingLive.length === 1 ? 'has' : 'have'} no LIVE price</b>:</div>`
-      + missingLive.map(t => `<div onclick="(function(){var el=document.querySelector('.pc-sorter-left[data-key=&quot;'+CSS.escape('${escapeHTML(t.key)}')+'&quot;]');if(el){el.classList.add('pc-sorter-glow');el.scrollIntoView({behavior:'smooth',block:'center'});}})()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #c9871f;border-radius:9px;padding:8px 11px;margin-bottom:7px;cursor:pointer;" title="Show this plan">
+  }).join('') : (needsAttention.length
+    ? `<div style="font-size:12.5px;padding:8px 0;color:#e0a93f;">Every Stripe price is placed — but <b>${needsAttention.length} plan${needsAttention.length === 1 ? '' : 's'} need${needsAttention.length === 1 ? 's' : ''} attention</b>:</div>`
+      + needsAttention.map(t => {
+        const isDrift = driftedLive.includes(t);
+        return `<div onclick="(function(){var el=document.querySelector('.pc-sorter-left[data-key=&quot;'+CSS.escape('${escapeHTML(t.key)}')+'&quot;]');if(el){el.classList.add('pc-sorter-glow');el.scrollIntoView({behavior:'smooth',block:'center'});}})()" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #c9871f;border-radius:9px;padding:8px 11px;margin-bottom:7px;cursor:pointer;" title="Show this plan">
           <span style="font-size:12px;font-weight:700;">${escapeHTML(t.label || t.key)}</span>
-          <span style="font-size:10px;color:#e0a93f;">✨ create it on the plan card →</span>
-        </div>`).join('')
-    : `<div style="color:#7BC47F;font-size:12.5px;padding:8px 0;">✓ Every Stripe price is assigned and every plan has a LIVE price.</div>`);
+          <span style="font-size:10px;color:#e0a93f;">${isDrift ? '⚠ price changed — update it →' : '✨ create it on the plan card →'}</span>
+        </div>`;
+      }).join('')
+    : `<div style="color:#7BC47F;font-size:12.5px;padding:8px 0;">✓ Every Stripe price is assigned and every plan has a LIVE price at the current amount.</div>`);
 
   // Layout: the two columns fill the modal body's height. The LEFT plans list
   // scrolls on its own; the RIGHT is a docked "platform" tray (own surface,
@@ -16497,8 +16534,8 @@ function _sorterRenderStep1(host) {
               <span style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">Live Stripe prices</span>
               ${unassigned.length
                 ? `<span style="font-size:10px;font-weight:800;color:var(--accent,#E8C547);border:1px solid var(--accent,#E8C547);border-radius:999px;padding:2px 9px;">${unassigned.length} to place</span>`
-                : (missingLive.length
-                  ? `<span style="font-size:10px;font-weight:800;color:#e0a93f;border:1px solid #c9871f;border-radius:999px;padding:2px 9px;">⚠ ${missingLive.length} plan${missingLive.length === 1 ? '' : 's'} need a LIVE price</span>`
+                : (needsAttention.length
+                  ? `<span style="font-size:10px;font-weight:800;color:#e0a93f;border:1px solid #c9871f;border-radius:999px;padding:2px 9px;">⚠ ${needsAttention.length} plan${needsAttention.length === 1 ? '' : 's'} need${needsAttention.length === 1 ? 's' : ''} attention</span>`
                   : `<span style="font-size:10px;font-weight:800;color:#7BC47F;">✓ all live</span>`)}
             </div>
             <div style="flex:1;min-height:0;overflow-y:auto;padding-right:4px;">${rightCards}</div>
