@@ -384,6 +384,7 @@ async function handler(req, res) {
             const keys = []; // { key, base_cents, allin_cents }
             for (const o of (offers || [])) {
               for (const off of ((o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [])) {
+                if (off.archived) continue;
                 if (String(off.type || "").toLowerCase() !== "membership") continue;
                 const title = String(off.title || "").trim();
                 if (!title) continue;
