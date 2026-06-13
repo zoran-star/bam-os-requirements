@@ -11499,6 +11499,21 @@ const _bbCommonExtraNotes = {
   hint:'Anything else about this section we should know'
 };
 
+// Discount codes — multiple rows, each a code + % or $ off, removable. Feeds
+// Price Match's "create discount codes in Stripe" (Coupon + Promotion Code).
+const _bbDiscountCodesField = {
+  key:'discount_codes', type:'block_builder', label:'Discount codes',
+  addLabel:'discount code',
+  collapsible:true,
+  summaryKeys:['code','kind','value'],
+  hint:'Codes customers enter at checkout — each is a percent or dollar discount. Create them in Stripe from Price Match.',
+  subFields:[
+    { key:'code', type:'text', label:'Code', required:true, hint:'What customers type, e.g. SIBLING10 (letters/numbers)' },
+    { key:'kind', type:'check_one', label:'Type', required:true, options:['Percent off','Dollar off'] },
+    { key:'value', type:'number', label:'Amount', required:true, hint:'e.g. 10 = 10% off (Percent) or $10 off (Dollar)' },
+  ],
+};
+
 // Pricing section is similar across most types (Training as ref).
 // Clients can offer multiple pricing options on the same offer
 // (e.g. a Membership AND a Package). Each pricing option is a row.
@@ -11564,8 +11579,7 @@ const _bbStdPricing = [
       { key:'price', type:'currency', label:'Price' },
       { key:'description', type:'textarea', label:'Description' }
     ] },
-  { key:'discount_codes', type:'text', label:'Discount codes',
-    hint:'e.g. "Sibling discount → 2SIBLING"' },
+  _bbDiscountCodesField,
   _bbCommonExtraNotes
 ];
 
@@ -13200,7 +13214,7 @@ const _bbTeamSubsections = [
       options:['Full upfront','Monthly installments','Custom'] },
     { key:'addons', type:'textarea', label:'Add-ons',
       hint:'Uniforms, travel, tournament fees, gear bundles' },
-    { key:'discount_codes', type:'text', label:'Discount codes' },
+    _bbDiscountCodesField,
     _bbTeamExtraNotes('pricing')
   ]},
   { id:'onboarding', label:'Onboarding', fields:[
@@ -16635,9 +16649,12 @@ function _sorterRenderStep1(host) {
           </div>
         </div>
       </div>
+      <div id="pc-sorter-discounts" style="margin-top:18px;"></div>
     </div>`;
 
   _sorterSetNext(`<button onclick="_sorterApproveAndNext()" style="font-size:13px;font-weight:700;padding:9px 18px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; Save matches →</button>`);
+
+  _sorterLoadDiscounts();
 
   // Deep-linked from a LIVE pill? Spotlight the plans that need fixing.
   // (Only once the plan cards actually exist — the first render happens
@@ -16830,6 +16847,99 @@ async function _sorterApplyMissing(slotId) {
     } else {
       alert('Create price failed: ' + _sorterErr(e));
     }
+  }
+}
+
+// ── Discount codes panel (Price Match) — mirror the offer's codes into Stripe ──
+// Reads discount_codes from the academy's offers, checks which already exist as
+// Stripe promotion codes, and creates the missing ones (Coupon + Promo Code).
+let _SORTER_DISCOUNTS = null; // { codes:[{code,kind,value}], live:Set<UPPER> }
+
+async function _sorterLoadDiscounts() {
+  const host = document.getElementById('pc-sorter-discounts');
+  if (!host) return;
+  host.innerHTML = '';
+  try {
+    // Collect discount codes from every non-archived offer's pricing section.
+    const { data: offers } = await _sb.from('offers').select('data,status').eq('client_id', _aiClientId());
+    const seen = new Map();
+    (offers || []).forEach(o => {
+      if (o.status === 'archived') return;
+      ((o.data && o.data.pricing && o.data.pricing.discount_codes) || []).forEach(d => {
+        if (d && d.code && !d.archived) {
+          const k = String(d.code).trim().toUpperCase();
+          if (k && !seen.has(k)) seen.set(k, { code: String(d.code).trim(), kind: d.kind, value: d.value });
+        }
+      });
+    });
+    const codes = [...seen.values()];
+    if (!codes.length) return; // nothing to show
+    // Which already live in Stripe?
+    let live = new Set();
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/offers/create-discount?client_id=' + encodeURIComponent(_aiClientId()), {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      const json = await _safeJson(r);
+      if (r.ok) live = new Set((json.codes || []).map(c => String(c.code).toUpperCase()));
+    } catch (_) {}
+    _SORTER_DISCOUNTS = { codes, live };
+    _sorterRenderDiscounts();
+  } catch (_) { /* non-fatal — panel just stays hidden */ }
+}
+
+function _sorterRenderDiscounts() {
+  const host = document.getElementById('pc-sorter-discounts');
+  if (!host || !_SORTER_DISCOUNTS) return;
+  const { codes, live } = _SORTER_DISCOUNTS;
+  const missing = codes.filter(c => !live.has(c.code.toUpperCase()));
+  const fmt = (c) => /percent|%/i.test(String(c.kind || '')) ? `${c.value}% off` : `$${c.value} off`;
+  const rows = codes.map(c => {
+    const inStripe = live.has(c.code.toUpperCase());
+    return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:8px 11px;margin-bottom:7px;">
+      <span style="font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace;">${escapeHTML(c.code)}</span>
+      <span style="font-size:11px;color:var(--text-mute,#888);">${escapeHTML(fmt(c))}</span>
+      <span style="margin-left:auto;font-size:9.5px;font-weight:800;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid ${inStripe ? '#1f7a3d' : '#c9871f'};color:${inStripe ? '#7BC47F' : '#e0a93f'};">${inStripe ? '✓ IN STRIPE' : 'NOT CREATED'}</span>
+    </div>`;
+  }).join('');
+  host.innerHTML = `
+    <div style="border:1px solid var(--border,#2a2a31);border-radius:12px;padding:14px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <span style="font-size:12.5px;font-weight:800;">🏷 Discount codes</span>
+        ${missing.length
+          ? `<button onclick="_sorterCreateDiscounts()" style="font-size:11.5px;font-weight:700;padding:6px 13px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">✨ Create ${missing.length} in Stripe</button>`
+          : `<span style="font-size:10px;font-weight:800;color:#7BC47F;">✓ all in Stripe</span>`}
+      </div>
+      ${rows}
+      <div style="font-size:10px;color:var(--text-mute,#888);margin-top:4px;">Add or edit codes in the offer's Pricing section; create them here so checkout can apply them.</div>
+    </div>`;
+}
+
+async function _sorterCreateDiscounts() {
+  if (!_SORTER_DISCOUNTS) return;
+  const missing = _SORTER_DISCOUNTS.codes.filter(c => !_SORTER_DISCOUNTS.live.has(c.code.toUpperCase()));
+  if (!missing.length) return;
+  const host = document.getElementById('pc-sorter-discounts');
+  if (host) host.innerHTML = _sorterLoading('Creating discount codes in Stripe…');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-discount', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), codes: missing }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    (json.results || []).forEach(res => {
+      if ((res.created || res.exists) && res.code) _SORTER_DISCOUNTS.live.add(String(res.code).toUpperCase());
+    });
+    const failed = (json.results || []).filter(x => x.error);
+    _sorterRenderDiscounts();
+    if (failed.length) alert('Some codes failed:\n' + failed.map(f => `${f.code}: ${f.error}`).join('\n'));
+  } catch (e) {
+    _sorterRenderDiscounts();
+    alert('Create discount codes failed: ' + _sorterErr(e));
   }
 }
 
