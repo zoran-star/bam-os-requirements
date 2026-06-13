@@ -30,6 +30,16 @@ metadata:
 > legacy = grandfathering; Stripe prices are immutable). Tier pill on chips
 > reveals "→ MAKE LIVE/LEGACY" on hover. /api/members sorter.matched = full
 > coverage + amount agreement (powers the strip dot).
+> **Create-price = editable + Submit (PR #283):** the ✨ create flow shows the
+> AI's amount in an editable $ field + "Submit — create in Stripe"
+> (`_sorterApplyMissing` reads the edited value). **Archive pricing options
+> (PR #277):** `archivable` block_builder flag → Archive/Restore, archived
+> rows below + Add, skipped by pills/matcher/coverage. **Discount codes
+> (PR #284):** offer Pricing `discount_codes` is a block_builder
+> (`_bbDiscountCodesField`: code + Percent/Dollar off + value, removable);
+> Price Match 🏷 panel lists them + "Create N in Stripe" via
+> `api/offers/create-discount.js` (Coupon + Promotion Code per row on the
+> connected acct, idempotent, GET lists live codes).
 
 > **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
 > action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
