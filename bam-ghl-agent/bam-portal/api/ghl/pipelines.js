@@ -379,6 +379,49 @@ async function handler(req, res) {
     }
   }
 
+  // 4b. Booked-trial dates from the ACTUAL GHL appointments on the client's
+  //     calendar entry points — the most authoritative source. A few calls
+  //     (one per calendar), not per-contact. Also collect which pipeline
+  //     stages are the trial-booking stages so the UI can flag date-less
+  //     cards that should have one.
+  const trialStageSet = new Set(); // `${pipelineNameLower}|||${stageNameLower}`
+  try {
+    const calEps = await sb(
+      `entry_points?client_id=eq.${clientId}&type=eq.calendar&enabled=eq.true&select=key,pipeline_name,stage_name`
+    ).catch(() => []);
+    for (const ep of (Array.isArray(calEps) ? calEps : [])) {
+      if (ep.pipeline_name && ep.stage_name) {
+        trialStageSet.add(`${ep.pipeline_name.toLowerCase()}|||${ep.stage_name.toLowerCase()}`);
+      }
+    }
+    const apptByContact = new Map();
+    const now = Date.now();
+    const winStart = now - 120 * 86400000, winEnd = now + 120 * 86400000;
+    for (const ep of (Array.isArray(calEps) ? calEps : [])) {
+      try {
+        const ev = await ghl("GET",
+          `/calendars/events?locationId=${encodeURIComponent(locationId)}&calendarId=${encodeURIComponent(ep.key)}&startTime=${winStart}&endTime=${winEnd}`,
+          { token });
+        for (const e of (ev.events || [])) {
+          const cid = e.contactId;
+          if (!cid || !e.startTime || e.appointmentStatus === "cancelled") continue;
+          const prev = apptByContact.get(cid);
+          if (!prev || new Date(e.startTime) > new Date(prev)) apptByContact.set(cid, e.startTime);
+        }
+      } catch (_) {}
+    }
+    for (const p of enriched) for (const o of p.opportunities) {
+      if (!o.trialDate && o.contactId && apptByContact.has(o.contactId)) {
+        o.trialDate = apptByContact.get(o.contactId);
+      }
+    }
+  } catch (_) {}
+
+  // Mark which stages expect a trial date (so the UI can flag empties orange).
+  for (const p of enriched) for (const st of p.stages) {
+    st.expectsTrial = trialStageSet.has(`${(p.name || "").toLowerCase()}|||${(st.name || "").toLowerCase()}`);
+  }
+
   // 5. For cards still missing an athlete name or trial date (legacy
   //    GHL-native contacts, not from the website), resolve from the contact's
   //    GHL custom fields. Field ids are discovered by name once, then contacts

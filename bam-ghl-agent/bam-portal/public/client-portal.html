@@ -6718,6 +6718,8 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-tag { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-right:5px; }
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
       #view-pipelines .pl-card-trial.is-past { color:#c47424; }
+      #view-pipelines .pl-card-notrial { border-color:rgba(224,134,60,0.75); background:rgba(224,134,60,0.09); }
+      #view-pipelines .pl-card-flag { font-size:11px; color:#e0863c; font-weight:700; margin-top:5px; }
       #view-pipelines .pl-card-ptf {
         margin-top:9px; width:100%; background:rgba(232,197,71,0.12);
         border:1px solid var(--accent); color:var(--accent); border-radius:7px;
@@ -15741,14 +15743,16 @@ function _renderPipelineBoard() {
     byStage.get(o.stageId).push(o);
   }
 
-  const cardHtml = (o) => {
+  const cardHtml = (o, stage) => {
     const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
     const stale = ageMs > 7 * 86400 * 1000;
     const parent = o.contact.name || o.name || 'Unknown';
     const tr = _plTrialInfo(o.trialDate);
     const trialStr = tr.str, trialPassed = tr.passed;
+    // A card in a trial-booking stage with no resolvable date gets flagged.
+    const missingTrial = stage && stage.expectsTrial && !trialStr;
     return `
-      <div class="pl-card ${stale ? 'pl-card-stale' : ''}"
+      <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''}"
            draggable="true"
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
@@ -15756,6 +15760,7 @@ function _renderPipelineBoard() {
         <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
         ${trialStr ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>` : ''}
+        ${missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
         ${trialPassed ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : ''}
       </div>`;
   };
@@ -15772,7 +15777,7 @@ function _renderPipelineBoard() {
           <span class="pl-col-count">${opps.length}</span>
         </div>
         <div class="pl-cards">
-          ${opps.length ? opps.map(cardHtml).join('') : '<div class="pl-empty">No cards here yet.</div>'}
+          ${opps.length ? opps.map(o => cardHtml(o, s)).join('') : '<div class="pl-empty">No cards here yet.</div>'}
         </div>
       </div>`;
   }).join('');
