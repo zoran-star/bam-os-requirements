@@ -16742,10 +16742,24 @@ async function _sorterProposeMissing(key) {
       // Stash the creation payload on the slot element; the button reads it back
       // by element id (avoids embedding JSON in an inline onclick attribute).
       slot._sorterCreation = { key: t.key, offer_id: t.offer_id, unit_amount_cents: rec.unit_amount_cents, currency: rec.currency, recurring: rec.recurring, product_name: rec.label || t.label };
+      const rc = rec.recurring || {};
+      let ivLabel = rc.interval || 'month';
+      if (rc.interval_count && rc.interval_count > 1) ivLabel = 'every ' + rc.interval_count + ' ' + rc.interval + 's';
+      const cur = (rec.currency || 'cad').toUpperCase();
+      const amt = ((rec.unit_amount_cents || 0) / 100).toFixed(2);
       slot.innerHTML = `<div style="margin-top:8px;padding:9px 11px;border:1px solid var(--accent,#E8C547);border-radius:9px;background:rgba(232,197,71,0.06);">
         <div style="font-size:12px;font-weight:700;">${escapeHTML(rec.plain_explanation || '')}</div>
         ${rec.offer_impact_note ? `<div style="font-size:10.5px;color:var(--text-mute,#888);margin-top:3px;">${escapeHTML(rec.offer_impact_note)}</div>` : ''}
-        <button onclick="_sorterApplyMissing('${escapeHTML(slotId)}')" style="margin-top:7px;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Approve &amp; create in Stripe</button>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:9px;">
+          <label style="font-size:10.5px;color:var(--text-mute,#888);">Price you'll charge</label>
+          <div style="display:flex;align-items:center;gap:4px;border:1px solid var(--border,#2a2a31);border-radius:7px;padding:4px 8px;background:var(--bg,#0d0d10);">
+            <span style="font-size:11px;color:var(--text-mute,#888);">$</span>
+            <input id="${escapeHTML(slotId)}-amt" type="number" min="0" step="0.01" value="${amt}" style="width:78px;border:none;background:transparent;color:var(--text,#eee);font-size:12.5px;font-weight:700;outline:none;">
+          </div>
+          <span style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(cur)} · ${escapeHTML(ivLabel)}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text-mute,#888);margin-top:4px;">Edit the amount if you want — this is what new signups get billed.</div>
+        <button onclick="_sorterApplyMissing('${escapeHTML(slotId)}')" style="margin-top:9px;font-size:12px;font-weight:700;padding:6px 14px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Submit — create in Stripe</button>
       </div>`;
     }
   } catch (e) {
@@ -16757,6 +16771,13 @@ async function _sorterApplyMissing(slotId) {
   const slot = document.getElementById(slotId);
   const creation = slot && slot._sorterCreation;
   if (!creation) return;
+  // Read the (editable) amount the owner submitted, before we overwrite the slot.
+  const amtInput = document.getElementById(slotId + '-amt');
+  if (amtInput) {
+    const v = parseFloat(amtInput.value);
+    if (isNaN(v) || v <= 0) { amtInput.focus(); alert('Enter a price greater than 0.'); return; }
+    creation.unit_amount_cents = Math.round(v * 100);
+  }
   // Loading bar right here in this little section — not a full-screen reload.
   slot.innerHTML = `<div style="margin-top:8px;">
     <div style="font-size:11px;color:var(--text-mute,#888);margin-bottom:7px;">Creating the price in Stripe…</div>
