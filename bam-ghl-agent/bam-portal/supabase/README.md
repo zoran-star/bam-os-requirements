@@ -53,8 +53,17 @@ No migration repair is needed for this patched file. Its version already exists 
 - `seeds/10_bam_gta_training_offer.sql`
 - `seeds/20_bam_gta_entry_points.sql`
 - `pricing-catalog-gta-seed.sql`
+- `seeds/30_local_parent_app_fixture.sql`
 
 These files provide local development data needed by the BAM GTA funnel, pricing catalog, entry points, and parent app work.
+
+`seeds/30_local_parent_app_fixture.sql` is synthetic. It is not a production data dump. It seeds local Auth users, parent profiles, students, student memberships, legacy `members`, and `member_links` so parent-app APIs can be tested against the service-role boundary.
+
+Local fixture logins:
+
+- `parent.alex.rivera@example.test` / `local-password`
+- `parent.jamie.chen@example.test` / `local-password`
+- `staff.admin@example.test` / `local-password`
 
 Keep client-specific/dev fixture data in seeds, not migrations. Migrations must be able to run before seeds exist.
 

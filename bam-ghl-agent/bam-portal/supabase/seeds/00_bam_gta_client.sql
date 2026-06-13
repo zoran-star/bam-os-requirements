@@ -7,7 +7,10 @@ insert into public.clients (
   marketing_included,
   v2_access,
   allowed_domains,
-  time_zone
+  time_zone,
+  stripe_connect_account_id,
+  stripe_connect_status,
+  stripe_connect_connected_at
 )
 values (
   '39875f07-0a4b-4429-a201-2249bc1f24df',
@@ -16,7 +19,10 @@ values (
   true,
   true,
   array['bam-gta.vercel.app'],
-  'America/Toronto'
+  'America/New_York',
+  'acct_1P7kUCRxInSEtAh8',
+  'connected',
+  '2026-05-24 00:00:00+00'::timestamptz
 )
 on conflict (id) do update set
   business_name = excluded.business_name,
@@ -25,4 +31,7 @@ on conflict (id) do update set
   v2_access = excluded.v2_access,
   allowed_domains = excluded.allowed_domains,
   time_zone = excluded.time_zone,
+  stripe_connect_account_id = excluded.stripe_connect_account_id,
+  stripe_connect_status = excluded.stripe_connect_status,
+  stripe_connect_connected_at = excluded.stripe_connect_connected_at,
   updated_at = now();

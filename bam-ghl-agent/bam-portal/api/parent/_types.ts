@@ -1,0 +1,13 @@
+export type HeaderValue = string | string[] | undefined;
+
+export type ParentApiRequest = {
+  method?: string;
+  headers: Record<string, HeaderValue>;
+  url?: string;
+};
+
+export type ParentApiResponse = {
+  setHeader(name: string, value: string): ParentApiResponse;
+  status(code: number): ParentApiResponse;
+  json(body: unknown): ParentApiResponse;
+};
