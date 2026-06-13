@@ -1854,6 +1854,14 @@
     to { transform: rotate(360deg); }
   }
 
+  /* Inline spinner for data-view loading placeholders */
+  .req-spin {
+    display:inline-block; width:15px; height:15px; vertical-align:middle;
+    margin-right:9px; border-radius:50%;
+    border:2px solid rgba(232,197,71,0.20); border-top-color: var(--gold);
+    animation: loading-spin 0.8s linear infinite;
+  }
+
   /* Confirmation success card */
   .confirmation-card {
     text-align: center;
@@ -6062,14 +6070,14 @@
             </div>
           </div>
           <div id="ad-report-container">
-            <div class="req-empty" style="padding:20px 0">Loading performance…</div>
+            <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading performance…</div>
           </div>
 
           <div class="readout" style="margin-top:48px">Active Campaigns</div>
 
           <!-- Dynamic campaigns container — populated by _renderMarketingCampaigns() -->
           <div id="marketing-campaigns-container">
-            <div class="req-empty" style="padding:20px 0">Loading campaigns…</div>
+            <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading campaigns…</div>
           </div>
 
           <!-- Add new campaign -->
@@ -6131,7 +6139,7 @@
 
           <!-- Creative grid — populated from Meta /adcreatives for the open campaign -->
           <div class="creative-grid" id="campaign-creative-grid">
-            <div class="req-empty" style="grid-column:1/-1;padding:18px 0">Loading creatives…</div>
+            <div class="req-empty" style="grid-column:1/-1;padding:18px 0"><span class="req-spin"></span>Loading creatives…</div>
           </div>
 
           <!-- Add new creative -->
@@ -6430,7 +6438,7 @@ Then the call to action."]</div>
             </div>
           </div>
           <div class="chat-messages" id="messages-thread" onscroll="_msgThreadScroll()">
-            <div class="req-empty" style="padding:48px 24px;text-align:center">Loading messages…</div>
+            <div class="req-empty" style="padding:48px 24px;text-align:center"><span class="req-spin"></span>Loading messages…</div>
           </div>
           <button type="button" id="msg-jump-pill" onclick="msgJumpToLatest()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -6472,7 +6480,7 @@ Then the call to action."]</div>
       <div class="content">
         <div class="readout">Your Roster</div>
         <div id="members-list-container">
-          <div class="req-empty" style="padding:20px 0">Loading members…</div>
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading members…</div>
         </div>
         <div id="member-modal-host"></div>
       </div>
@@ -6848,13 +6856,13 @@ Then the call to action."]</div>
           <aside class="pl-rail" id="pl-entry-rail">
             <div class="pl-rail-head">Entry Points</div>
             <div class="pl-rail-sub">Where leads come from. Separate from the pipeline board.</div>
-            <div id="pl-entry-list"><div class="pl-empty">Loading…</div></div>
+            <div id="pl-entry-list"><div class="pl-empty"><span class="req-spin"></span>Loading…</div></div>
           </aside>
           <div class="pl-divider" onclick="plToggleRail()" title="Collapse entry points">
             <span class="pl-divider-chev" id="pl-divider-chev">&#10094;</span>
           </div>
           <div id="pl-board-container">
-            <div class="req-empty" style="padding:20px 0">Loading pipelines…</div>
+            <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>
           </div>
         </div>
       </div>
@@ -6878,7 +6886,7 @@ Then the call to action."]</div>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
         <div id="inbox-list-container">
-          <div class="req-empty" style="padding:20px 0">Loading conversations…</div>
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading conversations…</div>
         </div>
       </div>
     </div>
@@ -6896,7 +6904,7 @@ Then the call to action."]</div>
       <div class="content">
         <div id="pricing-totals-host" class="pc-totals"></div>
         <div id="pricing-list-container">
-          <div class="req-empty" style="padding:20px 0">Loading prices…</div>
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading prices…</div>
         </div>
       </div>
     </div>
@@ -7134,7 +7142,7 @@ Then the call to action."]</div>
               <div class="bk-sub">Booking availability per calendar. Changes go live on the website instantly.</div>
               <button class="bk-new" onclick="bkOpenCreate()">+ New calendar</button>
             </div>
-            <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0">Loading booking calendars…</div></div>
+            <div id="bk-cal-list"><div class="req-empty" style="padding:14px 0"><span class="req-spin"></span>Loading booking calendars…</div></div>
           </div>
         </div>
 
@@ -8205,7 +8213,7 @@ Then the call to action."]</div>
           Everything your team needs to do. Anyone on your account — or your BAM team — can add, edit, assign, and check off items.
         </p>
         <div id="action-items-list">
-          <div class="req-empty" style="padding:20px 0">Loading…</div>
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading…</div>
         </div>
       </div>
 
@@ -13828,7 +13836,7 @@ function openCampaignDetail(campaignId, title, stats) {
 async function _renderCampaignCreatives(campaignId) {
   const gridEl = document.getElementById('campaign-creative-grid');
   if (!gridEl) return;
-  gridEl.innerHTML = '<div class="req-empty" style="grid-column:1/-1;padding:18px 0">Loading creatives…</div>';
+  gridEl.innerHTML = '<div class="req-empty" style="grid-column:1/-1;padding:18px 0"><span class="req-spin"></span>Loading creatives…</div>';
   try {
     const token = await _mreqAuthToken();
     const res = await fetch('/api/meta/creatives?campaign_id=' + encodeURIComponent(campaignId), {
@@ -15448,7 +15456,7 @@ let _PL_DRAG_OPP   = null;   // { oppId, fromStageId, pipelineId } during drag
 async function fetchAndRenderPipelines() {
   const container = document.getElementById('pl-board-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading pipelines…</div>';
+  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>';
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -15919,7 +15927,7 @@ let _INBOX_THREAD = null;  // { convo: {...}, messages: [...] }
 async function fetchAndRenderInbox() {
   const container = document.getElementById('inbox-list-container');
   if (!container) return;
-  container.innerHTML = '<div class="req-empty" style="padding:20px 0">Loading conversations…</div>';
+  container.innerHTML = '<div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading conversations…</div>';
   try {
     if (typeof CLIENT_ID === 'undefined' || !CLIENT_ID) throw new Error('CLIENT_ID not in scope');
     const token = await _mreqAuthToken();
@@ -18208,7 +18216,7 @@ async function openMemberPopup(memberId) {
   host.innerHTML = `
     <div id="member-drawer-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;opacity:0;transition:opacity 0.2s ease" onclick="closeMemberPopup()"></div>
     <div id="member-drawer" style="position:fixed;top:0;right:0;width:min(480px,92vw);height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,0.25);z-index:9999;overflow-y:auto;transform:translateX(100%);transition:transform 0.25s ease;color:var(--text)">
-      <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0">Loading…</div></div>
+      <div id="member-modal-body" style="padding:28px 28px 36px"><div class="req-empty" style="padding:24px 0"><span class="req-spin"></span>Loading…</div></div>
     </div>`;
   // Slide in on next frame so the transition fires.
   requestAnimationFrame(() => {
@@ -22674,7 +22682,7 @@ async function openMessageConvo(conversationId) {
   // or by the user's only client (single-POC).
   // Load messages
   document.getElementById('messages-thread').innerHTML =
-    '<div class="req-empty" style="padding:24px;text-align:center">Loading…</div>';
+    '<div class="req-empty" style="padding:24px;text-align:center"><span class="req-spin"></span>Loading…</div>';
   try {
     const json = await _msgApi('/api/messages?conversation_id=' + encodeURIComponent(conversationId) + '&limit=100');
     _msgMessages = json.messages || [];
