@@ -19,11 +19,20 @@ create table public.entry_points (
 
 alter table public.entry_points enable row level security; -- service-key access only
 
--- Seed BAM GTA's known entry points
-insert into public.entry_points (client_id, type, key, label, tags) values
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','website-form','contact','Website Contact Form', array['website-inquiry','contact form filled']),
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','website-form','free-trial','Website Free Trial', array['website-inquiry','free trial form filled']),
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','ghl-form','GLI35e0zHS4cFrft92le','GHL Contact Form', array[]::text[]),
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','ghl-form','00MuBSi1GxsRcSqklOkF','GHL Free Trial Form', array[]::text[]),
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','calendar','Cmw4bCVBhexgi0Oi0Dkf','Booking Calendar: Group 1 (Elementary)', array[]::text[]),
-  ('39875f07-0a4b-4429-a201-2249bc1f24df','calendar','G5y4QI0MsFq3159IhFU7','Booking Calendar: Group 2 (High School)', array[]::text[]);;
+-- Seed BAM GTA's known entry points when that production client row exists.
+-- Fresh local databases do not include production client data, so this must be
+-- a no-op there rather than violating the entry_points.client_id FK.
+insert into public.entry_points (client_id, type, key, label, tags)
+select c.id, v.type, v.key, v.label, v.tags
+from public.clients c
+cross join (
+  values
+    ('website-form','contact','Website Contact Form', array['website-inquiry','contact form filled']::text[]),
+    ('website-form','free-trial','Website Free Trial', array['website-inquiry','free trial form filled']::text[]),
+    ('ghl-form','GLI35e0zHS4cFrft92le','GHL Contact Form', array[]::text[]),
+    ('ghl-form','00MuBSi1GxsRcSqklOkF','GHL Free Trial Form', array[]::text[]),
+    ('calendar','Cmw4bCVBhexgi0Oi0Dkf','Booking Calendar: Group 1 (Elementary)', array[]::text[]),
+    ('calendar','G5y4QI0MsFq3159IhFU7','Booking Calendar: Group 2 (High School)', array[]::text[])
+) as v(type, key, label, tags)
+where c.id = '39875f07-0a4b-4429-a201-2249bc1f24df'
+on conflict (client_id, type, key) do nothing;;

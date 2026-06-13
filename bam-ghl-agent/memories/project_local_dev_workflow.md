@@ -6,6 +6,8 @@ type: project
 
 ## Setup (Level 1 + Level 2 from session 2026-04-27)
 
+**Scope note (2026-06-12):** this note describes the normal Vite dev loop, where localhost hits production Supabase. For the separate Supabase CLI/Docker local replay work, read [`project_supabase_local_replay.md`](project_supabase_local_replay.md) and [`../bam-portal/supabase/README.md`](../bam-portal/supabase/README.md) first.
+
 ```
 Frontend  →  localhost:5173 (Vite dev, live reload)
 API /api  →  proxied to PRODUCTION Vercel (vite.config.js)

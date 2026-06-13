@@ -2,6 +2,10 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## Supabase
+
+Before touching Supabase migrations, read [supabase/README.md](supabase/README.md). This repo currently has historical backfill migrations and ordered local seed files that make fresh local replay work while production migration history is being cleaned up.
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
