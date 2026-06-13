@@ -404,12 +404,16 @@ async function handler(req, res) {
               `&offer_price_key=not.is.null&select=offer_price_key,amount_cents`
             );
             const liveAmt = new Map((rows || []).map(r => [r.offer_price_key, r.amount_cents]));
-            // Covered AND not drifted: a live price exists whose amount still
-            // matches the offer (base or HST all-in).
+            // Covered AND not drifted. "Matches" is TOLERANT (within 8% of the
+            // pre-tax OR all-in price) — real Stripe prices are rounded to
+            // clean dollars and academies use varying tax/fee structures, so
+            // exact equality false-flagged everything. 8% still catches a
+            // genuine offer-price change (which moves the target well beyond).
+            const near = (amt, target) => target > 0 && Math.abs(amt - target) <= target * 0.08;
             return keys.every(k => {
               if (!liveAmt.has(k.key)) return false;
               const amt = liveAmt.get(k.key);
-              return amt == null || amt === k.base_cents || amt === k.allin_cents;
+              return amt == null || near(amt, k.base_cents) || near(amt, k.allin_cents);
             });
           } catch (_) { return false; }
         })();
