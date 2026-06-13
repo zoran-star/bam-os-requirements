@@ -379,19 +379,18 @@ async function handler(req, res) {
     }
   }
 
-  // 5. For cards still missing an athlete name (legacy GHL-native contacts,
-  //    not from the website), resolve it from the contact's GHL custom fields.
-  //    Athlete field ids are discovered by name once, then contacts are
-  //    fetched in throttled batches (bounded so a huge board can't blow the
+  // 5. For cards still missing an athlete name or trial date (legacy
+  //    GHL-native contacts, not from the website), resolve from the contact's
+  //    GHL custom fields. Field ids are discovered by name once, then contacts
+  //    are fetched in throttled batches (bounded so a huge board can't blow the
   //    rate limit or the function timeout).
   try {
     const missing = [];
     for (const p of enriched) for (const o of p.opportunities) {
-      if (!o.athlete && o.contactId) missing.push(o);
+      if ((!o.athlete || !o.trialDate) && o.contactId) missing.push(o);
     }
     if (missing.length) {
-      // Discover athlete custom-field ids by name (cached per-call).
-      let athleteFull = null, athleteFirst = null, athleteLast = null;
+      let athleteFull = null, athleteFirst = null, athleteLast = null, trialDateField = null;
       try {
         const cf = await ghl("GET", `/locations/${encodeURIComponent(locationId)}/customFields`, { token });
         for (const f of (cf.customFields || [])) {
@@ -399,20 +398,18 @@ async function handler(req, res) {
           if (n.includes("athlete") && n.includes("full")) athleteFull = f.id;
           else if (n.includes("athlete") && n.includes("first")) athleteFirst = f.id;
           else if (n.includes("athlete") && n.includes("last")) athleteLast = f.id;
+          else if (n.includes("free trial date") || (n.includes("trial") && n.includes("date"))) trialDateField = f.id;
         }
       } catch (_) {}
 
-      if (athleteFull || athleteFirst) {
+      if (athleteFull || athleteFirst || trialDateField) {
         const CAP = 150, BATCH = 8;
         const targets = missing.slice(0, CAP);
-        const readAthlete = (c) => {
-          const fields = c.customFields || c.customField || [];
-          const get = (id) => { const m = fields.find(x => (x.id || x.key) === id); return m ? (Array.isArray(m.value) ? m.value.join(" ") : m.value) : null; };
-          const full = athleteFull ? get(athleteFull) : null;
+        const readField = (fields, id) => { if (!id) return null; const m = fields.find(x => (x.id || x.key) === id); return m ? (Array.isArray(m.value) ? m.value.join(" ") : m.value) : null; };
+        const readAthlete = (fields) => {
+          const full = readField(fields, athleteFull);
           if (full && String(full).trim()) return String(full).trim();
-          const fn = athleteFirst ? get(athleteFirst) : null;
-          const ln = athleteLast ? get(athleteLast) : null;
-          const combined = `${fn || ""} ${ln || ""}`.trim();
+          const combined = `${readField(fields, athleteFirst) || ""} ${readField(fields, athleteLast) || ""}`.trim();
           return combined || null;
         };
         for (let i = 0; i < targets.length; i += BATCH) {
@@ -420,8 +417,10 @@ async function handler(req, res) {
           await Promise.all(slice.map(async (o) => {
             try {
               const cr = await ghl("GET", `/contacts/${encodeURIComponent(o.contactId)}`, { token });
-              o.athlete = readAthlete(cr.contact || cr) || null;
-            } catch (_) { /* leave parent-only */ }
+              const fields = (cr.contact || cr).customFields || (cr.contact || cr).customField || [];
+              if (!o.athlete) o.athlete = readAthlete(fields) || null;
+              if (!o.trialDate) { const td = readField(fields, trialDateField); if (td) o.trialDate = td; }
+            } catch (_) { /* leave as-is */ }
           }));
         }
       }
