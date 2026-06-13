@@ -1,0 +1,635 @@
+import { HttpError } from "./_errors.js";
+import { eq, inList, sb, verifySupabaseUser } from "./_supabase.js";
+import type { ParentApiRequest } from "./_types.js";
+
+const MISSING_CUSTOMER_PROFILE_MESSAGE =
+  "No customer profile found. Please register to continue.";
+
+const SLOT_SCAN_LIMIT = 1_000;
+const RESERVATION_SCAN_LIMIT = 1_000;
+
+type CustomerProfile = {
+  id: string;
+  supabase_user_id: string;
+};
+
+type Student = {
+  id: string;
+  parent_id: string;
+};
+
+type Membership = {
+  id: string;
+  academy_id: string;
+  customer_id: string | null;
+  student_id: string | null;
+  status: "ACTIVE" | "SUSPENDED" | "CANCELLED";
+};
+
+type ScheduleSlot = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  slot_type: string;
+  location_label: string | null;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  credit_cost: number | null;
+  is_cancelled: boolean;
+  instructor_id: string | null;
+  slot_template_id: string | null;
+  location_id: string | null;
+};
+
+type ReservationStatus = "CONFIRMED" | "CANCELLED" | "ATTENDED" | "NO_SHOW" | "LATE_CANCEL";
+
+type Reservation = {
+  id: string;
+  slot_id: string;
+  membership_id: string;
+  student_id: string | null;
+  status: ReservationStatus;
+  booked_at: string;
+  cancelled_at: string | null;
+};
+
+type WaitlistEntry = {
+  id: string;
+  slot_id: string;
+  membership_id: string;
+  student_id: string | null;
+  status: "WAITING" | "PROMOTED" | "EXPIRED" | "REMOVED";
+  created_at: string;
+};
+
+type ParentScheduleContext = {
+  profile: CustomerProfile;
+  memberships: Membership[];
+  membershipIds: string[];
+  academyIds: string[];
+};
+
+type SlotState = {
+  bookedCounts: Map<string, number>;
+  waitlistCounts: Map<string, number>;
+  reservationBySlotMembership: Map<string, Reservation>;
+  waitlistBySlotMembership: Map<string, WaitlistEntry>;
+};
+
+export type CustomerSlotOut = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  slot_type: string;
+  location_label: string | null;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  credit_cost: number;
+  is_cancelled: boolean;
+  instructor_name: string | null;
+  booked_count: number;
+  waitlist_length: number;
+  my_status: "CONFIRMED" | "WAITING" | null;
+  my_reservation_id: string | null;
+  my_waitlist_id: string | null;
+  can_book: boolean;
+  can_waitlist: boolean;
+  can_cancel: boolean;
+};
+
+export type CustomerReservationOut = {
+  id: string;
+  slot_id: string;
+  membership_id: string;
+  student_id: string | null;
+  status: ReservationStatus;
+  booked_at: string;
+  slot: CustomerSlotOut;
+};
+
+export async function getParentScheduleContext(
+  req: ParentApiRequest,
+): Promise<ParentScheduleContext> {
+  const user = await verifySupabaseUser(req);
+  const profile = await getCustomerProfile(user.id);
+  const students = await getStudents(profile.id);
+  const memberships = await getMemberships(profile.id, students.map((student) => student.id));
+
+  return {
+    profile,
+    memberships,
+    membershipIds: memberships.map((membership) => membership.id),
+    academyIds: [...new Set(memberships.map((membership) => membership.academy_id))],
+  };
+}
+
+export async function listScheduleSlots(
+  context: ParentScheduleContext,
+  opts: {
+    academyId: string;
+    membershipId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit: number;
+  },
+): Promise<CustomerSlotOut[]> {
+  ensureAcademyAccess(context, opts.academyId);
+  const membershipId = resolveMembershipForAcademy(context, opts.membershipId, opts.academyId);
+  const slots = await getSlots({
+    academyIds: [opts.academyId],
+    startGte: futureStartIso(opts.dateFrom),
+    startLt: opts.dateTo ? endExclusiveIso(opts.dateTo) : undefined,
+    limit: opts.limit,
+    order: "asc",
+    includeCancelled: false,
+  });
+  const state = await getSlotState(slots.map((slot) => slot.id));
+  return slots.map((slot) => toCustomerSlot(slot, state, membershipId));
+}
+
+export async function getScheduleSlot(
+  context: ParentScheduleContext,
+  slotId: string,
+  membershipId?: string,
+): Promise<CustomerSlotOut> {
+  const slot = await getSlotById(slotId);
+  if (!slot) {
+    throw new HttpError(404, "Slot not found.");
+  }
+
+  ensureAcademyAccess(context, slot.tenant_id);
+  const resolvedMembershipId = resolveMembershipForAcademy(context, membershipId, slot.tenant_id);
+  const state = await getSlotState([slot.id]);
+  return toCustomerSlot(slot, state, resolvedMembershipId);
+}
+
+export async function listUpcomingReservations(
+  context: ParentScheduleContext,
+  opts: {
+    membershipId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    limit: number;
+  },
+): Promise<CustomerReservationOut[]> {
+  const membershipIds = resolveMembershipIds(context, opts.membershipId);
+  if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
+
+  const slotLimit = scanLimit(opts.limit);
+  const slots = await getSlots({
+    academyIds: context.academyIds,
+    startGte: futureStartIso(opts.dateFrom),
+    startLt: opts.dateTo ? endExclusiveIso(opts.dateTo) : undefined,
+    limit: slotLimit,
+    order: "asc",
+    includeCancelled: false,
+  });
+  if (slots.length === 0) return [];
+
+  const slotById = mapSlots(slots);
+  const reservations = await getReservations({
+    slotIds: slots.map((slot) => slot.id),
+    membershipIds,
+    statuses: ["CONFIRMED"],
+    limit: RESERVATION_SCAN_LIMIT,
+  });
+  const state = await getSlotState(slots.map((slot) => slot.id));
+
+  return reservations
+    .filter((reservation) => slotById.has(reservation.slot_id))
+    .map((reservation) => toReservationOut(reservation, slotById.get(reservation.slot_id), state))
+    .sort((a, b) => compareSlotStart(a.slot, b.slot, "asc"))
+    .slice(0, opts.limit);
+}
+
+export async function listPastAppointments(
+  context: ParentScheduleContext,
+  opts: {
+    membershipId?: string;
+    days?: number;
+    limit: number;
+  },
+): Promise<CustomerReservationOut[]> {
+  const membershipIds = resolveMembershipIds(context, opts.membershipId);
+  if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
+
+  const now = new Date();
+  const slots = await getSlots({
+    academyIds: context.academyIds,
+    startGte: opts.days ? addDays(now, -opts.days).toISOString() : undefined,
+    startLt: now.toISOString(),
+    limit: scanLimit(opts.limit),
+    order: "desc",
+    includeCancelled: false,
+  });
+  if (slots.length === 0) return [];
+
+  const slotById = mapSlots(slots);
+  const reservations = await getReservations({
+    slotIds: slots.map((slot) => slot.id),
+    membershipIds,
+    statuses: ["CONFIRMED", "ATTENDED", "NO_SHOW"],
+    limit: RESERVATION_SCAN_LIMIT,
+  });
+  const state = await getSlotState(slots.map((slot) => slot.id));
+
+  return reservations
+    .filter((reservation) => slotById.has(reservation.slot_id))
+    .map((reservation) => toReservationOut(reservation, slotById.get(reservation.slot_id), state))
+    .sort((a, b) => compareSlotStart(a.slot, b.slot, "desc"))
+    .slice(0, opts.limit);
+}
+
+export function queryParam(req: ParentApiRequest, name: string): string | undefined {
+  const value = req.query?.[name];
+  if (Array.isArray(value)) return value[0];
+  if (typeof value === "string") return value;
+
+  if (!req.url) return undefined;
+  const url = new URL(req.url, "http://localhost");
+  return url.searchParams.get(name) || undefined;
+}
+
+export function requiredQueryParam(req: ParentApiRequest, name: string): string {
+  const value = queryParam(req, name);
+  if (!value) {
+    throw new HttpError(400, `Missing required query parameter: ${name}`);
+  }
+  return value;
+}
+
+export function intQueryParam(
+  req: ParentApiRequest,
+  name: string,
+  defaultValue: number,
+  maxValue: number,
+): number {
+  const value = queryParam(req, name);
+  if (!value) return defaultValue;
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new HttpError(400, `Invalid ${name}. Expected a positive integer.`);
+  }
+
+  return Math.min(parsed, maxValue);
+}
+
+async function getCustomerProfile(supabaseUserId: string): Promise<CustomerProfile> {
+  const rows = await sb<CustomerProfile[]>(
+    `customer_profiles?supabase_user_id=eq.${eq(supabaseUserId)}` +
+      "&select=id,supabase_user_id" +
+      "&limit=1",
+  );
+  const profile = Array.isArray(rows) ? rows[0] : null;
+  if (!profile) {
+    throw new HttpError(403, MISSING_CUSTOMER_PROFILE_MESSAGE, MISSING_CUSTOMER_PROFILE_MESSAGE);
+  }
+  return profile;
+}
+
+async function getStudents(parentId: string): Promise<Student[]> {
+  const rows = await sb<Student[]>(
+    `students?parent_id=eq.${eq(parentId)}` +
+      "&select=id,parent_id" +
+      "&order=created_at.asc",
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getMemberships(profileId: string, studentIds: string[]): Promise<Membership[]> {
+  const profileMemberships = await sb<Membership[]>(
+    `academy_memberships?customer_id=eq.${eq(profileId)}` +
+      "&select=id,academy_id,customer_id,student_id,status",
+  );
+
+  let studentMemberships: Membership[] = [];
+  if (studentIds.length > 0) {
+    studentMemberships = await sb<Membership[]>(
+      `academy_memberships?student_id=in.(${inList(studentIds)})` +
+        "&select=id,academy_id,customer_id,student_id,status",
+    );
+  }
+
+  return dedupeMemberships([
+    ...(Array.isArray(profileMemberships) ? profileMemberships : []),
+    ...(Array.isArray(studentMemberships) ? studentMemberships : []),
+  ]);
+}
+
+function dedupeMemberships(memberships: Membership[]): Membership[] {
+  const byId = new Map<string, Membership>();
+  for (const membership of memberships) {
+    byId.set(membership.id, membership);
+  }
+  return [...byId.values()];
+}
+
+function ensureAcademyAccess(context: ParentScheduleContext, academyId: string): void {
+  if (!context.academyIds.includes(academyId)) {
+    throw new HttpError(403, "Not authorized to access this academy schedule.");
+  }
+}
+
+function resolveMembershipForAcademy(
+  context: ParentScheduleContext,
+  membershipId: string | undefined,
+  academyId: string,
+): string | undefined {
+  if (!membershipId) return undefined;
+  const membership = getOwnedMembership(context, membershipId);
+  if (membership.academy_id !== academyId) {
+    throw new HttpError(403, "Membership does not belong to this academy.");
+  }
+  return membership.id;
+}
+
+function resolveMembershipIds(context: ParentScheduleContext, membershipId?: string): string[] {
+  if (!membershipId) return context.membershipIds;
+  return [getOwnedMembership(context, membershipId).id];
+}
+
+function getOwnedMembership(context: ParentScheduleContext, membershipId: string): Membership {
+  const membership = context.memberships.find((row) => row.id === membershipId);
+  if (!membership) {
+    throw new HttpError(404, "Membership not found.");
+  }
+  return membership;
+}
+
+async function getSlotById(slotId: string): Promise<ScheduleSlot | null> {
+  const rows = await sb<ScheduleSlot[]>(
+    `schedule_slots?id=eq.${eq(slotId)}` +
+      `&select=${slotSelect()}` +
+      "&limit=1",
+  );
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function getSlots(opts: {
+  academyIds: string[];
+  startGte?: string;
+  startLt?: string;
+  limit: number;
+  order: "asc" | "desc";
+  includeCancelled: boolean;
+}): Promise<ScheduleSlot[]> {
+  if (opts.academyIds.length === 0) return [];
+
+  const filters = [tenantFilter(opts.academyIds)];
+  if (!opts.includeCancelled) filters.push("is_cancelled=eq.false");
+  if (opts.startGte) filters.push(`start_time=gte.${eq(opts.startGte)}`);
+  if (opts.startLt) filters.push(`start_time=lt.${eq(opts.startLt)}`);
+
+  const rows = await sb<ScheduleSlot[]>(
+    `schedule_slots?${filters.join("&")}` +
+      `&select=${slotSelect()}` +
+      `&order=start_time.${opts.order}` +
+      `&limit=${opts.limit}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getSlotState(slotIds: string[]): Promise<SlotState> {
+  const empty = emptySlotState();
+  if (slotIds.length === 0) return empty;
+
+  const reservations = await getReservations({
+    slotIds,
+    statuses: ["CONFIRMED"],
+    limit: RESERVATION_SCAN_LIMIT,
+  });
+  const waitlists = await getWaitlistEntries(slotIds);
+
+  for (const reservation of reservations) {
+    empty.bookedCounts.set(
+      reservation.slot_id,
+      (empty.bookedCounts.get(reservation.slot_id) || 0) + 1,
+    );
+    empty.reservationBySlotMembership.set(slotMembershipKey(reservation), reservation);
+  }
+
+  for (const waitlist of waitlists) {
+    empty.waitlistCounts.set(
+      waitlist.slot_id,
+      (empty.waitlistCounts.get(waitlist.slot_id) || 0) + 1,
+    );
+    empty.waitlistBySlotMembership.set(slotMembershipKey(waitlist), waitlist);
+  }
+
+  return empty;
+}
+
+async function getReservations(opts: {
+  slotIds: string[];
+  membershipIds?: string[];
+  statuses: ReservationStatus[];
+  limit: number;
+}): Promise<Reservation[]> {
+  if (opts.slotIds.length === 0) return [];
+  if (opts.membershipIds && opts.membershipIds.length === 0) return [];
+
+  const filters = [
+    `slot_id=in.(${inList(opts.slotIds)})`,
+    statusFilter(opts.statuses),
+  ];
+  if (opts.membershipIds) {
+    filters.push(`membership_id=in.(${inList(opts.membershipIds)})`);
+  }
+
+  const rows = await sb<Reservation[]>(
+    `reservations?${filters.join("&")}` +
+      "&select=id,slot_id,membership_id,student_id,status,booked_at,cancelled_at" +
+      `&limit=${opts.limit}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function getWaitlistEntries(slotIds: string[]): Promise<WaitlistEntry[]> {
+  if (slotIds.length === 0) return [];
+
+  const rows = await sb<WaitlistEntry[]>(
+    `waitlist_entries?slot_id=in.(${inList(slotIds)})` +
+      "&status=eq.WAITING" +
+      "&select=id,slot_id,membership_id,student_id,status,created_at" +
+      `&limit=${RESERVATION_SCAN_LIMIT}`,
+  );
+
+  return Array.isArray(rows) ? rows : [];
+}
+
+function toCustomerSlot(
+  slot: ScheduleSlot,
+  state: SlotState,
+  membershipId: string | undefined,
+): CustomerSlotOut {
+  const bookedCount = state.bookedCounts.get(slot.id) || 0;
+  const waitlistLength = state.waitlistCounts.get(slot.id) || 0;
+  const reservation = membershipId
+    ? state.reservationBySlotMembership.get(slotMembershipKey({ slot_id: slot.id, membership_id: membershipId }))
+    : undefined;
+  const waitlist = membershipId
+    ? state.waitlistBySlotMembership.get(slotMembershipKey({ slot_id: slot.id, membership_id: membershipId }))
+    : undefined;
+  const startsInFuture = isFuture(slot.start_time);
+  const hasEnrollment = Boolean(reservation || waitlist);
+  const isFull = bookedCount >= slot.capacity;
+
+  return {
+    id: slot.id,
+    tenant_id: slot.tenant_id,
+    name: slot.name,
+    description: slot.description,
+    slot_type: slot.slot_type,
+    location_label: slot.location_label,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    capacity: slot.capacity,
+    credit_cost: slot.credit_cost ?? 1,
+    is_cancelled: slot.is_cancelled,
+    instructor_name: null,
+    booked_count: bookedCount,
+    waitlist_length: waitlistLength,
+    my_status: reservation ? "CONFIRMED" : waitlist ? "WAITING" : null,
+    my_reservation_id: reservation?.id ?? null,
+    my_waitlist_id: waitlist?.id ?? null,
+    can_book: startsInFuture && !slot.is_cancelled && !hasEnrollment && !isFull,
+    can_waitlist: startsInFuture && !slot.is_cancelled && !hasEnrollment,
+    can_cancel: Boolean(reservation && startsInFuture),
+  };
+}
+
+function toReservationOut(
+  reservation: Reservation,
+  slot: ScheduleSlot | undefined,
+  state: SlotState,
+): CustomerReservationOut {
+  if (!slot) {
+    throw new HttpError(500, "Reservation is missing its schedule slot.");
+  }
+
+  return {
+    id: reservation.id,
+    slot_id: reservation.slot_id,
+    membership_id: reservation.membership_id,
+    student_id: reservation.student_id,
+    status: reservation.status,
+    booked_at: reservation.booked_at,
+    slot: toCustomerSlot(slot, state, reservation.membership_id),
+  };
+}
+
+function emptySlotState(): SlotState {
+  return {
+    bookedCounts: new Map<string, number>(),
+    waitlistCounts: new Map<string, number>(),
+    reservationBySlotMembership: new Map<string, Reservation>(),
+    waitlistBySlotMembership: new Map<string, WaitlistEntry>(),
+  };
+}
+
+function mapSlots(slots: ScheduleSlot[]): Map<string, ScheduleSlot> {
+  const byId = new Map<string, ScheduleSlot>();
+  for (const slot of slots) byId.set(slot.id, slot);
+  return byId;
+}
+
+function tenantFilter(academyIds: string[]): string {
+  if (academyIds.length === 1) {
+    const academyId = academyIds[0];
+    if (!academyId) throw new HttpError(400, "Missing academy id.");
+    return `tenant_id=eq.${eq(academyId)}`;
+  }
+  return `tenant_id=in.(${inList(academyIds)})`;
+}
+
+function statusFilter(statuses: ReservationStatus[]): string {
+  if (statuses.length === 1) {
+    const status = statuses[0];
+    if (!status) throw new HttpError(500, "Reservation status filter is empty.");
+    return `status=eq.${eq(status)}`;
+  }
+  return `status=in.(${inList(statuses)})`;
+}
+
+function slotSelect(): string {
+  return [
+    "id",
+    "tenant_id",
+    "name",
+    "description",
+    "slot_type",
+    "location_label",
+    "start_time",
+    "end_time",
+    "capacity",
+    "credit_cost",
+    "is_cancelled",
+    "instructor_id",
+    "slot_template_id",
+    "location_id",
+  ].join(",");
+}
+
+function slotMembershipKey(row: { slot_id: string; membership_id: string }): string {
+  return `${row.slot_id}:${row.membership_id}`;
+}
+
+function futureStartIso(value: string | undefined): string {
+  const now = new Date();
+  if (!value) return now.toISOString();
+
+  const start = startOfDayIso(value);
+  return new Date(start) > now ? start : now.toISOString();
+}
+
+function startOfDayIso(value: string): string {
+  const parsed = parseDateValue(value, "start");
+  return parsed.toISOString();
+}
+
+function endExclusiveIso(value: string): string {
+  const parsed = parseDateValue(value, "end");
+  return parsed.toISOString();
+}
+
+function parseDateValue(value: string, boundary: "start" | "end"): Date {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const date = dateOnly ? new Date(`${value}T00:00:00.000Z`) : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpError(400, `Invalid date: ${value}`);
+  }
+
+  if (dateOnly && boundary === "end") {
+    return addDays(date, 1);
+  }
+  return date;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function isFuture(value: string): boolean {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) && date > new Date();
+}
+
+function compareSlotStart(a: CustomerSlotOut, b: CustomerSlotOut, order: "asc" | "desc"): number {
+  const left = new Date(a.start_time).getTime();
+  const right = new Date(b.start_time).getTime();
+  return order === "asc" ? left - right : right - left;
+}
+
+function scanLimit(limit: number): number {
+  return Math.min(Math.max(limit * 10, 100), SLOT_SCAN_LIMIT);
+}

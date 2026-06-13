@@ -3,6 +3,7 @@ export type HeaderValue = string | string[] | undefined;
 export type ParentApiRequest = {
   method?: string;
   headers: Record<string, HeaderValue>;
+  query?: Record<string, HeaderValue>;
   url?: string;
 };
 
