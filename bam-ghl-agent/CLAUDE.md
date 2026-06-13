@@ -343,6 +343,7 @@ When new onboarding completes:
 1. Stack is React/Vite/Supabase — see `bam-portal/package.json`
 2. Check which of the 10 integrations the feature touches
 3. Backend keys are still being reconnected — flag if you hit a key-missing issue
+4. Before touching Supabase migrations, seeds, local replay, storage buckets, or linked project repair, read `bam-portal/supabase/README.md`. It explains the temporary historical backfills, repair-applied requirement, seed ordering, storage caveat, and why `supabase migration fetch --linked` is risky right now.
 
 ### When touching knowledge (sections, guides, questions)
 1. Questions live in **Supabase** — add via `.claude/commands/add-question.md`

@@ -46,6 +46,28 @@ CREATE TABLE public.academy_mappings (
 );
 -- RLS: ENABLED
 
+CREATE TABLE public.academy_memberships (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  academy_id uuid NOT NULL,
+  customer_id uuid,
+  student_id uuid,
+  plan_id uuid,
+  stripe_customer_id character varying(255),
+  status text NOT NULL,
+  joined_at timestamp with time zone NOT NULL DEFAULT now(),
+  invited_by uuid,
+  ghl_contact_id character varying(255),
+  CONSTRAINT uq_membership_academy_customer UNIQUE (academy_id, customer_id),
+  CONSTRAINT uq_membership_academy_student UNIQUE (academy_id, student_id),
+  CONSTRAINT academy_memberships_pkey PRIMARY KEY (id),
+  CONSTRAINT academy_memberships_academy_id_fkey FOREIGN KEY (academy_id) REFERENCES clients(id) ON DELETE CASCADE,
+  CONSTRAINT academy_memberships_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES customer_profiles(id) ON DELETE CASCADE,
+  CONSTRAINT academy_memberships_student_id_fkey FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT academy_memberships_status_check CHECK ((status = ANY (ARRAY['ACTIVE'::text, 'SUSPENDED'::text, 'CANCELLED'::text]))),
+  CONSTRAINT ck_membership_customer_xor_student CHECK ((((customer_id IS NOT NULL) AND (student_id IS NULL)) OR ((customer_id IS NULL) AND (student_id IS NOT NULL))))
+);
+-- RLS: ENABLED
+
 CREATE TABLE public.action_items (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   client_id uuid NOT NULL,
@@ -263,6 +285,7 @@ CREATE TABLE public.clients (
   ghl_kpi_config jsonb,
   ghl_synced_at timestamp with time zone,
   allowed_domains text[],
+  sorter_dismissals jsonb NOT NULL DEFAULT '[]'::jsonb,
   CONSTRAINT clients_ghl_location_id_key UNIQUE (ghl_location_id),
   CONSTRAINT clients_pkey PRIMARY KEY (id),
   CONSTRAINT clients_auth_user_id_fkey FOREIGN KEY (auth_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -420,6 +443,21 @@ CREATE TABLE public.conversations (
 );
 -- RLS: ENABLED
 
+CREATE TABLE public.customer_profiles (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  supabase_user_id character varying(255) NOT NULL,
+  first_name character varying(255) NOT NULL,
+  last_name character varying(255) NOT NULL,
+  email character varying(255) NOT NULL,
+  phone character varying(50),
+  profile_type text NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT customer_profiles_pkey PRIMARY KEY (id),
+  CONSTRAINT customer_profiles_profile_type_check CHECK ((profile_type = ANY (ARRAY['PARENT'::text, 'STUDENT'::text])))
+);
+-- RLS: ENABLED
+
 CREATE TABLE public.device_tokens (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   token text NOT NULL,
@@ -448,9 +486,13 @@ CREATE TABLE public.entry_points (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   field_map jsonb NOT NULL DEFAULT '{}'::jsonb,
+  offer_id uuid,
+  ghl_workflow_id text,
+  ghl_workflow_name text,
   CONSTRAINT entry_points_client_id_type_key_key UNIQUE (client_id, type, key),
   CONSTRAINT entry_points_pkey PRIMARY KEY (id),
   CONSTRAINT entry_points_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  CONSTRAINT entry_points_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES offers(id),
   CONSTRAINT entry_points_type_check CHECK ((type = ANY (ARRAY['website-form'::text, 'ghl-form'::text, 'funnel'::text, 'calendar'::text])))
 );
 -- RLS: ENABLED
@@ -569,6 +611,22 @@ CREATE TABLE public.member_files (
 );
 -- RLS: ENABLED
 
+CREATE TABLE public.member_links (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  member_id uuid NOT NULL,
+  matched_by text NOT NULL,
+  confirmed_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT uq_member_links_member UNIQUE (member_id),
+  CONSTRAINT uq_member_links_student UNIQUE (student_id),
+  CONSTRAINT member_links_pkey PRIMARY KEY (id),
+  CONSTRAINT member_links_member_id_fkey FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+  CONSTRAINT member_links_student_id_fkey FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT member_links_matched_by_check CHECK ((matched_by = ANY (ARRAY['email'::text, 'phone'::text, 'manual'::text])))
+);
+-- RLS: ENABLED
+
 CREATE TABLE public.members (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   client_id uuid NOT NULL,
@@ -595,6 +653,7 @@ CREATE TABLE public.members (
   stripe_price_id text,
   stripe_joined_at timestamp with time zone,
   pause_scheduled_for date,
+  billing_mode text,
   CONSTRAINT members_pkey PRIMARY KEY (id),
   CONSTRAINT members_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
   CONSTRAINT members_engagement_check CHECK ((engagement = ANY (ARRAY['consistent'::text, 'at_risk'::text])))
@@ -627,6 +686,7 @@ CREATE TABLE public.members_staging (
   promoted_member_id uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  billing_mode text,
   CONSTRAINT members_staging_pkey PRIMARY KEY (id),
   CONSTRAINT members_staging_client_id_fkey FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
 );
@@ -1139,6 +1199,20 @@ CREATE TABLE public.staff_meta_tokens (
 );
 -- RLS: ENABLED
 
+CREATE TABLE public.students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  parent_id uuid NOT NULL,
+  first_name character varying(255) NOT NULL,
+  last_name character varying(255) NOT NULL,
+  date_of_birth date,
+  notes text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT students_pkey PRIMARY KEY (id),
+  CONSTRAINT students_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES customer_profiles(id) ON DELETE CASCADE
+);
+-- RLS: ENABLED
+
 CREATE TABLE public.tickets (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   client_id uuid,
@@ -1217,6 +1291,12 @@ CREATE TABLE public.website_leads (
 -- ============================================================
 -- INDEXES
 -- ============================================================
+CREATE INDEX ix_academy_memberships_customer_id ON public.academy_memberships USING btree (customer_id);
+CREATE INDEX ix_academy_memberships_ghl_contact_id ON public.academy_memberships USING btree (ghl_contact_id);
+CREATE INDEX ix_academy_memberships_plan_id ON public.academy_memberships USING btree (plan_id);
+CREATE INDEX ix_academy_memberships_student_id ON public.academy_memberships USING btree (student_id);
+CREATE INDEX ix_membership_academy_customer ON public.academy_memberships USING btree (academy_id, customer_id);
+CREATE INDEX ix_membership_academy_student ON public.academy_memberships USING btree (academy_id, student_id);
 CREATE INDEX action_items_client_id_idx ON public.action_items USING btree (client_id);
 CREATE UNIQUE INDEX action_items_client_onboarding_key_uk ON public.action_items USING btree (client_id, onboarding_key);
 CREATE INDEX action_items_open_due_idx ON public.action_items USING btree (client_id, completed_at, due_date);
@@ -1251,6 +1331,8 @@ CREATE INDEX conversation_messages_created_at_idx ON public.conversation_message
 CREATE INDEX conversation_reads_auth_user_id_idx ON public.conversation_reads USING btree (auth_user_id);
 CREATE INDEX conversations_client_id_idx ON public.conversations USING btree (client_id);
 CREATE INDEX conversations_last_message_at_idx ON public.conversations USING btree (last_message_at DESC NULLS LAST);
+CREATE UNIQUE INDEX ix_customer_profiles_email ON public.customer_profiles USING btree (email);
+CREATE UNIQUE INDEX ix_customer_profiles_supabase_user_id ON public.customer_profiles USING btree (supabase_user_id);
 CREATE INDEX device_tokens_auth_user_idx ON public.device_tokens USING btree (auth_user_id);
 CREATE INDEX device_tokens_client_id_idx ON public.device_tokens USING btree (client_id);
 CREATE INDEX idx_ghl_events_client_time ON public.ghl_funnel_events USING btree (client_id, occurred_at);
@@ -1309,6 +1391,7 @@ CREATE INDEX idx_scenario_feedback_rating ON public.sm_scenario_feedback USING b
 CREATE INDEX idx_scenario_feedback_scenario ON public.sm_scenario_feedback USING btree (scenario_id);
 CREATE INDEX idx_scenario_feedback_user ON public.sm_scenario_feedback USING btree (user_id);
 CREATE INDEX idx_staff_meta_tokens_staff_user_id ON public.staff_meta_tokens USING btree (staff_user_id);
+CREATE INDEX ix_students_parent_id ON public.students USING btree (parent_id);
 CREATE UNIQUE INDEX tickets_asana_gid_unique ON public.tickets USING btree (asana_gid) WHERE (asana_gid IS NOT NULL);
 CREATE INDEX tickets_assigned_to_idx ON public.tickets USING btree (assigned_to);
 CREATE INDEX tickets_client_id_idx ON public.tickets USING btree (client_id);
@@ -1514,10 +1597,6 @@ CREATE POLICY "device_tokens_owner_update" ON public.device_tokens
   USING ((auth_user_id = auth.uid()))
   WITH CHECK ((auth_user_id = auth.uid()));
 
-CREATE POLICY "Authenticated read guide cards" ON public.guide_cards
-  FOR SELECT TO authenticated
-  USING (true);
-
 CREATE POLICY "Marketing staff delete guide cards" ON public.guide_cards
   FOR DELETE TO authenticated
   USING ((EXISTS ( SELECT 1
@@ -1535,6 +1614,10 @@ CREATE POLICY "Marketing staff update guide cards" ON public.guide_cards
   USING ((EXISTS ( SELECT 1
    FROM staff
   WHERE ((staff.user_id = auth.uid()) AND (staff.role = ANY (ARRAY['admin'::text, 'marketing'::text, 'marketing_manager'::text, 'marketing_executor'::text]))))));
+
+CREATE POLICY "Staff read guide cards" ON public.guide_cards
+  FOR SELECT TO public
+  USING (is_staff());
 
 CREATE POLICY "locations_client_delete" ON public.locations
   FOR DELETE TO public
@@ -1711,10 +1794,10 @@ CREATE POLICY "playground widgets anon all" ON public.playground_widgets
   USING (true)
   WITH CHECK (true);
 
-CREATE POLICY "Allow all for authenticated" ON public.portal_feedback
+CREATE POLICY "Staff full access" ON public.portal_feedback
   FOR ALL TO authenticated
-  USING (true)
-  WITH CHECK (true);
+  USING (is_staff())
+  WITH CHECK (is_staff());
 
 CREATE POLICY "pricing_catalog_select" ON public.pricing_catalog
   FOR SELECT TO public
@@ -1847,9 +1930,9 @@ CREATE POLICY "Scenarios manageable by admin/lead" ON public.sm_scenarios
   FOR ALL TO authenticated
   USING ((get_sm_role(auth.uid()) = ANY (ARRAY['admin'::text, 'lead_sm'::text])));
 
-CREATE POLICY "Scenarios readable by authenticated" ON public.sm_scenarios
-  FOR SELECT TO authenticated
-  USING (true);
+CREATE POLICY "Scenarios readable by staff" ON public.sm_scenarios
+  FOR SELECT TO public
+  USING (is_staff());
 
 CREATE POLICY "Sessions own insert" ON public.sm_sessions
   FOR INSERT TO authenticated
@@ -1875,21 +1958,21 @@ CREATE POLICY "Units manageable by admin" ON public.sm_units
   FOR ALL TO authenticated
   USING ((get_sm_role(auth.uid()) = 'admin'::text));
 
-CREATE POLICY "Units readable by authenticated" ON public.sm_units
-  FOR SELECT TO authenticated
-  USING (true);
+CREATE POLICY "Units readable by staff" ON public.sm_units
+  FOR SELECT TO public
+  USING (is_staff());
 
 CREATE POLICY "Roles manageable by admin" ON public.sm_user_roles
   FOR ALL TO authenticated
   USING ((get_sm_role(auth.uid()) = 'admin'::text));
 
-CREATE POLICY "Roles readable" ON public.sm_user_roles
-  FOR SELECT TO authenticated
-  USING (true);
+CREATE POLICY "Roles readable by staff" ON public.sm_user_roles
+  FOR SELECT TO public
+  USING (is_staff());
 
 CREATE POLICY "Staff can read all staff" ON public.staff
   FOR SELECT TO public
-  USING ((auth.role() = 'authenticated'::text));
+  USING (is_staff());
 
 CREATE POLICY "Staff can update own row" ON public.staff
   FOR UPDATE TO public
@@ -1939,7 +2022,7 @@ CREATE POLICY "Users can update own token" ON public.user_slack_tokens
 
 CREATE POLICY "staff_read" ON public.website_leads
   FOR SELECT TO public
-  USING ((auth.role() = 'authenticated'::text));
+  USING (is_staff());
 
 -- ============================================================
 -- VIEWS
