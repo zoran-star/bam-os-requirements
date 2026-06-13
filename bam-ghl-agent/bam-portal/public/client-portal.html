@@ -7838,12 +7838,16 @@ Then the call to action."]</div>
       /* No content below when collapsed → drop the margin so we don't
          leave 10px of dead space under the title in a collapsed row. */
       #view-blueprint .bb-block-row-head:last-child { margin-bottom:0; }
-      #view-blueprint .bb-block-remove {
+      #view-blueprint .bb-block-remove,
+      #view-blueprint .bb-block-archive,
+      #view-blueprint .bb-block-restore {
         padding:4px 10px; border-radius:5px;
         background:transparent; border:1px solid var(--border-med);
         color:var(--text-sub); font-size:11px; cursor:pointer;
-        font-family:inherit;
+        font-family:inherit; white-space:nowrap;
       }
+      #view-blueprint .bb-block-archive:hover { border-color:#c9871f; color:#e0a93f; }
+      #view-blueprint .bb-block-restore { border-color:var(--accent,#E8C547); color:var(--accent,#E8C547); }
       #view-blueprint .bb-block-fields > .bb-field:last-child { margin-bottom:0; }
 
       /* Collapsible Block Builder row */
@@ -10545,7 +10549,7 @@ function _bbTermFromLength(s) {
   return null;
 }
 function _bbPlanKeys(offering) {
-  if (!offering || String(offering.type || '').toLowerCase() !== 'membership') return [];
+  if (!offering || offering.archived || String(offering.type || '').toLowerCase() !== 'membership') return [];
   const title = String(offering.title || '').trim();
   if (!title) return [];
   const HST = 1.13;
@@ -11501,6 +11505,7 @@ const _bbStdPricing = [
   { key:'pricing_offerings', type:'block_builder', label:'Pricing options', required:true,
     addLabel:'pricing option',
     collapsible:true,
+    archivable:true,   // soft-archive instead of hard-remove (keeps Stripe links/history)
     summaryKeys:['title','type','price'],
     hint:'Add one row per pricing option. A single offer can have multiple (e.g. both a Membership and a Package).',
     subFields:[
@@ -12187,48 +12192,65 @@ function _bbRenderField(field, sectionId) {
     }
     case 'block_builder': {
       const rows = Array.isArray(val) ? val : [];
-      body = `
-        <div class="bb-block-builder">
-          ${rows.map((row, i) => {
-            const rowLabel = field.addLabel
-              ? field.addLabel.charAt(0).toUpperCase() + field.addLabel.slice(1)
-              : 'Row';
-            if (field.collapsible) {
-              const expanded = _bbBlockIsExpanded(sectionId, field.key, i);
-              const summary = _bbBlockSummaryHtml(row, field.subFields, field.summaryKeys);
-              // Pricing rows carry a LIVE-on-Stripe health pill (per plan×term).
-              const livePill = field.key === 'pricing_offerings' ? _bbLivePill(_bbPlanKeys(row)) : '';
-              return `
-                <div class="bb-block-row">
-                  <div class="bb-block-row-head">
-                    <button class="bb-block-toggle" onclick="_bbBlockToggleExpand('${sectionId}','${field.key}',${i})" title="${expanded ? 'Collapse' : 'Expand'}">${expanded ? '▾' : '▸'}</button>
-                    <div class="bb-block-row-info">
-                      <div class="bb-block-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}${livePill}</div>
-                      <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
-                    </div>
-                    <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
-                  </div>
-                  ${expanded ? `
-                    <div class="bb-block-fields" style="margin-top:14px">
-                      ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
-                    </div>
-                  ` : ''}
+      const rowLabel = field.addLabel
+        ? field.addLabel.charAt(0).toUpperCase() + field.addLabel.slice(1)
+        : 'Row';
+      // Render one row by its ORIGINAL array index (kept stable so archive is
+      // just a flag flip, never a reorder). Archivable fields show Archive/
+      // Restore; everything else keeps Remove.
+      const renderRow = (row, i, isArchived) => {
+        const actionBtn = field.archivable
+          ? (isArchived
+            ? `<button class="bb-block-restore" onclick="_bbBlockRestore('${sectionId}','${field.key}',${i})">Restore</button>`
+            : `<button class="bb-block-archive" onclick="_bbBlockArchive('${sectionId}','${field.key}',${i})" title="Archive — keeps its Stripe price &amp; history; hidden from the live offer">Archive</button>`)
+          : `<button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>`;
+        if (field.collapsible) {
+          const expanded = _bbBlockIsExpanded(sectionId, field.key, i);
+          const summary = _bbBlockSummaryHtml(row, field.subFields, field.summaryKeys);
+          const livePill = (field.key === 'pricing_offerings' && !isArchived) ? _bbLivePill(_bbPlanKeys(row)) : '';
+          return `
+            <div class="bb-block-row" ${isArchived ? 'style="opacity:0.6;"' : ''}>
+              <div class="bb-block-row-head">
+                <button class="bb-block-toggle" onclick="_bbBlockToggleExpand('${sectionId}','${field.key}',${i})" title="${expanded ? 'Collapse' : 'Expand'}">${expanded ? '▾' : '▸'}</button>
+                <div class="bb-block-row-info">
+                  <div class="bb-block-row-title" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${summary.title || '(' + _bbEscapeHtml(rowLabel.toLowerCase()) + ' ' + (i+1) + ')'}${isArchived ? '<span style="font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);">ARCHIVED</span>' : livePill}</div>
+                  <div class="bb-block-row-meta">${summary.meta || '<span class="empty">Click ▸ to fill in details</span>'}</div>
                 </div>
-              `;
-            }
-            return `
-              <div class="bb-block-row">
-                <div class="bb-block-row-head">
-                  <div style="font-size:11px;color:var(--text-mute)">${_bbEscapeHtml(rowLabel)} ${i+1}</div>
-                  <button class="bb-block-remove" onclick="_bbBlockRemove('${sectionId}','${field.key}',${i})">Remove</button>
-                </div>
-                <div class="bb-block-fields">
+                ${actionBtn}
+              </div>
+              ${expanded ? `
+                <div class="bb-block-fields" style="margin-top:14px">
                   ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
                 </div>
-              </div>
-            `;
-          }).join('')}
+              ` : ''}
+            </div>`;
+        }
+        return `
+          <div class="bb-block-row" ${isArchived ? 'style="opacity:0.6;"' : ''}>
+            <div class="bb-block-row-head">
+              <div style="font-size:11px;color:var(--text-mute)">${_bbEscapeHtml(rowLabel)} ${i+1}${isArchived ? ' · ARCHIVED' : ''}</div>
+              ${actionBtn}
+            </div>
+            <div class="bb-block-fields">
+              ${(field.subFields || []).map(sf => _bbRenderSubField(sectionId, field.key, i, sf, row[sf.key], row)).join('')}
+            </div>
+          </div>`;
+      };
+
+      // Keep original indices; split active vs archived (archivable only).
+      const indexed = rows.map((row, i) => ({ row, i }));
+      const active   = field.archivable ? indexed.filter(x => !x.row.archived) : indexed;
+      const archived = field.archivable ? indexed.filter(x =>  x.row.archived) : [];
+
+      body = `
+        <div class="bb-block-builder">
+          ${active.map(x => renderRow(x.row, x.i, false)).join('')}
           <button class="btn-secondary-bb" onclick="_bbBlockAdd('${sectionId}','${field.key}')">+ Add ${_bbEscapeHtml(field.addLabel || 'row')}</button>
+          ${archived.length ? `
+            <div style="margin-top:18px;">
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Archived (${archived.length})</div>
+              ${archived.map(x => renderRow(x.row, x.i, true)).join('')}
+            </div>` : ''}
         </div>
       `;
       break;
@@ -12672,6 +12694,19 @@ function _bbBlockRemove(section, key, idx) {
   const next = [...arr];
   next.splice(idx, 1);
   _bbUpdateField(section, key, next);
+  _bbRenderWizardBody();
+}
+// Archive = soft-remove: flag the row, keep it (and its Stripe price + member
+// history). Archived rows drop out of the live offer, pills, matcher targets,
+// and coverage; they render below the Add button with a Restore button.
+function _bbBlockArchive(section, key, idx) { _bbBlockSetArchived(section, key, idx, true); }
+function _bbBlockRestore(section, key, idx) { _bbBlockSetArchived(section, key, idx, false); }
+function _bbBlockSetArchived(section, key, idx, archived) {
+  const arr = ((_bbState.offer.data || {})[section] || {})[key];
+  if (!Array.isArray(arr) || !arr[idx]) return;
+  const next = arr.map((r, i) => i === idx ? { ...r, archived } : r);
+  _bbUpdateField(section, key, next);
+  _BB_MATCH_HEALTH = null; // plan set changed → LIVE pills refetch
   _bbRenderWizardBody();
 }
 function _bbBlockUpdate(section, key, idx, subKey, val) {

@@ -261,6 +261,7 @@ async function buildOfferTargets(clientId) {
   for (const o of offers) {
     const offerings = (o.data && o.data.pricing && o.data.pricing.pricing_offerings) || [];
     for (const off of offerings) {
+      if (off.archived) continue; // archived pricing options are out of the live offer
       if (String(off.type || "").toLowerCase() !== "membership") continue; // skip Other/test junk
       const title = String(off.title || "").trim();
       if (!title) continue;
