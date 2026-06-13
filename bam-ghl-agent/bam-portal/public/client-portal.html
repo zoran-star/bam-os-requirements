@@ -6706,7 +6706,8 @@ Then the call to action."]</div>
       #view-pipelines .pl-card:hover { border-color:rgba(232,197,71,0.45); }
       #view-pipelines .pl-card.dragging { opacity:0.4; cursor:grabbing; }
       #view-pipelines .pl-card-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-      #view-pipelines .pl-card-contact { font-size:11px; color:var(--text-mute); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-card-contact { font-size:12px; color:var(--text-sub, var(--text-mute)); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      #view-pipelines .pl-card-tag { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-right:5px; }
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
       #view-pipelines .pl-card-trial.is-past { color:#c47424; }
       #view-pipelines .pl-card-ptf {
@@ -15713,8 +15714,8 @@ function _renderPipelineBoard() {
            ondragstart="_plDragStart(event,'${escapeHTML(o.id)}','${escapeHTML(o.stageId || '')}','${escapeHTML(p.id)}')"
            ondragend="_plDragEnd(event)"
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
-        <div class="pl-card-name">${escapeHTML(parent)}</div>
-        ${o.athlete ? `<div class="pl-card-contact">${escapeHTML(o.athlete)}</div>` : ''}
+        <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
+        <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
       </div>`;
   };
 
