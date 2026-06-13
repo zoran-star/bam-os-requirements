@@ -15668,6 +15668,21 @@ function _plSelectPipeline(pipelineId) {
   _renderPipelineBoard();
 }
 
+// Parse a trial date that may be a full ISO timestamp (website booking) or a
+// date-only string like "2026-06-13" (GHL custom field). Returns a display
+// string + whether it's in the past.
+function _plTrialInfo(raw) {
+  if (!raw) return { str: null, passed: false };
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim());
+  const d = new Date(dateOnly ? raw + 'T00:00:00' : raw);
+  if (isNaN(d.getTime())) return { str: null, passed: false };
+  const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const str = dateOnly ? dateStr : dateStr + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  // For date-only, "passed" means the day is fully over (compare end of day).
+  const cutoff = dateOnly ? d.getTime() + 86400000 : d.getTime();
+  return { str, passed: cutoff < Date.now() };
+}
+
 // Post-trial form — opens after a booked trial date has passed. What it
 // captures (coach assessment, did-they-show, fit) is TBD; stub for now.
 function _plPostTrialForm(oppId) {
@@ -15708,6 +15723,8 @@ function _renderPipelineBoard() {
     const ageMs = (o.lastStageChangeAt || o.updatedAt) ? Date.now() - new Date(o.lastStageChangeAt || o.updatedAt).getTime() : 0;
     const stale = ageMs > 7 * 86400 * 1000;
     const parent = o.contact.name || o.name || 'Unknown';
+    const tr = _plTrialInfo(o.trialDate);
+    const trialStr = tr.str, trialPassed = tr.passed;
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''}"
            draggable="true"
@@ -15716,6 +15733,8 @@ function _renderPipelineBoard() {
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
         <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
+        ${trialStr ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>` : ''}
+        ${trialPassed ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : ''}
       </div>`;
   };
 
@@ -15815,13 +15834,8 @@ function _plOpenCard(oppId) {
     ? `<span class="pl-tag pl-tag-member">member · ${escapeHTML(o.member.athlete_name || '')}</span>`
     : `<span class="pl-tag pl-tag-lead">lead</span>`;
 
-  const trial = o.trialDate ? new Date(o.trialDate) : null;
-  const trialOk = trial && !isNaN(trial.getTime());
-  const trialPassed = trialOk && trial.getTime() < Date.now();
-  const trialStr = trialOk
-    ? trial.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
-      ' · ' + trial.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    : null;
+  const tr = _plTrialInfo(o.trialDate);
+  const trialStr = tr.str, trialPassed = tr.passed;
 
   overlay.classList.add('open');
   drawer.classList.add('open');
