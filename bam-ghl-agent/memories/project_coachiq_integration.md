@@ -404,6 +404,34 @@ ENGINE (remaining):
    map; pick the `tier='canonical'` row per `canonical_plan` (1/wk→plan_ToNwa96lQ5I1Bs,
    2/wk→plan_ThYK86w2Zd8fp3, 3/wk→plan_U3CUUJkzgyTjel, unlmtd→plan_U3CFSoR1LdyGlb,
    + 3mo/6mo canonical variants). So create-sub doesn't need new price config.
+
+   ⭐ **COMMITMENT TERMS → Stripe Subscription Schedules (decided 2026-06-13).**
+   When an offer pricing-row is a Membership commitment (e.g. "3 months") with the
+   offer's "what happens after the commitment?" set to **Goes back to monthly**,
+   create-sub must build a **subscription_schedule**, NOT a plain subscription:
+     phases: [
+       { items:[{price: <committed term's LIVE price>}], iterations: <months in term> },
+       { items:[{price: <plan|monthly LIVE price>}] }   // no iterations → ongoing
+     ]
+   Stripe auto-flips phase1→phase2 at term end (no cron). "Renews same" → phase 2
+   repeats the committed price (or a single self-renewing sub). A Stripe **Price is
+   immutable and cannot reference another price** — the revert ONLY exists at
+   sub-creation, so it can't be baked into Price Match; the create-sub flow assembles
+   it from the offer toggle + the two matched LIVE prices (commitment + monthly),
+   both of which the Pricing Sorter already produces. Branch in create-sub:
+   commitment + "goes back to monthly" → schedule; everything else → plain sub.
+   See [[project_pricing_sorter_wizard]] (offer commitments + "what happens after").
+
+   **Early re-commit (staff action, decided 2026-06-13):** if a member wants
+   another 3-month term BEFORE phase 1 ends, you don't cancel/recreate — you edit
+   the existing schedule: extend phase 1's `iterations` (or append another
+   committed phase) and push phase 2 (monthly) out, then `proration_behavior:
+   'none'` so the current paid period isn't re-charged. Staff-side = a "Renew
+   commitment" button on the member popup that PATCHes the schedule (only works on
+   PORTAL-OWNED schedules — same app-created limit as the 6 billing actions;
+   CoachIQ/legacy subs handled by hand). On a plain (already-monthly) sub, "renew
+   commitment" instead WRAPS it into a new schedule starting now. Net: schedules
+   are editable in place — no cancel, no gap, no double charge.
 2. **Wire credits**: in `api/stripe/webhook.js` `handleInvoiceSucceeded`, for
    PORTAL-OWNED subs only (e.g. `metadata.coachiq_user_id` present), call
    `addCoachiqCredits(metadata.coachiq_user_id, { plan, amount })`. Never fire for
