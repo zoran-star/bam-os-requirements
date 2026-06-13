@@ -66,7 +66,8 @@ sql_paths = [
   "./seeds/00_bam_gta_client.sql",
   "./seeds/10_bam_gta_training_offer.sql",
   "./seeds/20_bam_gta_entry_points.sql",
-  "./pricing-catalog-gta-seed.sql"
+  "./pricing-catalog-gta-seed.sql",
+  "./seeds/30_local_parent_app_fixture.sql"
 ]
 
 [db.network_restrictions]
@@ -158,7 +159,10 @@ enabled = true
 # in emails.
 site_url = "http://127.0.0.1:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "fc-mobile-dev:///auth/callback",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
