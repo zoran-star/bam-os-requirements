@@ -3,7 +3,7 @@
 **For agents:** before making schema changes (new tables, columns, RLS, functions, drops/renames),
 diff your plan against the lists below. If anything overlaps → **stop and tell Zoran to message Luka.**
 
-Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-12.
+Owner: Luka (fc-mobile parent app backend). Last updated: 2026-06-13.
 Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-handoff/platform-foundations.md)
 
 ---
@@ -14,9 +14,9 @@ Full context: [`docs/core-handoff/platform-foundations.md`](../../docs/core-hand
 
 | Status | Tables |
 |---|---|
-| Coming next (identity) | `customer_profiles` · `students` · `academy_memberships` · `member_links` |
+| Applied (identity) | `customer_profiles` · `students` · `academy_memberships` · `member_links` |
+| Coming next (scheduling) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
 | Planned (billing/credits) | `membership_plans` · `credit_ledger` · `subscriptions` |
-| Planned (scheduling) | `slot_templates` · `schedule_slots` · `reservations` · `waitlist_entries` |
 | Planned (later) | `membership_change_requests` · parent messaging/notification tables (names TBD) |
 
 ⚠️ These names are **reserved even before the tables exist** — creating a table with one of
