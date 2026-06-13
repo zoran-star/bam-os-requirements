@@ -379,6 +379,55 @@ async function handler(req, res) {
     }
   }
 
+  // 5. For cards still missing an athlete name (legacy GHL-native contacts,
+  //    not from the website), resolve it from the contact's GHL custom fields.
+  //    Athlete field ids are discovered by name once, then contacts are
+  //    fetched in throttled batches (bounded so a huge board can't blow the
+  //    rate limit or the function timeout).
+  try {
+    const missing = [];
+    for (const p of enriched) for (const o of p.opportunities) {
+      if (!o.athlete && o.contactId) missing.push(o);
+    }
+    if (missing.length) {
+      // Discover athlete custom-field ids by name (cached per-call).
+      let athleteFull = null, athleteFirst = null, athleteLast = null;
+      try {
+        const cf = await ghl("GET", `/locations/${encodeURIComponent(locationId)}/customFields`, { token });
+        for (const f of (cf.customFields || [])) {
+          const n = (f.name || "").toLowerCase();
+          if (n.includes("athlete") && n.includes("full")) athleteFull = f.id;
+          else if (n.includes("athlete") && n.includes("first")) athleteFirst = f.id;
+          else if (n.includes("athlete") && n.includes("last")) athleteLast = f.id;
+        }
+      } catch (_) {}
+
+      if (athleteFull || athleteFirst) {
+        const CAP = 150, BATCH = 8;
+        const targets = missing.slice(0, CAP);
+        const readAthlete = (c) => {
+          const fields = c.customFields || c.customField || [];
+          const get = (id) => { const m = fields.find(x => (x.id || x.key) === id); return m ? (Array.isArray(m.value) ? m.value.join(" ") : m.value) : null; };
+          const full = athleteFull ? get(athleteFull) : null;
+          if (full && String(full).trim()) return String(full).trim();
+          const fn = athleteFirst ? get(athleteFirst) : null;
+          const ln = athleteLast ? get(athleteLast) : null;
+          const combined = `${fn || ""} ${ln || ""}`.trim();
+          return combined || null;
+        };
+        for (let i = 0; i < targets.length; i += BATCH) {
+          const slice = targets.slice(i, i + BATCH);
+          await Promise.all(slice.map(async (o) => {
+            try {
+              const cr = await ghl("GET", `/contacts/${encodeURIComponent(o.contactId)}`, { token });
+              o.athlete = readAthlete(cr.contact || cr) || null;
+            } catch (_) { /* leave parent-only */ }
+          }));
+        }
+      }
+    }
+  } catch (_) { /* non-fatal — cards just show parent-only */ }
+
   return res.status(200).json({ pipelines: enriched, totals: {
     pipelines: enriched.length,
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
