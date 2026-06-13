@@ -23,6 +23,13 @@ metadata:
 > only canonical+confirmed counts. Light `GET /api/offers/match-prices`
 > returns catalog offer-linkage rows; client mirrors buildOfferTargets key
 > construction (`_bbPlanKeys` — keep in sync if key format ever changes).
+> **Honest signals + drift (PRs #266/#268/#269):** every green = PLAN COVERAGE
+> AT THE CURRENT AMOUNT, not pool-empty. Drift = live amount_cents ≠ offer
+> pre-tax AND ≠ HST(1.13) all-in → pill "● price changed · update →", plan
+> card banner + "Create the updated price" (create auto-demotes old LIVE →
+> legacy = grandfathering; Stripe prices are immutable). Tier pill on chips
+> reveals "→ MAKE LIVE/LEGACY" on hover. /api/members sorter.matched = full
+> coverage + amount agreement (powers the strip dot).
 
 > **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
 > action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
