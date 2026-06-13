@@ -7791,6 +7791,7 @@ Then the call to action."]</div>
       }
       #view-blueprint .bb-save-state.saving { color:var(--accent); }
       #view-blueprint .bb-save-state.saved { color:#4ade80; }
+      #view-blueprint .bb-save-state.error { color:#e0654f; font-weight:700; }
 
       #view-blueprint .bb-error-banner {
         background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3);
@@ -11078,7 +11079,10 @@ function _bbRenderWizardBody() {
         <div class="bb-page-title">${_bbEscapeHtml(offer.title || '(untitled)')}</div>
         <div class="bb-page-sub">${_bbEscapeHtml(typeLabel)} · ${_bbEscapeHtml(offer.status)}</div>
       </div>
-      <button class="btn-secondary-bb" onclick="_bbNavigate('offers')">Save &amp; close</button>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="bb-save-state" id="bb-save-state-head">${_bbSaveStateLabel()}</span>
+        <button class="btn-primary-bb" onclick="_bbSaveAndClose()">Save &amp; close</button>
+      </div>
     </div>
     <div class="bb-wizard-steps">${stepsHtml}</div>
     <div class="bb-wizard-body">
@@ -11101,10 +11105,19 @@ function _bbRenderWizardBody() {
 }
 
 function _bbSaveStateLabel() {
-  if (_bbState.saveState === 'saving') return '… saving';
-  if (_bbState.saveState === 'saved')  return '✓ saved';
-  if (_bbState.saveState === 'error')  return '⚠ save failed';
-  return '';
+  if (_bbState.saveState === 'saving') return '… Saving';
+  if (_bbState.saveState === 'saved')  return '✓ All changes saved';
+  if (_bbState.saveState === 'error')  return '⚠ Couldn\'t save — retry';
+  return '✓ Changes save automatically';
+}
+
+// Flush any pending debounced autosave NOW, then close. Used by Save & close
+// so the last keystrokes can't be lost to the 600ms debounce window.
+async function _bbSaveAndClose() {
+  if (_bbState.offer && _sb && _bbState.saveState !== 'saved') {
+    try { await _bbAutoSave(); } catch (_) {}
+  }
+  _bbNavigate('offers');
 }
 
 function _bbGoToStep(n) {
@@ -13475,10 +13488,15 @@ async function _bbAutoSave() {
 }
 
 function _bbUpdateSaveStateLabel() {
-  const el = document.getElementById('bb-save-state');
-  if (!el) return;
-  el.textContent = _bbSaveStateLabel();
-  el.className = 'bb-save-state' + (_bbState.saveState === 'saving' ? ' saving' : '') + (_bbState.saveState === 'saved' ? ' saved' : '');
+  const cls = 'bb-save-state' + (_bbState.saveState === 'saving' ? ' saving' : '')
+    + (_bbState.saveState === 'saved' ? ' saved' : '')
+    + (_bbState.saveState === 'error' ? ' error' : '');
+  ['bb-save-state', 'bb-save-state-head'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = _bbSaveStateLabel();
+    el.className = cls;
+  });
 }
 
 // popstate listener for BB hash routing
