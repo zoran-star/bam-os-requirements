@@ -352,6 +352,33 @@ async function handler(req, res) {
     }
   }
 
+  // 4. Enrich with athlete name + booked trial date from our own website_leads
+  //    (we own this data — avoids a per-contact GHL call per card). Rows come
+  //    newest-first, so the first row seen per contact is the latest.
+  const wlRows = await sb(
+    `website_leads?client_id=eq.${clientId}&ghl_contact_id=not.is.null` +
+    `&select=ghl_contact_id,fields,created_at&order=created_at.desc&limit=2000`
+  ).catch(() => []);
+  const leadByContact = new Map();
+  for (const r of (Array.isArray(wlRows) ? wlRows : [])) {
+    const cid = r.ghl_contact_id;
+    if (!cid) continue;
+    const f = r.fields || {};
+    const cur = leadByContact.get(cid) || { athlete: null, trialDate: null };
+    if (!cur.athlete) {
+      cur.athlete = f.athlete || `${f.athlete_first || ""} ${f.athlete_last || ""}`.trim() || null;
+    }
+    if (!cur.trialDate && f.booked_slot) cur.trialDate = f.booked_slot;
+    leadByContact.set(cid, cur);
+  }
+  for (const p of enriched) {
+    for (const o of p.opportunities) {
+      const led = o.contactId ? leadByContact.get(o.contactId) : null;
+      o.athlete = led?.athlete || null;
+      o.trialDate = led?.trialDate || null;
+    }
+  }
+
   return res.status(200).json({ pipelines: enriched, totals: {
     pipelines: enriched.length,
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
