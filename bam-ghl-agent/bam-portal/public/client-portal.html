@@ -6739,6 +6739,14 @@ Then the call to action."]</div>
       #ptf-overlay .ptf-note { font-size:11px; color:var(--text-mute); padding:12px 20px 0; line-height:1.45; }
       #ptf-overlay .ptf-submit { margin:16px 20px 20px; width:calc(100% - 40px); background:var(--accent); color:#0B0B0D; border:none; border-radius:9px; padding:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
       #ptf-overlay .ptf-submit:disabled { opacity:0.5; cursor:not-allowed; }
+
+      /* Drawer journey timeline */
+      #pl-drawer .pl-tl-step { display:flex; align-items:center; gap:9px; font-size:13px; padding:4px 0; }
+      #pl-drawer .pl-tl-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
+      #pl-drawer .pl-tl-dot.ok { background:var(--green); }
+      #pl-drawer .pl-tl-dot.bad { background:#e07070; }
+      #pl-drawer .pl-tl-label { font-weight:600; }
+      #pl-drawer .pl-tl-sub { color:var(--text-mute); font-size:12px; margin-left:auto; }
       #view-pipelines .pl-card-trial.is-past { color:#c47424; }
       #view-pipelines .pl-card-notrial { border-color:rgba(224,134,60,0.75); background:rgba(224,134,60,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:#e0863c; font-weight:700; margin-top:5px; }
@@ -16067,6 +16075,26 @@ function _plOpenCard(oppId) {
   const tr = _plTrialInfo(o.trialDate);
   const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
 
+  // Journey timeline from what we know — form fill, booking, post-trial review,
+  // won/lost. Each step renders only if we have it.
+  const fmt = (iso) => { if (!iso) return null; const d = new Date(iso); if (isNaN(d.getTime())) return null; return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  const steps = [];
+  if (o.formFilledAt) steps.push(['Form filled', fmt(o.formFilledAt), true]);
+  if (trialStr) steps.push(['Trial booked', tr.str, true]);
+  const rv = o.review;
+  if (rv) {
+    if (rv.showed_up === true) steps.push(['Showed up', null, true]);
+    else if (rv.showed_up === false) steps.push(['No show', null, false]);
+    if (rv.good_fit === true) steps.push(['Good fit', rv.trainer ? 'Coach ' + rv.trainer : null, true]);
+    else if (rv.good_fit === false) steps.push(['Not a fit', null, false]);
+  }
+  if (o.status === 'won') steps.push(['Won', null, true]);
+  else if (o.status === 'lost') steps.push(['Lost', null, false]);
+  const timelineHtml = steps.length
+    ? `<div class="pl-d-section"><div class="lbl">Journey</div>${steps.map(([t, sub, ok]) =>
+        `<div class="pl-tl-step"><span class="pl-tl-dot ${ok ? 'ok' : 'bad'}"></span><span class="pl-tl-label">${escapeHTML(t)}</span>${sub ? `<span class="pl-tl-sub">${escapeHTML(sub)}</span>` : ''}</div>`).join('')}</div>`
+    : '';
+
   overlay.classList.add('open');
   drawer.classList.add('open');
   drawer.innerHTML = `
@@ -16080,13 +16108,19 @@ function _plOpenCard(oppId) {
     <div class="pl-d-section">
       <div class="pl-d-row"><div class="lbl2">Parent</div><div>${escapeHTML(o.contact.name || '—')}</div></div>
       <div class="pl-d-row"><div class="lbl2">Athlete</div><div>${escapeHTML(o.athlete || '—')}</div></div>
-      <div class="pl-d-row"><div class="lbl2">Phone</div><div>${escapeHTML(o.contact.phone || '—')}</div></div>
-      <div class="pl-d-row"><div class="lbl2">Email</div><div>${escapeHTML(o.contact.email || '—')}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Phone</div><div>${o.contact.phone ? `<a href="tel:${escapeHTML(o.contact.phone)}" style="color:var(--accent)">${escapeHTML(o.contact.phone)}</a>` : '—'}</div></div>
+      <div class="pl-d-row"><div class="lbl2">Email</div><div>${o.contact.email ? `<a href="mailto:${escapeHTML(o.contact.email)}" style="color:var(--accent)">${escapeHTML(o.contact.email)}</a>` : '—'}</div></div>
       ${trialStr ? `<div class="pl-d-row"><div class="lbl2">Trial</div><div style="color:${trialPassed ? '#c47424' : 'var(--accent)'};font-weight:600">${escapeHTML(trialStr)}</div></div>` : ''}
-      <div class="pl-d-row"><div class="lbl2">Value</div><div>${o.monetaryValue ? '$' + Number(o.monetaryValue).toLocaleString() : '—'}</div></div>
+      ${o.trainer ? `<div class="pl-d-row"><div class="lbl2">Coach</div><div>${escapeHTML(o.trainer)}</div></div>` : ''}
       <div class="pl-d-row"><div class="lbl2">Status</div><div>${escapeHTML(o.status || '—')}</div></div>
       <div class="pl-d-row"><div class="lbl2">Stage age</div><div>${escapeHTML(_plAgeShort(o.lastStageChangeAt))}</div></div>
     </div>
+    ${timelineHtml}
+    <div class="pl-d-section" id="pl-d-lead">
+      <div class="lbl">Lead details</div>
+      <div class="pl-d-row" id="pl-d-lead-loading" style="color:var(--text-mute)"><div class="lbl2"><span class="req-spin"></span></div><div>Loading…</div></div>
+    </div>
+    ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
     <div class="pl-d-actions">
       ${_plIsDoneTrialStage(s)
         ? `<div style="display:flex;gap:8px">
@@ -16101,6 +16135,27 @@ function _plOpenCard(oppId) {
         ? `<a class="pl-d-btn" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center" href="https://app.gohighlevel.com/v2/location/${escapeHTML((_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '')}/contacts/detail/${escapeHTML(o.contactId)}">Open in GHL ↗</a>`
         : ''}
     </div>`;
+  _plLoadLeadDetail(o);
+}
+
+// Fill the drawer's "Lead details" section with every populated field on the
+// contact (athlete age, start-when, near Oakville, etc.).
+async function _plLoadLeadDetail(o) {
+  const sec = document.getElementById('pl-d-lead');
+  if (!sec || !o.contactId) { document.getElementById('pl-d-lead-loading')?.remove(); return; }
+  const shown = new Set(['parent', 'athlete', 'phone', 'email', "athlete's full name"]);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(o.contactId)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await _safeJson(r);
+    if (!r.ok) throw new Error(d.error || 'detail failed');
+    const rows = (d.fields || []).filter(f => f.label && !shown.has(f.label.toLowerCase()));
+    sec.innerHTML = `<div class="lbl">Lead details</div>` + (rows.length
+      ? rows.map(f => `<div class="pl-d-row"><div class="lbl2">${escapeHTML(f.label)}</div><div>${escapeHTML(f.value)}</div></div>`).join('')
+      : `<div style="font-size:13px;color:var(--text-mute)">No extra details captured.</div>`);
+  } catch (e) {
+    sec.innerHTML = `<div class="lbl">Lead details</div><div style="font-size:13px;color:var(--text-mute)">Couldn't load details.</div>`;
+  }
 }
 
 function closePipelineDrawer() {

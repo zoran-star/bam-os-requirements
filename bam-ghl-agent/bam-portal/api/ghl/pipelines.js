@@ -379,11 +379,14 @@ async function handler(req, res) {
     const cid = r.ghl_contact_id;
     if (!cid) continue;
     const f = r.fields || {};
-    const cur = leadByContact.get(cid) || { athlete: null, trialDate: null };
+    const cur = leadByContact.get(cid) || { athlete: null, trialDate: null, formFilledAt: null };
     if (!cur.athlete) {
       cur.athlete = f.athlete || `${f.athlete_first || ""} ${f.athlete_last || ""}`.trim() || null;
     }
     if (!cur.trialDate && f.booked_slot) cur.trialDate = f.booked_slot;
+    // Rows are newest-first, so the last seen per contact is the earliest = the
+    // original form fill.
+    if (r.created_at) cur.formFilledAt = r.created_at;
     leadByContact.set(cid, cur);
   }
   for (const p of enriched) {
@@ -391,6 +394,7 @@ async function handler(req, res) {
       const led = o.contactId ? leadByContact.get(o.contactId) : null;
       o.athlete = led?.athlete || null;
       o.trialDate = led?.trialDate || null;
+      o.formFilledAt = led?.formFilledAt || null;
     }
   }
 
@@ -442,7 +446,7 @@ async function handler(req, res) {
   let trainerOptions = [];
   try {
     const reviews = await sb(
-      `post_trial_reviews?client_id=eq.${clientId}&select=opportunity_id,trainer,good_fit`
+      `post_trial_reviews?client_id=eq.${clientId}&select=opportunity_id,trainer,good_fit,showed_up,notes,created_at`
     ).catch(() => []);
     const byOpp = new Map();
     for (const r of (Array.isArray(reviews) ? reviews : [])) byOpp.set(r.opportunity_id, r);
@@ -450,6 +454,7 @@ async function handler(req, res) {
       const rv = byOpp.get(o.id);
       o.trainer = rv?.trainer || null;
       o.goodFit = rv ? rv.good_fit : null;
+      o.review = rv ? { good_fit: rv.good_fit, showed_up: rv.showed_up, trainer: rv.trainer, notes: rv.notes, created_at: rv.created_at } : null;
     }
   } catch (_) {}
 
