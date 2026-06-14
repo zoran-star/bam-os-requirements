@@ -17579,74 +17579,58 @@ function _sorterRenderStep3(host) {
   const subArr = links.stripe_no_member || [];
   const money = (cents, ival) => cents == null ? '' : '$' + (cents / 100).toFixed(0) + (ival ? '/' + String(ival).replace(/_/g, ' ') : '');
 
-  // ── ONE consolidated member list. Each member shows its price + every
-  // action it needs inline. Three groups: people in Stripe who aren't members
-  // yet (add them) · members needing attention · members ready. ──
+  // ── ONE table. Every person — CSV members AND people in Stripe who aren't
+  // in the CSV — in a single row list. A "Where" column says CSV / Stripe /
+  // both; a "To do" column holds whatever action they need. Attention on top.
   const mem = c.members || [];
-  const needWork = mem.filter(m => m.needs_work);
-  const ready = mem.filter(m => !m.needs_work);
-
-  // A member row: name/email · price · inline actions for whatever it needs.
-  const memRow = (m) => {
-    const sid = escapeHTML(String(m.id));
-    const work = m.needs_work;
-    const price = m.alt_payment ? '💵 pays another way'
-      : (m.price_label ? escapeHTML(m.price_label) + (m.amount_cents != null ? ' · ' + money(m.amount_cents, m.interval) : '')
-        : '<span style="color:#e0a93f;">— no price —</span>');
-    let actions = '';
-    if (work) {
-      if (m.suggestion) actions += fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(m.suggestion.email)}','${escapeHTML(m.suggestion.customer_id || '')}','${escapeHTML(m.suggestion.sub_id || '')}','${escapeHTML(m.suggestion.price_id || '')}')`)
-        + denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss');
-      if (m.no_offer) actions += fixBtn('Connect plan →', `_sorterOpenConnect('${sid}')`);
-      if (m.no_payment) actions += payBtn(sid, m.athlete_name);
-      if (m.is_dup_copy) actions += fixBtn('Remove copy', `_sorterRemoveStaged('${sid}')`)
-        + denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
-    }
-    return `
-      <div style="padding:8px 0;border-bottom:1px solid var(--border,#2a2a31);">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <span style="flex:none;width:7px;height:7px;border-radius:50%;background:${work ? '#e0a93f' : '#7BC47F'};"></span>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.athlete_name || '(no name)')}</div>
-            <div style="font-size:10.5px;color:var(--text-mute,#888);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.parent_email || '')}</div>
-          </div>
-          <div style="flex:none;text-align:right;font-size:12px;font-weight:700;">${price}</div>
-        </div>
-        ${work ? `<div style="margin-left:17px;margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-          <span style="font-size:10px;color:#e0a93f;font-weight:700;">${escapeHTML((m.issues || []).join(' · '))}</span>${actions}</div>` : ''}
-      </div>`;
+  const wherePill = (label, color) => `<span style="font-size:9px;font-weight:800;letter-spacing:.3px;padding:2px 7px;border-radius:999px;border:1px solid ${color};color:${color};white-space:nowrap;">${label}</span>`;
+  const td = (inner, extra) => `<td style="padding:8px 10px;vertical-align:top;${extra || ''}">${inner}</td>`;
+  const nameCell = (work, name, email, customerId) => {
+    const nm = escapeHTML(name || '(no name)');
+    const nmHtml = customerId
+      ? `<span onclick="_sorterStripeInfo('${escapeHTML(customerId)}')" title="See full Stripe info" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;">${nm}</span>`
+      : nm;
+    return `<td style="padding:8px 10px;vertical-align:top;"><div style="display:flex;align-items:flex-start;gap:8px;"><span style="flex:none;width:7px;height:7px;border-radius:50%;margin-top:4px;background:${work ? '#e0a93f' : '#7BC47F'};"></span><div style="min-width:0;"><div style="font-size:12.5px;font-weight:600;">${nmHtml}</div><div style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(email || '')}</div></div></div></td>`;
   };
 
-  // People paying in Stripe with NO member record — additions, not members.
-  const addRow = (inner) => `<div style="padding:8px 0;border-bottom:1px solid var(--border,#2a2a31);display:flex;align-items:center;flex-wrap:wrap;gap:4px;font-size:12px;">${inner}</div>`;
-  const subRows = list(subArr, x => addRow(
-    `💸 ${_sorterWho(x)}` +
-    fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`) +
-    denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member — dismiss')));
-  const oneTimeRows = list(prepaidArr, x => addRow(
-    `💰 ${_sorterWho(x)} — <b>$${((x.amount_cents || 0) / 100).toFixed(0)}</b> one-time ${escapeHTML(x.date || '')}` +
-    (x.maybe_staged
-      ? `<span style="color:#e0a93f;font-weight:700;">&nbsp;⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</span>` +
-        fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`)
-      : '') +
-    fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`) +
-    denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member — dismiss')));
-  const addCount = subArr.length + prepaidArr.length;
-  const churnedInner = list(churnedArr, x => `<div>• ${escapeHTML(x.name || x.email || '')} — sub ${escapeHTML(x.status || 'canceled')}</div>`);
+  // CSV member → row
+  const memTr = (m) => {
+    const sid = escapeHTML(String(m.id));
+    const work = m.needs_work;
+    const where = m.on_stripe ? wherePill('CSV + STRIPE', '#7BC47F') : wherePill('CSV ONLY', work ? '#e0a93f' : 'var(--text-mute,#888)');
+    const price = m.alt_payment ? '💵 pays another way'
+      : (m.price_label ? escapeHTML(m.price_label) + (m.amount_cents != null ? ' · ' + money(m.amount_cents, m.interval) : '')
+        : '<span style="color:#e0a93f;">— none —</span>');
+    let todo;
+    if (work) {
+      let btns = '';
+      if (m.suggestion) btns += fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(m.suggestion.email)}','${escapeHTML(m.suggestion.customer_id || '')}','${escapeHTML(m.suggestion.sub_id || '')}','${escapeHTML(m.suggestion.price_id || '')}')`) + denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person');
+      if (m.no_offer) btns += fixBtn('Connect plan →', `_sorterOpenConnect('${sid}')`);
+      if (m.no_payment) btns += payBtn(sid, m.athlete_name);
+      if (m.is_dup_copy) btns += fixBtn('Remove copy', `_sorterRemoveStaged('${sid}')`) + denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
+      todo = `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${btns}</div>`;
+    } else todo = '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
+    return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_email)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(todo)}</tr>`;
+  };
 
-  const groupHead = (txt, color) => `<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:${color || 'var(--text-mute,#888)'};font-weight:800;margin:14px 0 6px;">${txt}</div>`;
+  // In Stripe, not in the CSV — subscription
+  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, x.email, x.customer_id)}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  // In Stripe, not in the CSV — one-time / prepaid
+  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, x.email, x.customer_id)}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+
+  // Build the rows — attention first (Stripe-only additions + needs-work
+  // members), then everyone ready. One <tbody>, nothing else.
+  const attentionRows = subArr.map(subTr).join('') + prepaidArr.map(oneTimeTr).join('')
+    + mem.filter(m => m.needs_work).map(memTr).join('');
+  const readyRows = mem.filter(m => !m.needs_work).map(memTr).join('');
+  const th = (t) => `<th style="text-align:left;padding:6px 10px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);font-weight:800;border-bottom:1px solid var(--border,#2a2a31);">${t}</th>`;
 
   host.innerHTML = `
-    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">${counts.clean || 0} of ${counts.staged || 0} members ready to promote${needWork.length ? ` · <span style="color:#e0a93f;font-weight:700;">${needWork.length} need attention</span>` : ''}.</div>
-    <div style="border:1px solid var(--border,#2a2a31);border-radius:10px;padding:6px 14px 12px;">
-      ${addCount ? groupHead(`➕ In Stripe, not a member yet (${addCount})`, '#e0a93f') + subRows + oneTimeRows : ''}
-      ${needWork.length ? groupHead(`⚠ Needs attention (${needWork.length})`, '#e0a93f') + needWork.map(memRow).join('') : ''}
-      ${ready.length ? `<details ${needWork.length || addCount ? '' : 'open'}>
-        <summary style="cursor:pointer;list-style:none;">${groupHead(`✓ Ready to promote (${ready.length})`, '#7BC47F')}</summary>
-        ${ready.map(memRow).join('')}</details>` : ''}
-      ${!mem.length && !addCount ? '<div style="font-size:12px;color:var(--text-mute,#888);padding:12px 0;">No members staged yet.</div>' : ''}
-      ${churnedArr.length ? `<details style="margin-top:12px;border-top:1px dashed var(--border,#2a2a31);padding-top:8px;"><summary style="cursor:pointer;font-size:11px;color:var(--text-mute,#888);font-weight:700;list-style:none;">🕰 ${churnedArr.length} past members (canceled subs) · nothing to do</summary><div style="font-size:11px;color:var(--text-mute,#888);margin-top:6px;">${churnedInner}</div></details>` : ''}
-    </div>
+    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">${counts.clean || 0} of ${counts.staged || 0} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work + subArr.length + prepaidArr.length} need attention</span>` : (subArr.length + prepaidArr.length ? ` · <span style="color:#e0a93f;font-weight:700;">${subArr.length + prepaidArr.length} need attention</span>` : '')}.</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>${th('Member')}${th('Where')}${th('Price')}${th('To do')}</tr></thead>
+      <tbody>${attentionRows}${readyRows || ''}</tbody>
+    </table>
     <div id="pc-sorter-connect-host"></div>`;
 
   const canPromote = (counts.clean || 0) > 0;

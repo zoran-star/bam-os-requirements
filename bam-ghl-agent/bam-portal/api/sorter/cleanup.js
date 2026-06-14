@@ -955,6 +955,7 @@ async function handler(req, res) {
         amount_cents: amount,
         interval: cat && cat.interval || null,
         alt_payment: altPay,
+        on_stripe: !!link,
         needs_work: issues.length > 0,
         issues,
         // inline-action data
