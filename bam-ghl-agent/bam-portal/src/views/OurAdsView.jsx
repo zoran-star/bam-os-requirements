@@ -89,6 +89,8 @@ export default function OurAdsView({ tokens, session, me }) {
         tokens={t}
         role={me?.role || ""}
         session={session}
+        forceCanEdit
+
         onChanged={() => {
           // Re-fetch the internal entry so a freshly-saved ad account / campaign
           // selection is reflected without a full reload.

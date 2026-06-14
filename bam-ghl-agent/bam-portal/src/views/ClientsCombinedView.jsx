@@ -1132,9 +1132,12 @@ function suggestAdAccount(clientName, adAccounts) {
   return bestScore >= 15 ? best : null;
 }
 
-export function MarketingTab({ client, tokens, role, session, onChanged }) {
+export function MarketingTab({ client, tokens, role, session, onChanged, forceCanEdit = false }) {
   const t = tokens;
-  const canEdit = ROLES.canEditMeta(role);
+  // forceCanEdit lets a host surface (e.g. the email-gated "Our Ads" tab) allow
+  // its trusted viewers to pick campaigns even if their global role isn't a
+  // marketing/admin one. The server still enforces the real boundary.
+  const canEdit = forceCanEdit || ROLES.canEditMeta(role);
 
   // marketing_included defaults to true for legacy rows (the column was
   // added with DEFAULT true), so undefined === included for safety.

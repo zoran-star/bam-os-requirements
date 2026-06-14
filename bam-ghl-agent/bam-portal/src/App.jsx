@@ -167,7 +167,7 @@ export default function BAMPortal() {
   const canSeeFeedback = me?.role === "admin";
   // "Our Ads" — staff view of BAM's OWN ad campaigns. Email-gated to the same
   // internal-acquisition crew as the (dormant) Channel Dashboard.
-  const OUR_ADS_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com"];
+  const OUR_ADS_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com", "cam@byanymeansbball.com"];
   const canSeeOurAds = !!me && OUR_ADS_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.

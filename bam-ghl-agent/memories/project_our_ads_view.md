@@ -41,14 +41,16 @@ Same Meta ad account
 
 ## Access
 
-Email-gated (NOT role-gated) to the same internal-acquisition crew as the
-dormant Channel Dashboard: `zoran@`, `mike@`, `coleman@` (byanymeansbball.com).
-Allowlist lives in `OUR_ADS_ALLOWLIST` in `App.jsx`.
+Email-gated (NOT role-gated) to the internal-acquisition crew:
+`zoran@`, `mike@`, `coleman@`, `cam@` (byanymeansbball.com). Allowlist lives in
+`OUR_ADS_ALLOWLIST` in `App.jsx`.
 
-⚠️ **Editing the picker** still requires `ROLES.canEditMeta(role)`
-(admin/scaling_manager/marketing) server- and client-side. Coleman/Zoran (admin)
-can pick campaigns; if Mike's staff role isn't one of those, he can view but not
-edit the selection. Widen `canEditMeta` if Mike needs to pick.
+**Anyone who sees the tab can pick campaigns** — `OurAdsView` passes
+`forceCanEdit` to `MarketingTab`, and the server lets this crew (constant
+`INTERNAL_ADS_EDITORS` in `api/marketing.js`) write **only** to the internal
+entry (`INTERNAL_ADS_CLIENT_ID`). They get NO ability to edit real clients' ad
+config. (Zoran/Coleman are admin and Cam is marketing_manager anyway, so the
+bypass mainly covers Mike if his role isn't ops.)
 
 ## Setup required (one-time, by Zoran)
 
@@ -58,10 +60,16 @@ The tab is wired but inert until the internal entry exists and is pointed to:
    "By Any Means — Internal Ads".
 2. On that entry's Marketing tab, wire **our Meta ad account** + pick our
    campaigns.
-3. Set **`VITE_INTERNAL_ADS_CLIENT_ID`** = that entry's UUID in Vercel, redeploy.
+3. Set **two** Vercel env vars to that entry's UUID, then redeploy:
+   - **`VITE_INTERNAL_ADS_CLIENT_ID`** (frontend — which entry the tab loads)
+   - **`INTERNAL_ADS_CLIENT_ID`** (server — scopes the editor bypass to that entry)
+
+   Same value, two names (Vite only exposes `VITE_`-prefixed vars to the
+   browser; the API can't read those).
 
 Until `VITE_INTERNAL_ADS_CLIENT_ID` is set, the tab shows setup instructions
-instead of breaking.
+instead of breaking. If only the frontend var is set, the crew can view but a
+non-ops editor's campaign picks will 403 until `INTERNAL_ADS_CLIENT_ID` is set too.
 
 ## Open items / gotchas
 

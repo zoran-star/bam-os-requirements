@@ -1017,6 +1017,14 @@ function metaVerifyState(state) {
 //
 // Restricted to admin + marketing roles (the people who actually wire up ads).
 const META_OPS_ROLES = MARKETING_OPS_ROLES;
+// "Our Ads" editors: the internal-acquisition crew may pick campaigns on the
+// dedicated internal entry (INTERNAL_ADS_CLIENT_ID) even if their global role
+// isn't a marketing/admin one. Scoped to that one entry — no access to real
+// clients' ad config.
+const INTERNAL_ADS_EDITORS = new Set([
+  "zoran@byanymeansbball.com", "mike@byanymeansbball.com",
+  "coleman@byanymeansbball.com", "cam@byanymeansbball.com",
+]);
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
@@ -1024,8 +1032,21 @@ async function handleMetaAdAccounts(req, res) {
   // on behalf of a client (?client_id=… via Client Setup). Clients use it
   // post-OAuth to pick their own ad account.
   if (!ctx.staff && !ctx.client) return res.status(403).json({ error: "auth required" });
-  if (ctx.staff && !META_OPS_ROLES.has(ctx.staff.role)) {
+  const internalAdsClientId = (process.env.INTERNAL_ADS_CLIENT_ID || "").trim();
+  const isInternalAdsEditor = !!ctx.staff && !!internalAdsClientId &&
+    INTERNAL_ADS_EDITORS.has((ctx.staff.email || "").toLowerCase());
+  if (ctx.staff && !META_OPS_ROLES.has(ctx.staff.role) && !isInternalAdsEditor) {
     return res.status(403).json({ error: "admin or marketing role required" });
+  }
+  // Internal-ads editors who aren't ops staff may only write to the internal entry.
+  if (isInternalAdsEditor && !META_OPS_ROLES.has(ctx.staff.role)) {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const target = req.method === "POST"
+      ? (typeof body.client_id === "string" ? body.client_id.trim() : "")
+      : (req.query.client_id || "").trim();
+    if ((req.method === "POST" || req.method === "DELETE") && target !== internalAdsClientId) {
+      return res.status(403).json({ error: "internal ads editor: writes limited to the internal entry" });
+    }
   }
 
   // POST → set a client's chosen ad account.
