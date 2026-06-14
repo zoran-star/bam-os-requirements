@@ -930,8 +930,11 @@ async function handler(req, res) {
 
     const cleanCount = staging.filter(s => !dupIds.has(s.id) && !noOfferIds.has(s.id) && (s.athlete_name || "").toString().trim() && normEmail(s.parent_email)).length;
 
-    // ── Full roster: every staged member + the price attached, flagged with
-    // what (if anything) needs work. The UI sorts needs-work to the top. ──
+    // ── Full roster: every staged member + price + EVERYTHING needed to act
+    // on them inline (suggestion, dup-copy, no-offer, no-payment). One list. ──
+    const suggById = {}; for (const x of stagedNoStripe) if (x.suggestion) suggById[x.id] = x.suggestion;
+    const dupCopyIds = new Set(); const dupKeyById = {};
+    for (const g of duplicates) { g.ids.forEach(id => dupKeyById[id] = g.key); g.ids.slice(1).forEach(id => dupCopyIds.add(id)); }
     const members = staging.map(s => {
       const link = s.__link;
       const altPay = s.billing_mode === "alternate";
@@ -954,6 +957,12 @@ async function handler(req, res) {
         alt_payment: altPay,
         needs_work: issues.length > 0,
         issues,
+        // inline-action data
+        no_offer: noOfferIds.has(s.id),
+        no_payment: !link && !altPay,
+        is_dup_copy: dupCopyIds.has(s.id),
+        dup_key: dupKeyById[s.id] || null,
+        suggestion: suggById[s.id] || null,
       };
     }).sort((a, b) =>
       (b.needs_work - a.needs_work) ||
