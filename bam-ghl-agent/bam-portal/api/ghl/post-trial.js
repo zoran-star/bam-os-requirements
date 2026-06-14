@@ -139,6 +139,18 @@ async function handler(req, res) {
     } catch (e) { console.error("attendance write failed (non-fatal):", e.message); }
   }
 
+  // Mirror the trainer onto the contact so the Communications tab's trainer
+  // tabs pick it up (also editable inline there).
+  if (contactId && trainer) {
+    try {
+      await sb("contact_trainers?on_conflict=client_id,ghl_contact_id", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ client_id: clientId, ghl_contact_id: contactId, trainer, updated_by: ctx.staff?.name || ctx.user?.email || null, updated_at: new Date().toISOString() }),
+      });
+    } catch (e) { console.error("contact_trainers upsert failed (non-fatal):", e.message); }
+  }
+
   const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
   if (goodFit) {
