@@ -432,6 +432,19 @@ ENGINE (remaining):
    CoachIQ/legacy subs handled by hand). On a plain (already-monthly) sub, "renew
    commitment" instead WRAPS it into a new schedule starting now. Net: schedules
    are editable in place — no cancel, no gap, no double charge.
+
+   **FIRST LIVE create-sub SHIPPED (PR #292, 2026-06-13) — narrow prepaid case.**
+   `api/sorter/setup-monthly.js` (preview|create) creates a PORTAL-OWNED monthly
+   sub for a PREPAID one-time member: `trial_end` = prepaid charge date + term
+   months → no charge until the prepaid period ends, then monthly (a monthly sub
+   with a trial_end anchor IS the revert for the one-time-prepaid case — no
+   schedule needed). Finds the plan's monthly canonical/confirmed price in
+   pricing_catalog, reuses the customer's default card, idempotent, stamps
+   metadata + links the staging row. No card → Checkout `mode=setup` link the UI
+   copies to clipboard (sub only created once a card exists). UI = Connect popup
+   "💳 Set up monthly billing now" → preview → explicit confirm (amount/date/
+   card) → create. Gated milestone done narrowly behind a confirm; general
+   create-sub + schedules for NEW signups + full migration still pending sign-off.
 2. **Wire credits**: in `api/stripe/webhook.js` `handleInvoiceSucceeded`, for
    PORTAL-OWNED subs only (e.g. `metadata.coachiq_user_id` present), call
    `addCoachiqCredits(metadata.coachiq_user_id, { plan, amount })`. Never fire for
