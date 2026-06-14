@@ -6779,8 +6779,19 @@ Then the call to action."]</div>
         padding:14px 40px 14px 14px; align-self:flex-start;
         /* the whole platform is an arrow pointing into the pipeline */
         clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%);
-        filter: drop-shadow(0 0 1px rgba(125, 203, 148, 0.45));
       }
+      /* Board container never scrolls itself — only the inner board (x) and
+         each column's card list (y) do. Prevents a stray container scrollbar. */
+      #view-pipelines #pl-board-container { overflow: visible; }
+      /* Thin, subtle scrollbars so a scrolling column reads as part of the
+         column, not a stray floating bar. */
+      #view-pipelines .pl-cards::-webkit-scrollbar,
+      #view-pipelines .pl-board::-webkit-scrollbar { width:6px; height:6px; }
+      #view-pipelines .pl-cards::-webkit-scrollbar-thumb,
+      #view-pipelines .pl-board::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:6px; }
+      #view-pipelines .pl-cards::-webkit-scrollbar-track,
+      #view-pipelines .pl-board::-webkit-scrollbar-track { background:transparent; }
+      #view-pipelines .pl-cards { scrollbar-width:thin; scrollbar-color:rgba(255,255,255,0.15) transparent; }
       #view-pipelines .pl-rail-head {
         font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em;
         color:var(--text); padding:0 2px;
