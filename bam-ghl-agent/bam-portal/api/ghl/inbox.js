@@ -244,12 +244,44 @@ async function handler(req, res) {
   } catch (_) {}
 
   // Lead/Client tag config from the training offer.
-  let tagConfig = { lead_tag: null, client_tag: null };
+  //   client_tag (default "liveclient") → member.  lead_tags[] → lead.
+  //   A member ALWAYS wins over lead tags (someone tagged liveclient is a
+  //   member even if they still carry an old lead tag).
+  let leadTags = [];
+  let clientTag = "liveclient";
   try {
     const offers = await sb(`offers?client_id=eq.${clientId}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
     const d = offers?.[0]?.data || {};
-    tagConfig = { lead_tag: d.lead_tag || null, client_tag: d.client_tag || null };
+    if (Array.isArray(d.lead_tags)) leadTags = d.lead_tags.filter(Boolean);
+    else if (d.lead_tag)            leadTags = [d.lead_tag];   // legacy single value
+    if (d.client_tag)               clientTag = d.client_tag;  // override the default
   } catch (_) {}
+  const tagConfig = { lead_tags: leadTags, client_tag: clientTag };
+
+  // Resolve which GHL contactIds carry each tag (member tag + each lead tag)
+  // so we can classify conversations. One search per tag; degrades silently to
+  // the members-table match if the GHL search endpoint rejects the query.
+  const lc = (s) => String(s || "").toLowerCase();
+  async function contactIdsWithTag(tag) {
+    const ids = new Set();
+    if (!tag) return ids;
+    try {
+      for (let page = 1; page <= 5; page++) {
+        const data = await ghl("POST", `/contacts/search`, {
+          token,
+          body: { locationId, page, pageLimit: 100, filters: [{ field: "tags", operator: "contains", value: tag }] },
+        });
+        const list = data.contacts || data.data || [];
+        for (const c of list) { const id = c.id || c.contactId; if (id) ids.add(id); }
+        if (list.length < 100) break;
+      }
+    } catch (_) { /* search unsupported / failed — fall back to convo tags + members table */ }
+    return ids;
+  }
+  const memberTagSet = await contactIdsWithTag(clientTag);
+  const leadTagSetList = await Promise.all(leadTags.map(contactIdsWithTag));
+  const leadTagSet = new Set();
+  for (const s of leadTagSetList) for (const id of s) leadTagSet.add(id);
 
   const annotated = convos.map(c => {
     const m =
@@ -257,6 +289,19 @@ async function handler(req, res) {
       (c.email     && memberByEmail.get((c.email || "").toLowerCase())) ||
       (c.phone     && memberByPhone.get(normPhone(c.phone))) ||
       null;
+    // Tags carried directly on the conversation, if GHL returned them.
+    const convoTags = Array.isArray(c.tags)
+      ? c.tags.map(t => lc(typeof t === "string" ? t : (t.name || t.tag)))
+      : [];
+    const cid = c.contactId;
+    // Member wins: members-table match OR the member tag (set or inline).
+    const isMember = !!m
+      || (cid && memberTagSet.has(cid))
+      || convoTags.includes(lc(clientTag));
+    const isLead = !isMember && (
+      (cid && leadTagSet.has(cid))
+      || leadTags.some(t => convoTags.includes(lc(t)))
+    );
     return {
       id:                c.id,
       contactId:         c.contactId,
@@ -268,10 +313,7 @@ async function handler(req, res) {
       lastMessageType:   c.lastMessageType || "",
       lastMessageDirection: c.lastMessageDirection || "",
       unreadCount:       c.unreadCount || 0,
-      // Only a confirmed member-table match is a "member". Everyone else is
-      // "other" (shown in All only) — we no longer assume unmatched contacts
-      // are leads. A real "lead" classification will come from the lead_tag.
-      classification:    m ? "member" : "other",
+      classification:    isMember ? "member" : (isLead ? "lead" : "other"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
       trainer: (c.contactId && trainerByContact.get(c.contactId)) || null,
       channel: String(c.lastMessageType || c.type || "").replace(/^TYPE_/, "").toLowerCase() || null,

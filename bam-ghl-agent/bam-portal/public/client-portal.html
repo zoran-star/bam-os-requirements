@@ -11736,8 +11736,8 @@ const _bbOfferConfigs = {
     ]},
     { id:'pricing', label:'Pricing', fields:_bbStdPricing },
     { id:'sales', label:'Sales', fields:[
-      { key:'lead_tag', type:'ghl_tag', label:'Lead tag',
-        hint:'The GHL tag that marks a contact as a lead for this offer. Powers the Leads filter in the Inbox.' },
+      { key:'lead_tags', type:'ghl_tags_multi', label:'Lead tags',
+        hint:'GHL tags that mark a contact as a lead. Pick as many as apply — a contact is a lead if they carry ANY of them. ★ = AI suggestion. (Members always win over lead tags.)' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -11804,8 +11804,8 @@ const _bbOfferConfigs = {
       _bbCommonExtraNotes
     ]},
     { id:'onboarding', label:'Onboarding', fields:[
-      { key:'client_tag', type:'ghl_tag', label:'Client tag',
-        hint:'The GHL tag that marks a contact as a paying client/member. Powers the Members filter in the Inbox.' },
+      { key:'client_tag', type:'ghl_tag', label:'Member tag', default:'liveclient',
+        hint:'The GHL tag that marks a contact as a paying member. Defaults to "liveclient" — added automatically when GHL connects and by the website onboarding flow. Members always win over lead tags in the Inbox.' },
       ..._bbStdOnboarding(
         ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
         ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
@@ -12376,18 +12376,35 @@ function _bbRenderField(field, sectionId) {
       break;
     }
     case 'ghl_tag': {
-      // Lead/Client GHL tag picker. Reads + writes the TOP-LEVEL offer.data
-      // key (lead_tag / client_tag), not the section-scoped value, so it
-      // matches what the Inbox + comms-config read.
-      const cur = (_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key]) || '';
-      const rec = field.key === 'lead_tag' ? _bbTagRecommend.lead : _bbTagRecommend.client;
+      // Single GHL tag picker (Member tag → top-level offer.data.client_tag).
+      // Defaults to field.default ('liveclient') when unset, and always keeps
+      // that default available even if the academy hasn't created it in GHL yet.
+      const saved = (_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key]) || '';
+      const def = field.default || '';
+      const cur = saved || def;
+      const tagPool = def && !_bbTagList.includes(def) ? [def, ..._bbTagList] : _bbTagList;
+      if (!tagPool.length) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">${_bbTagsLoadedFor ? 'No GHL tags found — create tags in GHL, then reopen this offer.' : 'Loading tags…'}</div>`;
+      } else {
+        const opts = ['<option value="">— none —</option>'].concat(tagPool.map(tg =>
+          `<option value="${_bbEscapeAttr(tg)}" ${tg === cur ? 'selected' : ''}>${_bbEscapeHtml(tg)}${tg === def ? ' (default)' : ''}</option>`
+        )).join('');
+        body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
+      }
+      break;
+    }
+    case 'ghl_tags_multi': {
+      // Multi-select GHL tags (Lead tags → top-level offer.data.lead_tags
+      // array). A contact is a lead if they carry ANY of the picked tags.
+      const sel = Array.isArray(_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key])
+        ? _bbState.offer.data[field.key] : [];
+      const rec = _bbTagRecommend.lead;
       if (!_bbTagList.length) {
         body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">${_bbTagsLoadedFor ? 'No GHL tags found — create tags in GHL, then reopen this offer.' : 'Loading tags…'}</div>`;
       } else {
-        const opts = ['<option value="">— none —</option>'].concat(_bbTagList.map(tg =>
-          `<option value="${_bbEscapeAttr(tg)}" ${tg === cur ? 'selected' : ''}>${_bbEscapeHtml(tg)}${tg === rec ? ' (recommended)' : ''}</option>`
-        )).join('');
-        body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
+        body = `<div class="bb-choice-row">${_bbTagList.map(tg =>
+          `<button type="button" class="bb-choice ${sel.includes(tg) ? 'selected' : ''}" onclick="_bbToggleOfferTopArray('${field.key}','${_bbEscapeAttr(tg)}')">${_bbEscapeHtml(tg)}${tg === rec ? ' ★' : ''}</button>`
+        ).join('')}</div>`;
       }
       break;
     }
@@ -13438,13 +13455,31 @@ async function _bbLoadTags() {
   return _bbTagList;
 }
 
-// Tag fields persist at the TOP LEVEL of offer.data (data.lead_tag /
-// data.client_tag) — the canonical spot the Inbox + comms-config read — so the
-// offer editor and the standalone Sales/Onboarding selectors stay in sync.
+// Default GHL tag that marks a contact as a paying member/client. Added when
+// the academy connects GHL and by the website onboarding flow. Used as the
+// fallback when the Member-tag field hasn't been changed.
+const _BB_DEFAULT_CLIENT_TAG = 'liveclient';
+
+// Tag fields persist at the TOP LEVEL of offer.data (data.lead_tags array /
+// data.client_tag string) — the canonical spot the Inbox reads — so the offer
+// editor stays the single source of truth for classification.
 function _bbUpdateOfferTopKey(key, val) {
   if (!_bbState.offer) return;
   _bbState.offer.data = _bbState.offer.data || {};
   _bbState.offer.data[key] = val || null;
+}
+
+// Toggle a value in a TOP-LEVEL array on offer.data (used by multi-select
+// lead tags → data.lead_tags). Adds if absent, removes if present.
+function _bbToggleOfferTopArray(key, val) {
+  if (!_bbState.offer) return;
+  _bbState.offer.data = _bbState.offer.data || {};
+  const arr = Array.isArray(_bbState.offer.data[key]) ? _bbState.offer.data[key].slice() : [];
+  const i = arr.indexOf(val);
+  if (i >= 0) arr.splice(i, 1); else arr.push(val);
+  _bbState.offer.data[key] = arr;
+  _bbAutoSave();
+  _bbRenderWizardBody();
 }
 
 // Offers picker — pulls the academy's existing offers (excluding the
