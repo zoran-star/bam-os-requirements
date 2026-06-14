@@ -110,6 +110,27 @@ export default function FeedbackView({ tokens, dark, session }) {
     }
   };
 
+  // "Build spec" — turn a feedback item into a ready-to-build GitHub issue
+  // (Claude writes the spec). Stores the issue URL on the row so it isn't redone.
+  const specItem = async (item) => {
+    const tok = session?.access_token;
+    const res = await fetch(`/api/clients?action=feedback-spec&id=${encodeURIComponent(item.id)}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok}` },
+    });
+    const j = await res.json().catch(() => ({}));
+    if (j.reason === "github_not_configured") {
+      alert("GitHub isn't connected yet — an admin needs to set GITHUB_TOKEN + GITHUB_REPO in Vercel.");
+      return;
+    }
+    if (!res.ok || !j.url) {
+      alert("Couldn't create the spec: " + (j.error || res.statusText));
+      return;
+    }
+    setFeedback(prev => prev.map(f => (f.id === item.id ? { ...f, github_issue_url: j.url } : f)));
+    window.open(j.url, "_blank");
+  };
+
   return (
     <div>
       {/* Section switcher: Feedback vs Agent Sessions */}
@@ -214,7 +235,7 @@ export default function FeedbackView({ tokens, dark, session }) {
       {!loading && !err && visible.length > 0 && (
         <div style={{ display: "grid", gap: 12 }}>
           {visible.map(f => (
-            <FeedbackRow key={f.id} f={f} staff={staffMap[f.author_id]} tokens={t} onToggleResolved={() => toggleResolved(f)} />
+            <FeedbackRow key={f.id} f={f} staff={staffMap[f.author_id]} tokens={t} onToggleResolved={() => toggleResolved(f)} onSpec={() => specItem(f)} />
           ))}
         </div>
       )}
@@ -246,9 +267,10 @@ function FilterRow({ tokens, label, options, value, onChange, extra }) {
   );
 }
 
-function FeedbackRow({ f, staff, tokens, onToggleResolved }) {
+function FeedbackRow({ f, staff, tokens, onToggleResolved, onSpec }) {
   const t = tokens;
   const resolved = !!f.resolved_at;
+  const [specBusy, setSpecBusy] = useState(false);
   const portalColor = f.portal === "client" ? t.amber
     : f.portal === "signup" ? "#6EB4FF"
     : f.portal === "spec" ? "#E8C547"
@@ -350,6 +372,26 @@ function FeedbackRow({ f, staff, tokens, onToggleResolved }) {
               Page: {f.page}
             </div>
           )}
+
+          {/* Build spec → GitHub issue (Phase 2 of feedback → action) */}
+          <div style={{ marginTop: 12 }}>
+            {f.github_issue_url ? (
+              <a href={f.github_issue_url} target="_blank" rel="noreferrer" style={{
+                display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
+                color: t.accent || "#E8C547", textDecoration: "none",
+              }}>📋 View build spec ↗</a>
+            ) : !resolved ? (
+              <button
+                onClick={async () => { setSpecBusy(true); try { await onSpec(); } finally { setSpecBusy(false); } }}
+                disabled={specBusy}
+                style={{
+                  fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6,
+                  border: `1px solid ${t.border}`, background: t.surface, color: t.text,
+                  cursor: specBusy ? "default" : "pointer", fontFamily: "inherit",
+                }}
+              >{specBusy ? "Building spec…" : "✨ Build spec"}</button>
+            ) : null}
+          </div>
 
           {resolved && f.resolved_at && (
             <div style={{ marginTop: 8, fontSize: 11, color: t.green || "#7ED996", fontWeight: 600 }}>

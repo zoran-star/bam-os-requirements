@@ -188,8 +188,9 @@ async function triageFeedback(items) {
     "You triage product feedback for a small SaaS team so the founder can act fast.",
     "For EACH item, give a one-line concrete suggested action (what to build/do, plainly) and an effort estimate.",
     "effort must be exactly one of: S, M, L (small/medium/large).",
+    "auto_safe = true ONLY when the item is a small (S), clearly-scoped, low-risk feature or bug that a coding agent could spec confidently without more info. Anything vague, large, risky, or needing a product decision = false.",
     "Keep each action under 16 words. No jargon, no preamble.",
-    "Return ONLY a JSON array, no markdown, each element exactly: {\"id\": string, \"effort\": \"S|M|L\", \"action\": string}.",
+    "Return ONLY a JSON array, no markdown, each element exactly: {\"id\": string, \"effort\": \"S|M|L\", \"action\": string, \"auto_safe\": boolean}.",
   ].join(" ");
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -209,20 +210,114 @@ async function triageFeedback(items) {
     if (!match) return {};
     const arr = JSON.parse(match[0]);
     const map = {};
-    for (const e of arr) { if (e && e.id) map[e.id] = { effort: e.effort || "?", action: e.action || "" }; }
+    for (const e of arr) { if (e && e.id) map[e.id] = { effort: e.effort || "?", action: e.action || "", auto_safe: !!e.auto_safe }; }
     return map;
   } catch {
     return {};
   }
 }
 
+// ── Feedback → Action, Phase 2/3: spec a feedback item into a GitHub issue ──
+
+// Ask Claude to turn one feedback item into a ready-to-build issue spec.
+// Returns { title, body } (markdown) or null on failure / no key.
+async function specFeedbackItem(item) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+  const system = [
+    "You convert a single product-feedback note into a crisp, ready-to-build engineering issue for the BAM portal (React/Vite + Vercel serverless + Supabase).",
+    "Output JSON only: {\"title\": string, \"body\": string}.",
+    "title: under 80 chars, imperative (e.g. 'Add X to Y').",
+    "body: GitHub-flavored markdown with these sections — **Problem** (what the user asked + why), **Proposed approach** (concrete steps), **Likely files/areas** (best-guess paths in bam-ghl-agent/bam-portal), **Acceptance criteria** (checklist), **Effort** (S/M/L). Be specific but concise; it's a starting brief, not a novel.",
+    "If the feedback is too vague to scope, say so plainly in Proposed approach and list what to clarify.",
+  ].join(" ");
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1400,
+        system,
+        messages: [{ role: "user", content: `Feedback (kind=${item.kind}, page=${item.page || "-"}):\n\n${(item.body || "").slice(0, 1200)}\n\nWrite the issue JSON now.` }],
+      }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const text = j.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const parsed = JSON.parse(match[0]);
+    if (!parsed.title || !parsed.body) return null;
+    return { title: String(parsed.title).slice(0, 120), body: String(parsed.body) };
+  } catch {
+    return null;
+  }
+}
+
+// Create a GitHub issue. Needs GITHUB_TOKEN (issues:write) + GITHUB_REPO
+// ("owner/repo"). Returns the issue html_url or null (inert when unconfigured).
+async function createGithubIssue(title, body, labels) {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPO;
+  if (!token || !repo) return null;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "bam-portal-feedback",
+      },
+      body: JSON.stringify({ title, body, labels: labels || [] }),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.html_url || null;
+  } catch {
+    return null;
+  }
+}
+
+// Spec one feedback row → GitHub issue, and record the URL so we don't redo it.
+// Returns { url, created } or { error }.
+async function specFeedbackToIssue(item) {
+  if (item.github_issue_url) return { url: item.github_issue_url, created: false };
+  const spec = await specFeedbackItem(item);
+  const title = spec?.title || `Feedback: ${(item.body || "").slice(0, 60)}`;
+  const body = [
+    spec?.body || `**Problem**\n\n${item.body || ""}`,
+    "\n\n---",
+    `_Auto-generated from portal feedback \`${item.id}\`${item.submitter_email ? ` · ${item.submitter_email}` : ""}${item.page ? ` · page ${item.page}` : ""}._`,
+  ].join("");
+  const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement"];
+  const url = await createGithubIssue(title, body, labels);
+  if (!url) return { error: "issue_not_created" };
+  // Best-effort record (column may not exist yet pre-migration — don't fail).
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/portal_feedback?id=eq.${encodeURIComponent(item.id)}`, {
+      method: "PATCH",
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ github_issue_url: url, spec_created_at: new Date().toISOString() }),
+    });
+  } catch { /* column missing pre-migration — ignore */ }
+  return { url, created: true };
+}
+
 async function cronFeedbackDigest(req, res) {
   try {
     // Open = not yet resolved. Newest first; cap so the digest stays scannable.
-    const open = await supabaseSelect(
-      `portal_feedback?resolved_at=is.null&select=id,body,kind,page,portal,submitter_email,created_at&order=created_at.desc&limit=15`
-    );
-    const items = Array.isArray(open) ? open : [];
+    // Try to include github_issue_url; fall back if the column isn't migrated yet
+    // so the digest keeps working pre-migration.
+    const baseSelect = "id,body,kind,page,portal,submitter_email,created_at";
+    let items;
+    try {
+      items = await supabaseSelect(`portal_feedback?resolved_at=is.null&select=${baseSelect},github_issue_url&order=created_at.desc&limit=15`);
+    } catch {
+      items = await supabaseSelect(`portal_feedback?resolved_at=is.null&select=${baseSelect}&order=created_at.desc&limit=15`);
+    }
+    items = Array.isArray(items) ? items : [];
     if (!items.length) return res.status(200).json({ ok: true, open: 0, posted: false });
 
     const token = process.env.SLACK_BOT_TOKEN;
@@ -230,6 +325,23 @@ async function cronFeedbackDigest(req, res) {
     if (!token || !channel) return res.status(200).json({ ok: true, open: items.length, posted: false, reason: "slack_not_configured" });
 
     const triage = await triageFeedback(items);
+
+    // Phase 3 — auto-spec safe items into GitHub issues (cap per run). Only runs
+    // when GitHub is configured AND the column exists (item has the key). Never
+    // builds/merges code — it just files a ready-to-build issue for human pickup.
+    const issueByItem = {};
+    for (const it of items) { if (it.github_issue_url) issueByItem[it.id] = it.github_issue_url; }
+    let autoSpecced = 0;
+    if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPO) {
+      const candidates = items.filter(it => "github_issue_url" in it && !it.github_issue_url && triage[it.id]?.auto_safe).slice(0, 3);
+      for (const it of candidates) {
+        try {
+          const r = await specFeedbackToIssue(it);
+          if (r.url) { issueByItem[it.id] = r.url; if (r.created) autoSpecced++; }
+        } catch { /* skip this one, keep the digest going */ }
+      }
+    }
+
     const base = "https://portal.byanymeansbusiness.com";
     const lines = items.map((it, idx) => {
       const label = FEEDBACK_KIND_LABEL[it.kind] || "FEEDBACK";
@@ -239,11 +351,13 @@ async function cronFeedbackDigest(req, res) {
       const body = (it.body || "").replace(/\s+/g, " ").slice(0, 160);
       const tip = triage[it.id];
       const suggestion = tip ? `\n     ↳ _${tip.action}_ · *${tip.effort}* effort` : "";
-      return `*${idx + 1}. ${label}*${where} — ${body}${suggestion}\n     ${who}${when}`.trim();
+      const issue = issueByItem[it.id] ? `\n     📋 spec: <${issueByItem[it.id]}|GitHub issue>` : "";
+      return `*${idx + 1}. ${label}*${where} — ${body}${suggestion}${issue}\n     ${who}${when}`.trim();
     });
     const header = `:inbox_tray: *Feedback to action — ${items.length} open${items.length === 15 ? "+" : ""}*`;
+    const specNote = autoSpecced ? `\n_:robot_face: auto-drafted ${autoSpecced} ready-to-build spec${autoSpecced === 1 ? "" : "s"} (see 📋 links)._` : "";
     const footer = `\n\n→ Review + resolve: <${base}/?nav=feedback|Feedback tab>`;
-    const text = `${header}\n\n${lines.join("\n\n")}${footer}`;
+    const text = `${header}${specNote}\n\n${lines.join("\n\n")}${footer}`;
 
     const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
@@ -251,7 +365,7 @@ async function cronFeedbackDigest(req, res) {
       body: JSON.stringify({ channel, text, unfurl_links: false }),
     });
     const sj = await slackRes.json().catch(() => ({}));
-    return res.status(200).json({ ok: true, open: items.length, posted: !!sj.ok, ai: Object.keys(triage).length > 0, slack_error: sj.ok ? null : (sj.error || null) });
+    return res.status(200).json({ ok: true, open: items.length, posted: !!sj.ok, ai: Object.keys(triage).length > 0, auto_specced: autoSpecced, slack_error: sj.ok ? null : (sj.error || null) });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -1569,7 +1683,7 @@ async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally narrowed to the `admin` role inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -2134,6 +2248,26 @@ async function handler(req, res) {
           `portal_feedback?select=*${portalFilter}${kindFilter}&order=resolved_at.asc.nullsfirst,created_at.desc&limit=${limit}`
         );
         return res.status(200).json({ data: rows || [] });
+      }
+
+      // ── action=feedback-spec ──
+      // ADMIN-ONLY. "Build spec" button: turn one feedback item into a
+      // ready-to-build GitHub issue (Claude writes the spec). Records the issue
+      // URL on the row so it isn't recreated. Inert (clear error) when
+      // GITHUB_TOKEN/GITHUB_REPO aren't configured.
+      if (action === "feedback-spec") {
+        if (role !== "admin") return res.status(403).json({ error: "feedback spec is admin-only" });
+        if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+          return res.status(200).json({ ok: false, reason: "github_not_configured" });
+        }
+        const fbId = typeof req.query.id === "string" ? req.query.id : "";
+        if (!fbId) return res.status(400).json({ error: "id required" });
+        const rows = await supabaseSelect(`portal_feedback?id=eq.${encodeURIComponent(fbId)}&select=*&limit=1`);
+        const item = rows?.[0];
+        if (!item) return res.status(404).json({ error: "feedback not found" });
+        const result = await specFeedbackToIssue(item);
+        if (result.error) return res.status(502).json({ ok: false, error: result.error });
+        return res.status(200).json({ ok: true, url: result.url, created: result.created });
       }
 
       // ── action=resolve-feedback ──
