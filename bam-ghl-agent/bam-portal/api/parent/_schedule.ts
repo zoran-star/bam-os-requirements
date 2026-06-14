@@ -7,6 +7,8 @@ const MISSING_CUSTOMER_PROFILE_MESSAGE =
 
 const SLOT_SCAN_LIMIT = 1_000;
 const RESERVATION_SCAN_LIMIT = 1_000;
+const UTC_TIME_ZONE = "UTC";
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 type CustomerProfile = {
   id: string;
@@ -24,6 +26,11 @@ type Membership = {
   customer_id: string | null;
   student_id: string | null;
   status: "ACTIVE" | "SUSPENDED" | "CANCELLED";
+};
+
+type AcademyTimeZoneRow = {
+  id: string;
+  time_zone: string | null;
 };
 
 type ScheduleSlot = {
@@ -139,10 +146,16 @@ export async function listScheduleSlots(
 ): Promise<CustomerSlotOut[]> {
   ensureAcademyAccess(context, opts.academyId);
   const membershipId = resolveMembershipForAcademy(context, opts.membershipId, opts.academyId);
+  const timeZones = await getAcademyTimeZones([opts.academyId]);
+  const dateRange = futureDateRangeIso(
+    opts.dateFrom,
+    opts.dateTo,
+    academyTimeZone(timeZones, opts.academyId),
+  );
   const slots = await getSlots({
     academyIds: [opts.academyId],
-    startGte: futureStartIso(opts.dateFrom),
-    startLt: opts.dateTo ? endExclusiveIso(opts.dateTo) : undefined,
+    startGte: dateRange.startGte,
+    startLt: dateRange.startLt,
     limit: opts.limit,
     order: "asc",
     includeCancelled: false,
@@ -180,13 +193,11 @@ export async function listUpcomingReservations(
   if (membershipIds.length === 0 || context.academyIds.length === 0) return [];
 
   const slotLimit = scanLimit(opts.limit);
-  const slots = await getSlots({
-    academyIds: context.academyIds,
-    startGte: futureStartIso(opts.dateFrom),
-    startLt: opts.dateTo ? endExclusiveIso(opts.dateTo) : undefined,
+  const slots = await getFutureSlotsAcrossAcademies(context.academyIds, {
+    dateFrom: opts.dateFrom,
+    dateTo: opts.dateTo,
     limit: slotLimit,
     order: "asc",
-    includeCancelled: false,
   });
   if (slots.length === 0) return [];
 
@@ -330,6 +341,34 @@ function dedupeMemberships(memberships: Membership[]): Membership[] {
   return [...byId.values()];
 }
 
+async function getAcademyTimeZones(academyIds: string[]): Promise<Map<string, string>> {
+  if (academyIds.length === 0) return new Map();
+
+  const rows = await sb<AcademyTimeZoneRow[]>(
+    `clients?id=in.(${inList(academyIds)})` +
+      "&select=id,time_zone",
+  );
+
+  const byId = new Map<string, AcademyTimeZoneRow>();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    byId.set(row.id, row);
+  }
+
+  const timeZones = new Map<string, string>();
+  for (const academyId of academyIds) {
+    const row = byId.get(academyId);
+    if (!row) {
+      throw new HttpError(404, "Academy not found.");
+    }
+
+    const timeZone = row.time_zone?.trim() || UTC_TIME_ZONE;
+    assertValidTimeZone(timeZone);
+    timeZones.set(academyId, timeZone);
+  }
+
+  return timeZones;
+}
+
 function ensureAcademyAccess(context: ParentScheduleContext, academyId: string): void {
   if (!context.academyIds.includes(academyId)) {
     throw new HttpError(403, "Not authorized to access this academy schedule.");
@@ -394,6 +433,42 @@ async function getSlots(opts: {
   );
 
   return Array.isArray(rows) ? rows : [];
+}
+
+async function getFutureSlotsAcrossAcademies(
+  academyIds: string[],
+  opts: {
+    dateFrom?: string;
+    dateTo?: string;
+    limit: number;
+    order: "asc" | "desc";
+  },
+): Promise<ScheduleSlot[]> {
+  if (academyIds.length === 0) return [];
+
+  const timeZones = await getAcademyTimeZones(academyIds);
+  const slotGroups = await Promise.all(
+    academyIds.map((academyId) => {
+      const dateRange = futureDateRangeIso(
+        opts.dateFrom,
+        opts.dateTo,
+        academyTimeZone(timeZones, academyId),
+      );
+      return getSlots({
+        academyIds: [academyId],
+        startGte: dateRange.startGte,
+        startLt: dateRange.startLt,
+        limit: opts.limit,
+        order: opts.order,
+        includeCancelled: false,
+      });
+    }),
+  );
+
+  return slotGroups
+    .flat()
+    .sort((a, b) => compareStartTimes(a.start_time, b.start_time, opts.order))
+    .slice(0, opts.limit);
 }
 
 async function getSlotState(slotIds: string[]): Promise<SlotState> {
@@ -582,35 +657,74 @@ function slotMembershipKey(row: { slot_id: string; membership_id: string }): str
   return `${row.slot_id}:${row.membership_id}`;
 }
 
-function futureStartIso(value: string | undefined): string {
+function academyTimeZone(timeZones: Map<string, string>, academyId: string): string {
+  const timeZone = timeZones.get(academyId);
+  if (!timeZone) {
+    throw new HttpError(404, "Academy not found.");
+  }
+  return timeZone;
+}
+
+function futureDateRangeIso(
+  dateFrom: string | undefined,
+  dateTo: string | undefined,
+  timeZone: string,
+): { startGte: string; startLt?: string } {
+  return {
+    startGte: futureStartIso(dateFrom, timeZone),
+    startLt: dateTo ? dateBoundaryIso(dateTo, "end", timeZone) : undefined,
+  };
+}
+
+function futureStartIso(value: string | undefined, timeZone: string): string {
   const now = new Date();
   if (!value) return now.toISOString();
 
-  const start = startOfDayIso(value);
+  const start = dateBoundaryIso(value, "start", timeZone);
   return new Date(start) > now ? start : now.toISOString();
 }
 
-function startOfDayIso(value: string): string {
-  const parsed = parseDateValue(value, "start");
-  return parsed.toISOString();
-}
+function dateBoundaryIso(value: string, boundary: "start" | "end", timeZone: string): string {
+  const dateOnly = DATE_ONLY_PATTERN.exec(value);
+  if (!dateOnly) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new HttpError(400, `Invalid date: ${value}`);
+    }
+    return date.toISOString();
+  }
 
-function endExclusiveIso(value: string): string {
-  const parsed = parseDateValue(value, "end");
-  return parsed.toISOString();
-}
-
-function parseDateValue(value: string, boundary: "start" | "end"): Date {
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const date = dateOnly ? new Date(`${value}T00:00:00.000Z`) : new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const [, yearValue, monthValue, dayValue] = dateOnly;
+  if (!yearValue || !monthValue || !dayValue) {
     throw new HttpError(400, `Invalid date: ${value}`);
   }
 
-  if (dateOnly && boundary === "end") {
-    return addDays(date, 1);
+  const localDate = {
+    year: Number(yearValue),
+    month: Number(monthValue),
+    day: Number(dayValue),
+    hour: 0,
+    minute: 0,
+    second: 0,
+  };
+  if (!isValidDateParts(localDate)) {
+    throw new HttpError(400, `Invalid date: ${value}`);
   }
-  return date;
+
+  const boundaryDate = boundary === "end" ? addDaysToParts(localDate, 1) : localDate;
+  const date = zonedDateTimeToUtc(boundaryDate, timeZone);
+  if (Number.isNaN(date.getTime())) {
+    throw new HttpError(400, `Invalid date: ${value}`);
+  }
+  return date.toISOString();
+}
+
+function assertValidTimeZone(timeZone: string): void {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+  } catch {
+    throw new HttpError(500, "Invalid academy time zone configured.");
+  }
 }
 
 function addDays(date: Date, days: number): Date {
@@ -619,15 +733,114 @@ function addDays(date: Date, days: number): Date {
   return next;
 }
 
+type LocalDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function addDaysToParts(parts: LocalDateTimeParts, days: number): LocalDateTimeParts {
+  const next = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+  };
+}
+
+function isValidDateParts(parts: LocalDateTimeParts): boolean {
+  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  return (
+    date.getUTCFullYear() === parts.year &&
+    date.getUTCMonth() + 1 === parts.month &&
+    date.getUTCDate() === parts.day
+  );
+}
+
+function zonedDateTimeToUtc(parts: LocalDateTimeParts, timeZone: string): Date {
+  const desiredTime = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  let utcDate = new Date(desiredTime);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const renderedParts = timeZoneParts(utcDate, timeZone);
+    const renderedTime = Date.UTC(
+      renderedParts.year,
+      renderedParts.month - 1,
+      renderedParts.day,
+      renderedParts.hour,
+      renderedParts.minute,
+      renderedParts.second,
+    );
+    const offset = desiredTime - renderedTime;
+    if (offset === 0) return utcDate;
+    utcDate = new Date(utcDate.getTime() + offset);
+  }
+
+  return utcDate;
+}
+
+function timeZoneParts(date: Date, timeZone: string): LocalDateTimeParts {
+  const formattedParts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const values = new Map<string, string>();
+  for (const part of formattedParts) {
+    if (part.type !== "literal") values.set(part.type, part.value);
+  }
+
+  const year = values.get("year");
+  const month = values.get("month");
+  const day = values.get("day");
+  const hour = values.get("hour");
+  const minute = values.get("minute");
+  const second = values.get("second");
+  if (!year || !month || !day || !hour || !minute || !second) {
+    throw new HttpError(500, "Unable to resolve academy time zone.");
+  }
+
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+    second: Number(second),
+  };
+}
+
+function compareStartTimes(left: string, right: string, order: "asc" | "desc"): number {
+  const delta = new Date(left).getTime() - new Date(right).getTime();
+  return order === "asc" ? delta : -delta;
+}
+
 function isFuture(value: string): boolean {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date > new Date();
 }
 
 function compareSlotStart(a: CustomerSlotOut, b: CustomerSlotOut, order: "asc" | "desc"): number {
-  const left = new Date(a.start_time).getTime();
-  const right = new Date(b.start_time).getTime();
-  return order === "asc" ? left - right : right - left;
+  return compareStartTimes(a.start_time, b.start_time, order);
 }
 
 function scanLimit(limit: number): number {
