@@ -54,6 +54,7 @@ core_commit_reviewed: "1916564"
 
 | Item | Reason | Core impact or replacement |
 |---|---|---|
+| Resources library writable by content team (2026-06-14) | Content team was blocked by admin-only RLS on the resource trio | Additive RLS fn `is_resource_editor()` (admin + marketing roles) for INSERT/UPDATE on resources/resource_files/resource_categories + `resources` storage bucket; DELETE stays admin. Core: model a "content editor" permission on the content-library module. fc-core review deferred (repo not reachable this session). |
 | Core is direction, not compatibility target | Prototype is intentionally ahead | Adopt clean concepts, not implementation details |
 | Keep current prototype stack | Faster product learning | Handoffs describe production boundaries |
 | Direct Supabase access and separate SQL files | Fast iteration | Replace with owned services and migrations |
