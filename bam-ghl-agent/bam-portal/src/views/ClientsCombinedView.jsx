@@ -1132,7 +1132,7 @@ function suggestAdAccount(clientName, adAccounts) {
   return bestScore >= 15 ? best : null;
 }
 
-function MarketingTab({ client, tokens, role, session, onChanged }) {
+export function MarketingTab({ client, tokens, role, session, onChanged }) {
   const t = tokens;
   const canEdit = ROLES.canEditMeta(role);
 
