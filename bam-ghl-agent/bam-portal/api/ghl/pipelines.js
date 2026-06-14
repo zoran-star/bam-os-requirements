@@ -437,6 +437,29 @@ async function handler(req, res) {
     st.expectsTrial = trialStageSet.has(`${(p.name || "").toLowerCase()}|||${(st.name || "").toLowerCase()}`);
   }
 
+  // 4c. Post-trial reviews (our DB) → attach trainer to each opportunity so
+  //     the assigned coach shows on the card.
+  let trainerOptions = [];
+  try {
+    const reviews = await sb(
+      `post_trial_reviews?client_id=eq.${clientId}&select=opportunity_id,trainer,good_fit`
+    ).catch(() => []);
+    const byOpp = new Map();
+    for (const r of (Array.isArray(reviews) ? reviews : [])) byOpp.set(r.opportunity_id, r);
+    for (const p of enriched) for (const o of p.opportunities) {
+      const rv = byOpp.get(o.id);
+      o.trainer = rv?.trainer || null;
+      o.goodFit = rv ? rv.good_fit : null;
+    }
+  } catch (_) {}
+
+  // Trainer dropdown options from the "Lead Sales Person" custom field.
+  try {
+    const cf = (await ghl("GET", `/locations/${encodeURIComponent(locationId)}/customFields`, { token })).customFields || [];
+    const lsp = cf.find(f => /lead sales person/i.test(f.name || "")) || cf.find(f => /sales person|trainer/i.test(f.name || ""));
+    if (lsp) trainerOptions = lsp.picklistOptions || lsp.options || [];
+  } catch (_) {}
+
   // 5. For cards still missing an athlete name or trial date (legacy
   //    GHL-native contacts, not from the website), resolve from the contact's
   //    GHL custom fields. Field ids are discovered by name once, then contacts
@@ -485,7 +508,7 @@ async function handler(req, res) {
     }
   } catch (_) { /* non-fatal — cards just show parent-only */ }
 
-  return res.status(200).json({ pipelines: enriched, totals: {
+  return res.status(200).json({ pipelines: enriched, trainers: trainerOptions, totals: {
     pipelines: enriched.length,
     opportunities: enriched.reduce((s, p) => s + p.opportunities.length, 0),
   } });
