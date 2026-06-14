@@ -172,6 +172,7 @@ function shapeClient(row, revenue) {
     auth_user_id: row.auth_user_id || null,
     status: row.status,
     ghl_location_id: row.ghl_location_id || null,
+    address: row.address || null,
     slack_channel_id: row.slack_channel_id || null,
     stripe_customer_id: row.stripe_customer_id || null,
     notion_page_id: row.notion_page_id || null,
@@ -2629,6 +2630,12 @@ async function handler(req, res) {
       }
       if (req.query.action === "count-locations") {
         return res.status(200).json({ count: await cnt("locations", `client_id=eq.${clientId}`) });
+      }
+      if (req.query.action === "list-locations") {
+        // The client's physical locations (gyms) for the staff Overview tab.
+        // Non-sensitive; staff Bearer is the network-layer gate, same as counts.
+        const rows = await supabaseSelect(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=id,title,address,notes`);
+        return res.status(200).json({ locations: rows || [] });
       }
       if (req.query.action === "count-teammates") {
         return res.status(200).json({ count: await cnt("client_users", `client_id=eq.${clientId}&status=eq.active&role=neq.owner`) });

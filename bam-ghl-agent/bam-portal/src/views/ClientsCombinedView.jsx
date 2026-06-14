@@ -863,6 +863,19 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
     return () => { cancelled = true; };
   }, [client.id, session, canViewFinancials, client.stripe_customer_id]);
 
+  // Client physical locations (gyms) — shown in the Profile. null = loading.
+  const [locations, setLocations] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/clients?action=list-locations&client_id=${client.id}`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    })
+      .then(r => (r.ok ? r.json() : { locations: [] }))
+      .then(d => { if (!cancelled) setLocations(Array.isArray(d.locations) ? d.locations : []); })
+      .catch(() => { if (!cancelled) setLocations([]); });
+    return () => { cancelled = true; };
+  }, [client.id, session]);
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
       <div>
@@ -870,6 +883,19 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
         <Field k="Business Name" v={client.business_name} tokens={t} />
         <Field k="Point of contact" v={client.owner_name} tokens={t} />
         <Field k="Email" v={client.email} tokens={t} />
+        {/* Location(s): prefer the locations table; fall back to clients.address. */}
+        {locations === null
+          ? <Field k="Location" v="…" tokens={t} />
+          : locations.length === 0
+            ? <Field k="Location" v={client.address} tokens={t} />
+            : locations.map((loc, i) => (
+                <Field
+                  key={loc.id}
+                  k={locations.length > 1 ? `Location ${i + 1}` : "Location"}
+                  v={[loc.title, loc.address].filter(Boolean).join(" — ")}
+                  tokens={t}
+                />
+              ))}
         <Field k="Scaling Manager" v={staffMap[client.scaling_manager_id]?.name} tokens={t} />
         <Field k="Status" v={client.status} tokens={t} cap />
         <Field k="Created" v={client.created_at ? new Date(client.created_at).toLocaleDateString() : null} tokens={t} />
