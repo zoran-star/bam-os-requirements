@@ -183,11 +183,26 @@ async function handler(req, res) {
   if (!academy) return;  // loadAcademyAndToken already sent the response
   const { client, token, locationId } = academy;
 
-  // ── PATCH: move an opportunity to a new stage ─────────────
+  // ── PATCH: move an opportunity to a new stage, or set its status ──
   if (req.method === "PATCH") {
     const oppId = req.query.opportunity_id;
     const body = (req.body && typeof req.body === "object") ? req.body : {};
-    if (!oppId)               return res.status(400).json({ error: "opportunity_id required" });
+    if (!oppId) return res.status(400).json({ error: "opportunity_id required" });
+
+    // Status-only update (e.g. mark won/lost from the Done Trial stage).
+    if (body.status && !body.stage_id) {
+      const allowed = ["open", "won", "lost", "abandoned"];
+      if (!allowed.includes(body.status)) return res.status(400).json({ error: "invalid status" });
+      try {
+        const out = await ghl("PUT", `/opportunities/${encodeURIComponent(oppId)}`, {
+          token, body: { status: body.status },
+        });
+        return res.status(200).json({ ok: true, opportunity_id: oppId, status: body.status, raw: out });
+      } catch (e) {
+        return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
+      }
+    }
+
     if (!body.pipeline_id)    return res.status(400).json({ error: "pipeline_id required in body" });
     if (!body.stage_id)       return res.status(400).json({ error: "stage_id required in body" });
     try {

@@ -6720,6 +6720,15 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-trial.is-past { color:#c47424; }
       #view-pipelines .pl-card-notrial { border-color:rgba(224,134,60,0.75); background:rgba(224,134,60,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:#e0863c; font-weight:700; margin-top:5px; }
+      #view-pipelines .pl-card-wl { display:flex; gap:6px; margin-top:9px; }
+      #view-pipelines .pl-card-won, #view-pipelines .pl-card-lost {
+        flex:1; border-radius:7px; padding:7px; font-size:11px; font-weight:700;
+        cursor:pointer; font-family:inherit; border:1px solid;
+      }
+      #view-pipelines .pl-card-won { background:rgba(76,199,106,0.14); border-color:var(--green); color:var(--green); }
+      #view-pipelines .pl-card-won:hover { background:rgba(76,199,106,0.24); }
+      #view-pipelines .pl-card-lost { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
+      #view-pipelines .pl-card-lost:hover { background:rgba(224,112,112,0.22); }
       #view-pipelines .pl-card-ptf {
         margin-top:9px; width:100%; background:rgba(232,197,71,0.12);
         border:1px solid var(--accent); color:var(--accent); border-radius:7px;
@@ -15707,10 +15716,42 @@ function _plTrialInfo(raw) {
   return { str, passed: cutoff < Date.now() };
 }
 
+// A stage where the trial has already happened (Done Trial). Won/Lost
+// buttons replace the post-trial form here.
+function _plIsDoneTrialStage(stage) {
+  const n = (stage && stage.name || '').toLowerCase();
+  return n.includes('trial') && (n.includes('done') || n.includes('complete') || n.includes('attended'));
+}
+
 // Post-trial form — opens after a booked trial date has passed. What it
 // captures (coach assessment, did-they-show, fit) is TBD; stub for now.
 function _plPostTrialForm(oppId) {
   alert('Post-trial form coming soon.\n\nThis will capture how the trial went (coach assessment, attendance, next step) for opportunity ' + oppId + '.');
+}
+
+// Mark won — will link the contact to an existing member. Deferred until the
+// member work is done; stub for now (no GHL change yet).
+function _plMarkWon(oppId) {
+  alert('Mark as won — coming soon.\n\nThis will tie the trial to an existing member in the member list. We’ll wire it up once the member work is done.');
+}
+
+// Mark lost — sets the GHL opportunity status to lost.
+async function _plMarkLost(oppId) {
+  if (!confirm('Mark this trial as LOST?')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'lost' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    closePipelineDrawer();
+    fetchAndRenderPipelines();
+  } catch (e) {
+    alert('Couldn’t mark lost: ' + e.message);
+  }
 }
 
 function _plAgeShort(iso) {
@@ -15751,6 +15792,7 @@ function _renderPipelineBoard() {
     const trialStr = tr.str, trialPassed = tr.passed;
     // A card in a trial-booking stage with no resolvable date gets flagged.
     const missingTrial = stage && stage.expectsTrial && !trialStr;
+    const isDone = _plIsDoneTrialStage(stage);
     return `
       <div class="pl-card ${stale ? 'pl-card-stale' : ''} ${missingTrial ? 'pl-card-notrial' : ''}"
            draggable="true"
@@ -15761,7 +15803,12 @@ function _renderPipelineBoard() {
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
         ${trialStr ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>` : ''}
         ${missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
-        ${trialPassed ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : ''}
+        ${isDone
+          ? `<div class="pl-card-wl">
+               <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
+               <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
+             </div>`
+          : (trialPassed ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       </div>`;
   };
 
@@ -15885,10 +15932,15 @@ function _plOpenCard(oppId) {
       <div class="pl-d-row"><div class="lbl2">Stage age</div><div>${escapeHTML(_plAgeShort(o.lastStageChangeAt))}</div></div>
     </div>
     <div class="pl-d-actions">
-      ${trialPassed ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : ''}
+      ${_plIsDoneTrialStage(s)
+        ? `<div style="display:flex;gap:8px">
+             <button class="pl-d-btn primary" style="flex:1" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>
+             <button class="pl-d-btn" style="flex:1" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark lost</button>
+           </div>`
+        : (trialPassed ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       ${o.member
-        ? `<button class="pl-d-btn ${trialPassed ? '' : 'primary'}" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
-        : `<button class="pl-d-btn ${trialPassed ? '' : 'primary'}" onclick="_plConvert('${escapeHTML(o.id)}')">Convert to member</button>`}
+        ? `<button class="pl-d-btn ${(trialPassed && !_plIsDoneTrialStage(s)) ? '' : ''}" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
+        : `<button class="pl-d-btn" onclick="_plConvert('${escapeHTML(o.id)}')">Convert to member</button>`}
       ${o.contactId
         ? `<a class="pl-d-btn" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:block;text-align:center" href="https://app.gohighlevel.com/v2/location/${escapeHTML((_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.location_id) || '')}/contacts/detail/${escapeHTML(o.contactId)}">Open in GHL ↗</a>`
         : ''}
