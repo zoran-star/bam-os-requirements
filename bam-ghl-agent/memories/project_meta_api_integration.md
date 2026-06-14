@@ -50,7 +50,7 @@ Clean URLs via `vercel.json` rewrites:
 **Staff-side (active):**
 - `POST /api/marketing?resource=meta-staff-auth&step=prepare` — staff initiates OAuth
 - `GET  /api/auth/meta/callback` — Meta returns here; upsert into `staff_meta_tokens`
-- `GET  /api/marketing?resource=meta-staff-status` — is staff connected?
+- `GET  /api/marketing?resource=meta-staff-status` — is staff connected? **Now LIVE-validates** the token (probes `/me/adaccounts`), not just row presence. Returns `connected`/`team_connected` = token actually WORKS, plus `own_present`/`team_present` (a row exists) and `own_reason`/`team_reason` (`ok`|`expired`|`revoked`|`no_permission`|`no_ad_accounts`|`error`|`none`). Fixed 2026-06-14 — before this, a revoked/expired token still showed a green "connected" dot while the ad-account dropdown said "Meta not connected". Settings UI shows an amber "needs attention / reconnect" state with the reason.
 - `GET  /api/meta/adaccounts` — list ad accounts the connected staff has access to
 - `POST /api/meta/adaccounts` — staff picks an ad account for a client (writes `clients.meta_ad_account_id` + `clients.meta_campaign_ids`)
 - `GET  /api/meta/campaigns?client_id=...` — real campaigns + insights, last 30d

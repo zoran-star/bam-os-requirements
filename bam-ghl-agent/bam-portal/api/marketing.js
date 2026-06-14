@@ -2671,6 +2671,36 @@ async function handleStaffMetaAuth(req, res) {
 
 // GET ?resource=meta-staff-status
 // Lets the staff portal show "Meta connected as X" or "Connect Meta" button.
+// Live-validate a stored Meta token by doing the same call the ad-account
+// picker does (/me/adaccounts). A row existing in staff_meta_tokens does NOT
+// mean the token still works — it can be revoked, expired, or have lost asset
+// access. This probe returns WHY so the UI can stop showing a healthy green dot
+// for a dead token.
+async function probeMetaToken(accessToken, expiresAt) {
+  if (!accessToken) return { valid: false, reason: "none" };
+  // Cheap local check first — skip the network call when clearly expired.
+  if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+    return { valid: false, reason: "expired" };
+  }
+  try {
+    const r = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
+      fields: "account_id", limit: "1", access_token: accessToken,
+    }));
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const hasAccounts = Array.isArray(j.data) && j.data.length > 0;
+      return { valid: true, reason: hasAccounts ? "ok" : "no_ad_accounts" };
+    }
+    const err = j?.error || {};
+    let reason = "error";
+    if (err.code === 190) reason = err.error_subcode === 463 ? "expired" : "revoked";
+    else if (err.code === 200 || err.code === 10 || err.code === 3) reason = "no_permission";
+    return { valid: false, reason, message: err.message || `HTTP ${r.status}` };
+  } catch (e) {
+    return { valid: false, reason: "error", message: e?.message || "probe failed" };
+  }
+}
+
 async function handleStaffMetaStatus(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
@@ -2678,21 +2708,36 @@ async function handleStaffMetaStatus(req, res) {
   if (!ctx.staff) return res.status(403).json({ error: "staff only" });
 
   // Logged-in staff's own connection
-  const ownRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=fb_user_name,expires_at,created_at,updated_at`);
+  const ownRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,fb_user_name,expires_at,created_at,updated_at`);
   const own = ownRows?.[0];
 
   // Team-wide connection (anyone on staff connected — token shared for read ops)
-  const teamRows = await sb(`staff_meta_tokens?select=fb_user_name,updated_at&order=updated_at.desc&limit=1`);
+  const teamRows = await sb(`staff_meta_tokens?select=access_token,fb_user_name,expires_at,updated_at&order=updated_at.desc&limit=1`);
   const team = teamRows?.[0];
 
+  // Live-probe so the UI reflects reality, not just row presence.
+  const ownProbe = own ? await probeMetaToken(own.access_token, own.expires_at) : { valid: false, reason: "none" };
+  const teamProbe = team
+    ? (own && team.access_token === own.access_token ? ownProbe : await probeMetaToken(team.access_token, team.expires_at))
+    : { valid: false, reason: "none" };
+
   return res.status(200).json({
-    connected: !!own,
+    // connected = your own connection actually works
+    connected: ownProbe.valid,
+    own_present: !!own,
+    own_reason: ownProbe.reason,
+    own_message: ownProbe.message || null,
     fb_user_name: own?.fb_user_name || null,
     expires_at: own?.expires_at || null,
     connected_at: own?.created_at || null,
     updated_at: own?.updated_at || null,
-    team_connected: !!team,
+    // team_connected = a working team token exists (validated, not just present)
+    team_connected: teamProbe.valid,
+    team_present: !!team,
+    team_reason: teamProbe.reason,
+    team_message: teamProbe.message || null,
     team_fb_user_name: team?.fb_user_name || null,
+    team_expires_at: team?.expires_at || null,
   });
 }
 

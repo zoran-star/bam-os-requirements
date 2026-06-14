@@ -14,8 +14,21 @@ const INTEGRATIONS = [
   { key: "stripe", label: "Stripe", desc: "Payments, subscriptions, alerts", endpoint: "/api/stripe/alerts" },
 ];
 
+// Friendly explanation for why a stored Meta token failed its live probe.
+function metaReasonText(reason) {
+  switch (reason) {
+    case "expired":       return "the connection expired";
+    case "revoked":       return "access was revoked on Facebook's side";
+    case "no_permission": return "this login lost access to the ad accounts";
+    case "no_ad_accounts":return "this login can't see any ad accounts";
+    default:              return "the connection couldn't be verified";
+  }
+}
+
 function StatusDot({ status, tokens }) {
-  const color = status === "connected" ? tokens.green : status === "checking" ? tokens.amber : tokens.red;
+  const color = status === "connected" ? tokens.green
+    : (status === "checking" || status === "warning") ? tokens.amber
+    : tokens.red;
   return (
     <div style={{
       width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0,
@@ -381,7 +394,12 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
             display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
             borderRadius: 10, background: tokens.surface, border: `1px solid ${tokens.border}`,
           }}>
-            <StatusDot status={metaLoading ? "checking" : (metaStatus.connected || metaStatus.team_connected) ? "connected" : "disconnected"} tokens={tokens} />
+            <StatusDot status={
+              metaLoading ? "checking"
+              : (metaStatus.connected || metaStatus.team_connected) ? "connected"
+              : (metaStatus.own_present || metaStatus.team_present) ? "warning"
+              : "disconnected"
+            } tokens={tokens} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>Meta (Facebook Ads)</div>
               <div style={{ fontSize: 12, color: tokens.textMute }}>
@@ -389,7 +407,11 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
                   ? `Connected${metaStatus.fb_user_name ? ` as ${metaStatus.fb_user_name}` : ""} — powers real campaign data for client portals`
                   : metaStatus.team_connected
                     ? `Team is connected${metaStatus.team_fb_user_name ? ` via ${metaStatus.team_fb_user_name}` : ""} — connect your own to enable additional ad accounts you have access to`
-                    : "Connect your Meta to give clients real ad data (no setup on their side)"}
+                    : metaStatus.own_present
+                      ? `Your Meta connection needs attention — ${metaReasonText(metaStatus.own_reason)}. Reconnect to restore ad data.`
+                      : metaStatus.team_present
+                        ? `Team Meta connection is broken${metaStatus.team_fb_user_name ? ` (${metaStatus.team_fb_user_name})` : ""} — ${metaReasonText(metaStatus.team_reason)}. Reconnect to restore ad data for every client.`
+                        : "Connect your Meta to give clients real ad data (no setup on their side)"}
               </div>
               {metaToast && (
                 <div style={{ fontSize: 11, marginTop: 6, color: metaToast.kind === 'success' ? tokens.green : tokens.red }}>
@@ -412,7 +434,7 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
                 border: "none", background: tokens.accent, color: "#fff",
                 cursor: "pointer", fontFamily: "inherit",
                 transition: "all 0.15s ease",
-              }}>Connect Meta</button>
+              }}>{(metaStatus.own_present || metaStatus.team_present) ? "Reconnect" : "Connect Meta"}</button>
             )}
           </div>
         </div>
