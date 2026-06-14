@@ -6940,6 +6940,7 @@ Then the call to action."]</div>
           <button class="ib-tab"    data-tab="members" onclick="_ibSetTab('members')">Members <span id="ib-count-members"></span></button>
           <button class="ib-tab"    data-tab="leads"   onclick="_ibSetTab('leads')">Leads <span id="ib-count-leads"></span></button>
           <input id="ib-search" class="ib-search" type="text" placeholder="🔍  Search by name or content…" oninput="_ibSetSearch(this.value)">
+          <button onclick="_ibComposeNew()" title="New message" style="background:var(--accent);border:1px solid var(--accent);color:#08080A;padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">✏️ New</button>
           <button onclick="fetchAndRenderInbox()" title="Refresh" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;cursor:pointer;font-size:12px">↻</button>
         </div>
         <div id="inbox-list-container">
@@ -16222,6 +16223,27 @@ function _plOpenCard(oppId) {
       <div class="pl-d-row" id="pl-d-lead-loading" style="color:var(--text-mute)"><div class="lbl2"><span class="req-spin"></span></div><div>Loading…</div></div>
     </div>
     ${rv && rv.notes ? `<div class="pl-d-section"><div class="lbl">Post-trial notes</div><div style="font-size:13px;white-space:pre-wrap">${escapeHTML(rv.notes)}</div></div>` : ''}
+    <div class="pl-d-section" id="pl-d-msg">
+      <div class="lbl">Messages</div>
+      ${o.contactId ? `
+        <div id="pl-d-thread" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0">
+          <div style="color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading…</div>
+        </div>
+        <div style="margin-top:10px">
+          <textarea id="pl-msg-input" placeholder="Type a message…" style="width:100%;min-height:64px;padding:9px 11px;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;resize:vertical"></textarea>
+          <div id="pl-reply-files" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <select id="pl-msg-type" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px">
+              <option value="SMS">SMS</option><option value="Email">Email</option>
+            </select>
+            <label title="Attach file" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-sub);font-size:15px">
+              📎<input type="file" multiple style="display:none" onchange="_plMsgPickFiles(this)">
+            </label>
+            <button class="pl-d-btn primary" style="margin-left:auto;width:auto;padding:7px 16px" onclick="_plMsgSend()">Send</button>
+          </div>
+        </div>
+      ` : `<div style="font-size:13px;color:var(--text-mute)">No GHL contact linked to this card.</div>`}
+    </div>
     <div class="pl-d-actions">
       ${_plIsDoneTrialStage(s)
         ? `<div style="display:flex;gap:8px">
@@ -16237,6 +16259,92 @@ function _plOpenCard(oppId) {
         : ''}
     </div>`;
   _plLoadLeadDetail(o);
+  _PL_MSG = o.contactId ? { contactId: o.contactId, name: o.contact.name || o.name || '', phone: o.contact.phone || null, email: o.contact.email || null, conversationId: null } : null;
+  _IB_PENDING_FILES = [];
+  if (o.contactId) _plLoadMessages();
+}
+
+// ── Pipeline card drawer: messaging ─────────────────────────────────────────
+let _PL_MSG = null;   // { contactId, name, phone, email, conversationId }
+
+async function _plLoadMessages() {
+  const host = document.getElementById('pl-d-thread');
+  if (!host || !_PL_MSG) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/inbox?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(_PL_MSG.contactId)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _PL_MSG.conversationId = j.conversation_id || null;
+    _plRenderThread(j.messages || []);
+  } catch (e) {
+    host.innerHTML = `<div style="color:#9a3b2f;font-size:13px">Couldn't load messages — ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+function _plRenderThread(messages) {
+  const host = document.getElementById('pl-d-thread');
+  if (!host) return;
+  const sorted = [...messages].sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
+  host.innerHTML = sorted.length
+    ? sorted.map(m => {
+        const out = (m.direction || '').toLowerCase() === 'outbound';
+        const atts = _ibRenderAttachments(m.attachments);
+        const hasBody = (m.body || '').trim().length > 0;
+        return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
+          ${hasBody ? escapeHTML(m.body) : (atts ? '' : '(no body)')}${atts}
+          <div class="ib-msg-meta">${escapeHTML(String(m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+        </div>`;
+      }).join('')
+    : `<div style="color:var(--text-mute);font-size:13px">No messages yet — send the first one below.</div>`;
+  host.scrollTop = host.scrollHeight;
+}
+
+function _plMsgPickFiles(inputEl) {
+  _IB_PENDING_FILES.push(...Array.from(inputEl.files || []));
+  inputEl.value = '';
+  _plMsgRenderPendingFiles();
+}
+function _plMsgRenderPendingFiles() {
+  const wrap = document.getElementById('pl-reply-files');
+  if (!wrap) return;
+  wrap.innerHTML = _IB_PENDING_FILES.map((f, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px">📎 ${escapeHTML(f.name)} <button onclick="_IB_PENDING_FILES.splice(${i},1);_plMsgRenderPendingFiles()" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:13px;line-height:1;padding:0">×</button></span>`
+  ).join('');
+}
+
+async function _plMsgSend() {
+  const t = _PL_MSG;
+  if (!t) return;
+  const textEl = document.getElementById('pl-msg-input');
+  const typeEl = document.getElementById('pl-msg-type');
+  const btn    = document.querySelector('#pl-drawer #pl-d-msg .pl-d-btn.primary');
+  const message = (textEl?.value || '').trim();
+  const type    = typeEl?.value || 'SMS';
+  if (!message && !_IB_PENDING_FILES.length) return;
+  if (type === 'Email' && !t.email) { alert('This contact has no email on file — pick SMS, or add an email in GHL.'); return; }
+  if (type === 'SMS' && !t.phone)   { alert('This contact has no phone on file — pick Email, or add a phone in GHL.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const attachments = await _ibUploadPendingFiles();
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, contact_id: t.contactId, type, message, subject, attachments }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    if (textEl) textEl.value = '';
+    _IB_PENDING_FILES = [];
+    _plMsgRenderPendingFiles();
+    _plLoadMessages();
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
 }
 
 // Fill the drawer's "Lead details" section with every populated field on the
@@ -16581,6 +16689,141 @@ async function _ibSendReply() {
     _IB_PENDING_FILES = [];
     _renderInboxDrawer();
     // Refresh list in the background so the latest preview catches up
+    fetchAndRenderInbox();
+  } catch (e) {
+    alert('Send failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Send'; }
+  }
+}
+
+// ── Inbox: compose a NEW message to any GHL contact ─────────────────────────
+let _IB_COMPOSE = null;            // { contact: {id,name,phone,email} | null }
+let _IB_COMPOSE_TIMER = null;
+
+function _ibComposeNew() {
+  const overlay = document.getElementById('ib-drawer-overlay');
+  const drawer  = document.getElementById('ib-drawer');
+  if (!overlay || !drawer) return;
+  _IB_COMPOSE = { contact: null };
+  _IB_PENDING_FILES = [];
+  overlay.classList.add('open');
+  drawer.classList.add('open');
+  _ibRenderCompose();
+}
+
+function _ibRenderCompose() {
+  const drawer = document.getElementById('ib-drawer');
+  if (!drawer || !_IB_COMPOSE) return;
+  const c = _IB_COMPOSE.contact;
+  const picker = c
+    ? `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+         <div style="min-width:0">
+           <div style="font-weight:600">${escapeHTML(c.name)}</div>
+           <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(c.phone || c.email || '—')}</div>
+         </div>
+         <button onclick="_ibComposeClearContact()" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-sub);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">Change</button>
+       </div>`
+    : `<div style="margin-bottom:12px">
+         <input id="ib-compose-search" type="text" placeholder="Search contacts by name, email or phone…" autocomplete="off"
+           oninput="_ibComposeSearch(this.value)"
+           style="width:100%;padding:9px 12px;font-size:13px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit" />
+         <div id="ib-compose-results" style="margin-top:8px;max-height:240px;overflow-y:auto"></div>
+       </div>`;
+
+  drawer.innerHTML = `
+    <div class="ib-d-header">
+      <div><div class="ib-d-title">New message</div>
+      <div class="ib-d-sub">${c ? 'Compose your message' : 'Pick a contact to message'}</div></div>
+      <button class="ib-d-close" onclick="closeInboxDrawer()" aria-label="Close">×</button>
+    </div>
+    <div style="padding:16px 20px;flex:1;overflow-y:auto">
+      ${picker}
+      ${c ? `
+        <textarea id="ib-compose-input" placeholder="Type your message…" style="width:100%;min-height:120px;padding:10px 12px;font-size:14px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;outline:none;font-family:inherit;resize:vertical"></textarea>
+        <div id="ib-reply-files" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+      ` : ''}
+    </div>
+    ${c ? `
+    <div class="ib-d-reply">
+      <div class="ib-d-reply-actions">
+        <select id="ib-compose-type" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px">
+          <option value="SMS">SMS</option>
+          <option value="Email">Email</option>
+        </select>
+        <label title="Attach file" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-sub);font-size:16px">
+          📎<input type="file" multiple style="display:none" onchange="_ibPickFiles(this)">
+        </label>
+        <button class="ib-d-reply-send" onclick="_ibComposeSend()">Send</button>
+      </div>
+    </div>` : ''}`;
+  if (!c) { const s = document.getElementById('ib-compose-search'); if (s) s.focus(); }
+  else _ibRenderPendingFiles();
+}
+
+function _ibComposeSearch(q) {
+  clearTimeout(_IB_COMPOSE_TIMER);
+  const host = document.getElementById('ib-compose-results');
+  const query = (q || '').trim();
+  if (query.length < 2) { if (host) host.innerHTML = ''; return; }
+  if (host) host.innerHTML = `<div style="padding:10px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Searching…</div>`;
+  _IB_COMPOSE_TIMER = setTimeout(async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch(`/api/ghl/contacts-search?client_id=${encodeURIComponent(CLIENT_ID)}&q=${encodeURIComponent(query)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+      const j = await _safeJson(r);
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const cur = document.getElementById('ib-compose-search');
+      if (!cur || cur.value.trim() !== query) return; // stale
+      const rows = j.contacts || [];
+      host.innerHTML = rows.length
+        ? rows.map(c => `<div onclick="_ibComposePick('${escapeHTML(c.id)}','${escapeHTML((c.name||'').replace(/'/g,''))}','${escapeHTML(c.phone||'')}','${escapeHTML(c.email||'')}')"
+            style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">
+            <div style="font-weight:600;font-size:13px">${escapeHTML(c.name)}</div>
+            <div style="font-size:12px;color:var(--text-mute)">${escapeHTML(c.phone || c.email || '—')}</div>
+          </div>`).join('')
+        : `<div style="padding:10px;color:var(--text-mute);font-size:13px">No contacts match “${escapeHTML(query)}”.</div>`;
+    } catch (e) {
+      if (host) host.innerHTML = `<div style="padding:10px;color:#9a3b2f;font-size:13px">${escapeHTML(e.message)}</div>`;
+    }
+  }, 300);
+}
+
+function _ibComposePick(id, name, phone, email) {
+  _IB_COMPOSE.contact = { id, name, phone: phone || null, email: email || null };
+  _ibRenderCompose();
+}
+function _ibComposeClearContact() {
+  _IB_COMPOSE.contact = null;
+  _IB_PENDING_FILES = [];
+  _ibRenderCompose();
+}
+
+async function _ibComposeSend() {
+  const c = _IB_COMPOSE && _IB_COMPOSE.contact;
+  if (!c) return;
+  const textEl = document.getElementById('ib-compose-input');
+  const typeEl = document.getElementById('ib-compose-type');
+  const btn    = document.querySelector('#ib-drawer .ib-d-reply-send');
+  const message = (textEl?.value || '').trim();
+  const type    = typeEl?.value || 'SMS';
+  if (!message && !_IB_PENDING_FILES.length) return;
+  if (type === 'Email' && !c.email) { alert('This contact has no email on file — pick SMS, or add an email in GHL.'); return; }
+  if (type === 'SMS' && !c.phone)   { alert('This contact has no phone on file — pick Email, or add a phone in GHL.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const attachments = await _ibUploadPendingFiles();
+    const token = await _mreqAuthToken();
+    const subject = type === 'Email' ? `Message from ${(_GHL_CONNECT_STATE && _GHL_CONNECT_STATE.business_name) || 'us'}` : undefined;
+    const r = await fetch('/api/ghl/send-message', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: CLIENT_ID, contact_id: c.id, type, message, subject, attachments }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _IB_PENDING_FILES = [];
+    closeInboxDrawer();
     fetchAndRenderInbox();
   } catch (e) {
     alert('Send failed: ' + e.message);
@@ -18067,9 +18310,83 @@ function _sorterSetupPayment(stagingId, name) {
         <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
       </div>
       <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:14px;">How does ${who} pay?</div>
-      ${choice('💵', 'They pay another way', 'Cash or e-transfer — not billed through Stripe.', `_sorterCloseConnect();_sorterAltPay('${sid}')`)}
+      ${choice('🔎', 'They already pay in Stripe — connect it', 'Find their existing Stripe customer (maybe under a different email) and link it, then match their plan.', `_sorterFindCustomer('${sid}','${escapeHTML(String(name || '').replace(/'/g, ''))}')`)}
       ${choice('💳', 'Send them a card link', 'Generate a Stripe link to collect their card — copied to your clipboard.', `_sorterCloseConnect();_sorterSendCardLink('${sid}')`)}
+      ${choice('💵', 'They pay another way', 'Cash or e-transfer — not billed through Stripe.', `_sorterCloseConnect();_sorterAltPay('${sid}')`)}
     </div>`;
+}
+
+// Find & connect an existing Stripe customer to a CSV-only member, then run the
+// plan/offer match. Search box → results → Connect → (no offer? → Connect popup).
+function _sorterFindCustomer(stagingId, name) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  const sid = escapeHTML(String(stagingId));
+  host.innerHTML = `
+    <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div role="dialog" aria-modal="true" style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(520px,95vw);max-height:84vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="font-size:15px;font-weight:800;">Connect a Stripe customer</div>
+        <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input id="pc-cust-q" type="text" value="${escapeHTML(name || '')}" placeholder="Search name or email…" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12.5px;outline:none;" onkeydown="if(event.key==='Enter')_sorterRunCustomerSearch('${sid}')">
+        <button onclick="_sorterRunCustomerSearch('${sid}')" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Search</button>
+      </div>
+      <div id="pc-cust-results" style="flex:1;min-height:0;overflow:auto;"></div>
+    </div>`;
+  if (name) _sorterRunCustomerSearch(stagingId);
+}
+
+async function _sorterRunCustomerSearch(stagingId) {
+  const out = document.getElementById('pc-cust-results');
+  const q = (document.getElementById('pc-cust-q') || {}).value || '';
+  if (!q.trim()) { if (out) out.innerHTML = '<div style="font-size:12px;color:var(--text-mute,#888);">Type a name or email to search.</div>'; return; }
+  if (out) out.innerHTML = _sorterLoading('Searching Stripe customers…');
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=search-customers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, q }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const cs = json.customers || [];
+    if (!cs.length) { if (out) out.innerHTML = '<div style="font-size:12px;color:var(--text-mute,#888);padding:8px 0;">No Stripe customers found. Try a different name/email, or use a card link instead.</div>'; return; }
+    const sid = escapeHTML(String(stagingId));
+    out.innerHTML = cs.map(cu => {
+      const amt = cu.amount_cents != null ? '$' + (cu.amount_cents / 100).toFixed(0) : '';
+      const subTxt = cu.sub_id ? `${escapeHTML(cu.status || '')}${amt ? ' · ' + amt : ''}` : 'no subscription';
+      return `<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--border,#2a2a31);border-radius:9px;padding:9px 11px;margin-bottom:7px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:700;">${escapeHTML(cu.name || cu.email || cu.id)}</div>
+          <div style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(cu.email || '')} · ${subTxt}</div>
+        </div>
+        <button onclick="_sorterLinkCustomer('${sid}','${escapeHTML(cu.id)}','${escapeHTML(cu.sub_id || '')}','${escapeHTML(cu.price_id || '')}')" style="flex:none;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Connect</button>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    if (out) out.innerHTML = `<div style="font-size:12px;color:#e0654f;padding:8px 0;">Search failed — ${escapeHTML(_sorterErr(e))}</div>`;
+  }
+}
+
+async function _sorterLinkCustomer(stagingId, customerId, subId, priceId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=link-customer', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_id: stagingId, customer_id: customerId, sub_id: subId || null, price_id: priceId || null }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterCloseConnect();
+    // Linked — now match their plan. No offer for their price → Connect popup
+    // (match an offer / create a new one); otherwise just refresh the checks.
+    if (json.no_offer) _sorterOpenConnect(stagingId);
+    else _sorterRunChecks();
+  } catch (e) {
+    alert('Connect failed: ' + _sorterErr(e));
+  }
 }
 
 async function _sorterSendCardLink(stagingId) {
