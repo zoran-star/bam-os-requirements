@@ -40,6 +40,15 @@ metadata:
 > Price Match 🏷 panel lists them + "Create N in Stripe" via
 > `api/offers/create-discount.js` (Coupon + Promotion Code per row on the
 > connected acct, idempotent, GET lists live codes).
+> **Prepaid add → match plan (PR #288):** Cleanup's prepaid "+ Add & match
+> plan" stages the member then opens the Connect popup to tie them to the
+> offer-price they paid for (AI guess = closest-by-amount ⭐ recommended;
+> their Stripe charge shown). "None match? + Create a new offer ↗" → Offers
+> tab (full wizard). Commitment terms show a "drops to monthly after" hint —
+> the offer's "goes back to monthly" setting drives it, so tying the member
+> to that commitment offer-price is all that's needed (create-sub executes
+> the schedule later). The paid Stripe price already exists → pure
+> identification, connect-offer writes the catalog mapping.
 
 > **2026-06-11 — RENAMED "Stripe Matcher" in the UI** (modal title, aria-labels,
 > action-item CTA; function names still `openPricingSorter`/`_SORTER`). The BB →
