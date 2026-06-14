@@ -6907,11 +6907,6 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
-        <div class="tagcfg-bar">
-          <span class="tagcfg-label">Lead tag</span>
-          <select id="sales-lead-tag" class="tagcfg-select" onchange="_saveTagCfg('lead_tag', this.value)"><option value="">Loading…</option></select>
-          <span class="tagcfg-hint" id="sales-lead-hint"></span>
-        </div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
         <div class="pl-layout">
           <aside class="pl-rail" id="pl-entry-rail">
@@ -8405,7 +8400,7 @@ function switchView(name, el) {
   if (name === 'members') fetchAndRenderMembers();
   // 'pricing' view retired 2026-06-10 — price matching lives in BB → Offers.
   if (name === 'inbox')   fetchAndRenderInbox();
-  if (name === 'pipelines') { fetchAndRenderPipelines(); _loadTagCfg(); }
+  if (name === 'pipelines') { fetchAndRenderPipelines(); }
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') { renderCalendar(); bkFetchAndRender(); }
@@ -10807,13 +10802,7 @@ async function _bbRenderMemberOnboarding(panel) {
   }
 
   panel.innerHTML = `${back}
-    <div class="tagcfg-bar">
-      <span class="tagcfg-label">Client tag</span>
-      <select id="onb-client-tag" class="tagcfg-select" onchange="_saveTagCfg('client_tag', this.value)"><option value="">Loading…</option></select>
-      <span class="tagcfg-hint" id="onb-client-hint"></span>
-    </div>
     <div id="bb-mo-steps"><div class="bb-empty">Checking your connections…</div></div>`;
-  _loadTagCfg();
 
   // Connection state + live roster count from the same payload the Members tab uses.
   let ghl = { status: 'not_connected' }, memberCount = null;
@@ -15574,42 +15563,10 @@ let _PRICING_FILTER = 'all';
 // PIPELINES VIEW — per-academy GHL kanban + drag-drop + Convert
 // ══════════════════════════════════════════════════════════════
 
-// ── Lead/Client tag config (Sales = lead tag, Onboarding = client tag) ──
-let _TAGCFG = null;
-async function _loadTagCfg() {
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
-    const j = await _safeJson(r);
-    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _TAGCFG = j;
-    _fillTagSelect('sales-lead-tag', 'sales-lead-hint', j.tags, j.lead_tag, j.recommend?.lead);
-    _fillTagSelect('onb-client-tag', 'onb-client-hint', j.tags, j.client_tag, j.recommend?.client);
-  } catch (_) {}
-}
-function _fillTagSelect(selId, hintId, tags, current, rec) {
-  const sel = document.getElementById(selId);
-  if (!sel) return;
-  const opts = ['<option value="">— none —</option>']
-    .concat((tags || []).map(t => `<option value="${escapeHTML(t)}" ${t === current ? 'selected' : ''}>${escapeHTML(t)}${t === rec ? ' (recommended)' : ''}</option>`));
-  sel.innerHTML = opts.join('');
-  const hint = document.getElementById(hintId);
-  if (hint) hint.textContent = (!current && rec) ? `AI suggests: ${rec}` : '';
-}
-async function _saveTagCfg(field, value) {
-  try {
-    const token = await _mreqAuthToken();
-    await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value || null }),
-    });
-    if (_TAGCFG) _TAGCFG[field] = value || null;
-    const hintId = field === 'lead_tag' ? 'sales-lead-hint' : 'onb-client-hint';
-    const hint = document.getElementById(hintId);
-    if (hint) { hint.textContent = 'Saved'; hint.style.color = 'var(--green)'; setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 1500); }
-  } catch (e) { alert("Couldn't save tag: " + e.message); }
-}
+// Lead/Client tag config now lives inside the offer editor (Sales =
+// lead_tag, Onboarding = client_tag) via the `ghl_tag` field type — see
+// _bbLoadTags + _bbUpdateOfferTopKey. The old standalone selectors were
+// removed; the comms-config endpoint is still used by _bbLoadTags.
 
 let _PL_DATA       = null;   // { pipelines:[{id,name,stages,opportunities}], totals:{...} }
 let _PL_PIPELINE   = null;   // currently-selected pipeline id
