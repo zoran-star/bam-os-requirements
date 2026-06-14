@@ -18012,7 +18012,7 @@ function _sorterRenderStep3(host) {
   // yet" are the same question (how do they pay?) → one "Set up payment
   // method" button (pays another way · or · send a card link). A typo
   // suggestion still offers a quick Link.
-  const payBtn = (sid, nm) => fixBtn('💳 Set up payment', `_sorterSetupPayment('${sid}','${escapeHTML(String(nm || '').replace(/'/g, ''))}')`);
+  const payBtn = (sid, nm, em) => fixBtn('💳 Set up payment', `_sorterSetupPayment('${sid}','${escapeHTML(String(nm || '').replace(/'/g, ''))}','${escapeHTML(String(em || '').replace(/'/g, ''))}')`);
   const prepaidArr = (c.checks && c.checks.prepaid) || [];
   const churnedArr = links.churned || [];
   const subArr = links.stripe_no_member || [];
@@ -18047,7 +18047,7 @@ function _sorterRenderStep3(host) {
       let btns = '';
       if (m.suggestion) btns += fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(m.suggestion.email)}','${escapeHTML(m.suggestion.customer_id || '')}','${escapeHTML(m.suggestion.sub_id || '')}','${escapeHTML(m.suggestion.price_id || '')}')`) + denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person');
       if (m.no_offer) btns += fixBtn('Connect plan →', `_sorterOpenConnect('${sid}')`);
-      if (m.no_payment) btns += payBtn(sid, m.athlete_name);
+      if (m.no_payment) btns += payBtn(sid, m.athlete_name, m.parent_email);
       if (m.is_dup_copy) btns += fixBtn('Remove copy', `_sorterRemoveStaged('${sid}')`) + denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
       todo = `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${btns}</div>`;
     } else todo = '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
@@ -18361,7 +18361,7 @@ function _sorterAltPay(stagingId) {
 // "Set up payment method" — a small modal with two clear choices: pays
 // another way (cash/etransfer → mark alternate) or by card (generate a Stripe
 // card-collection link to copy + send).
-function _sorterSetupPayment(stagingId, name) {
+function _sorterSetupPayment(stagingId, name, email) {
   const host = document.getElementById('pc-sorter-connect-host');
   if (!host) { // fallback if the host isn't on the page
     if (confirm('OK = pays another way · Cancel = send a card link')) _sorterAltPay(stagingId);
@@ -18370,23 +18370,34 @@ function _sorterSetupPayment(stagingId, name) {
   }
   const sid = escapeHTML(String(stagingId));
   const who = name ? escapeHTML(name) : 'this member';
+  const q0 = (email || name || '').trim();
   const choice = (icon, title, sub, onclick) => `
-    <button onclick="${onclick}" style="display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:1px solid var(--border,#2a2a31);border-radius:11px;padding:13px 15px;background:var(--bg,#0d0d10);color:var(--text,#eee);cursor:pointer;margin-bottom:10px;" onmouseover="this.style.borderColor='var(--accent,#E8C547)';this.style.background='rgba(232,197,71,0.06)';" onmouseout="this.style.borderColor='var(--border,#2a2a31)';this.style.background='var(--bg,#0d0d10)';">
-      <span style="font-size:20px;flex:none;line-height:1.1;">${icon}</span>
-      <span style="min-width:0;"><span style="display:block;font-size:13px;font-weight:700;">${title}</span><span style="display:block;font-size:11.5px;color:var(--text-mute,#888);margin-top:2px;">${sub}</span></span>
+    <button onclick="${onclick}" style="display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:1px solid var(--border,#2a2a31);border-radius:11px;padding:12px 14px;background:var(--bg,#0d0d10);color:var(--text,#eee);cursor:pointer;margin-bottom:8px;" onmouseover="this.style.borderColor='var(--accent,#E8C547)';this.style.background='rgba(232,197,71,0.06)';" onmouseout="this.style.borderColor='var(--border,#2a2a31)';this.style.background='var(--bg,#0d0d10)';">
+      <span style="font-size:18px;flex:none;line-height:1.1;">${icon}</span>
+      <span style="min-width:0;"><span style="display:block;font-size:13px;font-weight:700;">${title}</span><span style="display:block;font-size:11px;color:var(--text-mute,#888);margin-top:2px;">${sub}</span></span>
     </button>`;
+  // Auto-search Stripe FIRST: results show at the top; the manual ways to set
+  // up payment (card link / pays another way) sit below as fallbacks.
   host.innerHTML = `
     <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
-    <div role="dialog" aria-modal="true" style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,94vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <div style="font-size:15px;font-weight:800;">Set up payment method</div>
+    <div role="dialog" aria-modal="true" style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(520px,95vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex:none;">
+        <div style="font-size:15px;font-weight:800;">Set up payment for ${who}</div>
         <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
       </div>
-      <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:14px;">How does ${who} pay?</div>
-      ${choice('🔎', 'They already pay in Stripe — connect it', 'Find their existing Stripe customer (maybe under a different email) and link it, then match their plan.', `_sorterFindCustomer('${sid}','${escapeHTML(String(name || '').replace(/'/g, ''))}')`)}
-      ${choice('💳', 'Send them a card link', 'Generate a Stripe link to collect their card — copied to your clipboard.', `_sorterCloseConnect();_sorterSendCardLink('${sid}')`)}
-      ${choice('💵', 'They pay another way', 'Cash or e-transfer — not billed through Stripe.', `_sorterCloseConnect();_sorterAltPay('${sid}')`)}
+      <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:12px;flex:none;">Checking Stripe for them first…</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex:none;">
+        <input id="pc-cust-q" type="text" value="${escapeHTML(q0)}" placeholder="Search Stripe by name or email…" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12.5px;outline:none;" onkeydown="if(event.key==='Enter')_sorterRunCustomerSearch('${sid}')">
+        <button onclick="_sorterRunCustomerSearch('${sid}')" style="font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Search</button>
+      </div>
+      <div id="pc-cust-results" style="flex:1;min-height:40px;overflow:auto;margin-bottom:10px;"></div>
+      <div style="flex:none;border-top:1px dashed var(--border,#2a2a31);padding-top:12px;">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">Not in Stripe? Set them up</div>
+        ${choice('💳', 'Send them a card link', 'Stripe link to collect their card — copied to your clipboard.', `_sorterCloseConnect();_sorterSendCardLink('${sid}')`)}
+        ${choice('💵', 'They pay another way', 'Cash or e-transfer — not billed through Stripe.', `_sorterCloseConnect();_sorterAltPay('${sid}')`)}
+      </div>
     </div>`;
+  if (q0) _sorterRunCustomerSearch(stagingId);
 }
 
 // Find & connect an existing Stripe customer to a CSV-only member, then run the
