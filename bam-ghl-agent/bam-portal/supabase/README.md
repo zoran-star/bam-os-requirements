@@ -54,10 +54,13 @@ No migration repair is needed for this patched file. Its version already exists 
 - `seeds/20_bam_gta_entry_points.sql`
 - `pricing-catalog-gta-seed.sql`
 - `seeds/30_local_parent_app_fixture.sql`
+- `seeds/40_local_parent_schedule_fixture.sql`
 
 These files provide local development data needed by the BAM GTA funnel, pricing catalog, entry points, and parent app work.
 
 `seeds/30_local_parent_app_fixture.sql` is synthetic. It is not a production data dump. It seeds local Auth users, parent profiles, students, student memberships, legacy `members`, and `member_links` so parent-app APIs can be tested against the service-role boundary.
+
+`seeds/40_local_parent_schedule_fixture.sql` is synthetic. It mirrors the fc-mobile parent demo schedule shape with date-relative slots, local BAM GTA locations, schedule templates, future reservations, a waitlist entry, and past attended/no-show appointments.
 
 Local fixture logins:
 
