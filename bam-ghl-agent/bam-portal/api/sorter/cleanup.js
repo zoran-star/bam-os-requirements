@@ -939,7 +939,11 @@ async function handler(req, res) {
       if (s.billing_mode === "alternate") continue; // not billed via Stripe — no offer needed
       const link = s.__link;
       const priceId = s.stripe_price_id || (link && link.price_id) || null;
-      const cat = priceId ? catalogByPrice[priceId] : null;
+      // "No offer" only applies once they HAVE a price to map. A member with no
+      // Stripe price at all is a "no payment set up" case, not "no offer" —
+      // flagging it here was redundant + showed a premature "Connect plan".
+      if (!priceId) continue;
+      const cat = catalogByPrice[priceId];
       const keyFromCat = cat && cat.offer_price_key;
       const keyFromStaging = s.offer_price_key;
       const hasOffer = (keyFromCat && offerKeys.has(keyFromCat)) || (keyFromStaging && offerKeys.has(keyFromStaging));
@@ -949,7 +953,7 @@ async function handler(req, res) {
           id: s.id, source_row: s.source_row, athlete_name: s.athlete_name,
           plan: s.plan, offer_price_key: keyFromStaging || keyFromCat || null,
           stripe_price_id: priceId,
-          reason: priceId ? (cat ? "price has no offer_price_key in catalog" : "price not in pricing_catalog") : "no plan/price to resolve",
+          reason: cat ? "price has no offer_price_key in catalog" : "price not in pricing_catalog",
         });
       }
     }
