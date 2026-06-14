@@ -1024,9 +1024,14 @@ const META_OPS_ROLES = MARKETING_OPS_ROLES;
 // dedicated internal entry (INTERNAL_ADS_CLIENT_ID) even if their global role
 // isn't a marketing/admin one. Scoped to that one entry — no access to real
 // clients' ad config.
+// Both login domains (bball.com legacy + business.com) and cam/cameron, so the
+// scoped bypass matches whichever address they actually authenticate with.
 const INTERNAL_ADS_EDITORS = new Set([
-  "zoran@byanymeansbball.com", "mike@byanymeansbball.com",
-  "coleman@byanymeansbball.com", "cam@byanymeansbball.com",
+  "zoran@byanymeansbball.com", "zoran@byanymeansbusiness.com",
+  "mike@byanymeansbball.com", "mike@byanymeansbusiness.com",
+  "coleman@byanymeansbball.com", "coleman@byanymeansbusiness.com",
+  "cam@byanymeansbball.com", "cam@byanymeansbusiness.com",
+  "cameron@byanymeansbball.com", "cameron@byanymeansbusiness.com",
 ]);
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);

@@ -167,7 +167,16 @@ export default function BAMPortal() {
   const canSeeFeedback = me?.role === "admin";
   // "Our Ads" — staff view of BAM's OWN ad campaigns. Email-gated to the same
   // internal-acquisition crew as the (dormant) Channel Dashboard.
-  const OUR_ADS_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com", "cam@byanymeansbball.com"];
+  // Staff log in across two domains (bball.com legacy + business.com) and Cam
+  // shows up as both cam@ and cameron@ — include every variant so access never
+  // silently breaks on the wrong address.
+  const OUR_ADS_ALLOWLIST = [
+    "zoran@byanymeansbball.com", "zoran@byanymeansbusiness.com",
+    "mike@byanymeansbball.com", "mike@byanymeansbusiness.com",
+    "coleman@byanymeansbball.com", "coleman@byanymeansbusiness.com",
+    "cam@byanymeansbball.com", "cam@byanymeansbusiness.com",
+    "cameron@byanymeansbball.com", "cameron@byanymeansbusiness.com",
+  ];
   const canSeeOurAds = !!me && OUR_ADS_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
