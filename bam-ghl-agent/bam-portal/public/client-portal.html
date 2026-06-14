@@ -6716,7 +6716,29 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-name { font-weight:600; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-card-contact { font-size:12px; color:var(--text-sub, var(--text-mute)); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-card-tag { font-size:9px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-right:5px; }
+      #view-pipelines .pl-card-coach { font-size:12px; color:var(--text-sub, var(--text-mute)); margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       #view-pipelines .pl-card-trial { font-size:11px; color:var(--accent); font-weight:600; margin-top:5px; }
+
+      /* Post-trial form modal */
+      #ptf-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity 200ms; z-index:70; display:flex; align-items:center; justify-content:center; padding:20px; }
+      #ptf-overlay.open { opacity:1; pointer-events:auto; }
+      #ptf-overlay .ptf-modal { background:var(--surface); border:1px solid var(--border); border-radius:14px; width:440px; max-width:100%; max-height:90vh; overflow-y:auto; padding:0; }
+      #ptf-overlay .ptf-head { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border); }
+      #ptf-overlay .ptf-title { font-size:17px; font-weight:700; }
+      #ptf-overlay .ptf-x { background:none; border:none; color:var(--text-mute); font-size:22px; cursor:pointer; padding:0 4px; }
+      #ptf-overlay .ptf-info { padding:14px 20px; border-bottom:1px solid var(--border); }
+      #ptf-overlay .ptf-row { display:flex; justify-content:space-between; gap:12px; font-size:13px; padding:3px 0; }
+      #ptf-overlay .ptf-row span { color:var(--text-mute); }
+      #ptf-overlay .ptf-field { padding:14px 20px 0; }
+      #ptf-overlay .ptf-field label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); margin-bottom:7px; }
+      #ptf-overlay .ptf-seg { display:flex; gap:8px; }
+      #ptf-overlay .ptf-segbtn { flex:1; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface-el); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+      #ptf-overlay .ptf-segbtn.on { border-color:var(--accent); background:rgba(232,197,71,0.14); color:var(--accent); }
+      #ptf-overlay .ptf-input { width:100%; background:var(--surface-el); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+      #ptf-overlay .ptf-err { display:none; color:#e07070; font-size:12px; padding:10px 20px 0; }
+      #ptf-overlay .ptf-note { font-size:11px; color:var(--text-mute); padding:12px 20px 0; line-height:1.45; }
+      #ptf-overlay .ptf-submit { margin:16px 20px 20px; width:calc(100% - 40px); background:var(--accent); color:#0B0B0D; border:none; border-radius:9px; padding:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+      #ptf-overlay .ptf-submit:disabled { opacity:0.5; cursor:not-allowed; }
       #view-pipelines .pl-card-trial.is-past { color:#c47424; }
       #view-pipelines .pl-card-notrial { border-color:rgba(224,134,60,0.75); background:rgba(224,134,60,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:#e0863c; font-weight:700; margin-top:5px; }
@@ -6891,6 +6913,7 @@ Then the call to action."]</div>
     </div>
     <div id="pl-drawer-overlay" onclick="closePipelineDrawer()"></div>
     <div id="pl-drawer" role="dialog" aria-modal="true"></div>
+    <div id="ptf-overlay" onclick="_ptfClose()"></div>
 
     <div class="view" id="view-inbox">
       <div class="topbar">
@@ -15734,10 +15757,85 @@ function _plIsDoneTrialStage(stage) {
   return n.includes('trial') && (n.includes('done') || n.includes('complete') || n.includes('attended'));
 }
 
-// Post-trial form — opens after a booked trial date has passed. What it
-// captures (coach assessment, did-they-show, fit) is TBD; stub for now.
+// Post-trial form — coach fills it after the trial. Captures fit, the
+// trainer leading the sale, and notes. On "good fit" the opportunity moves
+// to Done Trial, the trainer is assigned, and a signup-link text is queued
+// (not sent until the comms tab exists).
+let _PTF_OPP = null, _PTF_FIT = null;
 function _plPostTrialForm(oppId) {
-  alert('Post-trial form coming soon.\n\nThis will capture how the trial went (coach assessment, attendance, next step) for opportunity ' + oppId + '.');
+  let o = null;
+  for (const pl of (_PL_DATA?.pipelines || [])) { const f = pl.opportunities.find(x => x.id === oppId); if (f) { o = f; break; } }
+  if (!o) return;
+  _PTF_OPP = oppId; _PTF_FIT = null;
+  const tr = _plTrialInfo(o.trialDate);
+  const trainers = _PL_DATA?.trainers || [];
+  const trainerControl = trainers.length
+    ? `<select id="ptf-trainer" class="ptf-input"><option value="">Select trainer…</option>${trainers.map(t => `<option>${escapeHTML(t)}</option>`).join('')}</select>`
+    : `<input id="ptf-trainer" class="ptf-input" type="text" placeholder="Trainer name">`;
+  const ov = document.getElementById('ptf-overlay');
+  ov.innerHTML = `
+    <div class="ptf-modal" onclick="event.stopPropagation()">
+      <div class="ptf-head">
+        <div class="ptf-title">Post-trial form</div>
+        <button class="ptf-x" onclick="_ptfClose()" aria-label="Close">×</button>
+      </div>
+      <div class="ptf-info">
+        <div class="ptf-row"><span>Parent</span><b>${escapeHTML(o.contact.name || '—')}</b></div>
+        <div class="ptf-row"><span>Athlete</span><b>${escapeHTML(o.athlete || '—')}</b></div>
+        <div class="ptf-row"><span>Phone</span><b>${escapeHTML(o.contact.phone || '—')}</b></div>
+        <div class="ptf-row"><span>Email</span><b>${escapeHTML(o.contact.email || '—')}</b></div>
+        <div class="ptf-row"><span>Trial</span><b>${escapeHTML(tr.str || '—')}</b></div>
+      </div>
+      <div class="ptf-field">
+        <label>Was the trial a good fit?</label>
+        <div class="ptf-seg">
+          <button type="button" id="ptf-fit-yes" class="ptf-segbtn" onclick="_ptfSetFit(true)">Good fit</button>
+          <button type="button" id="ptf-fit-no" class="ptf-segbtn" onclick="_ptfSetFit(false)">Not a fit</button>
+        </div>
+      </div>
+      <div class="ptf-field">
+        <label>Trainer leading the sale</label>
+        ${trainerControl}
+      </div>
+      <div class="ptf-field">
+        <label>Special notes</label>
+        <textarea id="ptf-notes" class="ptf-input" rows="3" placeholder="Anything worth noting about this trial…"></textarea>
+      </div>
+      <div class="ptf-err" id="ptf-err"></div>
+      <div class="ptf-note">On a good fit: card moves to Done Trial, trainer is assigned, and a signup-link text is queued (sending goes live with the comms tab).</div>
+      <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
+    </div>`;
+  ov.classList.add('open');
+}
+function _ptfSetFit(v) {
+  _PTF_FIT = v;
+  document.getElementById('ptf-fit-yes')?.classList.toggle('on', v === true);
+  document.getElementById('ptf-fit-no')?.classList.toggle('on', v === false);
+}
+function _ptfClose() { document.getElementById('ptf-overlay')?.classList.remove('open'); _PTF_OPP = null; }
+async function _ptfSubmit() {
+  const err = document.getElementById('ptf-err');
+  if (_PTF_FIT === null) { err.textContent = 'Pick whether it was a good fit.'; err.style.display = 'block'; return; }
+  const trainer = document.getElementById('ptf-trainer')?.value || '';
+  const notes = document.getElementById('ptf-notes')?.value || '';
+  const btn = document.getElementById('ptf-submit');
+  err.style.display = 'none'; btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, trainer, notes }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _ptfClose();
+    closePipelineDrawer();
+    fetchAndRenderPipelines();
+  } catch (e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Submit review';
+  }
 }
 
 // Mark won — will link the contact to an existing member. Deferred until the
@@ -15812,6 +15910,7 @@ function _renderPipelineBoard() {
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
         <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
+        ${o.trainer ? `<div class="pl-card-coach"><span class="pl-card-tag">Coach</span> ${escapeHTML(o.trainer)}</div>` : ''}
         ${trialStr
           ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>`
           : isDone
