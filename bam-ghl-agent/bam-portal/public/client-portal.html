@@ -16319,7 +16319,9 @@ function _renderInboxList() {
     const unread = (c.unreadCount || 0) > 0;
     const tag = c.classification === 'member'
       ? `<span class="ib-tag ib-tag-member">${escapeHTML((c.member && c.member.athlete_name) ? c.member.athlete_name : 'Member')}</span>`
-      : `<span class="ib-tag ib-tag-lead">Lead</span>`;
+      : c.classification === 'lead'
+        ? `<span class="ib-tag ib-tag-lead">Lead</span>`
+        : '';
     return `
       <div class="ib-row" onclick="openInboxThread('${escapeHTML(c.id)}','${escapeHTML(c.contactId || '')}')">
         <div style="min-width:0">
@@ -16329,7 +16331,7 @@ function _renderInboxList() {
           </div>
           <div class="ib-row-preview">${escapeHTML(c.lastMessageBody || '(no message)')}</div>
         </div>
-        <div class="ib-row-type">${escapeHTML((c.lastMessageType || '').replace(/^TYPE_/, ''))}</div>
+        <div class="ib-row-type">${escapeHTML(String(c.lastMessageType || '').replace(/^TYPE_/, ''))}</div>
         <div class="ib-row-date">${escapeHTML(_ibFormatDate(c.lastMessageDate))}</div>
       </div>`;
   }).join('');
@@ -16343,6 +16345,7 @@ async function openInboxThread(conversationId, contactId) {
   if (!overlay || !drawer) return;
   overlay.classList.add('open');
   drawer.classList.add('open');
+  _IB_PENDING_FILES = [];
   drawer.innerHTML = `<div style="padding:24px;color:var(--text-mute)">Loading thread…</div>`;
 
   // Pull convo metadata from list so we can show contact name immediately
@@ -16389,9 +16392,12 @@ function _renderInboxDrawer() {
   const bubbles = sorted.length
     ? sorted.map(m => {
         const out = (m.direction || '').toLowerCase() === 'outbound';
+        const atts = _ibRenderAttachments(m.attachments);
+        const hasBody = (m.body || '').trim().length > 0;
         return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
-          ${escapeHTML(m.body || '(no body)')}
-          <div class="ib-msg-meta">${escapeHTML((m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+          ${hasBody ? escapeHTML(m.body) : (atts ? '' : '(no body)')}
+          ${atts}
+          <div class="ib-msg-meta">${escapeHTML(String(m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
         </div>`;
       }).join('')
     : '<div style="color:var(--text-mute);font-size:13px">No messages in this thread yet.</div>';
@@ -16407,11 +16413,15 @@ function _renderInboxDrawer() {
     <div class="ib-d-thread" id="ib-thread-scroll">${bubbles}</div>
     <div class="ib-d-reply">
       <textarea id="ib-reply-input" placeholder="Type your reply…"></textarea>
+      <div id="ib-reply-files" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
       <div class="ib-d-reply-actions">
         <select id="ib-reply-type" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:4px;font-size:12px">
           <option value="SMS">SMS</option>
           <option value="Email">Email</option>
         </select>
+        <label title="Attach file" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text-sub);font-size:16px">
+          📎<input type="file" multiple style="display:none" onchange="_ibPickFiles(this)">
+        </label>
         <button class="ib-d-reply-send" onclick="_ibSendReply()">Send</button>
       </div>
     </div>`;
@@ -16419,6 +16429,67 @@ function _renderInboxDrawer() {
   // Scroll to newest message
   const scrollEl = document.getElementById('ib-thread-scroll');
   if (scrollEl) scrollEl.scrollTop = scrollEl.scrollHeight;
+}
+
+// ── Inbox attachments ────────────────────────────────────────────────────────
+// Files the staff has staged for the next reply (not yet uploaded/sent).
+let _IB_PENDING_FILES = [];
+
+// Render attachments on a received/sent message bubble. GHL returns either an
+// array of URL strings or objects ({ url, fileName }); handle both.
+function _ibRenderAttachments(attachments) {
+  const list = (attachments || []).map(a => (typeof a === 'string' ? { url: a } : a)).filter(a => a && a.url);
+  if (!list.length) return '';
+  return `<div class="ib-msg-atts" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">` + list.map(a => {
+    const url = a.url;
+    const name = a.fileName || a.name || (url.split('/').pop() || 'file').split('?')[0];
+    const isImg = /\.(png|jpe?g|gif|webp|heic)(\?|$)/i.test(url);
+    return isImg
+      ? `<a href="${escapeHTML(url)}" target="_blank" rel="noopener"><img src="${escapeHTML(url)}" alt="${escapeHTML(name)}" style="max-width:160px;max-height:160px;border-radius:6px;display:block"></a>`
+      : `<a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">📎 ${escapeHTML(name)}</a>`;
+  }).join('') + `</div>`;
+}
+
+// Stage files chosen from the reply 📎 picker.
+function _ibPickFiles(inputEl) {
+  const files = Array.from(inputEl.files || []);
+  _IB_PENDING_FILES.push(...files);
+  inputEl.value = '';
+  _ibRenderPendingFiles();
+}
+
+function _ibRemovePendingFile(i) {
+  _IB_PENDING_FILES.splice(i, 1);
+  _ibRenderPendingFiles();
+}
+
+function _ibRenderPendingFiles() {
+  const wrap = document.getElementById('ib-reply-files');
+  if (!wrap) return;
+  wrap.innerHTML = _IB_PENDING_FILES.map((f, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:11px">
+      📎 ${escapeHTML(f.name)}
+      <button onclick="_ibRemovePendingFile(${i})" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:13px;line-height:1;padding:0">×</button>
+    </span>`).join('');
+}
+
+// Upload staged files to the public ticket-files bucket and return their URLs.
+async function _ibUploadPendingFiles() {
+  if (!_IB_PENDING_FILES.length) return [];
+  if (!_sb) throw new Error('Storage not ready');
+  const urls = [];
+  for (const file of _IB_PENDING_FILES) {
+    const cleanName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+    const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    const path = `inbox/${CLIENT_ID}/${stamp}-${cleanName}`;
+    const { error: upErr } = await _sb.storage.from('ticket-files').upload(path, file, {
+      cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream',
+    });
+    if (upErr) throw new Error('Upload failed for ' + file.name + ' — ' + upErr.message);
+    const { data } = _sb.storage.from('ticket-files').getPublicUrl(path);
+    if (data?.publicUrl) urls.push(data.publicUrl);
+  }
+  return urls;
 }
 
 async function _ibSendReply() {
@@ -16429,9 +16500,10 @@ async function _ibSendReply() {
   const btn    = document.querySelector('#ib-drawer .ib-d-reply-send');
   const message = (textEl?.value || '').trim();
   const type    = typeEl?.value || 'SMS';
-  if (!message) return;
+  if (!message && !_IB_PENDING_FILES.length) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
   try {
+    const attachments = await _ibUploadPendingFiles();
     const token = await _mreqAuthToken();
     const subject = type === 'Email' ? `Reply from ${t.convo?.contactName || 'us'}` : undefined;
     const r = await fetch('/api/ghl/send-message', {
@@ -16443,6 +16515,7 @@ async function _ibSendReply() {
         type,
         message,
         subject,
+        attachments,
       }),
     });
     const json = await _safeJson(r);
@@ -16454,8 +16527,10 @@ async function _ibSendReply() {
       type,
       direction: 'outbound',
       date:      new Date().toISOString(),
+      attachments,
     });
     if (textEl) textEl.value = '';
+    _IB_PENDING_FILES = [];
     _renderInboxDrawer();
     // Refresh list in the background so the latest preview catches up
     fetchAndRenderInbox();

@@ -186,7 +186,9 @@ async function handler(req, res) {
       const messages = (data.messages?.messages || data.messages || data.data || []).map(m => ({
         id:         m.id,
         body:       m.body || m.message || "",
-        type:       m.type || m.messageType || "",
+        // GHL returns `type` as a number for some channels — always coerce to a
+        // string so the client can safely call .replace() on it.
+        type:       String(m.type ?? m.messageType ?? ""),
         direction:  m.direction || "",
         status:     m.status || "",
         date:       m.dateAdded || m.createdAt || m.timestamp || null,
@@ -266,10 +268,13 @@ async function handler(req, res) {
       lastMessageType:   c.lastMessageType || "",
       lastMessageDirection: c.lastMessageDirection || "",
       unreadCount:       c.unreadCount || 0,
-      classification:    m ? "member" : "lead",
+      // Only a confirmed member-table match is a "member". Everyone else is
+      // "other" (shown in All only) — we no longer assume unmatched contacts
+      // are leads. A real "lead" classification will come from the lead_tag.
+      classification:    m ? "member" : "other",
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
       trainer: (c.contactId && trainerByContact.get(c.contactId)) || null,
-      channel: (c.lastMessageType || c.type || "").replace(/^TYPE_/, "").toLowerCase() || null,
+      channel: String(c.lastMessageType || c.type || "").replace(/^TYPE_/, "").toLowerCase() || null,
     };
   });
   const trainers = [...new Set([...trainerByContact.values()])].sort((a, b) => a.localeCompare(b));

@@ -249,8 +249,15 @@ async function handler(req, res) {
   const message = (body.message || "").trim();
   const subject = (body.subject || "").trim();
   const html    = (body.html    || "").trim();
+  // Public URLs of any files the sender attached. GHL accepts an `attachments`
+  // URL array on both SMS (→ MMS) and Email messages.
+  const attachments = Array.isArray(body.attachments)
+    ? body.attachments.filter(u => typeof u === "string" && u)
+    : [];
 
-  if (!message && !html) return res.status(400).json({ error: "message (or html for Email) required" });
+  if (!message && !html && !attachments.length) {
+    return res.status(400).json({ error: "message, html, or an attachment is required" });
+  }
   if (type === "Email" && !subject) return res.status(400).json({ error: "subject required for Email" });
 
   // Find the contact. Callers can pass contact_id directly (Inbox reply
@@ -271,12 +278,11 @@ async function handler(req, res) {
   // Send the message
   let sendResp;
   try {
-    sendResp = await ghl("POST", `/conversations/messages`, {
-      token,
-      body: type === "Email"
-        ? { type: "Email", contactId, subject, html: html || `<p>${message}</p>` }
-        : { type: "SMS",   contactId, message },
-    });
+    const sendBody = type === "Email"
+      ? { type: "Email", contactId, subject, html: html || `<p>${message}</p>` }
+      : { type: "SMS",   contactId, message };
+    if (attachments.length) sendBody.attachments = attachments;
+    sendResp = await ghl("POST", `/conversations/messages`, { token, body: sendBody });
   } catch (e) {
     return res.status(e.status || 502).json({
       error: `GHL send failed: ${e.message}`,
