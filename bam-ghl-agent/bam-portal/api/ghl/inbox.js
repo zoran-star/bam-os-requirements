@@ -176,26 +176,47 @@ async function handler(req, res) {
   const { token, locationId } = creds;
 
   const conversationId = req.query.conversation_id;
+  const contactId = req.query.contact_id;
+
+  // GHL returns `type` as a number for some channels — always coerce to a
+  // string so the client can safely call .replace() on it.
+  const mapMsg = (m) => ({
+    id:         m.id,
+    body:       m.body || m.message || "",
+    type:       String(m.type ?? m.messageType ?? ""),
+    direction:  m.direction || "",
+    status:     m.status || "",
+    date:       m.dateAdded || m.createdAt || m.timestamp || null,
+    attachments: m.attachments || [],
+    contactId:  m.contactId || null,
+  });
 
   // ────────────────────────────────────────────────────────
-  // Mode B: single thread
+  // Mode B: single thread (by conversation_id)
   // ────────────────────────────────────────────────────────
   if (conversationId) {
     try {
       const data = await ghl("GET", `/conversations/${encodeURIComponent(conversationId)}/messages`, { token });
-      const messages = (data.messages?.messages || data.messages || data.data || []).map(m => ({
-        id:         m.id,
-        body:       m.body || m.message || "",
-        // GHL returns `type` as a number for some channels — always coerce to a
-        // string so the client can safely call .replace() on it.
-        type:       String(m.type ?? m.messageType ?? ""),
-        direction:  m.direction || "",
-        status:     m.status || "",
-        date:       m.dateAdded || m.createdAt || m.timestamp || null,
-        attachments: m.attachments || [],
-        contactId:  m.contactId || null,
-      }));
+      const messages = (data.messages?.messages || data.messages || data.data || []).map(mapMsg);
       return res.status(200).json({ conversation_id: conversationId, messages });
+    } catch (e) {
+      return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
+    }
+  }
+
+  // ────────────────────────────────────────────────────────
+  // Mode C: a contact's thread (by contact_id) — find their conversation,
+  // then return its messages. Used by the Sales pipeline card drawer.
+  // ────────────────────────────────────────────────────────
+  if (contactId) {
+    try {
+      const params = new URLSearchParams({ locationId, contactId });
+      const search = await ghl("GET", `/conversations/search?${params}`, { token });
+      const convo = (search.conversations || search.data || [])[0];
+      if (!convo) return res.status(200).json({ conversation_id: null, messages: [] });
+      const data = await ghl("GET", `/conversations/${encodeURIComponent(convo.id)}/messages`, { token });
+      const messages = (data.messages?.messages || data.messages || data.data || []).map(mapMsg);
+      return res.status(200).json({ conversation_id: convo.id, messages });
     } catch (e) {
       return res.status(e.status || 502).json({ error: `GHL: ${e.message}`, detail: e.body || null });
     }

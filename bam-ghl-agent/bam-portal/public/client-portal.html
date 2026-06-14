@@ -6837,6 +6837,21 @@ Then the call to action."]</div>
         background:var(--surface); border:1px solid var(--border); border-radius:10px;
         padding:9px 11px; cursor:pointer; transition:border-color 150ms;
       }
+      /* Entry-points grid inside the offer editor (Sales step). Re-states the
+         card look since the rules above are scoped to #view-pipelines. */
+      .ep-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; margin-top:6px; }
+      .ep-grid .pl-ep { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:9px 11px; cursor:pointer; transition:border-color 150ms; }
+      .ep-grid .pl-ep:hover { border-color:rgba(232,197,71,0.45); }
+      .ep-grid .pl-ep-type { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); }
+      .ep-grid .pl-ep-name { font-size:13px; font-weight:600; margin-top:2px; line-height:1.35; }
+      .ep-grid .pl-ep-status { font-size:11px; margin-top:7px; display:flex; align-items:flex-start; gap:6px; line-height:1.45; }
+      .ep-grid .pl-ep.connected { border-color:rgba(76,199,106,0.55); }
+      .ep-grid .pl-ep.connected .pl-ep-status { color:var(--green); }
+      .ep-grid .pl-ep.blocked { border-style:dashed; opacity:0.8; }
+      .ep-grid .pl-ep.blocked .pl-ep-status { color:var(--text-mute); }
+      .ep-grid .pl-ep-dot { width:7px; height:7px; border-radius:50%; flex:0 0 auto; margin-top:4px; }
+      .ep-grid .pl-ep.connected .pl-ep-dot { background:var(--green); }
+      .ep-grid .pl-ep.blocked .pl-ep-dot { background:var(--text-mute); }
       #view-pipelines .pl-ep:hover { border-color:rgba(232,197,71,0.45); }
       #view-pipelines .pl-ep-type { font-size:10px; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-mute); }
       #view-pipelines .pl-ep-name { font-size:13px; font-weight:600; margin-top:2px; line-height:1.35; }
@@ -10990,6 +11005,7 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbLoadLocations();             // warm the locations cache for pickers
   _bbLoadStaff();                  // warm staff_select dropdowns
   _bbLoadTags();                   // warm Lead/Client ghl_tag dropdowns
+  _epEnsureLoaded();               // warm Entry points (training Sales step)
   _bbLoadOffersList();             // warm offer_select (upsells targets)
   await _bbLoadOfferFiles(offer.id);
   _bbRenderWizardBody();
@@ -11802,6 +11818,8 @@ const _bbOfferConfigs = {
           { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
+      { key:'__entry_points__', type:'entry_points', label:'Entry points',
+        hint:'Where leads come from — your website forms, GHL forms, calendars and funnels. Click one to connect it to a pipeline + stage.' },
       _bbCommonExtraNotes
     ]},
     { id:'onboarding', label:'Onboarding', fields:[
@@ -12406,6 +12424,20 @@ function _bbRenderField(field, sectionId) {
         body = `<div class="bb-choice-row">${_bbTagList.map(tg =>
           `<button type="button" class="bb-choice ${sel.includes(tg) ? 'selected' : ''}" onclick="_bbToggleOfferTopArray('${field.key}','${_bbEscapeAttr(tg)}')">${_bbEscapeHtml(tg)}${tg === rec ? ' ★' : ''}</button>`
         ).join('')}</div>`;
+      }
+      break;
+    }
+    case 'entry_points': {
+      // Entry-points manager, rendered inside the offer's Sales step. Cards open
+      // the existing Set-Up wizard (#pl-drawer overlays any view). _EP_DATA is
+      // warmed on offer open; if not ready yet we kick a load + show a spinner.
+      if (!_EP_DATA) {
+        _epEnsureLoaded();
+        body = `<div style="padding:14px;color:var(--text-mute);font-size:13px"><span class="req-spin"></span> Loading entry points…</div>`;
+      } else if (!_EP_DATA.length) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">No entry points yet. They appear here as your website forms, GHL forms, calendars and funnels are detected.</div>`;
+      } else {
+        body = `<div class="ep-grid">${_EP_DATA.map(ep => _epCardHtml(ep, `_epOpenWizard('${_bbEscapeAttr(ep.id)}')`)).join('')}</div>`;
       }
       break;
     }
@@ -15656,6 +15688,23 @@ async function _epFetchAndRender() {
   }
 }
 
+// Shared entry-point card. `onclickExpr` differs by surface: the Sales-page
+// rail jumps to the offer's Sales step; the offer editor opens the wizard.
+function _epCardHtml(ep, onclickExpr) {
+  const off = ep.enabled === false;
+  const connected = !off && !!(ep.pipeline_name && ep.stage_name);
+  const status = off
+    ? `<span class="pl-ep-dot"></span><span>Off — not selected</span>`
+    : connected
+      ? `<span class="pl-ep-dot"></span><span>${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}</span>`
+      : `<span class="pl-ep-dot"></span><span>Not connected — set up</span>`;
+  return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" style="${off ? 'opacity:0.5' : ''}" onclick="${onclickExpr}">
+    <div class="pl-ep-type">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)}</div>
+    <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
+    <div class="pl-ep-status">${status}</div>
+  </div>`;
+}
+
 function _renderEntryRail() {
   const host = document.getElementById('pl-entry-list');
   if (!host || !_EP_DATA) return;
@@ -15663,20 +15712,9 @@ function _renderEntryRail() {
     host.innerHTML = '<div class="pl-empty">No entry points yet.</div>';
     return;
   }
-  const card = (ep) => {
-    const off = ep.enabled === false;
-    const connected = !off && !!(ep.pipeline_name && ep.stage_name);
-    const status = off
-      ? `<span class="pl-ep-dot"></span><span>Off — not selected</span>`
-      : connected
-        ? `<span class="pl-ep-dot"></span><span>${escapeHTML(ep.pipeline_name)} → ${escapeHTML(ep.stage_name)}</span>`
-        : `<span class="pl-ep-dot"></span><span>Not connected — set up</span>`;
-    return `<div class="pl-ep ${connected ? 'connected' : 'blocked'}" style="${off ? 'opacity:0.5' : ''}" onclick="_epOpenWizard('${escapeHTML(ep.id)}')">
-      <div class="pl-ep-type">${escapeHTML(_EP_TYPE_LABELS[ep.type] || ep.type)}</div>
-      <div class="pl-ep-name">${escapeHTML(ep.label)}</div>
-      <div class="pl-ep-status">${status}</div>
-    </div>`;
-  };
+  // On the Sales page, clicking an entry point takes the user to the Training
+  // offer's Sales step, where setup now lives.
+  const card = (ep) => _epCardHtml(ep, `_epGotoOfferSales('${escapeHTML(ep.id)}')`);
   const isSetUp = (ep) => ep.enabled !== false && !!(ep.pipeline_name && ep.stage_name);
   const top = _EP_DATA.filter(isSetUp);
   const rest = _EP_DATA.filter(ep => !isSetUp(ep));
@@ -15688,6 +15726,51 @@ function _renderEntryRail() {
     <div id="pl-entry-more" class="${_EP_MORE_OPEN ? 'open' : ''}">${rest.map(card).join('')}</div>`;
   }
   host.innerHTML = html;
+}
+
+// Load entry points (+ pipelines for the wizard dropdowns) once, then refresh
+// whichever surface is showing them. Used by the offer editor's entry_points
+// field and the Sales-page deep-link.
+let _EP_LOADING = false;
+async function _epEnsureLoaded() {
+  if (_EP_LOADING) return;
+  _EP_LOADING = true;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/website/entry-points?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok) _EP_DATA = j.entry_points || [];
+    if (!_PL_DATA) {
+      try {
+        const pr = await fetch('/api/ghl/pipelines?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+        const pj = await _safeJson(pr);
+        if (pr.ok) _PL_DATA = pj;
+      } catch (_) {}
+    }
+  } catch (_) {} finally { _EP_LOADING = false; }
+  if (document.getElementById('pl-entry-list')) _renderEntryRail();
+  if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
+}
+
+// The academy's (single) Training offer id — entry-point setup lives on it.
+async function _epTrainingOfferId() {
+  if (!_sb || !CLIENT_ID) return null;
+  const { data } = await _sb.from('offers')
+    .select('id, type, status, sort_order')
+    .eq('client_id', CLIENT_ID).eq('type', 'training').neq('status', 'archived')
+    .order('sort_order', { ascending: true }).limit(1);
+  return (data && data[0] && data[0].id) || null;
+}
+
+// Sales-page → open the Training offer at its Sales step, then the ep wizard.
+async function _epGotoOfferSales(epId) {
+  const offerId = await _epTrainingOfferId();
+  if (!offerId) { alert('No Training offer yet — create your Training offer first, then set up entry points in its Sales step.'); return; }
+  const step = _bbSections.indexOf('sales') + 1;
+  switchView('blueprint', document.querySelector('.nav-item[data-feature="blueprint"]'));
+  _bbNavigate('offers', offerId, { step });
+  await _epEnsureLoaded();
+  if (epId) _epOpenWizard(epId);
 }
 
 let _EP_MORE_OPEN = false;
@@ -15822,6 +15905,8 @@ async function _epWizSave(disconnect) {
     Object.assign(ep, { pipeline_name, stage_name });
     if (enabled !== undefined) ep.enabled = enabled;
     _renderEntryRail();
+    // If we edited from inside the offer editor, refresh its entry-points section too.
+    if (document.querySelector('.view.active')?.id === 'view-blueprint' && _bbState.offer) _bbRenderWizardBody();
     closePipelineDrawer();
   } catch (e) {
     if (err) { err.textContent = e.message; err.style.display = 'block'; }

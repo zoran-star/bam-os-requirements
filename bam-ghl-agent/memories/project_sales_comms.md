@@ -63,6 +63,21 @@ Revamp of the Inbox tab into a tabbed comms hub.
   `trainers` list + `tagConfig` ({lead_tags[], client_tag}). `contact_trainers`
   table (post-trial mirrors into it).
 
+**Messaging + entry-points relocation — DONE (2026-06-14, part 2):**
+- **New message to any GHL contact**: Inbox "✏️ New" button → compose drawer
+  with a contact search (`/api/ghl/contacts-search` GET `?client_id=&q=`) →
+  pick → SMS/Email + text + file attachments → `/api/ghl/send-message`.
+- **Pipeline card drawer messaging**: `_plOpenCard` drawer has a Messages
+  section (thread + reply + attachments). Loads the contact's thread via
+  `api/ghl/inbox?contact_id=` (new Mode C — finds the contact's conversation,
+  returns its messages). Sends via `/api/ghl/send-message`.
+- **Entry points moved into the Training offer editor Sales step** (new
+  `entry_points` field type → `_epCardHtml`/`_epEnsureLoaded`; the Set-Up
+  wizard `_epOpenWizard` renders in the global `#pl-drawer` overlay, so it
+  works from any view). The standalone Sales-page rail now **deep-links**:
+  clicking an entry point calls `_epGotoOfferSales` → opens the Training offer
+  at its Sales step (`_epTrainingOfferId` finds the offer). Training-only.
+
 **Tag-based classification — DONE (2026-06-14):**
 - `api/ghl/inbox` classifies member/lead/other by GHL tags. It resolves
   contactIds carrying the member tag + each lead tag via `POST /contacts/search`
