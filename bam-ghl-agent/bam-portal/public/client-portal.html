@@ -17216,7 +17216,7 @@ function _sorterRenderStep3(host) {
       ? `<span style="color:#e0a93f;font-weight:700;">&nbsp;⚠ might be ${escapeHTML(x.maybe_staged.athlete_name || '')} from your sheet</span>` +
         fixBtn(`Link to ${escapeHTML(x.maybe_staged.athlete_name || 'them')} ✓`, `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`)
       : '') +
-    fixBtn('+ Add as member', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','','')`) +
+    fixBtn('+ Add &amp; match plan', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`) +
     denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || '')}')`, 'Not a member — dismiss')
   ));
 
@@ -17401,6 +17401,36 @@ function _sorterDenyPrepaid(email) {
     if (_SORTER.checks.counts) _SORTER.checks.counts.prepaid = c.prepaid.length;
   });
 }
+
+// Prepaid "+ Add & match plan": stage the member from their Stripe customer,
+// then open the Connect popup to tie them to an offer-price. The popup's
+// recommendation (closest by amount) is the AI best-guess; if no offer fits
+// they can create one in the Offers tab from there. The matched commitment
+// offer-price carries its own "goes back to monthly" setting, so once tied,
+// create-sub builds the schedule (drop-to-monthly) when that's live.
+async function _sorterAddPrepaid(email, name, customerId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=add-from-stripe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, email, name, customer_id: customerId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    // Drop them out of the prepaid list + bump counts.
+    const ch = _SORTER.checks && _SORTER.checks.checks || {};
+    ch.prepaid = (ch.prepaid || []).filter(x => x.email !== email);
+    if (_SORTER.checks && _SORTER.checks.counts) {
+      _SORTER.checks.counts.prepaid = (ch.prepaid || []).length;
+      if (json.counts) { _SORTER.checks.counts.staged = json.counts.staged; _SORTER.checks.counts.clean = json.counts.clean; }
+    }
+    _sorterRenderBody();
+    if (json.staging_id) _sorterOpenConnect(json.staging_id); // → pick the offer-price
+  } catch (e) {
+    alert('Add failed: ' + _sorterErr(e));
+  }
+}
 function _sorterDenyDup(key) {
   _sorterFixAction('dismiss', { key: 'dup:' + key }, () => {
     const c = _SORTER.checks.checks || {};
@@ -17493,6 +17523,11 @@ function _sorterRenderConnect() {
         <div>
           <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Pick the plan they're on</div>
           ${targets}
+          <div style="font-size:11px;color:var(--text-mute,#888);margin-top:8px;border-top:1px dashed var(--border,#2a2a31);padding-top:10px;">
+            None of these match? <button onclick="_sorterCloseConnect();_sorterGotoOffers()" style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">+ Create a new offer ↗</button>
+          </div>
+          ${_SORTER_CONNECT.chosen && /\|(3|6|12)_months/.test(_SORTER_CONNECT.chosen)
+            ? `<div style="font-size:10.5px;color:#7BC47F;margin-top:8px;">⏳ This is a commitment term — if the offer is set to "goes back to monthly", they'll auto-drop to the monthly price after it (once portal billing is live).</div>` : ''}
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a31);flex:none;">
