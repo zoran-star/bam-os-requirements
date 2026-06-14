@@ -16,8 +16,35 @@ pre-chewed, ready to approve.**
 | Phase | What | Status |
 |---|---|---|
 | 1 | Daily AI-triaged Slack digest of open feedback | **SHIPPED 2026-06-14** |
-| 2 | One-tap "Build this" → kicks a Claude session → drafts a PR | planned |
-| 3 | Auto-pilot: safe items auto-built → "Merge?" ping | planned |
+| 2 | "Build spec" → Claude writes a spec → opens a GitHub **issue** | **SHIPPED 2026-06-14** |
+| 3 | Auto-spec safe items in the digest → 📋 issue links | **SHIPPED 2026-06-14** |
+
+**Engine choice (Zoran, 2026-06-14):** "auto-spec → ready-to-build issue", NOT
+autonomous codegen. One tap (or auto for safe items) turns feedback into a
+GitHub issue with an AI-written spec; the actual build happens via Claude Code
+web on that issue. No unsupervised codegen, no auto-merge.
+
+## Phase 2/3 — how it works (shipped)
+
+- **Manual (Phase 2):** "✨ Build spec" button on each item in the Feedback tab →
+  `POST /api/clients?action=feedback-spec&id=…` (admin-only) → `specFeedbackItem()`
+  (Claude haiku writes title + markdown spec: Problem / Approach / Likely files /
+  Acceptance / Effort) → `createGithubIssue()` files it (labels `feedback` +
+  `bug`/`enhancement`) → URL saved to `portal_feedback.github_issue_url`. Button
+  flips to "📋 View build spec".
+- **Auto (Phase 3):** the digest cron triages each item with an extra
+  `auto_safe` flag (small + clearly-scoped + low-risk). For up to 3 safe items
+  with no issue yet, it auto-files the spec issue and shows 📋 links + an
+  "auto-drafted N specs" note in the Slack digest. **Never builds or merges code.**
+- Dedup via `portal_feedback.github_issue_url` (migration
+  `20260614223000_feedback_github_issue.sql`, + `spec_created_at`). Cron select
+  falls back gracefully if the column isn't migrated yet.
+
+### Env (Phase 2/3)
+- `GITHUB_TOKEN` (fine-grained PAT, **Issues: write** on the repo) — REQUIRED
+- `GITHUB_REPO` = `zoran-star/bam-os-requirements` — REQUIRED
+- Inert without both: button returns `github_not_configured`; cron skips auto-spec.
+- ⚠️ **Untested until those secrets exist + a first run** — no creds in this session.
 
 ## Phase 1 — how it works (shipped)
 
