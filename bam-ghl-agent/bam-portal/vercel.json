@@ -23,6 +23,10 @@
     {
       "path": "/api/marketing?resource=meta-health-cron",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/clients?action=cron-feedback-digest",
+      "schedule": "30 13 * * *"
     }
   ],
   "headers": [

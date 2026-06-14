@@ -163,6 +163,100 @@ async function getStripeRevenue(customerId) {
   }
 }
 
+// ── Feedback digest (Phase 1 of feedback → action) ──────────────────────────
+
+const FEEDBACK_KIND_LABEL = { bug: "BUG", feature: "FEATURE", idea: "IDEA", other: "FEEDBACK" };
+
+function feedbackRelativeTime(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const day = 86_400_000, hr = 3_600_000;
+  if (diff < hr) return "just now";
+  if (diff < day) return `${Math.round(diff / hr)}h ago`;
+  const d = Math.round(diff / day);
+  return d === 1 ? "yesterday" : `${d}d ago`;
+}
+
+// One Claude call to triage every open item. Returns { [id]: { effort, action } }.
+// Degrades to {} when no key / failure so the digest still posts (just without
+// the AI suggestions).
+async function triageFeedback(items) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || !items.length) return {};
+  const compact = items.map(i => ({ id: i.id, kind: i.kind, page: i.page, text: (i.body || "").slice(0, 400) }));
+  const system = [
+    "You triage product feedback for a small SaaS team so the founder can act fast.",
+    "For EACH item, give a one-line concrete suggested action (what to build/do, plainly) and an effort estimate.",
+    "effort must be exactly one of: S, M, L (small/medium/large).",
+    "Keep each action under 16 words. No jargon, no preamble.",
+    "Return ONLY a JSON array, no markdown, each element exactly: {\"id\": string, \"effort\": \"S|M|L\", \"action\": string}.",
+  ].join(" ");
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1200,
+        system,
+        messages: [{ role: "user", content: `Triage these feedback items:\n\n${JSON.stringify(compact)}\n\nReturn the JSON array now.` }],
+      }),
+    });
+    if (!r.ok) return {};
+    const j = await r.json();
+    const text = j.content?.[0]?.text || "";
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return {};
+    const arr = JSON.parse(match[0]);
+    const map = {};
+    for (const e of arr) { if (e && e.id) map[e.id] = { effort: e.effort || "?", action: e.action || "" }; }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+async function cronFeedbackDigest(req, res) {
+  try {
+    // Open = not yet resolved. Newest first; cap so the digest stays scannable.
+    const open = await supabaseSelect(
+      `portal_feedback?resolved_at=is.null&select=id,body,kind,page,portal,submitter_email,created_at&order=created_at.desc&limit=15`
+    );
+    const items = Array.isArray(open) ? open : [];
+    if (!items.length) return res.status(200).json({ ok: true, open: 0, posted: false });
+
+    const token = process.env.SLACK_BOT_TOKEN;
+    const channel = process.env.FEEDBACK_SLACK_CHANNEL;
+    if (!token || !channel) return res.status(200).json({ ok: true, open: items.length, posted: false, reason: "slack_not_configured" });
+
+    const triage = await triageFeedback(items);
+    const base = "https://portal.byanymeansbusiness.com";
+    const lines = items.map((it, idx) => {
+      const label = FEEDBACK_KIND_LABEL[it.kind] || "FEEDBACK";
+      const where = it.page && it.page !== "/" ? ` · \`${it.page}\`` : "";
+      const who = it.submitter_email ? ` — ${it.submitter_email}` : "";
+      const when = it.created_at ? ` · ${feedbackRelativeTime(it.created_at)}` : "";
+      const body = (it.body || "").replace(/\s+/g, " ").slice(0, 160);
+      const tip = triage[it.id];
+      const suggestion = tip ? `\n     ↳ _${tip.action}_ · *${tip.effort}* effort` : "";
+      return `*${idx + 1}. ${label}*${where} — ${body}${suggestion}\n     ${who}${when}`.trim();
+    });
+    const header = `:inbox_tray: *Feedback to action — ${items.length} open${items.length === 15 ? "+" : ""}*`;
+    const footer = `\n\n→ Review + resolve: <${base}/?nav=feedback|Feedback tab>`;
+    const text = `${header}\n\n${lines.join("\n\n")}${footer}`;
+
+    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+    const sj = await slackRes.json().catch(() => ({}));
+    return res.status(200).json({ ok: true, open: items.length, posted: !!sj.ok, ai: Object.keys(triage).length > 0, slack_error: sj.ok ? null : (sj.error || null) });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
 function shapeClient(row, revenue) {
   return {
     id: row.id,
@@ -172,6 +266,7 @@ function shapeClient(row, revenue) {
     auth_user_id: row.auth_user_id || null,
     status: row.status,
     ghl_location_id: row.ghl_location_id || null,
+    address: row.address || null,
     slack_channel_id: row.slack_channel_id || null,
     stripe_customer_id: row.stripe_customer_id || null,
     notion_page_id: row.notion_page_id || null,
@@ -680,6 +775,19 @@ function portalUrls(req) {
 async function handler(req, res) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return res.status(500).json({ error: "Supabase env vars missing (need VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)" });
+  }
+
+  // ── Cron job: daily "feedback → action" digest to Slack ──
+  // Pulls open portal_feedback, has Claude suggest an action + effort for each,
+  // and posts a scannable digest to FEEDBACK_SLACK_CHANNEL so feedback comes TO
+  // Zoran (push) instead of waiting for him to go check it. Phase 1 of the
+  // feedback-to-action system. Auth: Bearer CRON_SECRET (Vercel cron header).
+  if (req.query.action === "cron-feedback-digest") {
+    const auth = req.headers.authorization || "";
+    const expected = process.env.CRON_SECRET;
+    if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    if (auth !== `Bearer ${expected}`) return res.status(401).json({ error: "unauthorized" });
+    return cronFeedbackDigest(req, res);
   }
 
   // ── Cron job: auto-resend invite links to clients who never accepted ──
@@ -2629,6 +2737,12 @@ async function handler(req, res) {
       }
       if (req.query.action === "count-locations") {
         return res.status(200).json({ count: await cnt("locations", `client_id=eq.${clientId}`) });
+      }
+      if (req.query.action === "list-locations") {
+        // The client's physical locations (gyms) for the staff Overview tab.
+        // Non-sensitive; staff Bearer is the network-layer gate, same as counts.
+        const rows = await supabaseSelect(`locations?client_id=eq.${encodeURIComponent(clientId)}&select=id,title,address,notes`);
+        return res.status(200).json({ locations: rows || [] });
       }
       if (req.query.action === "count-teammates") {
         return res.status(200).json({ count: await cnt("client_users", `client_id=eq.${clientId}&status=eq.active&role=neq.owner`) });

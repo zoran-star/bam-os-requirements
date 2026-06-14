@@ -4,6 +4,14 @@ description: Migration that made Supabase `clients` the single source of truth f
 type: project
 ---
 
+## Staff Overview now shows client location (2026-06-14)
+
+The Clients → Overview tab Profile shows the client's **location**: it fetches
+`GET /api/clients?action=list-locations&client_id=…` (the `locations` table:
+id/title/address/notes) and lists each gym; if there are none it falls back to
+`clients.address` (now exposed via `shapeClient`). Same non-sensitive,
+staff-Bearer gate as the `count-*` actions.
+
 ## TL;DR — what changed
 
 Before: portal's **Clients tab** read from Notion (`CLIENT_PROFILES_PAGE = 3295aca8ac0f81f09b88c60e84173738`), portal's **Client Setup tab** read from Supabase `clients`. They were not in sync.
