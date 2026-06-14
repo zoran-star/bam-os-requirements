@@ -917,6 +917,36 @@ async function handler(req, res) {
 
     const cleanCount = staging.filter(s => !dupIds.has(s.id) && !noOfferIds.has(s.id) && (s.athlete_name || "").toString().trim() && normEmail(s.parent_email)).length;
 
+    // ── Full roster: every staged member + the price attached, flagged with
+    // what (if anything) needs work. The UI sorts needs-work to the top. ──
+    const members = staging.map(s => {
+      const link = s.__link;
+      const altPay = s.billing_mode === "alternate";
+      const priceId = s.stripe_price_id || (link && link.price_id) || null;
+      const cat = priceId ? catalogByPrice[priceId] : null;
+      const key = s.offer_price_key || (cat && cat.offer_price_key) || null;
+      const amount = cat && cat.amount_cents != null ? cat.amount_cents : (link && link.amount_cents) || null;
+      const issues = [];
+      if (dupIds.has(s.id)) issues.push("duplicate");
+      if (noOfferIds.has(s.id)) issues.push("no offer");
+      if (!link && !altPay) issues.push("no payment set up");
+      if (!(s.athlete_name || "").toString().trim()) issues.push("missing name");
+      return {
+        id: s.id,
+        athlete_name: s.athlete_name || "",
+        parent_email: s.parent_email || "",
+        price_label: key || (cat && cat.display_name) || null,
+        amount_cents: amount,
+        interval: cat && cat.interval || null,
+        alt_payment: altPay,
+        needs_work: issues.length > 0,
+        issues,
+      };
+    }).sort((a, b) =>
+      (b.needs_work - a.needs_work) ||
+      (a.athlete_name || "").localeCompare(b.athlete_name || "")
+    );
+
     return res.status(200).json({
       ok: true,
       academy: client.business_name,
@@ -931,6 +961,7 @@ async function handler(req, res) {
         no_offer: noOffer.length,
         tier_issues: tierIssues.length,
         clean: cleanCount,
+        needs_work: members.filter(m => m.needs_work).length,
       },
       checks: {
         links: { staged_no_stripe: stagedNoStripe, stripe_no_member: stripeNoMember, churned },
@@ -939,6 +970,7 @@ async function handler(req, res) {
         no_offer: noOffer,
         tier_issues: tierIssues,
       },
+      members,
     });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || String(e) });

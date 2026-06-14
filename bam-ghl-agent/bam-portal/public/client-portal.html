@@ -17455,7 +17455,7 @@ function _sorterRenderStep3(host) {
   // yet" are the same question (how do they pay?) → one "Set up payment
   // method" button (pays another way · or · send a card link). A typo
   // suggestion still offers a quick Link.
-  const payBtn = (sid) => fixBtn('💳 Set up payment method', `_sorterSetupPayment('${sid}')`);
+  const payBtn = (sid, nm) => fixBtn('💳 Set up payment method', `_sorterSetupPayment('${sid}','${escapeHTML(String(nm || '').replace(/'/g, ''))}')`);
   const linksInner = `
     ${list(links.staged_no_stripe, x => {
       const who = `<b>${escapeHTML(x.athlete_name || '')}</b>&nbsp;(${escapeHTML(x.parent_email || '')})`;
@@ -17463,8 +17463,8 @@ function _sorterRenderStep3(host) {
       if (x.alt_payment) return row(`💵 ${who} — pays another way ✓`);
       if (x.suggestion) return row(`✉️ ${who} — did you mean <b>${escapeHTML(x.suggestion.email)}</b>?` +
         fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(x.suggestion.email)}','${escapeHTML(x.suggestion.customer_id || '')}','${escapeHTML(x.suggestion.sub_id || '')}','${escapeHTML(x.suggestion.price_id || '')}')`) +
-        denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss this suggestion') + payBtn(sid));
-      return row(`• ${who} — no payment set up` + payBtn(sid));
+        denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss this suggestion') + payBtn(sid, x.athlete_name));
+      return row(`• ${who} — no payment set up` + payBtn(sid, x.athlete_name));
     })}
     ${list(links.stripe_no_member, x => row(
       `💸 ${_sorterWho(x)} is PAYING but not on your sheet` +
@@ -17501,12 +17501,38 @@ function _sorterRenderStep3(host) {
 
   const stagedNo = counts.staged_no_stripe || 0;
   const stripeNo = counts.stripe_no_member || 0;
+
+  // Full roster: every staged member + the price attached, needs-work first.
+  const mem = c.members || [];
+  const needWork = mem.filter(m => m.needs_work);
+  const ready = mem.filter(m => !m.needs_work);
+  const money = (cents, ival) => cents == null ? '' : '$' + (cents / 100).toFixed(0) + (ival ? '/' + String(ival).replace(/_/g, ' ') : '');
+  const memRow = (m, work) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border,#2a2a31);">
+      <span style="flex:none;width:7px;height:7px;border-radius:50%;background:${work ? '#e0a93f' : '#7BC47F'};"></span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.athlete_name || '(no name)')}</div>
+        <div style="font-size:10.5px;color:var(--text-mute,#888);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(m.parent_email || '')}</div>
+      </div>
+      <div style="flex:none;text-align:right;">
+        <div style="font-size:12px;font-weight:700;">${m.alt_payment ? '💵 alt pay' : (m.price_label ? escapeHTML(m.price_label) : '<span style="color:#e0a93f;">— no price —</span>')}</div>
+        <div style="font-size:10px;color:${work ? '#e0a93f' : 'var(--text-mute,#888)'};">${work ? escapeHTML((m.issues || []).join(' · ')) : (money(m.amount_cents, m.interval) || 'ready ✓')}</div>
+      </div>
+    </div>`;
+  const rosterCard = mem.length ? `
+    <div style="border:1px solid var(--border,#2a2a31);border-radius:10px;margin-bottom:10px;padding:12px;">
+      <div style="font-weight:700;font-size:13.5px;margin-bottom:8px;">👥 All members <span style="color:var(--text-mute,#888);font-weight:400;">(${mem.length})</span>${needWork.length ? ` <span style="color:#e0a93f;font-weight:800;">· ${needWork.length} need work</span>` : ''}</div>
+      ${needWork.map(m => memRow(m, true)).join('')}
+      ${ready.length ? `<details ${needWork.length ? '' : 'open'} style="margin-top:6px;"><summary style="cursor:pointer;font-size:11.5px;color:#7BC47F;font-weight:700;padding:6px 0;list-style:none;">✓ ${ready.length} ready to promote</summary>${ready.map(m => memRow(m, false)).join('')}</details>` : ''}
+    </div>` : '';
+
   host.innerHTML = `
     <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:14px;">${counts.clean || 0} of ${counts.staged || 0} staged members look clean and ready to promote.</div>
     ${card('🔗', 'Stripe links', stagedNo + stripeNo, linksInner)}
     ${prepaidArr.length ? card('💰', 'Possible prepaid members', prepaidArr.length, prepaidInner) : ''}
     ${card('👯', 'Duplicates', counts.duplicates || 0, dupInner)}
     ${card('🏷', 'On a price with no offer', counts.no_offer || 0, noOfferInner)}
+    ${rosterCard}
     ${churnedArr.length ? `
     <details style="border:1px dashed var(--border,#2a2a31);border-radius:10px;margin-bottom:10px;padding:0 12px;opacity:.75;">
       <summary style="cursor:pointer;padding:11px 0;font-weight:700;font-size:12.5px;list-style:none;color:var(--text-mute,#888);">🕰 Past members — ${churnedArr.length} canceled subs · nothing to do ✓</summary>
@@ -17713,14 +17739,34 @@ function _sorterAltPay(stagingId) {
   });
 }
 
-// "Set up payment method" — one entry covering both ways a no-Stripe member
-// can pay: another way (cash/etransfer → mark alternate) or by card (generate
-// a Stripe card-collection link to copy + send).
-function _sorterSetupPayment(stagingId) {
-  // OK = pays another way · Cancel = closes. A second click sends a card link.
-  const choice = confirm('How does this member pay?\n\nOK = They pay another way (cash / e-transfer)\nCancel = Send them a card link instead');
-  if (choice) { _sorterAltPay(stagingId); return; }
-  _sorterSendCardLink(stagingId);
+// "Set up payment method" — a small modal with two clear choices: pays
+// another way (cash/etransfer → mark alternate) or by card (generate a Stripe
+// card-collection link to copy + send).
+function _sorterSetupPayment(stagingId, name) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) { // fallback if the host isn't on the page
+    if (confirm('OK = pays another way · Cancel = send a card link')) _sorterAltPay(stagingId);
+    else _sorterSendCardLink(stagingId);
+    return;
+  }
+  const sid = escapeHTML(String(stagingId));
+  const who = name ? escapeHTML(name) : 'this member';
+  const choice = (icon, title, sub, onclick) => `
+    <button onclick="${onclick}" style="display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;border:1px solid var(--border,#2a2a31);border-radius:11px;padding:13px 15px;background:var(--bg,#0d0d10);color:var(--text,#eee);cursor:pointer;margin-bottom:10px;" onmouseover="this.style.borderColor='var(--accent,#E8C547)';this.style.background='rgba(232,197,71,0.06)';" onmouseout="this.style.borderColor='var(--border,#2a2a31)';this.style.background='var(--bg,#0d0d10)';">
+      <span style="font-size:20px;flex:none;line-height:1.1;">${icon}</span>
+      <span style="min-width:0;"><span style="display:block;font-size:13px;font-weight:700;">${title}</span><span style="display:block;font-size:11.5px;color:var(--text-mute,#888);margin-top:2px;">${sub}</span></span>
+    </button>`;
+  host.innerHTML = `
+    <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div role="dialog" aria-modal="true" style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,94vw);background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="font-size:15px;font-weight:800;">Set up payment method</div>
+        <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-mute,#888);margin-bottom:14px;">How does ${who} pay?</div>
+      ${choice('💵', 'They pay another way', 'Cash or e-transfer — not billed through Stripe.', `_sorterCloseConnect();_sorterAltPay('${sid}')`)}
+      ${choice('💳', 'Send them a card link', 'Generate a Stripe link to collect their card — copied to your clipboard.', `_sorterCloseConnect();_sorterSendCardLink('${sid}')`)}
+    </div>`;
 }
 
 async function _sorterSendCardLink(stagingId) {
