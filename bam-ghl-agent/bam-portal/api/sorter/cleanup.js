@@ -595,6 +595,72 @@ async function handler(req, res) {
       return key ? "ok" : "no_offer";
     }
 
+    // search-customers: find Stripe customers to connect to a CSV-only member
+    // (they may already pay under a different email). Returns id/name/email +
+    // their best sub's price/amount so the UI can show what they're on.
+    if (action === "search-customers") {
+      const acct = client.stripe_connect_account_id;
+      if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
+      const q = (body.q || "").toString().trim().replace(/["\\]/g, "");
+      if (!q) return res.status(400).json({ error: "q required" });
+      let customers = [];
+      try {
+        const r = await stripeGet(`/customers/search?query=${encodeURIComponent(`name~"${q}" OR email~"${q}"`)}&limit=10`, acct);
+        customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
+      } catch (_) {
+        // search API not available / errored → fall back to exact email lookup
+        try {
+          const r = await stripeGet(`/customers?email=${encodeURIComponent(q.toLowerCase())}&limit=10`, acct);
+          customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
+        } catch (_2) {}
+      }
+      // attach each customer's best sub (active-ish preferred) for context
+      for (const cu of customers) {
+        try {
+          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+          const subs = sr.data || [];
+          const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
+          if (best) {
+            const price = best.items && best.items.data && best.items.data[0] && best.items.data[0].price;
+            cu.sub_id = best.id; cu.status = best.status;
+            cu.price_id = price ? price.id : null;
+            cu.amount_cents = price ? price.unit_amount : null;
+          }
+        } catch (_) {}
+      }
+      return res.status(200).json({ ok: true, customers });
+    }
+
+    // link-customer: tie an existing Stripe customer (+ their best sub/price) to
+    // a CSV-only staged member. After this they have a price → the UI runs the
+    // plan/offer match (Connect) just like any other linked member.
+    if (action === "link-customer") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const acct = client.stripe_connect_account_id;
+      const custId = body.customer_id;
+      if (!acct || !custId) return res.status(400).json({ error: "customer_id required" });
+      let subId = body.sub_id || null, priceId = body.price_id || null;
+      if (!subId) {
+        try {
+          const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(custId)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+          const subs = sr.data || [];
+          const best = subs.find(s2 => ACTIVEISH.has(s2.status)) || subs[0];
+          if (best) { subId = best.id; const p = best.items && best.items.data && best.items.data[0] && best.items.data[0].price; priceId = priceId || (p && p.id) || null; }
+        } catch (_) {}
+      }
+      const status = s.is_duplicate ? "duplicate" : await priceVerdict(priceId);
+      await sb(`members_staging?id=eq.${s.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          stripe_customer_id: custId, stripe_subscription_id: subId, stripe_price_id: priceId,
+          stripe_linked: true, billing_mode: null, match_status: status,
+          cleanup_notes: "connected to an existing Stripe customer", updated_at: nowIso(),
+        }),
+      });
+      return res.status(200).json({ ok: true, match_status: status, no_offer: status === "no_offer", counts: await flagCounts(clientId, batchId) });
+    }
+
     // fix-link: accept a suggested Stripe match for a staged row (typo'd email).
     if (action === "fix-link") {
       const s = staging.find(x => String(x.id) === String(body.staging_id));
