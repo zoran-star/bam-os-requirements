@@ -57,6 +57,8 @@ async function resolveUser(req) {
 }
 
 // ── GHL HTTP helpers ─────────────────────────────────────
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function ghl(method, path, { token, body } = {}) {
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -64,11 +66,19 @@ async function ghl(method, path, { token, body } = {}) {
     Accept:        "application/json",
     "Content-Type": "application/json",
   };
-  const res = await fetch(`${GHL_V2}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  // Retry on GHL rate-limit (429) with backoff — respects Retry-After if sent.
+  let res;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch(`${GHL_V2}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status !== 429) break;
+    const ra = Number(res.headers.get("retry-after"));
+    const wait = ra > 0 ? Math.min(ra * 1000, 5000) : Math.min(400 * 2 ** attempt, 5000);
+    await sleep(wait);
+  }
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
@@ -287,7 +297,8 @@ async function handler(req, res) {
     const ids = new Set();
     if (!tag) return ids;
     try {
-      for (let page = 1; page <= 5; page++) {
+      // Cap at 2 pages (200 contacts) to keep GHL rate-limit usage low.
+      for (let page = 1; page <= 2; page++) {
         const data = await ghl("POST", `/contacts/search`, {
           token,
           body: { locationId, page, pageLimit: 100, filters: [{ field: "tags", operator: "contains", value: tag }] },
@@ -299,10 +310,14 @@ async function handler(req, res) {
     } catch (_) { /* search unsupported / failed — fall back to convo tags + members table */ }
     return ids;
   }
+  // Run searches sequentially (not Promise.all) so we never burst GHL's
+  // per-window rate limit — one member-tag search + one per lead tag.
   const memberTagSet = await contactIdsWithTag(clientTag);
-  const leadTagSetList = await Promise.all(leadTags.map(contactIdsWithTag));
   const leadTagSet = new Set();
-  for (const s of leadTagSetList) for (const id of s) leadTagSet.add(id);
+  for (const t of leadTags) {
+    const s = await contactIdsWithTag(t);
+    for (const id of s) leadTagSet.add(id);
+  }
 
   const annotated = convos.map(c => {
     const m =

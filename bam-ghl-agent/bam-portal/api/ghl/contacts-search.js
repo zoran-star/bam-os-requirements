@@ -39,12 +39,20 @@ async function resolveUser(req) {
   return { isStaff, clientIds };
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 async function ghl(method, path, { token, body } = {}) {
-  const res = await fetch(`${GHL_V2}${path}`, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, Accept: "application/json", "Content-Type": "application/json" },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    res = await fetch(`${GHL_V2}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, Version: V2_VERSION, Accept: "application/json", "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (res.status !== 429) break;
+    const ra = Number(res.headers.get("retry-after"));
+    await sleep(ra > 0 ? Math.min(ra * 1000, 5000) : Math.min(400 * 2 ** attempt, 5000));
+  }
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch (_) { json = { raw: text }; }
