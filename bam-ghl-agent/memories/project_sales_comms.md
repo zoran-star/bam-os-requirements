@@ -6,9 +6,9 @@ for now). See [[project_website_leads]] for the lead-capture/entry-points
 half and [[project_automation_agent_roadmap]] for the agent plan.
 
 ## Shipped (as of 2026-06-14)
-- **Sales page = pipeline board + Entry Points arrow rail** (green dotted
-  collapsible divider). Cards show **Parent + Athlete** only; click opens a
-  rich drawer.
+- **Sales page = full-width pipeline board.** (Entry Points used to be a left
+  rail here; moved into the Training offer editor's Sales step 2026-06-14.)
+  Cards show **Parent + Athlete** only; click opens a rich drawer.
 - **Card drawer** (`_plOpenCard`): identity (clickable phone/email, coach),
   **Journey timeline** (form filled → trial booked → showed up → good fit/coach
   → won/lost), **Lead details** (every populated GHL custom field via
@@ -74,9 +74,12 @@ Revamp of the Inbox tab into a tabbed comms hub.
 - **Entry points moved into the Training offer editor Sales step** (new
   `entry_points` field type → `_epCardHtml`/`_epEnsureLoaded`; the Set-Up
   wizard `_epOpenWizard` renders in the global `#pl-drawer` overlay, so it
-  works from any view). The standalone Sales-page rail now **deep-links**:
-  clicking an entry point calls `_epGotoOfferSales` → opens the Training offer
-  at its Sales step (`_epTrainingOfferId` finds the offer). Training-only.
+  works from any view). Training-only.
+- **Entry points REMOVED from the Sales tab entirely** (Zoran: "it does not
+  belong on the sales tab"). The Sales tab is now just the full-width pipeline
+  board — no left rail / divider. Entry points live ONLY in the offer editor.
+  (`_epGotoOfferSales`/`_renderEntryRail`/`plToggleRail` are now dead but
+  harmless no-ops.)
 
 **Tag-based classification — DONE (2026-06-14):**
 - `api/ghl/inbox` classifies member/lead/other by GHL tags. It resolves

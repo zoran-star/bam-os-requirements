@@ -6923,18 +6923,8 @@ Then the call to action."]</div>
       </div>
       <div class="content">
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
-        <div class="pl-layout">
-          <aside class="pl-rail" id="pl-entry-rail">
-            <div class="pl-rail-head">Entry Points</div>
-            <div class="pl-rail-sub">Where leads come from. Separate from the pipeline board.</div>
-            <div id="pl-entry-list"><div class="pl-empty"><span class="req-spin"></span>Loading…</div></div>
-          </aside>
-          <div class="pl-divider" onclick="plToggleRail()" title="Collapse entry points">
-            <span class="pl-divider-chev" id="pl-divider-chev">&#10094;</span>
-          </div>
-          <div id="pl-board-container">
-            <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>
-          </div>
+        <div id="pl-board-container">
+          <div class="req-empty" style="padding:20px 0"><span class="req-spin"></span>Loading pipelines…</div>
         </div>
       </div>
     </div>
@@ -15658,11 +15648,9 @@ async function fetchAndRenderPipelines() {
     }
     _renderPipelineTabs();
     _renderPipelineBoard();
-    _renderEntryRail(); // wizard needs _PL_DATA for pipeline/stage dropdowns
   } catch (e) {
     container.innerHTML = `<div class="req-empty" style="padding:20px 0">Couldn't load pipelines — ${escapeHTML(e.message)}</div>`;
   }
-  _epFetchAndRender();
 }
 
 /* ── Entry Points rail + Entry Point Set Up wizard ── */
