@@ -1,4 +1,4 @@
-import { withSentryApiRoute } from "./_sentry.js";
+import { withSentryApiRoute, captureApiMessage } from "./_sentry.js";
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
@@ -160,6 +160,9 @@ async function enrichWithClient(tickets) {
 async function handler(req, res) {
   try {
     const resource = req.query.resource;
+    if (resource === "meta-health-cron") {
+      return handleMetaHealthCron(req, res);
+    }
     if (resource === "tickets") {
       return handleMarketingTickets(req, res);
     }
@@ -1017,6 +1020,14 @@ function metaVerifyState(state) {
 //
 // Restricted to admin + marketing roles (the people who actually wire up ads).
 const META_OPS_ROLES = MARKETING_OPS_ROLES;
+// "Our Ads" editors: the internal-acquisition crew may pick campaigns on the
+// dedicated internal entry (INTERNAL_ADS_CLIENT_ID) even if their global role
+// isn't a marketing/admin one. Scoped to that one entry — no access to real
+// clients' ad config.
+const INTERNAL_ADS_EDITORS = new Set([
+  "zoran@byanymeansbball.com", "mike@byanymeansbball.com",
+  "coleman@byanymeansbball.com", "cam@byanymeansbball.com",
+]);
 async function handleMetaAdAccounts(req, res) {
   const ctx = await resolveUser(req);
   if (ctx.error) return res.status(ctx.error.status).json({ error: ctx.error.message });
@@ -1024,8 +1035,21 @@ async function handleMetaAdAccounts(req, res) {
   // on behalf of a client (?client_id=… via Client Setup). Clients use it
   // post-OAuth to pick their own ad account.
   if (!ctx.staff && !ctx.client) return res.status(403).json({ error: "auth required" });
-  if (ctx.staff && !META_OPS_ROLES.has(ctx.staff.role)) {
+  const internalAdsClientId = (process.env.INTERNAL_ADS_CLIENT_ID || "").trim();
+  const isInternalAdsEditor = !!ctx.staff && !!internalAdsClientId &&
+    INTERNAL_ADS_EDITORS.has((ctx.staff.email || "").toLowerCase());
+  if (ctx.staff && !META_OPS_ROLES.has(ctx.staff.role) && !isInternalAdsEditor) {
     return res.status(403).json({ error: "admin or marketing role required" });
+  }
+  // Internal-ads editors who aren't ops staff may only write to the internal entry.
+  if (isInternalAdsEditor && !META_OPS_ROLES.has(ctx.staff.role)) {
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const target = req.method === "POST"
+      ? (typeof body.client_id === "string" ? body.client_id.trim() : "")
+      : (req.query.client_id || "").trim();
+    if ((req.method === "POST" || req.method === "DELETE") && target !== internalAdsClientId) {
+      return res.status(403).json({ error: "internal ads editor: writes limited to the internal entry" });
+    }
   }
 
   // POST → set a client's chosen ad account.
@@ -2650,6 +2674,118 @@ async function handleStaffMetaAuth(req, res) {
 
 // GET ?resource=meta-staff-status
 // Lets the staff portal show "Meta connected as X" or "Connect Meta" button.
+// Live-validate a stored Meta token. A row existing in staff_meta_tokens does
+// NOT mean the token works — but ALSO, the token failing to LIST ad accounts
+// (/me/adaccounts) does NOT mean it's dead: a token can read accounts it's been
+// granted (campaigns load fine) while lacking the scope to enumerate them. So
+// we separate two things:
+//   valid           = the token authenticates at all (/me succeeds)
+//   canListAccounts = it can enumerate ad accounts (needed by the picker)
+// reason: ok | ok_no_accounts | limited (alive but can't list — usually a
+//   missing/old scope, fix by reconnecting) | expired | revoked | error | none
+async function probeMetaToken(accessToken, expiresAt) {
+  if (!accessToken) return { valid: false, canListAccounts: false, reason: "none" };
+  // Cheap local check first — skip the network call when clearly expired.
+  if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
+    return { valid: false, canListAccounts: false, reason: "expired" };
+  }
+  // 1) Is the token alive at all?
+  try {
+    const meR = await fetch(`${META_GRAPH}/me?` + new URLSearchParams({ fields: "id", access_token: accessToken }));
+    const meJ = await meR.json().catch(() => ({}));
+    if (!meR.ok) {
+      const err = meJ?.error || {};
+      let reason = "error";
+      if (err.code === 190) reason = err.error_subcode === 463 ? "expired" : "revoked";
+      return { valid: false, canListAccounts: false, reason, message: err.message || `HTTP ${meR.status}` };
+    }
+  } catch (e) {
+    return { valid: false, canListAccounts: false, reason: "error", message: e?.message || "probe failed" };
+  }
+  // 2) Token is alive — can it enumerate ad accounts? (picker needs this)
+  try {
+    const adR = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({ fields: "account_id", limit: "1", access_token: accessToken }));
+    const adJ = await adR.json().catch(() => ({}));
+    if (adR.ok) {
+      const hasAccounts = Array.isArray(adJ.data) && adJ.data.length > 0;
+      return { valid: true, canListAccounts: true, reason: hasAccounts ? "ok" : "ok_no_accounts" };
+    }
+    // Alive but can't list — almost always a missing/old scope. Token still
+    // serves campaign data for accounts it's been granted.
+    return { valid: true, canListAccounts: false, reason: "limited", message: adJ?.error?.message || `HTTP ${adR.status}` };
+  } catch (e) {
+    return { valid: true, canListAccounts: false, reason: "limited", message: e?.message || "list failed" };
+  }
+}
+
+// Daily watchdog (Vercel cron). Probes the shared/team Meta token and, if it's
+// broken, posts a Slack alert with the reason + raises a Sentry event so we
+// catch a dead token within a day instead of discovering it via a blank ad
+// dashboard. Auth: Vercel cron sends `Authorization: Bearer <CRON_SECRET>`.
+async function handleMetaHealthCron(req, res) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+  if ((req.headers.authorization || "") !== `Bearer ${expected}`) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  // The most-recently-updated token is the one read ops actually use.
+  const teamRows = await sb(`staff_meta_tokens?select=access_token,fb_user_name,expires_at,updated_at&order=updated_at.desc&limit=1`);
+  const team = teamRows?.[0];
+  if (!team) {
+    // No token at all — distinct from "broken". Alert once so it's not silent.
+    await postMetaHealthAlert(":warning: *Meta token watchdog* — no staff Meta token connected at all. Client ad dashboards are running on sample/blank data. Someone needs to connect Meta in the staff portal (Settings → Connect Meta).");
+    return res.status(200).json({ ok: true, state: "none" });
+  }
+
+  const probe = await probeMetaToken(team.access_token, team.expires_at);
+
+  // Token is alive — campaign data still flows. Don't cry wolf.
+  if (probe.valid) {
+    // "limited" = alive but can't enumerate ad accounts (the picker breaks, but
+    // dashboards work). Record it quietly in Sentry; no Slack — it's not an
+    // outage, it just means someone should reconnect to refresh scopes.
+    if (!probe.canListAccounts) {
+      captureApiMessage(`Meta token limited: ${probe.reason}`, {
+        level: "warning",
+        tags: { area: "meta", reason: probe.reason },
+        extra: { fb_user_name: team.fb_user_name || null, message: probe.message || null },
+      });
+    }
+    return res.status(200).json({ ok: true, state: probe.canListAccounts ? "valid" : "limited", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+  }
+
+  // Truly dead (expired/revoked/error) — campaigns won't load. Alert loudly.
+  const who = team.fb_user_name ? ` (${team.fb_user_name})` : "";
+  const detail = probe.message ? ` — ${probe.message}` : "";
+  const msg = `:rotating_light: *Meta token watchdog* — the shared Meta connection${who} is down: *${probe.reason}*${detail}. Client + internal ad dashboards are blank until someone reconnects Meta (staff portal → Settings → Connect Meta). Durable fix: a non-expiring Business Manager System User token.`;
+  await postMetaHealthAlert(msg);
+  captureApiMessage(`Meta token down: ${probe.reason}`, {
+    level: "error",
+    tags: { area: "meta", reason: probe.reason },
+    extra: { fb_user_name: team.fb_user_name || null, expires_at: team.expires_at || null, message: probe.message || null },
+  });
+
+  return res.status(200).json({ ok: true, state: "down", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+}
+
+// Post a plain-text alert to the marketing/ops Slack channel. No-ops quietly if
+// Slack isn't configured.
+async function postMetaHealthAlert(text) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.MARKETING_ALERTS_SLACK_CHANNEL;
+  if (!token || !channel) return;
+  try {
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+  } catch (err) {
+    console.error("Meta health Slack alert failed:", err?.message || err);
+  }
+}
+
 async function handleStaffMetaStatus(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   const ctx = await resolveUser(req);
@@ -2657,21 +2793,38 @@ async function handleStaffMetaStatus(req, res) {
   if (!ctx.staff) return res.status(403).json({ error: "staff only" });
 
   // Logged-in staff's own connection
-  const ownRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=fb_user_name,expires_at,created_at,updated_at`);
+  const ownRows = await sb(`staff_meta_tokens?staff_user_id=eq.${ctx.user.id}&select=access_token,fb_user_name,expires_at,created_at,updated_at`);
   const own = ownRows?.[0];
 
   // Team-wide connection (anyone on staff connected — token shared for read ops)
-  const teamRows = await sb(`staff_meta_tokens?select=fb_user_name,updated_at&order=updated_at.desc&limit=1`);
+  const teamRows = await sb(`staff_meta_tokens?select=access_token,fb_user_name,expires_at,updated_at&order=updated_at.desc&limit=1`);
   const team = teamRows?.[0];
 
+  // Live-probe so the UI reflects reality, not just row presence.
+  const ownProbe = own ? await probeMetaToken(own.access_token, own.expires_at) : { valid: false, reason: "none" };
+  const teamProbe = team
+    ? (own && team.access_token === own.access_token ? ownProbe : await probeMetaToken(team.access_token, team.expires_at))
+    : { valid: false, reason: "none" };
+
   return res.status(200).json({
-    connected: !!own,
+    // connected = your own token authenticates (campaigns can load)
+    connected: ownProbe.valid,
+    own_present: !!own,
+    own_reason: ownProbe.reason,
+    own_can_list: ownProbe.canListAccounts,
+    own_message: ownProbe.message || null,
     fb_user_name: own?.fb_user_name || null,
     expires_at: own?.expires_at || null,
     connected_at: own?.created_at || null,
     updated_at: own?.updated_at || null,
-    team_connected: !!team,
+    // team_connected = a working team token exists (validated, not just present)
+    team_connected: teamProbe.valid,
+    team_present: !!team,
+    team_reason: teamProbe.reason,
+    team_can_list: teamProbe.canListAccounts,
+    team_message: teamProbe.message || null,
     team_fb_user_name: team?.fb_user_name || null,
+    team_expires_at: team?.expires_at || null,
   });
 }
 

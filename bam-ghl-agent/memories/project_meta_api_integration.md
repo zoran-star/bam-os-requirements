@@ -42,6 +42,19 @@ Standard Access explicitly supports agency multi-client use (~25–50 client acc
 - `META_APP_ID = 2059912628202822` (public)
 - `META_APP_SECRET = encrypted`
 - `META_OAUTH_STATE_SECRET = encrypted` (HMAC state signing)
+- `MARKETING_ALERTS_SLACK_CHANNEL` — Slack channel id the token watchdog (+ marketing digest) posts to. If unset, the watchdog runs but stays silent.
+
+## Token health watchdog (2026-06-14)
+
+A daily Vercel cron `GET /api/marketing?resource=meta-health-cron` (13:00 UTC,
+auth = `Bearer CRON_SECRET`) live-probes the shared token. **Only Slack-alerts
+when the token is truly DOWN** (can't authenticate → campaigns won't load) to
+`MARKETING_ALERTS_SLACK_CHANNEL` + Sentry `error`. A `limited` token (alive but
+can't list accounts) is logged to Sentry as a `warning` only — **no Slack**,
+because campaign data still flows; it just means someone should reconnect to
+refresh scopes. **Detection only — does NOT auto-refresh.** Durable fix is still
+a non-expiring BM System User token (see `/meta-write-access`). Reuses
+`probeMetaToken` (same probe as `meta-staff-status`).
 
 ## Endpoints (all bundled in `api/marketing.js`)
 
@@ -50,7 +63,7 @@ Clean URLs via `vercel.json` rewrites:
 **Staff-side (active):**
 - `POST /api/marketing?resource=meta-staff-auth&step=prepare` — staff initiates OAuth
 - `GET  /api/auth/meta/callback` — Meta returns here; upsert into `staff_meta_tokens`
-- `GET  /api/marketing?resource=meta-staff-status` — is staff connected?
+- `GET  /api/marketing?resource=meta-staff-status` — **LIVE-validates** the token (2026-06-14), not just row presence. ⚠️ **Two distinct things** (learned the hard way): `connected`/`team_connected` = the token AUTHENTICATES (`/me` succeeds → campaign data loads); `own_can_list`/`team_can_list` = it can ENUMERATE ad accounts (`/me/adaccounts` → the picker dropdown). `reason`: `ok` | `ok_no_accounts` | **`limited`** (alive but can't list — usually a missing/old scope; campaigns STILL work, just reconnect to refresh scopes) | `expired` | `revoked` | `error` | `none`. **A token can serve campaign data while failing `/me/adaccounts` — that is `limited`, NOT down.** The Marketing-tab "Meta not connected" banner is driven by the *listing* call, so it shows even when data is flowing. Settings dot: green = alive+can_list, amber = alive-but-limited, red = down/none.
 - `GET  /api/meta/adaccounts` — list ad accounts the connected staff has access to
 - `POST /api/meta/adaccounts` — staff picks an ad account for a client (writes `clients.meta_ad_account_id` + `clients.meta_campaign_ids`)
 - `GET  /api/meta/campaigns?client_id=...` — real campaigns + insights, last 30d

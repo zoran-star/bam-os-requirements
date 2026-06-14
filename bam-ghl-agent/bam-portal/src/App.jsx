@@ -27,6 +27,7 @@ const ClientsCombinedView  = lazy(() => import('./views/ClientsCombinedView'));
 const FeedbackView         = lazy(() => import('./views/FeedbackView'));
 const InboxView            = lazy(() => import('./views/InboxView'));
 const ResourcesView        = lazy(() => import('./views/ResourcesView'));
+const OurAdsView           = lazy(() => import('./views/OurAdsView'));
 import AlertsPanel from './components/overlays/AlertsPanel';
 import LoginView from './views/LoginView';
 import UniversalFeedbackWidget from './components/UniversalFeedbackWidget';
@@ -164,6 +165,10 @@ export default function BAMPortal() {
   // submits feedback is universal (any user, any page), but only admins can
   // see the list + check items off as resolved.
   const canSeeFeedback = me?.role === "admin";
+  // "Our Ads" — staff view of BAM's OWN ad campaigns. Email-gated to the same
+  // internal-acquisition crew as the (dormant) Channel Dashboard.
+  const OUR_ADS_ALLOWLIST = ["zoran@byanymeansbball.com", "mike@byanymeansbball.com", "coleman@byanymeansbball.com", "cam@byanymeansbball.com"];
+  const canSeeOurAds = !!me && OUR_ADS_ALLOWLIST.includes((session?.user?.email || "").toLowerCase());
   // Channel dashboard hidden from portal (Cole's basketball acquisition
   // test page). View + backend code preserved in repo; just removed from nav.
 
@@ -187,12 +192,12 @@ export default function BAMPortal() {
     const gated = {
       systems: canSeeSystems, marketing: canSeeMarketing, content: canSeeContent,
       team: canSeeTeam, resources: canSeeResources, feedback: canSeeFeedback,
-      financials: canSeeFinancials,
+      financials: canSeeFinancials, ourads: canSeeOurAds,
     };
     if (nav === "dashboard" || (Object.prototype.hasOwnProperty.call(gated, nav) && !gated[nav])) {
       setNav("inbox");
     }
-  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials]);
+  }, [me, nav, canSeeSystems, canSeeMarketing, canSeeContent, canSeeTeam, canSeeResources, canSeeFeedback, canSeeFinancials, canSeeOurAds]);
 
   // Deep-link support: ?nav=inbox jumps the user straight to that nav
   // tab on page load. Used by mention notifications (Slack DM / future
@@ -203,7 +208,7 @@ export default function BAMPortal() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const target = params.get("nav");
-    if (target && ["dashboard", "inbox", "clients", "tasks", "calendar", "knowledge", "financials", "systems", "marketing", "content", "team", "feedback", "settings"].includes(target)) {
+    if (target && ["dashboard", "inbox", "clients", "tasks", "calendar", "knowledge", "financials", "systems", "marketing", "content", "team", "feedback", "ourads", "settings"].includes(target)) {
       setNav(target);
       params.delete("nav");
       const newQs = params.toString();
@@ -428,6 +433,7 @@ export default function BAMPortal() {
     content: ["Content", "Guide cards & ad creative content"],
     team: ["Team", "Staff members & roles"],
     feedback: ["Feedback", "Bug reports + portal feedback (admin only)"],
+    ourads: ["Our Ads", "Our own ad campaigns"],
     resources: ["Resources", "Library shown to all clients"],
     settings: ["Settings", "Preferences & integrations"],
   };
@@ -447,6 +453,7 @@ export default function BAMPortal() {
     marketing: IconFinancials,
     content: IconKnowledge,
     team: IconClients,
+    ourads: IconFinancials,
     training: IconTraining,
     resources: IconKnowledge,
     settings: IconSettings,
@@ -469,6 +476,7 @@ export default function BAMPortal() {
         ...(canSeeContent ? [{ label: "Content", key: "content" }] : []),
         ...(canSeeTeam ? [{ label: "Team", key: "team" }] : []),
         ...(canSeeResources ? [{ label: "Resources", key: "resources" }] : []),
+        ...(canSeeOurAds ? [{ label: "Our Ads", key: "ourads" }] : []),
         ...(canSeeFeedback ? [{ label: "Feedback", key: "feedback" }] : []),
       ];
 
@@ -811,6 +819,7 @@ export default function BAMPortal() {
               {nav === "content" && canSeeContent && <ContentView tokens={tk} dark={dark} me={me} session={session} />}
               {nav === "feedback" && canSeeFeedback && <FeedbackView tokens={tk} dark={dark} session={session} />}
               {nav === "resources" && canSeeResources && <ResourcesView tokens={tk} dark={dark} me={me} />}
+              {nav === "ourads" && canSeeOurAds && <OurAdsView tokens={tk} session={session} me={me} />}
             </Suspense>
             </div>
           </div>
