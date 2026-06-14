@@ -15739,15 +15739,15 @@ function _plSelectPipeline(pipelineId) {
 // date-only string like "2026-06-13" (GHL custom field). Returns a display
 // string + whether it's in the past.
 function _plTrialInfo(raw) {
-  if (!raw) return { str: null, passed: false };
+  if (!raw) return { str: null, passed: false, started: false };
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(String(raw).trim());
   const d = new Date(dateOnly ? raw + 'T00:00:00' : raw);
-  if (isNaN(d.getTime())) return { str: null, passed: false };
+  if (isNaN(d.getTime())) return { str: null, passed: false, started: false };
   const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const str = dateOnly ? dateStr : dateStr + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  // For date-only, "passed" means the day is fully over (compare end of day).
-  const cutoff = dateOnly ? d.getTime() + 86400000 : d.getTime();
-  return { str, passed: cutoff < Date.now() };
+  // started = the trial's start moment has arrived (post-trial form opens then).
+  // passed = it's fully over (for amber styling); date-only uses end of day.
+  return { str, started: d.getTime() <= Date.now(), passed: (dateOnly ? d.getTime() + 86400000 : d.getTime()) < Date.now() };
 }
 
 // A stage where the trial has already happened (Done Trial). Won/Lost
@@ -15761,12 +15761,12 @@ function _plIsDoneTrialStage(stage) {
 // trainer leading the sale, and notes. On "good fit" the opportunity moves
 // to Done Trial, the trainer is assigned, and a signup-link text is queued
 // (not sent until the comms tab exists).
-let _PTF_OPP = null, _PTF_FIT = null;
+let _PTF_OPP = null, _PTF_FIT = null, _PTF_SHOW = null;
 function _plPostTrialForm(oppId) {
   let o = null;
   for (const pl of (_PL_DATA?.pipelines || [])) { const f = pl.opportunities.find(x => x.id === oppId); if (f) { o = f; break; } }
   if (!o) return;
-  _PTF_OPP = oppId; _PTF_FIT = null;
+  _PTF_OPP = oppId; _PTF_FIT = null; _PTF_SHOW = null;
   const tr = _plTrialInfo(o.trialDate);
   const trainers = _PL_DATA?.trainers || [];
   const trainerControl = trainers.length
@@ -15779,12 +15779,19 @@ function _plPostTrialForm(oppId) {
         <div class="ptf-title">Post-trial form</div>
         <button class="ptf-x" onclick="_ptfClose()" aria-label="Close">×</button>
       </div>
-      <div class="ptf-info">
+      <div class="ptf-info" id="ptf-info">
         <div class="ptf-row"><span>Parent</span><b>${escapeHTML(o.contact.name || '—')}</b></div>
         <div class="ptf-row"><span>Athlete</span><b>${escapeHTML(o.athlete || '—')}</b></div>
         <div class="ptf-row"><span>Phone</span><b>${escapeHTML(o.contact.phone || '—')}</b></div>
-        <div class="ptf-row"><span>Email</span><b>${escapeHTML(o.contact.email || '—')}</b></div>
         <div class="ptf-row"><span>Trial</span><b>${escapeHTML(tr.str || '—')}</b></div>
+        <div class="ptf-row" id="ptf-loading" style="color:var(--text-mute)"><span><span class="req-spin"></span>Loading details…</span><b></b></div>
+      </div>
+      <div class="ptf-field">
+        <label>Did the athlete show up?</label>
+        <div class="ptf-seg">
+          <button type="button" id="ptf-show-yes" class="ptf-segbtn" onclick="_ptfSetShow(true)">Showed up</button>
+          <button type="button" id="ptf-show-no" class="ptf-segbtn" onclick="_ptfSetShow(false)">No show</button>
+        </div>
       </div>
       <div class="ptf-field">
         <label>Was the trial a good fit?</label>
@@ -15806,6 +15813,42 @@ function _plPostTrialForm(oppId) {
       <button class="ptf-submit" id="ptf-submit" onclick="_ptfSubmit()">Submit review</button>
     </div>`;
   ov.classList.add('open');
+  _ptfLoadDetail(o);
+}
+async function _ptfLoadDetail(o) {
+  const info = document.getElementById('ptf-info');
+  if (!info) return;
+  if (!o.contactId) { document.getElementById('ptf-loading')?.remove(); return; }
+  const tr = _plTrialInfo(o.trialDate);
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/contact-detail?client_id=${encodeURIComponent(CLIENT_ID)}&contact_id=${encodeURIComponent(o.contactId)}`, { headers: { 'Authorization': 'Bearer ' + token } });
+    const d = await _safeJson(r);
+    if (!r.ok) throw new Error(d.error || 'detail failed');
+    const rows = [
+      ['Parent', d.basics?.name || o.contact.name],
+      ['Athlete', o.athlete],
+      ['Phone', d.basics?.phone || o.contact.phone],
+      ['Email', d.basics?.email || o.contact.email],
+      ['Trial', tr.str],
+    ];
+    const seen = new Set(rows.map(x => (x[0] || '').toLowerCase()));
+    for (const f of (d.fields || [])) {
+      const k = (f.label || '').toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      rows.push([f.label, f.value]);
+    }
+    info.innerHTML = rows.filter(([, v]) => v != null && String(v).trim() !== '')
+      .map(([k, v]) => `<div class="ptf-row"><span>${escapeHTML(k)}</span><b>${escapeHTML(v)}</b></div>`).join('');
+  } catch (e) {
+    document.getElementById('ptf-loading')?.remove();
+  }
+}
+function _ptfSetShow(v) {
+  _PTF_SHOW = v;
+  document.getElementById('ptf-show-yes')?.classList.toggle('on', v === true);
+  document.getElementById('ptf-show-no')?.classList.toggle('on', v === false);
 }
 function _ptfSetFit(v) {
   _PTF_FIT = v;
@@ -15825,7 +15868,7 @@ async function _ptfSubmit() {
     const r = await fetch(`/api/ghl/post-trial?client_id=${encodeURIComponent(CLIENT_ID)}`, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, trainer, notes }),
+      body: JSON.stringify({ opportunity_id: _PTF_OPP, good_fit: _PTF_FIT, showed_up: _PTF_SHOW, trainer, notes }),
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
@@ -15898,7 +15941,7 @@ function _renderPipelineBoard() {
     const stale = ageMs > 7 * 86400 * 1000;
     const parent = o.contact.name || o.name || 'Unknown';
     const tr = _plTrialInfo(o.trialDate);
-    const trialStr = tr.str, trialPassed = tr.passed;
+    const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
     // A card in a trial-booking stage with no resolvable date gets flagged.
     const missingTrial = stage && stage.expectsTrial && !trialStr;
     const isDone = _plIsDoneTrialStage(stage);
@@ -15921,7 +15964,7 @@ function _renderPipelineBoard() {
                <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
                <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
              </div>`
-          : (trialPassed ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+          : (trialStarted ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       </div>`;
   };
 
@@ -16022,7 +16065,7 @@ function _plOpenCard(oppId) {
     : `<span class="pl-tag pl-tag-lead">lead</span>`;
 
   const tr = _plTrialInfo(o.trialDate);
-  const trialStr = tr.str, trialPassed = tr.passed;
+  const trialStr = tr.str, trialPassed = tr.passed, trialStarted = tr.started;
 
   overlay.classList.add('open');
   drawer.classList.add('open');
@@ -16050,7 +16093,7 @@ function _plOpenCard(oppId) {
              <button class="pl-d-btn primary" style="flex:1" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>
              <button class="pl-d-btn" style="flex:1" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark lost</button>
            </div>`
-        : (trialPassed ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
+        : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
       ${o.member
         ? `<button class="pl-d-btn ${(trialPassed && !_plIsDoneTrialStage(s)) ? '' : ''}" onclick="closePipelineDrawer(); openMemberPopup('${escapeHTML(o.member.id)}')">Open member popup</button>`
         : `<button class="pl-d-btn" onclick="_plConvert('${escapeHTML(o.id)}')">Convert to member</button>`}

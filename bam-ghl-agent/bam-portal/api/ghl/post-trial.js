@@ -96,6 +96,7 @@ async function handler(req, res) {
   const oppId = b.opportunity_id;
   if (!oppId) return res.status(400).json({ error: "opportunity_id required" });
   const goodFit = !!b.good_fit;
+  const showedUp = (b.showed_up === true || b.showed_up === false) ? b.showed_up : null;
   const trainer = (b.trainer || "").trim() || null;
   const notes = (b.notes || "").trim() || null;
 
@@ -121,7 +122,7 @@ async function handler(req, res) {
       headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
       body: JSON.stringify({
         client_id: clientId, opportunity_id: oppId, ghl_contact_id: contactId,
-        good_fit: goodFit, trainer, notes,
+        good_fit: goodFit, showed_up: showedUp, trainer, notes,
         signup_text_status: goodFit ? "queued" : "skipped",
         created_by: ctx.staff?.name || ctx.user?.email || null,
         updated_at: new Date().toISOString(),
@@ -129,7 +130,16 @@ async function handler(req, res) {
     });
   } catch (e) { return res.status(500).json({ error: `save review: ${e.message}` }); }
 
-  const result = { ok: true, good_fit: goodFit, moved: false, trainer, signup_text: "none" };
+  // Write attendance to the "Did the Athlete show up?" field (non-fatal).
+  if (contactId && showedUp !== null) {
+    try {
+      const cf = (await ghl("GET", `/locations/${encodeURIComponent(client.ghl_location_id)}/customFields`, { token })).customFields || [];
+      const f = cf.find(x => /did the athlete show up|showed up|attended/i.test(x.name || ""));
+      if (f) await ghl("PUT", `/contacts/${encodeURIComponent(contactId)}`, { token, body: { customFields: [{ id: f.id, field_value: showedUp ? "Yes" : "No" }] } });
+    } catch (e) { console.error("attendance write failed (non-fatal):", e.message); }
+  }
+
+  const result = { ok: true, good_fit: goodFit, showed_up: showedUp, moved: false, trainer, signup_text: "none" };
 
   if (goodFit) {
     // Move to the Done Trial stage of the opp's pipeline.
