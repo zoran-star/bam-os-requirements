@@ -6907,11 +6907,6 @@ Then the call to action."]</div>
         </div>
       </div>
       <div class="content">
-        <div class="tagcfg-bar">
-          <span class="tagcfg-label">Lead tag</span>
-          <select id="sales-lead-tag" class="tagcfg-select" onchange="_saveTagCfg('lead_tag', this.value)"><option value="">Loading…</option></select>
-          <span class="tagcfg-hint" id="sales-lead-hint"></span>
-        </div>
         <div id="pl-pipeline-tabs" class="pl-tabs"></div>
         <div class="pl-layout">
           <aside class="pl-rail" id="pl-entry-rail">
@@ -8405,7 +8400,7 @@ function switchView(name, el) {
   if (name === 'members') fetchAndRenderMembers();
   // 'pricing' view retired 2026-06-10 — price matching lives in BB → Offers.
   if (name === 'inbox')   fetchAndRenderInbox();
-  if (name === 'pipelines') { fetchAndRenderPipelines(); _loadTagCfg(); }
+  if (name === 'pipelines') { fetchAndRenderPipelines(); }
 
   // When entering Calendar, render the weekly grid (mock data for now)
   if (name === 'calendar') { renderCalendar(); bkFetchAndRender(); }
@@ -10807,13 +10802,7 @@ async function _bbRenderMemberOnboarding(panel) {
   }
 
   panel.innerHTML = `${back}
-    <div class="tagcfg-bar">
-      <span class="tagcfg-label">Client tag</span>
-      <select id="onb-client-tag" class="tagcfg-select" onchange="_saveTagCfg('client_tag', this.value)"><option value="">Loading…</option></select>
-      <span class="tagcfg-hint" id="onb-client-hint"></span>
-    </div>
     <div id="bb-mo-steps"><div class="bb-empty">Checking your connections…</div></div>`;
-  _loadTagCfg();
 
   // Connection state + live roster count from the same payload the Members tab uses.
   let ghl = { status: 'not_connected' }, memberCount = null;
@@ -10999,6 +10988,7 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbExpandedTeams = new Set();
   _bbLoadLocations();             // warm the locations cache for pickers
   _bbLoadStaff();                  // warm staff_select dropdowns
+  _bbLoadTags();                   // warm Lead/Client ghl_tag dropdowns
   _bbLoadOffersList();             // warm offer_select (upsells targets)
   await _bbLoadOfferFiles(offer.id);
   _bbRenderWizardBody();
@@ -11746,6 +11736,8 @@ const _bbOfferConfigs = {
     ]},
     { id:'pricing', label:'Pricing', fields:_bbStdPricing },
     { id:'sales', label:'Sales', fields:[
+      { key:'lead_tag', type:'ghl_tag', label:'Lead tag',
+        hint:'The GHL tag that marks a contact as a lead for this offer. Powers the Leads filter in the Inbox.' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -11811,10 +11803,14 @@ const _bbOfferConfigs = {
         ] },
       _bbCommonExtraNotes
     ]},
-    { id:'onboarding', label:'Onboarding', fields:_bbStdOnboarding(
-      ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
-      ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
-    )}
+    { id:'onboarding', label:'Onboarding', fields:[
+      { key:'client_tag', type:'ghl_tag', label:'Client tag',
+        hint:'The GHL tag that marks a contact as a paying client/member. Powers the Members filter in the Inbox.' },
+      ..._bbStdOnboarding(
+        ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
+        ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
+      )
+    ]}
   ],
 
   // ───────── CAMPS / CLINICS ─────────
@@ -12376,6 +12372,22 @@ function _bbRenderField(field, sectionId) {
         body = `<select class="bb-input" onchange="_bbUpdateField('${sectionId}','${field.key}',this.value); _bbAutoSave()">
           <option value="">Pick a teammate…</option>${opts}
         </select>`;
+      }
+      break;
+    }
+    case 'ghl_tag': {
+      // Lead/Client GHL tag picker. Reads + writes the TOP-LEVEL offer.data
+      // key (lead_tag / client_tag), not the section-scoped value, so it
+      // matches what the Inbox + comms-config read.
+      const cur = (_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key]) || '';
+      const rec = field.key === 'lead_tag' ? _bbTagRecommend.lead : _bbTagRecommend.client;
+      if (!_bbTagList.length) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">${_bbTagsLoadedFor ? 'No GHL tags found — create tags in GHL, then reopen this offer.' : 'Loading tags…'}</div>`;
+      } else {
+        const opts = ['<option value="">— none —</option>'].concat(_bbTagList.map(tg =>
+          `<option value="${_bbEscapeAttr(tg)}" ${tg === cur ? 'selected' : ''}>${_bbEscapeHtml(tg)}${tg === rec ? ' (recommended)' : ''}</option>`
+        )).join('');
+        body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
       }
       break;
     }
@@ -13400,6 +13412,39 @@ async function _bbLoadStaff() {
 }
 function _bbStaffById(id) {
   return _bbStaffList.find(s => s.id === id) || null;
+}
+
+// GHL tag picker — powers the Lead tag (Sales step) + Client tag (Onboarding
+// step) `ghl_tag` fields. Pulls the academy's GHL tags + AI recommendation
+// from the same comms-config endpoint the standalone selectors use. Re-renders
+// the open wizard once tags land so the dropdowns fill in.
+let _bbTagList = [];
+let _bbTagRecommend = { lead: null, client: null };
+let _bbTagsLoadedFor = null;
+async function _bbLoadTags() {
+  if (!CLIENT_ID || _bbTagsLoadedFor === CLIENT_ID) return _bbTagList;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok) {
+      _bbTagList = Array.isArray(j.tags) ? j.tags : [];
+      _bbTagRecommend = { lead: j.recommend?.lead || null, client: j.recommend?.client || null };
+      _bbTagsLoadedFor = CLIENT_ID;
+      // Fill the dropdowns now that tags are in hand (wizard still open).
+      if (_bbState.offer) _bbRenderWizardBody();
+    }
+  } catch (_) {}
+  return _bbTagList;
+}
+
+// Tag fields persist at the TOP LEVEL of offer.data (data.lead_tag /
+// data.client_tag) — the canonical spot the Inbox + comms-config read — so the
+// offer editor and the standalone Sales/Onboarding selectors stay in sync.
+function _bbUpdateOfferTopKey(key, val) {
+  if (!_bbState.offer) return;
+  _bbState.offer.data = _bbState.offer.data || {};
+  _bbState.offer.data[key] = val || null;
 }
 
 // Offers picker — pulls the academy's existing offers (excluding the
@@ -15518,42 +15563,10 @@ let _PRICING_FILTER = 'all';
 // PIPELINES VIEW — per-academy GHL kanban + drag-drop + Convert
 // ══════════════════════════════════════════════════════════════
 
-// ── Lead/Client tag config (Sales = lead tag, Onboarding = client tag) ──
-let _TAGCFG = null;
-async function _loadTagCfg() {
-  try {
-    const token = await _mreqAuthToken();
-    const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
-    const j = await _safeJson(r);
-    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    _TAGCFG = j;
-    _fillTagSelect('sales-lead-tag', 'sales-lead-hint', j.tags, j.lead_tag, j.recommend?.lead);
-    _fillTagSelect('onb-client-tag', 'onb-client-hint', j.tags, j.client_tag, j.recommend?.client);
-  } catch (_) {}
-}
-function _fillTagSelect(selId, hintId, tags, current, rec) {
-  const sel = document.getElementById(selId);
-  if (!sel) return;
-  const opts = ['<option value="">— none —</option>']
-    .concat((tags || []).map(t => `<option value="${escapeHTML(t)}" ${t === current ? 'selected' : ''}>${escapeHTML(t)}${t === rec ? ' (recommended)' : ''}</option>`));
-  sel.innerHTML = opts.join('');
-  const hint = document.getElementById(hintId);
-  if (hint) hint.textContent = (!current && rec) ? `AI suggests: ${rec}` : '';
-}
-async function _saveTagCfg(field, value) {
-  try {
-    const token = await _mreqAuthToken();
-    await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), {
-      method: 'PATCH',
-      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value || null }),
-    });
-    if (_TAGCFG) _TAGCFG[field] = value || null;
-    const hintId = field === 'lead_tag' ? 'sales-lead-hint' : 'onb-client-hint';
-    const hint = document.getElementById(hintId);
-    if (hint) { hint.textContent = 'Saved'; hint.style.color = 'var(--green)'; setTimeout(() => { hint.textContent = ''; hint.style.color = ''; }, 1500); }
-  } catch (e) { alert("Couldn't save tag: " + e.message); }
-}
+// Lead/Client tag config now lives inside the offer editor (Sales =
+// lead_tag, Onboarding = client_tag) via the `ghl_tag` field type — see
+// _bbLoadTags + _bbUpdateOfferTopKey. The old standalone selectors were
+// removed; the comms-config endpoint is still used by _bbLoadTags.
 
 let _PL_DATA       = null;   // { pipelines:[{id,name,stages,opportunities}], totals:{...} }
 let _PL_PIPELINE   = null;   // currently-selected pipeline id
