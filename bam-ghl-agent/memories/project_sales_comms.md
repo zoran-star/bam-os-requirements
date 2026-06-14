@@ -38,31 +38,46 @@ Revamp of the Inbox tab into a tabbed comms hub.
   owner sees all trainers. Trainer source = **the post-trial form** AND must be
   **inline-assignable on any conversation**.
 - Each tab has **Leads / Clients** sub-tabs, split by GHL tag:
-  - **Lead tag** selected atop the **Sales** page; **Client tag** atop the
-    **Member Onboarding** page. Training-offer scoped, stored in
-    `offers.data.lead_tag` / `offers.data.client_tag`. AI recommends a tag.
-  - Rule: **lead wins**; untagged → Leads. (Member import will add the client
-    tag; GHL automations add the lead tag.)
+  - **Lead tags** (multi-select) + **Member tag** are now set **inside the
+    Training offer editor** — Lead tags atop the **Sales** step (5), Member tag
+    atop the **Onboarding** step (6). (The old standalone bars on the Sales /
+    Member-Onboarding pages were removed 2026-06-14.) Stored top-level in
+    `offers.data.lead_tags` (array) / `offers.data.client_tag` (string).
+  - **Member tag defaults to `liveclient`** — added when GHL connects + by the
+    website onboarding flow. Editable in case an academy uses a different tag.
+  - Rule: **MEMBER wins** (liveclient), not lead tags — someone tagged
+    liveclient is a member even if they still carry an old lead tag. A contact
+    is a lead if they carry ANY lead tag and are not a member.
 - v1 sending: **reply on SMS + email**; other channels read-only.
 - Channels live for GTA: SMS, Email, Call, Instagram (show all the academy has
   connected; detected from `lastMessageType`).
 
 **Phase 1 shipped:**
-- `api/ghl/comms-config` (GET tags+recommend+current, PATCH save lead/client tag).
-- Sales + Member-Onboarding pages have the tag dropdowns (`_loadTagCfg`/`_saveTagCfg`).
-- `api/ghl/inbox` GET now returns per-conversation `trainer` + `channel`, plus
-  `trainers` list + `tagConfig`. `contact_trainers` table (post-trial mirrors into it).
+- `api/ghl/comms-config` (GET tags+recommend; still used by the offer editor's
+  `_bbLoadTags` to list location tags + AI suggestion). PATCH path is now
+  vestigial — the offer editor writes tags via its own autosave.
+- Tag pickers live in the **offer editor** (`ghl_tags_multi` for Lead tags,
+  `ghl_tag` for Member tag) — see `_bbLoadTags`, `_bbUpdateOfferTopKey`,
+  `_bbToggleOfferTopArray`. Write top-level `offers.data.lead_tags`/`client_tag`.
+- `api/ghl/inbox` GET returns per-conversation `trainer` + `channel`, plus
+  `trainers` list + `tagConfig` ({lead_tags[], client_tag}). `contact_trainers`
+  table (post-trial mirrors into it).
+
+**Tag-based classification — DONE (2026-06-14):**
+- `api/ghl/inbox` classifies member/lead/other by GHL tags. It resolves
+  contactIds carrying the member tag + each lead tag via `POST /contacts/search`
+  (filtered by tag), then: **member if** members-table match OR member-tag set
+  OR inline `c.tags`; **lead if** (not member AND) carries any lead tag; else
+  **other**. Member WINS. Degrades to members-table match if search fails.
 
 **Phase 2 TODO (the actual comms UI):**
 1. Revamp `#view-inbox` render (`fetchAndRenderInbox`/`_renderInboxList`) into:
    trainer tabs + Business → Leads/Clients sub-tabs → conversation list → thread.
-2. Classify Leads vs Clients by the configured tags. Currently inbox classifies
-   member(=client)/lead via the members table; switch to tag-based (fetch
-   contactIds carrying lead_tag / client_tag via GHL contact search, lead-wins).
-3. Per-conversation inline controls: **assign trainer** (writes `contact_trainers`)
-   + **select/add the lead or client GHL tag** (adds the GHL tag to the contact).
-4. Reply on SMS + email (reuse `api/ghl/send-message`).
-5. Trainer-restricted views later (trainers see only their tab) — owner-all now.
+2. Per-conversation inline controls: **assign trainer** (writes `contact_trainers`)
+   + **add the lead/member GHL tag** to the contact.
+3. Reply on SMS + email — **DONE** (reuse `api/ghl/send-message`, now with file
+   attachments via the `ticket-files` bucket).
+4. Trainer-restricted views later (trainers see only their tab) — owner-all now.
 
 ## When to update
 - Phase 2 ships → mark done, note the new endpoints/UI.
