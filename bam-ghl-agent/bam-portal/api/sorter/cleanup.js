@@ -370,35 +370,38 @@ async function handler(req, res) {
       const targets = await buildTargetsLite(clientId);
       let stripe = null;
       let charges = [];
-      if (client.stripe_connect_account_id) {
-        if (s.stripe_subscription_id) {
-          try {
-            const sub = await stripeGet(`/subscriptions/${s.stripe_subscription_id}?expand[]=items.data.price.product`, client.stripe_connect_account_id);
+      let subs = [];
+      const cust = s.stripe_customer_id || (s.__link && s.__link.customer_id) || null;
+      if (client.stripe_connect_account_id && cust) {
+        // ALL of this customer's subs (live + past), newest-status preferred.
+        try {
+          const r = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cust)}&status=all&limit=20&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
+          subs = (r.data || []).map(sub => {
             const item = sub.items && sub.items.data && sub.items.data[0];
             const price = item && item.price;
-            stripe = {
-              sub_id: sub.id,
-              status: sub.status,
+            return {
+              sub_id: sub.id, status: sub.status,
               price_id: price ? price.id : null,
-              product_name: price && price.product && price.product.name || null,
+              product_name: (price && price.product && price.product.name) || null,
               amount_cents: price ? price.unit_amount : null,
               interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
               started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
+              canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
             };
-          } catch (_) {}
-        }
-        const cust = s.stripe_customer_id;
-        if (cust) {
-          try {
-            const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cust)}&limit=10`, client.stripe_connect_account_id);
-            charges = (ch.data || []).map(c2 => ({
-              amount_cents: c2.amount, currency: c2.currency, status: c2.status,
-              refunded: !!c2.refunded, one_time: !c2.invoice,
-              date: c2.created ? new Date(c2.created * 1000).toISOString().slice(0, 10) : null,
-              description: c2.description || null,
-            }));
-          } catch (_) {}
-        }
+          });
+          // Primary sub (the one on the staging row, else the first active-ish).
+          stripe = subs.find(x => x.sub_id === s.stripe_subscription_id)
+            || subs.find(x => ACTIVEISH.has(x.status)) || subs[0] || null;
+        } catch (_) {}
+        try {
+          const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cust)}&limit=15`, client.stripe_connect_account_id);
+          charges = (ch.data || []).map(c2 => ({
+            amount_cents: c2.amount, currency: c2.currency, status: c2.status,
+            refunded: !!c2.refunded, one_time: !c2.invoice,
+            date: c2.created ? new Date(c2.created * 1000).toISOString().slice(0, 10) : null,
+            description: c2.description || null,
+          }));
+        } catch (_) {}
       }
       // Recommend the target closest to what they actually pay.
       const amt = (stripe && stripe.amount_cents) || (charges[0] && charges[0].amount_cents) || null;
@@ -417,10 +420,13 @@ async function handler(req, res) {
           id: s.id, athlete_name: s.athlete_name, parent_name: s.parent_name,
           parent_email: s.parent_email, parent_phone: s.parent_phone,
           plan: s.plan, status: s.status, joined_date: s.joined_date,
-          stripe_customer_id: s.stripe_customer_id, stripe_subscription_id: s.stripe_subscription_id,
+          stripe_customer_id: cust, stripe_subscription_id: s.stripe_subscription_id,
           stripe_price_id: s.stripe_price_id, billing_mode: s.billing_mode || null,
+          promoted: !!s.promoted, promoted_member_id: s.promoted_member_id || null,
+          raw: s.raw && typeof s.raw === "object" ? s.raw : null, // extra CSV columns
         },
-        stripe, charges, targets, recommendation,
+        stripe, subs, charges, targets, recommendation,
+        stripe_account_id: client.stripe_connect_account_id || null,
       });
     }
 
@@ -950,7 +956,9 @@ async function handler(req, res) {
       return {
         id: s.id,
         athlete_name: s.athlete_name || "",
+        parent_name: s.parent_name || "",
         parent_email: s.parent_email || "",
+        promoted_member_id: s.promoted_member_id || null,
         price_label: key || (cat && cat.display_name) || null,
         amount_cents: amount,
         interval: cat && cat.interval || null,

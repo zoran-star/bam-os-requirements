@@ -17660,15 +17660,17 @@ function _sorterRenderStep3(host) {
   const mem = c.members || [];
   const wherePill = (label, color) => `<span style="font-size:9px;font-weight:800;letter-spacing:.3px;padding:2px 7px;border-radius:999px;border:1px solid ${color};color:${color};white-space:nowrap;">${label}</span>`;
   const td = (inner, extra) => `<td style="padding:8px 10px;vertical-align:top;${extra || ''}">${inner}</td>`;
-  const nameCell = (work, name, email, customerId) => {
-    const nm = escapeHTML(name || '(no name)');
-    const nmHtml = customerId
-      ? `<span onclick="_sorterStripeInfo('${escapeHTML(customerId)}')" title="See full Stripe info" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;">${nm}</span>`
+  // Name cell — athlete (clickable → full info), parent line, email.
+  const nameCell = (work, athlete, parent, email, onclick) => {
+    const nm = escapeHTML(athlete || '(no name)');
+    const nmHtml = onclick
+      ? `<span onclick="${onclick}" title="See full info" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px;">${nm}</span>`
       : nm;
-    return `<td style="padding:8px 10px;vertical-align:top;"><div style="display:flex;align-items:flex-start;gap:8px;"><span style="flex:none;width:7px;height:7px;border-radius:50%;margin-top:4px;background:${work ? '#e0a93f' : '#7BC47F'};"></span><div style="min-width:0;"><div style="font-size:12.5px;font-weight:600;">${nmHtml}</div><div style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(email || '')}</div></div></div></td>`;
+    const psub = [parent ? 'parent: ' + escapeHTML(parent) : '', escapeHTML(email || '')].filter(Boolean).join(' · ');
+    return `<td style="padding:8px 10px;vertical-align:top;"><div style="display:flex;align-items:flex-start;gap:8px;"><span style="flex:none;width:7px;height:7px;border-radius:50%;margin-top:4px;background:${work ? '#e0a93f' : '#7BC47F'};"></span><div style="min-width:0;"><div style="font-size:12.5px;font-weight:600;">${nmHtml}</div><div style="font-size:10.5px;color:var(--text-mute,#888);">${psub}</div></div></div></td>`;
   };
 
-  // CSV member → row
+  // CSV member → row (name opens the full CSV+Stripe info popup)
   const memTr = (m) => {
     const sid = escapeHTML(String(m.id));
     const work = m.needs_work;
@@ -17685,13 +17687,13 @@ function _sorterRenderStep3(host) {
       if (m.is_dup_copy) btns += fixBtn('Remove copy', `_sorterRemoveStaged('${sid}')`) + denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
       todo = `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${btns}</div>`;
     } else todo = '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
-    return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_email)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(todo)}</tr>`;
+    return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_name, m.parent_email, `_sorterOpenInfo('${sid}')`)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(todo)}</tr>`;
   };
 
-  // In Stripe, not in the CSV — subscription
-  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, x.email, x.customer_id)}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  // In Stripe, not in the CSV — subscription (name → Stripe inspector)
+  const subTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">${x.amount_cents != null ? money(x.amount_cents) + '/sub' : 'subscription'}</span>`)}${td(`<div style="display:flex;flex-wrap:wrap;gap:4px;">${fixBtn('+ Add', `_sorterAddFromStripe('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}','${escapeHTML(x.sub_id || '')}','${escapeHTML(x.price_id || '')}')`)}${denyBtn(`_sorterDenyStripe('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
   // In Stripe, not in the CSV — one-time / prepaid
-  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, x.email, x.customer_id)}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
+  const oneTimeTr = (x) => `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(true, x.name || x.email, null, x.email, x.customer_id ? `_sorterStripeInfo('${escapeHTML(x.customer_id)}')` : '')}${td(wherePill('STRIPE ONLY', '#e0a93f'))}${td(`<span style="font-size:12px;font-weight:700;">$${((x.amount_cents || 0) / 100).toFixed(0)} one-time</span><div style="font-size:10px;color:var(--text-mute,#888);">${escapeHTML(x.date || '')}</div>`)}${td(`${x.maybe_staged ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">⚠ maybe ${escapeHTML(x.maybe_staged.athlete_name || '')}</div>` : ''}<div style="display:flex;flex-wrap:wrap;gap:4px;">${x.maybe_staged ? fixBtn('Link ✓', `_sorterLinkPrepaid('${escapeHTML(String(x.maybe_staged.id))}','${escapeHTML(x.email || '')}','${escapeHTML(x.customer_id || '')}')`) : ''}${fixBtn('+ Add &amp; match', `_sorterAddPrepaid('${escapeHTML(x.email || '')}','${escapeHTML((x.name || '').replace(/'/g, ''))}','${escapeHTML(x.customer_id || '')}')`)}${denyBtn(`_sorterDenyPrepaid('${escapeHTML(x.email || x.customer_id || '')}')`, 'Not a member')}</div>`)}</tr>`;
 
   // Build the rows — attention first (Stripe-only additions + needs-work
   // members), then everyone ready. One <tbody>, nothing else.
@@ -17836,6 +17838,92 @@ async function _sorterStripeInfo(customerId) {
   } catch (e) {
     _sorterCloseConnect();
     alert("Couldn't load Stripe info: " + _sorterErr(e));
+  }
+}
+
+// ── Full member info popup — everything on the CSV + Stripe (live subs +
+// past payments), plus "Manage billing" to change/pause/cancel their sub. ──
+async function _sorterOpenInfo(stagingId) {
+  const host = document.getElementById('pc-sorter-connect-host');
+  if (!host) return;
+  host.innerHTML = `<div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+    <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,95vw);max-height:86vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">${_sorterLoading('Loading their full record…')}</div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=member-detail', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_id: stagingId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const m = json.member || {}, subs = json.subs || [], charges = json.charges || [];
+    const fact = (label, val) => val ? `<div style="display:flex;gap:8px;font-size:12px;padding:2px 0;"><span style="color:var(--text-mute,#888);flex:none;width:90px;">${label}</span><span style="min-width:0;word-break:break-word;">${escapeHTML(String(val))}</span></div>` : '';
+    const rawFacts = m.raw && typeof m.raw === 'object'
+      ? Object.entries(m.raw).filter(([k, v]) => v != null && String(v).trim() !== '').map(([k, v]) => fact(k, v)).join('')
+      : '';
+    const subsHtml = subs.length ? subs.map(s2 => {
+      const live = ['active', 'trialing', 'past_due', 'paused', 'unpaid'].includes(s2.status);
+      return `<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--border,#2a2a31);">
+        <span style="min-width:0;">${escapeHTML(s2.product_name || s2.sub_id)}<span style="color:var(--text-mute,#888);"> · since ${escapeHTML(s2.started || '?')}${s2.canceled_at ? ' · ended ' + escapeHTML(s2.canceled_at) : ''}</span></span>
+        <span style="flex:none;"><b>${s2.amount_cents != null ? '$' + (s2.amount_cents / 100).toFixed(2) : '—'}</b>${s2.interval ? '/' + escapeHTML(s2.interval) : ''} <span style="font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;border:1px solid ${live ? '#1f7a3d;color:#7BC47F' : 'var(--border,#2a2a31);color:var(--text-mute,#888)'};">${escapeHTML((s2.status || '').toUpperCase())}</span></span>
+      </div>`;
+    }).join('') : '<div style="font-size:12px;color:var(--text-mute,#888);">No subscriptions.</div>';
+    const chargesHtml = charges.length ? charges.map(c2 => `
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;color:${c2.refunded ? 'var(--text-mute,#888)' : 'var(--text,#eee)'};">
+        <span style="min-width:0;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : ''}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
+        <span style="flex:none;font-weight:700;">$${((c2.amount_cents || 0) / 100).toFixed(2)}</span>
+      </div>`).join('') : '<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>';
+    host.innerHTML = `
+      <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
+      <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,95vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex:none;">
+          <div style="font-size:15px;font-weight:800;">${escapeHTML(m.athlete_name || 'Member')}</div>
+          <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+        </div>
+        <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div>
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">From your CSV</div>
+            ${fact('Athlete', m.athlete_name)}${fact('Parent', m.parent_name)}${fact('Email', m.parent_email)}${fact('Phone', m.parent_phone)}${fact('Plan', m.plan)}${fact('Status', m.status)}${fact('Joined', m.joined_date)}
+            ${rawFacts ? `<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Other CSV columns</div>${rawFacts}` : ''}
+          </div>
+          <div>
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Subscriptions</div>
+            ${subsHtml}
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
+            ${chargesHtml}
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a31);flex:none;">
+          <button onclick="_sorterCloseConnect()" style="font-size:12.5px;padding:8px 15px;border-radius:9px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text,#eee);cursor:pointer;">Close</button>
+          <button onclick="_sorterManageBilling('${escapeHTML(String(stagingId))}')" style="font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:9px;border:none;background:var(--accent,#E8C547);color:#1a1a1a;cursor:pointer;">Manage billing →</button>
+        </div>
+      </div>`;
+  } catch (e) {
+    _sorterCloseConnect();
+    alert("Couldn't load member info: " + _sorterErr(e));
+  }
+}
+
+// Change/pause/cancel their sub: promote the staged member (if needed) to get
+// a real members.id, then open the Members billing popup (the existing,
+// tested 6-action drawer — incl. the legacy-sub limitation handling).
+async function _sorterManageBilling(stagingId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=promote', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_ids: [stagingId] }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const memberId = (json.member_ids && json.member_ids[0]) || (json.promoted && json.promoted[0] && json.promoted[0].member_id);
+    if (!memberId) throw new Error('could not resolve the member after promote');
+    _sorterCloseConnect();
+    if (typeof fetchAndRenderMembers === 'function') fetchAndRenderMembers();
+    if (typeof openMemberPopup === 'function') openMemberPopup(memberId);
+    else alert('Member is live — open the Members tab to manage billing.');
+  } catch (e) {
+    alert("Couldn't open billing: " + _sorterErr(e));
   }
 }
 
