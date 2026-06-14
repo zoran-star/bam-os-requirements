@@ -750,28 +750,36 @@ async function handler(req, res) {
       }
       stagedNoStripe.push({ id: s.id, source_row: s.source_row, athlete_name: s.athlete_name, parent_email: s.parent_email, expected, alt_payment: altPay, suggestion });
     }
+    // Customer ids a staged member already owns (sheet id or resolved link) —
+    // so a sub on that customer isn't reported as "not in your portal".
+    const claimedCustomerIds = new Set();
+    for (const s of staging) {
+      if (s.stripe_customer_id) claimedCustomerIds.add(s.stripe_customer_id);
+      if (s.__link && s.__link.customer_id) claimedCustomerIds.add(s.__link.customer_id);
+    }
+    // In Stripe (subscription) but NOT on the sheet — reconcile per CUSTOMER
+    // (catches subs whose customer has no email, which an email-only pass
+    // would miss). Active-ish → "paying not in portal"; else churned.
     const stripeNoMember = [];
     const churned = [];
-    for (const [email, link] of emailMap.entries()) {
-      if (stagedEmails.has(email) || claimedEmails.has(email)) continue;
-      if (dismissed.has(`stripe:${email}`)) continue;
-      const item = { email, name: link.name, customer_id: link.customer_id, sub_id: link.sub_id, price_id: link.price_id, status: link.status, amount_cents: link.amount_cents };
+    for (const [custId, link] of byCustomerId.entries()) {
+      if (claimedCustomerIds.has(custId)) continue;
+      if (link.email && (stagedEmails.has(link.email) || claimedEmails.has(link.email))) continue;
+      if (link.email && dismissed.has(`stripe:${link.email}`)) continue;
+      if (dismissed.has(`stripe:cust:${custId}`) || dismissed.has(`stripe:${custId}`)) continue;
+      const item = { email: link.email || null, name: link.name, customer_id: custId, sub_id: link.sub_id, price_id: link.price_id, status: link.status, amount_cents: link.amount_cents };
       if (ACTIVEISH.has(link.status)) stripeNoMember.push(item);
       else churned.push(item);
     }
 
-    // ── (a2) possible PREPAID members — a big one-time charge recently, from
-    // someone who isn't on the sheet (e.g. paid 3 months up front, still in
-    // the paid window). Deniable per email. NOT a prepay: charges whose
-    // description is a subscription payment (CoachIQ/GHL bill subs via
-    // invoice-less PaymentIntents — "Subscription update/creation"), or whose
-    // Stripe CUSTOMER already belongs to a staged member. ──
-    const stagedCustomerIds = new Set();
-    for (const s of staging) {
-      if (s.stripe_customer_id) stagedCustomerIds.add(s.stripe_customer_id);
-      if (s.__link && s.__link.customer_id) stagedCustomerIds.add(s.__link.customer_id);
-    }
-    // Names on the sheet (parent + athlete) for "might be on your sheet" hints.
+    // ── (a2) possible PREPAID members — a one-time (non-subscription) charge
+    // from someone who isn't on the sheet (e.g. paid 3/6/12 months up front).
+    // Thoroughness: scan a FULL YEAR of charges, floor $100 (skips drop-in /
+    // single-session noise), resolve the payer email from billing OR the
+    // customer, dedup per customer, skip anyone already on the sheet or with
+    // an active sub. NOT a prepay: invoiced charges (those ARE subscriptions)
+    // or "Subscription …" descriptions (CoachIQ/GHL invoice-less sub charges).
+    const stagedCustomerIds = claimedCustomerIds; // reuse the same claimed set
     const stagedNames = staging.map(s => ({
       id: s.id, athlete_name: s.athlete_name,
       norms: [normName(s.parent_name), normName(s.athlete_name)].filter(Boolean),
@@ -780,37 +788,42 @@ async function handler(req, res) {
     if (client.stripe_connect_account_id) {
       try {
         const NOW = Math.floor(Date.now() / 1000);
-        const since = NOW - 120 * 86400;
-        const byEmail = new Map();
+        const since = NOW - 365 * 86400;        // a full year back
+        const byCust = new Map();               // dedup per customer (or per email if no customer)
         let startingAfter = null;
-        for (let page = 0; page < 4; page++) {
+        for (let page = 0; page < 12; page++) { // up to 1200 charges
           const qs = new URLSearchParams({ limit: "100" });
           qs.set("created[gte]", String(since));
+          qs.append("expand[]", "data.customer");
           if (startingAfter) qs.set("starting_after", startingAfter);
           const r = await stripeGet(`/charges?${qs.toString()}`, client.stripe_connect_account_id);
           const data = r.data || [];
           for (const ch of data) {
             if (ch.status !== "succeeded" || ch.refunded || ch.invoice) continue; // one-time only
-            if (ch.amount < 20000) continue; // < $200 → not a prepay
+            if (ch.amount < 10000) continue; // < $100 → drop-in / single session, not a prepay
             if (/^subscription\b/i.test(ch.description || "")) continue; // a sub payment, not a prepay
-            const custId = typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id) || null;
+            const cust = ch.customer && typeof ch.customer === "object" ? ch.customer : null;
+            const custId = cust ? cust.id : (typeof ch.customer === "string" ? ch.customer : null);
             if (custId && stagedCustomerIds.has(custId)) continue; // already a sheet member's customer
-            const email = normEmail((ch.billing_details && ch.billing_details.email) || ch.receipt_email);
-            if (!email || stagedEmails.has(email) || claimedEmails.has(email)) continue;
-            if (dismissed.has(`prepaid:${email}`)) continue;
-            // Same person under a different email? Fuzzy-compare the payer's
-            // name against the sheet's parent/athlete names.
-            const payerName = normName((ch.billing_details && ch.billing_details.name) || "");
+            if (custId && claimedCustomerIds.has(custId)) continue;
+            const email = normEmail((ch.billing_details && ch.billing_details.email) || ch.receipt_email || (cust && cust.email));
+            if (email && (stagedEmails.has(email) || claimedEmails.has(email))) continue;
+            if (email && dismissed.has(`prepaid:${email}`)) continue;
+            if (custId && (dismissed.has(`prepaid:cust:${custId}`) || dismissed.has(`prepaid:${custId}`))) continue;
+            if (!email && !custId) continue; // nothing to identify them by
+            // Same person under a different email? Fuzzy-match the payer name.
+            const payerName = normName((ch.billing_details && ch.billing_details.name) || (cust && cust.name) || "");
             let maybeStaged = null;
             if (payerName) {
               for (const sn of stagedNames) {
                 if (sn.norms.some(n => n === payerName || editDistance(n, payerName, 2) <= 2)) { maybeStaged = { id: sn.id, athlete_name: sn.athlete_name }; break; }
               }
             }
-            const prev = byEmail.get(email);
-            if (!prev || ch.amount > prev.amount_cents) byEmail.set(email, {
-              email,
-              name: (ch.billing_details && ch.billing_details.name) || null,
+            const dedupKey = custId || email;
+            const prev = byCust.get(dedupKey);
+            if (!prev || ch.amount > prev.amount_cents) byCust.set(dedupKey, {
+              email: email || null,
+              name: (ch.billing_details && ch.billing_details.name) || (cust && cust.name) || null,
               customer_id: custId,
               amount_cents: ch.amount,
               date: ch.created ? new Date(ch.created * 1000).toISOString().slice(0, 10) : null,
@@ -821,7 +834,7 @@ async function handler(req, res) {
           if (!r.has_more || data.length === 0) break;
           startingAfter = data[data.length - 1].id;
         }
-        prepaid.push(...byEmail.values());
+        prepaid.push(...byCust.values());
       } catch (_) { /* non-fatal */ }
     }
 
