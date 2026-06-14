@@ -15801,8 +15801,11 @@ function _renderPipelineBoard() {
            onclick="_plOpenCard('${escapeHTML(o.id)}')">
         <div class="pl-card-name"><span class="pl-card-tag">Parent</span> ${escapeHTML(parent)}</div>
         <div class="pl-card-contact"><span class="pl-card-tag">Athlete</span> ${o.athlete ? escapeHTML(o.athlete) : '<span style="opacity:0.5">—</span>'}</div>
-        ${trialStr ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>` : ''}
-        ${missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
+        ${trialStr
+          ? `<div class="pl-card-trial ${trialPassed ? 'is-past' : ''}">Trial: ${escapeHTML(trialStr)}</div>`
+          : isDone
+            ? `<div class="pl-card-trial" style="color:var(--text-mute)">Trial: <span style="opacity:0.6">—</span></div>`
+            : missingTrial ? `<div class="pl-card-flag">⚠ No trial date</div>` : ''}
         ${isDone
           ? `<div class="pl-card-wl">
                <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
