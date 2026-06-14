@@ -1,6 +1,17 @@
 # Resources Library
 
-Admin-published content library shown to **all clients** (global, not per-client). Staff (admin role only) publishes resources from `bam-portal/`; clients browse via the Resources tile in `client-portal.html`.
+Content library shown to **all clients** (global, not per-client). Staff publish from `bam-portal/`; clients browse via the Resources tile in `client-portal.html`.
+
+> **2026-06-14 — content team can now manage it (not just admins).** Feedback
+> from Cam ("content category + I have some ready to upload") surfaced that the
+> Resources tab + writes were admin-only, so the content team couldn't upload.
+> Now **admin + marketing_manager + marketing_executor** can see the tab
+> (`canSeeResources` in App.jsx, `isEditor` in ResourcesView) AND write, via new
+> RLS fn `public.is_resource_editor()` (migration
+> `20260614220000_resources_content_team_access.sql`). **DELETE stays
+> admin-only.** Additive change. ⚠️ Migration must be applied (Supabase) for
+> uploads/category-adds by non-admins to work — until then they see the tab but
+> writes 403.
 
 ## Tables (Supabase, project ref `jnojmfmpnsfmtqmwhopz`)
 
@@ -15,7 +26,8 @@ Bucket `resources` — public, 500 MB per file. Same pattern as `ticket-files`.
 ## RLS
 
 - SELECT: open to anon + auth (`USING (true)`) on all three tables + storage bucket.
-- INSERT/UPDATE/DELETE: gated by `public.is_admin_staff()` SECURITY DEFINER fn (`staff.user_id = auth.uid() AND role = 'admin'`).
+- SELECT: open. DELETE: `public.is_admin_staff()` (admin only).
+- INSERT/UPDATE (tables + `resources` storage bucket): `public.is_resource_editor()` SECURITY DEFINER fn (`staff.user_id = auth.uid() AND role IN ('admin','marketing_manager','marketing_executor')`). Original admin-only INSERT/UPDATE policies remain (additive; permissive OR).
 
 ## Frontend
 

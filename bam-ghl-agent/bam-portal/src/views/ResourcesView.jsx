@@ -45,7 +45,9 @@ export default function ResourcesView({ tokens, dark, me }) {
   const [showCats, setShowCats] = useState(false);
   const [converting, setConverting] = useState(null); // resource id being converted, or 'all'
 
-  const isAdmin = me?.role === "admin";
+  // Admins + the content/marketing team manage the library. Writes are enforced
+  // server-side by RLS is_resource_editor(); this is just the UI gate.
+  const isEditor = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
 
   // ─── Load resources + categories ───
   const load = useCallback(async () => {
@@ -149,10 +151,10 @@ export default function ResourcesView({ tokens, dark, me }) {
     } finally { setConverting(null); }
   };
 
-  if (!isAdmin) {
+  if (!isEditor) {
     return (
       <div style={{ padding: 40, color: tk.textSub }}>
-        Resources is admin-only. Your role: <strong>{me?.role || "unknown"}</strong>.
+        Resources is for admins and the content team. Your role: <strong>{me?.role || "unknown"}</strong>.
       </div>
     );
   }
