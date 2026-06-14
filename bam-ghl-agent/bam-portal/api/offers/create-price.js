@@ -286,6 +286,94 @@ async function runApply(req, res, ctx, body, clientId) {
   return res.status(200).json({ ok: true, mode: "apply", created });
 }
 
+// ── SEARCH: list the academy's existing Stripe prices to match against ──
+async function runSearch(req, res, ctx, body, clientId) {
+  if (!stripeKey()) throw new Error("Stripe secret key not configured");
+  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id&limit=1`);
+  const client = Array.isArray(clientRows) && clientRows[0];
+  if (!client) return res.status(404).json({ error: "academy not found" });
+  if (!client.stripe_connect_account_id) return res.status(409).json({ error: "academy not connected to Stripe" });
+  const stripeAccount = client.stripe_connect_account_id;
+  const q = (body.q || "").toString().trim().toLowerCase();
+
+  // Pull active prices (recurring focus) with product expanded, paginated.
+  const out = [];
+  let starting_after = null;
+  for (let page = 0; page < 6; page++) {
+    const params = new URLSearchParams({ limit: "100", active: "true" });
+    params.append("expand[]", "data.product");
+    if (starting_after) params.set("starting_after", starting_after);
+    const r = await stripeFetch(`/prices?${params.toString()}`, { stripeAccount });
+    const data = r.data || [];
+    for (const p of data) {
+      if (!p.recurring) continue; // memberships are recurring
+      const prod = p.product && typeof p.product === "object" ? p.product : null;
+      const name = (prod && prod.name) || p.nickname || "Untitled price";
+      out.push({
+        price_id: p.id,
+        product_id: typeof p.product === "string" ? p.product : (prod && prod.id) || null,
+        product_name: name,
+        nickname: p.nickname || null,
+        amount_cents: p.unit_amount,
+        currency: p.currency,
+        interval: p.recurring.interval,
+        interval_count: p.recurring.interval_count,
+      });
+    }
+    if (!r.has_more || !data.length) break;
+    starting_after = data[data.length - 1].id;
+  }
+  const filtered = q
+    ? out.filter(p => `${p.product_name} ${p.nickname || ""} ${(p.amount_cents / 100).toFixed(2)}`.toLowerCase().includes(q))
+    : out;
+  filtered.sort((a, b) => (a.product_name || "").localeCompare(b.product_name || ""));
+  return res.status(200).json({ ok: true, mode: "search", prices: filtered });
+}
+
+// ── LINK: attach an EXISTING Stripe price to an offer-price slot (no new price) ──
+async function runLink(req, res, ctx, body, clientId) {
+  const key = body.key || null;
+  const priceId = body.stripe_price_id || null;
+  if (!key || !priceId) return res.status(400).json({ error: "key and stripe_price_id required" });
+  const clientRows = await sb(`clients?id=eq.${encodeURIComponent(clientId)}&select=id,stripe_connect_account_id&limit=1`);
+  const client = Array.isArray(clientRows) && clientRows[0];
+  if (!client) return res.status(404).json({ error: "academy not found" });
+  const stripeAccount = client.stripe_connect_account_id || null;
+
+  // Read the price so the catalog row is accurate.
+  let price = null;
+  try {
+    const params = new URLSearchParams(); params.append("expand[]", "product");
+    price = await stripeFetch(`/prices/${encodeURIComponent(priceId)}?${params.toString()}`, { stripeAccount });
+  } catch (e) { return res.status(e.stripeStatus || 502).json({ error: `Stripe price lookup: ${e.message}` }); }
+
+  const prod = price.product && typeof price.product === "object" ? price.product : null;
+  const rc = price.recurring || {};
+  let interval = "4_weeks";
+  if (rc.interval === "month" && rc.interval_count === 3) interval = "3_months";
+  else if (rc.interval === "month" && rc.interval_count === 6) interval = "6_months";
+  const row = {
+    client_id: clientId, stripe_price_id: price.id,
+    stripe_product_id: (typeof price.product === "string" ? price.product : prod && prod.id) || null,
+    stripe_account_id: stripeAccount,
+    display_name: (prod && prod.name) || price.nickname || body.product_name || key,
+    offer_id: body.offer_id || null, offer_price_key: key, tier: "canonical",
+    amount_cents: price.unit_amount, currency: price.currency, interval,
+    is_routable: true, match_status: "confirmed", match_source: "sorter-link-existing",
+    matched_at: nowIso(), updated_at: nowIso(),
+  };
+  Object.keys(row).forEach(k => row[k] === undefined && delete row[k]);
+  await sb(`pricing_catalog?on_conflict=client_id,stripe_price_id`, {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([{ ...row, created_at: nowIso() }]),
+  });
+  await sb(
+    `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(key)}&tier=eq.canonical&stripe_price_id=neq.${encodeURIComponent(price.id)}`,
+    { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ tier: "legacy_unknown", updated_at: nowIso() }) }
+  ).catch(() => {});
+  return res.status(200).json({ ok: true, mode: "link", key, stripe_price_id: price.id });
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
@@ -299,7 +387,9 @@ async function handler(req, res) {
     const mode = body.mode || (Array.isArray(body.creations) ? "apply" : "propose");
     if (mode === "apply") return await runApply(req, res, ctx, body, clientId);
     if (mode === "propose") return await runPropose(req, res, ctx, body, clientId);
-    return res.status(400).json({ error: "unknown mode (expected 'propose' or 'apply')" });
+    if (mode === "search") return await runSearch(req, res, ctx, body, clientId);
+    if (mode === "link") return await runLink(req, res, ctx, body, clientId);
+    return res.status(400).json({ error: "unknown mode (expected 'propose', 'apply', 'search' or 'link')" });
   } catch (e) {
     return res.status(e.stripeStatus || e.status || 500).json({ error: e.message || String(e) });
   }

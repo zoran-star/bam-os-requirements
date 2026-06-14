@@ -16895,7 +16895,10 @@ function _sorterRenderStep1(host) {
     // No LIVE price (even with legacy attached) OR a drifted one → offer the
     // create path. Creating a new price auto-demotes the old LIVE to legacy.
     const createBtn = (liveChips.length && !drifted) ? '' :
-      `<button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="margin-top:8px;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create ${drifted ? 'the updated price' : (mine.length ? 'a LIVE price' : 'this price')} in Stripe</button>`;
+      `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+        <button onclick="_sorterSearchExisting('${escapeHTML(t.key)}')" style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:var(--surface-el,#222120);color:var(--text,#eee);cursor:pointer;">🔎 Match an existing Stripe price</button>
+        <button onclick="_sorterProposeMissing('${escapeHTML(t.key)}')" style="font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">✨ Create ${drifted ? 'the updated price' : 'a new price'}</button>
+      </div>`;
     const driftHint = drifted
       ? `<div style="font-size:10.5px;color:#e0a93f;margin-top:3px;">⚠ Price changed: LIVE bills <b>${_sorterAmt(liveAmtChip.amount_cents, liveAmtChip.interval)}</b> but the offer now says <b>$${(t.base_cents / 100).toFixed(0)}</b> ($${(t.allin_cents / 100).toFixed(2)} w/ HST). Create the updated price — members on the old one are grandfathered.</div>`
       : '';
@@ -17064,6 +17067,68 @@ function _sorterGotoOffers() {
   if (typeof closePricingSorter === 'function') closePricingSorter();
   try { if (typeof switchView === 'function') switchView('blueprint'); } catch (_) {}
   try { if (typeof _bbNavigate === 'function') _bbNavigate('offers'); } catch (_) {}
+}
+
+// ── Match an existing Stripe price: search the catalog, pick, link (no new price) ──
+let _sorterSearchCache = null;
+async function _sorterSearchExisting(key) {
+  const slotId = 'pc-sorter-create-' + key.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const slot = document.getElementById(slotId);
+  if (!slot) return;
+  slot.dataset.key = key;
+  slot.innerHTML = `<div style="margin-top:8px;padding:9px 11px;border:1px solid var(--border,#2a2a31);border-radius:9px;">
+    <input id="${escapeHTML(slotId)}-q" type="text" placeholder="Search your Stripe prices…" oninput="_sorterFilterPrices('${escapeHTML(slotId)}')" style="width:100%;box-sizing:border-box;border:1px solid var(--border,#2a2a31);border-radius:7px;padding:7px 9px;background:var(--bg,#0d0d10);color:var(--text,#eee);font-size:12.5px;">
+    <div id="${escapeHTML(slotId)}-list" style="margin-top:8px;max-height:230px;overflow-y:auto;"><div style="font-size:11.5px;color:var(--text-mute,#888);"><span class="req-spin"></span>Loading your Stripe prices…</div></div>
+  </div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-price', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'search' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    _sorterSearchCache = json.prices || [];
+    _sorterFilterPrices(slotId);
+  } catch (e) {
+    const list = document.getElementById(slotId + '-list');
+    if (list) list.innerHTML = `<div style="font-size:11.5px;color:#e0654f;">Failed: ${escapeHTML(e.message)}</div>`;
+  }
+}
+function _sorterFilterPrices(slotId) {
+  const list = document.getElementById(slotId + '-list');
+  const q = (document.getElementById(slotId + '-q')?.value || '').toLowerCase();
+  if (!list) return;
+  const prices = (_sorterSearchCache || []).filter(p =>
+    !q || `${p.product_name} ${p.nickname || ''} ${(p.amount_cents / 100).toFixed(2)}`.toLowerCase().includes(q));
+  if (!prices.length) { list.innerHTML = `<div style="font-size:11.5px;color:var(--text-mute,#888);">No matching prices. Try the create option instead.</div>`; return; }
+  list.innerHTML = prices.slice(0, 50).map(p => {
+    let iv = p.interval || 'month'; if (p.interval_count > 1) iv = `${p.interval_count} ${p.interval}s`;
+    const amt = '$' + ((p.amount_cents || 0) / 100).toFixed(2) + ' ' + (p.currency || 'cad').toUpperCase();
+    return `<div onclick="_sorterLinkExisting('${escapeHTML(slotId)}','${escapeHTML(p.price_id)}')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border,#2a2a31);border-radius:8px;margin-bottom:6px;cursor:pointer;" onmouseover="this.style.borderColor='var(--accent,#E8C547)'" onmouseout="this.style.borderColor='var(--border,#2a2a31)'">
+      <div style="min-width:0;"><div style="font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(p.product_name || 'Untitled')}</div><div style="font-size:10.5px;color:var(--text-mute,#888);">${escapeHTML(p.price_id)}</div></div>
+      <div style="font-size:12px;font-weight:700;white-space:nowrap;">${escapeHTML(amt)} <span style="color:var(--text-mute,#888);font-weight:500;">/ ${escapeHTML(iv)}</span></div>
+    </div>`;
+  }).join('');
+}
+async function _sorterLinkExisting(slotId, priceId) {
+  const slot = document.getElementById(slotId);
+  const key = slot?.dataset.key;
+  if (!key) return;
+  const t = (_SORTER.match.targets || []).find(x => x.key === key);
+  slot.innerHTML = `<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text-mute,#888);margin-bottom:7px;">Linking the price…</div><div class="asset-modal-loading" style="border-radius:99px;"></div></div>`;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/offers/create-price', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), mode: 'link', key, offer_id: t?.offer_id || null, stripe_price_id: priceId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterLoadStep1(); // refresh so the linked price shows as the LIVE chip
+  } catch (e) {
+    slot.innerHTML = `<div style="font-size:11.5px;color:#e0654f;margin-top:6px;">Failed: ${escapeHTML(e.message)}</div>`;
+  }
 }
 
 // ── Create a missing price: propose (explain) then apply (write to Stripe) ──
