@@ -10999,6 +10999,7 @@ async function _bbRenderOfferWizard(panel, offerId) {
   _bbExpandedTeams = new Set();
   _bbLoadLocations();             // warm the locations cache for pickers
   _bbLoadStaff();                  // warm staff_select dropdowns
+  _bbLoadTags();                   // warm Lead/Client ghl_tag dropdowns
   _bbLoadOffersList();             // warm offer_select (upsells targets)
   await _bbLoadOfferFiles(offer.id);
   _bbRenderWizardBody();
@@ -11746,6 +11747,8 @@ const _bbOfferConfigs = {
     ]},
     { id:'pricing', label:'Pricing', fields:_bbStdPricing },
     { id:'sales', label:'Sales', fields:[
+      { key:'lead_tag', type:'ghl_tag', label:'Lead tag',
+        hint:'The GHL tag that marks a contact as a lead for this offer. Powers the Leads filter in the Inbox.' },
       { key:'sales_path', type:'check_one', label:'Sales path', required:true,
         options:['Free trial','Paid trial','Discovery call first','Direct signup','Other'],
         hint:'Gates the next set of questions' },
@@ -11811,10 +11814,14 @@ const _bbOfferConfigs = {
         ] },
       _bbCommonExtraNotes
     ]},
-    { id:'onboarding', label:'Onboarding', fields:_bbStdOnboarding(
-      ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
-      ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
-    )}
+    { id:'onboarding', label:'Onboarding', fields:[
+      { key:'client_tag', type:'ghl_tag', label:'Client tag',
+        hint:'The GHL tag that marks a contact as a paying client/member. Powers the Members filter in the Inbox.' },
+      ..._bbStdOnboarding(
+        ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
+        ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
+      )
+    ]}
   ],
 
   // ───────── CAMPS / CLINICS ─────────
@@ -12376,6 +12383,22 @@ function _bbRenderField(field, sectionId) {
         body = `<select class="bb-input" onchange="_bbUpdateField('${sectionId}','${field.key}',this.value); _bbAutoSave()">
           <option value="">Pick a teammate…</option>${opts}
         </select>`;
+      }
+      break;
+    }
+    case 'ghl_tag': {
+      // Lead/Client GHL tag picker. Reads + writes the TOP-LEVEL offer.data
+      // key (lead_tag / client_tag), not the section-scoped value, so it
+      // matches what the Inbox + comms-config read.
+      const cur = (_bbState.offer && _bbState.offer.data && _bbState.offer.data[field.key]) || '';
+      const rec = field.key === 'lead_tag' ? _bbTagRecommend.lead : _bbTagRecommend.client;
+      if (!_bbTagList.length) {
+        body = `<div style="padding:14px;background:var(--surface-alt);border:1px dashed var(--border-med);border-radius:8px;color:var(--text-mute);font-size:13px">${_bbTagsLoadedFor ? 'No GHL tags found — create tags in GHL, then reopen this offer.' : 'Loading tags…'}</div>`;
+      } else {
+        const opts = ['<option value="">— none —</option>'].concat(_bbTagList.map(tg =>
+          `<option value="${_bbEscapeAttr(tg)}" ${tg === cur ? 'selected' : ''}>${_bbEscapeHtml(tg)}${tg === rec ? ' (recommended)' : ''}</option>`
+        )).join('');
+        body = `<select class="bb-input" onchange="_bbUpdateOfferTopKey('${field.key}', this.value); _bbAutoSave()">${opts}</select>`;
       }
       break;
     }
@@ -13400,6 +13423,39 @@ async function _bbLoadStaff() {
 }
 function _bbStaffById(id) {
   return _bbStaffList.find(s => s.id === id) || null;
+}
+
+// GHL tag picker — powers the Lead tag (Sales step) + Client tag (Onboarding
+// step) `ghl_tag` fields. Pulls the academy's GHL tags + AI recommendation
+// from the same comms-config endpoint the standalone selectors use. Re-renders
+// the open wizard once tags land so the dropdowns fill in.
+let _bbTagList = [];
+let _bbTagRecommend = { lead: null, client: null };
+let _bbTagsLoadedFor = null;
+async function _bbLoadTags() {
+  if (!CLIENT_ID || _bbTagsLoadedFor === CLIENT_ID) return _bbTagList;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/ghl/comms-config?client_id=' + encodeURIComponent(CLIENT_ID), { headers: { 'Authorization': 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (r.ok) {
+      _bbTagList = Array.isArray(j.tags) ? j.tags : [];
+      _bbTagRecommend = { lead: j.recommend?.lead || null, client: j.recommend?.client || null };
+      _bbTagsLoadedFor = CLIENT_ID;
+      // Fill the dropdowns now that tags are in hand (wizard still open).
+      if (_bbState.offer) _bbRenderWizardBody();
+    }
+  } catch (_) {}
+  return _bbTagList;
+}
+
+// Tag fields persist at the TOP LEVEL of offer.data (data.lead_tag /
+// data.client_tag) — the canonical spot the Inbox + comms-config read — so the
+// offer editor and the standalone Sales/Onboarding selectors stay in sync.
+function _bbUpdateOfferTopKey(key, val) {
+  if (!_bbState.offer) return;
+  _bbState.offer.data = _bbState.offer.data || {};
+  _bbState.offer.data[key] = val || null;
 }
 
 // Offers picker — pulls the academy's existing offers (excluding the
