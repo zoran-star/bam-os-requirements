@@ -396,21 +396,25 @@ export default function SettingsView({ tokens, dark, setDark, userName, session,
           }}>
             <StatusDot status={
               metaLoading ? "checking"
-              : (metaStatus.connected || metaStatus.team_connected) ? "connected"
-              : (metaStatus.own_present || metaStatus.team_present) ? "warning"
+              : ((metaStatus.connected && metaStatus.own_can_list) || (metaStatus.team_connected && metaStatus.team_can_list)) ? "connected"
+              : (metaStatus.connected || metaStatus.team_connected) ? "warning"
               : "disconnected"
             } tokens={tokens} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: tokens.text }}>Meta (Facebook Ads)</div>
               <div style={{ fontSize: 12, color: tokens.textMute }}>
                 {metaStatus.connected
-                  ? `Connected${metaStatus.fb_user_name ? ` as ${metaStatus.fb_user_name}` : ""} — powers real campaign data for client portals`
+                  ? (metaStatus.own_can_list
+                      ? `Connected${metaStatus.fb_user_name ? ` as ${metaStatus.fb_user_name}` : ""} — powers real campaign data for client portals`
+                      : `Connected${metaStatus.fb_user_name ? ` as ${metaStatus.fb_user_name}` : ""} and serving campaign data, but can't list ad accounts — reconnect to refresh access so the account picker works.`)
                   : metaStatus.team_connected
-                    ? `Team is connected${metaStatus.team_fb_user_name ? ` via ${metaStatus.team_fb_user_name}` : ""} — connect your own to enable additional ad accounts you have access to`
+                    ? (metaStatus.team_can_list
+                        ? `Team is connected${metaStatus.team_fb_user_name ? ` via ${metaStatus.team_fb_user_name}` : ""} — connect your own to enable additional ad accounts you have access to`
+                        : `Connected${metaStatus.team_fb_user_name ? ` via ${metaStatus.team_fb_user_name}` : ""} and serving campaign data, but can't list ad accounts — someone needs to reconnect Meta to refresh access so the account picker works.`)
                     : metaStatus.own_present
-                      ? `Your Meta connection needs attention — ${metaReasonText(metaStatus.own_reason)}. Reconnect to restore ad data.`
+                      ? `Your Meta connection is down — ${metaReasonText(metaStatus.own_reason)}. Reconnect to restore ad data.`
                       : metaStatus.team_present
-                        ? `Team Meta connection is broken${metaStatus.team_fb_user_name ? ` (${metaStatus.team_fb_user_name})` : ""} — ${metaReasonText(metaStatus.team_reason)}. Reconnect to restore ad data for every client.`
+                        ? `Team Meta connection is down${metaStatus.team_fb_user_name ? ` (${metaStatus.team_fb_user_name})` : ""} — ${metaReasonText(metaStatus.team_reason)}. Reconnect to restore ad data for every client.`
                         : "Connect your Meta to give clients real ad data (no setup on their side)"}
               </div>
               {metaToast && (

@@ -2674,33 +2674,47 @@ async function handleStaffMetaAuth(req, res) {
 
 // GET ?resource=meta-staff-status
 // Lets the staff portal show "Meta connected as X" or "Connect Meta" button.
-// Live-validate a stored Meta token by doing the same call the ad-account
-// picker does (/me/adaccounts). A row existing in staff_meta_tokens does NOT
-// mean the token still works — it can be revoked, expired, or have lost asset
-// access. This probe returns WHY so the UI can stop showing a healthy green dot
-// for a dead token.
+// Live-validate a stored Meta token. A row existing in staff_meta_tokens does
+// NOT mean the token works — but ALSO, the token failing to LIST ad accounts
+// (/me/adaccounts) does NOT mean it's dead: a token can read accounts it's been
+// granted (campaigns load fine) while lacking the scope to enumerate them. So
+// we separate two things:
+//   valid           = the token authenticates at all (/me succeeds)
+//   canListAccounts = it can enumerate ad accounts (needed by the picker)
+// reason: ok | ok_no_accounts | limited (alive but can't list — usually a
+//   missing/old scope, fix by reconnecting) | expired | revoked | error | none
 async function probeMetaToken(accessToken, expiresAt) {
-  if (!accessToken) return { valid: false, reason: "none" };
+  if (!accessToken) return { valid: false, canListAccounts: false, reason: "none" };
   // Cheap local check first — skip the network call when clearly expired.
   if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
-    return { valid: false, reason: "expired" };
+    return { valid: false, canListAccounts: false, reason: "expired" };
   }
+  // 1) Is the token alive at all?
   try {
-    const r = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({
-      fields: "account_id", limit: "1", access_token: accessToken,
-    }));
-    const j = await r.json().catch(() => ({}));
-    if (r.ok) {
-      const hasAccounts = Array.isArray(j.data) && j.data.length > 0;
-      return { valid: true, reason: hasAccounts ? "ok" : "no_ad_accounts" };
+    const meR = await fetch(`${META_GRAPH}/me?` + new URLSearchParams({ fields: "id", access_token: accessToken }));
+    const meJ = await meR.json().catch(() => ({}));
+    if (!meR.ok) {
+      const err = meJ?.error || {};
+      let reason = "error";
+      if (err.code === 190) reason = err.error_subcode === 463 ? "expired" : "revoked";
+      return { valid: false, canListAccounts: false, reason, message: err.message || `HTTP ${meR.status}` };
     }
-    const err = j?.error || {};
-    let reason = "error";
-    if (err.code === 190) reason = err.error_subcode === 463 ? "expired" : "revoked";
-    else if (err.code === 200 || err.code === 10 || err.code === 3) reason = "no_permission";
-    return { valid: false, reason, message: err.message || `HTTP ${r.status}` };
   } catch (e) {
-    return { valid: false, reason: "error", message: e?.message || "probe failed" };
+    return { valid: false, canListAccounts: false, reason: "error", message: e?.message || "probe failed" };
+  }
+  // 2) Token is alive — can it enumerate ad accounts? (picker needs this)
+  try {
+    const adR = await fetch(`${META_GRAPH}/me/adaccounts?` + new URLSearchParams({ fields: "account_id", limit: "1", access_token: accessToken }));
+    const adJ = await adR.json().catch(() => ({}));
+    if (adR.ok) {
+      const hasAccounts = Array.isArray(adJ.data) && adJ.data.length > 0;
+      return { valid: true, canListAccounts: true, reason: hasAccounts ? "ok" : "ok_no_accounts" };
+    }
+    // Alive but can't list — almost always a missing/old scope. Token still
+    // serves campaign data for accounts it's been granted.
+    return { valid: true, canListAccounts: false, reason: "limited", message: adJ?.error?.message || `HTTP ${adR.status}` };
+  } catch (e) {
+    return { valid: true, canListAccounts: false, reason: "limited", message: e?.message || "list failed" };
   }
 }
 
@@ -2725,22 +2739,34 @@ async function handleMetaHealthCron(req, res) {
   }
 
   const probe = await probeMetaToken(team.access_token, team.expires_at);
+
+  // Token is alive — campaign data still flows. Don't cry wolf.
   if (probe.valid) {
-    return res.status(200).json({ ok: true, state: "valid", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+    // "limited" = alive but can't enumerate ad accounts (the picker breaks, but
+    // dashboards work). Record it quietly in Sentry; no Slack — it's not an
+    // outage, it just means someone should reconnect to refresh scopes.
+    if (!probe.canListAccounts) {
+      captureApiMessage(`Meta token limited: ${probe.reason}`, {
+        level: "warning",
+        tags: { area: "meta", reason: probe.reason },
+        extra: { fb_user_name: team.fb_user_name || null, message: probe.message || null },
+      });
+    }
+    return res.status(200).json({ ok: true, state: probe.canListAccounts ? "valid" : "limited", reason: probe.reason, fb_user_name: team.fb_user_name || null });
   }
 
-  // Broken — alert + Sentry.
+  // Truly dead (expired/revoked/error) — campaigns won't load. Alert loudly.
   const who = team.fb_user_name ? ` (${team.fb_user_name})` : "";
   const detail = probe.message ? ` — ${probe.message}` : "";
-  const msg = `:rotating_light: *Meta token watchdog* — the shared Meta connection${who} is broken: *${probe.reason}*${detail}. Client + internal ad dashboards are blank until someone reconnects Meta (staff portal → Settings → Connect Meta). Durable fix: a non-expiring Business Manager System User token.`;
+  const msg = `:rotating_light: *Meta token watchdog* — the shared Meta connection${who} is down: *${probe.reason}*${detail}. Client + internal ad dashboards are blank until someone reconnects Meta (staff portal → Settings → Connect Meta). Durable fix: a non-expiring Business Manager System User token.`;
   await postMetaHealthAlert(msg);
-  captureApiMessage(`Meta token broken: ${probe.reason}`, {
+  captureApiMessage(`Meta token down: ${probe.reason}`, {
     level: "error",
     tags: { area: "meta", reason: probe.reason },
     extra: { fb_user_name: team.fb_user_name || null, expires_at: team.expires_at || null, message: probe.message || null },
   });
 
-  return res.status(200).json({ ok: true, state: "broken", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+  return res.status(200).json({ ok: true, state: "down", reason: probe.reason, fb_user_name: team.fb_user_name || null });
 }
 
 // Post a plain-text alert to the marketing/ops Slack channel. No-ops quietly if
@@ -2781,10 +2807,11 @@ async function handleStaffMetaStatus(req, res) {
     : { valid: false, reason: "none" };
 
   return res.status(200).json({
-    // connected = your own connection actually works
+    // connected = your own token authenticates (campaigns can load)
     connected: ownProbe.valid,
     own_present: !!own,
     own_reason: ownProbe.reason,
+    own_can_list: ownProbe.canListAccounts,
     own_message: ownProbe.message || null,
     fb_user_name: own?.fb_user_name || null,
     expires_at: own?.expires_at || null,
@@ -2794,6 +2821,7 @@ async function handleStaffMetaStatus(req, res) {
     team_connected: teamProbe.valid,
     team_present: !!team,
     team_reason: teamProbe.reason,
+    team_can_list: teamProbe.canListAccounts,
     team_message: teamProbe.message || null,
     team_fb_user_name: team?.fb_user_name || null,
     team_expires_at: team?.expires_at || null,
