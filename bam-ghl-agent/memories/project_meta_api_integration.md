@@ -42,6 +42,18 @@ Standard Access explicitly supports agency multi-client use (~25–50 client acc
 - `META_APP_ID = 2059912628202822` (public)
 - `META_APP_SECRET = encrypted`
 - `META_OAUTH_STATE_SECRET = encrypted` (HMAC state signing)
+- `MARKETING_ALERTS_SLACK_CHANNEL` — Slack channel id the token watchdog (+ marketing digest) posts to. If unset, the watchdog runs but stays silent.
+
+## Token health watchdog (2026-06-14)
+
+A daily Vercel cron `GET /api/marketing?resource=meta-health-cron` (13:00 UTC,
+auth = `Bearer CRON_SECRET`) live-probes the shared token. If it's broken/missing
+it posts a Slack alert to `MARKETING_ALERTS_SLACK_CHANNEL` with the reason and
+raises a Sentry event (`captureApiMessage`, tag `area=meta`). Built because a
+revoked/expired token otherwise blanks every ad dashboard silently. **Detection
+only — does NOT auto-refresh.** Durable fix is still a non-expiring BM System
+User token (see `/meta-write-access`). Reuses `probeMetaToken` (same probe as
+`meta-staff-status`).
 
 ## Endpoints (all bundled in `api/marketing.js`)
 

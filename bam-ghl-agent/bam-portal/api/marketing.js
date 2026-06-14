@@ -1,4 +1,4 @@
-import { withSentryApiRoute } from "./_sentry.js";
+import { withSentryApiRoute, captureApiMessage } from "./_sentry.js";
 import crypto from "node:crypto";
 import { MARKETING_OPS_ROLES } from "./_roles.js";
 import { CANONICAL_FUNNEL, mapStageName, buildKpis } from "./_ghl_funnel.js";
@@ -160,6 +160,9 @@ async function enrichWithClient(tickets) {
 async function handler(req, res) {
   try {
     const resource = req.query.resource;
+    if (resource === "meta-health-cron") {
+      return handleMetaHealthCron(req, res);
+    }
     if (resource === "tickets") {
       return handleMarketingTickets(req, res);
     }
@@ -2698,6 +2701,62 @@ async function probeMetaToken(accessToken, expiresAt) {
     return { valid: false, reason, message: err.message || `HTTP ${r.status}` };
   } catch (e) {
     return { valid: false, reason: "error", message: e?.message || "probe failed" };
+  }
+}
+
+// Daily watchdog (Vercel cron). Probes the shared/team Meta token and, if it's
+// broken, posts a Slack alert with the reason + raises a Sentry event so we
+// catch a dead token within a day instead of discovering it via a blank ad
+// dashboard. Auth: Vercel cron sends `Authorization: Bearer <CRON_SECRET>`.
+async function handleMetaHealthCron(req, res) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return res.status(500).json({ error: "CRON_SECRET not configured" });
+  if ((req.headers.authorization || "") !== `Bearer ${expected}`) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+
+  // The most-recently-updated token is the one read ops actually use.
+  const teamRows = await sb(`staff_meta_tokens?select=access_token,fb_user_name,expires_at,updated_at&order=updated_at.desc&limit=1`);
+  const team = teamRows?.[0];
+  if (!team) {
+    // No token at all — distinct from "broken". Alert once so it's not silent.
+    await postMetaHealthAlert(":warning: *Meta token watchdog* — no staff Meta token connected at all. Client ad dashboards are running on sample/blank data. Someone needs to connect Meta in the staff portal (Settings → Connect Meta).");
+    return res.status(200).json({ ok: true, state: "none" });
+  }
+
+  const probe = await probeMetaToken(team.access_token, team.expires_at);
+  if (probe.valid) {
+    return res.status(200).json({ ok: true, state: "valid", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+  }
+
+  // Broken — alert + Sentry.
+  const who = team.fb_user_name ? ` (${team.fb_user_name})` : "";
+  const detail = probe.message ? ` — ${probe.message}` : "";
+  const msg = `:rotating_light: *Meta token watchdog* — the shared Meta connection${who} is broken: *${probe.reason}*${detail}. Client + internal ad dashboards are blank until someone reconnects Meta (staff portal → Settings → Connect Meta). Durable fix: a non-expiring Business Manager System User token.`;
+  await postMetaHealthAlert(msg);
+  captureApiMessage(`Meta token broken: ${probe.reason}`, {
+    level: "error",
+    tags: { area: "meta", reason: probe.reason },
+    extra: { fb_user_name: team.fb_user_name || null, expires_at: team.expires_at || null, message: probe.message || null },
+  });
+
+  return res.status(200).json({ ok: true, state: "broken", reason: probe.reason, fb_user_name: team.fb_user_name || null });
+}
+
+// Post a plain-text alert to the marketing/ops Slack channel. No-ops quietly if
+// Slack isn't configured.
+async function postMetaHealthAlert(text) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.MARKETING_ALERTS_SLACK_CHANNEL;
+  if (!token || !channel) return;
+  try {
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ channel, text, unfurl_links: false }),
+    });
+  } catch (err) {
+    console.error("Meta health Slack alert failed:", err?.message || err);
   }
 }
 

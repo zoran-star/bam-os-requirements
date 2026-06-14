@@ -51,6 +51,13 @@ function configureScope(scope, req) {
   });
 }
 
+// Capture a non-exception event (e.g. a watchdog detecting a broken Meta
+// token). No-ops outside production so local/dev runs don't emit.
+export function captureApiMessage(message, { level = "error", tags = {}, extra = {} } = {}) {
+  if (!sentryApiEnabled) return;
+  Sentry.captureMessage(message, { level, tags, extra });
+}
+
 export function withSentryApiRoute(handler) {
   return async function sentryWrappedApiRoute(req, res) {
     if (!sentryApiEnabled) {
