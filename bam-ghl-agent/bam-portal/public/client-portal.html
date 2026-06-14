@@ -17582,7 +17582,8 @@ function _sorterRenderConnect() {
             None of these match? <button onclick="_sorterCloseConnect();_sorterGotoOffers()" style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--accent,#E8C547);background:rgba(232,197,71,0.12);color:var(--accent,#E8C547);cursor:pointer;">+ Create a new offer ↗</button>
           </div>
           ${_SORTER_CONNECT.chosen && /\|(3|6|12)_months/.test(_SORTER_CONNECT.chosen)
-            ? `<div style="font-size:10.5px;color:#7BC47F;margin-top:8px;">⏳ This is a commitment term — if the offer is set to "goes back to monthly", they'll auto-drop to the monthly price after it (once portal billing is live).</div>` : ''}
+            ? `<div style="font-size:10.5px;color:#7BC47F;margin-top:8px;">⏳ Commitment term — they should drop to the monthly price after it ends. If they PREPAID a one-time charge, set up monthly billing now so it starts automatically when the term's up:</div>
+               <button onclick="_sorterSetupMonthly()" style="margin-top:7px;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid #1f7a3d;background:rgba(123,196,127,0.12);color:#7BC47F;cursor:pointer;">💳 Set up monthly billing now</button>` : ''}
         </div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border,#2a2a31);flex:none;">
@@ -17614,6 +17615,56 @@ function _sorterConnectApply() {
       if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
       _sorterCloseConnect();
     });
+}
+
+// Set up monthly billing for a prepaid member: preview → confirm → create a
+// portal-owned monthly sub anchored to when the prepaid term ends. Writes live
+// billing, so it always confirms first; no-card returns a copyable link.
+async function _sorterSetupMonthly() {
+  if (!_SORTER_CONNECT || !_SORTER_CONNECT.chosen) return;
+  const d = _SORTER_CONNECT.detail || {};
+  const m = d.member || {};
+  const customerId = m.stripe_customer_id;
+  if (!customerId) { alert('No Stripe customer on this member — can’t set up billing.'); return; }
+  // Anchor = the most recent one-time (prepaid) charge date, else today.
+  const prepaid = (d.charges || []).find(c => c.one_time && !c.refunded) || (d.charges || [])[0];
+  const chargeDate = prepaid && prepaid.date ? prepaid.date : null;
+  const payload = {
+    client_id: _aiClientId(), customer_id: customerId,
+    offer_price_key: _SORTER_CONNECT.chosen, charge_date: chargeDate,
+    member_email: m.parent_email || null, staging_id: _SORTER_CONNECT.stagingId || null,
+  };
+  try {
+    const token = await _mreqAuthToken();
+    const pv = await fetch('/api/sorter/setup-monthly', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ...payload, mode: 'preview' }),
+    });
+    const prev = await _safeJson(pv);
+    if (!pv.ok) throw new Error(_sorterErr(prev.error) || ('HTTP ' + pv.status));
+    const amt = '$' + ((prev.amount_cents || 0) / 100).toFixed(2);
+    if (prev.needs_card) {
+      const link = prev.payment_link || '';
+      if (link) {
+        try { await navigator.clipboard.writeText(link); } catch (_) {}
+        prompt('No card on file. Send this link to collect a card, then run “Set up monthly billing” again. (Copied to your clipboard.)', link);
+      } else {
+        alert('No card on file and a payment link couldn’t be created. Collect a card in Stripe first.');
+      }
+      return;
+    }
+    const card = prev.card_last4 ? `card ····${prev.card_last4}` : 'the card on file';
+    if (!confirm(`Set up monthly billing for ${m.athlete_name || 'this member'}?\n\n${amt}/month, first charge ${prev.trial_end_iso} (when the prepaid term ends), on ${card}.\n\nThis creates a real subscription in Stripe.`)) return;
+    const cr = await fetch('/api/sorter/setup-monthly', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ ...payload, mode: 'create' }),
+    });
+    const made = await _safeJson(cr);
+    if (!cr.ok) throw new Error(_sorterErr(made.error) || ('HTTP ' + cr.status));
+    alert(`✓ Monthly billing set up — ${amt}/month starts ${made.trial_end_iso}. They’re not charged until then.`);
+  } catch (e) {
+    alert('Couldn’t set up monthly billing: ' + _sorterErr(e));
+  }
 }
 
 async function _sorterRunChecks() {
