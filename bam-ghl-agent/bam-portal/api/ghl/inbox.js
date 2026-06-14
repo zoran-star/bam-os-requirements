@@ -234,6 +234,21 @@ async function handler(req, res) {
     if (p) memberByPhone.set(p, m);
   }
 
+  // Per-contact trainer assignment (drives the comms trainer tabs).
+  const trainerByContact = new Map();
+  try {
+    const ct = await sb(`contact_trainers?client_id=eq.${clientId}&select=ghl_contact_id,trainer`);
+    for (const r of (Array.isArray(ct) ? ct : [])) if (r.ghl_contact_id && r.trainer) trainerByContact.set(r.ghl_contact_id, r.trainer);
+  } catch (_) {}
+
+  // Lead/Client tag config from the training offer.
+  let tagConfig = { lead_tag: null, client_tag: null };
+  try {
+    const offers = await sb(`offers?client_id=eq.${clientId}&type=eq.training&select=data&order=sort_order.asc&limit=1`);
+    const d = offers?.[0]?.data || {};
+    tagConfig = { lead_tag: d.lead_tag || null, client_tag: d.client_tag || null };
+  } catch (_) {}
+
   const annotated = convos.map(c => {
     const m =
       (c.contactId && memberByContactId.get(c.contactId)) ||
@@ -253,8 +268,11 @@ async function handler(req, res) {
       unreadCount:       c.unreadCount || 0,
       classification:    m ? "member" : "lead",
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
+      trainer: (c.contactId && trainerByContact.get(c.contactId)) || null,
+      channel: (c.lastMessageType || c.type || "").replace(/^TYPE_/, "").toLowerCase() || null,
     };
   });
+  const trainers = [...new Set([...trainerByContact.values()])].sort((a, b) => a.localeCompare(b));
 
   // Sort by lastMessageDate desc (newest first)
   annotated.sort((a, b) => {
@@ -265,6 +283,8 @@ async function handler(req, res) {
 
   return res.status(200).json({
     conversations: annotated,
+    trainers,
+    tagConfig,
     counts: {
       all:     annotated.length,
       members: annotated.filter(c => c.classification === "member").length,
