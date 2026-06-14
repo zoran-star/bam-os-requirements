@@ -17396,19 +17396,20 @@ function _sorterRenderStep3(host) {
 
   const denyBtn = (fn, label) => `<button onclick="${fn}" title="${label || 'Not right — dismiss'}" style="margin-left:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">✕ No</button>`;
 
-  // Staged member without a Stripe match: expected states are informational;
-  // a typo suggestion gets Link/Deny; everything else gets Alternate payment.
+  // Staged member without a Stripe match. "Alternate payment" and "no card
+  // yet" are the same question (how do they pay?) → one "Set up payment
+  // method" button (pays another way · or · send a card link). A typo
+  // suggestion still offers a quick Link.
+  const payBtn = (sid) => fixBtn('💳 Set up payment method', `_sorterSetupPayment('${sid}')`);
   const linksInner = `
     ${list(links.staged_no_stripe, x => {
       const who = `<b>${escapeHTML(x.athlete_name || '')}</b>&nbsp;(${escapeHTML(x.parent_email || '')})`;
       const sid = escapeHTML(String(x.id));
-      if (x.alt_payment) return row(`💵 ${who} — alternate payment method ✓`);
-      if (x.expected) return row(`💳 ${who} — no card yet, expected. Payment link comes after import.`);
-      const altBtn = fixBtn('💵 Alternate payment', `_sorterAltPay('${sid}')`);
+      if (x.alt_payment) return row(`💵 ${who} — pays another way ✓`);
       if (x.suggestion) return row(`✉️ ${who} — did you mean <b>${escapeHTML(x.suggestion.email)}</b>?` +
         fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(x.suggestion.email)}','${escapeHTML(x.suggestion.customer_id || '')}','${escapeHTML(x.suggestion.sub_id || '')}','${escapeHTML(x.suggestion.price_id || '')}')`) +
-        denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss this suggestion') + altBtn);
-      return row(`• ${who} — no Stripe match` + altBtn);
+        denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person — dismiss this suggestion') + payBtn(sid));
+      return row(`• ${who} — no payment set up` + payBtn(sid));
     })}
     ${list(links.stripe_no_member, x => row(
       `💸 ${_sorterWho(x)} is PAYING but not on your sheet` +
@@ -17655,6 +17656,35 @@ function _sorterAltPay(stagingId) {
     ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(stagingId));
     if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
   });
+}
+
+// "Set up payment method" — one entry covering both ways a no-Stripe member
+// can pay: another way (cash/etransfer → mark alternate) or by card (generate
+// a Stripe card-collection link to copy + send).
+function _sorterSetupPayment(stagingId) {
+  // OK = pays another way · Cancel = closes. A second click sends a card link.
+  const choice = confirm('How does this member pay?\n\nOK = They pay another way (cash / e-transfer)\nCancel = Send them a card link instead');
+  if (choice) { _sorterAltPay(stagingId); return; }
+  _sorterSendCardLink(stagingId);
+}
+
+async function _sorterSendCardLink(stagingId) {
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/sorter/cleanup?action=card-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, staging_id: stagingId }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    const url = json.url || '';
+    if (!url) { alert('Couldn’t create a card link — try again.'); return; }
+    try { await navigator.clipboard.writeText(url); } catch (_) {}
+    prompt('Card-collection link (copied to your clipboard) — send it to the member. They add a card, then you can set up billing.', url);
+  } catch (e) {
+    alert('Couldn’t create a card link: ' + _sorterErr(e));
+  }
 }
 
 // ── Connect popup: member detail on the left, offer/price selector + AI-style

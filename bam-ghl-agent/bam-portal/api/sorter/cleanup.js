@@ -86,6 +86,19 @@ async function stripeGet(path, stripeAccount) {
   if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
   return json;
 }
+async function stripePost(path, body, stripeAccount) {
+  const headers = { Authorization: `Bearer ${stripeKey()}`, "Content-Type": "application/x-www-form-urlencoded" };
+  if (stripeAccount) headers["Stripe-Account"] = stripeAccount;
+  const encoded = new URLSearchParams(Object.entries(body || {}).reduce((a, [k, v]) => {
+    if (v !== undefined && v !== null) a[k] = String(v);
+    return a;
+  }, {})).toString();
+  const res = await fetch(`${STRIPE_API}${path}`, { method: "POST", headers, body: encoded });
+  const text = await res.text();
+  const json = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(json?.error?.message || `Stripe ${res.status}`);
+  return json;
+}
 
 const ACTIVEISH = new Set(["active", "trialing", "past_due", "paused", "unpaid"]);
 
@@ -268,6 +281,44 @@ async function handler(req, res) {
         }),
       });
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // card-link: generate a Stripe card-collection link for a member who pays
+    // by card but has none on file. Find-or-creates a Stripe customer (by
+    // email), stores the id on the staging row, returns a Checkout setup URL
+    // to copy + send. (The sub itself is created later once a card exists.)
+    if (action === "card-link") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const acct = client.stripe_connect_account_id;
+      if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
+      const email = normEmail(s.parent_email);
+      let customerId = s.stripe_customer_id;
+      if (!customerId && email) {
+        const found = await stripeGet(`/customers?email=${encodeURIComponent(email)}&limit=1`, acct);
+        customerId = found.data && found.data[0] && found.data[0].id;
+      }
+      if (!customerId) {
+        const cust = await stripePost(`/customers`, {
+          email: email || undefined,
+          name: s.parent_name || s.athlete_name || undefined,
+          "metadata[source]": "fullcontrol-sorter",
+        }, acct);
+        customerId = cust.id;
+      }
+      if (customerId && customerId !== s.stripe_customer_id) {
+        await sb(`members_staging?id=eq.${s.id}`, {
+          method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ stripe_customer_id: customerId, billing_mode: "card", updated_at: nowIso() }),
+        }).catch(() => {});
+      }
+      const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
+      const sess = await stripePost(`/checkout/sessions`, {
+        mode: "setup", customer: customerId,
+        success_url: `${origin}/client-portal.html?card=saved`,
+        cancel_url: `${origin}/client-portal.html?card=cancelled`,
+      }, acct);
+      return res.status(200).json({ ok: true, url: sess.url || null, customer_id: customerId });
     }
 
     // stripe-detail: read-only "everything Stripe knows about this person" —
