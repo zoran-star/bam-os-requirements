@@ -160,7 +160,9 @@ export default function BAMPortal() {
   const canSeeTeam = me && (me.role === "admin" || me.role === "scaling_manager");
   const canSeeContent = me && (me.role === "admin" || me.role === "scaling_manager" || me.role === "marketing_manager" || me.role === "marketing_executor");
   const canSeeFinancials = me && (me.role === "admin" || me.role === "scaling_manager");
-  const canSeeResources = me?.role === "admin";
+  // Resources: admins + the content/marketing team (they upload + manage the
+  // library). Writes are enforced server-side by RLS is_resource_editor().
+  const canSeeResources = me && (me.role === "admin" || me.role === "marketing_manager" || me.role === "marketing_executor");
   // Feedback tab: ZORAN-ONLY (email-gated, not role-gated). The widget that
   // submits feedback is universal (any user, any page), but only admins can
   // see the list + check items off as resolved.
