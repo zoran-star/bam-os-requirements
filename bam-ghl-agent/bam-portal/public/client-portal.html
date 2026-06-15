@@ -6756,12 +6756,14 @@ Then the call to action."]</div>
       #view-pipelines .pl-card-notrial { border-color:rgba(224,134,60,0.75); background:rgba(224,134,60,0.09); }
       #view-pipelines .pl-card-flag { font-size:11px; color:#e0863c; font-weight:700; margin-top:5px; }
       #view-pipelines .pl-card-wl { display:flex; gap:6px; margin-top:9px; }
-      #view-pipelines .pl-card-won, #view-pipelines .pl-card-lost {
+      #view-pipelines .pl-card-won, #view-pipelines .pl-card-abandon, #view-pipelines .pl-card-lost {
         flex:1; border-radius:7px; padding:7px; font-size:11px; font-weight:700;
         cursor:pointer; font-family:inherit; border:1px solid;
       }
       #view-pipelines .pl-card-won { background:rgba(76,199,106,0.14); border-color:var(--green); color:var(--green); }
       #view-pipelines .pl-card-won:hover { background:rgba(76,199,106,0.24); }
+      #view-pipelines .pl-card-abandon { background:rgba(90,150,224,0.12); border-color:#5a96e0; color:#5a96e0; }
+      #view-pipelines .pl-card-abandon:hover { background:rgba(90,150,224,0.22); }
       #view-pipelines .pl-card-lost { background:rgba(224,112,112,0.12); border-color:#e07070; color:#e07070; }
       #view-pipelines .pl-card-lost:hover { background:rgba(224,112,112,0.22); }
       #view-pipelines .pl-card-ptf {
@@ -16138,6 +16140,25 @@ async function _plMarkLost(oppId) {
   }
 }
 
+// Mark abandoned — sets the GHL opportunity status to abandoned.
+async function _plMarkAbandoned(oppId) {
+  if (!confirm('Mark this trial as ABANDONED?')) return;
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch(`/api/ghl/pipelines?client_id=${encodeURIComponent(CLIENT_ID)}&opportunity_id=${encodeURIComponent(oppId)}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'abandoned' }),
+    });
+    const json = await _safeJson(r);
+    if (!r.ok) throw new Error(json.error || ('HTTP ' + r.status));
+    closePipelineDrawer();
+    fetchAndRenderPipelines();
+  } catch (e) {
+    alert('Couldn’t mark abandoned: ' + e.message);
+  }
+}
+
 function _plAgeShort(iso) {
   if (!iso) return '—';
   const d = new Date(iso); if (isNaN(d.getTime())) return '—';
@@ -16194,6 +16215,7 @@ function _renderPipelineBoard() {
         ${isDone
           ? `<div class="pl-card-wl">
                <button class="pl-card-won" onclick="event.stopPropagation(); _plMarkWon('${escapeHTML(o.id)}')">Won</button>
+               <button class="pl-card-abandon" onclick="event.stopPropagation(); _plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
                <button class="pl-card-lost" onclick="event.stopPropagation(); _plMarkLost('${escapeHTML(o.id)}')">Lost</button>
              </div>`
           : (trialStarted ? `<button class="pl-card-ptf" onclick="event.stopPropagation(); _plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
@@ -16370,6 +16392,7 @@ function _plOpenCard(oppId) {
       ${_plIsDoneTrialStage(s)
         ? `<div style="display:flex;gap:8px">
              <button class="pl-d-btn primary" style="flex:1" onclick="_plMarkWon('${escapeHTML(o.id)}')">Mark won</button>
+             <button class="pl-d-btn" style="flex:1;border-color:#5a96e0;color:#5a96e0" onclick="_plMarkAbandoned('${escapeHTML(o.id)}')">Abandon</button>
              <button class="pl-d-btn" style="flex:1" onclick="_plMarkLost('${escapeHTML(o.id)}')">Mark lost</button>
            </div>`
         : (trialStarted ? `<button class="pl-d-btn primary" onclick="_plPostTrialForm('${escapeHTML(o.id)}')">Post trial form</button>` : '')}
