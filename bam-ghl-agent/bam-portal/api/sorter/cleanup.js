@@ -601,19 +601,37 @@ async function handler(req, res) {
     if (action === "search-customers") {
       const acct = client.stripe_connect_account_id;
       if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
-      const q = (body.q || "").toString().trim().replace(/["\\]/g, "");
-      if (!q) return res.status(400).json({ error: "q required" });
-      let customers = [];
-      try {
-        const r = await stripeGet(`/customers/search?query=${encodeURIComponent(`name~"${q}" OR email~"${q}"`)}&limit=10`, acct);
-        customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
-      } catch (_) {
-        // search API not available / errored → fall back to exact email lookup
-        try {
-          const r = await stripeGet(`/customers?email=${encodeURIComponent(q.toLowerCase())}&limit=10`, acct);
-          customers = (r.data || []).map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null }));
-        } catch (_2) {}
+      // Search by EVERYTHING we have on them — not just one field. Gather the
+      // member's email, parent name, athlete name, and phone (+ any manual q).
+      const clean = (v) => String(v || "").trim().replace(/["\\]/g, "");
+      const terms = [];
+      const addTerm = (v) => { v = clean(v); if (v && !terms.some(t => t.toLowerCase() === v.toLowerCase())) terms.push(v); };
+      addTerm(body.q);
+      const srow = body.staging_id ? staging.find(x => String(x.id) === String(body.staging_id)) : null;
+      let phoneDigits = "";
+      if (srow) {
+        addTerm(srow.parent_email); addTerm(srow.parent_name); addTerm(srow.athlete_name);
+        phoneDigits = String(srow.parent_phone || "").replace(/\D/g, "");
       }
+      if (!terms.length && !phoneDigits) return res.status(400).json({ error: "q or staging_id required" });
+      const searched = terms.slice();
+      const found = new Map();
+      // One combined Stripe search across email + name (+ phone).
+      try {
+        const clauses = [];
+        for (const t of terms) { clauses.push(`email~"${t}"`); clauses.push(`name~"${t}"`); }
+        if (phoneDigits) { clauses.push(`phone~"${phoneDigits.slice(-10)}"`); searched.push("phone"); }
+        if (clauses.length) {
+          const r = await stripeGet(`/customers/search?query=${encodeURIComponent(clauses.join(" OR "))}&limit=20`, acct);
+          (r.data || []).forEach(c => found.set(c.id, c));
+        }
+      } catch (_) { /* search API may 400 / be disabled — exact lookups below still run */ }
+      // Exact email lookups as a belt-and-suspenders fallback.
+      for (const t of terms) {
+        if (!t.includes("@")) continue;
+        try { const r = await stripeGet(`/customers?email=${encodeURIComponent(t.toLowerCase())}&limit=5`, acct); (r.data || []).forEach(c => found.set(c.id, c)); } catch (_) {}
+      }
+      const customers = [...found.values()].map(cu => ({ id: cu.id, name: cu.name || null, email: cu.email || null, phone: cu.phone || null }));
       // attach each customer's best sub (active-ish preferred) for context
       for (const cu of customers) {
         try {
@@ -628,7 +646,7 @@ async function handler(req, res) {
           }
         } catch (_) {}
       }
-      return res.status(200).json({ ok: true, customers });
+      return res.status(200).json({ ok: true, customers, searched });
     }
 
     // link-customer: tie an existing Stripe customer (+ their best sub/price) to
