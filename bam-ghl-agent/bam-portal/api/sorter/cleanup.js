@@ -753,6 +753,7 @@ async function handler(req, res) {
     if (action === "remove-staged") {
       const s = staging.find(x => String(x.id) === String(body.staging_id));
       if (!s) return res.status(404).json({ error: "staging row not found" });
+      const removedRow = { ...s }; delete removedRow.__link; // full snapshot for Undo
       await sb(`members_staging?id=eq.${s.id}&client_id=eq.${encodeURIComponent(clientId)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       // If the dup group is down to one row, clear its duplicate flag and
       // recompute its verdict from the notes it already carries.
@@ -769,7 +770,40 @@ async function handler(req, res) {
           body: JSON.stringify({ is_duplicate: false, match_status: status, updated_at: nowIso() }),
         });
       }
+      return res.status(200).json({ ok: true, removed_row: removedRow, counts: await flagCounts(clientId, batchId) });
+    }
+
+    // ── Undo primitives ────────────────────────────────────────────────
+    // patch-staging: set whitelisted fields on a staging row (inverse of
+    // alt-pay / connect / link by clearing what they set).
+    if (action === "patch-staging") {
+      const s = staging.find(x => String(x.id) === String(body.staging_id));
+      if (!s) return res.status(404).json({ error: "staging row not found" });
+      const allowed = new Set(["billing_mode", "offer_price_key", "stripe_customer_id", "stripe_subscription_id", "stripe_price_id", "stripe_linked", "match_status", "is_duplicate", "cleanup_notes"]);
+      const fields = (body.fields && typeof body.fields === "object") ? body.fields : {};
+      const patch = { updated_at: nowIso() };
+      for (const k of Object.keys(fields)) if (allowed.has(k)) patch[k] = fields[k];
+      await sb(`members_staging?id=eq.${s.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
       return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+    // restore-staged: re-insert a previously removed/added row (inverse of remove).
+    if (action === "restore-staged") {
+      const row = (body.row && typeof body.row === "object") ? body.row : null;
+      if (!row) return res.status(400).json({ error: "row required" });
+      const cols = ["id", "athlete_name", "parent_name", "parent_email", "parent_phone", "plan", "offer_price_key", "status", "joined_date", "stripe_customer_id", "stripe_subscription_id", "stripe_price_id", "raw", "email_norm", "match_status", "cleanup_notes", "stripe_linked", "is_duplicate", "billing_mode", "source_row"];
+      const rec = { client_id: clientId, import_batch_id: batchId };
+      for (const k of cols) if (row[k] !== undefined) rec[k] = row[k];
+      await sb(`members_staging`, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify([rec]) });
+      return res.status(200).json({ ok: true, counts: await flagCounts(clientId, batchId) });
+    }
+    // undismiss: remove a dismissal key (inverse of the deny buttons).
+    if (action === "undismiss") {
+      const key = (body.key || "").toString();
+      if (dismissed.has(key)) {
+        dismissed.delete(key);
+        await sb(`clients?id=eq.${encodeURIComponent(clientId)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ sorter_dismissals: [...dismissed] }) });
+      }
+      return res.status(200).json({ ok: true });
     }
 
     // ════════════════════════════ CHECK ════════════════════════════
