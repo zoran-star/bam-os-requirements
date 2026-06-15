@@ -18687,7 +18687,10 @@ function _sorterRenderConnect() {
             ${fact('Joined', m.joined_date)}
           </div>
           <div style="border:1px solid var(--border,#2a2a31);border-radius:11px;padding:13px 14px;background:rgba(255,255,255,0.015);">
-            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">💳 Stripe</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">💳 Stripe</div>
+              ${m.stripe_customer_id ? `<a href="https://dashboard.stripe.com/customers/${escapeHTML(m.stripe_customer_id)}" target="_blank" rel="noopener" style="flex:none;font-size:10.5px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">Open in Stripe ↗</a>` : ''}
+            </div>
             ${st ? `${fact('Sub', st.status)}${fact('Product', st.product_name)}${fact('Pays', st.amount_cents != null ? '$' + (st.amount_cents / 100).toFixed(2) + (st.interval ? ' / ' + st.interval : '') : null)}${fact('Since', st.started)}` : `<div style="font-size:12px;color:var(--text-mute,#888);">No subscription.</div>`}
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:11px 0 6px;border-top:1px dashed var(--border,#2a2a31);padding-top:9px;">Recent payments</div>
             ${charges}
