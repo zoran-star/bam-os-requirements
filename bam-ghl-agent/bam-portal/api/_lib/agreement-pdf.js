@@ -80,7 +80,7 @@ export async function renderAgreementPdf({
   y -= 24;
 
   // Parties / plan summary
-  const kv = (k, v) => { line(`${k}:  ${v || "—"}`, { size: 11, gap: 4 }); };
+  const kv = (k, v) => { line(`${k}:  ${v || "n/a"}`, { size: 11, gap: 4 }); };
   kv("Athlete", athleteName);
   kv("Parent / guardian", parentName);
   if (planLabel) kv("Plan", planLabel);
