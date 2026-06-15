@@ -292,6 +292,18 @@ async function handler(req, res) {
       if (!s) return res.status(404).json({ error: "staging row not found" });
       const acct = client.stripe_connect_account_id;
       if (!acct) return res.status(409).json({ error: "academy not connected to Stripe" });
+      // A card link puts them ON a plan — paying collects the card AND starts
+      // the subscription. So we need a price first; if none is attached, tell
+      // the UI to connect a plan before sending the link.
+      let priceId = body.price_id || s.stripe_price_id || null;
+      if (!priceId && s.offer_price_key) {
+        const rows = await sb(
+          `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}&offer_price_key=eq.${encodeURIComponent(s.offer_price_key)}` +
+          `&tier=eq.canonical&match_status=eq.confirmed&select=stripe_price_id&limit=1`
+        );
+        priceId = (Array.isArray(rows) && rows[0] && rows[0].stripe_price_id) || null;
+      }
+      if (!priceId) return res.status(200).json({ ok: true, needs_plan: true });
       const email = normEmail(s.parent_email);
       let customerId = s.stripe_customer_id;
       if (!customerId && email) {
@@ -309,12 +321,15 @@ async function handler(req, res) {
       if (customerId && customerId !== s.stripe_customer_id) {
         await sb(`members_staging?id=eq.${s.id}`, {
           method: "PATCH", headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ stripe_customer_id: customerId, billing_mode: "card", updated_at: nowIso() }),
+          body: JSON.stringify({ stripe_customer_id: customerId, stripe_price_id: priceId, billing_mode: "card", updated_at: nowIso() }),
         }).catch(() => {});
       }
       const origin = (req.headers.origin || "https://portal.byanymeansbusiness.com").replace(/\/+$/, "");
+      // mode=subscription → the checkout collects the card AND starts the sub on
+      // their price (currency comes from the price, so no missing-param error).
       const sess = await stripePost(`/checkout/sessions`, {
-        mode: "setup", customer: customerId,
+        mode: "subscription", customer: customerId,
+        "line_items[0][price]": priceId, "line_items[0][quantity]": 1,
         success_url: `${origin}/client-portal.html?card=saved`,
         cancel_url: `${origin}/client-portal.html?card=cancelled`,
       }, acct);
