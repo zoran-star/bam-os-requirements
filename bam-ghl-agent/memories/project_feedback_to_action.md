@@ -19,6 +19,23 @@ pre-chewed, ready to approve.**
 | 2 | "Build spec" → Claude writes a spec → opens a GitHub **issue** | **SHIPPED 2026-06-14** |
 | 3 | Auto-spec safe items in the digest → 📋 issue links | **SHIPPED 2026-06-14** |
 | 4 | **Auto-build**: labelled issue → Claude opens a PR → human merges | **BUILT 2026-06-15** (needs setup) |
+| 5 | **Ship Queue**: approve+ship built PRs IN the portal, never on GitHub | **BUILT 2026-06-15** |
+
+## Phase 5 — Ship Queue (built 2026-06-15)
+
+Zoran said the GitHub PR flow was too much friction ("gotta go onto GitHub n
+shit"). So approval moved INTO the staff portal — he never opens GitHub.
+
+- **Where:** Feedback tab → **🚀 Ship queue** pill (admin-only).
+- **Backend (`api/clients.js`):** `GET ?action=ship-queue` lists open PRs whose
+  branch starts `feedback/` (the auto-build branches) with title + plain-English
+  summary (PR body) + CI state (`shipChecksState` rolls up check-runs).
+  `POST ?action=ship-merge&pr=<n>` squash-merges → Vercel auto-deploys. Both
+  admin-only; inert without `GITHUB_TOKEN`/`GITHUB_REPO`. Helper `githubApi()`.
+- **Frontend:** `ShipQueuePanel` in `FeedbackView.jsx` — one card per PR
+  (summary + checks badge + "🚀 Approve & ship"). Tapping ships it; GitHub stays
+  invisible. "view diff" link is there for Coleman, ignorable by Zoran.
+- Decision (Zoran 2026-06-15): approve in the portal (not Slack, not GitHub).
 
 **Engine choice (Zoran):** 2026-06-14 = "auto-spec → ready-to-build issue".
 2026-06-15 upgraded to **also auto-build a PR** (Phase 4) via the Claude Code
