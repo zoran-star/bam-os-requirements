@@ -18675,19 +18675,23 @@ function _sorterRenderConnect() {
         <button onclick="_sorterCloseConnect()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
       </div>
       <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div>
-          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Member</div>
-          ${fact('Athlete', m.athlete_name)}
-          ${fact('Parent', m.parent_name)}
-          ${fact('Email', m.parent_email)}
-          ${fact('Phone', m.parent_phone)}
-          ${fact('Sheet plan', m.plan)}
-          ${fact('Status', m.status)}
-          ${fact('Joined', m.joined_date)}
-          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Stripe</div>
-          ${st ? `${fact('Sub', st.status)}${fact('Product', st.product_name)}${fact('Pays', st.amount_cents != null ? '$' + (st.amount_cents / 100).toFixed(2) + (st.interval ? ' / ' + st.interval : '') : null)}${fact('Since', st.started)}` : `<div style="font-size:12px;color:var(--text-mute,#888);">No subscription.</div>`}
-          <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Recent payments</div>
-          ${charges}
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="border:1px solid var(--border,#2a2a31);border-radius:11px;padding:13px 14px;background:rgba(255,255,255,0.015);">
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">📄 From your sheet (CSV)</div>
+            ${fact('Athlete', m.athlete_name)}
+            ${fact('Parent', m.parent_name)}
+            ${fact('Email', m.parent_email)}
+            ${fact('Phone', m.parent_phone)}
+            ${fact('Sheet plan', m.plan)}
+            ${fact('Status', m.status)}
+            ${fact('Joined', m.joined_date)}
+          </div>
+          <div style="border:1px solid var(--border,#2a2a31);border-radius:11px;padding:13px 14px;background:rgba(255,255,255,0.015);">
+            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:8px;">💳 Stripe</div>
+            ${st ? `${fact('Sub', st.status)}${fact('Product', st.product_name)}${fact('Pays', st.amount_cents != null ? '$' + (st.amount_cents / 100).toFixed(2) + (st.interval ? ' / ' + st.interval : '') : null)}${fact('Since', st.started)}` : `<div style="font-size:12px;color:var(--text-mute,#888);">No subscription.</div>`}
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:11px 0 6px;border-top:1px dashed var(--border,#2a2a31);padding-top:9px;">Recent payments</div>
+            ${charges}
+          </div>
         </div>
         <div>
           <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Pick the plan they're on</div>
