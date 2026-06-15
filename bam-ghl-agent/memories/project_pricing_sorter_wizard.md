@@ -7,6 +7,34 @@ metadata:
 
 # The Pricing Sorter (onboarding wizard)
 
+> **2026-06-15 — CLEANUP STEP = ONE TABLE + lots of polish (PRs #303–#335).**
+> Cleanup (step 3) is now a SINGLE table of every person — CSV members AND
+> Stripe-payers not in the CSV — columns: Member (athlete + "parent: X" +
+> email, name click → full-info popup) · Where (CSV+STRIPE / CSV ONLY /
+> STRIPE ONLY) · Price · To do (inline actions). Attention rows on top, ready
+> below. Each member row has ✕ Remove; a top-right ↩ Undo reverses the last
+> action (server primitives in cleanup.js: patch-staging, restore-staged,
+> undismiss; remove-staged returns removed_row). Full-info popup = CSV left,
+> Stripe right (all subs + recent payments) + "View customer in Stripe ↗"
+> (member-detail returns subs[], stripe_account_id, raw, parent_name).
+> Set-up-payment modal AUTO-searches Stripe on open by ALL member info
+> (email+parent name+athlete name+phone via search-customers staging_id) →
+> Connect; fallbacks card-link / pays-another-way. Card-link is now a
+> mode=SUBSCRIPTION checkout on their price (fixes "Missing param: currency";
+> needs_plan → opens plan picker first). Stripe-not-CSV scan made thorough:
+> subs reconciled per-customer (catches no-email subs), one-time scan 365d /
+> $100 floor / customer-email fallback. "No offer" only flags members who
+> actually have a price. Green LIVE-on-Stripe pill (BB→Offers) click → live
+> price details popup; amber/red → fix in Match. Prepaid set-up-monthly =
+> first live create-sub (api/sorter/setup-monthly, preview→confirm→create,
+> see [[project_coachiq_integration]]).
+> ⚠️ DEPLOY: bam-portal does NOT auto-deploy — after merging to main run
+> `cd <repo root> && VERCEL_ORG_ID=team_6wlt8XJIU73wBv6T6SgOCr7J VERCEL_PROJECT_ID=prj_QZto4RmUsKKMHDEgS3EjauhIfpMQ vercel deploy --prod --yes`
+> then HARD-REFRESH (PWA cache). main is protected → PR+merge. Verify live via
+> `curl portal.byanymeansbusiness.com/client-portal.html | grep <new string>`.
+> ⚠️ CONCURRENT EDITS: other sessions/Rosano edit client-portal.html live —
+> `git pull` before editing, commit ONLY your files.
+
 > **2026-06-12 — OFFER-CENTRIC SPLIT (PR #252).** ⭐ Everything (sales,
 > members, funnels, agents, KPIs…) is structured AROUND EACH OFFER — Training
 > offer first (Zoran, also in [[project_website_leads]]). The wizard split
