@@ -295,7 +295,7 @@ async function handler(req, res) {
       if (!ctx.isStaff && !ctx.clientIds.includes(clientId)) return res.status(403).json({ error: "forbidden" });
       const rows = await sb(
         `pricing_catalog?client_id=eq.${encodeURIComponent(clientId)}` +
-        `&offer_price_key=not.is.null&select=offer_id,offer_price_key,tier,match_status,amount_cents`
+        `&offer_price_key=not.is.null&select=offer_id,offer_price_key,tier,match_status,amount_cents,interval,currency,display_name,stripe_price_id,stripe_product_id,stripe_account_id`
       ) || [];
       return res.status(200).json({ ok: true, rows });
     } catch (e) {
