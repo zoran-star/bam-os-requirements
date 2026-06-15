@@ -6658,13 +6658,14 @@ Then the call to action."]</div>
       #ib-drawer .ib-d-sub { font-size:12px; color:var(--text-mute); margin-top:3px; }
       #ib-drawer .ib-d-close { background:none; border:none; color:var(--text-mute); cursor:pointer; font-size:22px; padding:4px 10px; }
       #ib-drawer .ib-d-thread { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:10px; }
-      #ib-drawer .ib-msg {
+      #ib-drawer .ib-msg, #pl-drawer .ib-msg {
         max-width:80%; padding:8px 12px; border-radius:14px; font-size:13px; line-height:1.45;
         word-wrap:break-word;
       }
-      #ib-drawer .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
-      #ib-drawer .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
-      #ib-drawer .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #ib-drawer .ib-msg-in,  #pl-drawer .ib-msg-in  { background:rgba(255,255,255,0.04); border:1px solid var(--border); align-self:flex-start; border-bottom-left-radius:4px; }
+      #ib-drawer .ib-msg-out, #pl-drawer .ib-msg-out { background:var(--accent); color:#0B0B0D; align-self:flex-end; border-bottom-right-radius:4px; }
+      #ib-drawer .ib-msg-meta, #pl-drawer .ib-msg-meta { font-size:10px; color:var(--text-mute); margin-top:3px; }
+      #pl-drawer .ib-msg-out .ib-msg-meta { color:rgba(11,11,13,0.55); }
       #ib-drawer .ib-d-reply { border-top:1px solid var(--border); padding:14px 20px; flex-shrink:0; }
       #ib-drawer .ib-d-reply textarea { width:100%; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:10px; font:inherit; font-size:13px; color:var(--text); resize:vertical; min-height:60px; outline:none; }
       #ib-drawer .ib-d-reply-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
@@ -16403,18 +16404,41 @@ async function _plLoadMessages() {
   }
 }
 
+// Turn GHL's message `type` (numeric code like "2" or a "TYPE_SMS" string)
+// into a human-readable channel label. Falls back to "Message" for unknowns
+// so a raw code never leaks into the UI.
+function _ghlChannelLabel(type) {
+  const t = String(type || '').trim();
+  const byNum = {
+    '1':'Call', '2':'SMS', '3':'Email', '4':'SMS', '5':'Webchat', '6':'SMS',
+    '7':'SMS', '8':'Call', '9':'Email', '10':'Voicemail', '11':'Facebook',
+    '12':'Facebook', '13':'Call', '14':'SMS', '15':'Google', '16':'Google',
+    '17':'Review', '18':'Instagram', '19':'WhatsApp', '20':'SMS', '21':'Email',
+    '22':'SMS', '23':'Email', '24':'Call', '29':'Live chat', '30':'Live chat',
+  };
+  if (byNum[t]) return byNum[t];
+  const clean = t.replace(/^TYPE_/, '').replace(/_/g, ' ').trim();
+  if (!clean) return 'Message';
+  // Title-case a leftover string label
+  return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase();
+}
+
 function _plRenderThread(messages) {
   const host = document.getElementById('pl-d-thread');
   if (!host) return;
+  const contactFirst = ((_PL_MSG && _PL_MSG.name) || '').trim().split(/\s+/)[0] || 'Them';
   const sorted = [...messages].sort((a, b) => (a.date ? new Date(a.date).getTime() : 0) - (b.date ? new Date(b.date).getTime() : 0));
   host.innerHTML = sorted.length
     ? sorted.map(m => {
         const out = (m.direction || '').toLowerCase() === 'outbound';
         const atts = _ibRenderAttachments(m.attachments);
         const hasBody = (m.body || '').trim().length > 0;
+        const sender = out ? 'You' : escapeHTML(contactFirst);
+        const channel = escapeHTML(_ghlChannelLabel(m.type));
+        const when = escapeHTML(_ibFormatDate(m.date));
         return `<div class="ib-msg ${out ? 'ib-msg-out' : 'ib-msg-in'}">
           ${hasBody ? escapeHTML(m.body) : (atts ? '' : '(no body)')}${atts}
-          <div class="ib-msg-meta">${escapeHTML(String(m.type || '').replace(/^TYPE_/, ''))} · ${escapeHTML(_ibFormatDate(m.date))}</div>
+          <div class="ib-msg-meta">${sender} · ${channel}${when ? ' · ' + when : ''}</div>
         </div>`;
       }).join('')
     : `<div style="color:var(--text-mute);font-size:13px">No messages yet — send the first one below.</div>`;
