@@ -1,4 +1,5 @@
 import { withSentryApiRoute } from "./_sentry.js";
+// redeploy marker 2026-06-15: force a fresh deploy to pick up GITHUB_TOKEN/GITHUB_REPO
 // Vercel Serverless Function — Clients (Supabase clients table + live Stripe revenue)
 // GET /api/clients               → list all clients
 // GET /api/clients?id=<uuid>     → single client
