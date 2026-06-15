@@ -291,7 +291,10 @@ async function specFeedbackToIssue(item) {
     "\n\n---",
     `_Auto-generated from portal feedback \`${item.id}\`${item.submitter_email ? ` · ${item.submitter_email}` : ""}${item.page ? ` · page ${item.page}` : ""}._`,
   ].join("");
-  const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement"];
+  // `auto-implement` triggers the Auto-build workflow (.github/workflows/
+  // auto-implement.yml): Claude implements it + opens a PR for human review.
+  // Inert until the Claude GitHub App + ANTHROPIC_API_KEY are set up.
+  const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement", "auto-implement"];
   const url = await createGithubIssue(title, body, labels);
   if (!url) return { error: "issue_not_created" };
   // Best-effort record (column may not exist yet pre-migration — don't fail).

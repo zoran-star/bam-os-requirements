@@ -18,11 +18,28 @@ pre-chewed, ready to approve.**
 | 1 | Daily AI-triaged Slack digest of open feedback | **SHIPPED 2026-06-14** |
 | 2 | "Build spec" → Claude writes a spec → opens a GitHub **issue** | **SHIPPED 2026-06-14** |
 | 3 | Auto-spec safe items in the digest → 📋 issue links | **SHIPPED 2026-06-14** |
+| 4 | **Auto-build**: labelled issue → Claude opens a PR → human merges | **BUILT 2026-06-15** (needs setup) |
 
-**Engine choice (Zoran, 2026-06-14):** "auto-spec → ready-to-build issue", NOT
-autonomous codegen. One tap (or auto for safe items) turns feedback into a
-GitHub issue with an AI-written spec; the actual build happens via Claude Code
-web on that issue. No unsupervised codegen, no auto-merge.
+**Engine choice (Zoran):** 2026-06-14 = "auto-spec → ready-to-build issue".
+2026-06-15 upgraded to **also auto-build a PR** (Phase 4) via the Claude Code
+GitHub Action — but the PR is **never auto-merged** (human approves), and you can
+open the issue/PR in Claude Code on the web to take over and edit instead.
+
+## Phase 4 — auto-build (built 2026-06-15, needs setup)
+
+- `.github/workflows/auto-implement.yml`: triggers on an issue being labelled
+  `auto-implement` → `anthropics/claude-code-action@v1` implements it on branch
+  `feedback/issue-<n>` and opens a PR (`Closes #<n>`). Never merges. If the issue
+  is too vague/large it comments instead of guessing. Scoped by the label so it
+  doesn't run on every issue; `--max-turns 30 --model claude-sonnet-4-6`.
+- The spec engine (`specFeedbackToIssue`) now adds the `auto-implement` label, so
+  every spec'd issue (manual button + Phase 3 auto-safe) auto-builds a PR.
+- **Setup REQUIRED (Zoran, one-time):** install the Claude GitHub App
+  (github.com/apps/claude) on `zoran-star/bam-os-requirements` + add repo secret
+  `ANTHROPIC_API_KEY` (Settings → Secrets and variables → Actions). Inert until
+  both exist. Slack "PR opened" notifications = the GitHub Slack app
+  (`/github subscribe zoran-star/bam-os-requirements`), not built-in.
+- Cost: ~cents per small build; bounded by max-turns + the label gate.
 
 ## Phase 2/3 — how it works (shipped)
 
