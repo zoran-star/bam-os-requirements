@@ -18,7 +18,7 @@ pre-chewed, ready to approve.**
 | 1 | Daily AI-triaged Slack digest of open feedback | **SHIPPED 2026-06-14** |
 | 2 | "Build spec" → Claude writes a spec → opens a GitHub **issue** | **SHIPPED 2026-06-14** |
 | 3 | Auto-spec safe items in the digest → 📋 issue links | **SHIPPED 2026-06-14** |
-| 4 | **Auto-build**: labelled issue → Claude opens a PR → human merges | **BUILT 2026-06-15** (needs setup) |
+| 4 | **Auto-build**: labelled issue → Claude opens a PR → human merges | **PARKED** — needs repo admin (no one has it) |
 | 5 | **Ship Queue**: approve+ship built PRs IN the portal, never on GitHub | **BUILT 2026-06-15** |
 
 ## Phase 5 — Ship Queue (built 2026-06-15)
@@ -42,7 +42,19 @@ shit"). So approval moved INTO the staff portal — he never opens GitHub.
 GitHub Action — but the PR is **never auto-merged** (human approves), and you can
 open the issue/PR in Claude Code on the web to take over and edit instead.
 
-## Phase 4 — auto-build (built 2026-06-15, needs setup)
+## Phase 4 — auto-build (PARKED 2026-06-15: needs repo admin)
+
+Decision 2026-06-15: nobody has admin on `zoran-star/bam-os-requirements`
+(Zoran can't grant Coleman admin), and installing the Claude GitHub App + adding
+the `ANTHROPIC_API_KEY` Actions secret both REQUIRE admin. So unattended
+auto-build is **parked**. The spec engine no longer adds the `auto-implement`
+label, and the workflow file (`.github/workflows/auto-implement.yml`) stays in
+the repo but dormant. **Builder = a human in Claude Code** on the spec'd issue;
+the PR lands in the Ship Queue for Zoran to approve. To enable unattended builds
+later: install the App + secret (one-time admin task) and re-add the label in
+`specFeedbackToIssue`.
+
+### (original Phase 4 design, for when it's unparked)
 
 - `.github/workflows/auto-implement.yml`: triggers on an issue being labelled
   `auto-implement` → `anthropics/claude-code-action@v1` implements it on branch
