@@ -18114,15 +18114,18 @@ function _sorterRenderStep3(host) {
     const price = m.alt_payment ? '💵 pays another way'
       : (m.price_label ? escapeHTML(m.price_label) + (m.amount_cents != null ? ' · ' + money(m.amount_cents, m.interval) : '')
         : '<span style="color:#e0a93f;">— none —</span>');
-    let todo;
+    // Remove from the list — available on every member row.
+    const removeX = `<button onclick="_sorterRemoveStaged('${sid}')" title="Remove from this list" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;border:1px solid var(--border,#2a2a31);background:transparent;color:var(--text-mute,#888);cursor:pointer;">✕ Remove</button>`;
+    let btns = '';
     if (work) {
-      let btns = '';
       if (m.suggestion) btns += fixBtn('Link ✓', `_sorterFixLink('${sid}','${escapeHTML(m.suggestion.email)}','${escapeHTML(m.suggestion.customer_id || '')}','${escapeHTML(m.suggestion.sub_id || '')}','${escapeHTML(m.suggestion.price_id || '')}')`) + denyBtn(`_sorterDenySuggestion('${sid}')`, 'Wrong person');
       if (m.no_offer) btns += fixBtn('Connect plan →', `_sorterOpenConnect('${sid}')`);
       if (m.no_payment) btns += payBtn(sid, m.athlete_name, m.parent_email);
-      if (m.is_dup_copy) btns += fixBtn('Remove copy', `_sorterRemoveStaged('${sid}')`) + denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
-      todo = `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${btns}</div>`;
-    } else todo = '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
+      if (m.is_dup_copy) btns += denyBtn(`_sorterDenyDup('${escapeHTML(String(m.dup_key || ''))}')`, 'Not a duplicate');
+    }
+    const issuesLine = work ? `<div style="font-size:10px;color:#e0a93f;font-weight:700;margin-bottom:3px;">${escapeHTML((m.issues || []).join(' · '))}</div>` : '';
+    const readyTag = work ? '' : '<span style="font-size:11px;color:#7BC47F;">ready ✓</span>';
+    const todo = `${issuesLine}<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">${readyTag}${btns}${removeX}</div>`;
     return `<tr style="border-bottom:1px solid var(--border,#2a2a31);">${nameCell(work, m.athlete_name, m.parent_name, m.parent_email, `_sorterOpenInfo('${sid}')`)}${td(where)}${td(`<span style="font-size:12px;font-weight:700;">${price}</span>`)}${td(todo)}</tr>`;
   };
 
@@ -18138,8 +18141,12 @@ function _sorterRenderStep3(host) {
   const readyRows = mem.filter(m => !m.needs_work).map(memTr).join('');
   const th = (t) => `<th style="text-align:left;padding:6px 10px;font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);font-weight:800;border-bottom:1px solid var(--border,#2a2a31);">${t}</th>`;
 
+  const undoN = (_SORTER.undo || []).length;
   host.innerHTML = `
-    <div style="font-size:12.5px;color:var(--text-mute,#888);margin-bottom:12px;">${counts.clean || 0} of ${counts.staged || 0} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work + subArr.length + prepaidArr.length} need attention</span>` : (subArr.length + prepaidArr.length ? ` · <span style="color:#e0a93f;font-weight:700;">${subArr.length + prepaidArr.length} need attention</span>` : '')}.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="font-size:12.5px;color:var(--text-mute,#888);">${counts.clean || 0} of ${counts.staged || 0} ready to promote${counts.needs_work ? ` · <span style="color:#e0a93f;font-weight:700;">${counts.needs_work + subArr.length + prepaidArr.length} need attention</span>` : (subArr.length + prepaidArr.length ? ` · <span style="color:#e0a93f;font-weight:700;">${subArr.length + prepaidArr.length} need attention</span>` : '')}.</div>
+      <button onclick="_sorterUndo()" ${undoN ? '' : 'disabled'} title="Undo the last action" style="flex:none;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid var(--border,#2a2a31);background:transparent;color:${undoN ? 'var(--text,#eee)' : 'var(--text-mute,#888)'};cursor:${undoN ? 'pointer' : 'not-allowed'};opacity:${undoN ? '1' : '0.5'};">↩ Undo${undoN ? ' (' + undoN + ')' : ''}</button>
+    </div>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>${th('Member')}${th('Where')}${th('Price')}${th('To do')}</tr></thead>
       <tbody>${attentionRows}${readyRows || ''}</tbody>
@@ -18151,7 +18158,7 @@ function _sorterRenderStep3(host) {
 }
 
 // ── Step 3 one-tap fixes — mutate staging server-side, update local state, re-render ──
-async function _sorterFixAction(action, payload, prune) {
+async function _sorterFixAction(action, payload, prune, undoFactory) {
   try {
     const token = await _mreqAuthToken();
     const r = await fetch('/api/sorter/cleanup?action=' + action, {
@@ -18166,6 +18173,7 @@ async function _sorterFixAction(action, payload, prune) {
       _SORTER.checks.counts.clean = json.counts.clean;
     }
     if (prune) prune(json);
+    if (undoFactory) { const u = undoFactory(json); if (u) _sorterPushUndo(u); }
     // keep the derived counts in sync with the pruned lists
     const ch = _SORTER.checks.checks || {};
     const cs = _SORTER.checks.counts || {};
@@ -18178,13 +18186,34 @@ async function _sorterFixAction(action, payload, prune) {
   }
 }
 
+// ── Undo stack — each action records how to reverse it; the top-right Undo
+// button pops the last and re-runs the checks. ──
+function _sorterPushUndo(entry) { if (entry) (_SORTER.undo = _SORTER.undo || []).push(entry); }
+async function _sorterUndoApi(action, body) {
+  const token = await _mreqAuthToken();
+  const r = await fetch('/api/sorter/cleanup?action=' + action, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ client_id: _aiClientId(), batch_id: _SORTER.batchId, import_batch_id: _SORTER.batchId, ...body }),
+  });
+  const j = await _safeJson(r);
+  if (!r.ok) throw new Error(_sorterErr(j.error) || ('HTTP ' + r.status));
+  return j;
+}
+async function _sorterUndo() {
+  const e = (_SORTER.undo || []).pop();
+  if (!e) return;
+  try { await _sorterUndoApi(e.action, e.body); _sorterRunChecks(); }
+  catch (err) { (_SORTER.undo = _SORTER.undo || []).push(e); alert('Undo failed: ' + _sorterErr(err)); }
+}
+
 function _sorterFixLink(stagingId, email, customerId, subId, priceId) {
   _sorterFixAction('fix-link',
     { staging_id: stagingId, matched_email: email, customer_id: customerId, sub_id: subId, price_id: priceId },
     () => {
       const l = (_SORTER.checks.checks || {}).links || {};
       l.staged_no_stripe = (l.staged_no_stripe || []).filter(x => String(x.id) !== String(stagingId));
-    });
+    },
+    () => ({ label: 'link', action: 'patch-staging', body: { staging_id: stagingId, fields: { stripe_customer_id: null, stripe_subscription_id: null, stripe_price_id: null, stripe_linked: false } } }));
 }
 
 function _sorterAddFromStripe(email, name, customerId, subId, priceId) {
@@ -18193,7 +18222,8 @@ function _sorterAddFromStripe(email, name, customerId, subId, priceId) {
     () => {
       const l = (_SORTER.checks.checks || {}).links || {};
       l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
-    });
+    },
+    (json) => json.staging_id ? ({ label: 'add member', action: 'remove-staged', body: { staging_id: json.staging_id } }) : null);
 }
 
 function _sorterRemoveStaged(stagingId) {
@@ -18202,7 +18232,10 @@ function _sorterRemoveStaged(stagingId) {
     c.duplicates = (c.duplicates || [])
       .map(g => ({ ...g, ids: g.ids.filter(id => String(id) !== String(stagingId)) }))
       .filter(g => g.ids.length > 1);
-  });
+    // also drop from the member roster so the row disappears without a re-check
+    if (Array.isArray(_SORTER.checks.members)) _SORTER.checks.members = _SORTER.checks.members.filter(m => String(m.id) !== String(stagingId));
+  },
+    (json) => json.removed_row ? ({ label: 'remove', action: 'restore-staged', body: { row: json.removed_row } }) : null);
 }
 
 // Clickable identity for Stripe-side rows — name (email), underlined; click
@@ -18378,20 +18411,20 @@ function _sorterDenySuggestion(stagingId) {
   _sorterFixAction('dismiss', { key: 'suggestion:' + stagingId }, () => {
     const l = (_SORTER.checks.checks || {}).links || {};
     (l.staged_no_stripe || []).forEach(x => { if (String(x.id) === String(stagingId)) x.suggestion = null; });
-  });
+  }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'suggestion:' + stagingId } }));
 }
 function _sorterDenyStripe(email) {
   _sorterFixAction('dismiss', { key: 'stripe:' + email }, () => {
     const l = (_SORTER.checks.checks || {}).links || {};
     l.stripe_no_member = (l.stripe_no_member || []).filter(x => x.email !== email);
-  });
+  }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'stripe:' + email } }));
 }
 function _sorterDenyPrepaid(email) {
   _sorterFixAction('dismiss', { key: 'prepaid:' + email }, () => {
     const c = _SORTER.checks.checks || {};
     c.prepaid = (c.prepaid || []).filter(x => x.email !== email);
     if (_SORTER.checks.counts) _SORTER.checks.counts.prepaid = c.prepaid.length;
-  });
+  }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'prepaid:' + email } }));
 }
 
 // Prepaid "+ Add & match plan": stage the member from their Stripe customer,
@@ -18417,6 +18450,7 @@ async function _sorterAddPrepaid(email, name, customerId) {
       _SORTER.checks.counts.prepaid = (ch.prepaid || []).length;
       if (json.counts) { _SORTER.checks.counts.staged = json.counts.staged; _SORTER.checks.counts.clean = json.counts.clean; }
     }
+    if (json.staging_id) _sorterPushUndo({ label: 'add member', action: 'remove-staged', body: { staging_id: json.staging_id } });
     _sorterRenderBody();
     if (json.staging_id) _sorterOpenConnect(json.staging_id); // → pick the offer-price
   } catch (e) {
@@ -18427,7 +18461,7 @@ function _sorterDenyDup(key) {
   _sorterFixAction('dismiss', { key: 'dup:' + key }, () => {
     const c = _SORTER.checks.checks || {};
     c.duplicates = (c.duplicates || []).filter(g => g.key !== key);
-  });
+  }, () => ({ label: 'dismiss', action: 'undismiss', body: { key: 'dup:' + key } }));
 }
 
 // ── Alternate payment: member pays outside Stripe (cash / e-transfer) ──
@@ -18438,7 +18472,7 @@ function _sorterAltPay(stagingId) {
     (l.staged_no_stripe || []).forEach(x => { if (String(x.id) === String(stagingId)) { x.alt_payment = true; x.expected = true; x.suggestion = null; } });
     ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(stagingId));
     if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
-  });
+  }, () => ({ label: 'alt payment', action: 'patch-staging', body: { staging_id: stagingId, fields: { billing_mode: null } } }));
 }
 
 // "Set up payment method" — a small modal with two clear choices: pays
@@ -18548,6 +18582,7 @@ async function _sorterLinkCustomer(stagingId, customerId, subId, priceId) {
     });
     const json = await _safeJson(r);
     if (!r.ok) throw new Error(_sorterErr(json.error) || ('HTTP ' + r.status));
+    _sorterPushUndo({ label: 'connect customer', action: 'patch-staging', body: { staging_id: stagingId, fields: { stripe_customer_id: null, stripe_subscription_id: null, stripe_price_id: null, stripe_linked: false } } });
     _sorterCloseConnect();
     // Linked — now match their plan. No offer for their price → Connect popup
     // (match an offer / create a new one); otherwise just refresh the checks.
@@ -18693,7 +18728,8 @@ function _sorterConnectApply() {
       ch.no_offer = (ch.no_offer || []).filter(x => String(x.id) !== String(sid));
       if (_SORTER.checks.counts) _SORTER.checks.counts.no_offer = (ch.no_offer || []).length;
       _sorterCloseConnect();
-    });
+    },
+    () => ({ label: 'connect plan', action: 'patch-staging', body: { staging_id: sid, fields: { offer_price_key: null } } }));
 }
 
 // Set up monthly billing for a prepaid member: preview → confirm → create a
