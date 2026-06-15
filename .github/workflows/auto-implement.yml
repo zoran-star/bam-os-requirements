@@ -42,7 +42,10 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Sonnet is the right balance for real multi-file edits; bump max-turns
           # if builds get cut off. Keep it bounded so a run can't spiral.
-          claude_args: "--max-turns 30 --model claude-sonnet-4-6"
+          # allowedTools must include Bash (+ the file tools) or the action can
+          # edit in memory but cannot run git/gh/npm to push a branch + open the
+          # PR. Safe here: this runs on an ephemeral CI runner, not a dev machine.
+          claude_args: '--max-turns 30 --model claude-sonnet-4-6 --allowedTools "Edit Write Read Glob Grep Bash"'
           prompt: |
             You are implementing a change in the BAM monorepo from a product-feedback issue.
 
