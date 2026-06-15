@@ -10650,7 +10650,7 @@ function _bbLivePill(keys) {
   setTimeout(_bbApplyLivePills, 0);
   const ks = keys.map(k => k.key).join(',');
   const amts = keys.map(k => `${k.base_cents}:${k.allin_cents}`).join(',');
-  return `<span class="bb-live-pill" data-bb-live-pill="${_bbEscapeAttr(ks)}" data-bb-live-amts="${_bbEscapeAttr(amts)}" onclick="event.stopPropagation();_bbPillFix(this)" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
+  return `<span class="bb-live-pill" data-bb-live-pill="${_bbEscapeAttr(ks)}" data-bb-live-amts="${_bbEscapeAttr(amts)}" onclick="event.stopPropagation();_bbPillClick(this)" style="display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.3px;padding:2px 8px;border-radius:999px;border:1px solid var(--border,#2a2a31);color:var(--text-mute,#888);white-space:nowrap;cursor:pointer;">Stripe…</span>`;
 }
 
 // A live amount "matches" an offer target if within 8% of it — tolerant of
@@ -10685,6 +10685,50 @@ function _bbPillFix(el) {
   openPricingSorter(1);
   _SORTER.highlightKeys = focus;
 }
+
+// Pill click: fully-live (green) → show the live Stripe price details; anything
+// missing or drifted → jump to Price Match to fix it.
+function _bbPillClick(el) {
+  if (!_BB_MATCH_HEALTH) { _bbPillFix(el); return; }
+  const { missing, drifted } = _bbPillVerdict(el);
+  if (missing.length || drifted.length) _bbPillFix(el);
+  else _bbShowLivePrice(el);
+}
+
+// Read-only popup: the LIVE (canonical) Stripe price for each plan×term on
+// this pill — amount, interval, price id, + a View-in-Stripe link.
+function _bbShowLivePrice(el) {
+  const keys = (el.getAttribute('data-bb-live-pill') || '').split(',').filter(Boolean);
+  const rows = (_BB_MATCH_HEALTH || []).filter(r => r.tier === 'canonical' && r.match_status === 'confirmed' && keys.includes(r.offer_price_key));
+  let host = document.getElementById('bb-live-price-host');
+  if (!host) { host = document.createElement('div'); host.id = 'bb-live-price-host'; document.body.appendChild(host); }
+  const money = (c, cur) => c == null ? '—' : '$' + (c / 100).toFixed(2) + (cur ? ' ' + String(cur).toUpperCase() : '');
+  const ival = (s) => s ? ' / ' + String(s).replace(/_/g, ' ') : '';
+  const rowHtml = rows.map(r => {
+    const acct = r.stripe_account_id ? r.stripe_account_id + '/' : '';
+    const url = r.stripe_product_id ? `https://dashboard.stripe.com/${acct}products/${r.stripe_product_id}` : (r.stripe_price_id ? `https://dashboard.stripe.com/${acct}prices/${r.stripe_price_id}` : null);
+    return `<div style="border:1px solid var(--border,#2a2a31);border-radius:9px;padding:11px 13px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <span style="font-size:13px;font-weight:700;">${_bbEscapeHtml(r.offer_price_key || '')}</span>
+        <span style="font-size:9.5px;font-weight:800;color:#7BC47F;border:1px solid #1f7a3d;border-radius:6px;padding:1px 6px;">● LIVE</span>
+      </div>
+      <div style="font-size:12.5px;margin-top:4px;"><b>${money(r.amount_cents, r.currency)}</b>${_bbEscapeHtml(ival(r.interval))}</div>
+      ${r.display_name ? `<div style="font-size:11px;color:var(--text-mute,#888);margin-top:2px;">${_bbEscapeHtml(r.display_name)}</div>` : ''}
+      ${r.stripe_price_id ? `<div style="font-size:10px;color:var(--text-mute,#888);font-family:'JetBrains Mono',monospace;margin-top:4px;">${_bbEscapeHtml(r.stripe_price_id)}</div>` : ''}
+      ${url ? `<a href="${_bbEscapeHtml(url)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;">View in Stripe ↗</a>` : ''}
+    </div>`;
+  }).join('') || '<div style="font-size:12px;color:var(--text-mute,#888);">No live price details found.</div>';
+  host.innerHTML = `
+    <div onclick="_bbCloseLivePrice()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:150;"></div>
+    <div role="dialog" aria-modal="true" style="position:fixed;z-index:151;top:50%;left:50%;transform:translate(-50%,-50%);width:min(440px,94vw);max-height:80vh;overflow:auto;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:15px;font-weight:800;">Live Stripe price${rows.length > 1 ? 's' : ''}</div>
+        <button onclick="_bbCloseLivePrice()" style="background:none;border:none;color:var(--text-mute,#888);font-size:20px;cursor:pointer;">×</button>
+      </div>
+      ${rowHtml}
+    </div>`;
+}
+function _bbCloseLivePrice() { const h = document.getElementById('bb-live-price-host'); if (h) h.innerHTML = ''; }
 
 function _bbApplyLivePills() {
   if (!_BB_MATCH_HEALTH) { _bbLoadMatchHealth(); return; }
