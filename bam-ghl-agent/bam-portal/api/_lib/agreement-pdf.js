@@ -119,10 +119,12 @@ export async function renderAgreementPdf({
   return await doc.save(); // Uint8Array
 }
 
-// Upload PDF bytes to the private member-files bucket. Returns the storage path.
+// Upload PDF bytes to the private member-files bucket, under the same
+// "<client>/<member>/<kind>/..." layout the staff portal's member documents
+// use (so it lists alongside manual uploads). Returns { path, size }.
 export async function uploadAgreementPdf({ sbUrl, sbKey, clientId, memberId, bytes }) {
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const path = `${clientId}/${memberId}/agreement-${stamp}.pdf`;
+  const stamp = Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  const path = `${clientId}/${memberId}/waiver/${stamp}-enrollment-agreement.pdf`;
   const r = await fetch(`${sbUrl}/storage/v1/object/member-files/${path}`, {
     method: "POST",
     headers: {
@@ -134,5 +136,5 @@ export async function uploadAgreementPdf({ sbUrl, sbKey, clientId, memberId, byt
     body: Buffer.from(bytes),
   });
   if (!r.ok) throw new Error(`Storage upload ${r.status}: ${await r.text()}`);
-  return path;
+  return { path, size: bytes.length || bytes.byteLength || 0 };
 }

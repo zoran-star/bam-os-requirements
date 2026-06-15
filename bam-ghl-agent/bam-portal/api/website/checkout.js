@@ -292,7 +292,20 @@ async function maybeAttachAgreement({ member, client, parentName, athleteName, p
       signaturePngDataUrl: agreement.signature,
       signedAtIso: agreement.signed_at || nowIso(),
     });
-    const path = await uploadAgreementPdf({ sbUrl: SB_URL, sbKey: SB_KEY, clientId, memberId: member.id, bytes });
+    const { path, size } = await uploadAgreementPdf({ sbUrl: SB_URL, sbKey: SB_KEY, clientId, memberId: member.id, bytes });
+    // Record it as a member document (kind 'waiver') so it lists in the staff
+    // member popup alongside any manual uploads, with a signed date.
+    await sb(`member_files`, {
+      method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([{
+        member_id: member.id, client_id: clientId, kind: "waiver",
+        filename: "enrollment-agreement.pdf", storage_path: path,
+        mime_type: "application/pdf", size_bytes: size,
+        signed_at: agreement.signed_at || nowIso(),
+        metadata: { source: "website-enrollment" },
+      }]),
+    });
+    // Denormalized flag on the member (also gates re-generation on retries).
     await sb(`members?id=eq.${member.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ agreement_pdf_path: path, updated_at: nowIso() }) });
     member.agreement_pdf_path = path;
     return true;
