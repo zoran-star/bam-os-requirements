@@ -11852,6 +11852,8 @@ const _bbOfferConfigs = {
           { key:'target', type:'offer_select', label:'Target offer' },
           { key:'description', type:'textarea', label:'How it works' }
         ] },
+      { key:'welcome_video', type:'file', label:'Welcome video',
+        hint:'Plays on the website confirmation page right after a trial is booked. MP4, under 50 MB.' },
       { key:'__entry_points__', type:'entry_points', label:'Entry points',
         hint:'Where leads come from — your website forms, GHL forms, calendars and funnels. Click one to connect it to a pipeline + stage.' },
       _bbCommonExtraNotes
@@ -11859,10 +11861,12 @@ const _bbOfferConfigs = {
     { id:'onboarding', label:'Onboarding', fields:[
       { key:'client_tag', type:'ghl_tag', label:'Member tag', default:'liveclient',
         hint:'The GHL tag that marks a contact as a paying member. Defaults to "liveclient" — added automatically when GHL connects and by the website onboarding flow. Members always win over lead tags in the Inbox.' },
+      // Welcome video lives in the Sales section for training (it plays on the
+      // post-trial website confirmation page), so drop it from onboarding here.
       ..._bbStdOnboarding(
         ['Parent name','Phone','Email','Emergency contact name','Emergency contact phone'],
         ['Medical / allergies','School','Grade','Goals','Experience level','Jersey size','Add custom']
-      )
+      ).filter(f => f.key !== 'welcome_video')
     ]}
   ],
 
