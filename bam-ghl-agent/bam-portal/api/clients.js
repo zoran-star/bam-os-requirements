@@ -291,10 +291,12 @@ async function specFeedbackToIssue(item) {
     "\n\n---",
     `_Auto-generated from portal feedback \`${item.id}\`${item.submitter_email ? ` · ${item.submitter_email}` : ""}${item.page ? ` · page ${item.page}` : ""}._`,
   ].join("");
-  // `auto-implement` triggers the Auto-build workflow (.github/workflows/
-  // auto-implement.yml): Claude implements it + opens a PR for human review.
-  // Inert until the Claude GitHub App + ANTHROPIC_API_KEY are set up.
-  const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement", "auto-implement"];
+  // NOTE: no `auto-implement` label — the unattended Auto-build workflow needs
+  // repo-admin to enable (Claude GitHub App + Actions secret), which we don't
+  // have. The build is done by a human in Claude Code on this issue instead; the
+  // resulting PR (branch `feedback/…`) shows up in the portal Ship Queue.
+  // Re-add the label if/when the App is installed to turn on unattended builds.
+  const labels = ["feedback", item.kind === "bug" ? "bug" : "enhancement"];
   const url = await createGithubIssue(title, body, labels);
   if (!url) return { error: "issue_not_created" };
   // Best-effort record (column may not exist yet pre-migration — don't fail).
