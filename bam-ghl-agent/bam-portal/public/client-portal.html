@@ -18309,6 +18309,13 @@ async function _sorterOpenInfo(stagingId) {
         <span style="min-width:0;">${escapeHTML(c2.date || '')}${c2.one_time ? ' · one-time' : ''}${c2.refunded ? ' · refunded' : ''}${c2.description ? ' · ' + escapeHTML(c2.description) : ''}</span>
         <span style="flex:none;font-weight:700;">$${((c2.amount_cents || 0) / 100).toFixed(2)}</span>
       </div>`).join('') : '<div style="font-size:11.5px;color:var(--text-mute,#888);">No payments found.</div>';
+    // Link to the Stripe customer dashboard (account-scoped) when we have one.
+    const acct = json.stripe_account_id ? json.stripe_account_id + '/' : '';
+    const custUrl = (json.stripe_account_id && m.stripe_customer_id)
+      ? `https://dashboard.stripe.com/${acct}customers/${m.stripe_customer_id}` : null;
+    const custLink = custUrl
+      ? `<a href="${escapeHTML(custUrl)}" target="_blank" rel="noopener" style="font-size:11px;font-weight:700;color:var(--accent,#E8C547);text-decoration:none;white-space:nowrap;">View customer in Stripe ↗</a>`
+      : '';
     host.innerHTML = `
       <div onclick="_sorterCloseConnect()" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:140;"></div>
       <div style="position:fixed;z-index:141;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,95vw);max-height:86vh;display:flex;flex-direction:column;background:var(--surface,#16161a);border:1px solid var(--border,#2a2a31);border-radius:14px;padding:18px 20px;">
@@ -18323,9 +18330,13 @@ async function _sorterOpenInfo(stagingId) {
             ${rawFacts ? `<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 6px;">Other CSV columns</div>${rawFacts}` : ''}
           </div>
           <div>
-            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:6px;">Subscriptions</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+              <span style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);">Stripe</span>
+              ${custLink}
+            </div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin-bottom:4px;">Subscriptions</div>
             ${subsHtml}
-            <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-mute,#888);margin:12px 0 4px;">Recent payments</div>
             ${chargesHtml}
           </div>
         </div>
