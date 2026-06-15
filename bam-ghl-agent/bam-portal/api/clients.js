@@ -374,6 +374,70 @@ async function cronFeedbackDigest(req, res) {
   }
 }
 
+// ── Ship Queue: portal-native approval of auto-built PRs (no GitHub for Zoran) ──
+
+async function githubApi(path, { method = "GET", body } = {}) {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPO;
+  if (!token || !repo) return { ok: false, status: 400, json: {} };
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "bam-portal-shipqueue",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, json };
+  } catch (e) {
+    return { ok: false, status: 0, json: { message: e?.message || "github fetch failed" } };
+  }
+}
+
+// Roll up a head commit's CI check-runs into one word for the UI.
+async function shipChecksState(sha) {
+  const res = await githubApi(`/commits/${sha}/check-runs`);
+  if (!res.ok) return "unknown";
+  const runs = Array.isArray(res.json?.check_runs) ? res.json.check_runs : [];
+  if (!runs.length) return "unknown";
+  if (runs.some(r => r.status !== "completed")) return "pending";
+  if (runs.some(r => ["failure", "timed_out", "cancelled", "action_required"].includes(r.conclusion))) return "failure";
+  return "success";
+}
+
+// Open PRs from the auto-build flow (branch `feedback/…`), newest first, with a
+// plain-English summary + CI state for the portal Ship Queue.
+async function listShipQueue() {
+  const res = await githubApi(`/pulls?state=open&per_page=50&sort=created&direction=desc`);
+  if (!res.ok) return [];
+  const pulls = Array.isArray(res.json) ? res.json : [];
+  const feedbackPrs = pulls.filter(p => (p.head?.ref || "").startsWith("feedback/"));
+  const out = [];
+  for (const p of feedbackPrs) {
+    out.push({
+      number: p.number,
+      title: p.title,
+      summary: (p.body || "").replace(/\r/g, "").slice(0, 800),
+      url: p.html_url,
+      branch: p.head?.ref || null,
+      created_at: p.created_at,
+      author: p.user?.login || null,
+      checks: p.head?.sha ? await shipChecksState(p.head.sha) : "unknown",
+    });
+  }
+  return out;
+}
+
+async function mergeShipPr(prNum) {
+  const res = await githubApi(`/pulls/${prNum}/merge`, { method: "PUT", body: { merge_method: "squash" } });
+  if (res.ok) return { ok: true };
+  return { ok: false, status: res.status === 0 ? 502 : res.status, error: res.json?.message || `merge failed (${res.status})` };
+}
+
 function shapeClient(row, revenue) {
   return {
     id: row.id,
@@ -1686,7 +1750,7 @@ async function handler(req, res) {
       // submit-feedback moved to the public path (no auth required).
       // list-feedback + resolve-feedback flow through staff auth, then are
       // additionally narrowed to the `admin` role inside their handlers.
-      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec"]);
+      const ADMIN_ONLY_ACTIONS = new Set(["invite-staff", "update-staff", "reset-staff-password", "create-client", "setup-account", "reset-password", "transfer-owner", "archive", "list-feedback", "resolve-feedback", "feedback-spec", "ship-queue", "ship-merge"]);
       const ANY_STAFF_OK_ACTIONS = new Set(["update-fields"]);
 
       if (ADMIN_ONLY_ACTIONS.has(action)) {
@@ -2271,6 +2335,34 @@ async function handler(req, res) {
         const result = await specFeedbackToIssue(item);
         if (result.error) return res.status(502).json({ ok: false, error: result.error });
         return res.status(200).json({ ok: true, url: result.url, created: result.created });
+      }
+
+      // ── action=ship-queue ──
+      // ADMIN-ONLY. The portal-native "Ship Queue": lists open auto-built PRs
+      // (branch `feedback/…`) with a plain-English summary + checks status, so
+      // Zoran approves shipping IN the portal and never touches GitHub.
+      if (action === "ship-queue") {
+        if (role !== "admin") return res.status(403).json({ error: "ship queue is admin-only" });
+        if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+          return res.status(200).json({ ok: true, prs: [], reason: "github_not_configured" });
+        }
+        const prs = await listShipQueue();
+        return res.status(200).json({ ok: true, prs });
+      }
+
+      // ── action=ship-merge ──
+      // ADMIN-ONLY. Approve & ship: squash-merges a feedback PR behind the
+      // scenes (→ Vercel auto-deploys). Body/query: pr=<number>.
+      if (action === "ship-merge") {
+        if (role !== "admin") return res.status(403).json({ error: "ship is admin-only" });
+        if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+          return res.status(200).json({ ok: false, reason: "github_not_configured" });
+        }
+        const prNum = parseInt(req.query.pr || req.body?.pr, 10);
+        if (!prNum) return res.status(400).json({ error: "pr (number) required" });
+        const result = await mergeShipPr(prNum);
+        if (!result.ok) return res.status(result.status || 502).json({ ok: false, error: result.error });
+        return res.status(200).json({ ok: true, merged: true, pr: prNum });
       }
 
       // ── action=resolve-feedback ──
