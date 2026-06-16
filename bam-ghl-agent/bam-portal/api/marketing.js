@@ -144,13 +144,83 @@ async function postClientSlackNotification(clientId, text, req) {
   }
 }
 
+// Direct-message a single staff member via the BAM Portal bot. Slack accepts a
+// user ID as the `channel` for chat.postMessage (opens/uses the IM). Fire-and-
+// forget; no-ops if the bot token or the user's slack_user_id is missing.
+async function postStaffSlackDM(slackUserId, text, req) {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token || !slackUserId || !text) return;
+    const portalLink = clientPortalLinkForTicket(req);
+    await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+      body: JSON.stringify({ channel: slackUserId, text: `${text}\n→ ${portalLink}`, unfurl_links: false }),
+    });
+  } catch (err) {
+    console.error("Slack DM failed:", err?.message || err);
+  }
+}
+
+// Resolve the marketing manager's (Cam's) Slack user ID for new-ticket pings.
+// Prefers an explicit env override; else looks up the staff row by email.
+// Returns null — ping silently no-ops — until a slack_user_id is on file.
+async function marketingManagerSlackId() {
+  if (process.env.MARKETING_DM_SLACK_ID) return process.env.MARKETING_DM_SLACK_ID;
+  try {
+    const email = process.env.MARKETING_MANAGER_EMAIL || "cameron@byanymeansbusiness.com";
+    const rows = await sb(`staff?email=eq.${encodeURIComponent(email)}&select=slack_user_id`);
+    return rows?.[0]?.slack_user_id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// The client's assigned manager (the "SM") — auto-owner of their marketing tickets.
+async function clientScalingManager(clientId) {
+  try {
+    const rows = await sb(`clients?id=eq.${clientId}&select=scaling_manager_id`);
+    return rows?.[0]?.scaling_manager_id || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Fire Cam a DM that a fresh marketing request landed. Safe to call unawaited.
+function pingMarketingOnNewTicket({ ticketId, academy, priority }, req) {
+  const code = String(ticketId || "").slice(0, 3).toUpperCase();
+  const pr = priority === "high" ? "⚡ HIGH priority " : "";
+  marketingManagerSlackId().then(sid => {
+    if (sid) postStaffSlackDM(sid, `🆕 New marketing request ${pr}— ${academy || "client"} [${code}]`, req);
+  });
+}
+
 async function enrichWithClient(tickets) {
   if (!tickets.length) return tickets;
   const clientIds = [...new Set(tickets.map(t => t.client_id).filter(Boolean))];
-  if (!clientIds.length) return tickets;
-  const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id`);
-  const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]));
-  return tickets.map(t => ({ ...t, client: clientMap[t.client_id] || null }));
+  const clientMap = {};
+  if (clientIds.length) {
+    const clients = await sb(`clients?id=in.(${clientIds.join(",")})&select=id,business_name,brand_data,scaling_manager_id`);
+    Object.assign(clientMap, Object.fromEntries((clients || []).map(c => [c.id, c])));
+  }
+  // Resolve the assignee name: explicit assigned_to, else the client's manager.
+  const staffIds = [...new Set([
+    ...tickets.map(t => t.assigned_to),
+    ...Object.values(clientMap).map(c => c?.scaling_manager_id),
+  ].filter(Boolean))];
+  const staffMap = {};
+  if (staffIds.length) {
+    const staff = await sb(`staff?id=in.(${staffIds.join(",")})&select=id,name`);
+    Object.assign(staffMap, Object.fromEntries((staff || []).map(s => [s.id, s.name])));
+  }
+  return tickets.map(t => {
+    const client = clientMap[t.client_id] || null;
+    const assigneeId = t.assigned_to || client?.scaling_manager_id || null;
+    return { ...t, client, assigned_to_name: assigneeId ? (staffMap[assigneeId] || null) : null };
+  });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -306,9 +376,19 @@ async function handleMarketingTickets(req, res) {
         fields: fields || {},
         files: files || [],
         messages: [],
+        // Auto-assign to the client's manager (the "SM") — owner of their tickets.
+        assigned_to: await clientScalingManager(ctx.client.id),
       }]),
     });
-    return res.status(201).json({ ticket: inserted?.[0] || null });
+    const newTicket = inserted?.[0] || null;
+    if (newTicket) {
+      pingMarketingOnNewTicket({
+        ticketId: newTicket.id,
+        academy: ctx.client.business_name,
+        priority: fields?.priority,
+      }, req);
+    }
+    return res.status(201).json({ ticket: newTicket });
   }
 
   if (req.method === "PATCH") {
@@ -499,11 +579,20 @@ async function handleMarketingTickets(req, res) {
         ticketTitle: "a marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
     } else if (action === "mark-completed") {
+      // Client gets pinged in their channel...
       postClientSlackNotification(ticket.client_id,
         `✅ Completed — Marketing [${code}]`, req);
       notifyClientPush(ticket.client_id, "ticket-complete", {
         ticketTitle: "Your marketing request", ticketId: ticket.id, view: "marketing",
       }).catch(() => {});
+      // ...and the assigned SM (else the client's manager) gets a DM.
+      (async () => {
+        const smId = ticket.assigned_to || await clientScalingManager(ticket.client_id);
+        if (!smId) return;
+        const rows = await sb(`staff?id=eq.${smId}&select=slack_user_id`);
+        const sid = rows?.[0]?.slack_user_id;
+        if (sid) postStaffSlackDM(sid, `✅ Marketing request completed — [${code}]`, req);
+      })();
     } else if (action === "cancel") {
       postClientSlackNotification(ticket.client_id,
         `❌ Cancelled — Marketing [${code}]`, req);
@@ -864,9 +953,20 @@ async function handleContentTickets(req, res) {
             files: ticket.final_files,
             messages: [initialMessage],
             originated_from_content_ticket_id: ticket.id,
+            // Auto-assign to the client's manager (the "SM").
+            assigned_to: await clientScalingManager(ticket.client_id),
           }]),
         });
-        patch.marketing_ticket_id = marketingInsert?.[0]?.id || null;
+        const spawnedId = marketingInsert?.[0]?.id || null;
+        patch.marketing_ticket_id = spawnedId;
+        // Ping Cam that a fresh marketing request just hit his board.
+        if (spawnedId) {
+          pingMarketingOnNewTicket({
+            ticketId: spawnedId,
+            academy: ctxObj.campaign_title || mktFields.campaign_title,
+            priority: mktFields.priority,
+          }, req);
+        }
       }
 
       patch.status = "completed";

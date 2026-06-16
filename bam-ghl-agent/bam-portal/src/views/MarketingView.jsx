@@ -114,6 +114,7 @@ function normalizeTicket(apiTicket) {
     id: apiTicket.id,
     academyName: apiTicket.client?.business_name || "—",
     clientWebsite: apiTicket.client?.brand_data?.website_url || "",
+    assignedSm: apiTicket.assigned_to_name || "",
     priority: priorityOf(fields),
     campaignTitle: fields.campaign_title || "",
     type: apiTicket.type,
@@ -851,6 +852,10 @@ function Card({ children, tk, style }) {
 function renderClientInfo(t, tk, onAskSm) {
   const rows = [];
   rows.push(["Client", <span style={{ fontWeight: 600 }}>{t.academyName}</span>]);
+
+  rows.push(["Assigned SM", t.assignedSm
+    ? <span>{t.assignedSm}</span>
+    : <span style={{ color: tk.textMute }}>Unassigned</span>]);
 
   rows.push(["Client site", t.clientWebsite
     ? <a href={t.clientWebsite} target="_blank" rel="noreferrer" style={{ color: tk.accent, textDecoration: "none" }}>{t.clientWebsite} ↗</a>
