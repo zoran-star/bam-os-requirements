@@ -5443,6 +5443,17 @@
         Resources
       </div>
 
+      <div class="nav-item" onclick="switchView('assets', this)">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="9" cy="9" r="2"/>
+            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+          </svg>
+        </span>
+        Assets
+      </div>
+
       <div class="nav-item" onclick="switchView('action-items', this)">
         <span class="nav-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -8267,6 +8278,18 @@ Then the call to action."]</div>
       }
     </style>
 
+    <div class="view" id="view-assets">
+      <div class="topbar">
+        <div>
+          <span class="topbar-kicker">§ Assets</span>
+          <div class="topbar-title">Assets</div>
+        </div>
+      </div>
+      <div class="content">
+        <div id="assets-content"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-action-items">
       <div class="topbar">
         <div>
@@ -8375,6 +8398,148 @@ function hapticTap(style) {
   } catch (e) { /* haptics are a nicety — never throw */ }
 }
 
+// ══════════════════════════════════════════════════════════════
+// ASSETS VIEW — per-academy brand/asset library (client_assets table +
+// client-assets bucket). One library; each image can be tagged to an offer,
+// staff member, or location (or left as a brand asset).
+// ══════════════════════════════════════════════════════════════
+let _ASSETS = [];
+let _ASSET_FILTER = 'all';
+let _ASSET_TARGETS = { offers: [], staff: [], locations: [] };
+const _ASSET_CATS = ['logo','wordmark','hero','photo','crest','icon','og','favicon','other'];
+
+function _assetUrl(path) {
+  try { return _sb.storage.from('client-assets').getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
+}
+
+async function openAssetsView() {
+  const host = document.getElementById('assets-content');
+  if (!host || !_sb || typeof CLIENT_ID === 'undefined') return;
+  host.innerHTML = '<div class="req-empty" style="padding:24px 0"><span class="req-spin"></span> Loading assets…</div>';
+  try {
+    const [assets, offers, staff, locations] = await Promise.all([
+      _sb.from('client_assets').select('*').eq('client_id', CLIENT_ID).order('created_at', { ascending: false }),
+      _sb.from('offers').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
+      _sb.from('client_users').select('id,name,email').eq('client_id', CLIENT_ID),
+      _sb.from('locations').select('id,title').eq('client_id', CLIENT_ID).order('sort_order'),
+    ]);
+    _ASSETS = assets.data || [];
+    _ASSET_TARGETS = { offers: offers.data || [], staff: staff.data || [], locations: locations.data || [] };
+    _renderAssets();
+  } catch (e) {
+    host.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load assets — ${escapeHTML(e.message || String(e))}</div>`;
+  }
+}
+
+function _assetTargetName(a) {
+  if (a.offer_id)    { const o = _ASSET_TARGETS.offers.find(x => x.id === a.offer_id);       return 'Offer · '    + escapeHTML(o ? o.title : '—'); }
+  if (a.staff_id)    { const s = _ASSET_TARGETS.staff.find(x => x.id === a.staff_id);         return 'Staff · '    + escapeHTML(s ? (s.name || s.email) : '—'); }
+  if (a.location_id) { const l = _ASSET_TARGETS.locations.find(x => x.id === a.location_id);  return 'Location · ' + escapeHTML(l ? l.title : '—'); }
+  return 'Brand';
+}
+
+function _assetMatchesFilter(a) {
+  const tagged = a.offer_id || a.staff_id || a.location_id;
+  switch (_ASSET_FILTER) {
+    case 'brand':     return !tagged;
+    case 'offers':    return !!a.offer_id;
+    case 'staff':     return !!a.staff_id;
+    case 'locations': return !!a.location_id;
+    default:          return true;
+  }
+}
+
+function _renderAssets() {
+  const host = document.getElementById('assets-content');
+  if (!host) return;
+  const pills = [['all','All'],['brand','Brand'],['offers','Offers'],['staff','Staff'],['locations','Locations']]
+    .map(([k,l]) => `<button class="res-cat-pill ${_ASSET_FILTER === k ? 'active' : ''}" onclick="_assetSetFilter('${k}')">${l}${k === 'all' ? ' (' + _ASSETS.length + ')' : ''}</button>`).join('');
+  const shown = _ASSETS.filter(_assetMatchesFilter);
+  const cards = shown.length
+    ? shown.map(_assetCard).join('')
+    : '<div class="req-empty" style="padding:24px 0;color:var(--text-mute)">No assets here yet. Use “Upload assets” above.</div>';
+  host.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:var(--gold);color:#0B0B0D;font-weight:700;font-size:13px;border-radius:6px;cursor:pointer">
+        ＋ Upload assets
+        <input type="file" accept="image/*" multiple style="display:none" onchange="_uploadAssets(this)">
+      </label>
+      <span style="font-size:12px;color:var(--text-mute)">Drag images in, then tag each to an offer, staff member, or location.</span>
+    </div>
+    <div class="res-cats" style="margin-bottom:16px">${pills}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px">${cards}</div>`;
+}
+
+function _assetCard(a) {
+  const url = _assetUrl(a.storage_path);
+  const opt = (list, val, getLabel, ph) => `<option value="">${ph}</option>` + list.map(x => `<option value="${x.id}" ${val === x.id ? 'selected' : ''}>${escapeHTML(getLabel(x))}</option>`).join('');
+  const catOpts = _ASSET_CATS.map(c => `<option value="${c}" ${a.category === c ? 'selected' : ''}>${c}</option>`).join('');
+  const sel = (field, html) => `<select onchange="_assetSetTag('${a.id}','${field}',this.value)" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 7px;font:inherit;font-size:11.5px;margin-top:5px">${html}</select>`;
+  return `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="aspect-ratio:16/10;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <img src="${escapeHTML(url)}" alt="${escapeHTML(a.alt || '')}" loading="lazy" style="max-width:100%;max-height:100%;object-fit:contain">
+      </div>
+      <div style="padding:10px 11px;display:flex;flex-direction:column;gap:2px">
+        <input value="${escapeHTML(a.label || '')}" placeholder="Label" onchange="_assetSetTag('${a.id}','label',this.value)" style="background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font:inherit;font-size:13px;font-weight:600;padding:2px 0" onfocus="this.style.borderBottomColor='var(--border)'" onblur="this.style.borderBottomColor='transparent'">
+        <div style="font-size:10.5px;color:var(--gold);font-weight:700;letter-spacing:.04em;margin:2px 0 4px">${_assetTargetName(a)}</div>
+        ${sel('category', catOpts)}
+        ${sel('offer_id',    opt(_ASSET_TARGETS.offers,    a.offer_id,    x => x.title,            'Tag to offer…'))}
+        ${sel('staff_id',    opt(_ASSET_TARGETS.staff,     a.staff_id,    x => x.name || x.email,  'Tag to staff…'))}
+        ${sel('location_id', opt(_ASSET_TARGETS.locations, a.location_id, x => x.title,            'Tag to location…'))}
+        <input value="${escapeHTML(a.alt || '')}" placeholder="Alt text (accessibility)" onchange="_assetSetTag('${a.id}','alt',this.value)" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font:inherit;font-size:11px;padding:5px 7px;margin-top:5px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <a href="${escapeHTML(url)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--text-mute);text-decoration:none">Open ↗</a>
+          <button onclick="_assetRemove('${a.id}')" style="background:none;border:none;color:var(--text-mute);font-size:11px;cursor:pointer">Remove</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function _assetSetFilter(k) { _ASSET_FILTER = k; _renderAssets(); }
+
+async function _uploadAssets(inputEl) {
+  const files = Array.from(inputEl.files || []);
+  inputEl.value = '';
+  if (!files.length || !_sb || typeof CLIENT_ID === 'undefined') return;
+  for (const file of files) {
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+      const stamp = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      const path = `${CLIENT_ID}/${stamp}-${clean}`;
+      const { error: upErr } = await _sb.storage.from('client-assets').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || 'application/octet-stream' });
+      if (upErr) throw upErr;
+      const { error: insErr } = await _sb.from('client_assets').insert({
+        client_id: CLIENT_ID, label: file.name.replace(/\.[^.]+$/, ''), category: 'photo',
+        storage_path: path, mime_type: file.type || null, size_bytes: file.size,
+      });
+      if (insErr) { await _sb.storage.from('client-assets').remove([path]).catch(() => {}); throw insErr; }
+    } catch (e) { alert("Couldn't upload " + file.name + ' — ' + (e.message || e)); }
+  }
+  await openAssetsView();
+}
+
+async function _assetSetTag(id, field, value) {
+  const patch = {}; patch[field] = (value === '' ? null : value); patch.updated_at = new Date().toISOString();
+  const a = _ASSETS.find(x => x.id === id); if (a) a[field] = patch[field];
+  try {
+    const { error } = await _sb.from('client_assets').update(patch).eq('id', id);
+    if (error) throw error;
+    _renderAssets();
+  } catch (e) { alert('Update failed: ' + (e.message || e)); }
+}
+
+async function _assetRemove(id) {
+  if (!confirm('Remove this asset?')) return;
+  const a = _ASSETS.find(x => x.id === id);
+  try {
+    if (a) await _sb.storage.from('client-assets').remove([a.storage_path]).catch(() => {});
+    const { error } = await _sb.from('client_assets').delete().eq('id', id);
+    if (error) throw error;
+    await openAssetsView();
+  } catch (e) { alert("Couldn't remove: " + (e.message || e)); }
+}
+
 function switchView(name, el) {
   // Clients without marketing have the Marketing nav greyed + click-blocked
   if (name === 'marketing' && !MARKETING_INCLUDED) return;
@@ -8421,6 +8586,8 @@ function switchView(name, el) {
   if (name === 'home') openHomeView();
 
   if (name === 'resources') openResourcesView();
+
+  if (name === 'assets') openAssetsView();
 
   // When entering Action Items, load the list
   if (name === 'action-items') fetchAndRenderActionItems();
