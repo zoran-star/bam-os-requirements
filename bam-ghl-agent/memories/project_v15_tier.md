@@ -34,7 +34,7 @@ thread, `/api/ghl/send-message` for SMS/Email + `attachments` URLs).
   view, composer (SMS/Email toggle + email subject + attachment upload to the
   `message-attachments` bucket), and **Setup** = synced sender email + phone
   (new `GET /api/ghl/inbox?action=sender-info` → GHL location phone/email).
-- **P2 (pending):** filter by pipeline + stage, filter by failed messages.
+- **P2 (done):** filter by pipeline + stage (contact→opp map from `/api/ghl/pipelines`) + filter by failed messages (`lastMessageStatus` added to the inbox API; failed = failed/undelivered/error/rejected). Toolbar pills + pipeline/stage selects; client-side filtering of the cached list.
 - **P3 (pending):** **mass send** — tag-filtered audience (hundreds) → queued,
   throttled, DND-respecting SMS/email blast following GHL's bulk rules. Its own
   subsystem (queue table + worker).

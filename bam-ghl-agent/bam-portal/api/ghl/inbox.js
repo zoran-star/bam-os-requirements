@@ -367,6 +367,7 @@ async function handler(req, res) {
       lastMessageDate:   c.lastMessageDate || c.dateUpdated || null,
       lastMessageType:   c.lastMessageType || "",
       lastMessageDirection: c.lastMessageDirection || "",
+      lastMessageStatus: String(c.lastMessageStatus || c.status || "").toLowerCase(),
       unreadCount:       c.unreadCount || 0,
       classification:    isMember ? "member" : (isLead ? "lead" : "other"),
       member: m ? { id: m.id, athlete_name: m.athlete_name, status: m.status } : null,
