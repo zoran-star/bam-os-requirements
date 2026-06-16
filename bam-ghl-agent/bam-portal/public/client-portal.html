@@ -8779,6 +8779,7 @@ function _v15ibRenderAll() {
       <select onchange="_v15ibSetPipeline(this.value)" style="${selStyle}">${pipeOpts}</select>
       ${curPipe ? `<select onchange="_v15ibSetStage(this.value)" style="${selStyle}">${stageOpts}</select>` : ''}
       <span style="flex:1"></span>
+      <button onclick="_v15ibMassSend()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 14px;font:inherit;font-size:12px;font-weight:700;cursor:pointer">✉ Mass send</button>
       <button onclick="_v15ibSetup()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 12px;font:inherit;font-size:12px;cursor:pointer">⚙ Setup</button>
     </div>
     <div id="v15ib-body"></div>`;
@@ -8929,6 +8930,96 @@ async function _v15ibSetup() {
   } catch (e) {
     body.innerHTML = `<div class="req-empty" style="padding:24px 0;color:#9a3b2f">Couldn't load sender info — ${escapeHTML(e.message || String(e))}</div>`;
   }
+}
+
+// ── Mass send (V1.5 Inbox) — tag-filtered, queued, DND-safe blast ──
+let _V15MS = { tags: [], channel: 'SMS', tag: '', pollTimer: null };
+async function _v15ibMassSend() {
+  document.body.insertAdjacentHTML('beforeend', `<div id="v15ms-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:18px" onclick="if(event.target===this)_v15msClose()">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:22px">
+      <div id="v15ms-inner"><div class="req-empty" style="padding:20px"><span class="req-spin"></span> Loading tags…</div></div>
+    </div></div>`);
+  _V15MS = { tags: [], channel: 'SMS', tag: '', pollTimer: null };
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/mass-send?action=tags&client_id=' + encodeURIComponent(CLIENT_ID), { headers: { Authorization: 'Bearer ' + token } });
+    const j = await _safeJson(r);
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    _V15MS.tags = j.tags || [];
+    _v15msForm();
+  } catch (e) {
+    const inner = document.getElementById('v15ms-inner');
+    if (inner) inner.innerHTML = `<div style="color:#9a3b2f">Couldn't load tags — ${escapeHTML(e.message || String(e))}</div><div style="text-align:right;margin-top:12px"><button onclick="_v15msClose()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:8px 16px;cursor:pointer">Close</button></div>`;
+  }
+}
+function _v15msClose() { clearTimeout(_V15MS.pollTimer); document.getElementById('v15ms-overlay')?.remove(); }
+function _v15msSetChannel(c) { _V15MS.channel = c; _v15msForm(); }
+function _v15msForm() {
+  const inner = document.getElementById('v15ms-inner'); if (!inner) return;
+  const isEmail = _V15MS.channel === 'Email';
+  const tagOpts = '<option value="">Pick a tag…</option>' + _V15MS.tags.map(t => `<option value="${escapeHTML(t.tag)}" ${_V15MS.tag === t.tag ? 'selected' : ''}>${escapeHTML(t.tag)} (${t.count})</option>`).join('');
+  inner.innerHTML = `
+    <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px">Mass ${isEmail ? 'email' : 'text'}</div>
+    <div style="font-size:12px;color:var(--text-mute);margin-bottom:16px">Sends to everyone with the chosen tag. Skips do-not-contact + anyone missing a ${isEmail ? 'email' : 'phone'}, and paces the sends to respect GHL's limits.</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button onclick="_v15msSetChannel('SMS')" style="${_v15ibPill(!isEmail)}">SMS</button>
+      <button onclick="_v15msSetChannel('Email')" style="${_v15ibPill(isEmail)}">Email</button>
+    </div>
+    <div style="font-size:10px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Audience (tag)</div>
+    <select id="v15ms-tag" onchange="_V15MS.tag=this.value" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:12px">${tagOpts}</select>
+    ${isEmail ? `<input id="v15ms-subject" placeholder="Subject" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font:inherit;font-size:13px;margin-bottom:10px">` : ''}
+    <textarea id="v15ms-body" placeholder="Message…" style="width:100%;min-height:90px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;font-size:13px;resize:vertical;margin-bottom:14px"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:10px">
+      <button onclick="_v15msClose()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:9px 16px;font:inherit;font-size:13px;cursor:pointer">Cancel</button>
+      <button id="v15ms-send" onclick="_v15msConfirm()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-size:13px;font-weight:700;cursor:pointer">Send</button>
+    </div>`;
+}
+async function _v15msConfirm() {
+  const tag = _V15MS.tag;
+  const bodyText = (document.getElementById('v15ms-body')?.value || '').trim();
+  const subject = (document.getElementById('v15ms-subject')?.value || '').trim();
+  if (!tag) { alert('Pick a tag.'); return; }
+  if (!bodyText) { alert('Type a message.'); return; }
+  if (_V15MS.channel === 'Email' && !subject) { alert('Email needs a subject.'); return; }
+  if (!confirm(`Send this ${_V15MS.channel} to everyone tagged "${tag}"?`)) return;
+  const btn = document.getElementById('v15ms-send'); if (btn) { btn.disabled = true; btn.textContent = 'Queuing…'; }
+  try {
+    const token = await _mreqAuthToken();
+    const r = await fetch('/api/mass-send?action=create&client_id=' + encodeURIComponent(CLIENT_ID), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ channel: _V15MS.channel, tag, body: bodyText, subject: _V15MS.channel === 'Email' ? subject : undefined }),
+    });
+    const j = await _safeJson(r);
+    if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+    if (!j.job_id || !j.total) { _v15msResult(`No one eligible — ${escapeHTML(j.message || '0 contacts')}`); return; }
+    _v15msProgress(j.job_id, j.total);
+  } catch (e) { alert('Failed: ' + (e.message || e)); if (btn) { btn.disabled = false; btn.textContent = 'Send'; } }
+}
+function _v15msResult(html) {
+  const inner = document.getElementById('v15ms-inner'); if (!inner) return;
+  inner.innerHTML = `<div style="text-align:center;padding:10px"><div style="font-size:15px;color:var(--text);margin-bottom:14px">${html}</div><button onclick="_v15msClose()" style="background:var(--gold);color:#0B0B0D;border:none;border-radius:8px;padding:9px 18px;font:inherit;font-weight:700;cursor:pointer">Done</button></div>`;
+}
+function _v15msProgress(jobId, total) {
+  const draw = (sent, failed, status) => {
+    const inner = document.getElementById('v15ms-inner'); if (!inner) return;
+    const done = sent + failed, pct = total ? Math.round(done / total * 100) : 0;
+    inner.innerHTML = `<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">${status === 'done' ? 'Done ✓' : 'Sending…'}</div>
+      <div style="font-size:12px;color:var(--text-mute);margin-bottom:14px">Queued ${total}. You can close this — it keeps sending in the background.</div>
+      <div style="height:8px;background:var(--bg);border:1px solid var(--border);border-radius:999px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:var(--gold);transition:width .3s"></div></div>
+      <div style="font-size:12px;color:var(--text-sub)">${sent} sent${failed ? ` · ${failed} failed` : ''} · ${total - done} left</div>
+      <div style="text-align:right;margin-top:14px"><button onclick="_v15msClose()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text-sub);padding:8px 16px;font:inherit;cursor:pointer">Close</button></div>`;
+  };
+  draw(0, 0, 'queued');
+  const poll = async () => {
+    try {
+      const token = await _mreqAuthToken();
+      const r = await fetch('/api/mass-send?action=status&job_id=' + encodeURIComponent(jobId), { headers: { Authorization: 'Bearer ' + token } });
+      const j = await _safeJson(r);
+      if (r.ok && j.job) { draw(j.job.sent || 0, j.job.failed || 0, j.job.status); if (j.job.status === 'done' || j.job.status === 'canceled') return; }
+    } catch (_) {}
+    _V15MS.pollTimer = setTimeout(poll, 4000);
+  };
+  poll();
 }
 
 // ══════════════════════════════════════════════════════════════
