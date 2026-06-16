@@ -146,6 +146,61 @@ function buildEmailMap(subs) {
   return map;
 }
 
+// Every Stripe customer that could plausibly be this staged member — matched by
+// email, name, or phone — each with its best (active-ish) sub. Powers the
+// "multiple possible customers" warning in the connect popup so staff don't
+// silently link the wrong person. `linkedId` (the customer currently tied to the
+// row) is always included and marked, even if the search misses it.
+async function gatherCandidates(acct, srow, linkedId) {
+  if (!acct || !srow) return [];
+  const clean = (v) => String(v || "").trim().replace(/["\\]/g, "");
+  const terms = [];
+  const addTerm = (v) => { v = clean(v); if (v && !terms.some(t => t.toLowerCase() === v.toLowerCase())) terms.push(v); };
+  addTerm(srow.parent_email); addTerm(srow.parent_name); addTerm(srow.athlete_name);
+  const phoneDigits = String(srow.parent_phone || "").replace(/\D/g, "");
+  const found = new Map();
+  // One combined Stripe search across email + name (+ phone).
+  try {
+    const clauses = [];
+    for (const t of terms) { clauses.push(`email~"${t}"`); clauses.push(`name~"${t}"`); }
+    if (phoneDigits) clauses.push(`phone~"${phoneDigits.slice(-10)}"`);
+    if (clauses.length) {
+      const r = await stripeGet(`/customers/search?query=${encodeURIComponent(clauses.join(" OR "))}&limit=20`, acct);
+      (r.data || []).forEach(c => found.set(c.id, c));
+    }
+  } catch (_) { /* search API may be disabled — exact email lookups still run */ }
+  // Exact email lookups as a belt-and-suspenders fallback.
+  for (const t of terms) {
+    if (!t.includes("@")) continue;
+    try { const r = await stripeGet(`/customers?email=${encodeURIComponent(t.toLowerCase())}&limit=5`, acct); (r.data || []).forEach(c => found.set(c.id, c)); } catch (_) {}
+  }
+  // Always include the currently-linked customer, even if search missed it.
+  if (linkedId && !found.has(linkedId)) {
+    try { const c = await stripeGet(`/customers/${encodeURIComponent(linkedId)}`, acct); if (c && c.id) found.set(c.id, c); } catch (_) {}
+  }
+  const customers = [...found.values()].map(cu => ({
+    id: cu.id, name: cu.name || null, email: cu.email || null, phone: cu.phone || null,
+    is_linked: !!linkedId && cu.id === linkedId,
+  }));
+  // Attach each customer's best sub (active-ish preferred) for context.
+  for (const cu of customers) {
+    try {
+      const sr = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cu.id)}&status=all&limit=5&expand[]=data.items.data.price`, acct);
+      const subs2 = sr.data || [];
+      const best = subs2.find(s2 => ACTIVEISH.has(s2.status)) || subs2[0];
+      if (best) {
+        const price = best.items && best.items.data && best.items.data[0] && best.items.data[0].price;
+        cu.sub_id = best.id; cu.status = best.status;
+        cu.price_id = price ? price.id : null;
+        cu.amount_cents = price ? price.unit_amount : null;
+      }
+    } catch (_) {}
+  }
+  // Linked first, then customers that actually have a sub, then the rest.
+  customers.sort((a, b) => (Number(b.is_linked) - Number(a.is_linked)) || ((b.sub_id ? 1 : 0) - (a.sub_id ? 1 : 0)));
+  return customers;
+}
+
 // Small bounded Levenshtein for typo'd-email suggestions ("mguirges" vs
 // "mguirgrs"). Bails early when the distance clearly exceeds `max`.
 function editDistance(a, b, max = 2) {
@@ -386,28 +441,40 @@ async function handler(req, res) {
       let stripe = null;
       let charges = [];
       let subs = [];
+      let stripeError = null;
       const cust = s.stripe_customer_id || (s.__link && s.__link.customer_id) || null;
+      const mapSub = (sub) => {
+        const item = sub.items && sub.items.data && sub.items.data[0];
+        const price = item && item.price;
+        const product = price && price.product;
+        return {
+          sub_id: sub.id, status: sub.status,
+          price_id: price ? price.id : null,
+          product_name: (product && typeof product === "object" && product.name) || null,
+          amount_cents: price ? price.unit_amount : null,
+          interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
+          started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
+          canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
+        };
+      };
       if (client.stripe_connect_account_id && cust) {
         // ALL of this customer's subs (live + past), newest-status preferred.
-        try {
-          const r = await stripeGet(`/subscriptions?customer=${encodeURIComponent(cust)}&status=all&limit=20&expand[]=data.items.data.price.product`, client.stripe_connect_account_id);
-          subs = (r.data || []).map(sub => {
-            const item = sub.items && sub.items.data && sub.items.data[0];
-            const price = item && item.price;
-            return {
-              sub_id: sub.id, status: sub.status,
-              price_id: price ? price.id : null,
-              product_name: (price && price.product && price.product.name) || null,
-              amount_cents: price ? price.unit_amount : null,
-              interval: price && price.recurring ? `${price.recurring.interval_count > 1 ? price.recurring.interval_count + " " : ""}${price.recurring.interval}` : null,
-              started: sub.created ? new Date(sub.created * 1000).toISOString().slice(0, 10) : null,
-              canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString().slice(0, 10) : null,
-            };
-          });
-          // Primary sub (the one on the staging row, else the first active-ish).
-          stripe = subs.find(x => x.sub_id === s.stripe_subscription_id)
-            || subs.find(x => ACTIVEISH.has(x.status)) || subs[0] || null;
-        } catch (_) {}
+        // Try the rich product-expanded query first; if Stripe rejects the deep
+        // expand (legacy plan_ prices, expand-depth quirks), fall back to a
+        // lighter expand, then a bare query — a real subscription must NEVER
+        // silently render as "No subscription". Capture the error if all fail.
+        const subBase = `/subscriptions?customer=${encodeURIComponent(cust)}&status=all&limit=20`;
+        for (const q of [`${subBase}&expand[]=data.items.data.price.product`, `${subBase}&expand[]=data.items.data.price`, subBase]) {
+          try {
+            const r = await stripeGet(q, client.stripe_connect_account_id);
+            subs = (r.data || []).map(mapSub);
+            stripeError = null;
+            break;
+          } catch (e2) { stripeError = (e2 && e2.message) ? e2.message : String(e2); }
+        }
+        // Primary sub (the one on the staging row, else the first active-ish).
+        stripe = subs.find(x => x.sub_id === s.stripe_subscription_id)
+          || subs.find(x => ACTIVEISH.has(x.status)) || subs[0] || null;
         try {
           const ch = await stripeGet(`/charges?customer=${encodeURIComponent(cust)}&limit=15`, client.stripe_connect_account_id);
           charges = (ch.data || []).map(c2 => ({
@@ -429,6 +496,13 @@ async function handler(req, res) {
         }
         if (best) recommendation = { key: best.key, label: best.label, diff_cents: bestD };
       }
+      // Flag ambiguous matches: every Stripe customer that could be this member,
+      // so staff can confirm the right one before connecting (the sheet email
+      // and the Stripe email don't always agree → name/phone matches surface
+      // duplicate or alternate customers).
+      let candidates = [];
+      try { candidates = await gatherCandidates(client.stripe_connect_account_id, s, cust); } catch (_) {}
+      const ambiguous = candidates.length > 1;
       return res.status(200).json({
         ok: true,
         member: {
@@ -441,6 +515,7 @@ async function handler(req, res) {
           raw: s.raw && typeof s.raw === "object" ? s.raw : null, // extra CSV columns
         },
         stripe, subs, charges, targets, recommendation,
+        stripe_error: stripeError, candidates, ambiguous,
         stripe_account_id: client.stripe_connect_account_id || null,
       });
     }
