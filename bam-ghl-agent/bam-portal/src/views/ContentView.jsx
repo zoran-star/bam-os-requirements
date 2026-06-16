@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { useIsMobile } from "../hooks/useMediaQuery";
 
 const STORAGE_BUCKET = "ticket-files";
 const STORAGE_FOLDER = "guide-cards";
 
 export default function ContentView({ tokens: tk, dark, me, session }) {
+  const isMobile = useIsMobile();
   const [mainTab, setMainTab]     = useState("tickets"); // tickets | guides
   const [guides, setGuides]       = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -113,7 +115,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   // If the user is on the Tickets tab, hand off to the dedicated component
   if (mainTab === "tickets") {
     return (
-      <div style={{ padding: "24px 28px", color: tk.text }}>
+      <div style={{ padding: isMobile ? "16px 14px" : "24px 28px", color: tk.text }}>
         {renderMainTabs()}
         <ContentTicketsTab tk={tk} session={session} me={me} />
       </div>
@@ -126,7 +128,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
   // ─────────────────── Edit view ───────────────────
   if (isEditing) {
     return (
-      <div style={{ padding: "24px 28px", color: tk.text }}>
+      <div style={{ padding: isMobile ? "16px 14px" : "24px 28px", color: tk.text }}>
         {renderMainTabs()}
         {banner && <Banner banner={banner} tk={tk} />}
         <GuideEditor
@@ -143,7 +145,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
 
   // ─────────────────── List view ───────────────────
   return (
-    <div style={{ padding: "24px 28px", color: tk.text }}>
+    <div style={{ padding: isMobile ? "16px 14px" : "24px 28px", color: tk.text }}>
       {renderMainTabs()}
       {banner && <Banner banner={banner} tk={tk} />}
 
@@ -261,6 +263,7 @@ export default function ContentView({ tokens: tk, dark, me, session }) {
 // Edit/create form
 // ─────────────────────────────────────────────────────────
 function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
+  const isMobile = useIsMobile();
   const [title, setTitle]       = useState(initial.title || "");
   const [purpose, setPurpose]   = useState(initial.purpose || "");
   const [tips, setTips]         = useState(initial.filming_tips || "");
@@ -433,15 +436,15 @@ function GuideEditor({ tk, initial, isNew, onCancel, onSave, onDelete }) {
           <div style={{ fontSize: 12, color: tk.textMute, fontStyle: "italic", padding: "6px 0" }}>No links yet. Add ones to inspiration, references, or example ads.</div>
         )}
         {links.map((l, i) => (
-          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: isMobile ? "wrap" : "nowrap" }}>
             <input
-              style={{ ...inputStyle, marginBottom: 0, flex: 2, padding: "8px 10px" }}
+              style={{ ...inputStyle, marginBottom: 0, flex: isMobile ? "1 1 100%" : 2, padding: "8px 10px" }}
               value={l.url || ""}
               onChange={e => updateLink(i, "url", e.target.value)}
               placeholder="https://example.com/inspiration"
             />
             <input
-              style={{ ...inputStyle, marginBottom: 0, flex: 1, padding: "8px 10px" }}
+              style={{ ...inputStyle, marginBottom: 0, flex: isMobile ? 1 : 1, padding: "8px 10px" }}
               value={l.label || ""}
               onChange={e => updateLink(i, "label", e.target.value)}
               placeholder="Label (optional)"
@@ -574,6 +577,7 @@ const TYPE_META_CT = {
 };
 
 function ContentTicketsTab({ tk, session, me }) {
+  const isMobile = useIsMobile();
   const [subTab, setSubTab] = useState("active"); // active | client-dependent | completed
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -694,6 +698,7 @@ function ContentTicketsTab({ tk, session, me }) {
           value={typeFilter}
           onChange={e => setTypeFilter(e.target.value)}
           style={{
+            flex: isMobile ? "1 1 45%" : "0 0 auto",
             padding: "9px 12px", fontSize: 13,
             background: tk.surfaceEl, color: tk.text,
             border: `1px solid ${tk.border}`, borderRadius: 8,
@@ -709,6 +714,7 @@ function ContentTicketsTab({ tk, session, me }) {
           value={sortOrder}
           onChange={e => setSortOrder(e.target.value)}
           style={{
+            flex: isMobile ? "1 1 45%" : "0 0 auto",
             padding: "9px 12px", fontSize: 13,
             background: tk.surfaceEl, color: tk.text,
             border: `1px solid ${tk.border}`, borderRadius: 8,
@@ -727,7 +733,7 @@ function ContentTicketsTab({ tk, session, me }) {
       </div>
 
       <div style={{
-        display: "grid",
+        display: isMobile ? "none" : "grid",
         gridTemplateColumns: "1.2fr 1.5fr 0.8fr 1fr",
         gap: 16,
         padding: "8px 16px",
@@ -753,6 +759,41 @@ function ContentTicketsTab({ tk, session, me }) {
           const academyName = t.client?.business_name || "—";
           const previewNotes = (t.notes || "").split("\n").filter(Boolean).slice(0, 1).join(" ").slice(0, 110) || "(no notes)";
           const dateStr = t.submitted_at ? new Date(t.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+          const codeChip = (
+            <span style={{
+              fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
+              color: tk.textMute, padding: "2px 6px", borderRadius: 4,
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
+            }}>{ctkCode(t.id)}</span>
+          );
+
+          // ── Mobile: stacked card (the 4-col grid is unreadable on a phone) ──
+          if (isMobile) {
+            return (
+              <div
+                key={t.id}
+                onClick={() => setSelectedId(t.id)}
+                style={{
+                  display: "flex", flexDirection: "column", gap: 6,
+                  padding: "14px 16px",
+                  borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 500, color: tk.text, fontSize: 15 }}>
+                  {codeChip}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{academyName}</span>
+                </div>
+                <div style={{ color: tk.textSub, fontSize: 13, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{previewNotes}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: tk.textMute, fontFamily: "monospace", letterSpacing: "0.05em" }}>
+                  <span>{meta.icon} {meta.label}</span>
+                  <span>·</span>
+                  <span>{dateStr}</span>
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={t.id}
@@ -771,11 +812,7 @@ function ContentTicketsTab({ tk, session, me }) {
               onMouseLeave={e => e.currentTarget.style.background = "transparent"}
             >
               <div style={{ fontWeight: 500, color: tk.text, fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{
-                  fontFamily: "monospace", fontSize: 10, letterSpacing: "0.12em",
-                  color: tk.textMute, padding: "2px 6px", borderRadius: 4,
-                  background: "rgba(255,255,255,0.04)", border: `1px solid ${tk.border}`,
-                }}>{ctkCode(t.id)}</span>
+                {codeChip}
                 <span>{academyName}</span>
               </div>
               <div style={{ color: tk.textSub, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{previewNotes}</div>
@@ -814,6 +851,7 @@ function SubTab({ label, active, onClick, tk, red }) {
 // Detail view — review raw assets, upload finals, ship
 // ─────────────────────────────────────────────────────────
 function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTicket, showBanner }) {
+  const isMobile = useIsMobile();
   const [finalsToUpload, setFinalsToUpload] = useState([]); // local File objects
   const [uploading, setUploading] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
@@ -914,17 +952,17 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
   return (
     <div>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: isMobile ? 10 : 16, marginBottom: 24, flexWrap: isMobile ? "wrap" : "nowrap" }}>
         <button onClick={onBack} style={{
           background: "transparent", border: `1px solid ${tk.border}`, color: tk.textMute,
-          width: 38, height: 38, borderRadius: 8, cursor: "pointer", fontSize: 18,
+          width: 38, height: 38, borderRadius: 8, cursor: "pointer", fontSize: 18, flexShrink: 0,
           display: "inline-flex", alignItems: "center", justifyContent: "center",
         }}>←</button>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, color: tk.textMute, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 6 }}>
             § Content · Ticket · {ctkCode(ticket.id)}
           </div>
-          <div style={{ fontSize: 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
+          <div style={{ fontSize: isMobile ? 20 : 24, fontWeight: 500, color: tk.text, letterSpacing: "-0.01em" }}>
             {meta.icon}  {meta.label}{ticket.type === "mixed" ? " bundle" : ""}
           </div>
           <div style={{ fontSize: 13, color: tk.textSub, marginTop: 4 }}>
@@ -932,7 +970,9 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
             {ctkLastActivityIso(ticket) ? ` · Last activity ${ctkFormatRelative(ctkLastActivityIso(ticket))}` : ""}
           </div>
         </div>
-        <StatusBadge ticket={ticket} tk={tk} />
+        <div style={{ flexShrink: 0, marginLeft: isMobile ? 48 : 0 }}>
+          <StatusBadge ticket={ticket} tk={tk} />
+        </div>
       </div>
 
       {/* Client inputs */}
@@ -1021,26 +1061,35 @@ function ContentTicketDetail({ tk, session, ticket, onBack, onRefetch, patchTick
         )}
       </Card>
 
-      {/* Actions */}
+      {/* Actions — full-width stacked on mobile, right-aligned row on desktop */}
       {ticket.status !== "completed" && ticket.status !== "cancelled" && (
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", flexWrap: "wrap" }}>
-          <button onClick={cancelTicket} disabled={busy} style={{
-            background: "transparent", border: `1px solid ${tk.red || "#E55"}`, color: tk.red || "#E55",
-            padding: "10px 20px", borderRadius: 8, cursor: "pointer",
-            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
-          }}>✕  Cancel</button>
-          <button onClick={() => setActionModalOpen(true)} style={{
-            background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
-            padding: "10px 20px", borderRadius: 8, cursor: "pointer",
-            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
-          }}>Request Client Action</button>
+        <div style={{
+          display: "flex", gap: 10,
+          flexDirection: isMobile ? "column" : "row",
+          justifyContent: isMobile ? "stretch" : "flex-end",
+          flexWrap: "wrap",
+        }}>
+          {/* On mobile, primary action sits on top */}
           <button onClick={() => setSendModalOpen(true)} disabled={busy || !finalsExisting.length} style={{
             background: tk.accent, color: "#0A0A0B", border: 0,
-            padding: "10px 22px", borderRadius: 8,
+            padding: "12px 22px", borderRadius: 8,
             cursor: (busy || !finalsExisting.length) ? "not-allowed" : "pointer",
             fontFamily: "inherit", fontSize: 13, fontWeight: 700,
             opacity: (busy || !finalsExisting.length) ? 0.5 : 1,
+            order: isMobile ? 0 : 3,
           }}>📤  Send to Marketing</button>
+          <button onClick={() => setActionModalOpen(true)} style={{
+            background: "transparent", border: `1px solid ${tk.border}`, color: tk.textSub,
+            padding: "12px 20px", borderRadius: 8, cursor: "pointer",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+            order: isMobile ? 1 : 2,
+          }}>Request Client Action</button>
+          <button onClick={cancelTicket} disabled={busy} style={{
+            background: "transparent", border: `1px solid ${tk.red || "#E55"}`, color: tk.red || "#E55",
+            padding: "12px 20px", borderRadius: 8, cursor: "pointer",
+            fontFamily: "inherit", fontSize: 13, fontWeight: 500,
+            order: isMobile ? 2 : 1,
+          }}>✕  Cancel</button>
         </div>
       )}
 
@@ -1160,21 +1209,24 @@ function StatusBadge({ ticket, tk }) {
 }
 
 function ClientInputs({ ticket, tk }) {
+  const isMobile = useIsMobile();
   const ctx = ticket.context || {};
   const raw = Array.isArray(ticket.raw_files) ? ticket.raw_files : [];
   const subCreatives = Array.isArray(ctx.creatives) ? ctx.creatives : null;
 
   const row = (label, value) => (
     <div key={label} style={{
-      display: "flex", alignItems: "flex-start", gap: 16,
+      display: "flex", alignItems: "flex-start",
+      flexDirection: isMobile ? "column" : "row",
+      gap: isMobile ? 4 : 16,
       padding: "10px 0",
       borderBottom: `1px solid ${tk.borderSoft || tk.border}`,
     }}>
       <div style={{
         fontSize: 10, color: tk.textMute, letterSpacing: "0.2em", textTransform: "uppercase",
-        width: 150, flexShrink: 0, paddingTop: 4,
+        width: isMobile ? "auto" : 150, flexShrink: 0, paddingTop: isMobile ? 0 : 4,
       }}>{label}</div>
-      <div style={{ flex: 1, color: tk.text, fontSize: 14, lineHeight: 1.5 }}>{value}</div>
+      <div style={{ flex: 1, minWidth: 0, color: tk.text, fontSize: 14, lineHeight: 1.5, wordBreak: "break-word" }}>{value}</div>
     </div>
   );
 
