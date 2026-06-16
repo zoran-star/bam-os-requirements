@@ -811,19 +811,21 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
   const [savingOnb, setSavingOnb] = useState(false);
   const canViewFinancials = ROLES.canViewFinancials(role);
 
-  // V2 access toggle (renamed 2026-05-27 from "onboarding_in_progress").
-  // When ON, client sees the V2 portal — currently just adds the Members
-  // tab. Everything else (BB nav, tracker, etc.) is V1 = visible to all.
-  const v2Access = !!client.v2_access;
+  // Portal tier — V1 / V1.5 / V2, mutually exclusive. Backed by two booleans:
+  // v2_access + v15_access (V1 = both false). V1.5 = no GoHighLevel, lighter
+  // than V2 (requirements still being built out). The selector posts BOTH flags
+  // so the tiers can never overlap.
+  const tier = client.v2_access ? "v2" : client.v15_access ? "v15" : "v1";
 
-  async function toggleV2Access(next) {
+  async function setTier(next) {
+    if (next === tier) return;
     setSavingOnb(true);
     const tok = session?.access_token;
     try {
       const res = await fetch(`/api/clients?action=update-fields&id=${client.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` },
-        body: JSON.stringify({ client_id: client.id, v2_access: next }),
+        body: JSON.stringify({ client_id: client.id, v2_access: next === "v2", v15_access: next === "v15" }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
@@ -902,28 +904,40 @@ function OverviewTab({ client, staffMap, tokens, role, session, onChanged }) {
 
         <div style={{
           marginTop: 14, padding: "12px 14px",
-          background: v2Access ? `${t.accent}10` : t.surfaceEl,
-          border: `1px solid ${v2Access ? t.accentBorder : t.border}`,
+          background: tier !== "v1" ? `${t.accent}10` : t.surfaceEl,
+          border: `1px solid ${tier !== "v1" ? t.accentBorder : t.border}`,
           borderRadius: 8,
         }}>
-          <label style={{
-            display: "flex", alignItems: "center", gap: 10,
-            cursor: "pointer", fontSize: 13, color: t.text,
-          }}>
-            <input
-              type="checkbox"
-              checked={v2Access}
-              disabled={savingOnb}
-              onChange={(e) => toggleV2Access(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: "pointer", accentColor: t.accent }}
-            />
-            <span style={{ fontWeight: 600 }}>V2 access</span>
-            {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace" }}>saving…</span>}
-          </label>
-          <div style={{ fontSize: 11, color: t.textMute, marginTop: 6, marginLeft: 26, lineHeight: 1.5 }}>
-            {v2Access
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 8 }}>
+            Portal tier
+            {savingOnb && <span style={{ color: t.textMute, fontSize: 11, fontFamily: "monospace", fontWeight: 400 }}>saving…</span>}
+          </div>
+          <div style={{ display: "inline-flex", border: `1px solid ${t.border}`, borderRadius: 8, overflow: "hidden" }}>
+            {[["v1", "V1"], ["v15", "V1.5"], ["v2", "V2"]].map(([k, label], i) => {
+              const on = tier === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={savingOnb}
+                  onClick={() => setTier(k)}
+                  style={{
+                    padding: "7px 18px", fontSize: 13, fontWeight: 600,
+                    cursor: savingOnb ? "default" : "pointer",
+                    border: "none", borderLeft: i ? `1px solid ${t.border}` : "none",
+                    background: on ? t.accent : "transparent",
+                    color: on ? "#0B0B0D" : t.textMute,
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, color: t.textMute, marginTop: 8, lineHeight: 1.5 }}>
+            {tier === "v2"
               ? "V2 portal: Members tab is visible (in addition to the standard V1 nav)."
-              : "V1 portal — standard nav. Members tab is hidden until V2 is flipped on."}
+              : tier === "v15"
+                ? "V1.5: no GoHighLevel, lighter than V2. May need a little manual setup/cleanup to work right. (Requirements still being built out.)"
+                : "V1 portal — standard nav (uses GoHighLevel)."}
           </div>
         </div>
 

@@ -2117,6 +2117,17 @@ async function handler(req, res) {
           patch.v2_access = v;
         }
 
+        // v15_access — V1.5 portal tier (no GoHighLevel, lighter than V2).
+        // Mutually exclusive with v2_access in the staff "Portal tier" selector,
+        // which posts both flags together.
+        if (wasSet("v15_access")) {
+          const v = body.v15_access;
+          if (typeof v !== "boolean") {
+            return res.status(400).json({ error: "v15_access must be a boolean" });
+          }
+          patch.v15_access = v;
+        }
+
         // Meta Ads onboarding-tracker flag. Staff flips this on/off — the
         // body sends a boolean, we store NOW() / NULL on the timestamp
         // column. The client-portal tracker reads it via get_onboarding_progress().
